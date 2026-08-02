@@ -55,5 +55,17 @@ internal static class ReplayTenantPolicy
     /// </para>
     /// </summary>
     public static string? StorageTenantFor(string? tenantId)
-        => IsTestTenant(tenantId) ? tenantId![ReplayTestTenantPrefix.Length..] : null;
+    {
+        if (!IsTestTenant(tenantId))
+        {
+            return null;
+        }
+
+        // Strip exactly one prefix, then reject a suffix that still carries the separator. `:` is a legal identifier
+        // character (it has to be, for the prefix itself), so a doubled label like `replay-test:replay-test:x` or an
+        // embedded `replay-test:a:b` previously derived a physical tenant still containing `:` — the very character
+        // this method exists to remove, because some stores cannot carry it.
+        string storageTenant = tenantId![ReplayTestTenantPrefix.Length..];
+        return storageTenant.Contains(':', StringComparison.Ordinal) ? null : storageTenant;
+    }
 }

@@ -17,8 +17,24 @@ internal sealed record RecoveryValidationDatasetDescriptor(
     int AttachmentMetadataCount,
     bool UsesIsolatedValidationStore)
 {
-    /// <summary>Gets the deterministic total population represented by this descriptor.</summary>
-    public int TotalVolume => SourceRecordCount + WormAuditRecordCount + GovernedCommandCount + ApprovalCount + PolicySnapshotCount + AttachmentMetadataCount;
+    /// <summary>
+    /// Gets the deterministic total population represented by this descriptor.
+    /// <para>
+    /// Checked: an unchecked sum wraps, so counts past <see cref="int.MaxValue"/> could land on a small positive total
+    /// and match the configured <c>expectedVolume</c>, validating a descriptor whose declared population is nonsense.
+    /// An <see cref="OverflowException"/> here is caught by <see cref="Validate"/> and reported as a volume mismatch.
+    /// </para>
+    /// </summary>
+    public int TotalVolume
+    {
+        get
+        {
+            checked
+            {
+                return SourceRecordCount + WormAuditRecordCount + GovernedCommandCount + ApprovalCount + PolicySnapshotCount + AttachmentMetadataCount;
+            }
+        }
+    }
 
     /// <summary>
     /// Validates the populated descriptor against the exact configured provenance, including the configured isolated
@@ -90,8 +106,18 @@ internal sealed record RecoveryValidationDatasetDescriptor(
             return $"{nameof(AttachmentMetadataCount)} must be positive.";
         }
 
-        return TotalVolume == expectedVolume
+        int totalVolume;
+        try
+        {
+            totalVolume = TotalVolume;
+        }
+        catch (OverflowException)
+        {
+            return "Dataset category counts overflow the representable population.";
+        }
+
+        return totalVolume == expectedVolume
             ? null
-            : $"Dataset volume {TotalVolume} does not match configured volume {expectedVolume}.";
+            : $"Dataset volume {totalVolume} does not match configured volume {expectedVolume}.";
     }
 }

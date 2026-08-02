@@ -166,7 +166,7 @@ public sealed class LiveProjectionRebuildDriverTests
             ValidationPartitionRef = "recovery-partition-v1",
             ControllerCapability = LiveRecoveryValidationOptions.AspireControllerCapability,
             ControllerSecret = "tier3-value",
-            PerScenarioTimeout = RecoveryTargets.MaxRto,
+            PerScenarioTimeout = TimeSpan.FromMinutes(25),
             RestorationTimeout = TimeSpan.FromSeconds(5),
             WorkflowTimeout = TimeSpan.FromHours(5),
             EvidenceDirectory = Path.GetFullPath("TestResults/live-recovery"),

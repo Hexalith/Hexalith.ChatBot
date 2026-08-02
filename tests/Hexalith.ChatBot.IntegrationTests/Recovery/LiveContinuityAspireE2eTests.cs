@@ -130,11 +130,15 @@ public sealed class LiveContinuityAspireE2eTests
                 ValidationPartitionRef = "recovery-partition-v1",
                 ControllerCapability = LiveRecoveryValidationOptions.AspireControllerCapability,
                 ControllerSecret = controllerSecret,
-                PerScenarioTimeout = RecoveryTargets.MaxRto,
+                // A reachable per-scenario budget rather than the 4-hour recovery target: nine serial scenarios plus
+                // topology margin have to fit inside WorkflowTimeout, so a 4-hour per-scenario budget was nominal and
+                // silently truncated by the outer deadline. RestorationTimeout remains the lane's measurable recovery
+                // ceiling and is published in every manifest.
+                PerScenarioTimeout = TimeSpan.FromMinutes(25),
                 RestorationTimeout = TimeSpan.FromMinutes(3),
                 WorkflowTimeout = TimeSpan.FromHours(5),
                 EvidenceDirectory = evidenceDirectory,
-                EvidenceLocator = "artifact:live-recovery-validation",
+                EvidenceLocator = EvidenceArtifactLocator(),
             };
             options.Validate().ShouldBeNull();
 
@@ -263,11 +267,6 @@ public sealed class LiveContinuityAspireE2eTests
             }
 
             scopedOutcome.ScenariosValidated.ShouldBe(ScopedOutageDependencies.All.Count);
-            scopedOutcome.Contained.ShouldBe(ScopedOutageDependencies.All.Count);
-            scopedOutcome.Breached.ShouldBe(0);
-            scopedOutcome.ScopeRecordingExceeded.ShouldBe(0);
-            scopedOutcome.Unmeasurable.ShouldBe(0);
-            scopedOutcome.Alerted.ShouldBe(0);
             int expectedEvidence = ContinuityDrillScenarios.All.Count + 1 + ScopedOutageDependencies.All.Count;
 
             // The sinks' failure path writes a SECOND report+manifest pair for a substituted Unmeasurable report, so an
@@ -316,9 +315,13 @@ public sealed class LiveContinuityAspireE2eTests
             // Retain the run's own observations beside its manifests so the release gate can be re-evaluated in a
             // separate job from a fresh process. Alert counts and sweep completion are facts only this run can see;
             // every threshold they are judged by comes from the release path's policy, not from here.
+            // Enabled mirrors the configured option rather than a literal, and the summary is written BEFORE the
+            // outcome assertions below: hand-setting it to true, then only reaching the write on a fully passing run,
+            // made the gate's `live_validation_disabled` and `latest_attempt_incomplete` branches unreachable from any
+            // real artifact. A breached sweep must still retain a summary saying so.
             LiveRecoveryValidationAttemptSummary summary = new()
             {
-                Enabled = true,
+                Enabled = options.Enabled,
                 RunId = runId,
                 StartedAtUtc = attemptStartedAtUtc,
                 CompletedAtUtc = attemptCompletedAtUtc,
@@ -331,8 +334,16 @@ public sealed class LiveContinuityAspireE2eTests
                     cancellationToken)
                 .ConfigureAwait(true);
 
+            // Asserted only after the summary is durable, so a breached sweep still leaves retained evidence for the
+            // independent gate to reject rather than failing here with nothing written.
+            scopedOutcome.Contained.ShouldBe(ScopedOutageDependencies.All.Count);
+            scopedOutcome.Breached.ShouldBe(0);
+            scopedOutcome.ScopeRecordingExceeded.ShouldBe(0);
+            scopedOutcome.Unmeasurable.ShouldBe(0);
+            scopedOutcome.Alerted.ShouldBe(0);
+
             LiveRecoveryValidationEvidenceAttempt attempt = new(
-                Enabled: true,
+                Enabled: options.Enabled,
                 RunId: runId,
                 StartedAtUtc: attemptStartedAtUtc,
                 CompletedAtUtc: attemptCompletedAtUtc,
@@ -353,7 +364,10 @@ public sealed class LiveContinuityAspireE2eTests
                     ConfiguredProjectionDatasets: [options.DatasetRef],
                     TargetDeviationsBlockRelease: true,
                     RequiredDriverMode: RecoveryValidationEvidenceManifest.LiveDriverMode,
-                    MaximumEvidenceAge: options.MaximumEvidenceAge),
+                    MaximumEvidenceAge: options.MaximumEvidenceAge,
+                    ExpectedDatasetVersion: options.DatasetVersion,
+                    MinimumDatasetVolume: options.DatasetVolume,
+                    MaximumMeasurableRecoveryCeilingSeconds: options.RestorationTimeout.TotalSeconds),
                 DateTimeOffset.UtcNow);
             gate.IsStopShip.ShouldBeFalse(string.Join(',', gate.StopShipReasons));
             gate.TargetDeviationReasons.ShouldBeEmpty();
@@ -362,6 +376,18 @@ public sealed class LiveContinuityAspireE2eTests
         {
             await application.DisposeAsync().ConfigureAwait(true);
         }
+    }
+
+    /// <summary>
+    /// Returns the locator naming the workflow artifact this run's evidence is actually uploaded as. It was a literal
+    /// (<c>artifact:live-recovery-validation</c>) that matched neither uploaded artifact name, so every retained
+    /// manifest pointed a reviewer at nothing; <see cref="RecoveryValidationEvidenceManifest.IsSafeArtifactLocator"/>
+    /// is a syntax check and cannot catch that.
+    /// </summary>
+    private static string EvidenceArtifactLocator()
+    {
+        string? configured = Environment.GetEnvironmentVariable("HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT");
+        return $"artifact:{(string.IsNullOrWhiteSpace(configured) ? "live-recovery-validation-evidence" : configured.Trim())}";
     }
 
     private static void RequireTier3Runtime()

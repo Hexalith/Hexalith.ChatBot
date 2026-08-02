@@ -4,10 +4,18 @@ namespace Hexalith.ChatBot.Server.Audit;
 internal static class LiveRecoveryValidationEvidenceGate
 {
     /// <summary>
-    /// The measurement key bounded by the harness restoration budget, and therefore the only one whose target can
-    /// exceed what a lane is structurally able to measure.
+    /// The measurement keys whose targets the harness <b>restoration budget</b> actually bounds, and therefore the only
+    /// ones for which a target above <see cref="RecoveryValidationEvidenceManifest.MeasurableRecoveryCeilingSeconds"/>
+    /// is a real limit on what the pass may be cited for.
+    /// <para>
+    /// Both are recovery-duration targets: the lane cancels a recovery that outruns its restoration budget, so a slower
+    /// one converts to <c>unmeasurable</c> rather than <c>missed</c>. RPO is a data-loss window and NFR41
+    /// scope-recording latency is measured <i>during</i> the outage — neither is bounded by how long restoration is
+    /// allowed to take, so comparing them against the restoration ceiling emitted a category error on every passing run.
+    /// </para>
     /// </summary>
-    private const string RecoveryTimeMeasurementKey = "rto";
+    private static readonly IReadOnlySet<string> RestorationBoundedMeasurementKeys =
+        new HashSet<string>(StringComparer.Ordinal) { "rto", "rebuild-duration" };
 
 
     /// <summary>Returns a stop-ship decision for anything short of a valid latest three-job evidence attempt.</summary>
@@ -105,11 +113,40 @@ internal static class LiveRecoveryValidationEvidenceGate
                 stopShip.Add("unknown_live_job:evidence_rejected");
             }
 
-            // Without this the gate cannot tell a live Tier-3 run from a scripted fake: every other field a fake
-            // produces is structurally identical to a real one.
+            // Rejects a manifest naming a non-live mode. Note this is NOT proof of a live run: the sink declares the
+            // token rather than deriving it from the driver, so the anti-fake weight sits in the commit, dataset and
+            // volume anchoring below, which the release path supplies and the run cannot choose.
             if (!string.Equals(manifest.DriverMode, policy.RequiredDriverMode, StringComparison.Ordinal))
             {
                 stopShip.Add($"{SafeJob(manifest.JobId)}:driver_mode_not_live");
+            }
+
+            // Cross-manifest coherence proves the manifests agree with each other, not that they describe the subject
+            // the release path expects. Without these the run still declared how much it had exercised and which tree
+            // it came from: a one-record dataset, or evidence from an unrelated commit, satisfied the gate.
+            if (policy.ExpectedDatasetVersion is { } expectedDatasetVersion &&
+                !string.Equals(manifest.DatasetVersion, expectedDatasetVersion, StringComparison.Ordinal))
+            {
+                stopShip.Add($"{SafeJob(manifest.JobId)}:dataset_version_unexpected");
+            }
+
+            if (policy.MinimumDatasetVolume > 0 && manifest.DatasetVolume < policy.MinimumDatasetVolume)
+            {
+                stopShip.Add($"{SafeJob(manifest.JobId)}:dataset_volume_below_minimum");
+            }
+
+            if (policy.RequiredRepositoryCommit is { } requiredCommit &&
+                !string.Equals(manifest.RepositoryCommit, requiredCommit, StringComparison.OrdinalIgnoreCase))
+            {
+                stopShip.Add($"{SafeJob(manifest.JobId)}:repository_commit_unexpected");
+            }
+
+            // An inflated ceiling silences the claim-limitation channel, so the release path bounds what the run may
+            // claim it was able to measure.
+            if (policy.MaximumMeasurableRecoveryCeilingSeconds > 0 &&
+                manifest.MeasurableRecoveryCeilingSeconds > policy.MaximumMeasurableRecoveryCeilingSeconds)
+            {
+                stopShip.Add($"{SafeJob(manifest.JobId)}:measurable_ceiling_overstated");
             }
 
             // A matching RunId is not proof of freshness. Without bounding each manifest against both the attempt
@@ -219,6 +256,61 @@ internal static class LiveRecoveryValidationEvidenceGate
             _ => new Dictionary<string, double>(StringComparer.Ordinal),
         };
 
+    /// <summary>
+    /// Returns every assertion name a job's manifest must carry. Absence is stop-ship: a manifest that simply omits
+    /// <c>tenant-isolation-preserved</c> must not pass because nothing looked for it.
+    /// </summary>
+    internal static IReadOnlyList<string> RequiredAssertionsFor(string jobId)
+        => jobId switch
+        {
+            LiveRecoveryValidationJobs.Continuity =>
+            [
+                "cleanup-complete", "data-loss-absent", "fault-observed", "recovery-observed",
+                "state-reconstructable", "tenant-isolation-preserved", "unauthorized-mutation-absent", "measurable",
+            ],
+            LiveRecoveryValidationJobs.ProjectionRebuild =>
+            [
+                "cleanup-complete", "duration-within-target", "immutable-source-only",
+                "mailbox-reingestion-absent", "structurally-equivalent", "tenant-isolation-preserved",
+            ],
+            LiveRecoveryValidationJobs.ScopedOutage =>
+            [
+                "cleanup-complete", "fault-observed", "recovery-observed", "independent-control-succeeded",
+                "control-tenant-isolated", "scope-recorded-within-target", "scope-contained",
+                "cross-tenant-leakage-absent", "unauthorized-mutation-absent", "silent-data-loss-absent",
+                "inflight-items-recoverable", "duplicate-side-effect-absent",
+            ],
+            _ => [],
+        };
+
+    /// <summary>
+    /// Returns the subset of <see cref="RequiredAssertionsFor"/> whose falsity is a stop-ship structural or safety
+    /// breach. Deliberately excludes <c>duration-within-target</c> and <c>scope-recorded-within-target</c>, which are
+    /// measurable target misses and stay in the deviation channel per Task 6; <c>cleanup-complete</c>, which keeps its
+    /// own <c>{job}:cleanup_incomplete</c> code; and <c>data-loss-absent</c>/<c>structurally-equivalent</c>/
+    /// <c>scope-contained</c>, which are already routed through <see cref="IsStructuralBreach"/>.
+    /// </summary>
+    internal static IReadOnlyList<string> SafetyAssertionsFor(string jobId)
+        => jobId switch
+        {
+            LiveRecoveryValidationJobs.Continuity =>
+            [
+                "fault-observed", "recovery-observed", "state-reconstructable",
+                "tenant-isolation-preserved", "unauthorized-mutation-absent", "measurable",
+            ],
+            LiveRecoveryValidationJobs.ProjectionRebuild =>
+            [
+                "immutable-source-only", "mailbox-reingestion-absent", "tenant-isolation-preserved",
+            ],
+            LiveRecoveryValidationJobs.ScopedOutage =>
+            [
+                "fault-observed", "recovery-observed", "independent-control-succeeded", "control-tenant-isolated",
+                "cross-tenant-leakage-absent", "unauthorized-mutation-absent", "silent-data-loss-absent",
+                "inflight-items-recoverable", "duplicate-side-effect-absent",
+            ],
+            _ => [],
+        };
+
     private static void EvaluateJob(
         LiveRecoveryValidationEvidenceAttempt attempt,
         IReadOnlyList<RecoveryValidationEvidenceManifest> allEvidence,
@@ -288,11 +380,12 @@ internal static class LiveRecoveryValidationEvidenceGate
                 // Not a breach and not a deviation: the run met the target it could measure. It is a limit on what the
                 // pass may be cited as evidence for, and it travels with the decision so nobody has to infer it.
                 //
-                // This applies to every key whose canonical target exceeds the lane's reachable budget, not only the
-                // recovery-time key. The projection-rebuild job is measured against the same 4-hour target inside the
-                // same bounded lane, so scoping the disclosure to `rto` alone let an NFR57 pass be cited for a target
-                // the run could never have missed, with no limitation recorded at all.
-                if (canonicalTarget > manifest.MeasurableRecoveryCeilingSeconds)
+                // Scoped to the keys the restoration budget genuinely bounds. The projection-rebuild job is measured
+                // against the same 4-hour target inside the same bounded lane, so restricting this to `rto` let an
+                // NFR57 pass be cited for a target the run could never have missed; widening it to EVERY key was the
+                // opposite error, judging RPO and scope-recording latency against a budget that does not bound them.
+                if (RestorationBoundedMeasurementKeys.Contains(key) &&
+                    canonicalTarget > manifest.MeasurableRecoveryCeilingSeconds)
                 {
                     claimLimitations.Add($"{jobId}:{key}:target_exceeds_measurable_ceiling");
                 }
@@ -301,6 +394,38 @@ internal static class LiveRecoveryValidationEvidenceGate
             if (manifest.MeasurementsSeconds.Keys.Any(key => !manifest.AllowedTargetsSeconds.ContainsKey(key)))
             {
                 stopShip.Add($"{jobId}:measurement_target_missing");
+            }
+
+            // A key outside the canonical vocabulary carries an allowance nothing anchors, so the run would be
+            // declaring its own bar for it. The canonical set is closed; anything else is rejected rather than ignored.
+            if (manifest.MeasurementsSeconds.Keys.Any(key => !canonicalTargets.ContainsKey(key)))
+            {
+                stopShip.Add($"{jobId}:non_canonical_measurement_key");
+            }
+
+            // Assertion NAMES fail closed on absence only if something reads them. The gate previously consulted six
+            // of the twenty the sink writes, so `fault-observed: false` beside verdict `met` passed with no reason
+            // code — a driver regression that never injected the fault was indistinguishable from a clean drill.
+            //
+            // Every name below is structural or an NFR57/NFR59 safety invariant, never a measurable target miss:
+            // Task 6 defines the deviation bucket exhaustively as RPO/RTO, rebuild duration and scope-recording
+            // latency, and all three are measurement keys handled above. `duration-within-target` and
+            // `scope-recorded-within-target` therefore stay in the deviation channel via IsTargetDeviation, and
+            // `data-loss-absent`/`structurally-equivalent`/`scope-contained` stay in IsStructuralBreach.
+            foreach (string assertionName in RequiredAssertionsFor(jobId))
+            {
+                if (!manifest.Assertions.ContainsKey(assertionName))
+                {
+                    stopShip.Add($"{jobId}:{assertionName}:assertion_missing");
+                }
+            }
+
+            foreach (string assertionName in SafetyAssertionsFor(jobId))
+            {
+                if (manifest.Assertions.TryGetValue(assertionName, out bool passed) && !passed)
+                {
+                    stopShip.Add($"{jobId}:{assertionName}:assertion_failed");
+                }
             }
 
             bool unmeasurable = IsUnmeasurable(jobId, manifest.Verdict);

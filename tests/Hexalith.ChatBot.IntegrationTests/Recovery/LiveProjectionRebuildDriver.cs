@@ -4,6 +4,8 @@ using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 
+using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Projections;
@@ -95,7 +97,7 @@ internal sealed class LiveProjectionRebuildDriver(
         Exception? primaryFailure = null;
         try
         {
-            await ProjectPartitionAsync(
+            await RebuildPartitionThroughRealHandlerAsync(
                 readModelStore,
                 freshPartitionTenant,
                 sources,
@@ -117,7 +119,7 @@ internal sealed class LiveProjectionRebuildDriver(
                 dataset.ProjectionSchemaVersion,
                 dataset.ProjectionSchemaVersion,
                 new RecoveryValidationExecutionAssertions(
-                    CleanupComplete: true,
+                    CleanupComplete: false, // patched below with the cleanup step's real, independently observed outcome
                     FaultObserved: false,
                     RecoveryObserved: rebuilt.Count > 0,
                     IndependentControlSucceeded: false,
@@ -137,10 +139,12 @@ internal sealed class LiveProjectionRebuildDriver(
         }
 
         Exception? cleanupFailure = null;
+        bool cleanupComplete = false;
         try
         {
-            await CleanupPartitionAsync(readModelEraser, freshKeys, options.RestorationTimeout, cancellationToken)
+            await CleanupPartitionAsync(readModelEraser, freshKeys, options.RestorationTimeout)
                 .ConfigureAwait(false);
+            cleanupComplete = true;
         }
         catch (Exception exception)
         {
@@ -165,7 +169,9 @@ internal sealed class LiveProjectionRebuildDriver(
             ExceptionDispatchInfo.Capture(primaryFailure).Throw();
         }
 
-        return result ?? throw new InvalidOperationException("Projection rebuild completed without a measurement.");
+        ProjectionRebuildMeasurement measurement = result
+            ?? throw new InvalidOperationException("Projection rebuild completed without a measurement.");
+        return measurement with { ExecutionAssertions = measurement.ExecutionAssertions! with { CleanupComplete = cleanupComplete } };
     }
 
     /// <summary>
@@ -226,6 +232,83 @@ internal sealed class LiveProjectionRebuildDriver(
                 .ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Rebuilds the fresh partition by reconstructing each immutable source into a <see cref="MailboxMessageIntakeCaptured"/>
+    /// event and replaying it through the real <see cref="AssociationProjectionHandler"/> — the same production code that
+    /// turns a captured mailbox event into a <see cref="ProjectConversationSourceEmailView"/> — instead of copying the
+    /// pre-existing view verbatim. A real handler regression (or a deliberately mutated reconstruction) is therefore a
+    /// reachable divergence rather than a tautology of the same object compared against itself.
+    /// </summary>
+    private static async Task RebuildPartitionThroughRealHandlerAsync(
+        IReadModelStore store,
+        string partitionTenant,
+        IReadOnlyList<ProjectConversationSourceEmailView> sources,
+        IReadOnlyList<WormAuditChainRecord> auditRecords,
+        CancellationToken cancellationToken)
+    {
+        AssociationProjectionHandler handler = new(
+            new ReadModelAssociationProjectionStore(store),
+            new SystemClock(),
+            new ReadModelProjectConversationProjectionStore(store));
+        foreach (ProjectConversationSourceEmailView source in sources)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            AssociationProjectionHandler.ProjectionOutcome outcome = await handler
+                .HandleAsync(
+                    ReconstructCapturedEvent(source),
+                    partitionTenant,
+                    source.SourceVersion,
+                    source.CorrelationId,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (outcome != AssociationProjectionHandler.ProjectionOutcome.Applied)
+            {
+                throw new InvalidOperationException(
+                    "The real projection handler ignored a reconstructed rebuild source instead of applying it.");
+            }
+        }
+
+        var governedStore = new ReadModelGovernedOperationViewStore(store);
+        foreach (WormAuditChainRecord auditRecord in auditRecords)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await governedStore
+                .SaveAsync(ToGovernedOperationView(partitionTenant, auditRecord), cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Reverses the metadata-only projection back into the captured-event shape the real handler expects. Sender,
+    /// recipients, and attachment content are never retained by the redacted immutable view, so reconstruction uses
+    /// safe placeholders for those fields — the fields the story's structural digest and equivalence checks actually
+    /// compare (schema version, source version, provenance, redaction state, retention class) all round-trip exactly.
+    /// </summary>
+    private static MailboxMessageIntakeCaptured ReconstructCapturedEvent(ProjectConversationSourceEmailView source)
+        => new(
+            source.IntakeId,
+            source.SourceProviderMessageId,
+            source.InternetMessageId ?? string.Empty,
+            source.SourceConversationId,
+            source.SourceThreadId,
+            source.SourceMailboxId,
+            new MailboxParticipantIdentity("rebuild-reconstruction@invalid", DisplayName: null),
+            [],
+            source.SourceReceivedAtUtc,
+            source.SourceSentAtUtc,
+            source.SourceCreatedAtUtc,
+            [],
+            source.SourceTimezone,
+            "rebuild-reconstruction",
+            source.SourceProvenance,
+            "rebuild-reconstruction-kernel-v1",
+            source.RedactionState,
+            source.RetentionClass,
+            SchemaVersion: 1,
+            source.Authenticity,
+            source.DelegatedSender,
+            source.ExternalSender);
 
     private static async Task<IReadOnlyList<ProjectionResourceDigest>> ReadSnapshotAsync(
         IReadModelStore store,
@@ -324,11 +407,12 @@ internal sealed class LiveProjectionRebuildDriver(
     private static async Task CleanupPartitionAsync(
         IReadModelConditionalEraser eraser,
         IReadOnlyList<string> keys,
-        TimeSpan timeout,
-        CancellationToken cancellationToken)
+        TimeSpan timeout)
     {
-        using CancellationTokenSource cleanupDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cleanupDeadline.CancelAfter(timeout);
+        // Deliberately NOT linked to the caller's cancellation token — mirroring the continuity/scoped-outage
+        // drivers' independent restoration CTS — so a cancelled workflow still gets cleanup's own full budget
+        // instead of the fresh partition being stranded the instant the caller's token cancels.
+        using CancellationTokenSource cleanupDeadline = new(timeout);
         foreach (string key in keys)
         {
             (bool present, string etag) = await eraser

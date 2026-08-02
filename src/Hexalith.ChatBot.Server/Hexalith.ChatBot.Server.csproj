@@ -10,6 +10,9 @@
     <InternalsVisibleTo Include="Hexalith.ChatBot.Server.Tests" />
     <InternalsVisibleTo Include="Hexalith.ChatBot.IntegrationTests" />
     <InternalsVisibleTo Include="Hexalith.ChatBot.Conformance.Tests" />
+    <!-- Lets the architecture guards compare workflow YAML against the OPTION VALUES it must agree with, rather than
+         against the option source text. RunnerBudget and Cadence previously existed only inside their own validator. -->
+    <InternalsVisibleTo Include="Hexalith.ChatBot.Architecture.Tests" />
     <InternalsVisibleTo Include="Hexalith.ChatBot.RecoverySandbox" />
   </ItemGroup>
   <ItemGroup>

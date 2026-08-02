@@ -41,6 +41,7 @@ internal sealed class LiveScopedOutageInjectionDriver(
         ScopedOutageFaultObservation? observation = null;
         ScopedOutageRecoveryEndState? endState = null;
         Exception? failure = null;
+        bool cleanupComplete = false;
         try
         {
             // Inside the try: CheckpointAsync already mutates sandbox state (the graph branch POSTs `restore` and
@@ -81,13 +82,14 @@ internal sealed class LiveScopedOutageInjectionDriver(
             {
                 try
                 {
+                    // A recovery-verification EXCEPTION (the probe itself could not complete) stays unmeasurable —
+                    // but a genuinely OBSERVED non-recovery is a real, measured containment/recovery breach, not a
+                    // reason to discard the whole scenario. Converting it to a thrown failure made
+                    // ScopedOutageDegradationEvaluator's `inflight_not_recoverable` deviation unreachable from any
+                    // live run.
                     endState = await operations
                         .VerifyRecoveryAsync(dependency, testTenantRef, correlationId, scenarioToken)
                         .ConfigureAwait(false);
-                    if (!endState.AffectedOperationRecovered)
-                    {
-                        failure = new InvalidOperationException("The affected operation did not recover after restoration.");
-                    }
                 }
                 catch (Exception exception)
                 {
@@ -101,6 +103,7 @@ internal sealed class LiveScopedOutageInjectionDriver(
             try
             {
                 await operations.CleanupAsync(dependency, testTenantRef, cleanup.Token).ConfigureAwait(false);
+                cleanupComplete = true;
             }
             catch (Exception exception)
             {
@@ -137,9 +140,9 @@ internal sealed class LiveScopedOutageInjectionDriver(
             startedAtUtc,
             operations.UtcNow,
             new RecoveryValidationExecutionAssertions(
-                CleanupComplete: true,
+                CleanupComplete: cleanupComplete,
                 FaultObserved: observation is not null,
-                RecoveryObserved: completedEndState.AffectedOperationRecovered,
+                RecoveryObserved: endState is not null,
                 IndependentControlSucceeded: completedObservation.IndependentControlSucceeded,
                 TenantIsolationPreserved: !completedEndState.CrossTenantLeakageDetected,
                 UnauthorizedMutationAbsent: !completedObservation.UnauthorizedMutationDetected,

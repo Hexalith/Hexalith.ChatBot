@@ -8,6 +8,9 @@ namespace Hexalith.ChatBot.RecoverySandbox;
 /// <summary>Controllable command client behind the real <c>AcceptedCommandDispatcher</c> boundary.</summary>
 internal sealed class RecoveryEventStoreGatewayClient(RecoveryScopedOutageState state) : IEventStoreGatewayClient
 {
+    /// <summary>The most recent command the real dispatcher actually submitted, for post-dispatch effect inspection.</summary>
+    public SubmitCommandRequest? LastSubmitted { get; private set; }
+
     /// <inheritdoc />
     public Task<SubmitCommandResponse> SubmitCommandAsync(
         SubmitCommandRequest request,
@@ -21,6 +24,7 @@ internal sealed class RecoveryEventStoreGatewayClient(RecoveryScopedOutageState 
             throw new HttpRequestException("The recovery command-execution boundary is unavailable.");
         }
 
+        LastSubmitted = request;
         _ = state.RecordEffect("command-execution", request.Tenant, request.MessageId);
         return Task.FromResult(new SubmitCommandResponse(request.CorrelationId ?? request.MessageId, MessageId: request.MessageId));
     }

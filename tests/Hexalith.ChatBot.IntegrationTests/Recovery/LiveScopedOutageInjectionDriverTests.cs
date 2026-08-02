@@ -77,6 +77,26 @@ public sealed class LiveScopedOutageInjectionDriverTests
         operations.Cleaned.ShouldContain(ScopedOutageDependencies.AuditStore);
     }
 
+    [Fact]
+    public async Task AMismatchedObservedScopeSurvivesIntoTheMeasurementRatherThanBeingCoercedToMatch()
+    {
+        // Regression guard for the tautology the round-2 review flagged: a fixture that always fed
+        // ExpectedScope(dependency) back as the observed value made a real scope escape structurally
+        // unreachable. This asserts the driver is a faithful pass-through, not a second copy of the table.
+        RecordingOperations operations = new() { ObservedScopeOverride = ScopedOutageScopes.Tenant };
+        LiveScopedOutageInjectionDriver driver = new(operations, Options());
+
+        ScopedOutageDegradationMeasurement measurement = await driver.InjectAndMeasureAsync(
+            ScopedOutageDependencies.AiProvider,
+            RecoveryValidationTopology.LogicalTenantRef,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken);
+
+        measurement.ExpectedScope.ShouldBe(ScopedOutageScopes.Operation);
+        measurement.ObservedScope.ShouldBe(ScopedOutageScopes.Tenant);
+        measurement.ObservedScope.ShouldNotBe(measurement.ExpectedScope);
+    }
+
     [Theory]
     [InlineData(ScopedOutageDependencies.Graph, "tenant-alpha")]
     [InlineData("unknown-dependency", RecoveryValidationTopology.LogicalTenantRef)]
@@ -152,7 +172,7 @@ public sealed class LiveScopedOutageInjectionDriverTests
             ValidationPartitionRef = "recovery-partition-v1",
             ControllerCapability = LiveRecoveryValidationOptions.AspireControllerCapability,
             ControllerSecret = "tier3-value",
-            PerScenarioTimeout = RecoveryTargets.MaxRto,
+            PerScenarioTimeout = TimeSpan.FromMinutes(25),
             RestorationTimeout = TimeSpan.FromSeconds(5),
             WorkflowTimeout = TimeSpan.FromHours(5),
             EvidenceDirectory = Path.GetFullPath("TestResults/live-recovery"),
@@ -219,10 +239,12 @@ public sealed class LiveScopedOutageInjectionDriverTests
             return ValueTask.FromResult(new ScopedOutageFaultObservation(
                 observed,
                 observed + TimeSpan.FromMilliseconds(25),
-                LiveScopedOutageInjectionDriver.ExpectedScope(dependency),
+                ObservedScopeOverride ?? LiveScopedOutageInjectionDriver.ExpectedScope(dependency),
                 IndependentControlSucceeded: true,
                 UnauthorizedMutationDetected: false));
         }
+
+        public string? ObservedScopeOverride { get; init; }
 
         public ValueTask RestoreAsync(string dependency, string tenantRef, CancellationToken cancellationToken)
         {

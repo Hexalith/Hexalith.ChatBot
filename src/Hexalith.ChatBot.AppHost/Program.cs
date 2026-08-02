@@ -225,22 +225,33 @@ static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration
     }
 
     realm = realm.Replace(recoveryClientSecretPlaceholder, recoveryClientSecret, StringComparison.Ordinal);
-    string generatedDirectory = Path.Combine(
-        Path.GetTempPath(),
-        "hexalith-chatbot-keycloak",
-        Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
-    Directory.CreateDirectory(generatedDirectory);
+
+    // Created 0700 by CreateTempSubdirectory rather than 0755-then-chmod, and with a random name rather than the
+    // process id. The previous shape lost the race it existed to win: CreateDirectory and WriteAllText both completed
+    // at the default umask before SetUnixFileMode narrowed them, leaving the literal client secret world-readable on
+    // exactly the shared build host the comment below worries about. The predictable {temp}/hexalith-chatbot-keycloak/
+    // {pid} path also let a pre-created symlink redirect the write, and a recycled pid whose 0700 directory survived
+    // under another owner failed topology startup outright.
+    string generatedDirectory = Directory.CreateTempSubdirectory("hexalith-chatbot-keycloak-").FullName;
     string generatedRealmPath = Path.Combine(generatedDirectory, "hexalith-realm.json");
 
-    // This rendered realm is the only artifact that carries a literal client secret, so it must not inherit the
-    // default world-readable umask on a shared build host, and it must not outlive the process that needed it.
-    File.WriteAllText(generatedRealmPath, realm);
+    // This rendered realm is the only artifact that carries a literal client secret, so it must never exist at
+    // world-readable permissions even briefly, and it must not outlive the process that needed it. CreateNew makes the
+    // write fail rather than follow a pre-existing path, and UnixCreateMode applies the mode at creation.
+    FileStreamOptions realmFileOptions = new()
+    {
+        Mode = FileMode.CreateNew,
+        Access = FileAccess.Write,
+        Share = FileShare.None,
+    };
     if (!OperatingSystem.IsWindows())
     {
-        File.SetUnixFileMode(generatedRealmPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        File.SetUnixFileMode(
-            generatedDirectory,
-            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        realmFileOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+    }
+
+    using (StreamWriter realmWriter = new(new FileStream(generatedRealmPath, realmFileOptions)))
+    {
+        realmWriter.Write(realm);
     }
 
     AppDomain.CurrentDomain.ProcessExit += (_, _) =>

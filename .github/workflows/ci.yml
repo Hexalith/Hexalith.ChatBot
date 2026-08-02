@@ -100,10 +100,17 @@ jobs:
         run: dapr uninstall --all
 
   live-recovery-validation:
-    name: required serialized live recovery evidence gate
+    # Named distinctly from the release workflow's job: branch protection matches required checks by job
+    # NAME, and this copy is gated to schedule/dispatch, so a shared name let a run that is SKIPPED on
+    # every push and pull request satisfy a required check meant for the release lane.
+    name: scheduled live recovery validation sweep
     needs: build
     # Destructive, serialized, and up to 5.5 hours: run it on the cadence schedule or on explicit dispatch, never on
     # every pull request or push. Running it per-PR made every PR queue a 5.5-hour fault-injection job.
+    # workflow_dispatch is a DELIBERATE, disclosed part of the blast radius: any user with write access can launch
+    # this destructive 5.5-hour fault-injection lane on demand. Round 3 flagged both halves of that finding; only the
+    # least-privilege `permissions` half was applied, and the dispatch half went unrecorded until round 5. It is kept
+    # because an on-demand re-run is needed after a failed scheduled sweep, and the job holds `contents: read` only.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 330
@@ -117,6 +124,7 @@ jobs:
     permissions:
       contents: read
     env:
+      HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT: live-recovery-validation-evidence
       HEXALITH_CHATBOT_TIER3: "1"
       HEXALITH_CHATBOT_TIER3_REQUIRED: "1"
       ChatBotServiceGrants__LifetimeDays: "90"
@@ -142,6 +150,7 @@ jobs:
           --configuration Release
           --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate"
           --logger "console;verbosity=detailed"
+          --settings live-recovery.runsettings
           --logger "trx;LogFileName=live-recovery-validation.trx"
           --results-directory TestResults
       - name: Upload live recovery reports, manifests, and raw test evidence
@@ -156,7 +165,7 @@ jobs:
         run: dapr uninstall --all
 
   live-recovery-evidence-gate:
-    name: required independent live recovery evidence gate
+    name: scheduled live recovery evidence gate
     # The authoritative gate. It runs in a SEPARATE job from the run that produced the evidence, reads only the
     # uploaded artifact, applies the thresholds configured here rather than any the run declared about itself, and
     # evaluates against a fresh wall clock so the staleness branches are reachable. Evaluating the gate in-process
@@ -171,6 +180,10 @@ jobs:
       HEXALITH_CHATBOT_RECOVERY_EVIDENCE_DIR: ${{ github.workspace }}/RetainedEvidence
       HEXALITH_CHATBOT_RECOVERY_EXPECTED_DATASETS: recovery-baseline
       HEXALITH_CHATBOT_RECOVERY_MAX_EVIDENCE_AGE_HOURS: "192"
+      HEXALITH_CHATBOT_RECOVERY_EXPECTED_DATASET_VERSION: v1
+      HEXALITH_CHATBOT_RECOVERY_MINIMUM_DATASET_VOLUME: "6"
+      HEXALITH_CHATBOT_RECOVERY_MAX_MEASURABLE_CEILING_SECONDS: "180"
+      HEXALITH_CHATBOT_RECOVERY_REQUIRED_COMMIT: ${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -194,6 +207,7 @@ jobs:
           --configuration Release
           --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveRecoveryEvidenceGateReplayTests.RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess"
           --logger "console;verbosity=detailed"
+          --settings live-recovery.runsettings
           --logger "trx;LogFileName=live-recovery-evidence-gate.trx"
           --results-directory GateResults
       - name: Upload the gate decision

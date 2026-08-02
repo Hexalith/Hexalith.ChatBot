@@ -80,17 +80,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 330
     concurrency:
-      # Distinct from the CI workflow's group so the required release gate never queues behind (or is cancelled by)
-      # the scheduled CI run of the same lane, AND keyed by ref so release branches do not contend with each other.
-      # With a repository-wide group, a third push inside the 5.5-hour window made GitHub cancel the older PENDING
-      # run — turning a required check into a cancelled one and silently skipping semantic-release for that commit.
-      group: live-recovery-validation-release-${{ github.repository }}-${{ github.ref }}
+      # Keyed by COMMIT, not by ref. Distinct from the CI workflow's group so the required release gate never queues
+      # behind the scheduled CI run of the same lane — but keying by ref did not fix the failure it was added for:
+      # every push to `main` carries the same github.ref, so three pushes inside the 5.5-hour window still shared one
+      # group and GitHub still cancelled the older PENDING run, turning a required check into a cancelled one and
+      # silently skipping semantic-release for that commit. Ref-keying only separates DIFFERENT release branches.
+      #
+      # The lane runs on an ephemeral runner and composes its own Aspire topology, so there is no shared resource that
+      # serialization protects; the group bought cost control and paid for it with a cancellable required check. The
+      # per-commit key gives every publishable commit its own verdict and still collapses a re-dispatch of the same
+      # commit. Accepted cost: N pushes inside the window now run N concurrent 5.5-hour jobs instead of queueing.
+      group: live-recovery-validation-release-${{ github.repository }}-${{ github.sha }}
       cancel-in-progress: false
     # Least privilege: the workflow-level write scopes exist for semantic-release, not for a multi-hour fault-injection
     # job that executes submodule code.
     permissions:
       contents: read
     env:
+      HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT: release-live-recovery-validation-evidence
       HEXALITH_CHATBOT_TIER3: "1"
       HEXALITH_CHATBOT_TIER3_REQUIRED: "1"
       ChatBotServiceGrants__LifetimeDays: "90"
@@ -116,6 +123,7 @@ jobs:
           --configuration Release
           --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate"
           --logger "console;verbosity=detailed"
+          --settings live-recovery.runsettings
           --logger "trx;LogFileName=live-recovery-validation.trx"
           --results-directory TestResults
       - name: Upload live recovery reports, manifests, and raw test evidence
@@ -137,7 +145,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:
-      group: live-recovery-evidence-gate-release-${{ github.repository }}-${{ github.ref }}
+      group: live-recovery-evidence-gate-release-${{ github.repository }}-${{ github.sha }}
       cancel-in-progress: false
     permissions:
       contents: read
@@ -146,6 +154,10 @@ jobs:
       HEXALITH_CHATBOT_RECOVERY_EVIDENCE_DIR: ${{ github.workspace }}/RetainedEvidence
       HEXALITH_CHATBOT_RECOVERY_EXPECTED_DATASETS: recovery-baseline
       HEXALITH_CHATBOT_RECOVERY_MAX_EVIDENCE_AGE_HOURS: "192"
+      HEXALITH_CHATBOT_RECOVERY_EXPECTED_DATASET_VERSION: v1
+      HEXALITH_CHATBOT_RECOVERY_MINIMUM_DATASET_VOLUME: "6"
+      HEXALITH_CHATBOT_RECOVERY_MAX_MEASURABLE_CEILING_SECONDS: "180"
+      HEXALITH_CHATBOT_RECOVERY_REQUIRED_COMMIT: ${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -169,6 +181,7 @@ jobs:
           --configuration Release
           --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveRecoveryEvidenceGateReplayTests.RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess"
           --logger "console;verbosity=detailed"
+          --settings live-recovery.runsettings
           --logger "trx;LogFileName=live-recovery-evidence-gate.trx"
           --results-directory GateResults
       - name: Upload the gate decision

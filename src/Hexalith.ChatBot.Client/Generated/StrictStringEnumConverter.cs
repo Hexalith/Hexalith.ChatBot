@@ -31,6 +31,14 @@ internal sealed class StrictStringEnumConverter : StringEnumConverter
             throw new JsonSerializationException("Integer enum wire values are not accepted.");
         }
 
+        // The base converter maps an empty string to null for a nullable enum, so a malformed `"actorType": ""` read
+        // as absent rather than as an error — the caller then saw a missing value it could not distinguish from one
+        // the server never sent.
+        if (reader.TokenType == JsonToken.String && reader.Value is string { Length: 0 })
+        {
+            throw new JsonSerializationException("Empty enum wire values are not accepted.");
+        }
+
         return base.ReadJson(reader, objectType, existingValue, serializer);
     }
 }

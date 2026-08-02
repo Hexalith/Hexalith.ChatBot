@@ -1,3 +1,5 @@
+using Hexalith.ChatBot.Server.Audit;
+
 using Shouldly;
 
 namespace Hexalith.ChatBot.Architecture.Tests;
@@ -173,9 +175,24 @@ public static class LiveRecoveryValidationArchitectureTests
         string release = ReadProjectFile(".github/workflows/release.yml");
         release.ShouldContain("live-recovery-validation-release-");
 
-        // Keyed by ref, not repository-wide: a repository-wide group let a third push inside the window cancel the
-        // older PENDING required check and silently skip semantic-release for that commit.
-        release.ShouldContain("live-recovery-validation-release-${{ github.repository }}-${{ github.ref }}");
+        // Keyed by COMMIT. Repository-wide let a third push inside the window cancel the older PENDING required check;
+        // keying by REF did not fix that, because every push to `main` carries the same github.ref, so the pending run
+        // was still cancelled and semantic-release still skipped silently for that commit. Ref-keying separates only
+        // different release branches. Asserting the absence of the ref-keyed form keeps the weaker shape from returning.
+        release.ShouldContain("live-recovery-validation-release-${{ github.repository }}-${{ github.sha }}");
+        release.ShouldNotContain("live-recovery-validation-release-${{ github.repository }}-${{ github.ref }}");
+
+        // Branch protection matches required checks by job NAME. Identical names across the two workflows made the CI
+        // copy — which is SKIPPED on every push and pull request — indistinguishable from the release gate.
+        foreach (string ciJobName in new[]
+        {
+            "name: scheduled live recovery validation sweep",
+            "name: scheduled live recovery evidence gate",
+        })
+        {
+            ci.ShouldContain(ciJobName);
+            release.ShouldNotContain(ciJobName);
+        }
 
         // The gate must be evaluated OUT OF PROCESS, in a job chained after the run that produced the evidence. The
         // previous shape of this guard asserted only the producing test's own name, so it would have passed happily
@@ -189,12 +206,45 @@ public static class LiveRecoveryValidationArchitectureTests
             source.ShouldContain("RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess");
             source.ShouldContain("HEXALITH_CHATBOT_RECOVERY_EVIDENCE_REQUIRED");
 
+            // `dotnet test --filter` EXITS 0 when the filter matches nothing, so renaming or moving either lane's test
+            // turned a required job into a silent no-op that still reported success. This guard asserts the workflow
+            // string; only TreatNoTestsAsError makes the run itself fail, so both must be present.
+            source.ShouldContain("--settings live-recovery.runsettings");
+
+            // The release path anchors what the run may claim about itself; without these the run still declared its
+            // own dataset size and which tree its evidence came from.
+            source.ShouldContain("HEXALITH_CHATBOT_RECOVERY_REQUIRED_COMMIT: ${{ github.sha }}");
+            source.ShouldContain("HEXALITH_CHATBOT_RECOVERY_MINIMUM_DATASET_VOLUME");
+            source.ShouldContain("HEXALITH_CHATBOT_RECOVERY_MAX_MEASURABLE_CEILING_SECONDS");
+
             // Least privilege on the destructive lane and its gate.
             source.ShouldContain("permissions:\n      contents: read");
         }
 
         // The release must depend on the independent gate, not merely on the run that produced the evidence.
         release.ShouldContain("- live-recovery-evidence-gate");
+
+        string runSettings = ReadProjectFile("live-recovery.runsettings");
+        runSettings.ShouldContain("<TreatNoTestsAsError>true</TreatNoTestsAsError>");
+    }
+
+    [Fact]
+    public static void RunnerBudgetAndCadence_ShouldMatchTheWorkflowValuesTheyDescribe()
+    {
+        // Both options existed only inside their own validator: nothing tied RunnerBudget to the workflow's
+        // timeout-minutes or Cadence to the cron, in either direction, so lowering timeout-minutes left Validate()
+        // happily approving a WorkflowTimeout past the point the runner kills the job mid-injection.
+        LiveRecoveryValidationOptions defaults = new();
+        string ci = ReadProjectFile(".github/workflows/ci.yml");
+        string release = ReadProjectFile(".github/workflows/release.yml");
+
+        string expectedTimeout = $"timeout-minutes: {(int)defaults.RunnerBudget.TotalMinutes}";
+        ci.ShouldContain(expectedTimeout);
+        release.ShouldContain(expectedTimeout);
+
+        // The cron fires weekly; Cadence must agree or the configured value governs nothing.
+        ci.ShouldContain("cron: \"0 2 * * 0\"");
+        defaults.Cadence.ShouldBe(TimeSpan.FromDays(7));
     }
 
     [Fact]

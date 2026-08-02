@@ -30,7 +30,21 @@ internal static class ContinuityDrillScenarios
     public static readonly IReadOnlyList<string> SweepOrder = [EventStoreOutage, M365SubscriptionFailure];
 
     /// <summary>The closed set of all NFR56-required drill scenarios; the sweep runs every member.</summary>
-    public static readonly IReadOnlySet<string> All = new HashSet<string>(SweepOrder, StringComparer.Ordinal);
+    public static readonly IReadOnlySet<string> All = BuildClosedSet();
+
+    /// <summary>
+    /// Builds <see cref="All"/> and rejects a duplicate in <see cref="SweepOrder"/> rather than silently deduping it,
+    /// mirroring <see cref="ScopedOutageDependencies"/>. A bare <c>HashSet</c> over the ordered list swallowed a
+    /// duplicated token: the sweep would run that destructive drill twice while <see cref="All"/> stayed one short, so
+    /// the evidence gate emitted <c>continuity:incomplete_scenario_set</c> on every run thereafter.
+    /// </summary>
+    private static IReadOnlySet<string> BuildClosedSet()
+    {
+        HashSet<string> closed = new(SweepOrder, StringComparer.Ordinal);
+        return closed.Count == SweepOrder.Count
+            ? closed
+            : throw new InvalidOperationException($"{nameof(SweepOrder)} must not contain duplicate scenarios.");
+    }
 
     /// <summary>Returns <see langword="true"/> only for a known scenario token; any other value is unknown (fail-safe).</summary>
     public static bool Contains(string? scenario)

@@ -198,6 +198,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
                 dependency,
                 tenantRef,
                 correlationId,
+                "identity_token_unavailable",
                 cancellationToken).ConfigureAwait(false);
             observedAtUtc = monitored.RootElement
                 .GetProperty("dependencyFailureObservedAtUtc").GetDateTimeOffset().ToUniversalTime();
@@ -235,6 +236,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
                 dependency,
                 tenantRef,
                 correlationId,
+                root.GetProperty("reasonCode").GetString() ?? "graph_subscription_expired",
                 cancellationToken).ConfigureAwait(false);
             observedAtUtc = monitored.RootElement
                 .GetProperty("dependencyFailureObservedAtUtc").GetDateTimeOffset().ToUniversalTime();
@@ -670,11 +672,13 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         string dependency,
         string tenantRef,
         string correlationId,
+        string faultSignalCode,
         CancellationToken cancellationToken)
     {
         using HttpRequestMessage request = new(
             HttpMethod.Post,
-            $"/recovery/{Uri.EscapeDataString(tenantRef)}/scope-observation/{Uri.EscapeDataString(dependency)}/{Uri.EscapeDataString(correlationId)}");
+            $"/recovery/{Uri.EscapeDataString(tenantRef)}/scope-observation/{Uri.EscapeDataString(dependency)}/{Uri.EscapeDataString(correlationId)}" +
+            $"?faultSignalCode={Uri.EscapeDataString(faultSignalCode)}");
         request.Headers.Add("X-Recovery-Controller-Secret", _controllerSecret);
         return await SendSandboxAsync(request, cancellationToken).ConfigureAwait(false);
     }

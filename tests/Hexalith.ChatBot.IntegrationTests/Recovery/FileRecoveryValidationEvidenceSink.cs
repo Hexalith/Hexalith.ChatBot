@@ -48,7 +48,10 @@ internal sealed class FileRecoveryValidationEvidenceSink(
                     ["measurable"] = measurable,
                 },
                 report.Deviations,
-                cancellationToken);
+                cancellationToken,
+
+                // Stated, not inherited: one continuity scenario exercised by this manifest.
+                coverage: 1);
     }
 
     public ValueTask RecordAsync(ProjectionRebuildReport report, CancellationToken cancellationToken)
@@ -127,7 +130,10 @@ internal sealed class FileRecoveryValidationEvidenceSink(
                         ScopedOutageDegradationEvaluator.DuplicateSideEffectDeviation),
                 },
                 report.Deviations,
-                cancellationToken);
+                cancellationToken,
+
+                // Stated, not inherited: one scoped dependency exercised by this manifest.
+                coverage: 1);
     }
 
     private async ValueTask WriteAsync<TReport>(
@@ -143,7 +149,11 @@ internal sealed class FileRecoveryValidationEvidenceSink(
         IReadOnlyDictionary<string, bool> assertions,
         IReadOnlyList<string> deviations,
         CancellationToken cancellationToken,
-        int coverage = 1)
+
+        // No default. `int coverage = 1` let the continuity and scoped-outage overloads inherit a literal without
+        // saying so, and the gate's `{job}:zero_coverage` branch was then reachable only for the one overload that
+        // passed a measured number. Requiring it makes each caller state what its manifest claims to have covered.
+        int coverage)
     {
         Directory.CreateDirectory(options.EvidenceDirectory);
         string scenarioId = ChatBotCorrelationId.New().Value;

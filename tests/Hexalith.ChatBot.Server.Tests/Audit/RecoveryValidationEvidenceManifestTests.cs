@@ -52,6 +52,18 @@ public sealed class RecoveryValidationEvidenceManifestTests
             .Validate()
             .ShouldContain(error => error.Contains("MeasurableRecoveryCeilingSeconds", StringComparison.Ordinal));
         (ValidManifest() with { MeasurableRecoveryCeilingSeconds = 180 }).Validate().ShouldBeEmpty();
+
+        // The non-finite cases are the actual defect this check was added for: `NaN <= 0` is false, so a NaN or
+        // infinite ceiling passed a bounds test written only against zero and negatives. Covering 0/-1/180 alone left
+        // the finite check free to be deleted with every assertion still green.
+        foreach (double nonFinite in new[] { double.NaN, double.PositiveInfinity, double.NegativeInfinity })
+        {
+            (ValidManifest() with { MeasurableRecoveryCeilingSeconds = nonFinite })
+                .Validate()
+                .ShouldContain(
+                    error => error.Contains("MeasurableRecoveryCeilingSeconds", StringComparison.Ordinal),
+                    $"A ceiling of {nonFinite} must be rejected.");
+        }
     }
 
     private static RecoveryValidationEvidenceManifest ValidManifest()

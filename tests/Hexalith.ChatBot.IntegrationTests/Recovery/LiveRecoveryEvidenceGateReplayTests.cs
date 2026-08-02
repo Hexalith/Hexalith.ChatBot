@@ -23,6 +23,10 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
     private const string RequiredVariable = "HEXALITH_CHATBOT_RECOVERY_EVIDENCE_REQUIRED";
     private const string ExpectedDatasetsVariable = "HEXALITH_CHATBOT_RECOVERY_EXPECTED_DATASETS";
     private const string MaximumEvidenceAgeHoursVariable = "HEXALITH_CHATBOT_RECOVERY_MAX_EVIDENCE_AGE_HOURS";
+    private const string ExpectedDatasetVersionVariable = "HEXALITH_CHATBOT_RECOVERY_EXPECTED_DATASET_VERSION";
+    private const string MinimumDatasetVolumeVariable = "HEXALITH_CHATBOT_RECOVERY_MINIMUM_DATASET_VOLUME";
+    private const string RequiredCommitVariable = "HEXALITH_CHATBOT_RECOVERY_REQUIRED_COMMIT";
+    private const string MaximumMeasurableCeilingSecondsVariable = "HEXALITH_CHATBOT_RECOVERY_MAX_MEASURABLE_CEILING_SECONDS";
 
     [Fact]
     public async Task RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess()
@@ -98,7 +102,11 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
             ExpectedDatasets(),
             TargetDeviationsBlockRelease: true,
             RecoveryValidationEvidenceManifest.LiveDriverMode,
-            MaximumEvidenceAge());
+            MaximumEvidenceAge(),
+            ExpectedDatasetVersion: Optional(ExpectedDatasetVersionVariable),
+            MinimumDatasetVolume: (int)PositiveNumber(MinimumDatasetVolumeVariable, 0),
+            RequiredRepositoryCommit: Optional(RequiredCommitVariable),
+            MaximumMeasurableRecoveryCeilingSeconds: PositiveNumber(MaximumMeasurableCeilingSecondsVariable, 0));
 
         LiveRecoveryValidationEvidenceGateDecision decision = LiveRecoveryValidationEvidenceGate.Evaluate(
             attempt,
@@ -122,11 +130,43 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
         return [.. configured.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
     }
 
+    /// <summary>
+    /// Reads the configured maximum evidence age. A malformed value <b>throws</b> rather than falling back: silently
+    /// applying the 8-day default meant a typo in a tightened setting loosened the required gate's staleness bound with
+    /// no signal anywhere.
+    /// </summary>
     private static TimeSpan MaximumEvidenceAge()
     {
         string? configured = Environment.GetEnvironmentVariable(MaximumEvidenceAgeHoursVariable);
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return TimeSpan.FromDays(8);
+        }
+
         return double.TryParse(configured, NumberStyles.Float, CultureInfo.InvariantCulture, out double hours) && hours > 0
             ? TimeSpan.FromHours(hours)
-            : TimeSpan.FromDays(8);
+            : throw new InvalidOperationException(
+                $"{MaximumEvidenceAgeHoursVariable} is set to '{configured}', which is not a positive number of hours.");
+    }
+
+    /// <summary>Returns a configured value, or <see langword="null"/> when the release path leaves it unpinned.</summary>
+    private static string? Optional(string variable)
+    {
+        string? configured = Environment.GetEnvironmentVariable(variable);
+        return string.IsNullOrWhiteSpace(configured) ? null : configured.Trim();
+    }
+
+    /// <summary>Reads a positive numeric policy input, throwing on a malformed value for the same reason as above.</summary>
+    private static double PositiveNumber(string variable, double unset)
+    {
+        string? configured = Environment.GetEnvironmentVariable(variable);
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return unset;
+        }
+
+        return double.TryParse(configured, NumberStyles.Float, CultureInfo.InvariantCulture, out double value) && value > 0
+            ? value
+            : throw new InvalidOperationException($"{variable} is set to '{configured}', which is not a positive number.");
     }
 }

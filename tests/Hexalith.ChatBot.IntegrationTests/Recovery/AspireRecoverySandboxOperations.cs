@@ -52,7 +52,14 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     private readonly EventStoreDurableStateProbe _durableState;
     private readonly string _mailboxClientSecret;
     private readonly string _controllerSecret;
-    private string? _checkpointNoteRef;
+    /// <summary>
+    /// The number of independently committed governed notes seeded per continuity checkpoint. A single-record
+    /// checkpoint can only ever report 0 or 1 reconstructed, which is a trivial boolean wearing a count; three
+    /// independently timestamped records make a genuine partial-reconstruction outcome (e.g. 2 of 3) observable.
+    /// </summary>
+    private const int CommittedCheckpointRecordCount = 3;
+    private readonly List<string> _checkpointNoteRefs = [];
+    private readonly List<DateTimeOffset> _checkpointCommittedAtUtc = [];
     private string? _checkpointCorrelationId;
     private string? _faultProbeNoteRef;
     private string? _controlTenantNoteRef;
@@ -109,14 +116,21 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             .AcquireAsync(_application, cancellationToken).ConfigureAwait(false);
         string controlAccessToken = await RecoveryAccessTokenProvider
             .AcquireControlAsync(_application, cancellationToken).ConfigureAwait(false);
-        string noteRef = GovernedNoteId.New().Value;
-        string commandRef = ChatBotCommandId.New().Value;
         string operationRef = ChatBotTaskId.New().Value;
-        await SubmitUntilAcceptedAsync(noteRef, commandRef, operationRef, correlationId, userAccessToken, cancellationToken)
-            .ConfigureAwait(false);
-        await WaitForGovernedOperationAsync(noteRef, correlationId, expectPresent: true, userAccessToken, cancellationToken)
-            .ConfigureAwait(false);
-        _checkpointNoteRef = noteRef;
+        _checkpointNoteRefs.Clear();
+        _checkpointCommittedAtUtc.Clear();
+        for (int index = 0; index < CommittedCheckpointRecordCount; index++)
+        {
+            string noteRef = GovernedNoteId.New().Value;
+            string commandRef = ChatBotCommandId.New().Value;
+            await SubmitUntilAcceptedAsync(noteRef, commandRef, operationRef, correlationId, userAccessToken, cancellationToken)
+                .ConfigureAwait(false);
+            await WaitForGovernedOperationAsync(noteRef, correlationId, expectPresent: true, userAccessToken, cancellationToken)
+                .ConfigureAwait(false);
+            _checkpointNoteRefs.Add(noteRef);
+            _checkpointCommittedAtUtc.Add(UtcNow);
+        }
+
         _checkpointCorrelationId = correlationId;
 
         // Seed a resource owned by an INDEPENDENT control tenant. Probing a randomly generated id with the caller's
@@ -139,7 +153,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 cancellationToken)
             .ConfigureAwait(false);
         _controlTenantNoteRef = controlNoteRef;
-        return new RecoveryOperationCheckpoint(1, UtcNow, operationRef);
+        return new RecoveryOperationCheckpoint(_checkpointNoteRefs.Count, _checkpointCommittedAtUtc.Max(), operationRef);
     }
 
     /// <inheritdoc />
@@ -283,7 +297,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         RecoveryOperationCheckpoint checkpoint,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_checkpointNoteRef))
+        if (_checkpointNoteRefs.Count == 0)
         {
             throw new InvalidOperationException("No committed recovery checkpoint exists.");
         }
@@ -297,12 +311,28 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             .AcquireAsync(_application, cancellationToken).ConfigureAwait(false);
         string controlAccessToken = await RecoveryAccessTokenProvider
             .AcquireControlAsync(_application, cancellationToken).ConfigureAwait(false);
-        bool checkpointPresent = await WaitForGovernedOperationAsync(
-            _checkpointNoteRef,
-            checkpoint.OperationRef,
-            expectPresent: true,
-            userAccessToken,
-            cancellationToken).ConfigureAwait(false);
+        int reconstructedCount = 0;
+        foreach (string noteRef in _checkpointNoteRefs)
+        {
+            try
+            {
+                if (await WaitForGovernedOperationAsync(
+                    noteRef,
+                    checkpoint.OperationRef,
+                    expectPresent: true,
+                    userAccessToken,
+                    cancellationToken).ConfigureAwait(false))
+                {
+                    reconstructedCount++;
+                }
+            }
+            catch (TimeoutException)
+            {
+                // Genuinely not reconstructed within the presence budget — a real partial-loss signal, not every
+                // committed record needs to survive for the loop to keep checking the rest.
+            }
+        }
+
         bool unauthorizedMutationAbsent = string.IsNullOrWhiteSpace(_faultProbeNoteRef) ||
             !await WaitForGovernedOperationAsync(
                 _faultProbeNoteRef,
@@ -325,41 +355,65 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             cancellationToken).ConfigureAwait(false);
         bool tenantIsolation = foreignRead.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound &&
             controlRead.StatusCode == HttpStatusCode.OK;
-        return new RecoveryEventStoreEndState(checkpointPresent ? 1 : 0, tenantIsolation, unauthorizedMutationAbsent);
+        return new RecoveryEventStoreEndState(reconstructedCount, tenantIsolation, unauthorizedMutationAbsent);
     }
 
     /// <inheritdoc />
-    public async ValueTask CleanupEventStoreScenarioAsync(CancellationToken cancellationToken)
+    public async ValueTask<bool> CleanupEventStoreScenarioAsync(CancellationToken cancellationToken)
     {
         if (!await IsEventStoreEndpointAvailableAsync(cancellationToken).ConfigureAwait(false))
         {
             throw new InvalidOperationException("EventStore was not available during continuity cleanup verification.");
         }
 
-        if (string.IsNullOrWhiteSpace(_checkpointNoteRef) || string.IsNullOrWhiteSpace(_checkpointCorrelationId))
+        if (_checkpointNoteRefs.Count == 0 || string.IsNullOrWhiteSpace(_checkpointCorrelationId))
         {
             throw new InvalidOperationException("Continuity cleanup had no persisted checkpoint to verify.");
         }
 
         string userAccessToken = await RecoveryAccessTokenProvider
             .AcquireAsync(_application, cancellationToken).ConfigureAwait(false);
-        _ = await WaitForGovernedOperationAsync(
-            _checkpointNoteRef,
-            _checkpointCorrelationId,
-            expectPresent: true,
-            userAccessToken,
-            cancellationToken).ConfigureAwait(false);
+        bool complete = true;
+        foreach (string noteRef in _checkpointNoteRefs)
+        {
+            try
+            {
+                if (!await WaitForGovernedOperationAsync(
+                    noteRef,
+                    _checkpointCorrelationId,
+                    expectPresent: true,
+                    userAccessToken,
+                    cancellationToken).ConfigureAwait(false))
+                {
+                    complete = false;
+                }
+            }
+            catch (TimeoutException)
+            {
+                complete = false;
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(_faultProbeNoteRef))
         {
-            _ = await WaitForGovernedOperationAsync(
-                _faultProbeNoteRef,
-                _checkpointCorrelationId,
-                expectPresent: false,
-                userAccessToken,
-                cancellationToken).ConfigureAwait(false);
+            try
+            {
+                bool stillPresent = await WaitForGovernedOperationAsync(
+                    _faultProbeNoteRef,
+                    _checkpointCorrelationId,
+                    expectPresent: false,
+                    userAccessToken,
+                    cancellationToken).ConfigureAwait(false);
+                complete &= !stillPresent;
+            }
+            catch (InvalidOperationException)
+            {
+                complete = false;
+            }
         }
 
         _faultProbeNoteRef = null;
+        return complete;
     }
 
     /// <inheritdoc />
@@ -543,7 +597,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     }
 
     /// <inheritdoc />
-    public async ValueTask CleanupSubscriptionScenarioAsync(string tenantRef, CancellationToken cancellationToken)
+    public async ValueTask<bool> CleanupSubscriptionScenarioAsync(string tenantRef, CancellationToken cancellationToken)
     {
         // Erase FIRST, then restore and verify. Running the restore/verify steps ahead of the erase loop meant an
         // unreachable sandbox or a non-2xx status stranded the seeded rows permanently — including rows written into
@@ -571,6 +625,8 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         {
             throw new InvalidOperationException("The subscription simulator remained faulted after cleanup.");
         }
+
+        return true;
     }
 
     /// <summary>

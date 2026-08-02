@@ -74,6 +74,16 @@ internal sealed class LiveRecoveryValidationOptions
     public static int MinimumSweepScenarioCount
         => ContinuityDrillScenarios.All.Count + ScopedOutageDependencies.All.Count + 1;
 
+    /// <summary>Topology startup and cleanup margin reserved inside <see cref="WorkflowTimeout"/>.</summary>
+    private static readonly TimeSpan TopologyMargin = TimeSpan.FromMinutes(30);
+
+    /// <summary>
+    /// Guards the serial-budget arithmetic below. <c>PerScenarioTimeout * MinimumSweepScenarioCount</c> overflows for
+    /// values near <see cref="TimeSpan.MaxValue"/>, and a validator that throws reports a stack trace instead of a
+    /// configuration error.
+    /// </summary>
+    private static readonly TimeSpan MaximumTimeSpan = TimeSpan.MaxValue;
+
     /// <summary>Gets or sets the required workflow cadence.</summary>
     public TimeSpan Cadence { get; set; } = TimeSpan.FromDays(7);
 
@@ -132,20 +142,9 @@ internal sealed class LiveRecoveryValidationOptions
             return $"{nameof(TestTenantRef)} must use the replay-test: tenant prefix.";
         }
 
-        if (PerScenarioTimeout < RecoveryTargets.MaxRto)
-        {
-            return $"{nameof(PerScenarioTimeout)} must permit measurement through the {RecoveryTargets.MaxRto} recovery target.";
-        }
-
         if (RestorationTimeout >= PerScenarioTimeout)
         {
             return $"{nameof(RestorationTimeout)} must be shorter than {nameof(PerScenarioTimeout)}.";
-        }
-
-        TimeSpan requiredWorkflowTimeout = RecoveryTargets.MaxRto + RestorationTimeout + TimeSpan.FromMinutes(30);
-        if (WorkflowTimeout < requiredWorkflowTimeout)
-        {
-            return $"{nameof(WorkflowTimeout)} must include the recovery target plus topology startup and cleanup margin.";
         }
 
         if (WorkflowTimeout >= RunnerBudget)
@@ -153,14 +152,19 @@ internal sealed class LiveRecoveryValidationOptions
             return $"{nameof(WorkflowTimeout)} must be shorter than {nameof(RunnerBudget)} so the in-process deadline fails closed first.";
         }
 
-        // The per-scenario budget is nominal: the sweep runs at least MinimumSweepScenarioCount scenarios serially
-        // inside one WorkflowTimeout, so PerScenarioTimeout is unreachable in aggregate by design. What must hold is
-        // weaker but real — every scenario's fair share of the workflow has to at least cover restoration, or the
-        // sweep provably cannot finish and the tail scenarios yield no evidence at all.
-        TimeSpan fairScenarioShare = WorkflowTimeout / MinimumSweepScenarioCount;
-        if (RestorationTimeout >= fairScenarioShare)
+        // The sweep runs at least MinimumSweepScenarioCount scenarios SERIALLY inside one WorkflowTimeout, so a
+        // per-scenario budget the workflow cannot afford is not a budget — it is silently truncated by the outer
+        // deadline, and the tail scenarios yield no evidence at all.
+        //
+        // This replaces the former `PerScenarioTimeout >= RecoveryTargets.MaxRto` rule, which demanded a 4-hour
+        // per-scenario budget that nine serial scenarios can never afford inside a sub-RunnerBudget workflow. That
+        // rule read as "the lane can measure through the recovery target" while being arithmetically unsatisfiable;
+        // RestorationTimeout, published per manifest as MeasurableRecoveryCeilingSeconds, is the honest statement of
+        // what the lane can actually measure, and the gate discloses any target above it as a claim limitation.
+        if (PerScenarioTimeout > MaximumTimeSpan / MinimumSweepScenarioCount ||
+            WorkflowTimeout < (PerScenarioTimeout * MinimumSweepScenarioCount) + TopologyMargin)
         {
-            return $"{nameof(RestorationTimeout)} must fit within each scenario's share of {nameof(WorkflowTimeout)} across {MinimumSweepScenarioCount} scenarios.";
+            return $"{nameof(WorkflowTimeout)} must cover {MinimumSweepScenarioCount} serial {nameof(PerScenarioTimeout)} budgets plus topology startup and cleanup margin.";
         }
 
         if (MaximumEvidenceAge < Cadence)

@@ -41,15 +41,20 @@ internal sealed class RecoveryScopedOutageState
         }
     }
 
-    /// <summary>Restores the dependency and resets completed effects for a fresh idempotency exercise.</summary>
+    /// <summary>
+    /// Restores the dependency and resets completed effects for a fresh idempotency exercise. Returns the state as
+    /// observed immediately before clearing the fault — not a post-clear snapshot, which would always report
+    /// <c>faulted: false</c> by construction and make a pre-injection/post-cleanup dirty-boundary check unreachable.
+    /// </summary>
     public object Restore(string dependency, DateTimeOffset atUtc)
     {
         lock (_gate)
         {
+            object priorState = SnapshotCore(dependency);
             _ = _faulted.Remove(dependency);
             _restoredAtUtc[dependency] = atUtc.ToUniversalTime();
             _completedEffects.Remove(dependency);
-            return SnapshotCore(dependency);
+            return priorState;
         }
     }
 

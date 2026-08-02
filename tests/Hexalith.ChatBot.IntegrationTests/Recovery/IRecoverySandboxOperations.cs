@@ -14,11 +14,15 @@ internal interface IRecoverySandboxOperations
     ValueTask StartEventStoreAsync(CancellationToken cancellationToken);
     ValueTask<DateTimeOffset> WaitForEventStoreRecoveryAsync(CancellationToken cancellationToken);
     ValueTask<RecoveryEventStoreEndState> ReadEventStoreEndStateAsync(RecoveryOperationCheckpoint checkpoint, CancellationToken cancellationToken);
-    ValueTask CleanupEventStoreScenarioAsync(CancellationToken cancellationToken);
+
+    /// <summary>Verifies and erases scenario state; returns whether cleanup genuinely completed (not a hardcoded true).</summary>
+    ValueTask<bool> CleanupEventStoreScenarioAsync(CancellationToken cancellationToken);
 
     ValueTask ExpireSubscriptionAsync(string tenantRef, CancellationToken cancellationToken);
     ValueTask<RecoveryFaultObservation> ObserveSubscriptionFaultAsync(string tenantRef, string correlationId, CancellationToken cancellationToken);
     ValueTask RestoreSubscriptionAsync(string tenantRef, CancellationToken cancellationToken);
     ValueTask<RecoverySubscriptionEndState> ReconcileSubscriptionAsync(string tenantRef, string correlationId, CancellationToken cancellationToken);
-    ValueTask CleanupSubscriptionScenarioAsync(string tenantRef, CancellationToken cancellationToken);
+
+    /// <summary>Verifies and erases scenario state; returns whether cleanup genuinely completed (not a hardcoded true).</summary>
+    ValueTask<bool> CleanupSubscriptionScenarioAsync(string tenantRef, CancellationToken cancellationToken);
 }

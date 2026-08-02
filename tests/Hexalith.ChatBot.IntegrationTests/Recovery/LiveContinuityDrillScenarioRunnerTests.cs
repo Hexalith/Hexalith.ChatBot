@@ -143,7 +143,7 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
             ValidationPartitionRef = "recovery-partition-v1",
             ControllerCapability = LiveRecoveryValidationOptions.AspireControllerCapability,
             ControllerSecret = "tier3-value",
-            PerScenarioTimeout = RecoveryTargets.MaxRto,
+            PerScenarioTimeout = TimeSpan.FromMinutes(25),
             WorkflowTimeout = TimeSpan.FromHours(5),
             EvidenceDirectory = Path.GetFullPath("TestResults/live-recovery"),
             EvidenceLocator = "artifact:live-recovery-validation",
@@ -202,10 +202,10 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
             return ValueTask.FromResult(new RecoveryEventStoreEndState(1, TenantIsolationPreserved: true, UnauthorizedMutationAbsent: true));
         }
 
-        public ValueTask CleanupEventStoreScenarioAsync(CancellationToken cancellationToken)
+        public ValueTask<bool> CleanupEventStoreScenarioAsync(CancellationToken cancellationToken)
         {
             Calls.Add("cleanup-eventstore");
-            return ValueTask.CompletedTask;
+            return ValueTask.FromResult(true);
         }
 
         public ValueTask ExpireSubscriptionAsync(string tenantRef, CancellationToken cancellationToken)
@@ -238,10 +238,10 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
                 UnauthorizedMutationAbsent: true));
         }
 
-        public ValueTask CleanupSubscriptionScenarioAsync(string tenantRef, CancellationToken cancellationToken)
+        public ValueTask<bool> CleanupSubscriptionScenarioAsync(string tenantRef, CancellationToken cancellationToken)
         {
             Calls.Add("cleanup-subscription");
-            return ValueTask.CompletedTask;
+            return ValueTask.FromResult(true);
         }
     }
 }

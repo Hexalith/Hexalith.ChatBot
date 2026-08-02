@@ -28,6 +28,9 @@ builder.Services.AddSingleton<RecoveryAiAssistanceProvider>();
 builder.Services.AddSingleton<RecoveryEventStoreGatewayClient>();
 builder.Services.AddSingleton<RecoveryAuditWriter>();
 builder.Services.AddSingleton<RecoveryAttachmentContentSource>();
+builder.Services.AddSingleton<RecoveryFolderStore>();
+builder.Services.AddSingleton<RecoveryTenantAiPolicySnapshotProvider>();
+builder.Services.AddSingleton<Hexalith.ChatBot.Server.Projections.InMemoryProjectConversationProjectionStore>();
 builder.Services.AddSingleton<RecoveryScopeObservationMonitor>();
 builder.Services.AddHostedService(static services => services.GetRequiredService<RecoveryScopeObservationMonitor>());
 builder.Services.AddSingleton<RecoveryDependencyExercise>();
@@ -67,8 +70,7 @@ app.MapPost(
             return Results.NotFound();
         }
 
-        state.Restore(DateTimeOffset.UtcNow);
-        return Results.Ok(state.Snapshot());
+        return Results.Ok(state.Restore(DateTimeOffset.UtcNow));
     });
 
 app.MapPost(
@@ -211,19 +213,23 @@ app.MapPost(
         string requestedTenant,
         string dependency,
         string correlationId,
+        string faultSignalCode,
         HttpRequest request,
         RecoveryScopeObservationMonitor monitor,
         CancellationToken cancellationToken) =>
     {
         if (!Authorized(request, requestedTenant, tenantRef, controllerSecret) ||
             dependency is not ("graph" or "identity") ||
-            correlationId.Length != 26)
+            correlationId.Length != 26 ||
+            string.IsNullOrWhiteSpace(faultSignalCode))
         {
             return Results.NotFound();
         }
 
+        // The caller supplies the real signal it independently observed (the Graph simulator's own reason code,
+        // or the genuine failed token-acquisition outcome) — the monitor never derives scope from `dependency`.
         RecoveryScopeObservation observation = await monitor.RecordAsync(
-            new RecoveryDependencyFailure(dependency, correlationId, DateTimeOffset.UtcNow),
+            new RecoveryDependencyFailure(dependency, correlationId, DateTimeOffset.UtcNow, faultSignalCode),
             cancellationToken).ConfigureAwait(false);
         return Results.Ok(observation);
     });

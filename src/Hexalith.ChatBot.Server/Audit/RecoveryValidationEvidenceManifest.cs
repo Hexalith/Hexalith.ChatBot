@@ -7,8 +7,16 @@ namespace Hexalith.ChatBot.Server.Audit;
 internal sealed record RecoveryValidationEvidenceManifest
 {
     /// <summary>
-    /// The only <see cref="DriverMode"/> the release evidence gate accepts as a live run. A scripted fake produces a
-    /// manifest that is structurally identical in every other field, so this token is the sole discriminator.
+    /// The only <see cref="DriverMode"/> the release evidence gate accepts as a live run.
+    /// <para>
+    /// This token is <b>declared by the writing sink, not derived from the driver that produced the report</b>, so it
+    /// is not by itself proof of a live run: it rejects a manifest that names a non-live mode, and nothing more. The
+    /// claim that it is "the sole discriminator" against a scripted fake was false — the anti-fake weight is carried by
+    /// <see cref="LiveRecoveryValidationGatePolicy.RequiredRepositoryCommit"/>,
+    /// <see cref="LiveRecoveryValidationGatePolicy.ExpectedDatasetVersion"/> and
+    /// <see cref="LiveRecoveryValidationGatePolicy.MinimumDatasetVolume"/>, which the release path supplies and the run
+    /// cannot choose.
+    /// </para>
     /// </summary>
     public const string LiveDriverMode = "aspire-tier3-live";
 

@@ -200,6 +200,167 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
             .StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:invalid_evidence");
     }
 
+    [Fact]
+    public void AMissingOrFailedSafetyAssertionFailsClosedForEveryJob()
+    {
+        // The gate consulted six of the twenty assertions the sink writes, so a driver regression that never injected
+        // the fault produced `fault-observed: false` beside verdict `met` and passed with no reason code at all.
+        foreach (string jobId in LiveRecoveryValidationJobs.All)
+        {
+            foreach (string assertion in LiveRecoveryValidationEvidenceGate.SafetyAssertionsFor(jobId))
+            {
+                Evaluate(AttemptWithAssertion(jobId, assertion, value: false))
+                    .StopShipReasons.ShouldContain(
+                        $"{jobId}:{assertion}:assertion_failed",
+                        $"A false '{assertion}' must stop the release for job '{jobId}'.");
+
+                Evaluate(AttemptWithAssertion(jobId, assertion, value: null))
+                    .StopShipReasons.ShouldContain(
+                        $"{jobId}:{assertion}:assertion_missing",
+                        $"An omitted '{assertion}' must stop the release for job '{jobId}'.");
+            }
+        }
+    }
+
+    [Fact]
+    public void AMeasurableTargetMissStaysADeviationRatherThanBecomingAStructuralBreach()
+    {
+        // Task 6 keeps rebuild duration and scope-recording latency in the deviation channel. Sweeping them into the
+        // required-true set alongside the safety invariants would have collapsed a measurable miss into a breach.
+        foreach ((string jobId, string assertion) in new[]
+        {
+            (LiveRecoveryValidationJobs.ProjectionRebuild, "duration-within-target"),
+            (LiveRecoveryValidationJobs.ScopedOutage, "scope-recorded-within-target"),
+        })
+        {
+            LiveRecoveryValidationEvidenceAttempt deviating = AttemptWithAssertion(jobId, assertion, value: false);
+
+            // A deviation still requires its alert; without it the gate correctly stop-ships `unalerted_breach`, which
+            // would mask what this test is actually asserting.
+            LiveRecoveryValidationEvidenceGateDecision advisory = LiveRecoveryValidationEvidenceGate.Evaluate(
+                deviating with
+                {
+                    AlertsDeliveredByJob = new Dictionary<string, int>(StringComparer.Ordinal) { [jobId] = 1 },
+                },
+                Policy() with { TargetDeviationsBlockRelease = false },
+                Now);
+
+            advisory.IsStopShip.ShouldBeFalse(string.Join(',', advisory.StopShipReasons));
+            advisory.TargetDeviationReasons.ShouldContain($"{jobId}:target_deviation");
+            advisory.StopShipReasons.ShouldNotContain($"{jobId}:{assertion}:assertion_failed");
+        }
+    }
+
+    [Fact]
+    public void PolicyAnchorsDatasetProvenanceCommitAndMeasurableCeiling()
+    {
+        // Cross-manifest coherence proved only that the manifests agreed with each other. A one-record dataset, an
+        // inflated measurable ceiling, or evidence from an unrelated commit all stayed mutually coherent and passed.
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+
+        Evaluate(complete, Policy() with { ExpectedDatasetVersion = "v2" })
+            .StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:dataset_version_unexpected");
+        Evaluate(complete, Policy() with { MinimumDatasetVolume = 7 })
+            .StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:dataset_volume_below_minimum");
+        Evaluate(complete, Policy() with { RequiredRepositoryCommit = new string('a', 40) })
+            .StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:repository_commit_unexpected");
+        Evaluate(complete, Policy() with { MaximumMeasurableRecoveryCeilingSeconds = 179 })
+            .StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:measurable_ceiling_overstated");
+
+        // Unpinned is still permitted, so a local diagnostic run is not forced to invent a commit.
+        Evaluate(complete, Policy()).IsStopShip.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AMeasurementKeyOutsideTheCanonicalVocabularyIsRejected()
+    {
+        LiveRecoveryValidationEvidenceAttempt attempt = MutateContinuity(manifest => manifest with
+        {
+            MeasurementsSeconds = new Dictionary<string, double>(manifest.MeasurementsSeconds, StringComparer.Ordinal)
+            {
+                ["rto-adjusted"] = 1,
+            },
+            AllowedTargetsSeconds = new Dictionary<string, double>(manifest.AllowedTargetsSeconds, StringComparer.Ordinal)
+            {
+                ["rto-adjusted"] = 99_999,
+            },
+        });
+
+        Evaluate(attempt).StopShipReasons
+            .ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:non_canonical_measurement_key");
+    }
+
+    [Fact]
+    public void TheClaimLimitationCoversRecoveryDurationKeysOnlyNotRpoOrScopeRecordingLatency()
+    {
+        // RPO is a data-loss window and NFR41 latency is measured during the outage; neither is bounded by how long
+        // restoration is allowed to take, so judging them against the restoration ceiling was a category error emitted
+        // on every passing run.
+        string[] limitations = [.. Evaluate(CompleteAttempt()).ClaimLimitationReasons];
+
+        limitations.ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:rto:target_exceeds_measurable_ceiling");
+        limitations.ShouldContain($"{LiveRecoveryValidationJobs.ProjectionRebuild}:rebuild-duration:target_exceeds_measurable_ceiling");
+        limitations.ShouldNotContain($"{LiveRecoveryValidationJobs.Continuity}:rpo:target_exceeds_measurable_ceiling");
+        limitations.ShouldNotContain($"{LiveRecoveryValidationJobs.ScopedOutage}:scope-recording-latency:target_exceeds_measurable_ceiling");
+    }
+
+    [Fact]
+    public void CanonicalTargetsAreAnchoredToTheProductRecoveryTargets()
+    {
+        // Pins CanonicalTargetsFor to RecoveryTargets. Every fixture above states the seconds as literals precisely so
+        // this is the single place the two are tied together, rather than each proving the other.
+        LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(LiveRecoveryValidationJobs.Continuity)["rpo"]
+            .ShouldBe(RecoveryTargets.MaxRpo.TotalSeconds);
+        LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(LiveRecoveryValidationJobs.Continuity)["rto"]
+            .ShouldBe(RecoveryTargets.MaxRto.TotalSeconds);
+        LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(LiveRecoveryValidationJobs.ProjectionRebuild)["rebuild-duration"]
+            .ShouldBe(RecoveryTargets.MaxRto.TotalSeconds);
+        LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(LiveRecoveryValidationJobs.ScopedOutage)["scope-recording-latency"]
+            .ShouldBe(RecoveryTargets.MaxScopeRecordingLatency.TotalSeconds);
+    }
+
+    private static LiveRecoveryValidationEvidenceAttempt AttemptWithAssertion(string jobId, string assertion, bool? value)
+        => MutateJob(jobId, manifest =>
+        {
+            Dictionary<string, bool> assertions = new(manifest.Assertions, StringComparer.Ordinal);
+            if (value is { } present)
+            {
+                assertions[assertion] = present;
+            }
+            else
+            {
+                assertions.Remove(assertion);
+            }
+
+            return manifest with { Assertions = assertions };
+        });
+
+    private static LiveRecoveryValidationEvidenceAttempt MutateContinuity(
+        Func<RecoveryValidationEvidenceManifest, RecoveryValidationEvidenceManifest> mutate)
+        => MutateJob(LiveRecoveryValidationJobs.Continuity, mutate);
+
+    private static LiveRecoveryValidationEvidenceAttempt MutateJob(
+        string jobId,
+        Func<RecoveryValidationEvidenceManifest, RecoveryValidationEvidenceManifest> mutate)
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        bool mutated = false;
+        List<RecoveryValidationEvidenceManifest> evidence = [];
+        foreach (RecoveryValidationEvidenceManifest manifest in complete.Evidence!)
+        {
+            if (!mutated && string.Equals(manifest.JobId, jobId, StringComparison.Ordinal))
+            {
+                evidence.Add(mutate(manifest));
+                mutated = true;
+                continue;
+            }
+
+            evidence.Add(manifest);
+        }
+
+        return complete with { Evidence = evidence };
+    }
+
     private static LiveRecoveryValidationEvidenceGateDecision Evaluate(
         LiveRecoveryValidationEvidenceAttempt attempt,
         LiveRecoveryValidationGatePolicy? policy = null)
@@ -234,39 +395,40 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
 
     private static RecoveryValidationEvidenceManifest Manifest(string jobId, string scenario)
     {
-        Dictionary<string, bool> assertions = new(StringComparer.Ordinal)
-        {
-            ["cleanup-complete"] = true,
-        };
+        // Every assertion the sink writes, because the gate now requires the full per-job vocabulary: a manifest that
+        // simply omits `tenant-isolation-preserved` must not pass merely because nothing looked for it.
+        Dictionary<string, bool> assertions = LiveRecoveryValidationEvidenceGate
+            .RequiredAssertionsFor(jobId)
+            .ToDictionary(name => name, _ => true, StringComparer.Ordinal);
         string verdict;
         Dictionary<string, double> measurements = new(StringComparer.Ordinal);
         if (jobId == LiveRecoveryValidationJobs.Continuity)
         {
-            assertions["data-loss-absent"] = true;
             verdict = ContinuityDrillVerdicts.Met;
             measurements["rpo"] = 0;
             measurements["rto"] = 28;
         }
         else if (jobId == LiveRecoveryValidationJobs.ProjectionRebuild)
         {
-            assertions["duration-within-target"] = true;
-            assertions["structurally-equivalent"] = true;
             verdict = ProjectionRebuildVerdicts.Equivalent;
             measurements["rebuild-duration"] = 0.01;
         }
         else
         {
-            assertions["scope-contained"] = true;
-            assertions["scope-recorded-within-target"] = true;
             verdict = ScopedOutageDegradationVerdicts.Contained;
             measurements["scope-recording-latency"] = 0.001;
         }
 
-        // The gate owns the targets; a manifest that declares its own is rejected. Mirror the canonical values here so
-        // the fixture represents a well-formed run rather than a run that set its own bar.
-        Dictionary<string, double> targets = new(
-            LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(jobId),
-            StringComparer.Ordinal);
+        // Literal seconds, NOT LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(jobId). Building the fixture from
+        // the same function the gate compares against made `target_not_canonical` unfalsifiable: had CanonicalTargetsFor
+        // drifted from RecoveryTargets to 21_600 s, every one of these tests still passed. These values pin the product
+        // targets independently, so a drift in either direction fails here.
+        Dictionary<string, double> targets = jobId switch
+        {
+            LiveRecoveryValidationJobs.Continuity => new(StringComparer.Ordinal) { ["rpo"] = 900, ["rto"] = 14_400 },
+            LiveRecoveryValidationJobs.ProjectionRebuild => new(StringComparer.Ordinal) { ["rebuild-duration"] = 14_400 },
+            _ => new(StringComparer.Ordinal) { ["scope-recording-latency"] = 300 },
+        };
 
         return new RecoveryValidationEvidenceManifest
         {
@@ -304,12 +466,8 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
             MeasurableRecoveryCeilingSeconds = 180,
             ArtifactLocators = new Dictionary<string, string>
             {
-                ["test-output"] = "artifact:live-recovery/results.trx",
-                ["reports"] = "artifact:live-recovery/reports",
-                ["logs"] = "artifact:live-recovery/logs",
-                ["traces"] = "artifact:live-recovery/traces",
-                ["metrics"] = "artifact:live-recovery/metrics",
-                ["state-end-state"] = "artifact:live-recovery/state-end-state",
+                ["test-output"] = "artifact:live-recovery-validation-evidence/results.trx",
+                ["reports"] = "artifact:live-recovery-validation-evidence/reports",
             },
         };
     }

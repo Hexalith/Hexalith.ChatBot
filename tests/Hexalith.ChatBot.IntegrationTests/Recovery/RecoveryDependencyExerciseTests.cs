@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.RecoverySandbox;
+using Hexalith.ChatBot.Server.Projections;
 
 using Shouldly;
 
@@ -28,6 +29,9 @@ public sealed class RecoveryDependencyExerciseTests
                 new RecoveryEventStoreGatewayClient(state),
                 new RecoveryAuditWriter(state),
                 new RecoveryAttachmentContentSource(state),
+                new RecoveryFolderStore(),
+                new RecoveryTenantAiPolicySnapshotProvider(),
+                new InMemoryProjectConversationProjectionStore(),
                 monitor);
             _ = state.Fault(dependency, DateTimeOffset.UtcNow);
 

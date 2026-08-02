@@ -48,6 +48,8 @@ internal sealed class LiveContinuityDrillScenarioRunner(
             .SeedCommittedOperationAsync(tenantRef, correlationId, cancellationToken)
             .ConfigureAwait(false);
         bool measurementProduced = false;
+        bool cleanupComplete = false;
+        ContinuityDrillMeasurement? measurement;
         try
         {
             RecoveryFaultObservation? observation = null;
@@ -102,14 +104,14 @@ internal sealed class LiveContinuityDrillScenarioRunner(
                 ? OrderedDuration(checkpoint.LastCommittedAtUtc, observation.ObservedAtUtc, "EventStore RPO")
                 : TimeSpan.Zero;
             TimeSpan rto = OrderedDuration(observation.ObservedAtUtc, recoveredAtUtc, "EventStore RTO");
-            ContinuityDrillMeasurement measurement = new(
+            measurement = new ContinuityDrillMeasurement(
                 startedAtUtc,
                 recoveredAtUtc,
                 rpo,
                 rto,
                 dataLossDetected,
                 new RecoveryValidationExecutionAssertions(
-                    CleanupComplete: true,
+                    CleanupComplete: false, // patched below with the cleanup step's real, independently observed outcome
                     FaultObserved: true,
                     RecoveryObserved: recoveredAtUtc != default,
                     IndependentControlSucceeded: endState.TenantIsolationPreserved,
@@ -119,7 +121,6 @@ internal sealed class LiveContinuityDrillScenarioRunner(
                     ImmutableSourceOnly: false,
                     MailboxReingestionAbsent: false));
             measurementProduced = true;
-            return measurement;
         }
         finally
         {
@@ -129,7 +130,7 @@ internal sealed class LiveContinuityDrillScenarioRunner(
             try
             {
                 using CancellationTokenSource cleanup = new(options.RestorationTimeout);
-                await operations.CleanupEventStoreScenarioAsync(cleanup.Token).ConfigureAwait(false);
+                cleanupComplete = await operations.CleanupEventStoreScenarioAsync(cleanup.Token).ConfigureAwait(false);
             }
             catch (Exception) when (!measurementProduced)
             {
@@ -138,6 +139,8 @@ internal sealed class LiveContinuityDrillScenarioRunner(
                 // not match and the cleanup failure propagates as the real result.
             }
         }
+
+        return measurement with { ExecutionAssertions = measurement.ExecutionAssertions! with { CleanupComplete = cleanupComplete } };
     }
 
     private async ValueTask<ContinuityDrillMeasurement> RunSubscriptionFailureAsync(
@@ -147,6 +150,8 @@ internal sealed class LiveContinuityDrillScenarioRunner(
     {
         DateTimeOffset startedAtUtc = operations.UtcNow;
         bool measurementProduced = false;
+        bool cleanupComplete = false;
+        ContinuityDrillMeasurement? measurement;
         try
         {
             RecoveryFaultObservation? observation = null;
@@ -198,14 +203,14 @@ internal sealed class LiveContinuityDrillScenarioRunner(
                 ? OrderedDuration(startedAtUtc, observation.ObservedAtUtc, "subscription RPO")
                 : TimeSpan.Zero;
             TimeSpan rto = OrderedDuration(observation.ObservedAtUtc, endState.RecoveredAtUtc, "subscription RTO");
-            ContinuityDrillMeasurement measurement = new(
+            measurement = new ContinuityDrillMeasurement(
                 startedAtUtc,
                 endState.RecoveredAtUtc,
                 rpo,
                 rto,
                 dataLossDetected,
                 new RecoveryValidationExecutionAssertions(
-                    CleanupComplete: true,
+                    CleanupComplete: false, // patched below with the cleanup step's real, independently observed outcome
                     FaultObserved: true,
                     RecoveryObserved: endState.DeliveredCount > 0,
                     IndependentControlSucceeded: endState.TenantIsolationPreserved,
@@ -215,7 +220,6 @@ internal sealed class LiveContinuityDrillScenarioRunner(
                     ImmutableSourceOnly: false,
                     MailboxReingestionAbsent: false));
             measurementProduced = true;
-            return measurement;
         }
         finally
         {
@@ -224,13 +228,15 @@ internal sealed class LiveContinuityDrillScenarioRunner(
             try
             {
                 using CancellationTokenSource cleanup = new(options.RestorationTimeout);
-                await operations.CleanupSubscriptionScenarioAsync(tenantRef, cleanup.Token).ConfigureAwait(false);
+                cleanupComplete = await operations.CleanupSubscriptionScenarioAsync(tenantRef, cleanup.Token).ConfigureAwait(false);
             }
             catch (Exception) when (!measurementProduced)
             {
                 // A drill failure is already propagating and carries the root cause.
             }
         }
+
+        return measurement with { ExecutionAssertions = measurement.ExecutionAssertions! with { CleanupComplete = cleanupComplete } };
     }
 
     /// <summary>

@@ -46,12 +46,27 @@ public sealed class LiveRecoveryValidationOptionsTests
     [Fact]
     public void EnabledConfigurationCrossValidatesRecoveryScheduleAndWorkflowTimeouts()
     {
+        // A per-scenario budget the sweep cannot afford serially is rejected at validation rather than being silently
+        // truncated by the outer workflow deadline. This replaces the former `PerScenarioTimeout >= MaxRto` rule, which
+        // demanded a 4-hour per-scenario budget that nine serial scenarios can never fit inside a sub-RunnerBudget
+        // workflow — a rule that read as a measurement guarantee while being arithmetically unsatisfiable.
         LiveRecoveryValidationOptions options = ValidOptions();
-        options.PerScenarioTimeout = RecoveryTargets.MaxRto - TimeSpan.FromTicks(1);
-        options.Validate().ShouldNotBeNull().ShouldContain(nameof(LiveRecoveryValidationOptions.PerScenarioTimeout));
+        options.PerScenarioTimeout = options.WorkflowTimeout / LiveRecoveryValidationOptions.MinimumSweepScenarioCount;
+        options.Validate().ShouldNotBeNull().ShouldContain(nameof(LiveRecoveryValidationOptions.WorkflowTimeout));
 
         options = ValidOptions();
-        options.WorkflowTimeout = RecoveryTargets.MaxRto + options.RestorationTimeout;
+        options.WorkflowTimeout = TimeSpan.FromMinutes(31);
+        options.Validate().ShouldNotBeNull().ShouldContain(nameof(LiveRecoveryValidationOptions.WorkflowTimeout));
+
+        // WorkflowTimeout must fail closed before the runner kills the job mid-injection.
+        options = ValidOptions();
+        options.WorkflowTimeout = options.RunnerBudget;
+        options.Validate().ShouldNotBeNull().ShouldContain(nameof(LiveRecoveryValidationOptions.RunnerBudget));
+
+        // TimeSpan.MaxValue overflowed the serial-budget multiplication, so ValidateOnStart reported a stack trace
+        // instead of a configuration error.
+        options = ValidOptions();
+        options.PerScenarioTimeout = TimeSpan.MaxValue;
         options.Validate().ShouldNotBeNull().ShouldContain(nameof(LiveRecoveryValidationOptions.WorkflowTimeout));
 
         options = ValidOptions();
@@ -72,9 +87,9 @@ public sealed class LiveRecoveryValidationOptionsTests
             ValidationPartitionRef = "recovery-partition-v1",
             ControllerCapability = LiveRecoveryValidationOptions.AspireControllerCapability,
             ControllerSecret = "injected-by-tier3",
-            PerScenarioTimeout = RecoveryTargets.MaxRto,
+            PerScenarioTimeout = TimeSpan.FromMinutes(25),
             WorkflowTimeout = TimeSpan.FromHours(5),
             EvidenceDirectory = Path.GetFullPath("TestResults/live-recovery"),
-            EvidenceLocator = "artifact:live-recovery-validation",
+            EvidenceLocator = "artifact:live-recovery-validation-evidence",
         };
 }
