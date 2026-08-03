@@ -242,7 +242,7 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
             DatasetRef = "recovery-baseline",
             DatasetVersion = "v1",
             DatasetVolume = 6,
-            ProjectionSchemaVersion = "project-conversation-v1",
+            ProjectionSchemaVersion = "chatbot.project-conversation-source-email.v1",
             ValidationPartitionRef = "recovery-partition-v1",
             ControllerCapability = LiveRecoveryValidationOptions.AspireControllerCapability,
             ControllerSecret = "tier3-value",

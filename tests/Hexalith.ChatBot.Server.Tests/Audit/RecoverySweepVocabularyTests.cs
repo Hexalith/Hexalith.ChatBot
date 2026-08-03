@@ -63,7 +63,7 @@ public sealed class RecoverySweepVocabularyTests
         RecoveryValidationDatasetDescriptor overflowing = new(
             DatasetRef: "recovery-baseline",
             Version: "v1",
-            ProjectionSchemaVersion: "project-conversation-v1",
+            ProjectionSchemaVersion: "chatbot.project-conversation-source-email.v1",
             ValidationPartitionRef: "recovery-partition-v1",
             SourceRecordCount: int.MaxValue,
             WormAuditRecordCount: int.MaxValue,
@@ -74,7 +74,7 @@ public sealed class RecoverySweepVocabularyTests
             UsesIsolatedValidationStore: true);
 
         overflowing
-            .Validate("recovery-baseline", "v1", 6, "project-conversation-v1", "recovery-partition-v1")
+            .Validate("recovery-baseline", "v1", 6, "chatbot.project-conversation-source-email.v1", "recovery-partition-v1")
             .ShouldNotBeNull()
             .ShouldContain("overflow", Case.Insensitive);
     }

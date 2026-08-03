@@ -83,7 +83,7 @@ public sealed class LiveRecoveryValidationOptionsTests
             DatasetRef = "recovery-baseline",
             DatasetVersion = "v1",
             DatasetVolume = 6,
-            ProjectionSchemaVersion = "project-conversation-v1",
+            ProjectionSchemaVersion = "chatbot.project-conversation-source-email.v1",
             ValidationPartitionRef = "recovery-partition-v1",
             ControllerCapability = LiveRecoveryValidationOptions.AspireControllerCapability,
             ControllerSecret = "injected-by-tier3",

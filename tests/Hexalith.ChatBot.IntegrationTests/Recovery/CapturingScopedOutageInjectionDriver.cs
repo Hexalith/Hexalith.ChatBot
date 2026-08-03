@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 using Hexalith.ChatBot.Server.Audit;
 
 namespace Hexalith.ChatBot.IntegrationTests.Recovery;
@@ -5,8 +7,10 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 /// <summary>Diagnostic decorator that preserves live scoped-outage failures after the coordinator fails closed.</summary>
 internal sealed class CapturingScopedOutageInjectionDriver(IScopedOutageInjectionDriver inner) : IScopedOutageInjectionDriver
 {
+    private readonly ConcurrentDictionary<string, Exception> _failures = new(StringComparer.Ordinal);
+
     /// <summary>Gets the dependency failures captured during the current sweep.</summary>
-    public IDictionary<string, Exception> Failures { get; } = new Dictionary<string, Exception>(StringComparer.Ordinal);
+    public IReadOnlyDictionary<string, Exception> Failures => _failures;
 
     /// <inheritdoc />
     public async ValueTask<ScopedOutageDegradationMeasurement> InjectAndMeasureAsync(
@@ -21,9 +25,9 @@ internal sealed class CapturingScopedOutageInjectionDriver(IScopedOutageInjectio
                 .InjectAndMeasureAsync(dependency, testTenantRef, correlationId, cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch (Exception exception)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            Failures[dependency] = new InvalidOperationException($"Scoped-outage scenario '{dependency}' failed.", exception);
+            _failures[dependency] = new InvalidOperationException($"Scoped-outage scenario '{dependency}' failed.", exception);
             throw;
         }
     }

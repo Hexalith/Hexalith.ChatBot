@@ -34,6 +34,25 @@ internal static class LiveRecoveryValidationEvidenceGate
                 "The maximum evidence age must be positive.");
         }
 
+        // A negative floor is not "unpinned" (unpinned is zero) — it is a malformed policy that must fail fast rather
+        // than silently pass every manifest, because the comparisons below (`> 0`) never fire below zero.
+        if (policy.MinimumDatasetVolume < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(policy),
+                policy.MinimumDatasetVolume,
+                "The minimum dataset volume must not be negative.");
+        }
+
+        if (!double.IsFinite(policy.MaximumMeasurableRecoveryCeilingSeconds) ||
+            policy.MaximumMeasurableRecoveryCeilingSeconds < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(policy),
+                policy.MaximumMeasurableRecoveryCeilingSeconds,
+                "The maximum measurable recovery ceiling must be a finite, non-negative number of seconds.");
+        }
+
         List<string> stopShip = [];
         List<string> targetDeviations = [];
         List<string> claimLimitations = [];
@@ -512,15 +531,18 @@ internal static class LiveRecoveryValidationEvidenceGate
     /// <summary>
     /// Returns whether any measured value exceeded the <b>canonical</b> product target for its key. This is a
     /// measurable target deviation, never a structural or unmeasurable breach, so it stays in the deviation channel.
+    /// <para>
+    /// Compares only against <paramref name="canonicalTargets"/> — never against <c>manifest.AllowedTargetsSeconds</c>
+    /// — because the manifest's declared allowance is the run's own self-declared bar. A key outside the canonical
+    /// vocabulary is already rejected elsewhere as <c>non_canonical_measurement_key</c>, so falling back to the
+    /// manifest's declaration here let a run's own inflated allowance suppress a genuine deviation.
+    /// </para>
     /// </summary>
     private static bool ExceedsCanonicalTarget(
         RecoveryValidationEvidenceManifest manifest,
         IReadOnlyDictionary<string, double> canonicalTargets)
         => manifest.MeasurementsSeconds.Any(measurement =>
-            canonicalTargets.TryGetValue(measurement.Key, out double allowed)
-                ? measurement.Value > allowed
-                : manifest.AllowedTargetsSeconds.TryGetValue(measurement.Key, out double declared) &&
-                    measurement.Value > declared);
+            canonicalTargets.TryGetValue(measurement.Key, out double allowed) && measurement.Value > allowed);
 
     private static bool Assertion(RecoveryValidationEvidenceManifest manifest, string name)
         => manifest.Assertions.TryGetValue(name, out bool passed) && passed;

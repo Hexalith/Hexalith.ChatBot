@@ -21,9 +21,10 @@ internal sealed class CapturingContinuityDrillScenarioRunner(IContinuityDrillSce
         {
             return await inner.RunAsync(scenario, testTenantRef, correlationId, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            _failures.Add(new InvalidOperationException($"Live scenario '{scenario}' failed: {exception.Message}", exception));
+            // Stable token only — do not embed exception.Message (can leak into uploaded .trx outside metadata-only reports).
+            _failures.Add(new InvalidOperationException($"Live scenario '{scenario}' failed.", exception));
             throw;
         }
     }

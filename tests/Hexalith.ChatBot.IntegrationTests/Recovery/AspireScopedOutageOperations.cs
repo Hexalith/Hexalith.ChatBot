@@ -486,7 +486,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
     }
 
     /// <inheritdoc />
-    public async ValueTask CleanupAsync(string dependency, string tenantRef, CancellationToken cancellationToken)
+    public async ValueTask<bool> CleanupAsync(string dependency, string tenantRef, CancellationToken cancellationToken)
     {
         // Erase before restoring/verifying. Sentinel rows are seeded into the shared control tenant `tenant-beta`, so
         // a throw from RestoreAsync or a non-2xx status used to strand them permanently and poison later runs.
@@ -514,7 +514,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
                 throw new InvalidOperationException("Identity remained unavailable after scoped-outage cleanup.");
             }
 
-            return;
+            return true;
         }
 
         try
@@ -547,6 +547,8 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         {
             throw new InvalidOperationException("The dependency remained faulted after cleanup.");
         }
+
+        return true;
     }
 
     private async Task EraseSentinelsAsync(

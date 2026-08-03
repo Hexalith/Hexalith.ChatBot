@@ -2,10 +2,11 @@ namespace Hexalith.ChatBot.Server.Audit;
 
 /// <summary>
 /// The single, canonical home for the ChatBot's recovery-point / recovery-time objectives (Story 9.11, NFR56 / A10).
-/// These are the default-MVP commitments for source records, attachments, approval history, command history, policy
-/// snapshots, and audit records. Story 12.15 recorded RPO ≤ 15 min / RTO ≤ 4 hr as <b>provisional</b> against the named
-/// Aspire/DAPR sandbox, pending a retained hosted run locator; the A10 assumption is not yet discharged. Future drills
-/// continue to produce recalibration evidence through <see cref="ContinuityDrillReport"/>.
+/// These are the <b>provisional</b> default-MVP targets for source records, attachments, approval history, command
+/// history, policy snapshots, and audit records — not yet-discharged commitments. Story 12.15 recorded RPO ≤ 15 min /
+/// RTO ≤ 4 hr as provisional against the named Aspire/DAPR sandbox, pending a retained hosted run locator; the A10
+/// assumption is not yet discharged. Future drills continue to produce recalibration evidence through
+/// <see cref="ContinuityDrillReport"/>.
 /// <para>
 /// This class is the <b>single source of truth</b> for the two targets (mirroring
 /// <see cref="AuditCompletenessMeasurement.CompletenessTargetFraction"/> / <c>RollingWindow</c>): the pure

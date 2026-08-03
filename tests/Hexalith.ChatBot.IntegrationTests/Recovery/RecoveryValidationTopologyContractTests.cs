@@ -1,11 +1,13 @@
 using System.Text.Json;
 
+using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
 
 using CommunityToolkit.Aspire.Hosting.Dapr;
 
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Projections;
 
 using Shouldly;
 
@@ -14,6 +16,14 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 /// <summary>Story 12.15 Task 2 topology guards for the reserved identity, controls, and deterministic dataset.</summary>
 public sealed class RecoveryValidationTopologyContractTests
 {
+    // Program.cs fails closed without a configured recovery mailbox secret. These topology-only contract tests
+    // never exercise the recovery mailbox client, so a fixed, well-formed placeholder satisfies
+    // PrepareKeycloakRealmImport without pulling every test into live-recovery validation configuration.
+    private static readonly string[] MailboxSecretArgs =
+    [
+        $"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={new string('a', 32)}",
+    ];
+
     [Fact]
     public void RealmKeepsControlTenantsAndAddsDedicatedReplayValidationIdentity()
     {
@@ -64,7 +74,9 @@ public sealed class RecoveryValidationTopologyContractTests
             "Hexalith.ChatBot.AppHost",
             "Program.cs"));
         appHost.ShouldContain("__HEXALITH_CHATBOT_RECOVERY_CLIENT_SECRET__");
-        appHost.ShouldContain("RandomNumberGenerator.GetBytes");
+        appHost.ShouldContain("ChatBot:LiveRecoveryValidation:MailboxClientSecret");
+        appHost.ShouldContain("A recovery mailbox client secret must be supplied");
+        appHost.ShouldNotContain("RandomNumberGenerator");
     }
 
     [Fact]
@@ -81,7 +93,8 @@ public sealed class RecoveryValidationTopologyContractTests
 
         root.GetProperty("datasetRef").GetString().ShouldBe("recovery-baseline");
         root.GetProperty("version").GetString().ShouldBe("v1");
-        root.GetProperty("projectionSchemaVersion").GetString().ShouldBe("project-conversation-v1");
+        root.GetProperty("projectionSchemaVersion").GetString()
+            .ShouldBe(ProjectConversationSourceEmailView.CurrentSchemaVersion);
         root.GetProperty("projectionMode").GetString().ShouldBe("isolated-validation-store");
         root.GetProperty("validationPartitionRef").GetString().ShouldBe("recovery-partition-v1");
 
@@ -111,22 +124,96 @@ public sealed class RecoveryValidationTopologyContractTests
     public async Task RecoveryWorkerSimulatorIsAbsentByDefaultAndComposedOnlyWithExplicitCapabilityConfiguration()
     {
         IDistributedApplicationTestingBuilder ordinary = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(TestContext.Current.CancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
-        ordinary.Resources.ShouldNotContain(resource => string.Equals(resource.Name, "recovery-sandbox", StringComparison.Ordinal));
+        try
+        {
+            ordinary.Resources.ShouldNotContain(resource => string.Equals(resource.Name, "recovery-sandbox", StringComparison.Ordinal));
+        }
+        finally
+        {
+            await ordinary.DisposeAsync().ConfigureAwait(true);
+        }
 
         IDistributedApplicationTestingBuilder recovery = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(TestContext.Current.CancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
-        _ = recovery.AddRecoverySandbox(
-            "Testing",
-            "replay-test:recovery-validation",
-            "recovery-validation",
-            LiveRecoveryValidationOptions.AspireControllerCapability,
-            "tier3-injected-value",
-            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        try
+        {
+            _ = recovery.AddRecoverySandbox(
+                "Testing",
+                RecoveryValidationTopology.LogicalTenantRef,
+                RecoveryValidationTopology.StorageTenantRef,
+                LiveRecoveryValidationOptions.AspireControllerCapability,
+                "tier3-injected-value",
+                "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
-        recovery.Resources.ShouldContain(resource => string.Equals(resource.Name, "recovery-sandbox", StringComparison.Ordinal));
+            recovery.Resources.ShouldContain(resource => string.Equals(resource.Name, "recovery-sandbox", StringComparison.Ordinal));
+        }
+        finally
+        {
+            await recovery.DisposeAsync().ConfigureAwait(true);
+        }
+    }
+
+    [Theory]
+    [InlineData("Production", "replay-test:recovery-validation", "recovery-validation", LiveRecoveryValidationOptions.AspireControllerCapability)]
+    [InlineData("Testing", "tenant-alpha", "tenant-alpha", LiveRecoveryValidationOptions.AspireControllerCapability)]
+    [InlineData("Testing", "replay-test:recovery-validation", "wrong-storage", LiveRecoveryValidationOptions.AspireControllerCapability)]
+    [InlineData("Testing", "replay-test:recovery-validation", "recovery-validation", "wrong-capability")]
+    public async Task AddRecoverySandboxRejectsInvalidCapabilityTenantOrEnvironment(
+        string environmentName,
+        string tenantRef,
+        string storageTenantRef,
+        string controllerCapability)
+    {
+        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        try
+        {
+            _ = Should.Throw<InvalidOperationException>(() => builder.AddRecoverySandbox(
+                environmentName,
+                tenantRef,
+                storageTenantRef,
+                controllerCapability,
+                "tier3-injected-value",
+                "01ARZ3NDEKTSV4RRFFQ69G5FAW"));
+            builder.Resources.ShouldNotContain(resource => string.Equals(resource.Name, "recovery-sandbox", StringComparison.Ordinal));
+        }
+        finally
+        {
+            await builder.DisposeAsync().ConfigureAwait(true);
+        }
+    }
+
+    [Fact]
+    public async Task RecoverySandboxComposedEnvironmentKeepsLogicalAndPhysicalTenantsDistinct()
+    {
+        IDistributedApplicationTestingBuilder recovery = await DistributedApplicationTestingBuilder
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        try
+        {
+            _ = recovery.AddRecoverySandbox(
+                "Testing",
+                RecoveryValidationTopology.LogicalTenantRef,
+                RecoveryValidationTopology.StorageTenantRef,
+                LiveRecoveryValidationOptions.AspireControllerCapability,
+                "tier3-injected-value",
+                "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+            IResource sandbox = recovery.Resources.Single(resource =>
+                string.Equals(resource.Name, "recovery-sandbox", StringComparison.Ordinal));
+            IReadOnlyDictionary<string, string> environment = await ResolveEnvironmentAsync(sandbox).ConfigureAwait(true);
+            environment["Recovery__TenantRef"].ShouldBe(RecoveryValidationTopology.LogicalTenantRef);
+            environment["Recovery__StorageTenantRef"].ShouldBe(RecoveryValidationTopology.StorageTenantRef);
+            environment["Recovery__TenantRef"].ShouldNotBe(environment["Recovery__StorageTenantRef"]);
+        }
+        finally
+        {
+            await recovery.DisposeAsync().ConfigureAwait(true);
+        }
     }
 
     [Fact]
@@ -142,23 +229,113 @@ public sealed class RecoveryValidationTopologyContractTests
         };
         string[] args = expected
             .Select(pair => $"--Dapr:InternalGrpcPorts:{pair.Key}={pair.Value}")
+            .Concat(MailboxSecretArgs)
             .ToArray();
 
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
             .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(args, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
-
-        foreach ((string appId, int port) in expected)
+        try
         {
-            IResource application = builder.Resources.Single(resource =>
-                string.Equals(resource.Name, appId, StringComparison.Ordinal));
-            DaprSidecarAnnotation sidecar = application.Annotations.OfType<DaprSidecarAnnotation>().Single();
-            DaprSidecarOptions options = sidecar.Sidecar.Annotations
-                .OfType<DaprSidecarOptionsAnnotation>()
-                .Single()
-                .Options;
-            options.DaprInternalGrpcPort.ShouldBe(port, appId);
+            foreach ((string appId, int port) in expected)
+            {
+                IResource application = builder.Resources.Single(resource =>
+                    string.Equals(resource.Name, appId, StringComparison.Ordinal));
+                DaprSidecarAnnotation sidecar = application.Annotations.OfType<DaprSidecarAnnotation>().Single();
+                DaprSidecarOptions options = sidecar.Sidecar.Annotations
+                    .OfType<DaprSidecarOptionsAnnotation>()
+                    .Single()
+                    .Options;
+                options.DaprInternalGrpcPort.ShouldBe(port, appId);
+
+                // Every sidecar in this topology must load the local, default-allow ACL config; the deny-by-default
+                // accesscontrol.yaml would otherwise silently apply (mTLS is off, so its policy can never match) and
+                // the eventstore -> chatbot round-trip would fail closed with no caller identity to blame.
+                options.Config.ShouldNotBeNullOrWhiteSpace(appId);
+                options.Config.ShouldEndWith("accesscontrol.local.yaml", customMessage: appId);
+            }
         }
+        finally
+        {
+            await builder.DisposeAsync().ConfigureAwait(true);
+        }
+    }
+
+    [Fact]
+    public async Task AddHexalithChatBotRejectsTwoSidecarsSharingOneDaprInternalGrpcPort()
+    {
+        string[] args =
+        [
+            "--Dapr:InternalGrpcPorts:eventstore=41101",
+            "--Dapr:InternalGrpcPorts:chatbot=41101",
+            .. MailboxSecretArgs,
+        ];
+
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => DistributedApplicationTestingBuilder
+                .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(args, TestContext.Current.CancellationToken));
+
+        exception.Message.ShouldContain("eventstore");
+        exception.Message.ShouldContain("chatbot");
+        exception.Message.ShouldContain("41101");
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("65536")]
+    [InlineData("not-a-port")]
+    public async Task AddHexalithChatBotRejectsAnOutOfRangeOrUnparsableDaprInternalGrpcPort(string invalidPort)
+    {
+        string[] args =
+        [
+            $"--Dapr:InternalGrpcPorts:chatbot={invalidPort}",
+            .. MailboxSecretArgs,
+        ];
+
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => DistributedApplicationTestingBuilder
+                .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(args, TestContext.Current.CancellationToken));
+
+        exception.Message.ShouldContain("chatbot");
+        exception.Message.ShouldContain("must be an integer from 1 through 65535");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task PrepareKeycloakRealmImportRejectsAWhitespaceOrBlankMailboxClientSecret(string blankSecret)
+    {
+        string[] args = [$"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={blankSecret}"];
+
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => DistributedApplicationTestingBuilder
+                .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(args, TestContext.Current.CancellationToken));
+
+        exception.Message.ShouldContain("A recovery mailbox client secret must be supplied");
+    }
+
+    [Fact]
+    public async Task PrepareKeycloakRealmImportRejectsAMailboxClientSecretShorterThanThirtyTwoCharacters()
+    {
+        string[] args = [$"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={new string('a', 31)}"];
+
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => DistributedApplicationTestingBuilder
+                .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(args, TestContext.Current.CancellationToken));
+
+        exception.Message.ShouldContain("must be at least 32 characters long");
+    }
+
+    [Fact]
+    public async Task PrepareKeycloakRealmImportRejectsAMailboxClientSecretWithDisallowedCharacters()
+    {
+        string[] args = [$"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={new string('a', 31)}!"];
+
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => DistributedApplicationTestingBuilder
+                .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(args, TestContext.Current.CancellationToken));
+
+        exception.Message.ShouldContain("must contain only ASCII letters, digits, '-', or '_'");
     }
 
     [Fact]
@@ -203,6 +380,30 @@ public sealed class RecoveryValidationTopologyContractTests
         source.ShouldContain("= \"5\"");
         source.ShouldContain("EventStore__RateLimiting__PermitLimit");
         source.ShouldContain("EventStore__RateLimiting__ConsumerPermitLimit");
+    }
+
+    private static async Task<IReadOnlyDictionary<string, string>> ResolveEnvironmentAsync(IResource resource)
+    {
+        Dictionary<string, object> environment = new(StringComparer.Ordinal);
+        EnvironmentCallbackContext context = new(
+            new DistributedApplicationExecutionContext(DistributedApplicationOperation.Run),
+            resource,
+            environment,
+            TestContext.Current.CancellationToken);
+        foreach (EnvironmentCallbackAnnotation annotation in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
+        {
+            await annotation.Callback(context).ConfigureAwait(true);
+        }
+
+        return environment.ToDictionary(
+            static pair => pair.Key,
+            static pair => pair.Value switch
+            {
+                string text => text,
+                null => string.Empty,
+                _ => pair.Value.ToString() ?? string.Empty,
+            },
+            StringComparer.Ordinal);
     }
 
     private static string Tenant(JsonElement user)

@@ -25,4 +25,9 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Recovery\Datasets\recovery-baseline-v1.json"
+          CopyToOutputDirectory="PreserveNewest"
+          Link="Recovery\Datasets\recovery-baseline-v1.json" />
+  </ItemGroup>
 </Project>

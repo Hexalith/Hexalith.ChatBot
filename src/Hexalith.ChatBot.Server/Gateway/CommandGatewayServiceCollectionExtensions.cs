@@ -28,6 +28,7 @@ using Hexalith.EventStore.DomainService;
 using Dapr.Workflow;
 
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Hexalith.ChatBot.Server.Gateway;
 
@@ -66,13 +67,16 @@ internal static class CommandGatewayServiceCollectionExtensions
         // The section MUST be bound: without it the validator only ever sees the disabled defaults, the named section
         // is never read, and a deployment that sets ChatBot:LiveRecoveryValidation:Enabled=true (or a Production
         // EnvironmentName, or a non-replay-test tenant) is silently ignored instead of failing closed at startup.
+        //
+        // Validation itself is registered as an IValidateOptions<LiveRecoveryValidationOptions> singleton
+        // (LiveRecoveryValidationOptionsValidator) rather than an inline .Validate(...) predicate: the inline builder
+        // overload only ever surfaces the fixed generic message passed at registration time, discarding the specific
+        // reason LiveRecoveryValidationOptions.Validate() computed.
         _ = services
             .AddOptions<LiveRecoveryValidationOptions>()
             .BindConfiguration("ChatBot:LiveRecoveryValidation")
-            .Validate(
-                static options => options.Validate() is null,
-                "Invalid ChatBot:LiveRecoveryValidation configuration.")
             .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<LiveRecoveryValidationOptions>, LiveRecoveryValidationOptionsValidator>();
         services.TryAddSingleton<IRecoveryValidationEvidenceSink>(DiscardingRecoveryValidationEvidenceSink.Instance);
 
         // The real dispatcher routes admitted commands into EventStore through the public gateway client. The

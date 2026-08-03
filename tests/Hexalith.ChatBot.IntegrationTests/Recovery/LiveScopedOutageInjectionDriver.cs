@@ -109,8 +109,9 @@ internal sealed class LiveScopedOutageInjectionDriver(
             using CancellationTokenSource cleanup = new(options.RestorationTimeout);
             try
             {
-                await operations.CleanupAsync(dependency, testTenantRef, cleanup.Token).ConfigureAwait(false);
-                cleanupComplete = true;
+                cleanupComplete = await operations
+                    .CleanupAsync(dependency, testTenantRef, cleanup.Token)
+                    .ConfigureAwait(false);
             }
             catch (Exception exception)
             {

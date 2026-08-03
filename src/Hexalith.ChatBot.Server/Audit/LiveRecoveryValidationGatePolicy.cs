@@ -9,6 +9,13 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// target-deviation blocking policy, and its own driver mode is not being gated — it is grading its own homework. The
 /// gate now takes them from the configured release path instead.
 /// </para>
+/// <para>
+/// <see cref="ForRelease"/> is the constructor a <b>REQUIRED/release</b> path must use: it fails fast when
+/// <see cref="ExpectedDatasetVersion"/>, <see cref="MinimumDatasetVolume"/>, or
+/// <see cref="MaximumMeasurableRecoveryCeilingSeconds"/> is left unpinned, because an unpinned anchor on a required
+/// gate run is a configuration mistake, not a legitimate choice. The record constructor's own unpinned-by-default
+/// parameters remain available for unit tests that deliberately exercise the unpinned branches.
+/// </para>
 /// </summary>
 /// <param name="ConfiguredProjectionDatasets">The dataset refs the rebuild job must cover, from the release path.</param>
 /// <param name="TargetDeviationsBlockRelease">Whether a measurable target miss blocks, decided by the release path.</param>
@@ -38,4 +45,70 @@ internal sealed record LiveRecoveryValidationGatePolicy(
     string? ExpectedDatasetVersion = null,
     int MinimumDatasetVolume = 0,
     string? RequiredRepositoryCommit = null,
-    double MaximumMeasurableRecoveryCeilingSeconds = 0);
+    double MaximumMeasurableRecoveryCeilingSeconds = 0)
+{
+    /// <summary>
+    /// Builds the policy for a <b>REQUIRED/release</b> gate run, where an unpinned anchor is a configuration mistake
+    /// rather than a legitimate "leave it unpinned" choice. The record constructor's own defaults
+    /// (<see langword="null"/>/<c>0</c>, meaning "unpinned") stay as-is for unit tests that deliberately exercise the
+    /// unpinned branches; this factory instead fails fast so a release path can never silently construct a policy
+    /// that does not actually anchor dataset version or volume.
+    /// </summary>
+    /// <param name="configuredProjectionDatasets">The dataset refs the rebuild job must cover.</param>
+    /// <param name="targetDeviationsBlockRelease">Whether a measurable target miss blocks.</param>
+    /// <param name="requiredDriverMode">The driver-mode token evidence must carry to count as a live run.</param>
+    /// <param name="maximumEvidenceAge">How old evidence may be before it is stale.</param>
+    /// <param name="expectedDatasetVersion">The dataset version the release path expects. Required (non-null/non-whitespace).</param>
+    /// <param name="minimumDatasetVolume">The smallest dataset volume the release path accepts as meaningful coverage. Required to be positive.</param>
+    /// <param name="maximumMeasurableRecoveryCeilingSeconds">The largest measurable-recovery ceiling the release path believes the lane can honour. Required to be finite and positive.</param>
+    /// <param name="requiredRepositoryCommit">The commit the evidence must be attributed to, or <see langword="null"/> to leave it unpinned.</param>
+    /// <returns>A policy with every release-required anchor validated and pinned.</returns>
+    /// <exception cref="ArgumentException"><paramref name="expectedDatasetVersion"/> is null or whitespace.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="minimumDatasetVolume"/> is not positive, or <paramref name="maximumMeasurableRecoveryCeilingSeconds"/>
+    /// is not a finite positive number.
+    /// </exception>
+    public static LiveRecoveryValidationGatePolicy ForRelease(
+        IReadOnlyList<string> configuredProjectionDatasets,
+        bool targetDeviationsBlockRelease,
+        string requiredDriverMode,
+        TimeSpan maximumEvidenceAge,
+        string? expectedDatasetVersion,
+        int minimumDatasetVolume,
+        double maximumMeasurableRecoveryCeilingSeconds,
+        string? requiredRepositoryCommit = null)
+    {
+        if (string.IsNullOrWhiteSpace(expectedDatasetVersion))
+        {
+            throw new ArgumentException(
+                "A release gate policy must pin an expected dataset version.",
+                nameof(expectedDatasetVersion));
+        }
+
+        if (minimumDatasetVolume <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(minimumDatasetVolume),
+                minimumDatasetVolume,
+                "A release gate policy must pin a positive minimum dataset volume.");
+        }
+
+        if (!double.IsFinite(maximumMeasurableRecoveryCeilingSeconds) || maximumMeasurableRecoveryCeilingSeconds <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maximumMeasurableRecoveryCeilingSeconds),
+                maximumMeasurableRecoveryCeilingSeconds,
+                "A release gate policy must pin a finite, positive maximum measurable recovery ceiling.");
+        }
+
+        return new LiveRecoveryValidationGatePolicy(
+            configuredProjectionDatasets,
+            targetDeviationsBlockRelease,
+            requiredDriverMode,
+            maximumEvidenceAge,
+            expectedDatasetVersion,
+            minimumDatasetVolume,
+            requiredRepositoryCommit,
+            maximumMeasurableRecoveryCeilingSeconds);
+    }
+}

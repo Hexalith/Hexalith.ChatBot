@@ -6,4 +6,5 @@ internal sealed record RecoveryDatasetRecord(
     string Reference,
     string StructuralState,
     long? Sequence = null,
-    long? SourceVersion = null);
+    long? SourceVersion = null,
+    string? CommandKind = null);

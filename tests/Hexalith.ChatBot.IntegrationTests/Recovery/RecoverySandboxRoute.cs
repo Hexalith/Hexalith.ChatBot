@@ -13,11 +13,20 @@ internal static class RecoverySandboxRoute
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantRef);
         ArgumentException.ThrowIfNullOrWhiteSpace(dependency);
         ArgumentException.ThrowIfNullOrWhiteSpace(action);
-        bool isProcess = string.Equals(action, "process", StringComparison.Ordinal);
-        if (isProcess != !string.IsNullOrWhiteSpace(correlationId) ||
-            action is not ("fault" or "restore" or "status" or "process"))
+        if (action is not ("fault" or "restore" or "status" or "process"))
         {
-            throw new InvalidOperationException("Only scoped-outage process routes accept a correlation locator.");
+            throw new InvalidOperationException(
+                $"Scoped-outage action '{action}' is not in the closed set fault|restore|status|process.");
+        }
+
+        bool isProcess = string.Equals(action, "process", StringComparison.Ordinal);
+        bool hasCorrelation = !string.IsNullOrWhiteSpace(correlationId);
+        if (isProcess != hasCorrelation)
+        {
+            throw new InvalidOperationException(
+                isProcess
+                    ? "Scoped-outage process routes require a correlation locator."
+                    : "Only scoped-outage process routes accept a correlation locator.");
         }
 
         string path = $"/recovery/{Uri.EscapeDataString(tenantRef)}/scoped-outage/" +

@@ -2,7 +2,7 @@
   "datasetRef": "recovery-baseline",
   "version": "v1",
   "volume": 6,
-  "projectionSchemaVersion": "project-conversation-v1",
+  "projectionSchemaVersion": "chatbot.project-conversation-source-email.v1",
   "projectionMode": "isolated-validation-store",
   "validationPartitionRef": "recovery-partition-v1",
   "sourceRecords": [

@@ -242,7 +242,7 @@ public sealed class LiveScopedOutageInjectionDriverTests
             DatasetRef = "recovery-baseline",
             DatasetVersion = "v1",
             DatasetVolume = 6,
-            ProjectionSchemaVersion = "project-conversation-v1",
+            ProjectionSchemaVersion = "chatbot.project-conversation-source-email.v1",
             ValidationPartitionRef = "recovery-partition-v1",
             ControllerCapability = LiveRecoveryValidationOptions.AspireControllerCapability,
             ControllerSecret = "tier3-value",
@@ -351,13 +351,13 @@ public sealed class LiveScopedOutageInjectionDriverTests
                 DuplicateSideEffectDetected: false));
         }
 
-        public ValueTask CleanupAsync(string dependency, string tenantRef, CancellationToken cancellationToken)
+        public ValueTask<bool> CleanupAsync(string dependency, string tenantRef, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Cleaned.Add(dependency);
             return FailCleanup
-                ? ValueTask.FromException(new InvalidOperationException("cleanup-failed"))
-                : ValueTask.CompletedTask;
+                ? ValueTask.FromException<bool>(new InvalidOperationException("cleanup-failed"))
+                : ValueTask.FromResult(true);
         }
     }
 }

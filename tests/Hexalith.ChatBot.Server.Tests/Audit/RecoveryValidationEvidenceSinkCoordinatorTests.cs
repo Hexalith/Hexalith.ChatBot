@@ -66,6 +66,7 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
 
         report.Verdict.ShouldBe(ContinuityDrillVerdicts.Unmeasurable);
         report.IsBreach.ShouldBeTrue();
+        report.Deviations.ShouldContain(ContinuityDrillReport.EvidenceRetentionFailedDeviation);
     }
 
     private sealed class CapturingSink : IRecoveryValidationEvidenceSink

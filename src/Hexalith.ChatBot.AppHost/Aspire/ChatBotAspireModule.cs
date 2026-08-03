@@ -3,6 +3,8 @@ using Aspire.Hosting.ApplicationModel;
 
 using CommunityToolkit.Aspire.Hosting.Dapr;
 
+using Microsoft.Extensions.Configuration;
+
 using System.Globalization;
 
 namespace Hexalith.ChatBot.AppHost.Aspire;
@@ -65,6 +67,21 @@ internal static class ChatBotAspireModule
     private const string RedisHost = "127.0.0.1:6379";
 
     /// <summary>
+    /// Every app id this module configures a DAPR sidecar for, across <see cref="AddHexalithChatBot"/> and
+    /// <see cref="AddEventStoreAdmin"/>. Kept as one list so <see cref="ValidateUniqueInternalGrpcPorts"/> can check
+    /// the whole topology's <c>Dapr:InternalGrpcPorts</c> configuration up front, even though the EventStore Admin
+    /// resources are composed by a separate call.
+    /// </summary>
+    private static readonly string[] SidecarAppIds =
+    [
+        EventStoreServiceName,
+        TenantsAppId,
+        AppId,
+        EventStoreAdminAppId,
+        EventStoreAdminUiAppId,
+    ];
+
+    /// <summary>
     /// Builds sidecar options, applying optional placement/scheduler host-address overrides from configuration
     /// (<c>Dapr:PlacementHostAddress</c> / <c>Dapr:SchedulerHostAddress</c>). When unset, daprd uses its standard
     /// defaults (a conventional <c>dapr init</c>); the override exists for hosts whose <c>dapr init</c> mapped the
@@ -103,6 +120,42 @@ internal static class ChatBotAspireModule
         };
     }
 
+    /// <summary>
+    /// Fails closed when two of this module's sidecars (<see cref="SidecarAppIds"/>) are configured with the same
+    /// <c>Dapr:InternalGrpcPorts:{appId}</c> value. Reads configuration fresh on every call rather than caching
+    /// anything in static state, so parallel test compositions with different overrides never observe each other.
+    /// </summary>
+    /// <param name="configuration">The builder's configuration, read once per composition.</param>
+    private static void ValidateUniqueInternalGrpcPorts(IConfiguration configuration)
+    {
+        Dictionary<int, string> appIdByPort = new();
+        foreach (string appId in SidecarAppIds)
+        {
+            string? configuredPort = configuration[$"Dapr:InternalGrpcPorts:{appId}"];
+            if (string.IsNullOrWhiteSpace(configuredPort))
+            {
+                continue;
+            }
+
+            // A malformed value (non-integer or out of range) is reported by SidecarOptions itself when the app
+            // id's own sidecar is configured; this pass only needs to compare values that parse as ports.
+            if (!int.TryParse(configuredPort, NumberStyles.None, CultureInfo.InvariantCulture, out int port)
+                || port is <= 0 or > 65_535)
+            {
+                continue;
+            }
+
+            if (appIdByPort.TryGetValue(port, out string? conflictingAppId))
+            {
+                throw new InvalidOperationException(
+                    $"Dapr internal gRPC port {port} is configured for both '{conflictingAppId}' and '{appId}'. "
+                    + "Each Dapr:InternalGrpcPorts entry in this topology must use a distinct port.");
+            }
+
+            appIdByPort[port] = appId;
+        }
+    }
+
     public static HexalithChatBotResources AddHexalithChatBot(
         this IDistributedApplicationBuilder builder,
         IResourceBuilder<ProjectResource> eventStore,
@@ -114,6 +167,11 @@ internal static class ChatBotAspireModule
         ArgumentNullException.ThrowIfNull(eventStore);
         ArgumentNullException.ThrowIfNull(tenants);
         ArgumentNullException.ThrowIfNull(chatBot);
+
+        // Validated once per builder composition, from configuration alone (no static mutable state): two sidecars
+        // sharing one internal gRPC port fail unpredictably at daprd startup, naming only whichever process lost
+        // the bind race, instead of failing closed here with both conflicting app ids.
+        ValidateUniqueInternalGrpcPorts(builder.Configuration);
 
         // Redis is provided by `dapr init` at 127.0.0.1:6379 (mirrors the canonical Hexalith.EventStore module).
         // Use the IPv4 literal redisHost, never "localhost": on dual-stack hosts (e.g. WSL2) "localhost" resolves

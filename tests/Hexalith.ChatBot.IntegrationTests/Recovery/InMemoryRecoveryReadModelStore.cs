@@ -11,16 +11,19 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadModelConditionalEraser
 {
     private readonly ConcurrentDictionary<string, Entry> _entries = new(StringComparer.Ordinal);
+    private int _writes;
+    private int _reads;
+    private int _erases;
     private long _version;
 
     /// <summary>Gets the number of successful persisted writes.</summary>
-    public int Writes { get; private set; }
+    public int Writes => Volatile.Read(ref _writes);
 
     /// <summary>Gets the number of persisted reads.</summary>
-    public int Reads { get; private set; }
+    public int Reads => Volatile.Read(ref _reads);
 
     /// <summary>Gets the number of successful persisted erases.</summary>
-    public int Erases { get; private set; }
+    public int Erases => Volatile.Read(ref _erases);
 
     /// <inheritdoc />
     public Task<ReadModelEntry<TValue>> GetAsync<TValue>(
@@ -30,11 +33,19 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
         where TValue : class
     {
         cancellationToken.ThrowIfCancellationRequested();
-        Reads++;
-        return Task.FromResult(
-            _entries.TryGetValue(CompositeKey(storeName, key), out Entry? entry)
-                ? new ReadModelEntry<TValue>((TValue)entry.Value, entry.ETag)
-                : new ReadModelEntry<TValue>(null, null));
+        Interlocked.Increment(ref _reads);
+        if (!_entries.TryGetValue(CompositeKey(storeName, key), out Entry? entry))
+        {
+            return Task.FromResult(new ReadModelEntry<TValue>(null, null));
+        }
+
+        if (entry.Value is not TValue typed)
+        {
+            throw new InvalidCastException(
+                $"Stored read-model value for '{storeName}/{key}' is '{entry.Value.GetType().FullName}', not '{typeof(TValue).FullName}'.");
+        }
+
+        return Task.FromResult(new ReadModelEntry<TValue>(typed, entry.ETag));
     }
 
     /// <inheritdoc />
@@ -48,7 +59,7 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(value);
         _entries[CompositeKey(storeName, key)] = new Entry(value, NextEtag());
-        Writes++;
+        Interlocked.Increment(ref _writes);
         return Task.CompletedTask;
     }
 
@@ -63,6 +74,7 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(etag);
         string compositeKey = CompositeKey(storeName, key);
         while (true)
         {
@@ -75,7 +87,7 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
 
                 if (_entries.TryAdd(compositeKey, new Entry(value, NextEtag())))
                 {
-                    Writes++;
+                    Interlocked.Increment(ref _writes);
                     return Task.FromResult(true);
                 }
 
@@ -89,7 +101,7 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
 
             if (_entries.TryUpdate(compositeKey, new Entry(value, NextEtag()), current))
             {
-                Writes++;
+                Interlocked.Increment(ref _writes);
                 return Task.FromResult(true);
             }
         }
@@ -103,6 +115,7 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(etag);
         string compositeKey = CompositeKey(storeName, key);
         if (!_entries.TryGetValue(compositeKey, out Entry? current))
         {
@@ -117,7 +130,7 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
         bool removed = _entries.TryRemove(new KeyValuePair<string, Entry>(compositeKey, current));
         if (removed)
         {
-            Erases++;
+            Interlocked.Increment(ref _erases);
         }
 
         return Task.FromResult(removed);

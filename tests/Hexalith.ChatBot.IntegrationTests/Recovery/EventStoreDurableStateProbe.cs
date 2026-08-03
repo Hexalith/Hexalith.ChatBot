@@ -49,6 +49,11 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
         TimeSpan window,
         CancellationToken cancellationToken)
     {
+        if (window <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(window), window, "Absence observation requires a positive window.");
+        }
+
         Stopwatch timer = Stopwatch.StartNew();
         do
         {
@@ -118,10 +123,22 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
         }
 
         string content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        using JsonDocument document = JsonDocument.Parse(content);
-        return document.RootElement.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined
-            ? null
-            : document.RootElement.Clone();
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return null;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(content);
+            return document.RootElement.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined
+                ? null
+                : document.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private static string? GetString(JsonElement element, string propertyName)

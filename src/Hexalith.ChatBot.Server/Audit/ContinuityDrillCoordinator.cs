@@ -223,9 +223,12 @@ internal sealed class ContinuityDrillCoordinator(
             {
                 await evidenceSink.RecordAsync(unmeasurable, cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception) when (cancellationToken is { IsCancellationRequested: false })
+            catch (Exception)
             {
-                // The caller still receives an unmeasurable stop-ship report when the retaining sink is unavailable.
+                // Unfiltered: the primary RecordAsync already failed (not from cancellation, per the outer filter), so
+                // this fallback write must still degrade to the unmeasurable report even if the token is cancelled
+                // mid-fallback. The caller still receives an unmeasurable stop-ship report when the retaining sink is
+                // unavailable.
             }
 
             return unmeasurable;

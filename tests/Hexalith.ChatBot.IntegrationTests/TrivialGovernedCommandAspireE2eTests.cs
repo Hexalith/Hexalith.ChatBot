@@ -79,6 +79,14 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         "eventstore-admin-ui",
     ];
 
+    // Program.cs fails closed without a configured recovery mailbox secret; this suite never exercises the
+    // recovery mailbox client, so a fixed, well-formed placeholder satisfies PrepareKeycloakRealmImport without
+    // any of these tests needing to know about the live-recovery validation lane.
+    private static readonly string[] MailboxSecretArgs =
+    [
+        $"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={new string('a', 32)}",
+    ];
+
     private static readonly TimeSpan ProjectionTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan ProjectionStabilityWindow = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(3);
@@ -460,7 +468,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, cancellationToken)
             .ConfigureAwait(true);
 
         EndpointSnapshot[] before = CaptureEndpointSnapshots(builder);
@@ -524,7 +532,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, cancellationToken)
             .ConfigureAwait(true);
         EndpointSnapshot[] before = CaptureEndpointSnapshots(builder);
         IReadOnlyList<ReservedEndpoint> selected = GetIsolatedDaprHttpEndpoints(builder);
@@ -678,7 +686,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, cancellationToken)
             .ConfigureAwait(true);
 
         foreach (int[] invalidPorts in new[]
@@ -1402,7 +1410,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         CancellationToken cancellationToken)
     {
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, cancellationToken)
             .ConfigureAwait(false);
         IReadOnlyList<ReservedEndpoint> selected = GetIsolatedDaprHttpEndpoints(builder);
         IReadOnlySet<int> unselectedConcretePorts = GetUnselectedConcreteEndpointPorts(builder, selected);

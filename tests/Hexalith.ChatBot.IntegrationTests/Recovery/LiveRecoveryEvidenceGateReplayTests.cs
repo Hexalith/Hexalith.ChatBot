@@ -98,15 +98,25 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
             manifests,
             summary.AlertsDeliveredByJob);
 
-        LiveRecoveryValidationGatePolicy policy = new(
-            ExpectedDatasets(),
-            TargetDeviationsBlockRelease: true,
-            RecoveryValidationEvidenceManifest.LiveDriverMode,
-            MaximumEvidenceAge(),
-            ExpectedDatasetVersion: Optional(ExpectedDatasetVersionVariable),
-            MinimumDatasetVolume: (int)PositiveNumber(MinimumDatasetVolumeVariable, 0),
-            RequiredRepositoryCommit: Optional(RequiredCommitVariable),
-            MaximumMeasurableRecoveryCeilingSeconds: PositiveNumber(MaximumMeasurableCeilingSecondsVariable, 0));
+        LiveRecoveryValidationGatePolicy policy = required
+            ? LiveRecoveryValidationGatePolicy.ForRelease(
+                ExpectedDatasets(required),
+                targetDeviationsBlockRelease: true,
+                RecoveryValidationEvidenceManifest.LiveDriverMode,
+                MaximumEvidenceAge(),
+                expectedDatasetVersion: RequiredValue(ExpectedDatasetVersionVariable),
+                minimumDatasetVolume: (int)PositiveNumber(MinimumDatasetVolumeVariable, unset: null),
+                maximumMeasurableRecoveryCeilingSeconds: PositiveNumber(MaximumMeasurableCeilingSecondsVariable, unset: null),
+                requiredRepositoryCommit: Optional(RequiredCommitVariable))
+            : new LiveRecoveryValidationGatePolicy(
+                ExpectedDatasets(required),
+                TargetDeviationsBlockRelease: true,
+                RecoveryValidationEvidenceManifest.LiveDriverMode,
+                MaximumEvidenceAge(),
+                ExpectedDatasetVersion: Optional(ExpectedDatasetVersionVariable),
+                MinimumDatasetVolume: (int)PositiveNumber(MinimumDatasetVolumeVariable, unset: 0),
+                RequiredRepositoryCommit: Optional(RequiredCommitVariable),
+                MaximumMeasurableRecoveryCeilingSeconds: PositiveNumber(MaximumMeasurableCeilingSecondsVariable, unset: 0));
 
         LiveRecoveryValidationEvidenceGateDecision decision = LiveRecoveryValidationEvidenceGate.Evaluate(
             attempt,
@@ -124,10 +134,23 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
         }
     }
 
-    private static IReadOnlyList<string> ExpectedDatasets()
+    private static IReadOnlyList<string> ExpectedDatasets(bool required)
     {
-        string configured = Environment.GetEnvironmentVariable(ExpectedDatasetsVariable) ?? "recovery-baseline";
-        return [.. configured.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+        string? raw = Environment.GetEnvironmentVariable(ExpectedDatasetsVariable);
+        string configured = string.IsNullOrWhiteSpace(raw) ? "recovery-baseline" : raw.Trim();
+        string[] datasets = [.. configured.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+        if (datasets.Length == 0)
+        {
+            if (required)
+            {
+                throw new InvalidOperationException(
+                    $"{ExpectedDatasetsVariable} resolved to an empty dataset list for a required gate run.");
+            }
+
+            return ["recovery-baseline"];
+        }
+
+        return datasets;
     }
 
     /// <summary>
@@ -156,13 +179,30 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
         return string.IsNullOrWhiteSpace(configured) ? null : configured.Trim();
     }
 
-    /// <summary>Reads a positive numeric policy input, throwing on a malformed value for the same reason as above.</summary>
-    private static double PositiveNumber(string variable, double unset)
+    /// <summary>
+    /// Reads a variable that a REQUIRED gate run must pin. Fails closed rather than calling
+    /// <see cref="LiveRecoveryValidationGatePolicy.ForRelease"/> with a <see langword="null"/> anchor: an unset
+    /// required env var is a broken required-gate invocation, not a legitimate "leave it unpinned" choice.
+    /// </summary>
+    private static string RequiredValue(string variable)
+    {
+        string? configured = Environment.GetEnvironmentVariable(variable);
+        return string.IsNullOrWhiteSpace(configured)
+            ? throw new InvalidOperationException($"{variable} must be set when the release evidence gate is required.")
+            : configured.Trim();
+    }
+
+    /// <summary>
+    /// Reads a positive numeric policy input. When <paramref name="unset"/> is <see langword="null"/>, an unset
+    /// variable fails closed (required gate runs). When unset is a number, that value is used for optional local runs.
+    /// </summary>
+    private static double PositiveNumber(string variable, double? unset)
     {
         string? configured = Environment.GetEnvironmentVariable(variable);
         if (string.IsNullOrWhiteSpace(configured))
         {
-            return unset;
+            return unset ?? throw new InvalidOperationException(
+                $"{variable} must be a positive number when the release evidence gate is required.");
         }
 
         return double.TryParse(configured, NumberStyles.Float, CultureInfo.InvariantCulture, out double value) && value > 0

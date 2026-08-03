@@ -39,12 +39,28 @@ internal sealed class RecoveryValidationDataset
         string version = RequiredString(root, "version");
         int volume = root.GetProperty("volume").GetInt32();
         string projectionSchemaVersion = RequiredString(root, "projectionSchemaVersion");
+        // Single vocabulary (chunk 1d decision 1): the dataset pin is the product schema id, not a short alias.
+        if (!string.Equals(
+                projectionSchemaVersion,
+                ProjectConversationSourceEmailView.CurrentSchemaVersion,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"Recovery dataset projectionSchemaVersion '{projectionSchemaVersion}' must equal " +
+                $"'{ProjectConversationSourceEmailView.CurrentSchemaVersion}'.");
+        }
+
         string projectionMode = RequiredString(root, "projectionMode");
         string validationPartitionRef = RequiredString(root, "validationPartitionRef");
 
         List<RecoveryDatasetRecord> sourceMetadata = ReadRecords(root, "sourceRecords", "source", "resourceRef", "sourceVersion");
         List<RecoveryDatasetRecord> wormMetadata = ReadRecords(root, "wormAuditRecords", "worm-audit", "recordRef", "sequence");
-        List<RecoveryDatasetRecord> governed = ReadRecords(root, "governedCommands", "governed-command", "commandRef");
+        List<RecoveryDatasetRecord> governed = ReadRecords(
+            root,
+            "governedCommands",
+            "governed-command",
+            "commandRef",
+            requiredExtraProperty: "commandKind");
         List<RecoveryDatasetRecord> approvals = ReadRecords(root, "approvals", "approval", "approvalRef");
         List<RecoveryDatasetRecord> policies = ReadRecords(root, "policySnapshots", "policy-snapshot", "policyRef");
         List<RecoveryDatasetRecord> attachments = ReadRecords(root, "attachmentMetadata", "attachment-metadata", "attachmentRef");
@@ -84,7 +100,8 @@ internal sealed class RecoveryValidationDataset
         string propertyName,
         string kind,
         string referenceProperty,
-        string? numericProperty = null)
+        string? numericProperty = null,
+        string? requiredExtraProperty = null)
     {
         JsonElement array = root.GetProperty(propertyName);
         if (array.ValueKind != JsonValueKind.Array || array.GetArrayLength() == 0)
@@ -104,6 +121,9 @@ internal sealed class RecoveryValidationDataset
                 SourceVersion: numericProperty is not null &&
                     string.Equals(numericProperty, "sourceVersion", StringComparison.Ordinal)
                     ? element.GetProperty(numericProperty).GetInt64()
+                    : null,
+                CommandKind: requiredExtraProperty is not null
+                    ? RequiredString(element, requiredExtraProperty)
                     : null))
             .ToList();
     }

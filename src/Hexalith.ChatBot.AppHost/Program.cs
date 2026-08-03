@@ -1,5 +1,7 @@
 using System.Globalization;
-using System.Security.Cryptography;
+using System.Runtime.Versioning;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Hexalith.ChatBot.AppHost.Aspire;
@@ -207,12 +209,32 @@ static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration
 
     // Deliberately NOT the controller secret. The ADR requires the controller secret to stay out of the realm, and
     // reusing it would make one compromised fault-injection header also mint CaptureMailboxMessageIntake
-    // service-client tokens. `??` alone is not enough either: an empty or whitespace argument must fall back to the
-    // random value rather than being written into the realm as a blank client secret.
-    string? configuredClientSecret = configuration["LiveRecoveryValidation:MailboxClientSecret"];
-    string recoveryClientSecret = string.IsNullOrWhiteSpace(configuredClientSecret)
-        ? Convert.ToHexString(RandomNumberGenerator.GetBytes(32))
-        : configuredClientSecret;
+    // service-client tokens. The secret is required, fail-closed configuration with no generated fallback: an
+    // auto-generated value never round-trips back to whatever process needs to authenticate as the mailbox client,
+    // so silently minting one only hid a missing secret until the mailbox admission probe failed for an unrelated
+    // reason. `ChatBot:LiveRecoveryValidation:MailboxClientSecret` is preferred (aligned with the Server section
+    // binding); `LiveRecoveryValidation:MailboxClientSecret` remains supported as the legacy AppHost-only key.
+    string? configuredClientSecret = configuration["ChatBot:LiveRecoveryValidation:MailboxClientSecret"];
+    if (string.IsNullOrWhiteSpace(configuredClientSecret))
+    {
+        configuredClientSecret = configuration["LiveRecoveryValidation:MailboxClientSecret"];
+    }
+
+    if (string.IsNullOrWhiteSpace(configuredClientSecret))
+    {
+        throw new InvalidOperationException(
+            "A recovery mailbox client secret must be supplied via "
+            + "ChatBot:LiveRecoveryValidation:MailboxClientSecret (preferred) or "
+            + "LiveRecoveryValidation:MailboxClientSecret (legacy AppHost key). No secret was configured.");
+    }
+
+    string recoveryClientSecret = configuredClientSecret;
+    if (recoveryClientSecret.Length < 32)
+    {
+        throw new InvalidOperationException(
+            "The recovery mailbox client secret configured via ChatBot:LiveRecoveryValidation:MailboxClientSecret "
+            + "or LiveRecoveryValidation:MailboxClientSecret must be at least 32 characters long.");
+    }
 
     // The placeholder sits inside a JSON string literal, so the value is substituted verbatim into the document. A
     // secret carrying a quote or backslash would corrupt the realm; one shaped like `x","publicClient":true,"a":"`
@@ -221,7 +243,8 @@ static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration
     if (!recoveryClientSecret.All(static character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_'))
     {
         throw new InvalidOperationException(
-            "LiveRecoveryValidation:MailboxClientSecret must contain only ASCII letters, digits, '-', or '_'.");
+            "ChatBot:LiveRecoveryValidation:MailboxClientSecret (or the legacy LiveRecoveryValidation:MailboxClientSecret) "
+            + "must contain only ASCII letters, digits, '-', or '_'.");
     }
 
     realm = realm.Replace(recoveryClientSecretPlaceholder, recoveryClientSecret, StringComparison.Ordinal);
@@ -254,6 +277,14 @@ static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration
         realmWriter.Write(realm);
     }
 
+    if (OperatingSystem.IsWindows())
+    {
+        // UnixCreateMode has no Windows equivalent, so the file above was created inheriting the temp directory's
+        // ACL, which is not necessarily owner-only on a shared build host. Apply an explicit owner-only ACL so the
+        // client secret embedded in this rendered realm cannot be read by another account.
+        ApplyWindowsRealmFileAcl(generatedRealmPath);
+    }
+
     AppDomain.CurrentDomain.ProcessExit += (_, _) =>
     {
         try
@@ -271,4 +302,20 @@ static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration
     };
 
     return generatedDirectory;
+}
+
+// Windows has no UnixFileMode equivalent, so a file created on Windows inherits its parent directory's ACL instead
+// of an owner-only mode. Since the rendered realm carries a literal client secret, this ACL must be applied
+// explicitly rather than relying on the temp directory's default permissions, which are not guaranteed owner-only
+// on every Windows host (e.g. a shared build agent).
+[SupportedOSPlatform("windows")]
+static void ApplyWindowsRealmFileAcl(string path)
+{
+    SecurityIdentifier owner = WindowsIdentity.GetCurrent().User
+        ?? throw new InvalidOperationException("The current Windows identity has no security identifier.");
+    FileSecurity security = new();
+    security.SetOwner(owner);
+    security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+    security.AddAccessRule(new FileSystemAccessRule(owner, FileSystemRights.FullControl, AccessControlType.Allow));
+    new FileInfo(path).SetAccessControl(security);
 }

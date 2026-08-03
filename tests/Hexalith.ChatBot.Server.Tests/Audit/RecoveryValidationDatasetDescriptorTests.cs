@@ -14,22 +14,22 @@ public sealed class RecoveryValidationDatasetDescriptorTests
     {
         RecoveryValidationDatasetDescriptor descriptor = ValidDescriptor();
 
-        descriptor.Validate("recovery-baseline", "v1", 6, "project-conversation-v1", Partition).ShouldBeNull();
+        descriptor.Validate("recovery-baseline", "v1", 6, "chatbot.project-conversation-source-email.v1", Partition).ShouldBeNull();
     }
 
     [Fact]
     public void EmptyOrMismatchedDatasetFailsClosed()
     {
         (ValidDescriptor() with { SourceRecordCount = 0 })
-            .Validate("recovery-baseline", "v1", 5, "project-conversation-v1", Partition).ShouldNotBeNull()
+            .Validate("recovery-baseline", "v1", 5, "chatbot.project-conversation-source-email.v1", Partition).ShouldNotBeNull()
             .ShouldContain(nameof(RecoveryValidationDatasetDescriptor.SourceRecordCount));
 
         ValidDescriptor()
-            .Validate("recovery-baseline", "v2", 6, "project-conversation-v1", Partition).ShouldNotBeNull()
+            .Validate("recovery-baseline", "v2", 6, "chatbot.project-conversation-source-email.v1", Partition).ShouldNotBeNull()
             .ShouldContain("version");
 
         ValidDescriptor()
-            .Validate("recovery-baseline", "v1", 7, "project-conversation-v1", Partition).ShouldNotBeNull()
+            .Validate("recovery-baseline", "v1", 7, "chatbot.project-conversation-source-email.v1", Partition).ShouldNotBeNull()
             .ShouldContain("volume");
     }
 
@@ -39,11 +39,11 @@ public sealed class RecoveryValidationDatasetDescriptorTests
         // UsesIsolatedValidationStore is a boolean the descriptor asserts about itself. Without comparing the
         // partition, a descriptor naming the shared read-model partition validates clean simply by claiming isolation.
         (ValidDescriptor() with { ValidationPartitionRef = "chatbot-readmodels" })
-            .Validate("recovery-baseline", "v1", 6, "project-conversation-v1", Partition).ShouldNotBeNull()
+            .Validate("recovery-baseline", "v1", 6, "chatbot.project-conversation-source-email.v1", Partition).ShouldNotBeNull()
             .ShouldContain("partition");
 
         (ValidDescriptor() with { UsesIsolatedValidationStore = false })
-            .Validate("recovery-baseline", "v1", 6, "project-conversation-v1", Partition).ShouldNotBeNull()
+            .Validate("recovery-baseline", "v1", 6, "chatbot.project-conversation-source-email.v1", Partition).ShouldNotBeNull()
             .ShouldContain("partition");
     }
 
@@ -51,7 +51,7 @@ public sealed class RecoveryValidationDatasetDescriptorTests
         => new(
             "recovery-baseline",
             "v1",
-            "project-conversation-v1",
+            "chatbot.project-conversation-source-email.v1",
             "recovery-partition-v1",
             SourceRecordCount: 1,
             WormAuditRecordCount: 1,

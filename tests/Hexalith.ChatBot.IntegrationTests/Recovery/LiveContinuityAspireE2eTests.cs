@@ -62,6 +62,11 @@ public sealed class LiveContinuityAspireE2eTests
             $"--LiveRecoveryValidation:StorageTenantRef={RecoveryValidationTopology.StorageTenantRef}",
             $"--LiveRecoveryValidation:ControllerCapability={LiveRecoveryValidationOptions.AspireControllerCapability}",
             $"--LiveRecoveryValidation:ControllerSecret={controllerSecret}",
+
+            // ChatBot:LiveRecoveryValidation:MailboxClientSecret is the primary key (aligned with the Server
+            // section binding); the legacy AppHost-only LiveRecoveryValidation:MailboxClientSecret key is also
+            // supplied so both resolution paths stay exercised.
+            $"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={mailboxClientSecret}",
             $"--LiveRecoveryValidation:MailboxClientSecret={mailboxClientSecret}",
         ];
         arguments.AddRange(DaprInternalGrpcAppIds.Select((appId, index) =>
@@ -126,7 +131,7 @@ public sealed class LiveContinuityAspireE2eTests
                 DatasetRef = "recovery-baseline",
                 DatasetVersion = "v1",
                 DatasetVolume = 6,
-                ProjectionSchemaVersion = "project-conversation-v1",
+                ProjectionSchemaVersion = "chatbot.project-conversation-source-email.v1",
                 ValidationPartitionRef = "recovery-partition-v1",
                 ControllerCapability = LiveRecoveryValidationOptions.AspireControllerCapability,
                 ControllerSecret = controllerSecret,
@@ -162,7 +167,8 @@ public sealed class LiveContinuityAspireE2eTests
                 options,
                 ResolvedRepositoryCommit(),
                 InstalledDaprRuntimeVersion(),
-                ResolvedAspireVersion());
+                ResolvedAspireVersion(),
+                ResolvedAppHostVersion());
             DateTimeOffset attemptStartedAtUtc = DateTimeOffset.UtcNow;
             InMemoryAuditWriter audit = new();
             InMemoryOperatorAlertSink alerts = new();
@@ -472,6 +478,24 @@ public sealed class LiveContinuityAspireE2eTests
         // a manifest attributed to a commit it was not built from, which is worse than refusing to write evidence.
         throw new InvalidOperationException(
             "The repository commit for live-recovery evidence could not be resolved from GITHUB_SHA or git.");
+    }
+
+    /// <summary>Reads the AppHost assembly version so a bump cannot silently leave a hardcoded provenance token.</summary>
+    private static string ResolvedAppHostVersion()
+    {
+        System.Reflection.Assembly assembly = System.Reflection.Assembly.Load("Hexalith.ChatBot.AppHost");
+        string informational = assembly
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), inherit: false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .FirstOrDefault()?.InformationalVersion
+            ?? assembly.GetName().Version?.ToString()
+            ?? string.Empty;
+
+        int plus = informational.IndexOf('+', StringComparison.Ordinal);
+        string version = plus < 0 ? informational : informational[..plus];
+        return AuditMetadata.IsSafeStableIdentifier(version)
+            ? version
+            : throw new InvalidOperationException("The AppHost version was not a safe evidence token.");
     }
 
     /// <summary>Reads the Aspire version from the loaded assembly so a package bump cannot silently invalidate it.</summary>

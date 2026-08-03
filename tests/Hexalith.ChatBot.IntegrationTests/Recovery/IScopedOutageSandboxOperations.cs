@@ -31,6 +31,6 @@ internal interface IScopedOutageSandboxOperations
         string correlationId,
         CancellationToken cancellationToken);
 
-    /// <summary>Performs idempotent metadata-only cleanup.</summary>
-    ValueTask CleanupAsync(string dependency, string tenantRef, CancellationToken cancellationToken);
+    /// <summary>Performs idempotent metadata-only cleanup; returns whether cleanup genuinely completed (not a hardcoded true).</summary>
+    ValueTask<bool> CleanupAsync(string dependency, string tenantRef, CancellationToken cancellationToken);
 }

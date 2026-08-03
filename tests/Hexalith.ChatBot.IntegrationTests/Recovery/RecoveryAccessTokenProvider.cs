@@ -76,12 +76,23 @@ internal static class RecoveryAccessTokenProvider
                     .ConfigureAwait(false);
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
-                    using JsonDocument document = JsonDocument.Parse(
-                        await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
-                    string? token = document.RootElement.GetProperty("access_token").GetString();
-                    if (!string.IsNullOrWhiteSpace(token))
+                    try
                     {
-                        return token;
+                        using JsonDocument document = JsonDocument.Parse(
+                            await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                        string? token = document.RootElement.GetProperty("access_token").GetString();
+                        if (!string.IsNullOrWhiteSpace(token))
+                        {
+                            return token;
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                        // Keycloak returned 200 with a non-JSON or incomplete body; retry like transport failures.
+                    }
+                    catch (KeyNotFoundException)
+                    {
+                        // Missing access_token while the realm is still settling; retry within the bound.
                     }
                 }
                 else if ((int)response.StatusCode < 500 && response.StatusCode != HttpStatusCode.TooManyRequests)

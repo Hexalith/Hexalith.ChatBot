@@ -10,7 +10,9 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// <see cref="Unmeasurable"/> (verdict <see cref="ContinuityDrillVerdicts.Unmeasurable"/>), never a fabricated
 /// <see cref="ContinuityDrillVerdicts.Met"/>. <see cref="IsBreach"/> folds the fail-closed doctrine — a miss <b>or</b>
 /// an unmeasurable drill both fail-closed-audit-then-alert — while <see cref="IsMiss"/> distinguishes the honest
-/// recalibration signal (NOT stop-ship) from the fail-safe breach.
+/// recalibration signal, a measurable target deviation, from the fail-safe breach. Whether a measurable deviation
+/// blocks release is decided externally, by the evidence gate's <see cref="LiveRecoveryValidationGatePolicy.TargetDeviationsBlockRelease"/>
+/// policy — this type does not itself decide stop-ship.
 /// </para>
 /// </summary>
 internal sealed record ContinuityDrillReport(
@@ -45,7 +47,12 @@ internal sealed record ContinuityDrillReport(
     /// </summary>
     public const string EvidenceRetentionFailedDeviation = "continuity_drill_evidence_retention_failed";
 
-    /// <summary>True when the drill produced an honest <c>missed</c> verdict — a recorded deviation flagging A10 recalibration (NOT stop-ship).</summary>
+    /// <summary>
+    /// True when the drill produced an honest <c>missed</c> verdict — a recorded deviation flagging A10
+    /// recalibration. This is a measurable target deviation, distinct from a structural or unmeasurable breach;
+    /// whether it blocks release is decided by the external evidence gate's
+    /// <see cref="LiveRecoveryValidationGatePolicy.TargetDeviationsBlockRelease"/> policy, not by this property.
+    /// </summary>
     public bool IsMiss => string.Equals(Verdict, ContinuityDrillVerdicts.Missed, StringComparison.Ordinal);
 
     /// <summary>True when the drill did not meet target (a miss <b>or</b> an unmeasurable drill) — fail-closed-audit-then-alert.</summary>

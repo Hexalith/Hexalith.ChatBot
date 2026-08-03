@@ -2,6 +2,12 @@
 
 Items surfaced by reviews that are real but not actionable in the current change. Each entry should be revisited by the owning story/epic.
 
+## Deferred from: code review of 12-15-stand-up-live-recovery-continuity-fault-injection-drivers-and-recalibrate-a10 (2026-08-03, chunk 2)
+
+- **[MEDIUM · gate producer summary] Gate still trusts producer-written `LatestAttemptCompletedSuccessfully` and `AlertsDeliveredByJob`.** Known round-5 design: the out-of-process gate job still reads those fields from `attempt.summary.json`. **Release-claim impact:** a buggy producer can still influence completion/alert grading for those two inputs. **Owner:** Story 12.15 workflows/CI (group 3) if further independence is required. **Closure evidence:** derive completion/alerts from retained manifests alone, or accept and document the residual.
+- **[LOW · AppHost cleanup] Temp realm cleanup is only on `AppDomain.ProcessExit`.** Kill/crash can leave the secret-bearing realm under the shared temp root. **Release-claim impact:** local shared-host residual only. **Owner:** AppHost hygiene. **Closure evidence:** `IHostApplicationLifetime` / dispose path that always deletes the generated directory.
+- **[LOW · sandbox fixture] Committed Keycloak realm includes `recovery-validator` / `recovery-validator-pass`.** Same class as other local realm test users. **Release-claim impact:** none for production (sandbox realm only). **Owner:** AppHost/Keycloak fixture hygiene if credentials must rotate per run. **Closure evidence:** generated-at-runtime password or documented fixture residual in Completion Notes.
+
 ## Deferred from: code review of 12-15-stand-up-live-recovery-continuity-fault-injection-drivers-and-recalibrate-a10 (2026-08-03, chunk 1d)
 
 - **[MEDIUM · `RV-PROVIDER-SCALE`] `datasetVolume: 6` still overstates materialized rebuild inputs.** Reconfirmed in chunk 1d against `RecoveryValidationDataset` / evidence sink; four categories remain inert metadata while every manifest stamps volume 6. Already on the `RV-PROVIDER-SCALE` entry and the earlier open story finding. **Release-claim impact:** as on that entry. **Owner:** performance/capacity / dataset honesty. **Closure evidence:** per existing residual.

@@ -28,20 +28,27 @@ internal static class ReplayTenantPolicy
 
     /// <summary>
     /// Returns <see langword="true"/> when the tenant id is a replay/test tenant (a safe token carrying the reserved
-    /// <see cref="ReplayTestTenantPrefix"/> <b>and a non-empty suffix</b>). Every other value — including empty,
-    /// whitespace, the bare prefix, an unsafe token, or any production tenant id — is <see langword="false"/>
-    /// (fail-closed → treated as production).
+    /// <see cref="ReplayTestTenantPrefix"/> <b>and a non-empty, <c>:</c>-free suffix</b>). Every other value —
+    /// including empty, whitespace, the bare prefix, a suffix that still carries a <c>:</c>, an unsafe token, or any
+    /// production tenant id — is <see langword="false"/> (fail-closed → treated as production).
     /// <para>
     /// The suffix must be non-empty because <c>:</c> is itself a safe token character, so the bare
     /// <c>replay-test:</c> would otherwise classify as a test tenant and <see cref="StorageTenantFor"/> would derive
     /// an <b>empty</b> physical tenant — the default, unpartitioned namespace. That is precisely the "guarded label,
     /// unguarded data" failure this policy exists to prevent.
     /// </para>
+    /// <para>
+    /// The suffix must also carry no further <c>:</c> because a doubled or embedded label — e.g.
+    /// <c>replay-test:replay-test:x</c> or <c>replay-test:a:b</c> — previously classified as a test tenant while
+    /// <see cref="StorageTenantFor"/> derived a physical tenant still containing <c>:</c>, the very character some
+    /// stores cannot carry.
+    /// </para>
     /// </summary>
     public static bool IsTestTenant(string? tenantId)
         => AuditMetadata.IsSafeStableIdentifier(tenantId) &&
             tenantId!.StartsWith(ReplayTestTenantPrefix, StringComparison.Ordinal) &&
-            tenantId.Length > ReplayTestTenantPrefix.Length;
+            tenantId.Length > ReplayTestTenantPrefix.Length &&
+            !tenantId[ReplayTestTenantPrefix.Length..].Contains(':', StringComparison.Ordinal);
 
     /// <summary>
     /// Derives the physical/storage tenant id for a replay/test tenant by stripping the reserved prefix, or
@@ -61,11 +68,10 @@ internal static class ReplayTenantPolicy
             return null;
         }
 
-        // Strip exactly one prefix, then reject a suffix that still carries the separator. `:` is a legal identifier
-        // character (it has to be, for the prefix itself), so a doubled label like `replay-test:replay-test:x` or an
-        // embedded `replay-test:a:b` previously derived a physical tenant still containing `:` — the very character
-        // this method exists to remove, because some stores cannot carry it.
-        string storageTenant = tenantId![ReplayTestTenantPrefix.Length..];
-        return storageTenant.Contains(':', StringComparison.Ordinal) ? null : storageTenant;
+        // IsTestTenant already rejects a suffix that still carries `:` (a doubled label like
+        // `replay-test:replay-test:x` or an embedded `replay-test:a:b`), so stripping the prefix here can never
+        // leave the separator behind — the very character this method exists to remove, because some stores cannot
+        // carry it.
+        return tenantId![ReplayTestTenantPrefix.Length..];
     }
 }

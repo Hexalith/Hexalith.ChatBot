@@ -170,7 +170,7 @@ public sealed class LiveProjectionRebuildDriverTests
             DatasetRef = "recovery-baseline",
             DatasetVersion = "v1",
             DatasetVolume = 6,
-            ProjectionSchemaVersion = "project-conversation-v1",
+            ProjectionSchemaVersion = "chatbot.project-conversation-source-email.v1",
             ValidationPartitionRef = "recovery-partition-v1",
             ControllerCapability = LiveRecoveryValidationOptions.AspireControllerCapability,
             ControllerSecret = "tier3-value",
@@ -185,7 +185,7 @@ public sealed class LiveProjectionRebuildDriverTests
         => new(
             "recovery-baseline",
             "v1",
-            "project-conversation-v1",
+            "chatbot.project-conversation-source-email.v1",
             "recovery-partition-v1",
             SourceRecordCount: 1,
             WormAuditRecordCount: 1,

@@ -10,8 +10,11 @@ internal sealed class FileRecoveryValidationEvidenceSink(
     LiveRecoveryValidationOptions options,
     string repositoryCommit,
     string daprRuntimeVersion,
-    string aspireVersion) : IRecoveryValidationEvidenceSink
+    string aspireVersion,
+    string appHostVersion) : IRecoveryValidationEvidenceSink
 {
+    private const string NotApplicableScope = "not-applicable";
+
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     public ValueTask RecordAsync(ContinuityDrillReport report, CancellationToken cancellationToken)
@@ -157,6 +160,8 @@ internal sealed class FileRecoveryValidationEvidenceSink(
     {
         Directory.CreateDirectory(options.EvidenceDirectory);
         string scenarioId = ChatBotCorrelationId.New().Value;
+        string expectedScope = report is ScopedOutageDegradationReport scoped ? scoped.ExpectedScope : NotApplicableScope;
+        string observedScope = report is ScopedOutageDegradationReport observed ? observed.ObservedScope : NotApplicableScope;
         RecoveryValidationEvidenceManifest manifest = new()
         {
             RunId = ReportCorrelationId(report),
@@ -164,7 +169,7 @@ internal sealed class FileRecoveryValidationEvidenceSink(
             StartedAtUtc = startedAtUtc.ToUniversalTime(),
             EndedAtUtc = endedAtUtc.ToUniversalTime(),
             RepositoryCommit = repositoryCommit,
-            AppHostVersion = "chatbot-apphost-v1",
+            AppHostVersion = appHostVersion,
             // Resolved from the loaded Aspire assembly, not typed here: a literal silently kept claiming the old
             // version across an SDK bump, so published provenance could disagree with the topology that actually ran.
             AspireVersion = aspireVersion,
@@ -181,8 +186,8 @@ internal sealed class FileRecoveryValidationEvidenceSink(
             InjectedFaultAction = InjectedFaultAction(reportKind, scenario),
             RestoreAction = RestoreAction(reportKind, scenario),
             CleanupAction = $"cleanup:{scenario}",
-            ExpectedScope = report is ScopedOutageDegradationReport scoped ? scoped.ExpectedScope : "tenant",
-            ObservedScope = report is ScopedOutageDegradationReport observed ? observed.ObservedScope : "tenant",
+            ExpectedScope = expectedScope,
+            ObservedScope = observedScope,
             ReportKind = reportKind,
             Verdict = verdict,
             ReasonCode = reasonCode,
@@ -208,20 +213,76 @@ internal sealed class FileRecoveryValidationEvidenceSink(
         IReadOnlyList<string> errors = manifest.Validate();
         if (errors.Count > 0)
         {
-            throw new InvalidOperationException("The live recovery evidence manifest failed metadata validation.");
+            throw new InvalidOperationException(
+                "The live recovery evidence manifest failed metadata validation: " + string.Join("; ", errors));
         }
 
-        string safeScenario = scenario.Replace(':', '-');
-        string manifestPath = Path.Combine(options.EvidenceDirectory, $"{safeScenario}-{scenarioId}.manifest.json");
-        string reportPath = Path.Combine(options.EvidenceDirectory, $"{safeScenario}-{scenarioId}.report.json");
-        await File.WriteAllTextAsync(
-            manifestPath,
-            JsonSerializer.Serialize(manifest, SerializerOptions),
-            cancellationToken).ConfigureAwait(false);
-        await File.WriteAllTextAsync(
-            reportPath,
-            JsonSerializer.Serialize(report, SerializerOptions),
-            cancellationToken).ConfigureAwait(false);
+        // Keyed by scenario alone (not the per-run ULID) so a later record for the same scenario supersedes the
+        // prior artifact instead of leaving it stranded beside the substitute — e.g. a retention-fallback
+        // unmeasurable report must replace the met/missed artifact it is correcting, not accumulate next to it.
+        string safeScenario = SanitizeEvidenceToken(scenario);
+        string evidenceRoot = Path.GetFullPath(options.EvidenceDirectory);
+        string manifestPath = Path.GetFullPath(Path.Combine(evidenceRoot, $"{safeScenario}.manifest.json"));
+        string reportPath = Path.GetFullPath(Path.Combine(evidenceRoot, $"{safeScenario}.report.json"));
+        string rootPrefix = evidenceRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        if (!manifestPath.StartsWith(rootPrefix, StringComparison.Ordinal) ||
+            !reportPath.StartsWith(rootPrefix, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Evidence artifact paths escaped the configured evidence directory.");
+        }
+
+        try
+        {
+            await File.WriteAllTextAsync(
+                manifestPath,
+                JsonSerializer.Serialize(manifest, SerializerOptions),
+                cancellationToken).ConfigureAwait(false);
+            await File.WriteAllTextAsync(
+                reportPath,
+                JsonSerializer.Serialize(report, SerializerOptions),
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            TryDelete(manifestPath);
+            TryDelete(reportPath);
+            throw;
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (IOException)
+        {
+            // Best-effort pairing cleanup; the original write failure is the diagnostic.
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private static string SanitizeEvidenceToken(string scenario)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(scenario);
+        char[] buffer = new char[scenario.Length];
+        for (int index = 0; index < scenario.Length; index++)
+        {
+            char character = scenario[index];
+            buffer[index] = char.IsAsciiLetterOrDigit(character) || character is '-' or '_'
+                ? character
+                : '-';
+        }
+
+        string sanitized = new(buffer);
+        return string.IsNullOrWhiteSpace(sanitized) ? "scenario" : sanitized;
     }
 
     private static string ReportCorrelationId<TReport>(TReport report)
@@ -266,9 +327,9 @@ internal sealed class FileRecoveryValidationEvidenceSink(
         {
             ("continuity", ContinuityDrillScenarios.M365SubscriptionFailure) or
             ("scoped-outage", ScopedOutageDependencies.Graph) =>
-                ["RV-EXT-M365", "RV-PROD-CONTROL", "RV-PROVIDER-SCALE"],
+                ["RV-EXT-M365", "RV-PROD-CONTROL", "RV-PROVIDER-SCALE", "RV-EVIDENCE-KINDS"],
             ("projection-rebuild", _) or ("scoped-outage", ScopedOutageDependencies.AuditStore) =>
-                ["RV-DURABLE-WORM", "RV-PROD-CONTROL", "RV-PROVIDER-SCALE"],
-            _ => ["RV-PROD-CONTROL", "RV-PROVIDER-SCALE"],
+                ["RV-DURABLE-WORM", "RV-PROD-CONTROL", "RV-PROVIDER-SCALE", "RV-EVIDENCE-KINDS"],
+            _ => ["RV-PROD-CONTROL", "RV-PROVIDER-SCALE", "RV-EVIDENCE-KINDS"],
         };
 }
