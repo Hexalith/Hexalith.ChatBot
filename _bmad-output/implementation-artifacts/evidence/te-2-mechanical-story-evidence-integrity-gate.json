@@ -1,0 +1,314 @@
+{
+  "schemaVersion": "1.0",
+  "recordKind": "technicalEnabler",
+  "recordLedgerKey": "TE-2",
+  "storyKey": "te-2-mechanical-story-evidence-integrity-gate",
+  "storyTitle": "TE-2 Mechanical Story-Evidence Integrity Gate",
+  "storyPath": "_bmad-output/implementation-artifacts/spec-te-2-mechanical-story-evidence-integrity-gate.md",
+  "targetStatus": "done",
+  "persistedStatus": "complete",
+  "sprintStatusKey": "Add a mechanical story-evidence integrity gate that reconciles File Lists, scoped diffs, machine test results, primary-path execution, and checked tasks before a story moves to done.",
+  "bootstrap": true,
+  "scope": {
+    "implementationDigest": "a3aeb40023c96c671b7291572f963f7def0e01055cb13526235245a14ab07ade",
+    "repositories": [
+      {
+        "name": "root",
+        "path": ".",
+        "baseCommit": "$BASE",
+        "headCommit": "$HEAD",
+        "includeWorkingTree": true,
+        "includePaths": [
+          ".github/workflows/ci.yml",
+          "Hexalith.ChatBot.slnx",
+          "README.md",
+          "_bmad-output/implementation-artifacts/evidence/te-2-mechanical-story-evidence-integrity-gate.json",
+          "_bmad-output/implementation-artifacts/spec-te-2-mechanical-story-evidence-integrity-gate.md",
+          "_bmad-output/implementation-artifacts/sprint-status.yaml",
+          "_bmad-output/planning-artifacts/architecture.md",
+          "_bmad-output/planning-artifacts/epics.md",
+          "_bmad-output/planning-artifacts/index.md",
+          "_bmad-output/planning-artifacts/sprint-change-proposal-2026-08-03.md",
+          "_bmad-output/planning-artifacts/technical-enablers.md",
+          "docs/story-evidence-integrity.md",
+          "story-evidence-policy.json",
+          "tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs",
+          "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/GateFixture.cs",
+          "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj",
+          "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/StoryEvidenceGateTests.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/ChangedPath.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/CommandArguments.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/EvidenceJson.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/GateIssue.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/GateOptions.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/GateReason.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/GateReport.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/GateValidationException.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/GitCommandResult.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/GitReader.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/JsonReportWriter.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/LaneResult.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/MarkdownStoryReader.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/PrimaryPathVerdict.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/Program.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/ProvenanceAttestor.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/RepositoryScope.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/ScopeEvaluation.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/ScopeEvaluator.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/SprintLedgerReader.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/StoryEvidenceValidator.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/StoryRecord.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/TechnicalEnablerLedgerReader.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/TransitionDetector.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/TransitionRecord.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/TrxEvidenceReader.cs"
+        ]
+      }
+    ],
+    "lifecycleBookkeepingFields": [
+      "implementationDigest"
+    ]
+  },
+  "results": [
+    {
+      "lane": "story-evidence-gate",
+      "trx": "story-evidence-gate/story-evidence-gate.trx",
+      "provenance": "story-evidence-gate/story-evidence-gate.provenance.json",
+      "artifactLocator": "file:story-evidence-gate/story-evidence-gate.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    }
+  ],
+  "primaryPaths": [],
+  "mappings": [
+    {
+      "id": "task-1",
+      "kind": "task",
+      "paths": [
+        "_bmad-output/planning-artifacts/technical-enablers.md",
+        "_bmad-output/planning-artifacts/epics.md",
+        "_bmad-output/planning-artifacts/architecture.md",
+        "_bmad-output/planning-artifacts/index.md",
+        "_bmad-output/implementation-artifacts/sprint-status.yaml"
+      ],
+      "assertions": []
+    },
+    {
+      "id": "task-2",
+      "kind": "task",
+      "paths": [
+        "story-evidence-policy.json",
+        "_bmad-output/implementation-artifacts/evidence/te-2-mechanical-story-evidence-integrity-gate.json",
+        "tools/Hexalith.ChatBot.StoryEvidenceGate/StoryEvidenceValidator.cs",
+        "tools/Hexalith.ChatBot.StoryEvidenceGate/ScopeEvaluator.cs",
+        "tools/Hexalith.ChatBot.StoryEvidenceGate/TrxEvidenceReader.cs"
+      ],
+      "assertions": []
+    },
+    {
+      "id": "task-3",
+      "kind": "task",
+      "paths": [
+        "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/StoryEvidenceGateTests.cs",
+        "Hexalith.ChatBot.slnx",
+        "tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.ValidTechnicalEnablerBootstrapShouldPass",
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.RootDeclaredSubmoduleScopeShouldPassWithoutRecursiveDiscovery"
+      ]
+    },
+    {
+      "id": "task-4",
+      "kind": "task",
+      "paths": [
+        ".github/workflows/ci.yml",
+        "docs/story-evidence-integrity.md",
+        "README.md"
+      ],
+      "assertions": []
+    },
+    {
+      "id": "ac-1",
+      "kind": "acceptanceCriterion",
+      "paths": [
+        "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/StoryEvidenceGateTests.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.FallbackOnlyPrimaryPathShouldFailWithPrimaryReason",
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.NestedSubmoduleScopeShouldFailWithGitlinkReason",
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.RetainedExactDigestEvidenceShouldPass"
+      ]
+    },
+    {
+      "id": "ac-2",
+      "kind": "acceptanceCriterion",
+      "paths": [
+        "tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj",
+        "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj",
+        "Hexalith.ChatBot.slnx"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.ValidTechnicalEnablerBootstrapShouldPass"
+      ]
+    },
+    {
+      "id": "ac-3",
+      "kind": "acceptanceCriterion",
+      "paths": [
+        "_bmad-output/planning-artifacts/technical-enablers.md",
+        "_bmad-output/implementation-artifacts/sprint-status.yaml",
+        "docs/story-evidence-integrity.md"
+      ],
+      "assertions": []
+    }
+  ],
+  "outOfScopeDisclosures": [
+    {
+      "repository": "root",
+      "path": "_bmad-output/implementation-artifacts/12-15-stand-up-live-recovery-continuity-fault-injection-drivers-and-recalibrate-a10.md",
+      "owner": "story-12.15",
+      "reason": "Pre-existing live-recovery implementation work; TE-2 does not modify or claim it.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "_bmad-output/implementation-artifacts/deferred-work.md",
+      "owner": "story-12.15",
+      "reason": "Pre-existing deferred-work ledger edits; TE-2 does not modify or claim them.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "references/Hexalith.Conversations",
+      "owner": "story-12.15",
+      "reason": "Pre-existing root submodule pointer change; TE-2 never enters or modifies this scope.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "references/Hexalith.Parties",
+      "owner": "story-12.15",
+      "reason": "Pre-existing root submodule pointer change; TE-2 never enters or modifies this scope.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.IntegrationTests/Recovery/AspireRecoverySandboxOperations.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery implementation work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.IntegrationTests/Recovery/AspireScopedOutageOperations.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery implementation work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery implementation work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryDependencyExerciseTests.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery implementation work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoverySandboxContractTests.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery implementation work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoverySandboxRestoreResponse.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery implementation work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.RecoverySandbox/ControlledGraphMailboxMessageSource.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery sandbox work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.RecoverySandbox/Program.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery sandbox work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.RecoverySandbox/RecoveryBearerForwardingHandler.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery sandbox work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.RecoverySandbox/RecoveryDependencyExercise.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery sandbox work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.RecoverySandbox/RecoveryEventStoreGatewayClient.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery sandbox work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.RecoverySandbox/RecoveryMailboxConfigurationProvider.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery sandbox work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.RecoverySandbox/RecoverySandboxAuthorization.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery sandbox work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.RecoverySandbox/RecoveryScopeObservationMonitor.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery sandbox work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.RecoverySandbox/RecoveryScopedOutageState.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery sandbox work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    },
+    {
+      "repository": "root",
+      "path": "tests/Hexalith.ChatBot.RecoverySandbox/RecoverySubscriptionSimulatorState.cs",
+      "owner": "story-12.15",
+      "reason": "Concurrent live-recovery sandbox work outside TE-2.",
+      "classification": "preExistingLocalChange"
+    }
+  ],
+  "reportPath": "_bmad-output/implementation-artifacts/evidence/reports/te-2-mechanical-story-evidence-integrity-gate.json"
+}

@@ -11,6 +11,12 @@ internal sealed class RecoveryEventStoreGatewayClient(RecoveryScopedOutageState 
     /// <summary>The most recent command the real dispatcher actually submitted, for post-dispatch effect inspection.</summary>
     public SubmitCommandRequest? LastSubmitted { get; private set; }
 
+    /// <summary>
+    /// When <see langword="false"/>, successful submits are not recorded on the command-execution effect ledger
+    /// (used by the ai-provider exercise, which already records on its own dependency token).
+    /// </summary>
+    public bool RecordCommandExecutionEffects { get; set; } = true;
+
     /// <inheritdoc />
     public Task<SubmitCommandResponse> SubmitCommandAsync(
         SubmitCommandRequest request,
@@ -25,7 +31,11 @@ internal sealed class RecoveryEventStoreGatewayClient(RecoveryScopedOutageState 
         }
 
         LastSubmitted = request;
-        _ = state.RecordEffect("command-execution", request.Tenant, request.MessageId);
+        if (RecordCommandExecutionEffects)
+        {
+            _ = state.RecordEffect("command-execution", request.Tenant, request.MessageId);
+        }
+
         return Task.FromResult(new SubmitCommandResponse(request.CorrelationId ?? request.MessageId, MessageId: request.MessageId));
     }
 

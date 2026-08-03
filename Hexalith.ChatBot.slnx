@@ -24,6 +24,9 @@
     <Project Path="src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj" />
     <Project Path="src/Hexalith.ChatBot.Workers/Hexalith.ChatBot.Workers.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj" />
+  </Folder>
   <Folder Name="/references/Hexalith.Commons/">
     <Project Path="references/Hexalith.Commons/src/libraries/Hexalith.Commons.UniqueIds/Hexalith.Commons.UniqueIds.csproj" />
   </Folder>
@@ -69,6 +72,7 @@
     <Project Path="tests/Hexalith.ChatBot.Conformance.Tests/Hexalith.ChatBot.Conformance.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj" />
+    <Project Path="tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Mcp.Tests/Hexalith.ChatBot.Mcp.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.RecoverySandbox/Hexalith.ChatBot.RecoverySandbox.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj" />

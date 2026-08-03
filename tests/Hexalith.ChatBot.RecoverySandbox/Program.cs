@@ -1,10 +1,9 @@
 using System.Net.Http.Headers;
-using System.Security.Cryptography;
-using System.Text;
 
 using Hexalith.ChatBot.Client;
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.RecoverySandbox;
+using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Workers.Mailbox;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -15,11 +14,16 @@ string storageTenantRef = builder.Configuration["Recovery:StorageTenantRef"] ?? 
 string controllerSecret = builder.Configuration["Recovery:ControllerSecret"] ?? string.Empty;
 string providerMessageId = builder.Configuration["Recovery:ProviderMessageId"] ?? string.Empty;
 string chatBotBaseAddress = builder.Configuration["Recovery:ChatBotBaseAddress"] ?? string.Empty;
-if (!enabled || string.IsNullOrWhiteSpace(tenantRef) || string.IsNullOrWhiteSpace(storageTenantRef) ||
-    string.IsNullOrWhiteSpace(controllerSecret) || string.IsNullOrWhiteSpace(providerMessageId) ||
+const string AllowlistedMailboxId = "recovery-mailbox-001";
+if (!enabled ||
+    !ReplayTenantPolicy.IsTestTenant(tenantRef) ||
+    !string.Equals(ReplayTenantPolicy.StorageTenantFor(tenantRef), storageTenantRef, StringComparison.Ordinal) ||
+    string.IsNullOrWhiteSpace(controllerSecret) ||
+    string.IsNullOrWhiteSpace(providerMessageId) ||
     !Uri.TryCreate(chatBotBaseAddress, UriKind.Absolute, out Uri? chatBotUri))
 {
-    throw new InvalidOperationException("The recovery sandbox requires explicit enablement and complete Tier-3 configuration.");
+    throw new InvalidOperationException(
+        "The recovery sandbox requires explicit enablement, a replay-test tenant with a matching derived storage tenant, and complete Tier-3 configuration.");
 }
 
 builder.Services.AddSingleton<RecoverySubscriptionSimulatorState>();
@@ -35,14 +39,17 @@ builder.Services.AddSingleton<RecoveryScopeObservationMonitor>();
 builder.Services.AddHostedService(static services => services.GetRequiredService<RecoveryScopeObservationMonitor>());
 builder.Services.AddSingleton<RecoveryDependencyExercise>();
 builder.Services.AddSingleton<ControlledGraphMailboxMessageSource>();
+builder.Services.AddSingleton(new RecoveryMailboxConfigurationProvider(AllowlistedMailboxId));
+builder.Services.AddTransient<RecoveryBearerForwardingHandler>();
 
 // Pooled rather than one HttpClient per /process request: a repeated sweep allocated (and disposed) a client per
-// call, which exhausts sockets through TIME_WAIT under exactly the repeated-run pattern this lane uses.
+// call, which exhausts sockets through TIME_WAIT under exactly the repeated-run pattern this lane uses. Bearer auth
+// is applied per request via RecoveryBearerForwardingHandler — never via DefaultRequestHeaders on the pooled client.
 builder.Services.AddHttpClient("chatbot-forward", client =>
 {
     client.BaseAddress = chatBotUri;
     client.Timeout = TimeSpan.FromSeconds(30);
-});
+}).AddHttpMessageHandler<RecoveryBearerForwardingHandler>();
 
 WebApplication app = builder.Build();
 
@@ -52,7 +59,11 @@ app.MapPost(
     "/recovery/{requestedTenant}/m365-subscription-failure/fault",
     (string requestedTenant, HttpRequest request, RecoverySubscriptionSimulatorState state) =>
     {
-        if (!Authorized(request, requestedTenant, tenantRef, controllerSecret))
+        if (!RecoverySandboxAuthorization.Authorized(
+                requestedTenant,
+                tenantRef,
+                controllerSecret,
+                request.Headers["X-Recovery-Controller-Secret"].ToString()))
         {
             return Results.NotFound();
         }
@@ -65,7 +76,11 @@ app.MapPost(
     "/recovery/{requestedTenant}/m365-subscription-failure/restore",
     (string requestedTenant, HttpRequest request, RecoverySubscriptionSimulatorState state) =>
     {
-        if (!Authorized(request, requestedTenant, tenantRef, controllerSecret))
+        if (!RecoverySandboxAuthorization.Authorized(
+                requestedTenant,
+                tenantRef,
+                controllerSecret,
+                request.Headers["X-Recovery-Controller-Secret"].ToString()))
         {
             return Results.NotFound();
         }
@@ -80,10 +95,15 @@ app.MapPost(
         HttpRequest request,
         RecoverySubscriptionSimulatorState state,
         ControlledGraphMailboxMessageSource source,
+        RecoveryMailboxConfigurationProvider mailboxConfiguration,
         IHttpClientFactory httpClientFactory,
         CancellationToken cancellationToken) =>
     {
-        if (!Authorized(request, requestedTenant, tenantRef, controllerSecret) ||
+        if (!RecoverySandboxAuthorization.Authorized(
+                requestedTenant,
+                tenantRef,
+                controllerSecret,
+                request.Headers["X-Recovery-Controller-Secret"].ToString()) ||
             request.Headers.Authorization.ToString() is not string authorization ||
             !AuthenticationHeaderValue.TryParse(authorization, out AuthenticationHeaderValue? bearer) ||
             !string.Equals(bearer.Scheme, "Bearer", StringComparison.OrdinalIgnoreCase) ||
@@ -99,35 +119,41 @@ app.MapPost(
         }
 
         HttpClient http = httpClientFactory.CreateClient("chatbot-forward");
-        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearer.Parameter);
-        ChatBotClient client = new(new Client(http));
-        GraphMailboxIntakeWorker worker = new(
-            storageTenantRef,
-            new RecoveryMailboxConfigurationProvider(),
-            source,
-            client);
-        MailboxIntakeWorkerResult result = await worker.ProcessAsync(
-            new GraphMailboxNotification(
-                "recovery-mailbox-001",
-                $"{providerMessageId}-{scenarioLane}",
-                OpaqueProviderState: null),
-            cancellationToken: cancellationToken).ConfigureAwait(false);
-        bool submitted = result.Kind == MailboxIntakeWorkerResultKind.Submitted;
-        state.RecordProcessing(submitted);
-        return Results.Ok(new
+        using (RecoveryBearerForwardingHandler.Use(bearer.Parameter))
         {
-            kind = result.Kind.ToString().ToLowerInvariant(),
-            result.ReasonCode,
-            result.IntakeId,
-            submitted,
-            observedAtUtc = DateTimeOffset.UtcNow,
-        });
+            ChatBotClient client = new(new Client(http));
+            GraphMailboxIntakeWorker worker = new(
+                storageTenantRef,
+                mailboxConfiguration,
+                source,
+                client);
+            MailboxIntakeWorkerResult result = await worker.ProcessAsync(
+                new GraphMailboxNotification(
+                    AllowlistedMailboxId,
+                    $"{providerMessageId}-{scenarioLane}",
+                    OpaqueProviderState: null),
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+            bool submitted = result.Kind == MailboxIntakeWorkerResultKind.Submitted;
+            state.RecordProcessing(submitted);
+            return Results.Ok(new
+            {
+                kind = result.Kind.ToString().ToLowerInvariant(),
+                result.ReasonCode,
+                result.IntakeId,
+                submitted,
+                observedAtUtc = DateTimeOffset.UtcNow,
+            });
+        }
     });
 
 app.MapGet(
     "/recovery/{requestedTenant}/m365-subscription-failure/status",
     (string requestedTenant, HttpRequest request, RecoverySubscriptionSimulatorState state) =>
-        Authorized(request, requestedTenant, tenantRef, controllerSecret)
+        RecoverySandboxAuthorization.Authorized(
+            requestedTenant,
+            tenantRef,
+            controllerSecret,
+            request.Headers["X-Recovery-Controller-Secret"].ToString())
             ? Results.Ok(state.Snapshot())
             : Results.NotFound());
 
@@ -135,7 +161,11 @@ app.MapPost(
     "/recovery/{requestedTenant}/scoped-outage/{dependency}/fault",
     (string requestedTenant, string dependency, HttpRequest request, RecoveryScopedOutageState state) =>
     {
-        if (!Authorized(request, requestedTenant, tenantRef, controllerSecret) ||
+        if (!RecoverySandboxAuthorization.Authorized(
+                requestedTenant,
+                tenantRef,
+                controllerSecret,
+                request.Headers["X-Recovery-Controller-Secret"].ToString()) ||
             !RecoveryScopedOutageState.Contains(dependency))
         {
             return Results.NotFound();
@@ -148,7 +178,11 @@ app.MapPost(
     "/recovery/{requestedTenant}/scoped-outage/{dependency}/restore",
     (string requestedTenant, string dependency, HttpRequest request, RecoveryScopedOutageState state) =>
     {
-        if (!Authorized(request, requestedTenant, tenantRef, controllerSecret) ||
+        if (!RecoverySandboxAuthorization.Authorized(
+                requestedTenant,
+                tenantRef,
+                controllerSecret,
+                request.Headers["X-Recovery-Controller-Secret"].ToString()) ||
             !RecoveryScopedOutageState.Contains(dependency))
         {
             return Results.NotFound();
@@ -168,7 +202,11 @@ app.MapPost(
         RecoveryDependencyExercise exercise,
         CancellationToken cancellationToken) =>
     {
-        if (!Authorized(request, requestedTenant, tenantRef, controllerSecret) ||
+        if (!RecoverySandboxAuthorization.Authorized(
+                requestedTenant,
+                tenantRef,
+                controllerSecret,
+                request.Headers["X-Recovery-Controller-Secret"].ToString()) ||
             !RecoveryScopedOutageState.Contains(dependency) ||
             correlationId.Length != 26)
         {
@@ -184,7 +222,7 @@ app.MapPost(
             observedAtUtc = result.ObservedAtUtc,
             scopeRecordedAtUtc = scope?.ScopeRecordedAtUtc,
             observedScope = scope?.ObservedScope,
-            recoverable = result.FaultObserved || result.EffectCount == 1,
+            recoverable = result.FaultObserved || !result.SilentDataLossDetected,
             result.CrossTenantLeakageDetected,
             result.UnauthorizedMutationDetected,
             result.SilentDataLossDetected,
@@ -198,7 +236,11 @@ app.MapGet(
     "/recovery/{requestedTenant}/scoped-outage/{dependency}/status",
     (string requestedTenant, string dependency, HttpRequest request, RecoveryScopedOutageState state) =>
     {
-        if (!Authorized(request, requestedTenant, tenantRef, controllerSecret) ||
+        if (!RecoverySandboxAuthorization.Authorized(
+                requestedTenant,
+                tenantRef,
+                controllerSecret,
+                request.Headers["X-Recovery-Controller-Secret"].ToString()) ||
             !RecoveryScopedOutageState.Contains(dependency))
         {
             return Results.NotFound();
@@ -218,10 +260,14 @@ app.MapPost(
         RecoveryScopeObservationMonitor monitor,
         CancellationToken cancellationToken) =>
     {
-        if (!Authorized(request, requestedTenant, tenantRef, controllerSecret) ||
+        if (!RecoverySandboxAuthorization.Authorized(
+                requestedTenant,
+                tenantRef,
+                controllerSecret,
+                request.Headers["X-Recovery-Controller-Secret"].ToString()) ||
             dependency is not ("graph" or "identity") ||
             correlationId.Length != 26 ||
-            string.IsNullOrWhiteSpace(faultSignalCode))
+            !RecoveryScopeObservationMonitor.IsKnownFaultSignal(faultSignalCode))
         {
             return Results.NotFound();
         }
@@ -236,16 +282,3 @@ app.MapPost(
 
 app.Run();
 
-static bool Authorized(HttpRequest request, string requestedTenant, string configuredTenant, string configuredSecret)
-{
-    if (!string.Equals(requestedTenant, configuredTenant, StringComparison.Ordinal) ||
-        request.Headers["X-Recovery-Controller-Secret"].ToString() is not string presented ||
-        string.IsNullOrWhiteSpace(presented))
-    {
-        return false;
-    }
-
-    byte[] configuredHash = SHA256.HashData(Encoding.UTF8.GetBytes(configuredSecret));
-    byte[] presentedHash = SHA256.HashData(Encoding.UTF8.GetBytes(presented));
-    return CryptographicOperations.FixedTimeEquals(configuredHash, presentedHash);
-}

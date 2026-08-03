@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0",
+  "storyKey": "te-2-mechanical-story-evidence-integrity-gate",
+  "baseCommit": "e14afd950e728bf06a62b1c52ba13ac7ae724282",
+  "headCommit": "e14afd950e728bf06a62b1c52ba13ac7ae724282",
+  "implementationDigest": "a3aeb40023c96c671b7291572f963f7def0e01055cb13526235245a14ab07ade",
+  "policyVersion": "1.0",
+  "passed": true,
+  "fileListCount": 44,
+  "scopedDiffCount": 44,
+  "checkedItemCount": 7,
+  "mappedItemCount": 7,
+  "repositoryScopes": [
+    "."
+  ],
+  "lanes": [
+    {
+      "lane": "story-evidence-gate",
+      "source": "current-run",
+      "total": 109,
+      "executed": 109,
+      "passed": 109,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-evidence-gate/story-evidence-gate.trx",
+      "checksumSha256": "0a2bd25d101434dea1aeabd43b477858a91cc4e7b5bd8fb61c42f2f895d7a228"
+    }
+  ],
+  "primaryPaths": [],
+  "issues": [],
+  "evaluatedAtUtc": "2026-08-03T10:12:42.7430365+00:00"
+}

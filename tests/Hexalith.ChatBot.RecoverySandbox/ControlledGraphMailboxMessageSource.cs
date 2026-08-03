@@ -10,6 +10,7 @@ internal sealed class ControlledGraphMailboxMessageSource(RecoverySubscriptionSi
         GraphMailboxNotification notification,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(notification);
         cancellationToken.ThrowIfCancellationRequested();
         if (state.IsFaulted())
         {
@@ -17,11 +18,12 @@ internal sealed class ControlledGraphMailboxMessageSource(RecoverySubscriptionSi
         }
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
+        string laneKey = notification.ProviderMessageId;
         GraphMailboxMessage message = new(
             notification.MailboxId,
             notification.ProviderMessageId,
-            "recovery-internet-message-001",
-            "recovery-conversation-001",
+            $"recovery-internet-message:{laneKey}",
+            $"recovery-conversation:{laneKey}",
             ThreadId: null,
             From: new GraphMailboxParticipant("sender@example.invalid", "Recovery Sender"),
             Sender: null,
@@ -31,7 +33,7 @@ internal sealed class ControlledGraphMailboxMessageSource(RecoverySubscriptionSi
             SentAt: now,
             CreatedAt: now,
             SourceTimezone: "UTC",
-            Attachments: [new GraphMailboxAttachment("attachment-001", "recovery.bin", "application/octet-stream", 1)],
+            Attachments: [new GraphMailboxAttachment($"attachment:{laneKey}", "recovery.bin", "application/octet-stream", 1)],
             InternetMessageHeaders: []);
         return ValueTask.FromResult(GraphMailboxFetchResult.Found(message));
     }

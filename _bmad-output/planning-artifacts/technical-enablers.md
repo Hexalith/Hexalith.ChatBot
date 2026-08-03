@@ -1,6 +1,6 @@
 ---
 status: active-ledger
-updated: 2026-07-17
+updated: 2026-08-03
 sourceProposal: _bmad-output/planning-artifacts/sprint-change-proposal-2026-07-17.md
 productEpicCountImpact: 0
 ---
@@ -30,3 +30,23 @@ This ledger tracks architecture and platform work that preserves product behavio
 ### Completion evidence rule
 
 TE-1 remains complete only while the linked architecture decision and implementation records continue to prove the product invariants above. A future platform-composition enhancement may remove the retained AppHost shim, but that is a new platform task and does not reopen a ChatBot product epic unless it changes user- or operator-visible behavior.
+
+## TE-2 — Mechanical Story-Evidence Integrity Gate
+
+- **Status:** review; implementation self-validates prospectively, but completion remains blocked on the required protected check.
+- **Source:** `sprint-change-proposal-2026-08-03.md`
+- **Owners:** Amelia (implementation) with Murat (evidence/primary-path policy); Winston reviews architecture and CI boundaries.
+- **Product impact:** none; delivery-integrity control only.
+- **Invariant:** a story or technical-enabler item may move to `done` only when the repository-owned gate passes for the proposed status, exact scoped diff, exact machine results, required primary paths, File List, and checked-task/acceptance mappings.
+
+| Task | Outcome | Status |
+| --- | --- | --- |
+| TE-2.1 | Define the versioned JSON policy and per-story evidence-contract schema, including stable reason codes and metadata-only output. | complete |
+| TE-2.2 | Reconcile story/sprint status, File List, explicit out-of-scope disclosures, root and root-declared-submodule diffs/gitlinks, and mandatory checkbox state. | complete |
+| TE-2.3 | Parse policy-approved machine results, bind them to the tested implementation digest, and enforce required primary-path execution with zero-test/all-skipped/fallback-only failure. | complete |
+| TE-2.4 | Require every checked task and acceptance criterion to map to current diff and/or passing machine assertions; detect proposed `done` transitions in CI and emit a fail-closed report. | complete |
+| TE-2.5 | Prove the gate with positive, per-reason negative, mutation, multi-repository, and bootstrap self-validation fixtures; publish the developer runbook and activate the protected check. | in-progress — repository work complete; external required-check activation remains open |
+
+### Completion evidence rule
+
+TE-2 cannot waive its own gate. While its record is still `review`, CI evaluates it with `targetStatus=done`; after all negative mutations are proven to fail and the positive exact-scope run passes, its status may change to `complete`. The Epic 13 action stays open until that self-validation and required branch check are both active.

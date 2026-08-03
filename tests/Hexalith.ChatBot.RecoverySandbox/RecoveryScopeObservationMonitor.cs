@@ -14,10 +14,23 @@ namespace Hexalith.ChatBot.RecoverySandbox;
 internal sealed class RecoveryScopeObservationMonitor(TimeSpan? pollInterval = null) : BackgroundService
 {
     private static readonly TimeSpan DefaultPollInterval = TimeSpan.FromMilliseconds(200);
+    private static readonly HashSet<string> KnownFaultSignals = new(StringComparer.Ordinal)
+    {
+        "graph_subscription_expired",
+        "identity_token_unavailable",
+        "ai_provider_unavailable",
+        "command_execution_unavailable",
+        "audit_unavailable",
+        "attachment_dependency_unavailable",
+    };
 
     private readonly TimeSpan _pollInterval = pollInterval ?? DefaultPollInterval;
     private readonly ConcurrentQueue<RecoveryDependencyFailure> _pendingFailures = new();
     private readonly ConcurrentDictionary<string, TaskCompletionSource<RecoveryScopeObservation>> _pending = new(StringComparer.Ordinal);
+
+    /// <summary>Returns whether <paramref name="faultSignalCode"/> is in the closed recovery signal set.</summary>
+    public static bool IsKnownFaultSignal(string? faultSignalCode)
+        => !string.IsNullOrWhiteSpace(faultSignalCode) && KnownFaultSignals.Contains(faultSignalCode);
 
     /// <summary>Publishes a failure and waits until the independent periodic monitoring loop records its scope.</summary>
     public async ValueTask<RecoveryScopeObservation> RecordAsync(
@@ -25,6 +38,11 @@ internal sealed class RecoveryScopeObservationMonitor(TimeSpan? pollInterval = n
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(failure);
+        if (!IsKnownFaultSignal(failure.FaultSignalCode))
+        {
+            throw new InvalidOperationException($"Unrecognized recovery fault signal '{failure.FaultSignalCode}'.");
+        }
+
         string key = KeyFor(failure.Dependency, failure.CorrelationId);
         TaskCompletionSource<RecoveryScopeObservation> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         if (!_pending.TryAdd(key, completion))
@@ -35,6 +53,10 @@ internal sealed class RecoveryScopeObservationMonitor(TimeSpan? pollInterval = n
         try
         {
             _pendingFailures.Enqueue(failure);
+            // Intentional detection latency, then drain on this caller. The hosted ExecuteAsync loop remains as a
+            // concurrent drain for multi-waiter hosted scenarios; TrySetResult is idempotent.
+            await Task.Delay(_pollInterval, cancellationToken).ConfigureAwait(false);
+            DrainPending();
             return await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -46,22 +68,53 @@ internal sealed class RecoveryScopeObservationMonitor(TimeSpan? pollInterval = n
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using PeriodicTimer timer = new(_pollInterval);
-        while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
+        try
         {
-            while (_pendingFailures.TryDequeue(out RecoveryDependencyFailure? failure))
+            // Task.Delay (not PeriodicTimer): under the xUnit test host PeriodicTimer ticks were observed never to
+            // complete while RecordAsync waiters blocked, aborting the exercise suite. Delay keeps the intentional
+            // non-zero poll latency and reliably wakes.
+            while (!stoppingToken.IsCancellationRequested)
             {
-                string key = KeyFor(failure.Dependency, failure.CorrelationId);
-                if (_pending.TryGetValue(key, out TaskCompletionSource<RecoveryScopeObservation>? completion))
-                {
-                    string observedScope = ScopeForSignal(failure.FaultSignalCode);
-                    _ = completion.TrySetResult(new RecoveryScopeObservation(
-                        failure.Dependency,
-                        failure.CorrelationId,
-                        observedScope,
-                        failure.ObservedAtUtc,
-                        DateTimeOffset.UtcNow));
-                }
+                await Task.Delay(_pollInterval, stoppingToken).ConfigureAwait(false);
+                DrainPending();
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Hosted-service shutdown.
+        }
+        finally
+        {
+            foreach (KeyValuePair<string, TaskCompletionSource<RecoveryScopeObservation>> pair in _pending)
+            {
+                _ = pair.Value.TrySetCanceled(stoppingToken);
+            }
+        }
+    }
+
+    private void DrainPending()
+    {
+        while (_pendingFailures.TryDequeue(out RecoveryDependencyFailure? failure))
+        {
+            string key = KeyFor(failure.Dependency, failure.CorrelationId);
+            if (!_pending.TryGetValue(key, out TaskCompletionSource<RecoveryScopeObservation>? completion))
+            {
+                continue;
+            }
+
+            try
+            {
+                string observedScope = ScopeForSignal(failure.FaultSignalCode);
+                _ = completion.TrySetResult(new RecoveryScopeObservation(
+                    failure.Dependency,
+                    failure.CorrelationId,
+                    observedScope,
+                    failure.ObservedAtUtc,
+                    DateTimeOffset.UtcNow));
+            }
+            catch (Exception ex)
+            {
+                _ = completion.TrySetException(ex);
             }
         }
     }

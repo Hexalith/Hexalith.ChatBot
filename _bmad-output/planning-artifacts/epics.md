@@ -8,7 +8,8 @@ status: implementation-readiness-rebaseline
 completedAt: "2026-05-29"
 epicCount: 13
 storyCount: 112
-technicalEnablerCount: 1
+technicalEnablerCount: 2
+storyEvidenceIntegrityAlignedAt: "2026-08-03"
 correctedAt: "2026-05-30"
 readinessAlignedAt: "2026-06-09"
 readinessBlockersResolvedAt: "2026-06-09"
@@ -26,6 +27,7 @@ inputDocuments:
   - "_bmad-output/planning-artifacts/implementation-readiness-report-2026-07-17.md"
   - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-17.md"
   - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-18.md"
+  - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-08-03.md"
 ---
 
 # Hexalith.ChatBot - Epic Breakdown
@@ -34,7 +36,7 @@ inputDocuments:
 
 This document provides the complete epic and story breakdown for Hexalith.ChatBot, decomposing the requirements from the PRD, UX Design, and Architecture into implementable stories.
 
-Hexalith.ChatBot turns project email threads into structured, auditable workspaces where people and AI agents act with clear project context, authorization, and traceability. It is a B2B SaaS orchestration layer over existing Hexalith bounded contexts (Projects, Parties, Folders, Tenants, Conversations, EventStore, Memories, FrontComposer). The MVP is a single release delivered in three dependency-ordered increments: **M0** (vertical thesis path, UI-only) → **M1** (cross-surface parity + full governance) → **M2** (operations, recovery, continuity, and release-readiness surface closure). Architecture and epics must preserve the M0 → M1 → M2 dependency order. Canonical Epic 13 owns the governed interactive workspace and complete UI-conformance outcome. Technical Enabler TE-1 is tracked separately and is excluded from the product epic/story counts.
+Hexalith.ChatBot turns project email threads into structured, auditable workspaces where people and AI agents act with clear project context, authorization, and traceability. It is a B2B SaaS orchestration layer over existing Hexalith bounded contexts (Projects, Parties, Folders, Tenants, Conversations, EventStore, Memories, FrontComposer). The MVP is a single release delivered in three dependency-ordered increments: **M0** (vertical thesis path, UI-only) → **M1** (cross-surface parity + full governance) → **M2** (operations, recovery, continuity, and release-readiness surface closure). Architecture and epics must preserve the M0 → M1 → M2 dependency order. Canonical Epic 13 owns the governed interactive workspace and complete UI-conformance outcome. Technical Enablers TE-1 and TE-2 are tracked separately and are excluded from the product epic/story counts. TE-2 governs prospective story-completion evidence across every product epic.
 
 ## Requirements Inventory
 
@@ -549,7 +551,7 @@ Every FR (and sub-FR) maps to exactly one primary epic below. Cross-cutting FRs 
 
 ## Epic List
 
-13 independently valuable product epics across the 3 fixed increments (M0 → M1 → M2), containing 112 assignable product stories. Dependency flow is strictly forward. Technical Enabler TE-1 is tracked in `technical-enablers.md` and is excluded from these counts. M0's first four epics deliver the complete vertical email-to-governed-action loop. The non-negotiable safety floor (tenant isolation, authorization, fail-closed, audit-of-the-command, idempotency, safe AI approval) is established in Epic 1 and inherited by all later epics; it is never trimmed.
+13 independently valuable product epics across the 3 fixed increments (M0 → M1 → M2), containing 112 assignable product stories. Dependency flow is strictly forward. Technical Enablers TE-1 and TE-2 are tracked in `technical-enablers.md` and are excluded from these counts. M0's first four epics deliver the complete vertical email-to-governed-action loop. The non-negotiable safety floor (tenant isolation, authorization, fail-closed, audit-of-the-command, idempotency, safe AI approval) is established in Epic 1 and inherited by all later epics; it is never trimmed.
 
 ### ▸ Increment M0 — Vertical Thesis Path (UI-only)
 
@@ -617,6 +619,7 @@ These notes are binding acceptance/planning context for the stories below. They 
 - **M1/M2 UX surface elaboration gate.** Architecture details M0 S1–S3 UI homes fully but marks M1/M2 surfaces more broadly. Before assigning any M1/M2 story that implements S4, S6, S7, S8, S9, or S10, the story must import the applicable information architecture, states, interactions, accessibility, responsive behavior, localization, and redaction-safe failure handling from the indexed UX package. The approved artifacts are `_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/m1-m2-surface-elaboration.md` and `implementation-conformance-addendum-2026-07-17.md`.
 - **"ChatBot" naming/positioning.** M0 remains a project-conversation view plus review/approval surfaces. The governed interactive chat surface and its complete UI conformance outcome are delivered by canonical Epic 13 before MVP readiness sign-off. UX and architecture continue to forbid a fake or ungoverned chat textbox: every message is admitted through CommandGateway, and risky requests become governed AI-action proposals.
 - **Outcome-framed titles.** Story titles drafted during sprint planning must keep the user/operator/security outcome explicit, even where an epic identifier is technical (e.g., "Command Spine", "CLI & MCP").
+- **Mechanical story-evidence completion gate.** A story may be proposed as `done` only through the repository-owned TE-2 gate. The gate must reconcile the story File List with the explicit repository/submodule-scoped diff; parse current policy-approved machine test results; prove every required primary browser/runtime/topology path executed with no required skip or diagnostic substitution; and bind every checked task and acceptance criterion to current diff and/or passing assertions. Missing, stale, zero-test, all-skipped, fallback-only, scope-mismatched, status-mismatched, or contradictory evidence leaves the story in `review`/`in-progress`. Historical `done` records are not retroactively reopened solely by this rule.
 
 ---
 

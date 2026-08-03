@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Hexalith.ChatBot.RecoverySandbox;
 using Hexalith.ChatBot.Server.Projections;
 
@@ -19,56 +21,53 @@ public sealed class RecoveryDependencyExerciseTests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         RecoveryScopedOutageState state = new();
-        using RecoveryScopeObservationMonitor monitor = new();
-        await monitor.StartAsync(cancellationToken);
-        try
-        {
-            RecoveryDependencyExercise exercise = new(
-                state,
-                new RecoveryAiAssistanceProvider(state),
-                new RecoveryEventStoreGatewayClient(state),
-                new RecoveryAuditWriter(state),
-                new RecoveryAttachmentContentSource(state),
-                new RecoveryFolderStore(),
-                new RecoveryTenantAiPolicySnapshotProvider(),
-                new InMemoryProjectConversationProjectionStore(),
-                monitor);
-            _ = state.Fault(dependency, DateTimeOffset.UtcNow);
+        // RecordAsync self-drains after the poll interval; a hosted StartAsync loop is not required for this unit test.
+        using RecoveryScopeObservationMonitor monitor = new(TimeSpan.FromMilliseconds(10));
+        RecoveryDependencyExercise exercise = new(
+            state,
+            new RecoveryAiAssistanceProvider(state),
+            new RecoveryEventStoreGatewayClient(state),
+            new RecoveryAuditWriter(state),
+            new RecoveryAttachmentContentSource(state),
+            new RecoveryFolderStore(),
+            new RecoveryTenantAiPolicySnapshotProvider(),
+            new InMemoryProjectConversationProjectionStore(),
+            monitor);
+        _ = state.Fault(dependency, DateTimeOffset.UtcNow);
 
-            (RecoveryDependencyExerciseResult fault, RecoveryScopeObservation? scope) = await exercise.ProcessAsync(
-                dependency,
-                "replay-test:recovery-validation",
-                "01ARZ3NDEKTSV4RRFFQ69G5FAW",
-                cancellationToken);
+        (RecoveryDependencyExerciseResult fault, RecoveryScopeObservation? scope) = await exercise.ProcessAsync(
+            dependency,
+            "replay-test:recovery-validation",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            cancellationToken);
 
-            fault.FaultObserved.ShouldBeTrue();
-            fault.EffectCount.ShouldBe(0);
-            fault.UnauthorizedMutationDetected.ShouldBeFalse();
-            scope.ShouldNotBeNull();
-            scope.ObservedScope.ShouldBe(expectedScope);
-            scope.ScopeRecordedAtUtc.ShouldBeGreaterThanOrEqualTo(scope.DependencyFailureObservedAtUtc);
+        fault.FaultObserved.ShouldBeTrue();
+        fault.EffectCount.ShouldBe(0);
+        fault.UnauthorizedMutationDetected.ShouldBeFalse();
+        scope.ShouldNotBeNull();
+        scope.ObservedScope.ShouldBe(expectedScope);
+        scope.ScopeRecordedAtUtc.ShouldBeGreaterThanOrEqualTo(scope.DependencyFailureObservedAtUtc);
 
-            _ = state.Restore(dependency, DateTimeOffset.UtcNow);
-            (RecoveryDependencyExerciseResult first, _) = await exercise.ProcessAsync(
-                dependency,
-                "replay-test:recovery-validation",
-                "01ARZ3NDEKTSV4RRFFQ69G5FAW",
-                cancellationToken);
-            (RecoveryDependencyExerciseResult replay, _) = await exercise.ProcessAsync(
-                dependency,
-                "replay-test:recovery-validation",
-                "01ARZ3NDEKTSV4RRFFQ69G5FAW",
-                cancellationToken);
+        string restoreJson = JsonSerializer.Serialize(state.Restore(dependency, DateTimeOffset.UtcNow));
+        using JsonDocument restoreDocument = JsonDocument.Parse(restoreJson);
+        RecoverySandboxRestoreResponse.WasPreviouslyFaulted(restoreDocument.RootElement).ShouldBeTrue();
+        RecoverySandboxRestoreResponse.IsCurrentlyFaulted(restoreDocument.RootElement).ShouldBeFalse();
 
-            first.FaultObserved.ShouldBeFalse();
-            replay.EffectCount.ShouldBe(1);
-            replay.SilentDataLossDetected.ShouldBeFalse();
-            replay.DuplicateSideEffectDetected.ShouldBeFalse();
-            replay.CrossTenantLeakageDetected.ShouldBeFalse();
-        }
-        finally
-        {
-            await monitor.StopAsync(cancellationToken);
-        }
+        (RecoveryDependencyExerciseResult first, _) = await exercise.ProcessAsync(
+            dependency,
+            "replay-test:recovery-validation",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            cancellationToken);
+        (RecoveryDependencyExerciseResult replay, _) = await exercise.ProcessAsync(
+            dependency,
+            "replay-test:recovery-validation",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            cancellationToken);
+
+        first.FaultObserved.ShouldBeFalse();
+        replay.EffectCount.ShouldBe(1);
+        replay.SilentDataLossDetected.ShouldBeFalse();
+        replay.DuplicateSideEffectDetected.ShouldBeFalse();
+        replay.CrossTenantLeakageDetected.ShouldBeFalse();
     }
 }

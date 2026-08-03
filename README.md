@@ -39,6 +39,12 @@ In this sandbox, `dotnet test` can fail because the VSTest runner opens a denied
 tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -noLogo -noColor
 ```
 
+Before proposing a story as `done`, run the repository-owned [story-evidence integrity preflight](docs/story-evidence-integrity.md):
+
+```bash
+dotnet run --project tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj --configuration Release -- validate --story <story-path> --contract <evidence-contract> --target-status done --base <full-base-sha> --head <full-head-sha> --results <results-root>
+```
+
 ## Aspire and DAPR
 
 The retained AppHost is a local-development umbrella only. It wires ChatBot with EventStore, Tenants, Keycloak, and DAPR sidecars while reusable hosting behavior stays in the EventStore DomainService SDK.

@@ -19,6 +19,7 @@ using Hexalith.EventStore.Contracts.Commands;
 
 using CommandSubmissionRequest = Hexalith.ChatBot.Client.Generated.CommandSubmissionRequest;
 using CommandSubmissionRequestRequestSchemaVersion = Hexalith.ChatBot.Client.Generated.CommandSubmissionRequestRequestSchemaVersion;
+using CommandSubmissionResponse = Hexalith.ChatBot.Client.Generated.CommandSubmissionResponse;
 
 namespace Hexalith.ChatBot.RecoverySandbox;
 
@@ -40,6 +41,9 @@ internal sealed class RecoveryDependencyExercise(
     InMemoryProjectConversationProjectionStore projectionStore,
     RecoveryScopeObservationMonitor scopeMonitor)
 {
+    private readonly InMemoryCoarseIdempotencyStore _idempotencyStore = new(new SystemClock());
+    private readonly HashSet<string> _seededAttachmentIntakes = new(StringComparer.Ordinal);
+
     /// <summary>Runs the selected dependency contract for one idempotent correlation.</summary>
     public async ValueTask<(RecoveryDependencyExerciseResult Result, RecoveryScopeObservation? Scope)> ProcessAsync(
         string dependency,
@@ -79,10 +83,13 @@ internal sealed class RecoveryDependencyExercise(
                 cancellationToken).ConfigureAwait(false)
             : null;
         int effectsAfter = state.EffectCount(dependency, tenantRef);
+        int effectDelta = effectsAfter - effectsBefore;
+        int correlationEmissions = state.CorrelationEffectCount(dependency, tenantRef, correlationId);
 
         // Ground truth (expectedFault) and observation (orchestratorCommitted) are produced by independent code
         // paths: a faulted dependency that the orchestrator committed through anyway is a real unauthorized
         // mutation; a healthy dependency the orchestrator failed to commit through is a real silent loss.
+        // Duplicate: more than one emission in this call, or this correlation already has more than one emission.
         return (
             new RecoveryDependencyExerciseResult(
                 faultObserved,
@@ -90,7 +97,7 @@ internal sealed class RecoveryDependencyExercise(
                 effectsAfter,
                 UnauthorizedMutationDetected: expectedFault && orchestratorCommitted,
                 SilentDataLossDetected: !expectedFault && !orchestratorCommitted,
-                DuplicateSideEffectDetected: effectsAfter - effectsBefore > 1,
+                DuplicateSideEffectDetected: !faultObserved && (effectDelta > 1 || correlationEmissions > 1),
                 CrossTenantLeakageDetected: state.HasCrossTenantEffect(dependency, tenantRef)),
             scope);
     }
@@ -137,13 +144,32 @@ internal sealed class RecoveryDependencyExercise(
             throw new InvalidOperationException("The ai-provider recovery exercise was not admitted; the admission stages are not exercising cleanly.");
         }
 
-        AcceptedCommandDispatcher dispatcher = new(
-            eventStore,
-            new RecoveryParticipantResolutionOrchestrator(),
-            new RecoveryAssociationScoringOrchestrator(),
-            new SystemClock(),
-            aiAssistanceProvider: aiProvider);
-        _ = await dispatcher.DispatchAsync(decision.Context!, cancellationToken).ConfigureAwait(false);
+        // AI assistance still submits through the EventStore client; do not attribute that submit to the
+        // command-execution ledger (Restore for ai-provider would not clear it).
+        bool previousRecording = eventStore.RecordCommandExecutionEffects;
+        eventStore.RecordCommandExecutionEffects = false;
+        try
+        {
+            AcceptedCommandDispatcher dispatcher = new(
+                eventStore,
+                new RecoveryParticipantResolutionOrchestrator(),
+                new RecoveryAssociationScoringOrchestrator(),
+                new SystemClock(),
+                aiAssistanceProvider: aiProvider);
+            try
+            {
+                _ = await dispatcher.DispatchAsync(decision.Context!, cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                await AbortAdmissionAsync(decision, cancellationToken).ConfigureAwait(false);
+                throw;
+            }
+        }
+        finally
+        {
+            eventStore.RecordCommandExecutionEffects = previousRecording;
+        }
 
         SubmitCommandRequest submitted = eventStore.LastSubmitted
             ?? throw new InvalidOperationException("The ai-provider recovery exercise did not observe a real dispatcher submission.");
@@ -153,6 +179,17 @@ internal sealed class RecoveryDependencyExercise(
             ?? throw new InvalidOperationException("The dispatched command did not carry the AI execution record.");
         bool faultObserved = string.Equals(record.Outcome, "failed", StringComparison.Ordinal);
         bool committed = string.Equals(record.Outcome, "succeeded", StringComparison.Ordinal);
+        // Failed provider outcome must not seal the coarse key — Restore then retry needs a fresh Admit.
+        // Succeeded dispatch mirrors CommandGateway.RecordOutcomeAsync so same-correlation replay is safe.
+        if (faultObserved)
+        {
+            await AbortAdmissionAsync(decision, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await RecordAdmissionOutcomeAsync(decision, cancellationToken).ConfigureAwait(false);
+        }
+
         return (faultObserved, committed, faultObserved ? record.FailureCode : null);
     }
 
@@ -161,19 +198,23 @@ internal sealed class RecoveryDependencyExercise(
         string correlationId,
         CancellationToken cancellationToken)
     {
-        ClaimsPrincipal principal = new(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "recovery-validator")], "recovery"));
-        CommandSubmissionRequest request = new()
+        ChatBotCommandAdmissionDecision decision = await AdmitAsync(
+            tenantRef,
+            correlationId,
+            nameof(RecordGovernedNote),
+            new RecordGovernedNote(correlationId),
+            cancellationToken).ConfigureAwait(false);
+        if (decision.Kind == ChatBotCommandAdmissionDecisionKind.ReplayPriorOutcome)
         {
-            CommandId = correlationId,
-            CommandType = nameof(RecordGovernedNote),
-            Command = new RecordGovernedNote(correlationId),
-            RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
-        };
-        ChatBotCommandSubmission submission = new(principal, request, correlationId, correlationId);
-        ChatBotGatewayContext context = new(
-            submission,
-            new ChatBotAuthenticatedActor("recovery-validator", principal),
-            new ChatBotTenantBinding(tenantRef));
+            return (FaultObserved: false, Committed: true, FaultSignalCode: null);
+        }
+
+        if (!decision.IsAccepted)
+        {
+            throw new InvalidOperationException(
+                $"The command-execution recovery exercise was not admitted: {decision.ReasonCode}.");
+        }
+
         AcceptedCommandDispatcher dispatcher = new(
             eventStore,
             new RecoveryParticipantResolutionOrchestrator(),
@@ -181,11 +222,13 @@ internal sealed class RecoveryDependencyExercise(
             new SystemClock());
         try
         {
-            _ = await dispatcher.DispatchAsync(context, cancellationToken).ConfigureAwait(false);
+            _ = await dispatcher.DispatchAsync(decision.Context!, cancellationToken).ConfigureAwait(false);
+            await RecordAdmissionOutcomeAsync(decision, cancellationToken).ConfigureAwait(false);
             return (FaultObserved: false, Committed: true, FaultSignalCode: null);
         }
-        catch (HttpRequestException) when (state.IsFaulted("command-execution"))
+        catch (Exception) when (state.IsFaulted("command-execution"))
         {
+            await AbortAdmissionAsync(decision, cancellationToken).ConfigureAwait(false);
             return (FaultObserved: true, Committed: false, FaultSignalCode: "command_execution_unavailable");
         }
     }
@@ -216,6 +259,12 @@ internal sealed class RecoveryDependencyExercise(
                 $"The audit-store recovery exercise was rejected for an unexpected reason: {decision.ReasonCode}.");
         }
 
+        if (decision.IsAccepted)
+        {
+            // Audit-store exercise stops at admission; still seal the idempotency record for replay.
+            await RecordAdmissionOutcomeAsync(decision, cancellationToken).ConfigureAwait(false);
+        }
+
         return (faultObserved, Committed: decision.IsAccepted, FaultSignalCode: faultObserved ? decision.ReasonCode : null);
     }
 
@@ -234,8 +283,13 @@ internal sealed class RecoveryDependencyExercise(
         AttachmentCaptureCoordinatorResult result = await coordinator
             .CaptureAsync(new AttachmentCaptureCoordinatorRequest(tenantRef, intakeId, 1, correlationId), cancellationToken)
             .ConfigureAwait(false);
-        bool committed = result.StoredCount > 0;
-        bool faultObserved = result.DegradedCount > 0 && result.StoredCount == 0;
+        bool contentFaulted = state.IsFaulted("attachment-processing");
+        // Replay after a successful capture finds no Pending/Retryable candidates (StoredCount == 0). Treat a
+        // prior successful effect for this correlation as committed so SilentDataLoss is not a false positive.
+        bool committed = result.StoredCount > 0
+            || (!contentFaulted
+                && state.CorrelationEffectCount("attachment-processing", tenantRef, correlationId) > 0);
+        bool faultObserved = contentFaulted && result.DegradedCount > 0 && result.StoredCount == 0;
         return (faultObserved, committed, faultObserved ? "attachment_dependency_unavailable" : null);
     }
 
@@ -245,6 +299,12 @@ internal sealed class RecoveryDependencyExercise(
         string correlationId,
         CancellationToken cancellationToken)
     {
+        if (!_seededAttachmentIntakes.Add(intakeId))
+        {
+            // Leave any previously stored attachment outcome intact so a second process can exercise idempotency.
+            return;
+        }
+
         string associationId = $"association-recovery:{correlationId}";
         await projectionStore.UpsertAsync(
             new ProjectConversationItemView(
@@ -312,6 +372,42 @@ internal sealed class RecoveryDependencyExercise(
             cancellationToken).ConfigureAwait(false);
     }
 
+    private async ValueTask RecordAdmissionOutcomeAsync(
+        ChatBotCommandAdmissionDecision decision,
+        CancellationToken cancellationToken)
+    {
+        if (!decision.IsAccepted || decision.Idempotency is null || decision.Context is null)
+        {
+            return;
+        }
+
+        CommandSubmissionResponse response = new()
+        {
+            CommandId = decision.Context.Submission.Request.CommandId,
+            CorrelationId = decision.CorrelationId,
+            TaskId = decision.TaskId,
+            LifecycleState = Hexalith.ChatBot.Client.Generated.LifecycleState.Proposed,
+            AcceptedAt = DateTimeOffset.UtcNow,
+        };
+        await _idempotencyStore
+            .RecordOutcomeAsync(decision.Idempotency, response, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async ValueTask AbortAdmissionAsync(
+        ChatBotCommandAdmissionDecision decision,
+        CancellationToken cancellationToken)
+    {
+        if (decision.Idempotency is null)
+        {
+            return;
+        }
+
+        await _idempotencyStore
+            .AbortAdmissionAsync(decision.Idempotency, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     private async ValueTask<ChatBotCommandAdmissionDecision> AdmitAsync(
         string tenantRef,
         string correlationId,
@@ -345,7 +441,7 @@ internal sealed class RecoveryDependencyExercise(
             new ParticipantAuthorizationStage(),
             new DeterministicAiActionRiskClassifier(),
             new AiActionApprovalGate(new DefaultAiActionPolicyEvaluator(aiPolicySnapshots)),
-            new InMemoryCoarseIdempotencyStore(new SystemClock()),
+            _idempotencyStore,
             auditWriter,
             new InMemoryAuditReplayIntentQueue(),
             new InMemoryOperatorAlertSink(),

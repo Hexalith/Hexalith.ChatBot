@@ -22,18 +22,17 @@ internal sealed class RecoverySubscriptionSimulatorState
     }
 
     /// <summary>
-    /// Restores the closed subscription boundary and returns the state as observed immediately before clearing it —
-    /// not a post-clear snapshot, which would always report <c>faulted: false</c> by construction and make a
-    /// pre-injection/post-cleanup dirty-boundary check unreachable.
+    /// Restores the closed subscription boundary and returns both the pre-clear <c>prior</c> snapshot (so
+    /// dirty-boundary checks stay reachable) and the post-clear <c>current</c> snapshot.
     /// </summary>
     public object Restore(DateTimeOffset atUtc)
     {
         lock (_gate)
         {
-            object priorState = SnapshotCore();
+            object prior = SnapshotCore();
             _faulted = false;
             _restoredAtUtc = atUtc.ToUniversalTime();
-            return priorState;
+            return new { prior, current = SnapshotCore() };
         }
     }
 

@@ -26,7 +26,12 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
     /// How long an absence assertion polls before concluding a resource genuinely is not there. Kept equal to the
     /// presence budget so a no-duplicate claim is not systematically easier to satisfy than a materialization claim.
     /// </summary>
-    private static readonly TimeSpan AbsenceConfirmationWindow = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan AbsenceConfirmationWindow = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// How long to wait for a stopped identity provider to stop serving, matching EventStore's stop confirmation.
+    /// </summary>
+    private static readonly TimeSpan StopConfirmationTimeout = TimeSpan.FromSeconds(60);
     private readonly DistributedApplication _application;
     private readonly IResource _securityResource;
     private readonly HttpClient _chatBotClient;
@@ -121,7 +126,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         else if (string.Equals(dependency, ScopedOutageDependencies.Graph, StringComparison.Ordinal))
         {
             using JsonDocument restored = await SendSubscriptionAsync(tenantRef, "restore", includeBearer: false, cancellationToken).ConfigureAwait(false);
-            if (restored.RootElement.GetProperty("faulted").GetBoolean())
+            if (RecoverySandboxRestoreResponse.IsCurrentlyFaulted(restored.RootElement))
             {
                 throw new InvalidOperationException("The Graph boundary was not clean before injection.");
             }
@@ -144,7 +149,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
                 correlationId: null,
                 cancellationToken)
                 .ConfigureAwait(false);
-            if (restored.RootElement.GetProperty("faulted").GetBoolean())
+            if (RecoverySandboxRestoreResponse.IsCurrentlyFaulted(restored.RootElement))
             {
                 throw new InvalidOperationException("The scoped dependency was not clean before injection.");
             }
@@ -157,10 +162,39 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         if (string.Equals(dependency, ScopedOutageDependencies.Identity, StringComparison.Ordinal))
         {
             ExecuteCommandResult result = await ExecuteSecurityCommandAsync(KnownResourceCommands.StopCommand, cancellationToken).ConfigureAwait(false);
-            bool available = await IsIdentityAvailableAsync(cancellationToken).ConfigureAwait(false);
-            if ((!result.Success || result.Canceled) && available)
+            bool commandSucceeded = result.Success && !result.Canceled;
+            bool available = true;
+            using (CancellationTokenSource stopDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+            {
+                stopDeadline.CancelAfter(StopConfirmationTimeout);
+                try
+                {
+                    while (true)
+                    {
+                        available = await IsIdentityAvailableAsync(stopDeadline.Token).ConfigureAwait(false);
+                        if (!available)
+                        {
+                            break;
+                        }
+
+                        await Task.Delay(PollInterval, stopDeadline.Token).ConfigureAwait(false);
+                    }
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    // Confirmation window elapsed while Keycloak still served.
+                }
+            }
+
+            if ((!commandSucceeded) && available)
             {
                 throw new InvalidOperationException("The allowlisted identity stop command did not reach the dependency boundary.");
+            }
+
+            if (available)
+            {
+                throw new InvalidOperationException(
+                    $"Identity was still reachable {StopConfirmationTimeout.TotalSeconds:N0}s after an accepted stop command.");
             }
 
             return;
@@ -168,11 +202,21 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
 
         if (string.Equals(dependency, ScopedOutageDependencies.Graph, StringComparison.Ordinal))
         {
-            using JsonDocument _ = await SendSubscriptionAsync(tenantRef, "fault", includeBearer: false, cancellationToken).ConfigureAwait(false);
+            using JsonDocument faulted = await SendSubscriptionAsync(tenantRef, "fault", includeBearer: false, cancellationToken).ConfigureAwait(false);
+            if (!faulted.RootElement.GetProperty("faulted").GetBoolean())
+            {
+                throw new InvalidOperationException("The Graph boundary did not report itself faulted after injection.");
+            }
+
             return;
         }
 
-        using JsonDocument __ = await SendScopedAsync(dependency, tenantRef, "fault", correlationId: null, cancellationToken).ConfigureAwait(false);
+        using JsonDocument scopedFaulted = await SendScopedAsync(dependency, tenantRef, "fault", correlationId: null, cancellationToken).ConfigureAwait(false);
+        if (!scopedFaulted.RootElement.GetProperty("faulted").GetBoolean())
+        {
+            throw new InvalidOperationException(
+                $"The scoped dependency '{dependency}' did not report itself faulted after injection.");
+        }
     }
 
     /// <inheritdoc />
@@ -204,8 +248,10 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
                 .GetProperty("dependencyFailureObservedAtUtc").GetDateTimeOffset().ToUniversalTime();
             recordedAtUtc = monitored.RootElement
                 .GetProperty("scopeRecordedAtUtc").GetDateTimeOffset().ToUniversalTime();
-            observedScope = monitored.RootElement.GetProperty("observedScope").GetString()
-                ?? throw new InvalidOperationException("Identity monitoring returned no observed scope.");
+            observedScope = RequireObservedScope(
+                monitored.RootElement.GetProperty("observedScope").GetString(),
+                "Identity");
+            RequireNonDegenerateScopeStamps(observedAtUtc, recordedAtUtc, "Identity");
             ProjectConversationSourceEmailView? affected = await _readModels
                 .GetSourceEmailAsync(
                     _identityAffectedSentinel!.TenantId,
@@ -242,8 +288,10 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
                 .GetProperty("dependencyFailureObservedAtUtc").GetDateTimeOffset().ToUniversalTime();
             recordedAtUtc = monitored.RootElement
                 .GetProperty("scopeRecordedAtUtc").GetDateTimeOffset().ToUniversalTime();
-            observedScope = monitored.RootElement.GetProperty("observedScope").GetString()
-                ?? throw new InvalidOperationException("Graph monitoring returned no observed scope.");
+            observedScope = RequireObservedScope(
+                monitored.RootElement.GetProperty("observedScope").GetString(),
+                "Graph");
+            RequireNonDegenerateScopeStamps(observedAtUtc, recordedAtUtc, "Graph");
             ProjectConversationSourceEmailView? affected = await _readModels
                 .GetSourceEmailAsync(
                     _graphAffectedSentinel!.TenantId,
@@ -272,7 +320,8 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
 
             observedAtUtc = root.GetProperty("observedAtUtc").GetDateTimeOffset().ToUniversalTime();
             recordedAtUtc = root.GetProperty("scopeRecordedAtUtc").GetDateTimeOffset().ToUniversalTime();
-            observedScope = root.GetProperty("observedScope").GetString() ?? ScopedOutageScopes.Tenant;
+            observedScope = RequireObservedScope(root.GetProperty("observedScope").GetString(), dependency);
+            RequireNonDegenerateScopeStamps(observedAtUtc, recordedAtUtc, dependency);
             unauthorizedMutationDetected = root.GetProperty("unauthorizedMutationDetected").GetBoolean();
         }
 
@@ -305,11 +354,20 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
 
         if (string.Equals(dependency, ScopedOutageDependencies.Graph, StringComparison.Ordinal))
         {
-            using JsonDocument _ = await SendSubscriptionAsync(tenantRef, "restore", includeBearer: false, cancellationToken).ConfigureAwait(false);
+            using JsonDocument restored = await SendSubscriptionAsync(tenantRef, "restore", includeBearer: false, cancellationToken).ConfigureAwait(false);
+            if (RecoverySandboxRestoreResponse.IsCurrentlyFaulted(restored.RootElement))
+            {
+                throw new InvalidOperationException("The Graph boundary remained faulted after restore.");
+            }
+
             return;
         }
 
-        using JsonDocument __ = await SendScopedAsync(dependency, tenantRef, "restore", correlationId: null, cancellationToken).ConfigureAwait(false);
+        using JsonDocument scopedRestored = await SendScopedAsync(dependency, tenantRef, "restore", correlationId: null, cancellationToken).ConfigureAwait(false);
+        if (RecoverySandboxRestoreResponse.IsCurrentlyFaulted(scopedRestored.RootElement))
+        {
+            throw new InvalidOperationException($"The scoped dependency '{dependency}' remained faulted after restore.");
+        }
     }
 
     /// <inheritdoc />
@@ -342,7 +400,8 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
             recovered = await TryAcquireRecoveryTokenOnceAsync(cancellationToken).ConfigureAwait(false) && affectedUnchanged;
             leakage = !controlUnchanged;
             silentLoss = affected is null;
-            duplicate = !_identityFaultLeftStateUnchanged || !affectedUnchanged || !controlUnchanged;
+            // Identity has no duplicate-commit probe; sentinel drift is leakage/non-recovery, not duplication.
+            duplicate = false;
         }
         else if (string.Equals(dependency, ScopedOutageDependencies.Graph, StringComparison.Ordinal))
         {
@@ -405,6 +464,14 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         else
         {
             using JsonDocument first = await SendScopedAsync(dependency, tenantRef, "process", correlationId, cancellationToken).ConfigureAwait(false);
+            JsonElement firstRoot = first.RootElement;
+            if (firstRoot.GetProperty("faulted").GetBoolean() ||
+                !string.Equals(firstRoot.GetProperty("outcome").GetString(), "completed", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"The first post-restore process for '{dependency}' did not complete cleanly.");
+            }
+
             using JsonDocument second = await SendScopedAsync(dependency, tenantRef, "process", correlationId, cancellationToken).ConfigureAwait(false);
             JsonElement root = second.RootElement;
             recovered = !root.GetProperty("faulted").GetBoolean() &&
@@ -425,35 +492,54 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         // a throw from RestoreAsync or a non-2xx status used to strand them permanently and poison later runs.
         if (string.Equals(dependency, ScopedOutageDependencies.Identity, StringComparison.Ordinal))
         {
-            await EraseSentinelsAsync(
-                [_identityAffectedSentinel, _identityControlSentinel],
-                cancellationToken).ConfigureAwait(false);
-
-            if (!await TryAcquireRecoveryTokenOnceAsync(cancellationToken).ConfigureAwait(false))
+            try
             {
-                await RestoreAsync(dependency, tenantRef, cancellationToken).ConfigureAwait(false);
+                await EraseSentinelsAsync(
+                    [_identityAffectedSentinel, _identityControlSentinel],
+                    cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                // Always restore when identity is down; never leave Keycloak stopped after a partial erase failure.
+                if (!await TryAcquireRecoveryTokenOnceAsync(cancellationToken).ConfigureAwait(false) ||
+                    !await IsIdentityAvailableAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    await RestoreAsync(dependency, tenantRef, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            if (!await TryAcquireRecoveryTokenOnceAsync(cancellationToken).ConfigureAwait(false) ||
+                !await IsIdentityAvailableAsync(cancellationToken).ConfigureAwait(false))
+            {
+                throw new InvalidOperationException("Identity remained unavailable after scoped-outage cleanup.");
             }
 
             return;
         }
 
-        if (string.Equals(dependency, ScopedOutageDependencies.Graph, StringComparison.Ordinal))
+        try
         {
-            await EraseSentinelsAsync([_graphAffectedSentinel, _graphControlSentinel], cancellationToken)
-                .ConfigureAwait(false);
-            foreach (string? cleanupIntake in new[] { _graphRecoveredIntakeRef, _graphDuplicateProbeIntakeRef })
+            if (string.Equals(dependency, ScopedOutageDependencies.Graph, StringComparison.Ordinal))
             {
-                if (!string.IsNullOrWhiteSpace(cleanupIntake))
+                await EraseSentinelsAsync([_graphAffectedSentinel, _graphControlSentinel], cancellationToken)
+                    .ConfigureAwait(false);
+                foreach (string? cleanupIntake in new[] { _graphRecoveredIntakeRef, _graphDuplicateProbeIntakeRef })
                 {
-                    await EraseIntakeReadModelsAsync(
-                        RecoveryValidationTopology.StorageTenantRef,
-                        cleanupIntake,
-                        cancellationToken).ConfigureAwait(false);
+                    if (!string.IsNullOrWhiteSpace(cleanupIntake))
+                    {
+                        await EraseIntakeReadModelsAsync(
+                            RecoveryValidationTopology.StorageTenantRef,
+                            cleanupIntake,
+                            cancellationToken).ConfigureAwait(false);
+                    }
                 }
             }
         }
+        finally
+        {
+            await RestoreAsync(dependency, tenantRef, cancellationToken).ConfigureAwait(false);
+        }
 
-        await RestoreAsync(dependency, tenantRef, cancellationToken).ConfigureAwait(false);
         using JsonDocument status = string.Equals(dependency, ScopedOutageDependencies.Graph, StringComparison.Ordinal)
             ? await SendSubscriptionAsync(tenantRef, "status", includeBearer: false, cancellationToken, HttpMethod.Get).ConfigureAwait(false)
             : await SendScopedAsync(dependency, tenantRef, "status", correlationId: null, cancellationToken, HttpMethod.Get).ConfigureAwait(false);
@@ -541,6 +627,36 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
     {
         ResourceCommandService commands = _application.Services.GetRequiredService<ResourceCommandService>();
         return await commands.ExecuteCommandAsync(_securityResource, command, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static string RequireObservedScope(string? observedScope, string dependencyLabel)
+    {
+        if (string.IsNullOrWhiteSpace(observedScope))
+        {
+            throw new InvalidOperationException(
+                $"{dependencyLabel} scope monitoring returned no observed scope (missing monitoring is unmeasurable, not Tenant-by-default).");
+        }
+
+        return observedScope;
+    }
+
+    private static void RequireNonDegenerateScopeStamps(
+        DateTimeOffset observedAtUtc,
+        DateTimeOffset recordedAtUtc,
+        string dependencyLabel)
+    {
+        if (observedAtUtc == default || recordedAtUtc == default)
+        {
+            throw new InvalidOperationException(
+                $"{dependencyLabel} scope monitoring returned a default timestamp (missing monitoring is unmeasurable).");
+        }
+
+        // Equal clocks collapse NFR41 latency to 0ms and look measured; Task 5 requires that path to be unmeasurable.
+        if (recordedAtUtc <= observedAtUtc)
+        {
+            throw new InvalidOperationException(
+                $"{dependencyLabel} scope-recording stamps are degenerate (recordedAtUtc <= observedAtUtc).");
+        }
     }
 
     private async Task<bool> IsIdentityAvailableAsync(CancellationToken cancellationToken)

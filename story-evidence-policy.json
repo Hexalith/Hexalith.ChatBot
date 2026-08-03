@@ -1,0 +1,210 @@
+{
+  "schemaVersion": "1.0",
+  "minimumSupportedVersion": "1.0",
+  "maximumEvidenceAgeHours": 720,
+  "acceptedResultFormats": [
+    "trx"
+  ],
+  "requiredStorySections": [
+    "Tasks & Acceptance",
+    "Acceptance Criteria",
+    "Tasks / Subtasks",
+    "File List"
+  ],
+  "mandatoryCheckboxSections": [
+    "Execution",
+    "Tasks / Subtasks"
+  ],
+  "storyGrammars": [
+    {
+      "name": "te-spec",
+      "titleSource": "frontmatter:title",
+      "statusSource": "frontmatter:status",
+      "tasksSection": "## Tasks & Acceptance / **Execution:**",
+      "acceptanceSection": "## Tasks & Acceptance / **Acceptance Criteria:**",
+      "fileListSection": "## File List"
+    },
+    {
+      "name": "bmad-product-story",
+      "titleSource": "# Story ...",
+      "statusSource": "Status: ...",
+      "tasksSection": "## Tasks / Subtasks",
+      "acceptanceSection": "## Acceptance Criteria",
+      "fileListSection": "### File List"
+    }
+  ],
+  "eventBaseHeadResolution": {
+    "schemaVersion": "1.0",
+    "pullRequestBase": "github.event.pull_request.base.sha",
+    "pullRequestHead": "github.event.pull_request.head.sha",
+    "pushBase": "github.event.before",
+    "pushHead": "github.sha",
+    "zeroOrUnavailablePushBaseFallback": "git rev-parse HEAD^"
+  },
+  "sourceDigest": {
+    "algorithm": "SHA-256",
+    "tuple": "repository/path/mode/blob",
+    "sort": "ordinal",
+    "rootDeclaredSubmodulesOnly": true,
+    "immutableContentSource": "git-tree",
+    "worktreeModeSource": "git-index",
+    "symlinkMode": "120000"
+  },
+  "reasonCodes": [
+    "status_mismatch",
+    "file_list_diff_mismatch",
+    "gitlink_scope_mismatch",
+    "scope_digest_mismatch",
+    "machine_results_invalid",
+    "evidence_stale_or_unbound",
+    "primary_path_not_executed",
+    "checked_item_evidence_mismatch",
+    "evidence_payload_forbidden"
+  ],
+  "primaryPathTriggers": [
+    {
+      "class": "browser",
+      "pathPatterns": [
+        "src/**/*.razor",
+        "src/**/wwwroot/**",
+        "tests/**/*E2E*"
+      ],
+      "claimPatterns": [
+        "[claim:browser]"
+      ],
+      "recognizedLanes": [
+        "browser-primary"
+      ],
+      "recognizedLaneBindings": [
+        {
+          "lane": "browser-primary",
+          "selector": "class:Hexalith.ChatBot.UI.E2E.Tests.RealRenderCrossSurfaceE2ETests",
+          "sources": [
+            "current-run"
+          ]
+        }
+      ]
+    },
+    {
+      "class": "signalr",
+      "pathPatterns": [
+        "src/**/*Hub*.cs",
+        "src/**/*SignalR*.cs",
+        "tests/**/*SignalR*.cs"
+      ],
+      "claimPatterns": [
+        "[claim:signalr]"
+      ],
+      "recognizedLanes": [
+        "signalr-primary"
+      ],
+      "recognizedLaneBindings": [
+        {
+          "lane": "signalr-primary",
+          "selector": "class:Hexalith.ChatBot.Server.Tests.Projections.ChatBotProjectConversationHubE2ETests",
+          "sources": [
+            "current-run"
+          ]
+        }
+      ]
+    },
+    {
+      "class": "hosting-assets",
+      "pathPatterns": [
+        "src/**/*AppHost*",
+        "src/**/wwwroot/**",
+        "src/**/*.css",
+        "src/**/App.razor"
+      ],
+      "claimPatterns": [
+        "[claim:hosting-assets]"
+      ],
+      "recognizedLanes": [
+        "hosting-assets-primary"
+      ],
+      "recognizedLaneBindings": [
+        {
+          "lane": "hosting-assets-primary",
+          "selector": "class:Hexalith.ChatBot.UI.E2E.Tests.FrontComposerShellIntegrationE2ETests",
+          "sources": [
+            "current-run"
+          ]
+        }
+      ]
+    },
+    {
+      "class": "aspire-dapr",
+      "pathPatterns": [
+        "src/Hexalith.ChatBot.AppHost/**",
+        "**/*Dapr*.cs",
+        "**/*Aspire*.cs"
+      ],
+      "claimPatterns": [
+        "[claim:aspire-dapr]"
+      ],
+      "recognizedLanes": [
+        "aspire-dapr-primary"
+      ],
+      "recognizedLaneBindings": [
+        {
+          "lane": "aspire-dapr-primary",
+          "selector": "class:Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests",
+          "sources": [
+            "current-run"
+          ]
+        }
+      ]
+    },
+    {
+      "class": "recovery",
+      "pathPatterns": [
+        "tests/**/Recovery/**",
+        ".github/workflows/release.yml"
+      ],
+      "claimPatterns": [
+        "[claim:recovery]"
+      ],
+      "recognizedLanes": [
+        "recovery-primary"
+      ],
+      "recognizedLaneBindings": [
+        {
+          "lane": "recovery-primary",
+          "selector": "class:Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests",
+          "sources": [
+            "current-run",
+            "retained"
+          ]
+        }
+      ]
+    }
+  ],
+  "metadataOnly": {
+    "forbiddenFieldNames": [
+      "secret",
+      "password",
+      "credential",
+      "token",
+      "payload",
+      "prompt"
+    ],
+    "allowedArtifactFields": [
+      "artifactLocator",
+      "trxSha256",
+      "implementationDigest"
+    ],
+    "allowedLocatorSchemes": [
+      "file",
+      "github-actions"
+    ],
+    "maximumStringLength": 512,
+    "redactedFailureSubject": "redacted"
+  },
+  "reportExcludedPaths": [
+    "_bmad-output/implementation-artifacts/evidence/reports/"
+  ],
+  "allowedLifecycleBookkeepingFields": [
+    "implementationDigest"
+  ],
+  "exceptions": []
+}

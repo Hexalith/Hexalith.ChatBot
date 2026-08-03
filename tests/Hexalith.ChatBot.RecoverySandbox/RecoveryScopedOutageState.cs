@@ -1,6 +1,6 @@
 namespace Hexalith.ChatBot.RecoverySandbox;
 
-/// <summary>Thread-safe fault and idempotent-effect state for the four exercised ChatBot dependency seams.</summary>
+/// <summary>Thread-safe fault and effect-emission state for the four exercised ChatBot dependency seams.</summary>
 internal sealed class RecoveryScopedOutageState
 {
     private static readonly HashSet<string> Dependencies =
@@ -15,7 +15,7 @@ internal sealed class RecoveryScopedOutageState
     private readonly HashSet<string> _faulted = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DateTimeOffset> _faultedAtUtc = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DateTimeOffset> _restoredAtUtc = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, Dictionary<string, HashSet<string>>> _completedEffects = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Dictionary<string, Dictionary<string, int>>> _completedEffects = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _faultObservations = new(StringComparer.Ordinal);
 
     /// <summary>Returns whether this state owns the dependency token.</summary>
@@ -42,19 +42,19 @@ internal sealed class RecoveryScopedOutageState
     }
 
     /// <summary>
-    /// Restores the dependency and resets completed effects for a fresh idempotency exercise. Returns the state as
-    /// observed immediately before clearing the fault — not a post-clear snapshot, which would always report
-    /// <c>faulted: false</c> by construction and make a pre-injection/post-cleanup dirty-boundary check unreachable.
+    /// Restores the dependency and resets completed effects for a fresh idempotency exercise. Returns both the
+    /// pre-clear <c>prior</c> snapshot (so dirty-boundary checks stay reachable) and the post-clear <c>current</c>
+    /// snapshot (so callers can assert cleanliness without a follow-up status read when they only hold this body).
     /// </summary>
     public object Restore(string dependency, DateTimeOffset atUtc)
     {
         lock (_gate)
         {
-            object priorState = SnapshotCore(dependency);
+            object prior = SnapshotCore(dependency);
             _ = _faulted.Remove(dependency);
             _restoredAtUtc[dependency] = atUtc.ToUniversalTime();
             _completedEffects.Remove(dependency);
-            return priorState;
+            return new { prior, current = SnapshotCore(dependency) };
         }
     }
 
@@ -67,36 +67,49 @@ internal sealed class RecoveryScopedOutageState
         }
     }
 
-    /// <summary>Records an idempotent metadata-only effect and returns its per-correlation emission count.</summary>
+    /// <summary>Records one effect emission and returns the per-correlation emission count after recording.</summary>
     public int RecordEffect(string dependency, string tenantRef, string correlationId)
     {
         lock (_gate)
         {
-            if (!_completedEffects.TryGetValue(dependency, out Dictionary<string, HashSet<string>>? tenants))
+            if (!_completedEffects.TryGetValue(dependency, out Dictionary<string, Dictionary<string, int>>? tenants))
             {
-                tenants = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+                tenants = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
                 _completedEffects[dependency] = tenants;
             }
 
-            if (!tenants.TryGetValue(tenantRef, out HashSet<string>? effects))
+            if (!tenants.TryGetValue(tenantRef, out Dictionary<string, int>? effects))
             {
-                effects = new HashSet<string>(StringComparer.Ordinal);
+                effects = new Dictionary<string, int>(StringComparer.Ordinal);
                 tenants[tenantRef] = effects;
             }
 
-            _ = effects.Add(correlationId);
-            return effects.Count(effect => string.Equals(effect, correlationId, StringComparison.Ordinal));
+            int count = effects.GetValueOrDefault(correlationId) + 1;
+            effects[correlationId] = count;
+            return count;
         }
     }
 
-    /// <summary>Returns the number of completed effects for one dependency and tenant.</summary>
+    /// <summary>Returns the total number of completed effect emissions for one dependency and tenant.</summary>
     public int EffectCount(string dependency, string tenantRef)
     {
         lock (_gate)
         {
-            return _completedEffects.TryGetValue(dependency, out Dictionary<string, HashSet<string>>? tenants) &&
-                tenants.TryGetValue(tenantRef, out HashSet<string>? effects)
-                ? effects.Count
+            return _completedEffects.TryGetValue(dependency, out Dictionary<string, Dictionary<string, int>>? tenants) &&
+                tenants.TryGetValue(tenantRef, out Dictionary<string, int>? effects)
+                ? effects.Values.Sum()
+                : 0;
+        }
+    }
+
+    /// <summary>Returns the emission count for one dependency, tenant, and correlation id.</summary>
+    public int CorrelationEffectCount(string dependency, string tenantRef, string correlationId)
+    {
+        lock (_gate)
+        {
+            return _completedEffects.TryGetValue(dependency, out Dictionary<string, Dictionary<string, int>>? tenants) &&
+                tenants.TryGetValue(tenantRef, out Dictionary<string, int>? effects)
+                ? effects.GetValueOrDefault(correlationId)
                 : 0;
         }
     }
@@ -106,7 +119,7 @@ internal sealed class RecoveryScopedOutageState
     {
         lock (_gate)
         {
-            return _completedEffects.TryGetValue(dependency, out Dictionary<string, HashSet<string>>? tenants) &&
+            return _completedEffects.TryGetValue(dependency, out Dictionary<string, Dictionary<string, int>>? tenants) &&
                 tenants.Any(pair => !string.Equals(pair.Key, tenantRef, StringComparison.Ordinal) && pair.Value.Count > 0);
         }
     }
@@ -127,8 +140,8 @@ internal sealed class RecoveryScopedOutageState
             faultedAtUtc = _faultedAtUtc.GetValueOrDefault(dependency),
             restoredAtUtc = _restoredAtUtc.GetValueOrDefault(dependency),
             faultObservations = _faultObservations.GetValueOrDefault(dependency),
-            effectCount = _completedEffects.TryGetValue(dependency, out Dictionary<string, HashSet<string>>? tenants)
-                ? tenants.Values.Sum(static effects => effects.Count)
+            effectCount = _completedEffects.TryGetValue(dependency, out Dictionary<string, Dictionary<string, int>>? tenants)
+                ? tenants.Values.Sum(static effects => effects.Values.Sum())
                 : 0,
         };
 }

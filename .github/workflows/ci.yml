@@ -37,11 +37,19 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           submodules: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact producer event head
+        env:
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EVENT_HEAD"
       - name: Initialize references submodules
         run: git submodule update --init
       - name: Setup .NET
@@ -53,7 +61,198 @@ jobs:
       - name: Build
         run: dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release
       - name: Test
-        run: dotnet test Hexalith.ChatBot.slnx --no-build --configuration Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t projects < <(find tests -mindepth 2 -maxdepth 2 -name '*.csproj' -print | sort)
+          declare -A seen_lanes=()
+          for project in "${projects[@]}"; do
+            lane="$(basename "${project%.csproj}")"
+            if [[ -n "${seen_lanes[$lane]+present}" ]]; then
+              printf 'Colliding test lane %s: %s and %s\n' "$lane" "${seen_lanes[$lane]}" "$project" >&2
+              exit 1
+            fi
+            seen_lanes[$lane]="$project"
+          done
+          for project in "${projects[@]}"; do
+            if [[ "$project" == *"Hexalith.ChatBot.RecoverySandbox.csproj" ]]; then
+              continue
+            fi
+            lane="$(basename "${project%.csproj}")"
+            output="TestResults/${lane}"
+            dotnet test "$project" --no-build --configuration Release \
+              --logger "trx;LogFileName=${lane}.trx" --results-directory "$output"
+            sha256sum "${output}/${lane}.trx" > "${output}/${lane}.trx.sha256"
+          done
+          printf '%s\n' "$(git rev-parse HEAD)" > TestResults/producer-head.sha
+      - name: Upload collision-safe machine results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: machine-test-results
+          path: TestResults
+          retention-days: 30
+
+  story-evidence-integrity:
+    name: story-evidence-integrity
+    needs: [build, topology-acceptance]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout full transition history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Initialize root-declared references submodules
+        run: git submodule update --init
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.302
+      - name: Require successful general machine-result producer
+        if: needs.build.result != 'success'
+        run: exit 1
+      - name: Download machine results
+        uses: actions/download-artifact@v4
+        with:
+          name: machine-test-results
+          path: ${{ runner.temp }}/machine-results
+      - name: Run gate self-tests with current-run TRX
+        run: >-
+          dotnet test tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj
+          --configuration Release
+          --logger "trx;LogFileName=story-evidence-gate.trx"
+          --results-directory "${{ runner.temp }}/machine-results/story-evidence-gate"
+      - name: Resolve exact transition bounds
+        id: bounds
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+          PUSH_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base_sha="$PR_BASE"
+            head_sha="$PR_HEAD"
+          elif [[ -n "${PUSH_BASE:-}" && ! "$PUSH_BASE" =~ ^0+$ ]] && git cat-file -e "${PUSH_BASE}^{commit}"; then
+            base_sha="$PUSH_BASE"
+            head_sha="$PUSH_HEAD"
+          else
+            head_sha="$PUSH_HEAD"
+            base_sha="$(git rev-parse HEAD^)"
+          fi
+          checked_out_head="$(git rev-parse HEAD)"
+          if [[ "$checked_out_head" != "$head_sha" ]]; then
+            printf 'Checked-out HEAD %s does not match event head %s.\n' "$checked_out_head" "$head_sha" >&2
+            exit 1
+          fi
+          printf 'base=%s\nhead=%s\n' "$base_sha" "$head_sha" >> "$GITHUB_OUTPUT"
+      - name: Detect proposed completion transitions
+        env:
+          TRANSITIONS_PATH: ${{ runner.temp }}/story-evidence-transitions.json
+        run: >-
+          dotnet run --project tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj
+          --configuration Release --no-build -- detect
+          --base "${{ steps.bounds.outputs.base }}"
+          --head "${{ steps.bounds.outputs.head }}"
+          --output "$TRANSITIONS_PATH"
+      - name: Resolve transition-declared artifact requirements
+        id: artifacts
+        shell: bash
+        env:
+          TRANSITIONS_PATH: ${{ runner.temp }}/story-evidence-transitions.json
+          RETAINED_LOCATORS_PATH: ${{ runner.temp }}/story-evidence-retained-locators.txt
+        run: |
+          set -euo pipefail
+          requires_topology=false
+          : > "$RETAINED_LOCATORS_PATH"
+          while IFS= read -r contract; do
+            [[ -z "$contract" ]] && continue
+            if [[ ! -f "$contract" ]]; then
+              printf 'Detected transition contract is missing.\n' >&2
+              exit 1
+            fi
+            if jq -e '.results[]? | select(.source == "current-run" and .lane == "aspire-dapr-primary")' \
+                "$contract" > /dev/null; then
+              requires_topology=true
+            fi
+            jq -r '.results[]? | select(.source == "retained") | .artifactLocator' \
+              "$contract" >> "$RETAINED_LOCATORS_PATH"
+          done < <(jq -r '.[].contractPath' "$TRANSITIONS_PATH")
+          sort -u -o "$RETAINED_LOCATORS_PATH" "$RETAINED_LOCATORS_PATH"
+          printf 'requires_topology=%s\n' "$requires_topology" >> "$GITHUB_OUTPUT"
+      - name: Require successful topology producer when transition-declared
+        if: steps.artifacts.outputs.requires_topology == 'true' && needs.topology-acceptance.result != 'success'
+        run: exit 1
+      - name: Download transition-declared current topology primary result
+        if: steps.artifacts.outputs.requires_topology == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: topology-acceptance-evidence
+          path: ${{ runner.temp }}/machine-results/topology-primary
+      - name: Collect transition-declared retained exact-run artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULTS_ROOT: ${{ runner.temp }}/machine-results
+          RETAINED_LOCATORS_PATH: ${{ runner.temp }}/story-evidence-retained-locators.txt
+        run: |
+          set -euo pipefail
+          declare -A downloaded=()
+          while IFS= read -r locator; do
+            [[ -z "$locator" ]] && continue
+            if [[ ! "$locator" =~ ^github-actions://([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/runs/([1-9][0-9]{0,19})/artifacts/([A-Za-z0-9][A-Za-z0-9_.-]{0,127})$ ]]; then
+              printf 'Unsafe retained locator.\n' >&2
+              exit 1
+            fi
+            repository="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+            run_id="${BASH_REMATCH[3]}"
+            artifact="${BASH_REMATCH[4]}"
+            key="${repository}/${run_id}/${artifact}"
+            [[ -n "${downloaded[$key]+present}" ]] && continue
+            destination="${RESULTS_ROOT}/retained/${run_id}/${artifact}"
+            if [[ -e "$destination" ]]; then
+              printf 'Retained destination collision.\n' >&2
+              exit 1
+            fi
+            mkdir -p "$destination"
+            gh run download "$run_id" --repo "$repository" --name "$artifact" --dir "$destination"
+            downloaded[$key]=1
+          done < "$RETAINED_LOCATORS_PATH"
+      - name: Verify general producer artifact binds the exact event head
+        run: |
+          set -euo pipefail
+          test "$(cat "${{ runner.temp }}/machine-results/producer-head.sha")" = "${{ steps.bounds.outputs.head }}"
+      - name: Verify topology producer artifact binds the exact event head when transition-declared
+        if: steps.artifacts.outputs.requires_topology == 'true'
+        run: |
+          set -euo pipefail
+          test "$(cat "${{ runner.temp }}/machine-results/topology-primary/producer-head.sha")" = "${{ steps.bounds.outputs.head }}"
+      - name: Attest and evaluate proposed completion transitions
+        run: >-
+          dotnet run --project tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj
+          --configuration Release -- ci
+          --base "${{ steps.bounds.outputs.base }}"
+          --head "${{ steps.bounds.outputs.head }}"
+          --results "${{ runner.temp }}/machine-results"
+          --report-directory "${{ runner.temp }}/story-evidence-reports"
+      - name: Upload story-evidence reports and provenance sidecars
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: story-evidence-integrity-reports
+          path: |
+            ${{ runner.temp }}/story-evidence-reports
+            ${{ runner.temp }}/machine-results/**/*.provenance.json
+          retention-days: 30
 
   topology-acceptance:
     name: required Aspire + DAPR topology acceptance
@@ -68,7 +267,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           submodules: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact topology producer event head
+        env:
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EVENT_HEAD"
       - name: Initialize references submodules
         run: git submodule update --init
       - name: Setup .NET
@@ -89,6 +294,8 @@ jobs:
           --logger "console;verbosity=detailed"
           --logger "trx;LogFileName=topology-acceptance.trx"
           --results-directory TestResults
+      - name: Record topology producer head
+        run: printf '%s\n' "$(git rev-parse HEAD)" > TestResults/producer-head.sha
       - name: Upload topology acceptance evidence
         if: always()
         uses: actions/upload-artifact@v4

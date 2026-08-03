@@ -303,6 +303,10 @@ public sealed class LiveContinuityAspireE2eTests
                 outcome.Unmeasurable == 0 &&
                 rebuildOutcome.Unmeasurable == 0 &&
                 scopedOutcome.Unmeasurable == 0 &&
+                scopedOutcome.Contained == ScopedOutageDependencies.All.Count &&
+                scopedOutcome.Breached == 0 &&
+                scopedOutcome.ScopeRecordingExceeded == 0 &&
+                scopedOutcome.Alerted == 0 &&
                 manifestFiles.Length == expectedEvidence;
 
             Dictionary<string, int> alertsDeliveredByJob = new(StringComparer.Ordinal)
@@ -535,12 +539,15 @@ public sealed class LiveContinuityAspireE2eTests
         request.Headers.Add("X-Correlation-Id", ChatBotCorrelationId.New().Value);
         using HttpResponseMessage response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
-        // The empty command body may legitimately be rejected on validation grounds; what must NOT happen is a
-        // credential rejection, which is what this probe exists to rule out.
-        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        // The empty command body may legitimately be rejected on validation grounds after admission; what must NOT
+        // happen is a credential rejection — and a 5xx/timeout/"success" that never reached auth must not count either.
+        if (response.StatusCode is not (
+            HttpStatusCode.BadRequest or
+            HttpStatusCode.UnprocessableEntity or
+            HttpStatusCode.Accepted))
         {
             throw new InvalidOperationException(
-                $"The recovery mailbox token was rejected by the running ChatBot (status {(int)response.StatusCode}).");
+                $"The recovery mailbox admission probe returned an unexpected status {(int)response.StatusCode}.");
         }
     }
 

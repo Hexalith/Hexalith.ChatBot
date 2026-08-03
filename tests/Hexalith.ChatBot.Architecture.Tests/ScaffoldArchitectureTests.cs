@@ -40,6 +40,8 @@ public static class ScaffoldArchitectureTests
             "tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj",
             "tests/Hexalith.ChatBot.Conformance.Tests/Hexalith.ChatBot.Conformance.Tests.csproj",
             "tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj",
+            "tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj",
+            "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj",
         ];
 
         foreach (string project in expected)
@@ -758,11 +760,154 @@ public static class ScaffoldArchitectureTests
     }
 
     [Fact]
+    public static void StoryEvidenceIntegrityGateShouldRemainFailClosedAndMachineBound()
+    {
+        string root = RepositoryRoot();
+        string policy = File.ReadAllText(Path.Combine(root, "story-evidence-policy.json"));
+        string workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "ci.yml"));
+        string releaseWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "release.yml"));
+        string browserPrimarySource = File.ReadAllText(Path.Combine(
+            root,
+            "tests",
+            "Hexalith.ChatBot.UI.E2E.Tests",
+            "RealRenderCrossSurfaceE2ETests.cs"));
+        string signalRPrimarySource = File.ReadAllText(Path.Combine(
+            root,
+            "tests",
+            "Hexalith.ChatBot.Server.Tests",
+            "Projections",
+            "ChatBotProjectConversationHubE2ETests.cs"));
+        string hostingAssetsPrimarySource = File.ReadAllText(Path.Combine(
+            root,
+            "tests",
+            "Hexalith.ChatBot.UI.E2E.Tests",
+            "FrontComposerShellIntegrationE2ETests.cs"));
+        string aspireDaprPrimarySource = File.ReadAllText(Path.Combine(
+            root,
+            "tests",
+            "Hexalith.ChatBot.IntegrationTests",
+            "TrivialGovernedCommandAspireE2eTests.cs"));
+        string recoveryPrimarySource = File.ReadAllText(Path.Combine(
+            root,
+            "tests",
+            "Hexalith.ChatBot.IntegrationTests",
+            "Recovery",
+            "LiveContinuityAspireE2eTests.cs"));
+        string toolProject = File.ReadAllText(Path.Combine(
+            root,
+            "tools",
+            "Hexalith.ChatBot.StoryEvidenceGate",
+            "Hexalith.ChatBot.StoryEvidenceGate.csproj"));
+        string toolProgram = File.ReadAllText(Path.Combine(
+            root,
+            "tools",
+            "Hexalith.ChatBot.StoryEvidenceGate",
+            "Program.cs"));
+
+        policy.ShouldContain("\"schemaVersion\": \"1.0\"");
+        policy.ShouldContain("\"scope_digest_mismatch\"");
+        policy.ShouldContain("\"primary_path_not_executed\"");
+        policy.ShouldContain("\"checked_item_evidence_mismatch\"");
+        policy.ShouldContain("\"eventBaseHeadResolution\"");
+        policy.ShouldContain("\"pullRequestHead\": \"github.event.pull_request.head.sha\"");
+        policy.ShouldContain("\"zeroOrUnavailablePushBaseFallback\": \"git rev-parse HEAD^\"");
+        policy.ShouldContain("\"allowedLifecycleBookkeepingFields\"");
+        policy.ShouldContain("\"immutableContentSource\": \"git-tree\"");
+        policy.ShouldContain("\"worktreeModeSource\": \"git-index\"");
+        policy.ShouldContain("\"recognizedLaneBindings\"");
+        policy.ShouldContain("\"allowedLocatorSchemes\"");
+        policy.ShouldContain(
+            "\"selector\": \"class:Hexalith.ChatBot.UI.E2E.Tests.RealRenderCrossSurfaceE2ETests\"");
+        policy.ShouldContain(
+            "\"selector\": \"class:Hexalith.ChatBot.Server.Tests.Projections.ChatBotProjectConversationHubE2ETests\"");
+        policy.ShouldContain(
+            "\"selector\": \"class:Hexalith.ChatBot.UI.E2E.Tests.FrontComposerShellIntegrationE2ETests\"");
+        policy.ShouldContain(
+            "\"selector\": \"class:Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests\"");
+        policy.ShouldContain(
+            "\"selector\": \"class:Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests\"");
+        policy.ShouldNotContain("Hexalith.ChatBot.BrowserPrimaryTests");
+        policy.ShouldNotContain("Hexalith.ChatBot.SignalRPrimaryTests");
+        policy.ShouldNotContain("Hexalith.ChatBot.HostingAssetsPrimaryTests");
+        policy.ShouldNotContain("Hexalith.ChatBot.AspireDaprPrimaryTests");
+        policy.ShouldNotContain("Hexalith.ChatBot.RecoveryPrimaryTests");
+        browserPrimarySource.ShouldContain("namespace Hexalith.ChatBot.UI.E2E.Tests;");
+        browserPrimarySource.ShouldContain("public sealed class RealRenderCrossSurfaceE2ETests");
+        signalRPrimarySource.ShouldContain("namespace Hexalith.ChatBot.Server.Tests.Projections;");
+        signalRPrimarySource.ShouldContain("public sealed class ChatBotProjectConversationHubE2ETests");
+        hostingAssetsPrimarySource.ShouldContain("namespace Hexalith.ChatBot.UI.E2E.Tests;");
+        hostingAssetsPrimarySource.ShouldContain("public sealed class FrontComposerShellIntegrationE2ETests");
+        aspireDaprPrimarySource.ShouldContain("namespace Hexalith.ChatBot.IntegrationTests;");
+        aspireDaprPrimarySource.ShouldContain("public sealed class TrivialGovernedCommandAspireE2eTests");
+        recoveryPrimarySource.ShouldContain("namespace Hexalith.ChatBot.IntegrationTests.Recovery;");
+        recoveryPrimarySource.ShouldContain("public sealed class LiveContinuityAspireE2eTests");
+        workflow.ShouldContain("story-evidence-integrity:");
+        workflow.ShouldContain("name: story-evidence-integrity");
+        workflow.ShouldContain("needs: [build, topology-acceptance]\n    if: always()");
+        workflow.ShouldContain("if: needs.build.result != 'success'");
+        workflow.ShouldContain(
+            "if: steps.artifacts.outputs.requires_topology == 'true' && needs.topology-acceptance.result != 'success'");
+        workflow.ShouldContain("ref: ${{ github.event.pull_request.head.sha || github.sha }}");
+        Regex.Matches(workflow, "ref: \\$\\{\\{ github\\.event\\.pull_request\\.head\\.sha \\|\\| github\\.sha \\}\\}")
+            .Count.ShouldBeGreaterThanOrEqualTo(3);
+        workflow.ShouldContain("actions: read");
+        workflow.ShouldContain("declare -A seen_lanes=()");
+        workflow.ShouldContain("Colliding test lane");
+        workflow.ShouldContain("Detect proposed completion transitions");
+        workflow.ShouldContain("--output \"$TRANSITIONS_PATH\"");
+        workflow.ShouldContain("Resolve transition-declared artifact requirements");
+        workflow.ShouldContain("done < <(jq -r '.[].contractPath' \"$TRANSITIONS_PATH\")");
+        workflow.ShouldContain("requires_topology=false");
+        workflow.ShouldContain(".source == \"current-run\" and .lane == \"aspire-dapr-primary\"");
+        workflow.ShouldContain("requires_topology=%s");
+        workflow.ShouldContain(
+            "- name: Download transition-declared current topology primary result\n"
+            + "        if: steps.artifacts.outputs.requires_topology == 'true'");
+        workflow.ShouldContain("name: topology-acceptance-evidence");
+        workflow.ShouldContain(
+            "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests."
+            + "TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology");
+        workflow.ShouldContain("trx;LogFileName=topology-acceptance.trx");
+        releaseWorkflow.ShouldContain(
+            "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests."
+            + "TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology");
+        releaseWorkflow.ShouldContain("trx;LogFileName=topology-acceptance.trx");
+        workflow.ShouldContain(
+            "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests."
+            + "LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate");
+        workflow.ShouldContain("trx;LogFileName=live-recovery-validation.trx");
+        releaseWorkflow.ShouldContain(
+            "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests."
+            + "LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate");
+        releaseWorkflow.ShouldContain("trx;LogFileName=live-recovery-validation.trx");
+        workflow.ShouldContain("Collect transition-declared retained exact-run artifacts");
+        workflow.ShouldContain("done < \"$RETAINED_LOCATORS_PATH\"");
+        workflow.ShouldNotContain("_bmad-output/implementation-artifacts/evidence/*.json | sort -u");
+        workflow.ShouldContain("gh run download \"$run_id\"");
+        workflow.ShouldContain("github-actions://([A-Za-z0-9_.-]+)");
+        workflow.ShouldContain("Verify general producer artifact binds the exact event head");
+        workflow.ShouldContain(
+            "- name: Verify topology producer artifact binds the exact event head when transition-declared\n"
+            + "        if: steps.artifacts.outputs.requires_topology == 'true'");
+        workflow.IndexOf("Resolve exact transition bounds", StringComparison.Ordinal)
+            .ShouldBeLessThan(workflow.IndexOf("Detect proposed completion transitions", StringComparison.Ordinal));
+        workflow.IndexOf("Detect proposed completion transitions", StringComparison.Ordinal)
+            .ShouldBeLessThan(workflow.IndexOf("Collect transition-declared retained exact-run artifacts", StringComparison.Ordinal));
+        Regex.Matches(workflow, "producer-head\\.sha").Count.ShouldBeGreaterThanOrEqualTo(4);
+        toolProgram.ShouldContain("GITHUB_STEP_SUMMARY");
+        workflow.ShouldContain("fetch-depth: 0");
+        workflow.ShouldContain("StoryEvidenceGate.Tests");
+        workflow.ShouldNotContain("git submodule update --init --recursive");
+        toolProject.ShouldNotContain("PackageReference");
+    }
+
+    [Fact]
     public static void WorkflowsAndToolsShouldNotUseRecursiveSubmoduleCommands()
     {
         string root = RepositoryRoot();
         IEnumerable<string> files = Directory.EnumerateFiles(Path.Combine(root, ".github", "workflows"), "*", SearchOption.AllDirectories)
-            .Concat(Directory.EnumerateFiles(Path.Combine(root, "tests", "tools"), "*", SearchOption.AllDirectories));
+            .Concat(Directory.EnumerateFiles(Path.Combine(root, "tests", "tools"), "*", SearchOption.AllDirectories))
+            .Concat(Directory.EnumerateFiles(Path.Combine(root, "tools"), "*.cs", SearchOption.AllDirectories));
 
         Regex forbidden = new(@"git\s+submodule\s+(?:update|foreach)\b[^\r\n]*--recursive", RegexOptions.IgnoreCase);
         string[] violations = files

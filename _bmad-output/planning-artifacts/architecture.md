@@ -10,6 +10,7 @@ inputDocuments:
   - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-17.md"
   - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-18.md"
   - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-20.md"
+  - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-08-03.md"
   - "references/Hexalith.EventStore/_bmad-output/project-context.md"
   - "references/Hexalith.Conversations/_bmad-output/project-context.md"
   - "references/Hexalith.Projects/_bmad-output/project-context.md"
@@ -637,6 +638,8 @@ allowlist`, return a typed rejection and **write no durable state** (queue inten
 audited (rejected transition, actor, reason, correlation); terminal states (`Rejected`/`Failed`/`Skipped`)
 never move back — reprocess creates a **new workflow instance** with `supersedes`/`superseded_by` audit links.
 
+**[ChatBot delivery] Story-evidence integrity:** `done` is a gated state transition. One repository-owned validator reads the story, sprint ledger, explicit evidence contract, exact root/root-submodule diff, and policy-approved machine results. It fails closed unless File List and scoped change sets reconcile, result provenance matches the tested implementation digest, mandatory tests are non-vacuous, required primary paths executed, and every checked task/acceptance item has current evidence. The report is metadata-only and uses stable reason codes. This validates evidence integrity; it does not replace semantic or adversarial review.
+
 **[ChatBot] Correction propagation (FR91a):** aggregate owns `correcting`/`current` lifecycle via
 `Apply(CorrectionStarted/Completed)`; Epic 2's coordinator/activity seam coordinates required M0 derived-store
 invalidation and writes durable propagation events, while hosted Dapr Workflow runtime binding remains pending.
@@ -847,6 +850,8 @@ projection → SignalR nudge → UI.
 - **Non-vacuous gates:** required Aspire/Dapr topology and browser tiers must execute their named tests. Missing,
   zero-test, self-skipped, or all-skipped evidence fails the lane; uploaded results do not substitute for passing
   execution.
+- **Story status transition gate:** CI detects each story or sprint-ledger transition to `done` and requires a matching TE-2 evidence contract and passing `story-evidence-integrity` report. Results come from machine files produced by the current exact implementation digest or from an approved retained exact-digest artifact within policy age. Narrative summaries, screenshots without direct invariant assertions, diagnostic fallbacks, and unrelated aggregate suites cannot satisfy a missing local primary-path obligation. Root-declared submodule changes require both the submodule diff and superproject gitlink to reconcile; nested submodules are never initialized.
+  The gate also detects contract-bound technical-enabler ledger transitions to `complete` and matching action transitions to `done`. Its versioned policy fixes PR and push event base/head selection, CI checks out and verifies the exact event head, a failed result-producing job fails the always-running gate, and retained provenance is immutable rather than re-attested by CI.
 - **Release provenance:** release runs only after successful push-triggered CI on `main`, checks out and asserts
   the triggering `workflow_run.head_sha`, does not repeat CI tests, and records the tested source SHA with the
   released artifacts.
@@ -987,6 +992,7 @@ operational dashboards + SLO calibration (M2); reversibility/undo; AI cost gover
   tenant/provenance/kernel-version/redaction/retention/schema-version.
 - Write the matching tests in the same change (Tier 1 aggregate, isolation negatives, fail-closed table,
   idempotency); inspect state-store end-state in Tier 2/3.
+- Run the local TE-2 story-evidence preflight and attach its exact metadata report before proposing any story or technical enabler as `done`.
 
 **First Implementation Priority:** scaffold the `Hexalith.ChatBot` module (the canonical sibling-module shape +
 EventStore submodule under `references/` + Aspire AppHost), then the Contract Spine + `IChatBotClient`, then the CommandGateway
