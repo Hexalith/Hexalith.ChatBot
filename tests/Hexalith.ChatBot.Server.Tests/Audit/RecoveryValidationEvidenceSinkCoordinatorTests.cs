@@ -69,6 +69,48 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
         report.Deviations.ShouldContain(ContinuityDrillReport.EvidenceRetentionFailedDeviation);
     }
 
+    [Fact]
+    public async Task EvidenceSinkFailureTurnsOtherwiseEquivalentRebuildIntoUnmeasurableBreach()
+    {
+        ProjectionRebuildValidationCoordinator coordinator = new(
+            new RebuildDriver(),
+            new InMemoryAuditWriter(),
+            new InMemoryOperatorAlertSink(),
+            new WormAuditTestData.FixedClock(Now),
+            new ThrowingSink());
+
+        ProjectionRebuildReport report = await coordinator.RunValidationAndRecordAsync(
+            TestTenant,
+            "recovery-baseline-v1",
+            Correlation,
+            TestContext.Current.CancellationToken);
+
+        report.Verdict.ShouldBe(ProjectionRebuildVerdicts.Unmeasurable);
+        report.IsBreach.ShouldBeTrue();
+        report.Deviations.ShouldContain(ProjectionRebuildReport.EvidenceRetentionFailedDeviation);
+    }
+
+    [Fact]
+    public async Task EvidenceSinkFailureTurnsOtherwiseContainedOutageIntoUnmeasurableBreach()
+    {
+        ScopedOutageDegradationValidationCoordinator coordinator = new(
+            new OutageDriver(),
+            new InMemoryAuditWriter(),
+            new InMemoryOperatorAlertSink(),
+            new WormAuditTestData.FixedClock(Now),
+            new ThrowingSink());
+
+        ScopedOutageDegradationReport report = await coordinator.RunScenarioAndRecordAsync(
+            ScopedOutageDependencies.CommandExecution,
+            TestTenant,
+            Correlation,
+            TestContext.Current.CancellationToken);
+
+        report.Verdict.ShouldBe(ScopedOutageDegradationVerdicts.Unmeasurable);
+        report.IsBreach.ShouldBeTrue();
+        report.Deviations.ShouldContain(ScopedOutageDegradationReport.EvidenceRetentionFailedDeviation);
+    }
+
     private sealed class CapturingSink : IRecoveryValidationEvidenceSink
     {
         public List<string> Events { get; } = [];

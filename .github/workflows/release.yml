@@ -76,7 +76,9 @@ jobs:
         run: dapr uninstall --all
 
   live-recovery-validation:
-    name: required serialized live recovery evidence gate
+    # Producer only — the authoritative judge is `live-recovery-evidence-gate` below. Branch protection matches by
+    # job NAME; calling this job an "evidence gate" made the producer indistinguishable from the independent judge.
+    name: required live recovery validation sweep
     runs-on: ubuntu-latest
     timeout-minutes: 330
     concurrency:
@@ -87,9 +89,10 @@ jobs:
       # silently skipping semantic-release for that commit. Ref-keying only separates DIFFERENT release branches.
       #
       # The lane runs on an ephemeral runner and composes its own Aspire topology, so there is no shared resource that
-      # serialization protects; the group bought cost control and paid for it with a cancellable required check. The
-      # per-commit key gives every publishable commit its own verdict and still collapses a re-dispatch of the same
-      # commit. Accepted cost: N pushes inside the window now run N concurrent 5.5-hour jobs instead of queueing.
+      # a repository-wide queue would protect; the group bought cost control and paid for it with a cancellable
+      # required check. The per-commit key gives every publishable commit its own non-cancelling verdict and still
+      # collapses a re-dispatch of the same commit. Accepted cost: N pushes inside the window now run N concurrent
+      # 5.5-hour jobs instead of serializing behind one shared group.
       group: live-recovery-validation-release-${{ github.repository }}-${{ github.sha }}
       cancel-in-progress: false
     # Least privilege: the workflow-level write scopes exist for semantic-release, not for a multi-hour fault-injection
@@ -116,7 +119,7 @@ jobs:
         uses: dapr/setup-dapr@v2
       - name: Initialize DAPR runtime
         run: dapr init
-      - name: Run all live recovery coordinators and fail-closed evidence gate
+      - name: Run all live recovery coordinators and retain evidence
         run: >-
           dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
           -m:1
@@ -141,7 +144,11 @@ jobs:
     name: required independent live recovery evidence gate
     # The authoritative gate: a separate job, reading only the uploaded artifact, applying the thresholds configured
     # here rather than any the run declared about itself, evaluated against a fresh wall clock.
+    #
+    # Run after a failed producer too: evidence is uploaded with `if: always()`, and a Contained-breach / red
+    # validation must still be judged out of process. Skip only when the producer itself was skipped.
     needs: live-recovery-validation
+    if: always() && needs.live-recovery-validation.result != 'skipped'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     concurrency:

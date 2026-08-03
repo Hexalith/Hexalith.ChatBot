@@ -216,6 +216,10 @@ jobs:
             repository="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
             run_id="${BASH_REMATCH[3]}"
             artifact="${BASH_REMATCH[4]}"
+            if [[ "$repository" != "$GITHUB_REPOSITORY" ]]; then
+              printf 'Retained locator repository %s is not this repository (%s).\n' "$repository" "$GITHUB_REPOSITORY" >&2
+              exit 1
+            fi
             key="${repository}/${run_id}/${artifact}"
             [[ -n "${downloaded[$key]+present}" ]] && continue
             destination="${RESULTS_ROOT}/retained/${run_id}/${artifact}"
@@ -350,7 +354,7 @@ jobs:
         uses: dapr/setup-dapr@v2
       - name: Initialize DAPR runtime
         run: dapr init
-      - name: Run all live recovery coordinators and fail-closed evidence gate
+      - name: Run all live recovery coordinators and retain evidence
         run: >-
           dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
           -m:1
@@ -377,7 +381,11 @@ jobs:
     # uploaded artifact, applies the thresholds configured here rather than any the run declared about itself, and
     # evaluates against a fresh wall clock so the staleness branches are reachable. Evaluating the gate in-process
     # inside the producing test meant the run supplied its own judge with its own answers.
+    #
+    # Run after a failed producer too: evidence is uploaded with `if: always()`, and a Contained-breach / red
+    # validation must still be judged out of process. Skip only when the producer itself was skipped (push/PR).
     needs: live-recovery-validation
+    if: always() && needs.live-recovery-validation.result != 'skipped'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

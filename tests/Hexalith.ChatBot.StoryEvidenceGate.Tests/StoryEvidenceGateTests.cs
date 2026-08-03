@@ -505,7 +505,12 @@ public static class StoryEvidenceGateTests
     [InlineData("src/SignalR/ProjectHub.cs", "signalr", "signalr-primary")]
     [InlineData("src/Assets/site.css", "hosting-assets", "hosting-assets-primary")]
     [InlineData("src/Hexalith.ChatBot.AppHost/Program.cs", "aspire-dapr", "aspire-dapr-primary")]
+    [InlineData(
+        "tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs",
+        "aspire-dapr",
+        "aspire-dapr-primary")]
     [InlineData("tests/Module/Recovery/Scenario.cs", "recovery", "recovery-primary")]
+    [InlineData(".github/workflows/ci.yml", "recovery", "recovery-primary")]
     public static void EveryConfiguredPrimaryPathClassShouldPassItsRecognizedLane(
         string relativePath,
         string pathClass,
@@ -1252,6 +1257,214 @@ public static class StoryEvidenceGateTests
               "reportPath": "_bmad-output/implementation-artifacts/evidence/reports/te-x.json"
             }
             """;
+    }
+
+    /// <summary>Proves duplicate result-lane names fail closed before validation can invent coverage.</summary>
+    [Fact]
+    public static void DuplicateResultLaneNamesShouldFailWithMachineReason()
+    {
+        using GateFixture fixture = new();
+        File.Copy(fixture.TrxPath, Path.Combine(fixture.ResultsRoot, "gate-dup.trx"));
+        File.Copy(fixture.ProvenancePath, Path.Combine(fixture.ResultsRoot, "gate-dup.provenance.json"));
+        fixture.MutateContract(contract =>
+        {
+            JsonArray results = EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid);
+            JsonObject first = results[0]!.AsObject();
+            results.Add(new JsonObject
+            {
+                ["lane"] = EvidenceJson.RequiredString(first, "lane", GateReason.MachineResultsInvalid),
+                ["trx"] = "gate-dup.trx",
+                ["provenance"] = "gate-dup.provenance.json",
+                ["artifactLocator"] = "file:gate-dup.trx",
+                ["source"] = "current-run",
+                ["selectors"] = new JsonArray("class:GateFixture"),
+                ["allowSkipped"] = false,
+                ["primaryPathClass"] = null,
+            });
+        }, refreshEvidence: false);
+        fixture.RefreshEvidence();
+
+        GateIssue issue = fixture.Validate().Issues.Single();
+        issue.ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
+        issue.Subject.ShouldBe("duplicate-lane");
+    }
+
+    /// <summary>Proves recovery-primary accepts a retained source binding allowed by policy.</summary>
+    [Fact]
+    public static void RecoveryPrimaryRetainedSourceShouldPass()
+    {
+        using GateFixture fixture = new();
+        fixture.UsePrimaryPath("tests/Module/Recovery/Scenario.cs", "recovery", "recovery-primary");
+        fixture.UseRetainedEvidence();
+
+        GateReport report = fixture.Validate();
+        report.Passed.ShouldBeTrue(string.Join(", ", report.Issues.Select(static issue => $"{issue.ReasonCode}:{issue.Subject}")));
+        report.PrimaryPaths.ShouldContain(static verdict =>
+            verdict.PathClass.Equals("recovery", StringComparison.Ordinal) && verdict.Executed);
+    }
+
+    /// <summary>Proves a Server *Dapr* path no longer forces the aspire-dapr primary lane.</summary>
+    [Fact]
+    public static void ServerDaprNamedFileShouldNotTriggerAspireDaprPrimary()
+    {
+        using GateFixture fixture = new();
+        fixture.AddOwnedFile(
+            "src/Hexalith.ChatBot.Server/Operations/DaprAppIdHandler.cs",
+            "namespace Hexalith.ChatBot.Server.Operations;\n\ninternal static class DaprAppIdHandler;\n");
+
+        GateReport report = fixture.Validate();
+        report.Passed.ShouldBeTrue(string.Join(", ", report.Issues.Select(static issue => $"{issue.ReasonCode}:{issue.Subject}")));
+        report.PrimaryPaths.ShouldBeEmpty();
+    }
+
+    /// <summary>Proves retained locators fail closed when GITHUB_REPOSITORY disagrees with owner/repo.</summary>
+    [Fact]
+    public static void WrongRetainedRepositoryShouldFailWithProvenanceReason()
+    {
+        string? previous = Environment.GetEnvironmentVariable("GITHUB_REPOSITORY");
+        try
+        {
+            Environment.SetEnvironmentVariable("GITHUB_REPOSITORY", "hexalith/other-repo");
+            using GateFixture fixture = new();
+            fixture.UseRetainedEvidence();
+
+            fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.EvidenceStaleOrUnbound);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("GITHUB_REPOSITORY", previous);
+        }
+    }
+
+    /// <summary>Proves the validate CLI returns exit code 0 and JSON on a green fixture.</summary>
+    [Fact]
+    public static void ValidateCommandShouldReturnZeroOnSuccess()
+    {
+        using GateFixture fixture = new();
+        int exitCode = InvokeMain(
+            fixture,
+            out string stdout,
+            "validate",
+            "--repository-root", fixture.RepositoryRoot,
+            "--policy", fixture.PolicyPath,
+            "--story", fixture.StoryPath,
+            "--contract", fixture.ContractPath,
+            "--results", fixture.ResultsRoot,
+            "--target-status", "done",
+            "--base", fixture.BaseCommit,
+            "--head", fixture.HeadCommit);
+
+        exitCode.ShouldBe(0);
+        stdout.ShouldContain("\"passed\": true");
+    }
+
+    /// <summary>Proves the validate CLI returns exit code 1 when validation fails closed.</summary>
+    [Fact]
+    public static void ValidateCommandShouldReturnOneOnValidationFailure()
+    {
+        using GateFixture fixture = new();
+        fixture.MutateContract(contract => contract["persistedStatus"] = "wrong", refreshEvidence: false);
+        int exitCode = InvokeMain(
+            fixture,
+            out string stdout,
+            "validate",
+            "--repository-root", fixture.RepositoryRoot,
+            "--policy", fixture.PolicyPath,
+            "--story", fixture.StoryPath,
+            "--contract", fixture.ContractPath,
+            "--results", fixture.ResultsRoot,
+            "--target-status", "done",
+            "--base", fixture.BaseCommit,
+            "--head", fixture.HeadCommit);
+
+        exitCode.ShouldBe(1);
+        stdout.ShouldContain("\"passed\": false");
+    }
+
+    /// <summary>Proves malformed CLI arguments return exit code 2 with a metadata-only report.</summary>
+    [Fact]
+    public static void UnknownCommandShouldReturnTwoWithMetadataOnlyReport()
+    {
+        using GateFixture fixture = new();
+        int exitCode = InvokeMain(fixture, out string stdout, "not-a-command");
+
+        exitCode.ShouldBe(2);
+        stdout.ShouldContain("\"passed\": false");
+        stdout.ShouldContain(GateReason.StatusMismatch);
+    }
+
+    /// <summary>Proves detect writes JSON transitions and returns exit code 0.</summary>
+    [Fact]
+    public static void DetectCommandShouldReturnZeroWithTransitionJson()
+    {
+        using GateFixture fixture = new();
+        int exitCode = InvokeMain(
+            fixture,
+            out string stdout,
+            "detect",
+            "--repository-root", fixture.RepositoryRoot,
+            "--base", fixture.BaseCommit,
+            "--head", fixture.HeadCommit);
+
+        exitCode.ShouldBe(0);
+        stdout.TrimStart().ShouldStartWith("[");
+    }
+
+    /// <summary>Proves attest honors --policy and returns a success envelope.</summary>
+    [Fact]
+    public static void AttestCommandShouldHonorPolicyOption()
+    {
+        using GateFixture fixture = new();
+        int exitCode = InvokeMain(
+            fixture,
+            out string stdout,
+            "attest",
+            "--repository-root", fixture.RepositoryRoot,
+            "--policy", fixture.PolicyPath,
+            "--contract", fixture.ContractPath,
+            "--results", fixture.ResultsRoot,
+            "--base", fixture.BaseCommit,
+            "--head", fixture.HeadCommit);
+
+        exitCode.ShouldBe(0);
+        stdout.ShouldContain("\"operation\":\"attest\"");
+    }
+
+    /// <summary>Proves InvalidOperationException paths emit a fail-closed metadata report.</summary>
+    [Fact]
+    public static void DetectCommandShouldFailClosedWhenOutputHasNoParent()
+    {
+        using GateFixture fixture = new();
+        int exitCode = InvokeMain(
+            fixture,
+            out string stdout,
+            "detect",
+            "--repository-root", fixture.RepositoryRoot,
+            "--base", fixture.BaseCommit,
+            "--head", fixture.HeadCommit,
+            "--output", Path.GetPathRoot(fixture.RepositoryRoot)!);
+
+        exitCode.ShouldBe(2);
+        stdout.ShouldContain("\"passed\": false");
+        stdout.ShouldContain("io-or-process");
+    }
+
+    private static int InvokeMain(GateFixture fixture, out string stdout, params string[] args)
+    {
+        ArgumentNullException.ThrowIfNull(fixture);
+        TextWriter original = Console.Out;
+        using StringWriter buffer = new();
+        Console.SetOut(buffer);
+        try
+        {
+            int exitCode = Program.Main(args);
+            stdout = buffer.ToString();
+            return exitCode;
+        }
+        finally
+        {
+            Console.SetOut(original);
+        }
     }
 
     private static string RunGit(string repositoryPath, params string[] arguments)

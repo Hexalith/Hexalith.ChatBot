@@ -16,17 +16,20 @@ public static class ProvenanceAttestor
     /// <param name="headCommit">The exact head revision.</param>
     /// <param name="resultsRoot">The results root.</param>
     /// <param name="producedAtUtc">The production timestamp.</param>
+    /// <param name="policyPath">Optional policy path; defaults to the repository-root policy file.</param>
     public static void AttestContract(
         string repositoryRoot,
         string contractPath,
         string baseCommit,
         string headCommit,
         string resultsRoot,
-        DateTimeOffset producedAtUtc)
+        DateTimeOffset producedAtUtc,
+        string? policyPath = null)
     {
         ArgumentNullException.ThrowIfNull(baseCommit);
         ArgumentNullException.ThrowIfNull(headCommit);
-        JsonObject policy = EvidenceJson.LoadPolicy(Path.Combine(repositoryRoot, "story-evidence-policy.json"));
+        JsonObject policy = EvidenceJson.LoadPolicy(
+            policyPath ?? Path.Combine(repositoryRoot, "story-evidence-policy.json"));
         JsonObject contract = EvidenceJson.LoadContract(contractPath);
         ScopeEvaluation scope = ScopeEvaluator.Evaluate(repositoryRoot, policy, contract, baseCommit, headCommit);
         JsonArray results = EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid);

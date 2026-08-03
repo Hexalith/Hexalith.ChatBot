@@ -58,14 +58,14 @@ Fully built **and tested** against a scripted fake driver: `ScopedOutageDependen
 
 **Story 12.15 implementation update (partial retirement).** **Retired:** the live fault-injection deferral for `identity` and `graph`, which fault real topology boundaries — an allowlisted Keycloak resource stop/start with the token-acquisition path as the probe, and the composed Worker/provider mailbox boundary including subscription expiry.
 
-**Not retired, and re-opened by the round-4 review:**
+**Updated after remediation (still not production-equivalent):**
 
-1. **`ai-provider`, `command-execution`, `audit-store`, `attachment-processing`** — these call sandbox types shaped like the Server contracts, registered as concrete singletons and invoked directly. Only `command-execution` degrades ChatBot code; the real consumers (`AcceptedCommandDispatcher` for AI, `ChatBotCommandAdmissionPipeline`'s fail-closed `RecordPreCommitAsync` gate for audit) are bypassed. The `audit-store` contract — governed mutation fails closed when audit evidence is unavailable — is therefore not exercised at all.
-2. **The three NFR59 assertions and the NFR13 duplicate check, for all four sandbox-exercised dependencies** — the faulted branch never records an effect and the unfaulted branch always records exactly one, over a correlation-id set both calls share, so unauthorized-mutation, silent-loss and duplicate-effect cannot evaluate `true`; nothing in the sandbox can write a second tenant, so cross-tenant leakage cannot either.
-3. **NFR58 observed scope, for all six** — the sandbox monitor's scope table is a byte-identical copy of the driver's expectation table and feeds `ObservedScope` on every path, so `ExpectedScope == ObservedScope` unconditionally and the evaluator's `scope_escape` deviation is unreachable.
-4. **NFR41 scope-recording latency, for all six** — both time bounds are minted inside one process a channel hop apart, and for `identity`/`graph` the one honest timestamp is overwritten by an on-demand stamp. No latency figure is published; missing monitoring evidence is `unmeasurable`, not a sub-millisecond latency.
+1. **`ai-provider`, `command-execution`, `audit-store`, `attachment-processing`** — exercised through real ChatBot consuming types (`AcceptedCommandDispatcher` / admission / `AttachmentCaptureCoordinator`) via `RecoveryDependencyExercise`, not by calling leaf sandbox types alone. Product DI composition and production provider/scale fidelity remain `RV-PROVIDER-SCALE`.
+2. **NFR59 / NFR13 safety outcomes** — derived by comparing the fault switch's ground truth to what the orchestrator actually committed, not hardcoded sandbox constants. Cross-tenant and production-scale leakage remain out of scope for this sandbox.
+3. **NFR58 observed scope** — the monitor maps independently sourced fault signals through `ScopeForSignal` (not a byte copy of `ExpectedScope`), so `scope_escape` is reachable on a mismatched signal.
+4. **NFR41 scope-recording latency** — product monitoring instrumentation is still absent; missing honest monitoring evidence is `unmeasurable`, not a fabricated sub-millisecond latency, and no NFR41 figure may be published as product-monitoring evidence.
 
-The serialized CI/release gate invokes all six through `RunAllScenariosAsync` on the scheduled, manually dispatched and release lanes only — ordinary `push`/`pull_request` CI runs no recovery validation. Product DI remains inert; external Graph, durable WORM, production control, product composition, provider/traffic scale, and the lane's measurable recovery ceiling remain explicit residuals.
+The CI/release gate (release: per-commit non-cancelling concurrency) invokes all six through `RunAllScenariosAsync` on the scheduled, manually dispatched and release lanes only — ordinary `push`/`pull_request` CI runs no recovery validation. Product DI remains inert; external Graph, durable WORM, production control, product composition, provider/traffic scale, and the lane's measurable recovery ceiling remain explicit residuals.
 
 ## Consequences
 

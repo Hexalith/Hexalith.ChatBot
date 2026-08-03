@@ -136,8 +136,7 @@
       "class": "aspire-dapr",
       "pathPatterns": [
         "src/Hexalith.ChatBot.AppHost/**",
-        "**/*Dapr*.cs",
-        "**/*Aspire*.cs"
+        "tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs"
       ],
       "claimPatterns": [
         "[claim:aspire-dapr]"
@@ -159,6 +158,7 @@
       "class": "recovery",
       "pathPatterns": [
         "tests/**/Recovery/**",
+        ".github/workflows/ci.yml",
         ".github/workflows/release.yml"
       ],
       "claimPatterns": [

@@ -107,7 +107,9 @@ public static class LiveRecoveryValidationArchitectureTests
         driver.ShouldContain("IReadOnlyList<ProjectConversationSourceEmailView> immutableSourceRecords");
         driver.ShouldContain("wormAuditStore.EnumerateChain(testTenantRef)");
         driver.ShouldContain("ReplayTenantPolicy.IsTestTenant(testTenantRef)");
-        driver.ShouldContain("freshPartition");
+        driver.ShouldContain("FreshPartitionTenant(testTenantRef, dataset.ValidationPartitionRef, correlationId)");
+        driver.ShouldContain("RebuildPartitionThroughRealHandlerAsync");
+        driver.ShouldContain("AssertPartitionAbsentAsync");
         driver.ShouldContain("ReadModelProjectConversationProjectionStore");
         driver.ShouldContain("ReadModelGovernedOperationViewStore");
         driver.ShouldContain("TryEraseAsync");
@@ -194,6 +196,10 @@ public static class LiveRecoveryValidationArchitectureTests
             release.ShouldNotContain(ciJobName);
         }
 
+        release.ShouldContain("name: required live recovery validation sweep");
+        release.ShouldContain("name: required independent live recovery evidence gate");
+        release.ShouldNotContain("name: required serialized live recovery evidence gate");
+
         // The gate must be evaluated OUT OF PROCESS, in a job chained after the run that produced the evidence. The
         // previous shape of this guard asserted only the producing test's own name, so it would have passed happily
         // while the only "gate" was the run grading its own homework.
@@ -202,20 +208,27 @@ public static class LiveRecoveryValidationArchitectureTests
             string source = ReadProjectFile(workflow);
             source.ShouldContain("live-recovery-evidence-gate:");
             source.ShouldContain("needs: live-recovery-validation");
+            // Producer failure must still reach the independent judge; skip only when the producer was skipped.
+            source.ShouldContain("if: always() && needs.live-recovery-validation.result != 'skipped'");
             source.ShouldContain("actions/download-artifact@v4");
             source.ShouldContain("RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess");
             source.ShouldContain("HEXALITH_CHATBOT_RECOVERY_EVIDENCE_REQUIRED");
 
             // `dotnet test --filter` EXITS 0 when the filter matches nothing, so renaming or moving either lane's test
-            // turned a required job into a silent no-op that still reported success. This guard asserts the workflow
-            // string; only TreatNoTestsAsError makes the run itself fail, so both must be present.
-            source.ShouldContain("--settings live-recovery.runsettings");
+            // turned a required job into a silent no-op that still reported success. Count per producer+gate invocation
+            // rather than a single whole-file Contains (which stays green if only one job keeps the flag).
+            int settingsUses = CountOccurrences(source, "--settings live-recovery.runsettings");
+            settingsUses.ShouldBeGreaterThanOrEqualTo(2);
 
             // The release path anchors what the run may claim about itself; without these the run still declared its
             // own dataset size and which tree its evidence came from.
             source.ShouldContain("HEXALITH_CHATBOT_RECOVERY_REQUIRED_COMMIT: ${{ github.sha }}");
             source.ShouldContain("HEXALITH_CHATBOT_RECOVERY_MINIMUM_DATASET_VOLUME");
             source.ShouldContain("HEXALITH_CHATBOT_RECOVERY_MAX_MEASURABLE_CEILING_SECONDS");
+            source.ShouldContain("HEXALITH_CHATBOT_RECOVERY_EXPECTED_DATASETS: recovery-baseline");
+            source.ShouldContain("HEXALITH_CHATBOT_RECOVERY_EXPECTED_DATASET_VERSION: v1");
+            source.ShouldContain("HEXALITH_CHATBOT_RECOVERY_MAX_EVIDENCE_AGE_HOURS: \"192\"");
+            source.ShouldContain("retention-days: 30");
 
             // Least privilege on the destructive lane and its gate.
             source.ShouldContain("permissions:\n      contents: read");
@@ -245,6 +258,12 @@ public static class LiveRecoveryValidationArchitectureTests
         // The cron fires weekly; Cadence must agree or the configured value governs nothing.
         ci.ShouldContain("cron: \"0 2 * * 0\"");
         defaults.Cadence.ShouldBe(TimeSpan.FromDays(7));
+
+        // MaximumEvidenceAge defaults to 8 days; both gate jobs must pin the same hour budget.
+        string expectedAge = $"HEXALITH_CHATBOT_RECOVERY_MAX_EVIDENCE_AGE_HOURS: \"{(int)defaults.MaximumEvidenceAge.TotalHours}\"";
+        ci.ShouldContain(expectedAge);
+        release.ShouldContain(expectedAge);
+        defaults.MaximumEvidenceAge.ShouldBe(TimeSpan.FromDays(8));
     }
 
     [Fact]
@@ -319,6 +338,19 @@ public static class LiveRecoveryValidationArchitectureTests
 
     private static string ReadProjectFile(string relativePath)
         => File.ReadAllText(Path.Combine(RepositoryRoot(), relativePath));
+
+    private static int CountOccurrences(string source, string needle)
+    {
+        int count = 0;
+        int index = 0;
+        while ((index = source.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += needle.Length;
+        }
+
+        return count;
+    }
 
     private static string RepositoryRoot()
     {

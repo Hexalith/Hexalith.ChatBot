@@ -43,6 +43,25 @@ public sealed class StrictEnumWirePolicyTests
     }
 
     [Fact]
+    public void ReadOnlyDictionaryValuedEnumsRejectIntegerOrdinals()
+    {
+        Should.Throw<JsonSerializationException>(() => JsonConvert.DeserializeObject<ReadOnlyDictionaryCarrier>(
+            """{"states":{"primary":1}}""",
+            StrictSettings()));
+    }
+
+    [Fact]
+    public void ReadOnlyDictionaryValuedEnumsAcceptNamedWireValues()
+    {
+        ReadOnlyDictionaryCarrier? carrier = JsonConvert.DeserializeObject<ReadOnlyDictionaryCarrier>(
+            """{"states":{"primary":"delegated"}}""",
+            StrictSettings());
+
+        carrier.ShouldNotBeNull().States.ShouldNotBeNull()["primary"]
+            .ShouldBe(ContractMailboxDelegatedSenderState.Delegated);
+    }
+
+    [Fact]
     public void NullableEnumsRejectAnEmptyStringRatherThanReadingItAsAbsent()
     {
         // The base StringEnumConverter maps "" to null for a nullable enum, so a malformed value arrived as a missing
@@ -66,6 +85,12 @@ public sealed class StrictEnumWirePolicyTests
     {
         [JsonProperty("states")]
         public IDictionary<string, ContractMailboxDelegatedSenderState>? States { get; set; }
+    }
+
+    private sealed class ReadOnlyDictionaryCarrier
+    {
+        [JsonProperty("states")]
+        public IReadOnlyDictionary<string, ContractMailboxDelegatedSenderState>? States { get; set; }
     }
 
     private sealed class ScalarCarrier

@@ -18,6 +18,8 @@ public static class GitReader
         "show",
     };
 
+    private static readonly TimeSpan CommandTimeout = TimeSpan.FromMinutes(5);
+
     /// <summary>Resolves and verifies an exact full commit identifier.</summary>
     /// <param name="repositoryPath">The repository path.</param>
     /// <param name="revision">The supplied revision.</param>
@@ -179,7 +181,7 @@ public static class GitReader
             using MemoryStream output = new();
             process.StandardOutput.BaseStream.CopyTo(output);
             _ = process.StandardError.ReadToEnd();
-            process.WaitForExit();
+            WaitForExitOrFail(process);
             if (process.ExitCode != 0)
             {
                 throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-blob");
@@ -233,7 +235,7 @@ public static class GitReader
                 ?? throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-process");
             string standardOutput = process.StandardOutput.ReadToEnd();
             string standardError = process.StandardError.ReadToEnd();
-            process.WaitForExit();
+            WaitForExitOrFail(process);
             return new GitCommandResult(process.ExitCode, standardOutput, standardError);
         }
         catch (Exception exception) when (exception is System.ComponentModel.Win32Exception
@@ -241,6 +243,25 @@ public static class GitReader
             or UnauthorizedAccessException)
         {
             throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-process");
+        }
+    }
+
+    private static void WaitForExitOrFail(Process process)
+    {
+        if (!process.WaitForExit((int)CommandTimeout.TotalMilliseconds))
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException
+                or System.ComponentModel.Win32Exception
+                or NotSupportedException)
+            {
+                // Best-effort kill; still fail closed on timeout.
+            }
+
+            throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-timeout");
         }
     }
 
@@ -257,8 +278,13 @@ public static class GitReader
     private static IReadOnlyDictionary<string, string> ParseNameStatus(string output)
     {
         string[] tokens = output.Split('\0', StringSplitOptions.RemoveEmptyEntries);
+        if (tokens.Length % 2 != 0)
+        {
+            throw new GateValidationException(GateReason.ScopeDigestMismatch, "diff-parse");
+        }
+
         Dictionary<string, string> result = new(StringComparer.Ordinal);
-        for (int index = 0; index + 1 < tokens.Length; index += 2)
+        for (int index = 0; index < tokens.Length; index += 2)
         {
             result[NormalizePath(tokens[index + 1])] = tokens[index].Length == 0 ? "M" : tokens[index][..1];
         }

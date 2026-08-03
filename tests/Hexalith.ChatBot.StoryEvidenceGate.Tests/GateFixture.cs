@@ -264,7 +264,8 @@ internal sealed class GateFixture : IDisposable
             BaseCommit,
             HeadCommit,
             ResultsRoot,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            PolicyPath);
     }
 
     /// <summary>Moves the changed source to a primary browser path and declares a lane.</summary>
@@ -625,7 +626,8 @@ internal sealed class GateFixture : IDisposable
         BaseCommit,
         HeadCommit,
         ResultsRoot,
-        DateTimeOffset.UtcNow.AddMinutes(1));
+        DateTimeOffset.UtcNow.AddMinutes(1),
+        PolicyPath);
 
     /// <summary>Mutates the copied policy.</summary>
     public void MutatePolicy(Action<JsonObject> mutation)
@@ -653,7 +655,8 @@ internal sealed class GateFixture : IDisposable
             BaseCommit,
             HeadCommit,
             ResultsRoot,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            PolicyPath);
     }
 
     /// <summary>Commits an immutable scope whose contract forbids all worktree/index drift.</summary>
@@ -693,7 +696,8 @@ internal sealed class GateFixture : IDisposable
             BaseCommit,
             HeadCommit,
             ResultsRoot,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            PolicyPath);
     }
 
     /// <summary>Commits an unrelated path despite disclosing it as pre-existing local work.</summary>

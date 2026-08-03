@@ -826,6 +826,13 @@ public static class ScaffoldArchitectureTests
             "\"selector\": \"class:Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests\"");
         policy.ShouldContain(
             "\"selector\": \"class:Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests\"");
+        policy.ShouldContain("\".github/workflows/ci.yml\"");
+        policy.ShouldContain("\".github/workflows/release.yml\"");
+        policy.ShouldContain("\"src/Hexalith.ChatBot.AppHost/**\"");
+        policy.ShouldContain(
+            "\"tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs\"");
+        policy.ShouldNotContain("\"**/*Dapr*.cs\"");
+        policy.ShouldNotContain("\"**/*Aspire*.cs\"");
         policy.ShouldNotContain("Hexalith.ChatBot.BrowserPrimaryTests");
         policy.ShouldNotContain("Hexalith.ChatBot.SignalRPrimaryTests");
         policy.ShouldNotContain("Hexalith.ChatBot.HostingAssetsPrimaryTests");
@@ -885,6 +892,7 @@ public static class ScaffoldArchitectureTests
         workflow.ShouldNotContain("_bmad-output/implementation-artifacts/evidence/*.json | sort -u");
         workflow.ShouldContain("gh run download \"$run_id\"");
         workflow.ShouldContain("github-actions://([A-Za-z0-9_.-]+)");
+        workflow.ShouldContain("if [[ \"$repository\" != \"$GITHUB_REPOSITORY\" ]]; then");
         workflow.ShouldContain("Verify general producer artifact binds the exact event head");
         workflow.ShouldContain(
             "- name: Verify topology producer artifact binds the exact event head when transition-declared\n"

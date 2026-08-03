@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reflection;
 
 using Newtonsoft.Json;
@@ -5,7 +6,13 @@ using Newtonsoft.Json.Serialization;
 
 namespace Hexalith.ChatBot.Client.Generated;
 
-/// <summary>Overrides NSwag's per-property enum converter with the strict generated-client wire contract.</summary>
+/// <summary>
+/// Overrides NSwag's per-property enum converter with the strict generated-client wire contract.
+/// <para>
+/// Ownership: this type is hand-maintained beside NSwag output under <c>Generated/</c>. NSwag regenerates only
+/// <c>HexalithChatBotClient.g.cs</c> (see <c>nswag.json</c>); do not delete this file in a Generated wipe.
+/// </para>
+/// </summary>
 internal sealed class StrictEnumContractResolver : DefaultContractResolver
 {
     protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
@@ -50,20 +57,40 @@ internal sealed class StrictEnumContractResolver : DefaultContractResolver
 
     private static Type? DictionaryValueType(Type type)
     {
-        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IDictionary<,>))
+        if (TryDictionaryValueType(type, out Type? direct))
         {
-            return type.GetGenericArguments()[1];
+            return direct;
         }
 
         foreach (Type candidate in type.GetInterfaces())
         {
-            if (candidate.IsGenericType && candidate.GetGenericTypeDefinition() == typeof(IDictionary<,>))
+            if (TryDictionaryValueType(candidate, out Type? fromInterface))
             {
-                return candidate.GetGenericArguments()[1];
+                return fromInterface;
             }
         }
 
         return null;
+    }
+
+    private static bool TryDictionaryValueType(Type type, out Type? valueType)
+    {
+        valueType = null;
+        if (!type.IsGenericType)
+        {
+            return false;
+        }
+
+        Type definition = type.GetGenericTypeDefinition();
+        if (definition == typeof(IDictionary<,>) ||
+            definition == typeof(IReadOnlyDictionary<,>) ||
+            definition == typeof(IImmutableDictionary<,>))
+        {
+            valueType = type.GetGenericArguments()[1];
+            return true;
+        }
+
+        return false;
     }
 
     private static bool IsEnumType(Type type)

@@ -103,12 +103,8 @@ public sealed class RecoveryValidationEvidenceManifestTests
             MeasurableRecoveryCeilingSeconds = 180,
             ArtifactLocators = new Dictionary<string, string>
             {
-                ["test-output"] = "artifact:live-recovery/results.trx",
-                ["reports"] = "artifact:live-recovery/reports",
-                ["logs"] = "artifact:live-recovery/logs",
-                ["traces"] = "artifact:live-recovery/traces",
-                ["metrics"] = "artifact:live-recovery/metrics",
-                ["state-end-state"] = "artifact:live-recovery/state-end-state",
+                ["test-output"] = "artifact:live-recovery-validation-evidence/results.trx",
+                ["reports"] = "artifact:live-recovery-validation-evidence/reports",
             },
         };
 }

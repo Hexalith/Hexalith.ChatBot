@@ -96,6 +96,31 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
     }
 
     [Fact]
+    public void PassingVerdictWithFailedCleanupAloneStopShipsAsCleanupIncomplete()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        RecoveryValidationEvidenceManifest[] evidence = complete.Evidence.ToArray();
+        int continuityIndex = Array.FindIndex(
+            evidence,
+            manifest => manifest.Scenario == ContinuityDrillScenarios.EventStoreOutage);
+        Dictionary<string, bool> assertions = new(evidence[continuityIndex].Assertions, StringComparer.Ordinal)
+        {
+            ["cleanup-complete"] = false,
+        };
+        evidence[continuityIndex] = evidence[continuityIndex] with
+        {
+            Verdict = ContinuityDrillVerdicts.Met,
+            Assertions = assertions,
+        };
+
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(complete with { Evidence = evidence });
+
+        decision.IsStopShip.ShouldBeTrue();
+        decision.StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:cleanup_incomplete");
+        decision.StopShipReasons.ShouldNotContain($"{LiveRecoveryValidationJobs.Continuity}:unmeasurable");
+    }
+
+    [Fact]
     public void TargetDeviationIsVisibleAndOnlyBlocksWhenTheApprovedPolicyRequiresIt()
     {
         LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();

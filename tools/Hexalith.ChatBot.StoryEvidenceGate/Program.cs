@@ -40,6 +40,8 @@ public static class Program
             or ArgumentException
             or UnauthorizedAccessException
             or NotSupportedException
+            or InvalidOperationException
+            or OutOfMemoryException
             or System.Security.SecurityException
             or System.ComponentModel.Win32Exception)
         {
@@ -84,7 +86,8 @@ public static class Program
             command.Required("base").ToLowerInvariant(),
             command.Required("head").ToLowerInvariant(),
             FullPath(repositoryRoot, command.Required("results")),
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            FullPath(repositoryRoot, command.Optional("policy") ?? "story-evidence-policy.json"));
         Console.Out.WriteLine("{\"passed\":true,\"operation\":\"attest\"}");
         return 0;
     }
@@ -133,6 +136,7 @@ public static class Program
             return 0;
         }
 
+        string policyPath = FullPath(repositoryRoot, command.Optional("policy") ?? "story-evidence-policy.json");
         bool passed = true;
         List<GateReport> reports = [];
         foreach (TransitionRecord transition in transitions)
@@ -143,11 +147,12 @@ public static class Program
                 baseCommit,
                 headCommit,
                 resultsRoot,
-                DateTimeOffset.UtcNow);
+                DateTimeOffset.UtcNow,
+                policyPath);
             GateReport report = StoryEvidenceValidator.Validate(new GateOptions
             {
                 RepositoryRoot = repositoryRoot,
-                PolicyPath = Path.Combine(repositoryRoot, "story-evidence-policy.json"),
+                PolicyPath = policyPath,
                 StoryPath = Path.Combine(repositoryRoot, transition.StoryPath),
                 ContractPath = transition.ContractPath,
                 TargetStatus = "done",

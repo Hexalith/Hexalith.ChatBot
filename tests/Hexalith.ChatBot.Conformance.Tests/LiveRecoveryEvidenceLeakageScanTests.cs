@@ -39,9 +39,11 @@ public sealed class LiveRecoveryEvidenceLeakageScanTests
             ExpectedScope = ScopedOutageScopes.WorkflowItem,
             ObservedScope = ScopedOutageScopes.WorkflowItem,
             ReportKind = LiveRecoveryValidationJobs.ScopedOutage,
-            Verdict = ScopedOutageDegradationVerdicts.Contained,
-            ReasonCode = ScopedOutageDegradationReport.ValidationCompletedReasonCode,
-            MeasurementsSeconds = new Dictionary<string, double> { ["scope-recording-latency"] = 0.025 },
+            // Honest when product monitoring is absent: unmeasurable (sink still records the latency key; do not
+            // publish Contained + a fabricated NFR41 success figure).
+            Verdict = ScopedOutageDegradationVerdicts.Unmeasurable,
+            ReasonCode = ScopedOutageDegradationReport.ValidationUnmeasurableReasonCode,
+            MeasurementsSeconds = new Dictionary<string, double> { ["scope-recording-latency"] = 0 },
             AllowedTargetsSeconds = new Dictionary<string, double> { ["scope-recording-latency"] = 300 },
             Assertions = new Dictionary<string, bool>
             {
@@ -53,17 +55,13 @@ public sealed class LiveRecoveryEvidenceLeakageScanTests
                 ["unauthorized-mutation-absent"] = true,
             },
             Coverage = new Dictionary<string, int> { ["scenario"] = 1 },
-            Deviations = [],
-            ResidualIds = ["RV-PROVIDER-SCALE"],
+            Deviations = ["scope_recording_unmeasurable"],
+            ResidualIds = ["RV-PROVIDER-SCALE", "RV-EVIDENCE-KINDS"],
             MeasurableRecoveryCeilingSeconds = 180,
             ArtifactLocators = new Dictionary<string, string>
             {
-                ["test-output"] = "artifact:live-recovery/results.trx",
-                ["reports"] = "artifact:live-recovery/reports",
-                ["logs"] = "artifact:live-recovery/logs",
-                ["traces"] = "artifact:live-recovery/traces",
-                ["metrics"] = "artifact:live-recovery/metrics",
-                ["state-end-state"] = "artifact:live-recovery/state-end-state",
+                ["test-output"] = "artifact:live-recovery-validation-evidence/results.trx",
+                ["reports"] = "artifact:live-recovery-validation-evidence/reports",
             },
         };
 

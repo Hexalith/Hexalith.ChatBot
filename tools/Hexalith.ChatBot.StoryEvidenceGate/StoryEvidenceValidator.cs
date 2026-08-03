@@ -231,13 +231,16 @@ public static class StoryEvidenceValidator
                     "class:Hexalith.ChatBot.UI.E2E.Tests.FrontComposerShellIntegrationE2ETests",
                     ["current-run"]),
                 ["aspire-dapr"] = (
-                    ["src/Hexalith.ChatBot.AppHost/**", "**/*Dapr*.cs", "**/*Aspire*.cs"],
+                    [
+                        "src/Hexalith.ChatBot.AppHost/**",
+                        "tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs",
+                    ],
                     "[claim:aspire-dapr]",
                     "aspire-dapr-primary",
                     "class:Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests",
                     ["current-run"]),
                 ["recovery"] = (
-                    ["tests/**/Recovery/**", ".github/workflows/release.yml"],
+                    ["tests/**/Recovery/**", ".github/workflows/ci.yml", ".github/workflows/release.yml"],
                     "[claim:recovery]",
                     "recovery-primary",
                     "class:Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests",

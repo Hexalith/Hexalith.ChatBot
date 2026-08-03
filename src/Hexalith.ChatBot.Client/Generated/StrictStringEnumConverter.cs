@@ -6,6 +6,10 @@ namespace Hexalith.ChatBot.Client.Generated;
 /// <summary>
 /// Rejects integer enum wire values on read, and writes named values only.
 /// <para>
+/// Ownership: hand-maintained beside NSwag output under <c>Generated/</c>. NSwag regenerates only
+/// <c>HexalithChatBotClient.g.cs</c>; do not delete this file in a Generated wipe.
+/// </para>
+/// <para>
 /// Scope: this converter governs the values it is applied to. It reaches scalar enum properties through
 /// <see cref="StrictEnumContractResolver"/>'s property converter and enum collection elements through that resolver's
 /// item converter. Name matching itself remains <see cref="Newtonsoft.Json.Converters.StringEnumConverter"/>'s — that

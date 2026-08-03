@@ -208,6 +208,16 @@ public static class TrxEvidenceReader
             throw new GateValidationException(GateReason.EvidenceStaleOrUnbound, lane);
         }
 
+        string? expectedRepository = Environment.GetEnvironmentVariable("GITHUB_REPOSITORY");
+        if (!string.IsNullOrWhiteSpace(expectedRepository))
+        {
+            string actualRepository = $"{match.Groups[1].Value}/{match.Groups[2].Value}";
+            if (!actualRepository.Equals(expectedRepository, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new GateValidationException(GateReason.EvidenceStaleOrUnbound, lane);
+            }
+        }
+
         string prefix = $"retained/{match.Groups[3].Value}/{match.Groups[4].Value}/";
         if (!trxRelative.StartsWith(prefix, StringComparison.Ordinal)
             || !provenanceRelative.StartsWith(prefix, StringComparison.Ordinal))
