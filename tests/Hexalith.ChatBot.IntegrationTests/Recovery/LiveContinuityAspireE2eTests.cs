@@ -84,12 +84,7 @@ public sealed class LiveContinuityAspireE2eTests
         IResource eventStore = builder.Resources.Single(resource => string.Equals(resource.Name, "eventstore", StringComparison.Ordinal));
         IResource security = builder.Resources.Single(resource => string.Equals(resource.Name, "security", StringComparison.Ordinal));
         IResource chatBot = builder.Resources.Single(resource => string.Equals(resource.Name, "chatbot", StringComparison.Ordinal));
-        eventStore.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
-        {
-            context.EnvironmentVariables["DOTNET_SHUTDOWNTIMEOUTSECONDS"] = "5";
-            context.EnvironmentVariables["EventStore__RateLimiting__PermitLimit"] = "100000";
-            context.EnvironmentVariables["EventStore__RateLimiting__ConsumerPermitLimit"] = "10000";
-        }));
+        LiveRecoveryTopologyConfiguration.ConfigureEventStore(eventStore);
         chatBot.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
         {
             context.EnvironmentVariables["ChatBot__Projection__Topic"] = $"{RecoveryValidationTopology.StorageTenantRef}.chatbot.events";

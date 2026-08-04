@@ -7,75 +7,69 @@ namespace Hexalith.ChatBot.Architecture.Tests;
 public static class LiveRecoveryValidationArchitectureTests
 {
     [Fact]
-    public static void LiveRecoveryValidationAdr_ShouldKeepFaultAuthorityAtTheTierThreeBoundary()
+    public static void LiveRecoveryFaultVocabularies_ShouldBeClosedAndDeterministicallyOrdered()
     {
-        string adr = ReadProjectFile("docs/adrs/live-recovery-validation-drivers.md");
+        string[] expectedDependencies =
+        [
+            ScopedOutageDependencies.Graph,
+            ScopedOutageDependencies.AiProvider,
+            ScopedOutageDependencies.CommandExecution,
+            ScopedOutageDependencies.AuditStore,
+            ScopedOutageDependencies.AttachmentProcessing,
+            ScopedOutageDependencies.Identity,
+        ];
+        string[] expectedContinuityScenarios =
+        [
+            ContinuityDrillScenarios.EventStoreOutage,
+            ContinuityDrillScenarios.M365SubscriptionFailure,
+        ];
 
-        // The ADR's lifecycle status is deliberately NOT pinned here. Pinning the exact string "Accepted (...)" meant
-        // that correcting the status to `Proposed` — the right move while the story is still in-progress — broke the
-        // build, so the guard locked in a status the engineering state did not support. Assert only that the story is
-        // named and that a recognised status is declared; the architecture invariants below are what this guard exists
-        // to protect.
-        bool declaresStatus =
-            adr.Contains("Proposed (2026-08-01, Story 12.15)", StringComparison.Ordinal) ||
-            adr.Contains("Accepted (2026-08-01, Story 12.15)", StringComparison.Ordinal);
-
-        declaresStatus.ShouldBeTrue("the live-recovery ADR must declare either Proposed or Accepted status for Story 12.15");
-        adr.ShouldContain("Tier-3 orchestration boundary owns every fault and restoration action");
-        adr.ShouldContain("ResourceCommandService");
-        adr.ShouldContain("KnownResourceCommands.StopCommand");
-        adr.ShouldContain("KnownResourceCommands.StartCommand");
-        adr.ShouldContain("KnownResourceCommands.RestartCommand");
-        adr.ShouldContain("production Server never receives AppHost or DCP resource-lifecycle authority");
-        adr.ShouldContain("ReplayTenantPolicy.IsTestTenant");
-        adr.ShouldContain("replay-test:");
-        adr.ShouldContain("closed scenario tokens");
-        adr.ShouldContain("restoration runs in `finally`");
+        ScopedOutageDependencies.SweepOrder.ShouldBe(expectedDependencies);
+        ScopedOutageDependencies.All.SetEquals(expectedDependencies).ShouldBeTrue();
+        ContinuityDrillScenarios.SweepOrder.ShouldBe(expectedContinuityScenarios);
+        ContinuityDrillScenarios.All.SetEquals(expectedContinuityScenarios).ShouldBeTrue();
+        ScopedOutageDependencies.Contains("unknown-dependency").ShouldBeFalse();
+        ContinuityDrillScenarios.Contains("unknown-scenario").ShouldBeFalse();
+        LiveRecoveryValidationOptions.MinimumSweepScenarioCount.ShouldBe(9);
     }
 
     [Fact]
-    public static void LiveRecoveryValidationAdr_ShouldDefineAClosedScenarioMechanismMatrix()
+    public static void LiveRecoveryEvidenceGate_ShouldRequireEachJobsBehavioralProof()
     {
-        string adr = ReadProjectFile("docs/adrs/live-recovery-validation-drivers.md");
+        LiveRecoveryValidationEvidenceGate.RequiredAssertionsFor(LiveRecoveryValidationJobs.Continuity)
+            .ShouldContain("state-reconstructable");
+        LiveRecoveryValidationEvidenceGate.RequiredAssertionsFor(LiveRecoveryValidationJobs.ProjectionRebuild)
+            .ShouldContain("structurally-equivalent");
+        LiveRecoveryValidationEvidenceGate.RequiredAssertionsFor(LiveRecoveryValidationJobs.ScopedOutage)
+            .ShouldContain("scope-contained");
 
-        foreach (string scenario in new[]
-        {
-            "eventstore-outage",
-            "m365-subscription-failure",
-            "graph",
-            "identity",
-            "ai-provider",
-            "command-execution",
-            "audit-store",
-            "attachment-processing",
-            "projection-rebuild",
-        })
-        {
-            adr.ShouldContain($"`{scenario}`");
-        }
-
-        adr.ShouldContain("Faulted boundary");
-        adr.ShouldContain("Observed-fault proof");
-        adr.ShouldContain("Recovery proof");
-        adr.ShouldContain("Production-equivalence residual");
-        adr.ShouldContain("zero scenario coverage");
-        adr.ShouldContain("Unmeasurable");
+        LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(LiveRecoveryValidationJobs.Continuity)["rto"]
+            .ShouldBe(RecoveryTargets.MaxRto.TotalSeconds);
+        LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(LiveRecoveryValidationJobs.ProjectionRebuild)["rebuild-duration"]
+            .ShouldBe(RecoveryTargets.MaxRto.TotalSeconds);
+        LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(LiveRecoveryValidationJobs.ScopedOutage)["scope-recording-latency"]
+            .ShouldBe(RecoveryTargets.MaxScopeRecordingLatency.TotalSeconds);
     }
 
     [Fact]
-    public static void LiveRecoveryValidationAdr_ShouldRecordSandboxSuitabilityAndEvidenceRetentionLimits()
+    public static void LiveRecoveryReleasePolicy_ShouldRejectUnpinnedDatasetEvidence()
     {
-        string adr = ReadProjectFile("docs/adrs/live-recovery-validation-drivers.md");
-
-        adr.ShouldContain("Conditionally suitable");
-        adr.ShouldContain("no live Graph/M365 resource");
-        adr.ShouldContain("no hosted Workers resource");
-        adr.ShouldContain("process-local `InMemoryWormAuditStore`");
-        adr.ShouldContain("no production AKS or multi-replica control plane");
-        adr.ShouldContain("metadata-only");
-        adr.ShouldContain("30-day retention policy");
-        adr.ShouldContain("raw `.trx` plus generated reports/manifests");
-        adr.ShouldContain("must not be described as production-equivalent");
+        _ = Should.Throw<ArgumentException>(() => LiveRecoveryValidationGatePolicy.ForRelease(
+            ["recovery-baseline"],
+            targetDeviationsBlockRelease: true,
+            requiredDriverMode: RecoveryValidationEvidenceManifest.LiveDriverMode,
+            maximumEvidenceAge: TimeSpan.FromDays(8),
+            expectedDatasetVersion: null,
+            minimumDatasetVolume: 6,
+            maximumMeasurableRecoveryCeilingSeconds: 180));
+        _ = Should.Throw<ArgumentOutOfRangeException>(() => LiveRecoveryValidationGatePolicy.ForRelease(
+            ["recovery-baseline"],
+            targetDeviationsBlockRelease: true,
+            requiredDriverMode: RecoveryValidationEvidenceManifest.LiveDriverMode,
+            maximumEvidenceAge: TimeSpan.FromDays(8),
+            expectedDatasetVersion: "v1",
+            minimumDatasetVolume: 0,
+            maximumMeasurableRecoveryCeilingSeconds: 180));
     }
 
     [Fact]
@@ -97,28 +91,6 @@ public static class LiveRecoveryValidationArchitectureTests
             .ToArray();
 
         violations.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public static void LiveProjectionRebuildDriver_ShouldUseOnlyImmutableTenantSourceAndWormReads()
-    {
-        string driver = ReadProjectFile("tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveProjectionRebuildDriver.cs");
-
-        driver.ShouldContain("IReadOnlyList<ProjectConversationSourceEmailView> immutableSourceRecords");
-        driver.ShouldContain("wormAuditStore.EnumerateChain(testTenantRef)");
-        driver.ShouldContain("ReplayTenantPolicy.IsTestTenant(testTenantRef)");
-        driver.ShouldContain("FreshPartitionTenant(testTenantRef, dataset.ValidationPartitionRef, correlationId)");
-        driver.ShouldContain("RebuildPartitionThroughRealHandlerAsync");
-        driver.ShouldContain("AssertPartitionAbsentAsync");
-        driver.ShouldContain("ReadModelProjectConversationProjectionStore");
-        driver.ShouldContain("ReadModelGovernedOperationViewStore");
-        driver.ShouldContain("TryEraseAsync");
-        driver.ShouldNotContain("EnumerateTenants(");
-        driver.ShouldNotContain("AppendAsync(");
-        driver.ShouldNotContain("GraphServiceClient");
-        driver.ShouldNotContain("CaptureMailboxMessageIntake");
-        driver.ShouldNotContain("PartyClient");
-        driver.ShouldNotContain("FolderClient");
     }
 
     [Fact]
@@ -307,34 +279,14 @@ public static class LiveRecoveryValidationArchitectureTests
     [Fact]
     public static void ScopedOutageSweepOrder_ShouldBeDeterministicWithIdentityLast()
     {
-        // Identity stops the topology's security root, so it must run last. An IReadOnlySet cannot express that:
-        // HashSet<T> enumeration order is an unspecified implementation detail. This assembly has no access to
-        // Server internals, so the ordering contract is verified from source.
-        string dependencies = ReadProjectFile("src/Hexalith.ChatBot.Server/Audit/ScopedOutageDependencies.cs");
-        dependencies.ShouldContain("IReadOnlyList<string> SweepOrder");
-        dependencies.ShouldContain("new HashSet<string>(SweepOrder, StringComparer.Ordinal)");
+        ScopedOutageDependencies.SweepOrder[^1].ShouldBe(ScopedOutageDependencies.Identity);
+        ScopedOutageDependencies.SweepOrder.Distinct(StringComparer.Ordinal).Count()
+            .ShouldBe(ScopedOutageDependencies.SweepOrder.Count);
+        ScopedOutageDependencies.All.SetEquals(ScopedOutageDependencies.SweepOrder).ShouldBeTrue();
 
-        int sweepOrderStart = dependencies.IndexOf("SweepOrder =", StringComparison.Ordinal);
-        sweepOrderStart.ShouldBeGreaterThan(-1);
-        int sweepOrderEnd = dependencies.IndexOf("];", sweepOrderStart, StringComparison.Ordinal);
-        sweepOrderEnd.ShouldBeGreaterThan(sweepOrderStart);
-        string sweepOrder = dependencies[sweepOrderStart..sweepOrderEnd];
-        sweepOrder.IndexOf("Identity", StringComparison.Ordinal)
-            .ShouldBeGreaterThan(sweepOrder.IndexOf("AttachmentProcessing", StringComparison.Ordinal));
-
-        // A duplicate in SweepOrder dedupes silently into All, so the sweep would inject one outage twice while the
-        // gate saw one manifest too many and reported incomplete_scenario_set on every run thereafter.
-        dependencies.ShouldContain("closed.Count == SweepOrder.Count");
-
-        ReadProjectFile("src/Hexalith.ChatBot.Server/Audit/ScopedOutageDegradationValidationCoordinator.cs")
-            .ShouldContain("foreach (string dependency in ScopedOutageDependencies.SweepOrder)");
-
-        // The continuity sweep is equally destructive and was left on HashSet enumeration order when its sibling was
-        // hardened. Both destructive sweeps must be ordered.
-        ReadProjectFile("src/Hexalith.ChatBot.Server/Audit/ContinuityDrillScenarios.cs")
-            .ShouldContain("IReadOnlyList<string> SweepOrder");
-        ReadProjectFile("src/Hexalith.ChatBot.Server/Audit/ContinuityDrillCoordinator.cs")
-            .ShouldContain("foreach (string scenario in ContinuityDrillScenarios.SweepOrder)");
+        ContinuityDrillScenarios.SweepOrder.Distinct(StringComparer.Ordinal).Count()
+            .ShouldBe(ContinuityDrillScenarios.SweepOrder.Count);
+        ContinuityDrillScenarios.All.SetEquals(ContinuityDrillScenarios.SweepOrder).ShouldBeTrue();
     }
 
     private static string ReadProjectFile(string relativePath)

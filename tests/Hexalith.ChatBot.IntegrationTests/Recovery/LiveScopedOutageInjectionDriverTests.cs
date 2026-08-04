@@ -321,12 +321,27 @@ public sealed class LiveScopedOutageInjectionDriverTests
             return ValueTask.FromResult(new ScopedOutageFaultObservation(
                 observed,
                 observed + TimeSpan.FromMilliseconds(25),
-                ObservedScopeOverride ?? LiveScopedOutageInjectionDriver.ExpectedScope(dependency),
+                ObservedScopeOverride ?? IndependentlyObservedScope(dependency),
                 IndependentControlSucceeded: IndependentControlSucceeded,
                 UnauthorizedMutationDetected: false));
         }
 
         public string? ObservedScopeOverride { get; init; }
+
+        // Deliberately independent from LiveScopedOutageInjectionDriver.ExpectedScope. If the driver's expectation
+        // table drifts from what the sandbox fixture observes, the coordinator test must surface a scope breach rather
+        // than feeding the changed expectation straight back as its own observation.
+        private static string IndependentlyObservedScope(string dependency)
+            => dependency switch
+            {
+                ScopedOutageDependencies.Graph => ScopedOutageScopes.Mailbox,
+                ScopedOutageDependencies.Identity => ScopedOutageScopes.ServiceClient,
+                ScopedOutageDependencies.AiProvider => ScopedOutageScopes.Operation,
+                ScopedOutageDependencies.CommandExecution => ScopedOutageScopes.Operation,
+                ScopedOutageDependencies.AuditStore => ScopedOutageScopes.CommandSurface,
+                ScopedOutageDependencies.AttachmentProcessing => ScopedOutageScopes.WorkflowItem,
+                _ => throw new InvalidOperationException("The test fixture received an unknown scoped-outage dependency."),
+            };
 
         public ValueTask RestoreAsync(string dependency, string tenantRef, CancellationToken cancellationToken)
         {

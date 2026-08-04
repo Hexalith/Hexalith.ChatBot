@@ -24,7 +24,10 @@ internal sealed class LiveRecoveryValidationOptions
     /// <summary>Gets or sets the configured baseline dataset version.</summary>
     public string DatasetVersion { get; set; } = string.Empty;
 
-    /// <summary>Gets or sets the exact expected baseline dataset volume.</summary>
+    /// <summary>
+    /// Gets or sets the exact configured baseline-corpus volume. Evidence manifests report this separately from the
+    /// number of corpus records or resources each scenario actually exercised.
+    /// </summary>
     public int DatasetVolume { get; set; }
 
     /// <summary>Gets or sets the projection schema version expected from the baseline dataset.</summary>

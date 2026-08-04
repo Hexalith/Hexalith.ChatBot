@@ -367,19 +367,27 @@ public sealed class RecoveryValidationTopologyContractTests
     }
 
     [Fact]
-    public void RecoveryTier3LaneBoundsEventStoreGracefulShutdownInsideAspireCommandDeadline()
+    public async Task RecoveryTier3LaneBoundsEventStoreGracefulShutdownInsideAspireCommandDeadline()
     {
-        string source = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
-            "tests",
-            "Hexalith.ChatBot.IntegrationTests",
-            "Recovery",
-            "LiveContinuityAspireE2eTests.cs"));
+        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        try
+        {
+            IResource eventStore = builder.Resources.Single(resource =>
+                string.Equals(resource.Name, "eventstore", StringComparison.Ordinal));
+            LiveRecoveryTopologyConfiguration.ConfigureEventStore(eventStore);
 
-        source.ShouldContain("DOTNET_SHUTDOWNTIMEOUTSECONDS");
-        source.ShouldContain("= \"5\"");
-        source.ShouldContain("EventStore__RateLimiting__PermitLimit");
-        source.ShouldContain("EventStore__RateLimiting__ConsumerPermitLimit");
+            IReadOnlyDictionary<string, string> environment = await ResolveEnvironmentAsync(eventStore).ConfigureAwait(true);
+
+            environment["DOTNET_SHUTDOWNTIMEOUTSECONDS"].ShouldBe("5");
+            environment["EventStore__RateLimiting__PermitLimit"].ShouldBe("100000");
+            environment["EventStore__RateLimiting__ConsumerPermitLimit"].ShouldBe("10000");
+        }
+        finally
+        {
+            await builder.DisposeAsync().ConfigureAwait(true);
+        }
     }
 
     private static async Task<IReadOnlyDictionary<string, string>> ResolveEnvironmentAsync(IResource resource)

@@ -297,6 +297,28 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
     }
 
     [Fact]
+    public void DatasetVolumeReportsWhatEachScenarioActuallyExercises()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+
+        RecoveryValidationEvidenceManifest[] overstatedContinuity = complete.Evidence.ToArray();
+        int continuityIndex = Array.FindIndex(
+            overstatedContinuity,
+            static manifest => manifest.JobId == LiveRecoveryValidationJobs.Continuity);
+        overstatedContinuity[continuityIndex] = overstatedContinuity[continuityIndex] with { DatasetVolume = 6 };
+        Evaluate(complete with { Evidence = overstatedContinuity }).StopShipReasons
+            .ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:dataset_volume_not_applicable");
+
+        RecoveryValidationEvidenceManifest[] understatedRebuild = complete.Evidence.ToArray();
+        int rebuildIndex = Array.FindIndex(
+            understatedRebuild,
+            static manifest => manifest.JobId == LiveRecoveryValidationJobs.ProjectionRebuild);
+        understatedRebuild[rebuildIndex] = understatedRebuild[rebuildIndex] with { DatasetVolume = 0 };
+        Evaluate(complete with { Evidence = understatedRebuild }).StopShipReasons
+            .ShouldContain($"{LiveRecoveryValidationJobs.ProjectionRebuild}:dataset_volume_mismatch");
+    }
+
+    [Fact]
     public void AMeasurementKeyOutsideTheCanonicalVocabularyIsRejected()
     {
         LiveRecoveryValidationEvidenceAttempt attempt = MutateContinuity(manifest => manifest with
@@ -470,7 +492,8 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
             TenantRef = "replay-test:recovery-validation",
             DatasetRef = "recovery-baseline",
             DatasetVersion = "v1",
-            DatasetVolume = 6,
+            ConfiguredDatasetVolume = 6,
+            DatasetVolume = jobId == LiveRecoveryValidationJobs.ProjectionRebuild ? 1 : 0,
             DriverMode = RecoveryValidationEvidenceManifest.LiveDriverMode,
             JobId = jobId,
             Scenario = scenario,

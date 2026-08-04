@@ -53,6 +53,9 @@ internal sealed class FileRecoveryValidationEvidenceSink(
                 report.Deviations,
                 cancellationToken,
 
+                // Continuity drills do not consult the configured projection baseline.
+                datasetVolume: 0,
+
                 // Stated, not inherited: one continuity scenario exercised by this manifest.
                 coverage: 1);
     }
@@ -82,7 +85,8 @@ internal sealed class FileRecoveryValidationEvidenceSink(
                 },
                 report.Deviations,
                 cancellationToken,
-                report.ResourcesCompared);
+                datasetVolume: report.ResourcesCompared,
+                coverage: report.ResourcesCompared);
     }
 
     public ValueTask RecordAsync(ScopedOutageDegradationReport report, CancellationToken cancellationToken)
@@ -135,6 +139,9 @@ internal sealed class FileRecoveryValidationEvidenceSink(
                 report.Deviations,
                 cancellationToken,
 
+                // Scoped dependency outages do not consult the configured projection baseline.
+                datasetVolume: 0,
+
                 // Stated, not inherited: one scoped dependency exercised by this manifest.
                 coverage: 1);
     }
@@ -152,6 +159,7 @@ internal sealed class FileRecoveryValidationEvidenceSink(
         IReadOnlyDictionary<string, bool> assertions,
         IReadOnlyList<string> deviations,
         CancellationToken cancellationToken,
+        int datasetVolume,
 
         // No default. `int coverage = 1` let the continuity and scoped-outage overloads inherit a literal without
         // saying so, and the gate's `{job}:zero_coverage` branch was then reachable only for the one overload that
@@ -179,7 +187,8 @@ internal sealed class FileRecoveryValidationEvidenceSink(
             TenantRef = options.TestTenantRef,
             DatasetRef = options.DatasetRef,
             DatasetVersion = options.DatasetVersion,
-            DatasetVolume = options.DatasetVolume,
+            ConfiguredDatasetVolume = options.DatasetVolume,
+            DatasetVolume = datasetVolume,
             DriverMode = RecoveryValidationEvidenceManifest.LiveDriverMode,
             JobId = reportKind,
             Scenario = scenario,

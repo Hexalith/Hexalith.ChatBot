@@ -11,6 +11,46 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 public sealed class FileRecoveryValidationEvidenceSinkTests
 {
     [Fact]
+    public async Task RecordAsyncDistinguishesConfiguredCorpusVolumeFromScenarioExerciseVolume()
+    {
+        string evidenceDirectory = CreateEvidenceDirectory();
+        LiveRecoveryValidationOptions options = Options(evidenceDirectory);
+        FileRecoveryValidationEvidenceSink sink = new(
+            options,
+            repositoryCommit: "0123456789abcdef0123456789abcdef01234567",
+            daprRuntimeVersion: "1.18.4",
+            aspireVersion: "13.4.6",
+            appHostVersion: "1.0.0");
+        DateTimeOffset started = DateTimeOffset.Parse(
+            "2026-08-01T00:00:00Z",
+            System.Globalization.CultureInfo.InvariantCulture);
+
+        await sink.RecordAsync(
+            MetReport(ChatBotCorrelationId.New().Value, ContinuityDrillScenarios.EventStoreOutage, started),
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
+        await sink.RecordAsync(
+            EquivalentProjectionReport(ChatBotCorrelationId.New().Value, started.AddMinutes(1), resourcesCompared: 2),
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
+        await sink.RecordAsync(
+            ContainedScopedOutageReport(ChatBotCorrelationId.New().Value, started.AddMinutes(2)),
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
+
+        RecoveryValidationEvidenceManifest[] manifests = Directory
+            .GetFiles(evidenceDirectory, "*.manifest.json")
+            .Select(DeserializeManifest)
+            .ToArray();
+
+        manifests.Length.ShouldBe(3);
+        manifests.ShouldAllBe(static manifest => manifest.ConfiguredDatasetVolume == 6);
+        manifests.Single(static manifest => manifest.JobId == LiveRecoveryValidationJobs.Continuity)
+            .DatasetVolume.ShouldBe(0);
+        manifests.Single(static manifest => manifest.JobId == LiveRecoveryValidationJobs.ProjectionRebuild)
+            .DatasetVolume.ShouldBe(2);
+        manifests.Single(static manifest => manifest.JobId == LiveRecoveryValidationJobs.ScopedOutage)
+            .DatasetVolume.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task RecordAsyncRetainsMetAndMissedContinuityReportsWithProvenance()
     {
         string evidenceDirectory = CreateEvidenceDirectory();
@@ -166,6 +206,53 @@ public sealed class FileRecoveryValidationEvidenceSinkTests
             RecalibrationFlag = true,
             Deviations = ["rto_target_missed"],
         };
+
+    private static ProjectionRebuildReport EquivalentProjectionReport(
+        string correlationId,
+        DateTimeOffset started,
+        int resourcesCompared)
+        => new(
+            RecoveryValidationTopology.LogicalTenantRef,
+            DatasetRef: "recovery-baseline",
+            started,
+            started.AddSeconds(1),
+            MeasuredRebuildDuration: TimeSpan.FromSeconds(1),
+            DurationWithinTarget: true,
+            ProjectionRebuildVerdicts.Equivalent,
+            resourcesCompared,
+            Deviations: [],
+            FirstDivergingResourceLocator: null,
+            ProjectConversationSourceEmailView.CurrentSchemaVersion,
+            correlationId,
+            ProjectionRebuildReport.ValidationCompletedReasonCode);
+
+    private static ScopedOutageDegradationReport ContainedScopedOutageReport(
+        string correlationId,
+        DateTimeOffset started)
+        => new(
+            RecoveryValidationTopology.LogicalTenantRef,
+            ScopedOutageDependencies.Graph,
+            ScopedOutageScopes.Tenant,
+            ScopedOutageScopes.Tenant,
+            started,
+            started.AddSeconds(1),
+            ScopeRecordingLatency: TimeSpan.FromSeconds(1),
+            ScopeRecordedWithinTarget: true,
+            ScopedOutageDegradationVerdicts.Contained,
+            Deviations: [],
+            FirstBreachLocator: null,
+            correlationId,
+            ScopedOutageDegradationReport.ValidationCompletedReasonCode,
+            new RecoveryValidationExecutionAssertions(
+                CleanupComplete: true,
+                FaultObserved: true,
+                RecoveryObserved: true,
+                IndependentControlSucceeded: true,
+                TenantIsolationPreserved: true,
+                UnauthorizedMutationAbsent: true,
+                StateReconstructable: true,
+                ImmutableSourceOnly: false,
+                MailboxReingestionAbsent: false));
 
     private static LiveRecoveryValidationOptions Options(string evidenceDirectory)
         => new()

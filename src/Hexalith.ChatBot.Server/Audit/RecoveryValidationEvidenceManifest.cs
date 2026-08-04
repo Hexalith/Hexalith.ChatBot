@@ -33,6 +33,14 @@ internal sealed record RecoveryValidationEvidenceManifest
     public required string TenantRef { get; init; }
     public required string DatasetRef { get; init; }
     public required string DatasetVersion { get; init; }
+
+    /// <summary>Gets the number of records in the configured baseline corpus.</summary>
+    public required int ConfiguredDatasetVolume { get; init; }
+
+    /// <summary>
+    /// Gets the number of configured dataset records or resources this scenario actually exercised. Scenarios that do
+    /// not consult the baseline corpus report zero; projection rebuild reports the resources it compared.
+    /// </summary>
     public required int DatasetVolume { get; init; }
     public required string DriverMode { get; init; }
     public required string JobId { get; init; }
@@ -135,9 +143,14 @@ internal sealed record RecoveryValidationEvidenceManifest
             errors.Add("Manifest metadata contains an unsafe or sensitive value.");
         }
 
-        if (DatasetVolume <= 0)
+        if (ConfiguredDatasetVolume <= 0)
         {
-            errors.Add("Dataset volume must be positive.");
+            errors.Add("Configured dataset volume must be positive.");
+        }
+
+        if (DatasetVolume < 0)
+        {
+            errors.Add("Exercised dataset volume must not be negative.");
         }
 
         if (!IsFiniteNonNegative(MeasurementsSeconds) || !IsFiniteNonNegative(AllowedTargetsSeconds))

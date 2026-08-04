@@ -149,7 +149,7 @@ internal static class LiveRecoveryValidationEvidenceGate
                 stopShip.Add($"{SafeJob(manifest.JobId)}:dataset_version_unexpected");
             }
 
-            if (policy.MinimumDatasetVolume > 0 && manifest.DatasetVolume < policy.MinimumDatasetVolume)
+            if (policy.MinimumDatasetVolume > 0 && manifest.ConfiguredDatasetVolume < policy.MinimumDatasetVolume)
             {
                 stopShip.Add($"{SafeJob(manifest.JobId)}:dataset_volume_below_minimum");
             }
@@ -198,7 +198,7 @@ internal static class LiveRecoveryValidationEvidenceGate
             evidence.Select(static manifest => manifest.TenantRef).Distinct(StringComparer.Ordinal).Count() > 1 ||
             evidence.Select(static manifest => manifest.DatasetRef).Distinct(StringComparer.Ordinal).Count() > 1 ||
             evidence.Select(static manifest => manifest.DatasetVersion).Distinct(StringComparer.Ordinal).Count() > 1 ||
-            evidence.Select(static manifest => manifest.DatasetVolume).Distinct().Count() > 1 ||
+            evidence.Select(static manifest => manifest.ConfiguredDatasetVolume).Distinct().Count() > 1 ||
             evidence.Select(static manifest => manifest.RepositoryCommit).Distinct(StringComparer.Ordinal).Count() > 1))
         {
             stopShip.Add("attempt_evidence_incoherent");
@@ -372,6 +372,19 @@ internal static class LiveRecoveryValidationEvidenceGate
             if (manifest.Coverage.Count == 0 || manifest.Coverage.Values.Any(static value => value <= 0))
             {
                 stopShip.Add($"{jobId}:zero_coverage");
+            }
+
+            if (string.Equals(jobId, LiveRecoveryValidationJobs.ProjectionRebuild, StringComparison.Ordinal))
+            {
+                if (!manifest.Coverage.TryGetValue("scenario", out int resourcesCompared) ||
+                    manifest.DatasetVolume != resourcesCompared)
+                {
+                    stopShip.Add($"{jobId}:dataset_volume_mismatch");
+                }
+            }
+            else if (manifest.DatasetVolume != 0)
+            {
+                stopShip.Add($"{jobId}:dataset_volume_not_applicable");
             }
 
             if (!Assertion(manifest, "cleanup-complete"))

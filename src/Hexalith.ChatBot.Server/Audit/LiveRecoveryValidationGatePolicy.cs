@@ -27,7 +27,9 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// declaring a matching volume kept every manifest mutually coherent and passed the gate.
 /// </param>
 /// <param name="MinimumDatasetVolume">
-/// The smallest dataset volume the release path accepts as meaningful coverage. Zero leaves it unpinned.
+/// The smallest configured baseline-corpus volume the release path accepts. Zero leaves it unpinned. Per-scenario
+/// <see cref="RecoveryValidationEvidenceManifest.DatasetVolume"/> separately reports how much of that corpus a driver
+/// actually exercised.
 /// </param>
 /// <param name="RequiredRepositoryCommit">
 /// The commit the evidence must be attributed to, or <see langword="null"/> to leave it unpinned. Cross-manifest
@@ -52,14 +54,14 @@ internal sealed record LiveRecoveryValidationGatePolicy(
     /// rather than a legitimate "leave it unpinned" choice. The record constructor's own defaults
     /// (<see langword="null"/>/<c>0</c>, meaning "unpinned") stay as-is for unit tests that deliberately exercise the
     /// unpinned branches; this factory instead fails fast so a release path can never silently construct a policy
-    /// that does not actually anchor dataset version or volume.
+    /// that does not actually anchor dataset version or configured corpus volume.
     /// </summary>
     /// <param name="configuredProjectionDatasets">The dataset refs the rebuild job must cover.</param>
     /// <param name="targetDeviationsBlockRelease">Whether a measurable target miss blocks.</param>
     /// <param name="requiredDriverMode">The driver-mode token evidence must carry to count as a live run.</param>
     /// <param name="maximumEvidenceAge">How old evidence may be before it is stale.</param>
     /// <param name="expectedDatasetVersion">The dataset version the release path expects. Required (non-null/non-whitespace).</param>
-    /// <param name="minimumDatasetVolume">The smallest dataset volume the release path accepts as meaningful coverage. Required to be positive.</param>
+    /// <param name="minimumDatasetVolume">The smallest configured baseline-corpus volume the release path accepts. Required to be positive.</param>
     /// <param name="maximumMeasurableRecoveryCeilingSeconds">The largest measurable-recovery ceiling the release path believes the lane can honour. Required to be finite and positive.</param>
     /// <param name="requiredRepositoryCommit">The commit the evidence must be attributed to, or <see langword="null"/> to leave it unpinned.</param>
     /// <returns>A policy with every release-required anchor validated and pinned.</returns>
