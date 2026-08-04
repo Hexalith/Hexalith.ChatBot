@@ -149,7 +149,8 @@ public static class LiveRecoveryValidationArchitectureTests
         composer.ShouldContain("Testing");
         composer.ShouldNotContain("WithExternalHttpEndpoints");
         sandbox.ShouldContain("RecoveryScopedOutageState.Contains(dependency)");
-        sandbox.ShouldContain("Authorized(request, requestedTenant, tenantRef, controllerSecret)");
+        sandbox.ShouldContain("RecoverySandboxAuthorization.Authorized(");
+        sandbox.ShouldContain("X-Recovery-Controller-Secret");
         sandbox.ShouldNotContain("{resource}");
     }
 
