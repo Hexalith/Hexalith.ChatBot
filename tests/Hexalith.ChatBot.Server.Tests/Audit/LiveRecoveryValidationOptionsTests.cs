@@ -69,6 +69,14 @@ public sealed class LiveRecoveryValidationOptionsTests
         options.PerScenarioTimeout = TimeSpan.MaxValue;
         options.Validate().ShouldNotBeNull().ShouldContain(nameof(LiveRecoveryValidationOptions.WorkflowTimeout));
 
+        // A per-scenario budget just under the first guard's own threshold — TimeSpan.MaxValue / N passes
+        // `PerScenarioTimeout > MaximumTimeSpan / MinimumSweepScenarioCount` (equal, not greater) — still overflows
+        // once multiplied back out by N and added to TopologyMargin, and must be caught by the try/catch rather than
+        // let an unhandled OverflowException escape ValidateOnStart.
+        options = ValidOptions();
+        options.PerScenarioTimeout = TimeSpan.MaxValue / LiveRecoveryValidationOptions.MinimumSweepScenarioCount;
+        options.Validate().ShouldNotBeNull().ShouldContain(nameof(TimeSpan));
+
         options = ValidOptions();
         options.MaximumEvidenceAge = options.Cadence - TimeSpan.FromTicks(1);
         options.Validate().ShouldNotBeNull().ShouldContain(nameof(LiveRecoveryValidationOptions.MaximumEvidenceAge));

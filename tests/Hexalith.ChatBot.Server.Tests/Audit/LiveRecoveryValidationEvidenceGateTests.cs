@@ -205,6 +205,19 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
     }
 
     [Fact]
+    public void RepositoryCommitCoherenceIsCaseInsensitive()
+    {
+        // Two manifests naming the same commit in different case (e.g. from two different CI runners) must remain a
+        // coherent attempt — only a genuinely different commit is incoherent.
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        RecoveryValidationEvidenceManifest[] evidence = complete.Evidence.ToArray();
+        evidence[0] = evidence[0] with { RepositoryCommit = evidence[0].RepositoryCommit.ToUpperInvariant() };
+
+        Evaluate(complete with { Evidence = evidence }).StopShipReasons
+            .ShouldNotContain("attempt_evidence_incoherent");
+    }
+
+    [Fact]
     public void EvidenceFromTwoDifferentSubjectsIsNotOneCoherentAttempt()
     {
         LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
@@ -223,6 +236,77 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
 
         Should.NotThrow(() => Evaluate(complete with { Evidence = evidence }))
             .StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:invalid_evidence");
+    }
+
+    [Fact]
+    public void AManifestInvalidOnlyViaANonDictionaryFieldIsExcludedFromJobGradingNotJustInvalidEvidence()
+    {
+        // AManifestWithNullMembersYieldsAReasonCodeRatherThanAnException nulls a dictionary, which the older
+        // null-dictionary check inside EvaluateJob already excludes regardless of Validate(). This corrupts only a
+        // non-dictionary field (RunId) with every dictionary intact and a safety assertion deliberately false, so
+        // only the newer Validate()-based invalidManifests exclusion — not the null-dictionary check — can be
+        // keeping it out of job-level grading.
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        RecoveryValidationEvidenceManifest[] evidence = complete.Evidence.ToArray();
+        int continuityIndex = Array.FindIndex(
+            evidence,
+            manifest => manifest.Scenario == ContinuityDrillScenarios.EventStoreOutage);
+        Dictionary<string, bool> assertions = new(evidence[continuityIndex].Assertions, StringComparer.Ordinal)
+        {
+            ["fault-observed"] = false,
+        };
+        evidence[continuityIndex] = evidence[continuityIndex] with
+        {
+            RunId = "not-a-canonical-ulid",
+            Assertions = assertions,
+        };
+
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(complete with { Evidence = evidence });
+
+        decision.StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:invalid_evidence");
+        decision.StopShipReasons.ShouldNotContain($"{LiveRecoveryValidationJobs.Continuity}:fault-observed:assertion_failed");
+    }
+
+    [Fact]
+    public void NegativeAlertDeliveryCountsAreUnreadableRatherThanUnalerted()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        Dictionary<string, int> alerts = new(complete.AlertsDeliveredByJob, StringComparer.Ordinal)
+        {
+            [LiveRecoveryValidationJobs.Continuity] = -1,
+        };
+
+        Evaluate(complete with { AlertsDeliveredByJob = alerts })
+            .StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:attempt_alert_counts_unreadable");
+        Evaluate(complete with { AlertsDeliveredByJob = alerts })
+            .StopShipReasons.ShouldNotContain($"{LiveRecoveryValidationJobs.Continuity}:unalerted_breach");
+    }
+
+    [Fact]
+    public void NegativeAlertDeliveryCountsAlsoStopShipAsUnalertedBreachWhenAlertsWereRequired()
+    {
+        // Deliberately both: the clamp only makes the delivered-vs-required comparison well-defined, it does not
+        // vouch for delivery, so a job whose alert counts are unreadable AND which required an alert must still fail
+        // closed on the delivery question, not just the readability one.
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        RecoveryValidationEvidenceManifest[] evidence = complete.Evidence.ToArray();
+        int continuityIndex = Array.FindIndex(
+            evidence,
+            manifest => manifest.Scenario == ContinuityDrillScenarios.EventStoreOutage);
+        evidence[continuityIndex] = evidence[continuityIndex] with
+        {
+            Verdict = ContinuityDrillVerdicts.Unmeasurable,
+        };
+        Dictionary<string, int> alerts = new(complete.AlertsDeliveredByJob, StringComparer.Ordinal)
+        {
+            [LiveRecoveryValidationJobs.Continuity] = -1,
+        };
+
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(
+            complete with { Evidence = evidence, AlertsDeliveredByJob = alerts });
+
+        decision.StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:attempt_alert_counts_unreadable");
+        decision.StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:unalerted_breach");
     }
 
     [Fact]

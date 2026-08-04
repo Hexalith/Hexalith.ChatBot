@@ -8,10 +8,11 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 public sealed class LiveContinuityDrillScenarioRunnerTests
 {
     [Theory]
-    [InlineData(true, true, true)]
-    [InlineData(false, false, true)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, false)]
     [InlineData(false, true, false)]
-    public void StopControlRequiresEitherCommandSuccessOrAnObservedUnavailableEndpoint(
+    public void StopControlRequiresCommandSuccessAndAnObservedUnavailableEndpoint(
         bool commandSucceeded,
         bool endpointAvailable,
         bool expected)
@@ -41,6 +42,8 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
         measurement.MeasuredRto.ShouldBe(TimeSpan.FromMinutes(2));
         measurement.DataLossDetected.ShouldBeFalse();
         measurement.ExecutionAssertions!.CleanupComplete.ShouldBeTrue();
+        // Not observed by this drill — must never alias TenantIsolationPreserved (a past regression).
+        measurement.ExecutionAssertions!.IndependentControlSucceeded.ShouldBeFalse();
         operations.Calls.ShouldBe(["seed", "stop-eventstore", "observe-eventstore", "start-eventstore", "wait-eventstore", "read-eventstore", "cleanup-eventstore"]);
     }
 
@@ -62,6 +65,8 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
         measurement.MeasuredRto.ShouldBe(TimeSpan.FromMinutes(2));
         measurement.DataLossDetected.ShouldBeFalse();
         measurement.ExecutionAssertions!.CleanupComplete.ShouldBeTrue();
+        // Not observed by this drill — must never alias TenantIsolationPreserved (a past regression).
+        measurement.ExecutionAssertions!.IndependentControlSucceeded.ShouldBeFalse();
         operations.Calls.ShouldBe([
             "checkpoint-subscription",
             "expire-subscription",
@@ -152,6 +157,69 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
 
         operations.Calls.ShouldContain("start-eventstore");
         operations.Calls.ShouldContain("cleanup-eventstore");
+        operations.StartEventStoreTokenWasCanceled.ShouldBe(false);
+        operations.WaitEventStoreTokenWasCanceled.ShouldBe(false);
+        operations.CleanupEventStoreTokenWasCanceled.ShouldBe(false);
+    }
+
+    [Fact]
+    public async Task CanceledObservationWithFailedRestoreIsScenarioFailureNotBareCancel()
+    {
+        using CancellationTokenSource canceled = new();
+        RecordingOperations operations = new()
+        {
+            CancelObservationToken = canceled,
+            ThrowOnEventStoreStart = true,
+        };
+        LiveContinuityDrillScenarioRunner runner = new(operations, Options());
+
+        AggregateException thrown = await Should.ThrowAsync<AggregateException>(() => runner.RunAsync(
+            ContinuityDrillScenarios.EventStoreOutage,
+            Tenant,
+            Correlation,
+            canceled.Token).AsTask());
+
+        thrown.InnerExceptions.ShouldContain(static ex => ex is OperationCanceledException);
+        thrown.InnerExceptions.ShouldContain(static ex => ex is InvalidOperationException);
+        operations.Calls.ShouldContain("cleanup-eventstore");
+    }
+
+    [Fact]
+    public async Task SubSecondReversedRtoBoundsClampToZero()
+    {
+        RecordingOperations operations = new()
+        {
+            FaultObservedAt = Started + TimeSpan.FromMinutes(1),
+            RecoveredAt = Started + TimeSpan.FromMinutes(1) - TimeSpan.FromMilliseconds(500),
+        };
+        LiveContinuityDrillScenarioRunner runner = new(operations, Options());
+
+        ContinuityDrillMeasurement measurement = await runner.RunAsync(
+            ContinuityDrillScenarios.EventStoreOutage,
+            Tenant,
+            Correlation,
+            TestContext.Current.CancellationToken);
+
+        measurement.MeasuredRto.ShouldBe(TimeSpan.Zero);
+    }
+
+    [Fact]
+    public async Task LargerReversedRtoBoundsStayUnmeasurable()
+    {
+        RecordingOperations operations = new()
+        {
+            FaultObservedAt = Started + TimeSpan.FromMinutes(1),
+            RecoveredAt = Started + TimeSpan.FromMinutes(1) - TimeSpan.FromSeconds(2),
+        };
+        LiveContinuityDrillScenarioRunner runner = new(operations, Options());
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() => runner.RunAsync(
+            ContinuityDrillScenarios.EventStoreOutage,
+            Tenant,
+            Correlation,
+            TestContext.Current.CancellationToken).AsTask());
+
+        thrown.Message.ShouldContain("reversed");
     }
 
     [Fact]
@@ -250,18 +318,24 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
             RestorationTimeout = TimeSpan.FromSeconds(5),
             WorkflowTimeout = TimeSpan.FromHours(5),
             EvidenceDirectory = Path.GetFullPath("TestResults/live-recovery"),
-            EvidenceLocator = "artifact:live-recovery-validation",
+            EvidenceLocator = "artifact:live-recovery-validation-evidence",
         };
 
     private sealed class RecordingOperations : IRecoverySandboxOperations
     {
         public List<string> Calls { get; } = [];
         public bool ThrowOnEventStoreStop { get; init; }
+        public bool ThrowOnEventStoreStart { get; init; }
         public bool ThrowOnExpireSubscription { get; init; }
         public bool ThrowOnEventStoreCleanup { get; init; }
         public CancellationTokenSource? CancelObservationToken { get; init; }
         public int EventStoreReconstructableCount { get; init; } = 1;
         public bool SubscriptionNoSilentLoss { get; init; } = true;
+        public DateTimeOffset? FaultObservedAt { get; init; }
+        public DateTimeOffset? RecoveredAt { get; init; }
+        public bool? StartEventStoreTokenWasCanceled { get; private set; }
+        public bool? WaitEventStoreTokenWasCanceled { get; private set; }
+        public bool? CleanupEventStoreTokenWasCanceled { get; private set; }
         public DateTimeOffset UtcNow => Started;
 
         public ValueTask<RecoveryOperationCheckpoint> SeedCommittedOperationAsync(string tenantRef, string correlationId, CancellationToken cancellationToken)
@@ -290,25 +364,32 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
-            return ValueTask.FromResult(new RecoveryFaultObservation(Started + TimeSpan.FromMinutes(1), "eventstore-unavailable"));
+            return ValueTask.FromResult(new RecoveryFaultObservation(
+                FaultObservedAt ?? Started + TimeSpan.FromMinutes(1),
+                "eventstore-unavailable"));
         }
 
         public ValueTask StartEventStoreAsync(CancellationToken cancellationToken)
         {
             Calls.Add("start-eventstore");
-            return ValueTask.CompletedTask;
+            StartEventStoreTokenWasCanceled = cancellationToken.IsCancellationRequested;
+            return ThrowOnEventStoreStart
+                ? ValueTask.FromException(new InvalidOperationException("start failed"))
+                : ValueTask.CompletedTask;
         }
 
         public ValueTask<DateTimeOffset> WaitForEventStoreRecoveryAsync(CancellationToken cancellationToken)
         {
             Calls.Add("wait-eventstore");
-            return ValueTask.FromResult(Started + TimeSpan.FromMinutes(3));
+            WaitEventStoreTokenWasCanceled = cancellationToken.IsCancellationRequested;
+            return ValueTask.FromResult(RecoveredAt ?? Started + TimeSpan.FromMinutes(3));
         }
 
         public ValueTask<RecoveryEventStoreEndState> ReadEventStoreEndStateAsync(RecoveryOperationCheckpoint checkpoint, CancellationToken cancellationToken)
         {
             Calls.Add("read-eventstore");
             return ValueTask.FromResult(new RecoveryEventStoreEndState(
+                RecoveredAt ?? Started + TimeSpan.FromMinutes(3),
                 EventStoreReconstructableCount,
                 TenantIsolationPreserved: true,
                 UnauthorizedMutationAbsent: true));
@@ -317,6 +398,7 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
         public ValueTask<bool> CleanupEventStoreScenarioAsync(CancellationToken cancellationToken)
         {
             Calls.Add("cleanup-eventstore");
+            CleanupEventStoreTokenWasCanceled = cancellationToken.IsCancellationRequested;
             return ThrowOnEventStoreCleanup
                 ? ValueTask.FromException<bool>(new InvalidOperationException("cleanup failed"))
                 : ValueTask.FromResult(true);

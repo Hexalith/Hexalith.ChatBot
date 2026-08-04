@@ -164,10 +164,22 @@ internal sealed class LiveRecoveryValidationOptions
         // rule read as "the lane can measure through the recovery target" while being arithmetically unsatisfiable;
         // RestorationTimeout, published per manifest as MeasurableRecoveryCeilingSeconds, is the honest statement of
         // what the lane can actually measure, and the gate discloses any target above it as a claim limitation.
-        if (PerScenarioTimeout > MaximumTimeSpan / MinimumSweepScenarioCount ||
-            WorkflowTimeout < (PerScenarioTimeout * MinimumSweepScenarioCount) + TopologyMargin)
+        if (PerScenarioTimeout > MaximumTimeSpan / MinimumSweepScenarioCount)
         {
             return $"{nameof(WorkflowTimeout)} must cover {MinimumSweepScenarioCount} serial {nameof(PerScenarioTimeout)} budgets plus topology startup and cleanup margin.";
+        }
+
+        try
+        {
+            TimeSpan serialBudget = (PerScenarioTimeout * MinimumSweepScenarioCount) + TopologyMargin;
+            if (WorkflowTimeout < serialBudget)
+            {
+                return $"{nameof(WorkflowTimeout)} must cover {MinimumSweepScenarioCount} serial {nameof(PerScenarioTimeout)} budgets plus topology startup and cleanup margin.";
+            }
+        }
+        catch (OverflowException)
+        {
+            return $"{nameof(WorkflowTimeout)} serial budget overflows {nameof(TimeSpan)}.";
         }
 
         if (MaximumEvidenceAge < Cadence)

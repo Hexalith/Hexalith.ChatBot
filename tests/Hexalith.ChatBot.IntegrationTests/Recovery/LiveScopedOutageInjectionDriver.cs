@@ -183,6 +183,8 @@ internal sealed class LiveScopedOutageInjectionDriver(
 
     private static Exception PreserveCancellationOrWrap(Exception failure, string message)
     {
+        // Align with continuity Decision 1 option 3: bare cancel only when restore/cleanup did not also fail.
+        // An Aggregate that mixes OCE with a restore/cleanup failure is a scenario failure (not clean cancel).
         if (failure is OperationCanceledException canceled)
         {
             return canceled;

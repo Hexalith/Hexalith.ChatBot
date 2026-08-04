@@ -64,12 +64,12 @@ internal static class RecoveryAccessTokenProvider
         using FormUrlEncodedContent form = new(fields);
         string formBody = await form.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         Stopwatch timer = Stopwatch.StartNew();
+        using HttpClient client = new() { BaseAddress = security, Timeout = TimeSpan.FromSeconds(15) };
         while (timer.Elapsed < TimeSpan.FromMinutes(3))
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                using HttpClient client = new() { BaseAddress = security, Timeout = TimeSpan.FromSeconds(15) };
                 using StringContent content = new(formBody, Encoding.UTF8, "application/x-www-form-urlencoded");
                 using HttpResponseMessage response = await client
                     .PostAsync("/realms/hexalith/protocol/openid-connect/token", content, cancellationToken)
@@ -95,7 +95,7 @@ internal static class RecoveryAccessTokenProvider
                         // Missing access_token while the realm is still settling; retry within the bound.
                     }
                 }
-                else if ((int)response.StatusCode < 500 && response.StatusCode != HttpStatusCode.TooManyRequests)
+                else if (!IsRetryableStatus(response.StatusCode))
                 {
                     throw new InvalidOperationException("Keycloak rejected a dedicated recovery identity.");
                 }
@@ -114,4 +114,8 @@ internal static class RecoveryAccessTokenProvider
 
         throw new TimeoutException("Keycloak did not issue a dedicated recovery bearer before the deadline.");
     }
+
+    internal static bool IsRetryableStatus(HttpStatusCode statusCode)
+        => statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests ||
+            (int)statusCode >= 500;
 }

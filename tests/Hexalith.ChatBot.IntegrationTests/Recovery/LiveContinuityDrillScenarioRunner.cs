@@ -63,7 +63,7 @@ internal sealed class LiveContinuityDrillScenarioRunner(
                 .SeedCommittedOperationAsync(tenantRef, correlationId, cancellationToken)
                 .ConfigureAwait(false);
             RecoveryFaultObservation? observation = null;
-            DateTimeOffset recoveredAtUtc = default;
+            DateTimeOffset listenerReadyAtUtc = default;
             Exception? injectionFailure = null;
             Exception? restorationFailure = null;
             try
@@ -86,7 +86,7 @@ internal sealed class LiveContinuityDrillScenarioRunner(
                 {
                     using CancellationTokenSource restoration = new(options.RestorationTimeout);
                     await operations.StartEventStoreAsync(restoration.Token).ConfigureAwait(false);
-                    recoveredAtUtc = await operations.WaitForEventStoreRecoveryAsync(restoration.Token).ConfigureAwait(false);
+                    listenerReadyAtUtc = await operations.WaitForEventStoreRecoveryAsync(restoration.Token).ConfigureAwait(false);
                     restorationSucceeded = true;
                 }
                 catch (Exception failure)
@@ -108,6 +108,7 @@ internal sealed class LiveContinuityDrillScenarioRunner(
             RecoveryEventStoreEndState endState = await operations
                 .ReadEventStoreEndStateAsync(checkpoint, cancellationToken)
                 .ConfigureAwait(false);
+            DateTimeOffset recoveredAtUtc = endState.RecoveredAtUtc;
             bool dataLossDetected = endState.ReconstructableCommittedCount != checkpoint.CommittedCount ||
                 !endState.TenantIsolationPreserved ||
                 !endState.UnauthorizedMutationAbsent;
@@ -126,8 +127,8 @@ internal sealed class LiveContinuityDrillScenarioRunner(
                 new RecoveryValidationExecutionAssertions(
                     CleanupComplete: false, // patched below with the cleanup step's real, independently observed outcome
                     FaultObserved: true,
-                    RecoveryObserved: recoveredAtUtc != default,
-                    IndependentControlSucceeded: endState.TenantIsolationPreserved,
+                    RecoveryObserved: listenerReadyAtUtc != default && recoveredAtUtc != default,
+                    IndependentControlSucceeded: false, // not observed — do not alias to tenant isolation
                     TenantIsolationPreserved: endState.TenantIsolationPreserved,
                     UnauthorizedMutationAbsent: endState.UnauthorizedMutationAbsent,
                     StateReconstructable: endState.ReconstructableCommittedCount == checkpoint.CommittedCount,
@@ -233,7 +234,7 @@ internal sealed class LiveContinuityDrillScenarioRunner(
                     CleanupComplete: false, // patched below with the cleanup step's real, independently observed outcome
                     FaultObserved: true,
                     RecoveryObserved: endState.DeliveredCount > 0,
-                    IndependentControlSucceeded: endState.TenantIsolationPreserved,
+                    IndependentControlSucceeded: false, // not observed — do not alias to tenant isolation
                     TenantIsolationPreserved: endState.TenantIsolationPreserved,
                     UnauthorizedMutationAbsent: endState.UnauthorizedMutationAbsent,
                     StateReconstructable: endState.NoSilentLoss && endState.NoDuplicateSideEffects,
@@ -277,9 +278,9 @@ internal sealed class LiveContinuityDrillScenarioRunner(
 
     private static Exception Combine(string stage, Exception? injectionFailure, Exception? restorationFailure)
     {
-        // Cancellation must stay cancellation. Prefer bare OperationCanceledException whenever injection was canceled,
-        // even if restoration also failed — otherwise the coordinator cannot distinguish cancel from scenario failure.
-        if (injectionFailure is OperationCanceledException canceled)
+        // Decision 1 option 3 (2026-08-04): bare OCE only when restore succeeded. A failed restore after cancel is a
+        // scenario failure — Capturing must record it and the sweep must not treat a stopped EventStore as clean cancel.
+        if (injectionFailure is OperationCanceledException canceled && restorationFailure is null)
         {
             return canceled;
         }

@@ -61,7 +61,8 @@ public static class LiveRecoveryValidationArchitectureTests
             maximumEvidenceAge: TimeSpan.FromDays(8),
             expectedDatasetVersion: null,
             minimumDatasetVolume: 6,
-            maximumMeasurableRecoveryCeilingSeconds: 180));
+            maximumMeasurableRecoveryCeilingSeconds: 180,
+            requiredRepositoryCommit: new string('a', 40)));
         _ = Should.Throw<ArgumentOutOfRangeException>(() => LiveRecoveryValidationGatePolicy.ForRelease(
             ["recovery-baseline"],
             targetDeviationsBlockRelease: true,
@@ -69,7 +70,17 @@ public static class LiveRecoveryValidationArchitectureTests
             maximumEvidenceAge: TimeSpan.FromDays(8),
             expectedDatasetVersion: "v1",
             minimumDatasetVolume: 0,
-            maximumMeasurableRecoveryCeilingSeconds: 180));
+            maximumMeasurableRecoveryCeilingSeconds: 180,
+            requiredRepositoryCommit: new string('a', 40)));
+        _ = Should.Throw<ArgumentException>(() => LiveRecoveryValidationGatePolicy.ForRelease(
+            ["recovery-baseline"],
+            targetDeviationsBlockRelease: true,
+            requiredDriverMode: RecoveryValidationEvidenceManifest.LiveDriverMode,
+            maximumEvidenceAge: TimeSpan.FromDays(8),
+            expectedDatasetVersion: "v1",
+            minimumDatasetVolume: 6,
+            maximumMeasurableRecoveryCeilingSeconds: 180,
+            requiredRepositoryCommit: null));
     }
 
     [Fact]

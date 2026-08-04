@@ -24,7 +24,10 @@ using Shouldly;
 
 namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 
-/// <summary>Tier-3 proof for both mandatory continuity scenarios through their existing coordinator.</summary>
+/// <summary>
+/// Tier-3 proof that continuity, projection-rebuild, and scoped-outage coordinators run live fault injection and pass
+/// the evidence gate.
+/// </summary>
 [Trait("Category", "E2E")]
 [Collection(LiveRecoveryValidationCollection.Name)]
 public sealed class LiveContinuityAspireE2eTests
@@ -92,6 +95,10 @@ public sealed class LiveContinuityAspireE2eTests
         }));
 
         DistributedApplication application = await builder.BuildAsync(cancellationToken).ConfigureAwait(true);
+        IReadOnlyList<string>? rebuildFreshKeys = null;
+        IReadModelConditionalEraser? rebuildEraser = null;
+        TimeSpan rebuildEraseTimeout = TimeSpan.FromMinutes(3);
+        string? freshPartitionTenant = null;
         try
         {
             using CancellationTokenSource startup = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -110,11 +117,13 @@ public sealed class LiveContinuityAspireE2eTests
                 .AcquireControlAsync(application, startup.Token)
                 .ConfigureAwait(true);
             await AssertMailboxTokenAdmissionAsync(application, mailboxAccessToken, startup.Token).ConfigureAwait(true);
+            await AssertInvalidMailboxBearerIsRejectedBeforeAdmissionAsync(application, startup.Token).ConfigureAwait(true);
             using DaprClient recoveryDaprClient = new DaprClientBuilder()
                 .UseGrpcEndpoint(application.GetEndpoint("chatbot-dapr-cli", "grpc").ToString())
                 .UseHttpEndpoint(application.GetEndpoint("chatbot-dapr-cli", "http").ToString())
                 .Build();
             DaprReadModelStore recoveryReadModels = new(recoveryDaprClient);
+            rebuildEraser = recoveryReadModels;
             using EventStoreDurableStateProbe durableState = new(
                 application.GetEndpoint("eventstore-dapr-cli", "http"));
             string evidenceDirectory = Path.Combine(RepositoryRoot(), "TestResults", "live-recovery", runId);
@@ -141,6 +150,7 @@ public sealed class LiveContinuityAspireE2eTests
                 EvidenceLocator = EvidenceArtifactLocator(),
             };
             options.Validate().ShouldBeNull();
+            rebuildEraseTimeout = options.RestorationTimeout;
 
             // Enforce the configured WorkflowTimeout in-process. Without it the only real bound was the GitHub
             // `timeout-minutes: 330`, so a hung scenario was killed by the runner mid-injection with no `finally`
@@ -178,11 +188,6 @@ public sealed class LiveContinuityAspireE2eTests
                 throw new AggregateException("Live continuity validation produced unmeasurable scenario failures.", runner.Failures);
             }
 
-            outcome.ScenariosRun.ShouldBe(ContinuityDrillScenarios.All.Count);
-            outcome.Unmeasurable.ShouldBe(0);
-            (outcome.Met + outcome.Missed).ShouldBe(ContinuityDrillScenarios.All.Count);
-            outcome.Alerted.ShouldBe(outcome.Missed);
-
             RecoveryValidationDataset validationDataset = RecoveryValidationDataset.Load(
                 Path.Combine(
                     RepositoryRoot(),
@@ -212,6 +217,14 @@ public sealed class LiveContinuityAspireE2eTests
                 validationDataset.SourceRecords,
                 worm.EnumerateChain(tenantRef),
                 workflowToken).ConfigureAwait(true);
+            freshPartitionTenant = LiveProjectionRebuildDriver.FreshPartitionTenant(
+                tenantRef,
+                options.ValidationPartitionRef,
+                runId);
+            rebuildFreshKeys = LiveProjectionRebuildDriver.ProjectionKeys(
+                freshPartitionTenant,
+                validationDataset.SourceRecords,
+                worm.EnumerateChain(tenantRef).ToArray());
             LiveProjectionRebuildDriver rebuildDriver = new(
                 validationDataset.SourceRecords,
                 worm,
@@ -220,8 +233,9 @@ public sealed class LiveContinuityAspireE2eTests
                 dataset,
                 options,
                 new SystemClock());
+            CapturingProjectionRebuildDriver capturingRebuildDriver = new(rebuildDriver);
             ProjectionRebuildValidationCoordinator rebuildCoordinator = new(
-                rebuildDriver,
+                capturingRebuildDriver,
                 audit,
                 alerts,
                 new SystemClock(),
@@ -231,12 +245,12 @@ public sealed class LiveContinuityAspireE2eTests
                 .RunAllAsync(tenantRef, [options.DatasetRef], runId, workflowToken)
                 .ConfigureAwait(true);
 
-            rebuildOutcome.TenantsValidated.ShouldBe(1);
-            rebuildOutcome.Equivalent.ShouldBe(1);
-            rebuildOutcome.Divergent.ShouldBe(0);
-            rebuildOutcome.DurationExceeded.ShouldBe(0);
-            rebuildOutcome.Unmeasurable.ShouldBe(0);
-            rebuildOutcome.Alerted.ShouldBe(0);
+            if (capturingRebuildDriver.Failures.Count > 0)
+            {
+                throw new AggregateException(
+                    "Live projection-rebuild validation produced unmeasurable scenario failures.",
+                    capturingRebuildDriver.Failures);
+            }
 
             AspireScopedOutageOperations scopedOperations = new(
                 application,
@@ -267,7 +281,6 @@ public sealed class LiveContinuityAspireE2eTests
                     scopedDriver.Failures.Values);
             }
 
-            scopedOutcome.ScenariosValidated.ShouldBe(ScopedOutageDependencies.All.Count);
             int expectedEvidence = ContinuityDrillScenarios.All.Count + 1 + ScopedOutageDependencies.All.Count;
 
             // The sinks' failure path writes a SECOND report+manifest pair for a substituted Unmeasurable report, so an
@@ -297,18 +310,25 @@ public sealed class LiveContinuityAspireE2eTests
             DateTimeOffset attemptCompletedAtUtc = DateTimeOffset.UtcNow;
 
             // Derived from what the run actually produced, not asserted. This field is the one the gate branches on
-            // first, so hand-setting it to true meant the gate was handed its own answer.
+            // first, so hand-setting it to true meant the gate was handed its own answer. Continuity Missed and
+            // rebuild equivalence are part of success — not only Unmeasurable/Contained tallies.
             bool attemptSucceeded =
                 runner.Failures.Count == 0 &&
+                capturingRebuildDriver.Failures.Count == 0 &&
                 scopedDriver.Failures.Count == 0 &&
                 outcome.Unmeasurable == 0 &&
+                outcome.Missed == 0 &&
+                outcome.Met == ContinuityDrillScenarios.All.Count &&
                 rebuildOutcome.Unmeasurable == 0 &&
+                rebuildOutcome.Equivalent == 1 &&
+                rebuildOutcome.Divergent == 0 &&
+                rebuildOutcome.DurationExceeded == 0 &&
                 scopedOutcome.Unmeasurable == 0 &&
                 scopedOutcome.Contained == ScopedOutageDependencies.All.Count &&
                 scopedOutcome.Breached == 0 &&
                 scopedOutcome.ScopeRecordingExceeded == 0 &&
                 scopedOutcome.Alerted == 0 &&
-                manifestFiles.Length == expectedEvidence;
+                manifestFiles.Length >= expectedEvidence;
 
             Dictionary<string, int> alertsDeliveredByJob = new(StringComparer.Ordinal)
             {
@@ -323,7 +343,7 @@ public sealed class LiveContinuityAspireE2eTests
             // Enabled mirrors the configured option rather than a literal, and the summary is written BEFORE the
             // outcome assertions below: hand-setting it to true, then only reaching the write on a fully passing run,
             // made the gate's `live_validation_disabled` and `latest_attempt_incomplete` branches unreachable from any
-            // real artifact. A breached sweep must still retain a summary saying so.
+            // real artifact. A breached/missed/divergent sweep must still retain a summary saying so.
             LiveRecoveryValidationAttemptSummary summary = new()
             {
                 Enabled = options.Enabled,
@@ -339,8 +359,20 @@ public sealed class LiveContinuityAspireE2eTests
                     cancellationToken)
                 .ConfigureAwait(true);
 
-            // Asserted only after the summary is durable, so a breached sweep still leaves retained evidence for the
-            // independent gate to reject rather than failing here with nothing written.
+            // Asserted only after the summary is durable, so a breached/missed/divergent sweep still leaves retained
+            // evidence for the independent gate to reject rather than failing here with nothing written.
+            outcome.ScenariosRun.ShouldBe(ContinuityDrillScenarios.All.Count);
+            outcome.Unmeasurable.ShouldBe(0);
+            outcome.Missed.ShouldBe(0);
+            outcome.Met.ShouldBe(ContinuityDrillScenarios.All.Count);
+            outcome.Alerted.ShouldBe(0);
+            rebuildOutcome.TenantsValidated.ShouldBe(1);
+            rebuildOutcome.Equivalent.ShouldBe(1);
+            rebuildOutcome.Divergent.ShouldBe(0);
+            rebuildOutcome.DurationExceeded.ShouldBe(0);
+            rebuildOutcome.Unmeasurable.ShouldBe(0);
+            rebuildOutcome.Alerted.ShouldBe(0);
+            scopedOutcome.ScenariosValidated.ShouldBe(ScopedOutageDependencies.All.Count);
             scopedOutcome.Contained.ShouldBe(ScopedOutageDependencies.All.Count);
             scopedOutcome.Breached.ShouldBe(0);
             scopedOutcome.ScopeRecordingExceeded.ShouldBe(0);
@@ -379,6 +411,27 @@ public sealed class LiveContinuityAspireE2eTests
         }
         finally
         {
+            // Decision 2 option 1: Task 4 may have left failed-partition keys; erase after evidence capture attempt.
+            if (rebuildEraser is not null && rebuildFreshKeys is { Count: > 0 })
+            {
+                try
+                {
+                    await LiveProjectionRebuildDriver
+                        .ErasePartitionAsync(rebuildEraser, rebuildFreshKeys, rebuildEraseTimeout)
+                        .ConfigureAwait(true);
+                }
+                catch (Exception exception)
+                {
+                    // Prefer disposing the topology; stranded keys are still better than blocking teardown. Log
+                    // rather than silently discard: a repeated failure here is exactly the "stranded fresh-partition
+                    // keys poison later runs" scenario this compensating erase exists to prevent, and nothing else
+                    // connects a later poisoned run back to this cause.
+                    Console.Error.WriteLine(
+                        $"Post-rebuild compensating erase failed for run '{runId}', partition '{freshPartitionTenant}' " +
+                        $"({rebuildFreshKeys.Count} keys): {exception}");
+                }
+            }
+
             await application.DisposeAsync().ConfigureAwait(true);
         }
     }
@@ -392,7 +445,14 @@ public sealed class LiveContinuityAspireE2eTests
     private static string EvidenceArtifactLocator()
     {
         string? configured = Environment.GetEnvironmentVariable("HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT");
-        return $"artifact:{(string.IsNullOrWhiteSpace(configured) ? "live-recovery-validation-evidence" : configured.Trim())}";
+        string locator = $"artifact:{(string.IsNullOrWhiteSpace(configured) ? "live-recovery-validation-evidence" : configured.Trim())}";
+        if (!RecoveryValidationEvidenceManifest.IsSafeArtifactLocator(locator))
+        {
+            throw new InvalidOperationException(
+                "HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT is not a safe artifact locator.");
+        }
+
+        return locator;
     }
 
     private static void RequireTier3Runtime()
@@ -419,9 +479,19 @@ public sealed class LiveContinuityAspireE2eTests
                 RedirectStandardError = true,
                 UseShellExecute = false,
             });
-            if (process is null || !process.WaitForExit(10_000))
+            if (process is null)
             {
-                process?.Kill(entireProcessTree: true);
+                return false;
+            }
+
+            // Drain both streams concurrently: reading them sequentially can deadlock if the un-drained stream fills
+            // its OS pipe buffer before the process closes the stream being read first.
+            Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();
+            Task<string> stderrTask = process.StandardError.ReadToEndAsync();
+            Task.WaitAll(stdoutTask, stderrTask);
+            if (!process.WaitForExit(10_000))
+            {
+                process.Kill(entireProcessTree: true);
                 return false;
             }
 
@@ -455,10 +525,15 @@ public sealed class LiveContinuityAspireE2eTests
                 RedirectStandardError = true,
                 UseShellExecute = false,
             });
-            if (process is not null && process.WaitForExit(10_000) && process.ExitCode == 0)
+            if (process is not null)
             {
-                string head = process.StandardOutput.ReadToEnd().Trim();
-                if (AuditMetadata.IsSafeStableIdentifier(head))
+                // Drain both streams concurrently — see CommandSucceeds for why sequential ReadToEnd can deadlock.
+                Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();
+                Task<string> stderrTask = process.StandardError.ReadToEndAsync();
+                Task.WaitAll(stdoutTask, stderrTask);
+                string head = stdoutTask.Result.Trim();
+                if (process.WaitForExit(10_000) && process.ExitCode == 0 &&
+                    AuditMetadata.IsSafeStableIdentifier(head))
                 {
                     return head;
                 }
@@ -519,13 +594,22 @@ public sealed class LiveContinuityAspireE2eTests
             RedirectStandardError = true,
             UseShellExecute = false,
         });
-        if (process is null || !process.WaitForExit(10_000) || process.ExitCode != 0)
+        if (process is null)
         {
             throw new InvalidOperationException("The DAPR runtime version could not be resolved for live evidence.");
         }
 
-        string? runtimeLine = process.StandardOutput
-            .ReadToEnd()
+        // Drain both streams concurrently — see CommandSucceeds for why sequential ReadToEnd can deadlock.
+        Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();
+        Task<string> stderrTask = process.StandardError.ReadToEndAsync();
+        Task.WaitAll(stdoutTask, stderrTask);
+        string stdout = stdoutTask.Result;
+        if (!process.WaitForExit(10_000) || process.ExitCode != 0)
+        {
+            throw new InvalidOperationException("The DAPR runtime version could not be resolved for live evidence.");
+        }
+
+        string? runtimeLine = stdout
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .SingleOrDefault(line => line.StartsWith("Runtime version:", StringComparison.OrdinalIgnoreCase));
         string runtimeVersion = runtimeLine?["Runtime version:".Length..].Trim() ?? string.Empty;
@@ -547,8 +631,9 @@ public sealed class LiveContinuityAspireE2eTests
         CancellationToken cancellationToken)
     {
         using HttpClient client = application.CreateHttpClient("chatbot");
+        // Deliberately invalid after admission: IntakeId is not a ULID. Auth must pass; the command must not Accepted.
         string body = $$"""
-            {"commandId":"{{ChatBotCommandId.New().Value}}","commandType":"CaptureMailboxMessageIntake","command":{},"origin":"mailbox","requestSchemaVersion":"v1"}
+            {"commandId":"{{ChatBotCommandId.New().Value}}","commandType":"CaptureMailboxMessageIntake","command":{"intakeId":"not-a-ulid","source":{"providerMessageId":"probe","mailboxId":"probe","receivedAtUtc":"2026-08-01T00:00:00Z"},"recipients":[],"attachments":[]},"origin":"mailbox","requestSchemaVersion":"v1"}
             """;
         using HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands")
         {
@@ -558,15 +643,43 @@ public sealed class LiveContinuityAspireE2eTests
         request.Headers.Add("X-Correlation-Id", ChatBotCorrelationId.New().Value);
         using HttpResponseMessage response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
-        // The empty command body may legitimately be rejected on validation grounds after admission; what must NOT
-        // happen is a credential rejection — and a 5xx/timeout/"success" that never reached auth must not count either.
+        // Decision 3 option 1: only post-admission validation failures prove admission without enqueueing work.
         if (response.StatusCode is not (
             HttpStatusCode.BadRequest or
-            HttpStatusCode.UnprocessableEntity or
-            HttpStatusCode.Accepted))
+            HttpStatusCode.UnprocessableEntity))
         {
             throw new InvalidOperationException(
                 $"The recovery mailbox admission probe returned an unexpected status {(int)response.StatusCode}.");
+        }
+    }
+
+    /// <summary>
+    /// Companion to <see cref="AssertMailboxTokenAdmissionAsync"/>: proves the auth-before-validation pipeline
+    /// ordering that probe's own <c>400</c>/<c>422</c> expectation depends on, by sending the identical
+    /// post-admission-invalid payload with no bearer at all and requiring the auth boundary — not the same
+    /// validation failure — to reject it first.
+    /// </summary>
+    private static async Task AssertInvalidMailboxBearerIsRejectedBeforeAdmissionAsync(
+        DistributedApplication application,
+        CancellationToken cancellationToken)
+    {
+        using HttpClient client = application.CreateHttpClient("chatbot");
+        string body = $$"""
+            {"commandId":"{{ChatBotCommandId.New().Value}}","commandType":"CaptureMailboxMessageIntake","command":{"intakeId":"not-a-ulid","source":{"providerMessageId":"probe","mailboxId":"probe","receivedAtUtc":"2026-08-01T00:00:00Z"},"recipients":[],"attachments":[]},"origin":"mailbox","requestSchemaVersion":"v1"}
+            """;
+        using HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands")
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "not-a-real-token");
+        request.Headers.Add("X-Correlation-Id", ChatBotCorrelationId.New().Value);
+        using HttpResponseMessage response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+        if (response.StatusCode != HttpStatusCode.Unauthorized)
+        {
+            throw new InvalidOperationException(
+                $"An invalid mailbox bearer returned {(int)response.StatusCode} instead of 401 — the sibling admission " +
+                "probe's 400/422 expectation would not prove auth ran first.");
         }
     }
 

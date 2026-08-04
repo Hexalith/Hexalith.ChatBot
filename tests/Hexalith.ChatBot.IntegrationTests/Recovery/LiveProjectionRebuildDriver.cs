@@ -154,7 +154,7 @@ internal sealed class LiveProjectionRebuildDriver(
                     StateReconstructable: sourcesEquivalent,
                     // Honest for the source path: rebuild uses only immutableSourceRecords + AssociationProjectionHandler.
                     ImmutableSourceOnly: true,
-                    MailboxReingestionAbsent: true));
+                    MailboxReingestionAbsent: false)); // not observed — do not fabricate mailbox absence
         }
         catch (Exception exception)
         {
@@ -163,6 +163,7 @@ internal sealed class LiveProjectionRebuildDriver(
         }
 
         // Task 4: do not destroy failed-partition evidence before capture. Skip erase when rebuild failed.
+        // The Aspire E2E owns post-capture compensating erase (Decision 2 option 1).
         if (primaryFailure is not null)
         {
             ExceptionDispatchInfo.Capture(primaryFailure).Throw();
@@ -172,7 +173,7 @@ internal sealed class LiveProjectionRebuildDriver(
         bool cleanupComplete = false;
         try
         {
-            await CleanupPartitionAsync(readModelEraser, freshKeys, options.RestorationTimeout)
+            await ErasePartitionAsync(readModelEraser, freshKeys, options.RestorationTimeout)
                 .ConfigureAwait(false);
             cleanupComplete = true;
         }
@@ -456,7 +457,8 @@ internal sealed class LiveProjectionRebuildDriver(
             record.Envelope.Timestamp);
     }
 
-    private static IReadOnlyList<string> ProjectionKeys(
+    /// <summary>Builds the persisted keys for a rebuild or baseline partition (shared with the Aspire E2E cleanup).</summary>
+    internal static IReadOnlyList<string> ProjectionKeys(
         string partitionTenant,
         IReadOnlyList<ProjectConversationSourceEmailView> sources,
         IReadOnlyList<WormAuditChainRecord> auditRecords)
@@ -466,24 +468,15 @@ internal sealed class LiveProjectionRebuildDriver(
             .. auditRecords.Select(record => GovernedOperationView.KeyFor(partitionTenant, record.Envelope.ResourceId)),
         ];
 
-    private static async Task AssertPartitionAbsentAsync(
-        IReadModelConditionalEraser eraser,
-        IReadOnlyList<string> keys,
-        CancellationToken cancellationToken)
-    {
-        foreach (string key in keys)
-        {
-            (bool present, _) = await eraser
-                .TryReadEtagAsync(ChatBotReadModelStoreNames.StateStoreName, key, cancellationToken)
-                .ConfigureAwait(false);
-            if (present)
-            {
-                throw new InvalidOperationException("The fresh projection rebuild partition was not empty before execution.");
-            }
-        }
-    }
+    /// <summary>Fresh-partition tenant label used by the live rebuild driver and post-capture E2E erase.</summary>
+    internal static string FreshPartitionTenant(string testTenantRef, string validationPartitionRef, string correlationId)
+        => $"{testTenantRef}:rebuild:{validationPartitionRef}:{correlationId}";
 
-    private static async Task CleanupPartitionAsync(
+    /// <summary>
+    /// Erases a rebuild partition after evidence capture. Used by the success-path driver cleanup and by the Aspire
+    /// E2E compensating <c>finally</c> when Task 4 skipped erase on failure.
+    /// </summary>
+    internal static async Task ErasePartitionAsync(
         IReadModelConditionalEraser eraser,
         IReadOnlyList<string> keys,
         TimeSpan timeout)
@@ -514,11 +507,25 @@ internal sealed class LiveProjectionRebuildDriver(
         }
     }
 
+    private static async Task AssertPartitionAbsentAsync(
+        IReadModelConditionalEraser eraser,
+        IReadOnlyList<string> keys,
+        CancellationToken cancellationToken)
+    {
+        foreach (string key in keys)
+        {
+            (bool present, _) = await eraser
+                .TryReadEtagAsync(ChatBotReadModelStoreNames.StateStoreName, key, cancellationToken)
+                .ConfigureAwait(false);
+            if (present)
+            {
+                throw new InvalidOperationException("The fresh projection rebuild partition was not empty before execution.");
+            }
+        }
+    }
+
     private static string BaselinePartitionTenant(string testTenantRef, string validationPartitionRef)
         => $"{testTenantRef}:baseline:{validationPartitionRef}";
-
-    private static string FreshPartitionTenant(string testTenantRef, string validationPartitionRef, string correlationId)
-        => $"{testTenantRef}:rebuild:{validationPartitionRef}:{correlationId}";
 
     private static string Digest(params string[] values)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('|', values)))).ToLowerInvariant();

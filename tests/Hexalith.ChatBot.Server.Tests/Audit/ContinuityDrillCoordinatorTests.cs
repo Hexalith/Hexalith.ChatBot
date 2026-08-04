@@ -165,6 +165,9 @@ public sealed class ContinuityDrillCoordinatorTests
         outcome.Unmeasurable.ShouldBe(0); // the drills produced evidence (the release-gate dimension)
         outcome.Alerted.ShouldBe(1); // only the missed scenario fails-closed-audits-then-alerts
 
+        // Destructive sweep order is a contract: EventStore stop before M365 subscription fault.
+        runner.ScenariosSeen.ShouldBe(ContinuityDrillScenarios.SweepOrder);
+
         // No-production-mutation by construction: the runner was only ever invoked against the test tenant.
         runner.TenantsSeen.ShouldAllBe(tenant => ReplayTenantPolicy.IsTestTenant(tenant));
     }
@@ -195,10 +198,12 @@ public sealed class ContinuityDrillCoordinatorTests
     private sealed class SwitchingRunner : IContinuityDrillScenarioRunner
     {
         public List<string> TenantsSeen { get; } = [];
+        public List<string> ScenariosSeen { get; } = [];
 
         public ValueTask<ContinuityDrillMeasurement> RunAsync(string scenario, string testTenantRef, string correlationId, CancellationToken cancellationToken)
         {
             TenantsSeen.Add(testTenantRef);
+            ScenariosSeen.Add(scenario);
             bool miss = string.Equals(scenario, ContinuityDrillScenarios.M365SubscriptionFailure, StringComparison.Ordinal);
             TimeSpan rto = miss ? RecoveryTargets.MaxRto + TimeSpan.FromHours(1) : TimeSpan.FromHours(1);
             return ValueTask.FromResult(new ContinuityDrillMeasurement(Now, Now + rto, TimeSpan.FromMinutes(1), rto, false));

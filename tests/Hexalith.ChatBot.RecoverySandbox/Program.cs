@@ -118,6 +118,20 @@ app.MapPost(
             return Results.NotFound();
         }
 
+        string notificationPhase = request.Headers[RecoveryNotificationIdentity.HeaderName].ToString();
+        string notificationIdentity;
+        try
+        {
+            notificationIdentity = RecoveryNotificationIdentity.Compose(
+                providerMessageId,
+                scenarioLane,
+                notificationPhase);
+        }
+        catch (InvalidOperationException)
+        {
+            return Results.NotFound();
+        }
+
         HttpClient http = httpClientFactory.CreateClient("chatbot-forward");
         using (RecoveryBearerForwardingHandler.Use(bearer.Parameter))
         {
@@ -130,7 +144,7 @@ app.MapPost(
             MailboxIntakeWorkerResult result = await worker.ProcessAsync(
                 new GraphMailboxNotification(
                     AllowlistedMailboxId,
-                    $"{providerMessageId}-{scenarioLane}",
+                    notificationIdentity,
                     OpaqueProviderState: null),
                 cancellationToken: cancellationToken).ConfigureAwait(false);
             bool submitted = result.Kind == MailboxIntakeWorkerResultKind.Submitted;
@@ -281,4 +295,3 @@ app.MapPost(
     });
 
 app.Run();
-

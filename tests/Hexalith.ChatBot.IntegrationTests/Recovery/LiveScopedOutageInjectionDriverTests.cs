@@ -233,6 +233,77 @@ public sealed class LiveScopedOutageInjectionDriverTests
         operations.Faulted.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task CanceledObservationStillRestoresAndCleansOnIndependentTokens()
+    {
+        using CancellationTokenSource canceled = new();
+        RecordingOperations operations = new() { CancelObservationToken = canceled };
+        LiveScopedOutageInjectionDriver driver = new(operations, Options());
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(() => driver.InjectAndMeasureAsync(
+            ScopedOutageDependencies.AiProvider,
+            RecoveryValidationTopology.LogicalTenantRef,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            canceled.Token).AsTask());
+
+        operations.Restored.ShouldContain(ScopedOutageDependencies.AiProvider);
+        operations.Cleaned.ShouldContain(ScopedOutageDependencies.AiProvider);
+        operations.RestoreTokenWasCanceled.ShouldAllBe(static canceledToken => !canceledToken);
+        operations.CleanupTokenWasCanceled.ShouldAllBe(static canceledToken => !canceledToken);
+    }
+
+    [Fact]
+    public async Task CanceledObservationWithFailedRestoreIsScenarioFailureNotBareCancel()
+    {
+        using CancellationTokenSource canceled = new();
+        RecordingOperations operations = new()
+        {
+            CancelObservationToken = canceled,
+            FailRestoration = true,
+        };
+        LiveScopedOutageInjectionDriver driver = new(operations, Options());
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() => driver.InjectAndMeasureAsync(
+            ScopedOutageDependencies.AiProvider,
+            RecoveryValidationTopology.LogicalTenantRef,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            canceled.Token).AsTask());
+
+        thrown.ShouldNotBeOfType<OperationCanceledException>();
+        operations.Restored.ShouldContain(ScopedOutageDependencies.AiProvider);
+        operations.Cleaned.ShouldContain(ScopedOutageDependencies.AiProvider);
+    }
+
+    [Fact]
+    public async Task SubSecondReversedScopeRecordingLatencyClampsToZero()
+    {
+        RecordingOperations operations = new() { ScopeRecordingSkew = TimeSpan.FromMilliseconds(500) };
+        LiveScopedOutageInjectionDriver driver = new(operations, Options());
+
+        ScopedOutageDegradationMeasurement measurement = await driver.InjectAndMeasureAsync(
+            ScopedOutageDependencies.CommandExecution,
+            RecoveryValidationTopology.LogicalTenantRef,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken);
+
+        measurement.ScopeRecordingLatency.ShouldBe(TimeSpan.Zero);
+    }
+
+    [Fact]
+    public async Task LargerReversedScopeRecordingLatencyStaysUnmeasurable()
+    {
+        RecordingOperations operations = new() { ScopeRecordingSkew = TimeSpan.FromSeconds(2) };
+        LiveScopedOutageInjectionDriver driver = new(operations, Options());
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() => driver.InjectAndMeasureAsync(
+            ScopedOutageDependencies.CommandExecution,
+            RecoveryValidationTopology.LogicalTenantRef,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken).AsTask());
+
+        thrown.Message.ShouldContain("preceded");
+    }
+
     private static LiveRecoveryValidationOptions Options()
         => new()
         {
@@ -250,7 +321,7 @@ public sealed class LiveScopedOutageInjectionDriverTests
             RestorationTimeout = TimeSpan.FromSeconds(5),
             WorkflowTimeout = TimeSpan.FromHours(5),
             EvidenceDirectory = Path.GetFullPath("TestResults/live-recovery"),
-            EvidenceLocator = "artifact:live-recovery-validation",
+            EvidenceLocator = "artifact:live-recovery-validation-evidence",
         };
 
     private sealed class RecordingOperations : IScopedOutageSandboxOperations
@@ -265,6 +336,10 @@ public sealed class LiveScopedOutageInjectionDriverTests
 
         public List<string> Cleaned { get; } = [];
 
+        public List<bool> RestoreTokenWasCanceled { get; } = [];
+
+        public List<bool> CleanupTokenWasCanceled { get; } = [];
+
         public bool FailObservation { get; init; }
 
         public bool FailRestoration { get; init; }
@@ -276,6 +351,10 @@ public sealed class LiveScopedOutageInjectionDriverTests
         public bool AffectedOperationRecovered { get; init; } = true;
 
         public bool IndependentControlSucceeded { get; init; } = true;
+
+        public CancellationTokenSource? CancelObservationToken { get; init; }
+
+        public TimeSpan? ScopeRecordingSkew { get; init; }
 
         public DateTimeOffset UtcNow
         {
@@ -311,6 +390,12 @@ public sealed class LiveScopedOutageInjectionDriverTests
             string correlationId,
             CancellationToken cancellationToken)
         {
+            if (CancelObservationToken is not null)
+            {
+                CancelObservationToken.Cancel();
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             cancellationToken.ThrowIfCancellationRequested();
             if (FailObservation)
             {
@@ -318,9 +403,12 @@ public sealed class LiveScopedOutageInjectionDriverTests
             }
 
             DateTimeOffset observed = UtcNow;
+            DateTimeOffset recorded = ScopeRecordingSkew is { } skew
+                ? observed - skew
+                : observed + TimeSpan.FromMilliseconds(25);
             return ValueTask.FromResult(new ScopedOutageFaultObservation(
                 observed,
-                observed + TimeSpan.FromMilliseconds(25),
+                recorded,
                 ObservedScopeOverride ?? IndependentlyObservedScope(dependency),
                 IndependentControlSucceeded: IndependentControlSucceeded,
                 UnauthorizedMutationDetected: false));
@@ -345,7 +433,7 @@ public sealed class LiveScopedOutageInjectionDriverTests
 
         public ValueTask RestoreAsync(string dependency, string tenantRef, CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            RestoreTokenWasCanceled.Add(cancellationToken.IsCancellationRequested);
             Restored.Add(dependency);
             return FailRestoration
                 ? ValueTask.FromException(new InvalidOperationException("restore-failed"))
@@ -368,7 +456,7 @@ public sealed class LiveScopedOutageInjectionDriverTests
 
         public ValueTask<bool> CleanupAsync(string dependency, string tenantRef, CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            CleanupTokenWasCanceled.Add(cancellationToken.IsCancellationRequested);
             Cleaned.Add(dependency);
             return FailCleanup
                 ? ValueTask.FromException<bool>(new InvalidOperationException("cleanup-failed"))

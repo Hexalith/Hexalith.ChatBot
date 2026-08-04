@@ -207,6 +207,9 @@ public sealed class ScopedOutageDegradationValidationCoordinatorTests
         outcome.Unmeasurable.ShouldBe(1);
         outcome.Alerted.ShouldBe(3); // breached + slow + unmeasurable each fail-closed-audit-then-alert; the clean ones do not
 
+        // Destructive sweep order is a contract (Identity last so a mid-sweep identity fault cannot poison later controls).
+        driver.DependenciesSeen.ShouldBe(ScopedOutageDependencies.SweepOrder);
+
         // No-production-mutation by construction: the driver was only ever invoked against the test tenant.
         driver.TenantsSeen.ShouldAllBe(tenant => ReplayTenantPolicy.IsTestTenant(tenant));
     }
@@ -257,10 +260,12 @@ public sealed class ScopedOutageDegradationValidationCoordinatorTests
     private sealed class SwitchingDriver : IScopedOutageInjectionDriver
     {
         public List<string> TenantsSeen { get; } = [];
+        public List<string> DependenciesSeen { get; } = [];
 
         public ValueTask<ScopedOutageDegradationMeasurement> InjectAndMeasureAsync(string dependency, string testTenantRef, string correlationId, CancellationToken cancellationToken)
         {
             TenantsSeen.Add(testTenantRef);
+            DependenciesSeen.Add(dependency);
 
             if (string.Equals(dependency, ScopedOutageDependencies.AiProvider, StringComparison.Ordinal))
             {

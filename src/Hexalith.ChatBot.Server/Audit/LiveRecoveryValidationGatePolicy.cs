@@ -11,10 +11,11 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// </para>
 /// <para>
 /// <see cref="ForRelease"/> is the constructor a <b>REQUIRED/release</b> path must use: it fails fast when
-/// <see cref="ExpectedDatasetVersion"/>, <see cref="MinimumDatasetVolume"/>, or
-/// <see cref="MaximumMeasurableRecoveryCeilingSeconds"/> is left unpinned, because an unpinned anchor on a required
-/// gate run is a configuration mistake, not a legitimate choice. The record constructor's own unpinned-by-default
-/// parameters remain available for unit tests that deliberately exercise the unpinned branches.
+/// <see cref="ExpectedDatasetVersion"/>, <see cref="MinimumDatasetVolume"/>,
+/// <see cref="MaximumMeasurableRecoveryCeilingSeconds"/>, or <see cref="RequiredRepositoryCommit"/> is left unpinned,
+/// because an unpinned anchor on a required gate run is a configuration mistake, not a legitimate choice. The record
+/// constructor's own unpinned-by-default parameters remain available for unit tests that deliberately exercise the
+/// unpinned branches.
 /// </para>
 /// </summary>
 /// <param name="ConfiguredProjectionDatasets">The dataset refs the rebuild job must cover, from the release path.</param>
@@ -54,7 +55,7 @@ internal sealed record LiveRecoveryValidationGatePolicy(
     /// rather than a legitimate "leave it unpinned" choice. The record constructor's own defaults
     /// (<see langword="null"/>/<c>0</c>, meaning "unpinned") stay as-is for unit tests that deliberately exercise the
     /// unpinned branches; this factory instead fails fast so a release path can never silently construct a policy
-    /// that does not actually anchor dataset version or configured corpus volume.
+    /// that does not actually anchor dataset version, configured corpus volume, measurable ceiling, or repository commit.
     /// </summary>
     /// <param name="configuredProjectionDatasets">The dataset refs the rebuild job must cover.</param>
     /// <param name="targetDeviationsBlockRelease">Whether a measurable target miss blocks.</param>
@@ -63,9 +64,11 @@ internal sealed record LiveRecoveryValidationGatePolicy(
     /// <param name="expectedDatasetVersion">The dataset version the release path expects. Required (non-null/non-whitespace).</param>
     /// <param name="minimumDatasetVolume">The smallest configured baseline-corpus volume the release path accepts. Required to be positive.</param>
     /// <param name="maximumMeasurableRecoveryCeilingSeconds">The largest measurable-recovery ceiling the release path believes the lane can honour. Required to be finite and positive.</param>
-    /// <param name="requiredRepositoryCommit">The commit the evidence must be attributed to, or <see langword="null"/> to leave it unpinned.</param>
+    /// <param name="requiredRepositoryCommit">The commit the evidence must be attributed to. Required (non-null/non-whitespace).</param>
     /// <returns>A policy with every release-required anchor validated and pinned.</returns>
-    /// <exception cref="ArgumentException"><paramref name="expectedDatasetVersion"/> is null or whitespace.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="expectedDatasetVersion"/> or <paramref name="requiredRepositoryCommit"/> is null or whitespace.
+    /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="minimumDatasetVolume"/> is not positive, or <paramref name="maximumMeasurableRecoveryCeilingSeconds"/>
     /// is not a finite positive number.
@@ -78,7 +81,7 @@ internal sealed record LiveRecoveryValidationGatePolicy(
         string? expectedDatasetVersion,
         int minimumDatasetVolume,
         double maximumMeasurableRecoveryCeilingSeconds,
-        string? requiredRepositoryCommit = null)
+        string? requiredRepositoryCommit)
     {
         if (string.IsNullOrWhiteSpace(expectedDatasetVersion))
         {
@@ -101,6 +104,13 @@ internal sealed record LiveRecoveryValidationGatePolicy(
                 nameof(maximumMeasurableRecoveryCeilingSeconds),
                 maximumMeasurableRecoveryCeilingSeconds,
                 "A release gate policy must pin a finite, positive maximum measurable recovery ceiling.");
+        }
+
+        if (string.IsNullOrWhiteSpace(requiredRepositoryCommit))
+        {
+            throw new ArgumentException(
+                "A release gate policy must pin the repository commit the evidence is attributed to.",
+                nameof(requiredRepositoryCommit));
         }
 
         return new LiveRecoveryValidationGatePolicy(

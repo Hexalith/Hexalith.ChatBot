@@ -16,6 +16,12 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
     private int _erases;
     private long _version;
 
+    /// <summary>When set, the Nth successful write attempt throws before persisting.</summary>
+    public int? FailOnWriteNumber { get; set; }
+
+    /// <summary>When true, every write attempt throws before persisting.</summary>
+    public bool RejectWrites { get; set; }
+
     /// <summary>Gets the number of successful persisted writes.</summary>
     public int Writes => Volatile.Read(ref _writes);
 
@@ -58,6 +64,13 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(value);
+        ThrowIfWriteRejected();
+        int nextWrite = Volatile.Read(ref _writes) + 1;
+        if (FailOnWriteNumber is int failAt && nextWrite == failAt)
+        {
+            throw new InvalidOperationException("Injected read-model write failure.");
+        }
+
         _entries[CompositeKey(storeName, key)] = new Entry(value, NextEtag());
         Interlocked.Increment(ref _writes);
         return Task.CompletedTask;
@@ -75,6 +88,7 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(value);
         ArgumentNullException.ThrowIfNull(etag);
+        ThrowIfWriteRejected();
         string compositeKey = CompositeKey(storeName, key);
         while (true)
         {
@@ -154,6 +168,14 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
         ArgumentException.ThrowIfNullOrWhiteSpace(storeName);
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         return $"{storeName}\u001f{key}";
+    }
+
+    private void ThrowIfWriteRejected()
+    {
+        if (RejectWrites)
+        {
+            throw new InvalidOperationException("Injected read-model write failure.");
+        }
     }
 
     private string NextEtag()

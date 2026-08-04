@@ -222,19 +222,27 @@ internal sealed class ScopedOutageDegradationValidationCoordinator(
         }
         catch (Exception) when (cancellationToken is { IsCancellationRequested: false })
         {
+            DateTimeOffset endedAtUtc = clock.UtcNow;
+            if (endedAtUtc < report.StartedAtUtc)
+            {
+                endedAtUtc = report.StartedAtUtc;
+            }
+
             ScopedOutageDegradationReport unmeasurable = ScopedOutageDegradationReport.Unmeasurable(
                 report.TenantRef,
                 report.Dependency,
                 report.CorrelationId,
                 report.StartedAtUtc,
-                clock.UtcNow);
+                endedAtUtc);
 
             // Keep WHY it is unmeasurable in the artifact. The verdict model is unchanged — a retention failure is
             // still a stop-ship — but the deviation distinguishes "the sink was unavailable" from "the outage exercise
-            // failed".
+            // failed". Preserve ExecutionAssertions from the completed run so a successful fallback write does not erase
+            // the execution facts that already finished.
             unmeasurable = unmeasurable with
             {
                 Deviations = [.. unmeasurable.Deviations, ScopedOutageDegradationReport.EvidenceRetentionFailedDeviation],
+                ExecutionAssertions = report.ExecutionAssertions,
             };
             try
             {

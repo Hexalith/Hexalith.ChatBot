@@ -9,6 +9,7 @@ using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
 
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.RecoverySandbox;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Client.Projections;
@@ -51,6 +52,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
     private ProjectConversationSourceEmailView? _identityAffectedSentinel;
     private ProjectConversationSourceEmailView? _identityControlSentinel;
     private bool _identityFaultLeftStateUnchanged;
+    private readonly List<string> _controlOperationRefs = [];
 
     public AspireScopedOutageOperations(
         DistributedApplication application,
@@ -126,7 +128,8 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         else if (string.Equals(dependency, ScopedOutageDependencies.Graph, StringComparison.Ordinal))
         {
             using JsonDocument restored = await SendSubscriptionAsync(tenantRef, "restore", includeBearer: false, cancellationToken).ConfigureAwait(false);
-            if (RecoverySandboxRestoreResponse.IsCurrentlyFaulted(restored.RootElement))
+            if (RecoverySandboxRestoreResponse.WasPreviouslyFaulted(restored.RootElement) ||
+                RecoverySandboxRestoreResponse.IsCurrentlyFaulted(restored.RootElement))
             {
                 throw new InvalidOperationException("The Graph boundary was not clean before injection.");
             }
@@ -149,7 +152,8 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
                 correlationId: null,
                 cancellationToken)
                 .ConfigureAwait(false);
-            if (RecoverySandboxRestoreResponse.IsCurrentlyFaulted(restored.RootElement))
+            if (RecoverySandboxRestoreResponse.WasPreviouslyFaulted(restored.RootElement) ||
+                RecoverySandboxRestoreResponse.IsCurrentlyFaulted(restored.RootElement))
             {
                 throw new InvalidOperationException("The scoped dependency was not clean before injection.");
             }
@@ -186,13 +190,17 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
                 }
             }
 
-            if ((!commandSucceeded) && available)
+            // Shared with the EventStore boundary check (AspireRecoverySandboxOperations.StopReachedDependencyBoundary),
+            // which the LiveContinuityDrillScenarioRunnerTests theory table-tests exhaustively for this exact
+            // (commandSucceeded, endpointAvailable) predicate — this branch previously had no coverage outside the
+            // skipped Tier-3 E2E.
+            if (!AspireRecoverySandboxOperations.StopReachedDependencyBoundary(commandSucceeded, available))
             {
-                throw new InvalidOperationException("The allowlisted identity stop command did not reach the dependency boundary.");
-            }
+                if (!commandSucceeded)
+                {
+                    throw new InvalidOperationException("The allowlisted identity stop command did not complete successfully.");
+                }
 
-            if (available)
-            {
                 throw new InvalidOperationException(
                     $"Identity was still reachable {StopConfirmationTimeout.TotalSeconds:N0}s after an accepted stop command.");
             }
@@ -431,11 +439,25 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
 
             // Poll for the full absence window rather than reading once after a fixed 2s sleep: a duplicate aggregate
             // that commits a moment later than the sleep was being reported as "no duplicate side effect".
-            bool duplicateAggregateCommitted = !await _durableState.RemainsAbsentAsync(
+            Task<bool> duplicateAggregateAbsent = _durableState.RemainsAbsentAsync(
                 RecoveryValidationTopology.StorageTenantRef,
                 _graphDuplicateProbeIntakeRef,
                 AbsenceConfirmationWindow,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken);
+            Task<bool> controlTenantAggregateAbsent = _durableState.RemainsAbsentAsync(
+                RecoveryValidationTopology.ControlTenantRef,
+                _graphRecoveredIntakeRef,
+                AbsenceConfirmationWindow,
+                cancellationToken);
+            Task<bool> controlTenantReadModelsAbsent = RemainsIntakeReadModelsAbsentAsync(
+                RecoveryValidationTopology.ControlTenantRef,
+                _graphRecoveredIntakeRef,
+                AbsenceConfirmationWindow,
+                cancellationToken);
+            bool[] isolationOutcomes = await Task.WhenAll(
+                duplicateAggregateAbsent,
+                controlTenantAggregateAbsent,
+                controlTenantReadModelsAbsent).ConfigureAwait(false);
             bool recoveredAggregateStillCommitted = await _durableState.IsMailboxIntakeCommittedAsync(
                 RecoveryValidationTopology.StorageTenantRef,
                 _graphRecoveredIntakeRef,
@@ -454,12 +476,13 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
                 .ConfigureAwait(false);
             recovered = recoveredAggregateStillCommitted;
             duplicate = string.Equals(_graphDuplicateProbeIntakeRef, _graphRecoveredIntakeRef, StringComparison.Ordinal) ||
-                duplicateAggregateCommitted ||
-                !recoveredAggregateStillCommitted;
+                !isolationOutcomes[0];
             silentLoss = !recovered;
             leakage = !_graphFaultLeftStateUnchanged ||
                 !Equals(affected, _graphAffectedSentinel) ||
-                !Equals(control, _graphControlSentinel);
+                !Equals(control, _graphControlSentinel) ||
+                !isolationOutcomes[1] ||
+                !isolationOutcomes[2];
         }
         else
         {
@@ -482,88 +505,159 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
             leakage = root.GetProperty("crossTenantLeakageDetected").GetBoolean();
         }
 
+        List<Task<bool>> controlIsolationChecks = [];
+        foreach (string controlNoteRef in _controlOperationRefs)
+        {
+            controlIsolationChecks.Add(_durableState.RemainsGovernedNoteAbsentAsync(
+                RecoveryValidationTopology.StorageTenantRef,
+                controlNoteRef,
+                AbsenceConfirmationWindow,
+                cancellationToken));
+            controlIsolationChecks.Add(RemainsReadModelKeyAbsentAsync(
+                GovernedOperationView.KeyFor(RecoveryValidationTopology.StorageTenantRef, controlNoteRef),
+                AbsenceConfirmationWindow,
+                cancellationToken));
+        }
+
+        if (controlIsolationChecks.Count > 0)
+        {
+            bool[] controlIsolation = await Task.WhenAll(controlIsolationChecks).ConfigureAwait(false);
+            leakage |= controlIsolation.Any(static absent => !absent);
+        }
+
         return new ScopedOutageRecoveryEndState(recovered, leakage, silentLoss, duplicate);
     }
 
     /// <inheritdoc />
     public async ValueTask<bool> CleanupAsync(string dependency, string tenantRef, CancellationToken cancellationToken)
     {
-        // Erase before restoring/verifying. Sentinel rows are seeded into the shared control tenant `tenant-beta`, so
-        // a throw from RestoreAsync or a non-2xx status used to strand them permanently and poison later runs.
+        List<(string Tenant, string Intake)> intakeTargets = [];
         if (string.Equals(dependency, ScopedOutageDependencies.Identity, StringComparison.Ordinal))
         {
-            try
+            AddIntakeTarget(intakeTargets, _identityAffectedSentinel);
+            AddIntakeTarget(intakeTargets, _identityControlSentinel);
+        }
+        else if (string.Equals(dependency, ScopedOutageDependencies.Graph, StringComparison.Ordinal))
+        {
+            AddIntakeTarget(intakeTargets, _graphAffectedSentinel);
+            AddIntakeTarget(intakeTargets, _graphControlSentinel);
+            AddIntakeTarget(intakeTargets, RecoveryValidationTopology.StorageTenantRef, _graphRecoveredIntakeRef);
+            AddIntakeTarget(intakeTargets, RecoveryValidationTopology.StorageTenantRef, _graphDuplicateProbeIntakeRef);
+        }
+
+        try
+        {
+            foreach ((string cleanupTenant, string cleanupIntake) in intakeTargets)
             {
-                await EraseSentinelsAsync(
-                    [_identityAffectedSentinel, _identityControlSentinel],
+                await EraseIntakeReadModelsAsync(cleanupTenant, cleanupIntake, cancellationToken).ConfigureAwait(false);
+            }
+
+            foreach (string controlNoteRef in _controlOperationRefs)
+            {
+                await EraseReadModelAsync(
+                    GovernedOperationView.KeyFor(RecoveryValidationTopology.ControlTenantRef, controlNoteRef),
                     cancellationToken).ConfigureAwait(false);
             }
-            finally
+        }
+        finally
+        {
+            if (string.Equals(dependency, ScopedOutageDependencies.Identity, StringComparison.Ordinal))
             {
-                // Always restore when identity is down; never leave Keycloak stopped after a partial erase failure.
                 if (!await TryAcquireRecoveryTokenOnceAsync(cancellationToken).ConfigureAwait(false) ||
                     !await IsIdentityAvailableAsync(cancellationToken).ConfigureAwait(false))
                 {
                     await RestoreAsync(dependency, tenantRef, cancellationToken).ConfigureAwait(false);
                 }
             }
+            else
+            {
+                await RestoreAsync(dependency, tenantRef, cancellationToken).ConfigureAwait(false);
+            }
+        }
 
+        if (string.Equals(dependency, ScopedOutageDependencies.Identity, StringComparison.Ordinal))
+        {
             if (!await TryAcquireRecoveryTokenOnceAsync(cancellationToken).ConfigureAwait(false) ||
                 !await IsIdentityAvailableAsync(cancellationToken).ConfigureAwait(false))
             {
                 throw new InvalidOperationException("Identity remained unavailable after scoped-outage cleanup.");
             }
-
-            return true;
         }
-
-        try
+        else
         {
-            if (string.Equals(dependency, ScopedOutageDependencies.Graph, StringComparison.Ordinal))
+            using JsonDocument status = string.Equals(dependency, ScopedOutageDependencies.Graph, StringComparison.Ordinal)
+                ? await SendSubscriptionAsync(tenantRef, "status", includeBearer: false, cancellationToken, HttpMethod.Get).ConfigureAwait(false)
+                : await SendScopedAsync(dependency, tenantRef, "status", correlationId: null, cancellationToken, HttpMethod.Get).ConfigureAwait(false);
+            if (status.RootElement.GetProperty("faulted").GetBoolean() ||
+                (!string.Equals(dependency, ScopedOutageDependencies.Graph, StringComparison.Ordinal) &&
+                    status.RootElement.GetProperty("effectCount").GetInt32() != 0))
             {
-                await EraseSentinelsAsync([_graphAffectedSentinel, _graphControlSentinel], cancellationToken)
-                    .ConfigureAwait(false);
-                foreach (string? cleanupIntake in new[] { _graphRecoveredIntakeRef, _graphDuplicateProbeIntakeRef })
-                {
-                    if (!string.IsNullOrWhiteSpace(cleanupIntake))
-                    {
-                        await EraseIntakeReadModelsAsync(
-                            RecoveryValidationTopology.StorageTenantRef,
-                            cleanupIntake,
-                            cancellationToken).ConfigureAwait(false);
-                    }
-                }
+                throw new InvalidOperationException("The dependency retained fault/effect state after cleanup.");
             }
         }
-        finally
+
+        bool complete = true;
+        foreach ((string cleanupTenant, string cleanupIntake) in intakeTargets)
         {
-            await RestoreAsync(dependency, tenantRef, cancellationToken).ConfigureAwait(false);
+            complete &= await AreIntakeReadModelsAbsentAsync(
+                cleanupTenant,
+                cleanupIntake,
+                cancellationToken).ConfigureAwait(false);
         }
 
-        using JsonDocument status = string.Equals(dependency, ScopedOutageDependencies.Graph, StringComparison.Ordinal)
-            ? await SendSubscriptionAsync(tenantRef, "status", includeBearer: false, cancellationToken, HttpMethod.Get).ConfigureAwait(false)
-            : await SendScopedAsync(dependency, tenantRef, "status", correlationId: null, cancellationToken, HttpMethod.Get).ConfigureAwait(false);
-        if (status.RootElement.GetProperty("faulted").GetBoolean())
+        foreach (string controlNoteRef in _controlOperationRefs)
         {
-            throw new InvalidOperationException("The dependency remained faulted after cleanup.");
+            (bool present, _) = await _readModelEraser.TryReadEtagAsync(
+                ChatBotReadModelStoreNames.StateStoreName,
+                GovernedOperationView.KeyFor(RecoveryValidationTopology.ControlTenantRef, controlNoteRef),
+                cancellationToken).ConfigureAwait(false);
+            complete &= !present;
         }
 
-        return true;
+        if (string.Equals(dependency, ScopedOutageDependencies.Graph, StringComparison.Ordinal) &&
+            !string.IsNullOrWhiteSpace(_graphDuplicateProbeIntakeRef))
+        {
+            complete &= await _durableState.RemainsAbsentAsync(
+                RecoveryValidationTopology.StorageTenantRef,
+                _graphDuplicateProbeIntakeRef,
+                AbsenceConfirmationWindow,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        if (complete)
+        {
+            _identityAffectedSentinel = null;
+            _identityControlSentinel = null;
+            _identityFaultLeftStateUnchanged = false;
+            _graphAffectedSentinel = null;
+            _graphControlSentinel = null;
+            _graphRecoveredIntakeRef = null;
+            _graphDuplicateProbeIntakeRef = null;
+            _graphFaultLeftStateUnchanged = false;
+            _controlOperationRefs.Clear();
+        }
+
+        return complete;
     }
 
-    private async Task EraseSentinelsAsync(
-        IEnumerable<ProjectConversationSourceEmailView?> sentinels,
-        CancellationToken cancellationToken)
+    private static void AddIntakeTarget(
+        ICollection<(string Tenant, string Intake)> targets,
+        ProjectConversationSourceEmailView? sentinel)
     {
-        foreach (ProjectConversationSourceEmailView? sentinel in sentinels)
+        if (sentinel is not null)
         {
-            if (sentinel is not null &&
-                !string.IsNullOrWhiteSpace(sentinel.TenantId) &&
-                !string.IsNullOrWhiteSpace(sentinel.IntakeId))
-            {
-                await EraseIntakeReadModelsAsync(sentinel.TenantId, sentinel.IntakeId, cancellationToken)
-                    .ConfigureAwait(false);
-            }
+            AddIntakeTarget(targets, sentinel.TenantId, sentinel.IntakeId);
+        }
+    }
+
+    private static void AddIntakeTarget(
+        ICollection<(string Tenant, string Intake)> targets,
+        string tenantId,
+        string? intakeId)
+    {
+        if (!string.IsNullOrWhiteSpace(tenantId) && !string.IsNullOrWhiteSpace(intakeId))
+        {
+            targets.Add((tenantId, intakeId));
         }
     }
 
@@ -576,7 +670,90 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         await EraseReadModelAsync(
             ProjectConversationAttachmentSetView.KeyFor(tenantId, intakeId),
             cancellationToken).ConfigureAwait(false);
+        await EraseReadModelAsync(
+            AttachmentIndexKeyFor(tenantId, intakeId),
+            cancellationToken).ConfigureAwait(false);
     }
+
+    private async Task<bool> AreIntakeReadModelsAbsentAsync(
+        string tenantId,
+        string intakeId,
+        CancellationToken cancellationToken)
+    {
+        foreach (string key in IntakeReadModelKeys(tenantId, intakeId))
+        {
+            (bool present, _) = await _readModelEraser.TryReadEtagAsync(
+                ChatBotReadModelStoreNames.StateStoreName,
+                key,
+                cancellationToken).ConfigureAwait(false);
+            if (present)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private async Task<bool> RemainsIntakeReadModelsAbsentAsync(
+        string tenantId,
+        string intakeId,
+        TimeSpan window,
+        CancellationToken cancellationToken)
+    {
+        Stopwatch timer = Stopwatch.StartNew();
+        do
+        {
+            if (!await AreIntakeReadModelsAbsentAsync(tenantId, intakeId, cancellationToken).ConfigureAwait(false))
+            {
+                return false;
+            }
+
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
+        while (timer.Elapsed < window);
+
+        return await AreIntakeReadModelsAbsentAsync(tenantId, intakeId, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<bool> RemainsReadModelKeyAbsentAsync(
+        string key,
+        TimeSpan window,
+        CancellationToken cancellationToken)
+    {
+        Stopwatch timer = Stopwatch.StartNew();
+        do
+        {
+            (bool present, _) = await _readModelEraser.TryReadEtagAsync(
+                ChatBotReadModelStoreNames.StateStoreName,
+                key,
+                cancellationToken).ConfigureAwait(false);
+            if (present)
+            {
+                return false;
+            }
+
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
+        while (timer.Elapsed < window);
+
+        (bool finalPresent, _) = await _readModelEraser.TryReadEtagAsync(
+            ChatBotReadModelStoreNames.StateStoreName,
+            key,
+            cancellationToken).ConfigureAwait(false);
+        return !finalPresent;
+    }
+
+    private static string[] IntakeReadModelKeys(string tenantId, string intakeId)
+        =>
+        [
+            ProjectConversationSourceEmailView.KeyFor(tenantId, intakeId),
+            ProjectConversationAttachmentSetView.KeyFor(tenantId, intakeId),
+            AttachmentIndexKeyFor(tenantId, intakeId),
+        ];
+
+    private static string AttachmentIndexKeyFor(string tenantId, string intakeId)
+        => $"{tenantId}:project-conversation:{intakeId}:attachments";
 
     private async Task EraseReadModelAsync(string key, CancellationToken cancellationToken)
     {
@@ -642,7 +819,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         return observedScope;
     }
 
-    private static void RequireNonDegenerateScopeStamps(
+    internal static void RequireNonDegenerateScopeStamps(
         DateTimeOffset observedAtUtc,
         DateTimeOffset recordedAtUtc,
         string dependencyLabel)
@@ -668,7 +845,11 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
             using HttpResponseMessage response = await _securityClient.GetAsync("/realms/hexalith", cancellationToken).ConfigureAwait(false);
             return response.IsSuccessStatusCode;
         }
-        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        catch (HttpRequestException)
+        {
+            return false;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             return false;
         }
@@ -688,6 +869,8 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
             string noteRef = GovernedNoteId.New().Value;
             string commandRef = ChatBotCommandId.New().Value;
             string operationRef = ChatBotTaskId.New().Value;
+            string correlationId = ChatBotCorrelationId.New().Value;
+            _controlOperationRefs.Add(noteRef);
             string body = $$"""
                 {"commandId":"{{commandRef}}","commandType":"RecordGovernedNote","command":{"noteId":"{{noteRef}}"},"origin":"ui","requestSchemaVersion":"v1"}
                 """;
@@ -696,12 +879,30 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
                 Content = new StringContent(body, Encoding.UTF8, "application/json"),
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", controlAccessToken);
-            request.Headers.Add("X-Correlation-Id", ChatBotCorrelationId.New().Value);
+            request.Headers.Add("X-Correlation-Id", correlationId);
             request.Headers.Add("X-Hexalith-Task-Id", operationRef);
             using HttpResponseMessage response = await _chatBotClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-            return response.StatusCode == HttpStatusCode.Accepted;
+            if (response.StatusCode != HttpStatusCode.Accepted)
+            {
+                return false;
+            }
+
+            await _durableState.WaitForGovernedNoteAsync(
+                RecoveryValidationTopology.ControlTenantRef,
+                noteRef,
+                cancellationToken).ConfigureAwait(false);
+            await WaitForControlOperationProjectionAsync(
+                noteRef,
+                correlationId,
+                controlAccessToken,
+                cancellationToken).ConfigureAwait(false);
+            return true;
         }
-        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        catch (HttpRequestException)
+        {
+            return false;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             return false;
         }
@@ -726,6 +927,38 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         throw new TimeoutException("The identity provider did not recover before the restoration deadline.");
     }
 
+    private async Task WaitForControlOperationProjectionAsync(
+        string noteRef,
+        string correlationId,
+        string accessToken,
+        CancellationToken cancellationToken)
+    {
+        Stopwatch timer = Stopwatch.StartNew();
+        while (timer.Elapsed < AbsenceConfirmationWindow)
+        {
+            using HttpRequestMessage request = new(
+                HttpMethod.Get,
+                $"/api/v1/governed-operations/{noteRef}");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            request.Headers.Add("X-Correlation-Id", correlationId);
+            using HttpResponseMessage response = await _chatBotClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.OK)
+            {
+                return;
+            }
+
+            if (response.StatusCode != HttpStatusCode.NotFound)
+            {
+                throw new InvalidOperationException(
+                    $"The independent control projection returned unexpected status {(int)response.StatusCode}.");
+            }
+
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new TimeoutException("The independent control operation did not reach projected state.");
+    }
+
     private async Task<bool> TryAcquireRecoveryTokenOnceAsync(CancellationToken cancellationToken)
     {
         try
@@ -743,7 +976,11 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
                 .ConfigureAwait(false);
             return response.StatusCode == HttpStatusCode.OK;
         }
-        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        catch (HttpRequestException)
+        {
+            return false;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             return false;
         }
@@ -760,6 +997,12 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         using HttpRequestMessage request = new(method ?? HttpMethod.Post, $"/recovery/{tenant}/m365-subscription-failure/{action}");
         request.Headers.Add("X-Recovery-Controller-Secret", _controllerSecret);
         request.Headers.Add("X-Recovery-Scenario-Lane", "graph");
+        if (string.Equals(action, "process", StringComparison.Ordinal))
+        {
+            request.Headers.Add(
+                RecoveryNotificationIdentity.HeaderName,
+                RecoveryNotificationIdentity.RecoveryPhase);
+        }
         if (includeBearer)
         {
             string mailboxAccessToken = await RecoveryAccessTokenProvider

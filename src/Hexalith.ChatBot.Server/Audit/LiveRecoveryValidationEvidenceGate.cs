@@ -110,11 +110,15 @@ internal static class LiveRecoveryValidationEvidenceGate
             stopShip.Add($"{LiveRecoveryValidationJobs.ProjectionRebuild}:invalid_expected_scenarios");
         }
 
+        // Computed once here and reused by EvaluateJob below via reference identity, instead of calling
+        // manifest.Validate() a second time per manifest per job.
+        HashSet<RecoveryValidationEvidenceManifest> invalidManifests = new(ReferenceEqualityComparer.Instance);
         foreach (RecoveryValidationEvidenceManifest manifest in evidence)
         {
             if (manifest.Validate().Count > 0)
             {
                 stopShip.Add($"{SafeJob(manifest.JobId)}:invalid_evidence");
+                invalidManifests.Add(manifest);
             }
 
             if (!string.Equals(manifest.RunId, attempt.RunId, StringComparison.Ordinal))
@@ -199,7 +203,7 @@ internal static class LiveRecoveryValidationEvidenceGate
             evidence.Select(static manifest => manifest.DatasetRef).Distinct(StringComparer.Ordinal).Count() > 1 ||
             evidence.Select(static manifest => manifest.DatasetVersion).Distinct(StringComparer.Ordinal).Count() > 1 ||
             evidence.Select(static manifest => manifest.ConfiguredDatasetVolume).Distinct().Count() > 1 ||
-            evidence.Select(static manifest => manifest.RepositoryCommit).Distinct(StringComparer.Ordinal).Count() > 1))
+            evidence.Select(static manifest => manifest.RepositoryCommit).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1))
         {
             stopShip.Add("attempt_evidence_incoherent");
         }
@@ -207,6 +211,7 @@ internal static class LiveRecoveryValidationEvidenceGate
         EvaluateJob(
             attempt,
             evidence,
+            invalidManifests,
             LiveRecoveryValidationJobs.Continuity,
             ContinuityDrillScenarios.All,
             stopShip,
@@ -216,6 +221,7 @@ internal static class LiveRecoveryValidationEvidenceGate
         EvaluateJob(
             attempt,
             evidence,
+            invalidManifests,
             LiveRecoveryValidationJobs.ProjectionRebuild,
             configuredDatasets.ToHashSet(StringComparer.Ordinal),
             stopShip,
@@ -225,6 +231,7 @@ internal static class LiveRecoveryValidationEvidenceGate
         EvaluateJob(
             attempt,
             evidence,
+            invalidManifests,
             LiveRecoveryValidationJobs.ScopedOutage,
             ScopedOutageDependencies.All,
             stopShip,
@@ -306,8 +313,11 @@ internal static class LiveRecoveryValidationEvidenceGate
     /// Returns the subset of <see cref="RequiredAssertionsFor"/> whose falsity is a stop-ship structural or safety
     /// breach. Deliberately excludes <c>duration-within-target</c> and <c>scope-recorded-within-target</c>, which are
     /// measurable target misses and stay in the deviation channel per Task 6; <c>cleanup-complete</c>, which keeps its
-    /// own <c>{job}:cleanup_incomplete</c> code; and <c>data-loss-absent</c>/<c>structurally-equivalent</c>/
-    /// <c>scope-contained</c>, which are already routed through <see cref="IsStructuralBreach"/>.
+    /// own <c>{job}:cleanup_incomplete</c> code; <c>data-loss-absent</c>/<c>structurally-equivalent</c>/
+    /// <c>scope-contained</c>, which are already routed through <see cref="IsStructuralBreach"/>; and
+    /// <c>mailbox-reingestion-absent</c>, which no live driver observes and which is always published <see
+    /// langword="false"/> — including it here would make <see cref="LiveRecoveryValidationJobs.ProjectionRebuild"/>
+    /// stop-ship on every run. <c>RequiredAssertionsFor</c> still requires the key be present.
     /// </summary>
     internal static IReadOnlyList<string> SafetyAssertionsFor(string jobId)
         => jobId switch
@@ -317,9 +327,13 @@ internal static class LiveRecoveryValidationEvidenceGate
                 "fault-observed", "recovery-observed", "state-reconstructable",
                 "tenant-isolation-preserved", "unauthorized-mutation-absent", "measurable",
             ],
+            // "mailbox-reingestion-absent" is deliberately excluded: no live driver observes mailbox reingestion, so
+            // the assertion is always published false (see RecoveryValidationExecutionAssertions.MailboxReingestionAbsent)
+            // and including it here would make the ProjectionRebuild job stop-ship on every run, healthy or not. The gap
+            // is tracked as the RV-REBUILD-WORM residual/claim-limitation instead of a stop-ship safety assertion.
             LiveRecoveryValidationJobs.ProjectionRebuild =>
             [
-                "immutable-source-only", "mailbox-reingestion-absent", "tenant-isolation-preserved",
+                "immutable-source-only", "tenant-isolation-preserved",
             ],
             LiveRecoveryValidationJobs.ScopedOutage =>
             [
@@ -333,6 +347,7 @@ internal static class LiveRecoveryValidationEvidenceGate
     private static void EvaluateJob(
         LiveRecoveryValidationEvidenceAttempt attempt,
         IReadOnlyList<RecoveryValidationEvidenceManifest> allEvidence,
+        IReadOnlySet<RecoveryValidationEvidenceManifest> invalidManifests,
         string jobId,
         IReadOnlySet<string> expectedScenarios,
         List<string> stopShip,
@@ -360,9 +375,16 @@ internal static class LiveRecoveryValidationEvidenceGate
         int alertsRequired = 0;
         foreach (RecoveryValidationEvidenceManifest manifest in evidence)
         {
-            // Already stop-shipped as `{job}:invalid_evidence` by the caller. Every check below dereferences a
-            // dictionary that a structurally incomplete manifest may not carry, so a fail-closed gate must not
-            // continue into them and turn a reason code into a NullReferenceException.
+            // Already stop-shipped as `{job}:invalid_evidence` by the caller (which computed Validate() once for
+            // every manifest, reused here by reference identity). Do not grade coverage, verdicts, or alerts against
+            // a structurally invalid manifest — non-null dictionaries alone are not proof of validity.
+            if (invalidManifests.Contains(manifest))
+            {
+                continue;
+            }
+
+            // Every check below dereferences a dictionary that a structurally incomplete manifest may not carry, so a
+            // fail-closed gate must not continue into them and turn a reason code into a NullReferenceException.
             if (manifest.MeasurementsSeconds is null || manifest.AllowedTargetsSeconds is null ||
                 manifest.Assertions is null || manifest.Coverage is null)
             {
@@ -483,6 +505,11 @@ internal static class LiveRecoveryValidationEvidenceGate
                 targetDeviations.Add($"{jobId}:target_deviation");
             }
 
+            // Alert accounting is deliberately scoped to breach-class outcomes the producer already audits-then-alerts
+            // on (unmeasurable / structural / target-deviation). `{job}:cleanup_incomplete` and failed
+            // `SafetyAssertionsFor` remain gate-only stop-ships: they still block release, but they do not drive
+            // `unalerted_breach`. Expanding this counter without also expanding producer alert emission would invent
+            // systematic unalerted-breach failures on paths that never emit an operator alert today.
             if (unmeasurable || structuralBreach || targetDeviation)
             {
                 alertsRequired++;
@@ -490,6 +517,16 @@ internal static class LiveRecoveryValidationEvidenceGate
         }
 
         int alertsDelivered = attempt.AlertsDeliveredByJob?.GetValueOrDefault(jobId) ?? 0;
+        if (alertsDelivered < 0)
+        {
+            stopShip.Add($"{jobId}:attempt_alert_counts_unreadable");
+            alertsDelivered = 0;
+        }
+
+        // A negative count that also required alerts (alertsRequired > 0) deliberately yields BOTH
+        // `attempt_alert_counts_unreadable` and `unalerted_breach`: the clamp above only makes the comparison
+        // well-defined, it does not vouch for delivery, so a job that both has unreadable counts AND required an
+        // alert must still fail closed on the delivery question, not just the readability one.
         if (alertsDelivered < alertsRequired)
         {
             stopShip.Add($"{jobId}:unalerted_breach");

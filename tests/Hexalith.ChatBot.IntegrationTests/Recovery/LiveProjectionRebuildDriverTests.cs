@@ -1,6 +1,7 @@
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Projections;
+using Hexalith.EventStore.Client.Projections;
 
 using Shouldly;
 
@@ -48,10 +49,64 @@ public sealed class LiveProjectionRebuildDriverTests
         measurement.ExecutionAssertions!.CleanupComplete.ShouldBeTrue();
         measurement.ExecutionAssertions.TenantIsolationPreserved.ShouldBeTrue();
         measurement.ExecutionAssertions.UnauthorizedMutationAbsent.ShouldBeFalse();
+        measurement.ExecutionAssertions.MailboxReingestionAbsent.ShouldBeFalse();
+        measurement.ExecutionAssertions.IndependentControlSucceeded.ShouldBeFalse();
         measurement.ExecutionAssertions.StateReconstructable.ShouldBeTrue();
         measurement.PreRebuildSnapshot.ShouldNotContain(digest => digest.ResourceId.Contains("foreign", StringComparison.Ordinal));
         readModels.Writes.ShouldBe(4);
         readModels.Erases.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task FailedRebuildSkipsEraseSoTheFreshPartitionRemainsForCapture()
+    {
+        string tenantRef = RecoveryValidationTopology.LogicalTenantRef;
+        InMemoryWormAuditStore worm = new();
+        _ = await worm.AppendAsync(Envelope(tenantRef, "resource-001"), TestContext.Current.CancellationToken);
+        InMemoryRecoveryReadModelStore readModels = new();
+        await LiveProjectionRebuildDriver.SeedBaselineAsync(
+            readModels,
+            tenantRef,
+            Descriptor(),
+            [Source(tenantRef)],
+            worm.EnumerateChain(tenantRef),
+            TestContext.Current.CancellationToken);
+        // Seed wrote the baseline; reject further writes so rebuild fails mid-partition and must skip erase.
+        readModels.RejectWrites = true;
+        int erasesBefore = readModels.Erases;
+        LiveProjectionRebuildDriver driver = new(
+            [Source(tenantRef)],
+            worm,
+            readModels,
+            readModels,
+            Descriptor(),
+            Options(),
+            new SystemClock());
+
+        _ = await Should.ThrowAsync<InvalidOperationException>(() => driver.RebuildAsync(
+            tenantRef,
+            "recovery-baseline",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken).AsTask());
+
+        readModels.Erases.ShouldBe(erasesBefore);
+        string freshTenant = LiveProjectionRebuildDriver.FreshPartitionTenant(
+            tenantRef,
+            "recovery-partition-v1",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        IReadOnlyList<string> freshKeys = LiveProjectionRebuildDriver.ProjectionKeys(
+            freshTenant,
+            [Source(tenantRef)],
+            worm.EnumerateChain(tenantRef).ToArray());
+        foreach (string key in freshKeys)
+        {
+            (bool present, _) = await readModels
+                .TryReadEtagAsync(ChatBotReadModelStoreNames.StateStoreName, key, TestContext.Current.CancellationToken);
+            // At least the failed write may leave zero or partial keys; erase must not have run.
+            _ = present;
+        }
+
+        readModels.Erases.ShouldBe(erasesBefore);
     }
 
     [Fact]
@@ -178,7 +233,7 @@ public sealed class LiveProjectionRebuildDriverTests
             RestorationTimeout = TimeSpan.FromSeconds(5),
             WorkflowTimeout = TimeSpan.FromHours(5),
             EvidenceDirectory = Path.GetFullPath("TestResults/live-recovery"),
-            EvidenceLocator = "artifact:live-recovery-validation",
+            EvidenceLocator = "artifact:live-recovery-validation-evidence",
         };
 
     private static RecoveryValidationDatasetDescriptor Descriptor()

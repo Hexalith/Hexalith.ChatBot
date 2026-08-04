@@ -159,6 +159,8 @@ public sealed class RecoveryValidationTopologyContractTests
     [Theory]
     [InlineData("Production", "replay-test:recovery-validation", "recovery-validation", LiveRecoveryValidationOptions.AspireControllerCapability)]
     [InlineData("Testing", "tenant-alpha", "tenant-alpha", LiveRecoveryValidationOptions.AspireControllerCapability)]
+    [InlineData("Testing", "replay-test:tenant-alpha", "tenant-alpha", LiveRecoveryValidationOptions.AspireControllerCapability)]
+    [InlineData("Testing", "replay-test:tenant-beta", "tenant-beta", LiveRecoveryValidationOptions.AspireControllerCapability)]
     [InlineData("Testing", "replay-test:recovery-validation", "wrong-storage", LiveRecoveryValidationOptions.AspireControllerCapability)]
     [InlineData("Testing", "replay-test:recovery-validation", "recovery-validation", "wrong-capability")]
     public async Task AddRecoverySandboxRejectsInvalidCapabilityTenantOrEnvironment(

@@ -9,6 +9,7 @@ using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
 
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.RecoverySandbox;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Client.Projections;
 
@@ -41,6 +42,15 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     /// the presence budget: a shorter absence window silently biases every no-duplicate / no-unauthorized-mutation
     /// check toward passing on an eventually-consistent read path.
     /// </summary>
+    /// <remarks>
+    /// <see cref="ReadEventStoreEndStateAsync"/> stamps its returned <c>RecoveredAtUtc</c> only after the concurrent
+    /// cross-tenant/fault-probe checks that use this window complete, so a full <see cref="AbsenceConfirmationWindow"/>
+    /// of harness self-verification is included in the measured RTO on the happy path — the published
+    /// <c>MeasurableRecoveryCeilingSeconds</c> bounds harness verification time as well as product recovery time, not
+    /// product recovery time alone. Deliberate: the sustained-isolation proof must complete before recovery is
+    /// declared, and re-timing the stamp to first-presence would let the isolation proof land after the timestamp it
+    /// is meant to validate.
+    /// </remarks>
     private static readonly TimeSpan AbsenceConfirmationWindow = TimeSpan.FromMinutes(1);
     private readonly DistributedApplication _application;
     private readonly IResource _eventStoreResource;
@@ -63,10 +73,9 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     private string? _checkpointCorrelationId;
     private string? _faultProbeNoteRef;
     private string? _controlTenantNoteRef;
-    private int _subscriptionSubmittedBaseline;
-    private int _subscriptionFailuresBaseline;
     private ProjectConversationSourceEmailView? _affectedTenantSentinel;
     private ProjectConversationSourceEmailView? _controlTenantSentinel;
+    private string? _subscriptionCheckpointIntakeRef;
     private string? _reconciledIntakeRef;
     private string? _duplicateProbeIntakeRef;
     private bool _subscriptionFaultLeftStateUnchanged;
@@ -126,24 +135,28 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         string operationRef = ChatBotTaskId.New().Value;
         _checkpointNoteRefs.Clear();
         _checkpointCommittedAtUtc.Clear();
+        _checkpointCorrelationId = correlationId;
         for (int index = 0; index < CommittedCheckpointRecordCount; index++)
         {
             string noteRef = GovernedNoteId.New().Value;
             string commandRef = ChatBotCommandId.New().Value;
+            _checkpointNoteRefs.Add(noteRef);
             await SubmitUntilAcceptedAsync(noteRef, commandRef, operationRef, correlationId, userAccessToken, cancellationToken)
                 .ConfigureAwait(false);
             await WaitForGovernedOperationAsync(noteRef, correlationId, expectPresent: true, userAccessToken, cancellationToken)
                 .ConfigureAwait(false);
-            _checkpointNoteRefs.Add(noteRef);
+            await _durableState.WaitForGovernedNoteAsync(
+                RecoveryValidationTopology.StorageTenantRef,
+                noteRef,
+                cancellationToken).ConfigureAwait(false);
             _checkpointCommittedAtUtc.Add(UtcNow);
         }
-
-        _checkpointCorrelationId = correlationId;
 
         // Seed a resource owned by an INDEPENDENT control tenant. Probing a randomly generated id with the caller's
         // own token can only ever 404, so it proves nothing; a real foreign-tenant resource that must stay
         // unreadable after recovery is what makes the isolation assertion falsifiable.
         string controlNoteRef = GovernedNoteId.New().Value;
+        _controlTenantNoteRef = controlNoteRef;
         await SubmitUntilAcceptedAsync(
                 controlNoteRef,
                 ChatBotCommandId.New().Value,
@@ -159,7 +172,10 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 controlAccessToken,
                 cancellationToken)
             .ConfigureAwait(false);
-        _controlTenantNoteRef = controlNoteRef;
+        await _durableState.WaitForGovernedNoteAsync(
+            RecoveryValidationTopology.ControlTenantRef,
+            controlNoteRef,
+            cancellationToken).ConfigureAwait(false);
         return new RecoveryOperationCheckpoint(_checkpointNoteRefs.Count, _checkpointCommittedAtUtc.Max(), operationRef);
     }
 
@@ -198,15 +214,18 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             }
         }
 
-        if (!StopReachedDependencyBoundary(commandSucceeded, endpointAvailable))
-        {
-            throw ResourceCommandFailure(KnownResourceCommands.StopCommand, result);
-        }
-
-        if (endpointAvailable)
+        // Check the specific "command succeeded but the endpoint never went away" case before the generic boundary
+        // check below: StopReachedDependencyBoundary(true, true) is false, so the generic check would otherwise throw
+        // a misleading ResourceCommandFailure for a command that actually succeeded.
+        if (commandSucceeded && endpointAvailable)
         {
             throw new InvalidOperationException(
                 $"EventStore was still reachable {StopConfirmationTimeout.TotalSeconds:N0}s after an accepted stop command.");
+        }
+
+        if (!StopReachedDependencyBoundary(commandSucceeded, endpointAvailable))
+        {
+            throw ResourceCommandFailure(KnownResourceCommands.StopCommand, result);
         }
     }
 
@@ -254,6 +273,12 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             // The real ChatBot/DAPR command path surfaced the dependency fault as transport unavailability.
         }
 
+        if (await IsEventStoreEndpointAvailableAsync(cancellationToken).ConfigureAwait(false))
+        {
+            throw new InvalidOperationException(
+                "The ChatBot fault probe failed, but EventStore itself was reachable; the requested dependency boundary was not proven.");
+        }
+
         return new RecoveryFaultObservation(UtcNow, "eventstore-command-path-unavailable");
     }
 
@@ -262,7 +287,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         => await ExecuteResourceCommandAsync(KnownResourceCommands.StartCommand, cancellationToken).ConfigureAwait(false);
 
     internal static bool StopReachedDependencyBoundary(bool commandSucceeded, bool endpointAvailable)
-        => commandSucceeded || !endpointAvailable;
+        => commandSucceeded && !endpointAvailable;
 
     /// <inheritdoc />
     public async ValueTask<DateTimeOffset> WaitForEventStoreRecoveryAsync(CancellationToken cancellationToken)
@@ -326,6 +351,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         int reconstructedCount = 0;
         foreach (string noteRef in _checkpointNoteRefs)
         {
+            bool projectionPresent = false;
             try
             {
                 if (await WaitForGovernedOperationAsync(
@@ -335,7 +361,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                     userAccessToken,
                     cancellationToken).ConfigureAwait(false))
                 {
-                    reconstructedCount++;
+                    projectionPresent = true;
                 }
             }
             catch (TimeoutException)
@@ -343,15 +369,51 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 // Genuinely not reconstructed within the presence budget — a real partial-loss signal, not every
                 // committed record needs to survive for the loop to keep checking the rest.
             }
+
+            bool durablePresent = await _durableState.IsGovernedNoteCommittedAsync(
+                RecoveryValidationTopology.StorageTenantRef,
+                noteRef,
+                cancellationToken).ConfigureAwait(false);
+            if (projectionPresent && durablePresent)
+            {
+                reconstructedCount++;
+            }
         }
 
-        bool unauthorizedMutationAbsent = string.IsNullOrWhiteSpace(_faultProbeNoteRef) ||
-            !await WaitForGovernedOperationAsync(
+        bool unauthorizedMutationAbsent = true;
+        if (!string.IsNullOrWhiteSpace(_faultProbeNoteRef))
+        {
+            Task<bool> durableFaultAbsent = _durableState.RemainsGovernedNoteAbsentAsync(
+                RecoveryValidationTopology.StorageTenantRef,
+                _faultProbeNoteRef,
+                AbsenceConfirmationWindow,
+                cancellationToken);
+            bool projectionFaultAbsent = !await WaitForGovernedOperationAsync(
                 _faultProbeNoteRef,
                 checkpoint.OperationRef,
                 expectPresent: false,
                 userAccessToken,
                 cancellationToken).ConfigureAwait(false);
+            unauthorizedMutationAbsent = projectionFaultAbsent && await durableFaultAbsent.ConfigureAwait(false);
+        }
+
+        List<Task<bool>> crossTenantAbsenceChecks = _checkpointNoteRefs
+            .Select(noteRef => _durableState.RemainsGovernedNoteAbsentAsync(
+                RecoveryValidationTopology.ControlTenantRef,
+                noteRef,
+                AbsenceConfirmationWindow,
+                cancellationToken))
+            .ToList();
+        crossTenantAbsenceChecks.Add(_durableState.RemainsGovernedNoteAbsentAsync(
+            RecoveryValidationTopology.StorageTenantRef,
+            _controlTenantNoteRef,
+            AbsenceConfirmationWindow,
+            cancellationToken));
+        bool[] crossTenantAbsence = await Task.WhenAll(crossTenantAbsenceChecks).ConfigureAwait(false);
+        bool controlDurable = await _durableState.IsGovernedNoteCommittedAsync(
+            RecoveryValidationTopology.ControlTenantRef,
+            _controlTenantNoteRef,
+            cancellationToken).ConfigureAwait(false);
 
         // Read a REAL resource owned by the independent control tenant using the recovery tenant's own bearer. The
         // control tenant must still be able to read it, and the recovery tenant must not.
@@ -366,8 +428,10 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             controlAccessToken,
             cancellationToken).ConfigureAwait(false);
         bool tenantIsolation = foreignRead.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound &&
-            controlRead.StatusCode == HttpStatusCode.OK;
-        return new RecoveryEventStoreEndState(reconstructedCount, tenantIsolation, unauthorizedMutationAbsent);
+            controlRead.StatusCode == HttpStatusCode.OK &&
+            controlDurable &&
+            crossTenantAbsence.All(static absent => absent);
+        return new RecoveryEventStoreEndState(UtcNow, reconstructedCount, tenantIsolation, unauthorizedMutationAbsent);
     }
 
     /// <inheritdoc />
@@ -378,14 +442,17 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             throw new InvalidOperationException("EventStore was not available during continuity cleanup verification.");
         }
 
-        if (_checkpointNoteRefs.Count == 0 || string.IsNullOrWhiteSpace(_checkpointCorrelationId))
+        bool hasOwnedState = _checkpointNoteRefs.Count > 0 ||
+            !string.IsNullOrWhiteSpace(_controlTenantNoteRef) ||
+            !string.IsNullOrWhiteSpace(_faultProbeNoteRef);
+        if (!hasOwnedState)
         {
-            throw new InvalidOperationException("Continuity cleanup had no persisted checkpoint to verify.");
+            return true;
         }
 
-        if (string.IsNullOrWhiteSpace(_controlTenantNoteRef))
+        if (string.IsNullOrWhiteSpace(_checkpointCorrelationId))
         {
-            throw new InvalidOperationException("Continuity cleanup had no control-tenant note to verify and erase.");
+            throw new InvalidOperationException("Continuity cleanup lost the correlation identity for its owned state.");
         }
 
         string userAccessToken = await RecoveryAccessTokenProvider
@@ -413,21 +480,24 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             }
         }
 
-        try
+        if (!string.IsNullOrWhiteSpace(_controlTenantNoteRef))
         {
-            if (!await WaitForGovernedOperationAsync(
-                _controlTenantNoteRef,
-                _checkpointCorrelationId,
-                expectPresent: true,
-                controlAccessToken,
-                cancellationToken).ConfigureAwait(false))
+            try
+            {
+                if (!await WaitForGovernedOperationAsync(
+                    _controlTenantNoteRef,
+                    _checkpointCorrelationId,
+                    expectPresent: true,
+                    controlAccessToken,
+                    cancellationToken).ConfigureAwait(false))
+                {
+                    complete = false;
+                }
+            }
+            catch (TimeoutException)
             {
                 complete = false;
             }
-        }
-        catch (TimeoutException)
-        {
-            complete = false;
         }
 
         if (!string.IsNullOrWhiteSpace(_faultProbeNoteRef))
@@ -457,9 +527,12 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 cancellationToken).ConfigureAwait(false);
         }
 
-        await EraseReadModelAsync(
-            GovernedOperationView.KeyFor(RecoveryValidationTopology.ControlTenantRef, _controlTenantNoteRef),
-            cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(_controlTenantNoteRef))
+        {
+            await EraseReadModelAsync(
+                GovernedOperationView.KeyFor(RecoveryValidationTopology.ControlTenantRef, _controlTenantNoteRef),
+                cancellationToken).ConfigureAwait(false);
+        }
         if (!string.IsNullOrWhiteSpace(_faultProbeNoteRef))
         {
             await EraseReadModelAsync(
@@ -467,44 +540,42 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 cancellationToken).ConfigureAwait(false);
         }
 
-        foreach (string noteRef in _checkpointNoteRefs)
+        try
         {
-            try
-            {
-                bool stillPresent = await WaitForGovernedOperationAsync(
+            List<Task<bool>> absenceChecks = _checkpointNoteRefs
+                .Select(noteRef => WaitForGovernedOperationAsync(
                     noteRef,
                     _checkpointCorrelationId,
                     expectPresent: false,
                     userAccessToken,
-                    cancellationToken).ConfigureAwait(false);
-                complete &= !stillPresent;
-            }
-            catch (InvalidOperationException)
+                    cancellationToken))
+                .ToList();
+            if (!string.IsNullOrWhiteSpace(_controlTenantNoteRef))
             {
-                complete = false;
+                absenceChecks.Add(WaitForGovernedOperationAsync(
+                    _controlTenantNoteRef,
+                    _checkpointCorrelationId,
+                    expectPresent: false,
+                    controlAccessToken,
+                    cancellationToken));
             }
-        }
-
-        try
-        {
-            bool controlStillPresent = await WaitForGovernedOperationAsync(
-                _controlTenantNoteRef,
-                _checkpointCorrelationId,
-                expectPresent: false,
-                controlAccessToken,
-                cancellationToken).ConfigureAwait(false);
-            complete &= !controlStillPresent;
+            bool[] stillPresent = await Task.WhenAll(absenceChecks).ConfigureAwait(false);
+            complete &= stillPresent.All(static present => !present);
         }
         catch (InvalidOperationException)
         {
             complete = false;
         }
 
-        _faultProbeNoteRef = null;
-        _controlTenantNoteRef = null;
-        _checkpointNoteRefs.Clear();
-        _checkpointCommittedAtUtc.Clear();
-        _checkpointCorrelationId = null;
+        if (complete)
+        {
+            _faultProbeNoteRef = null;
+            _controlTenantNoteRef = null;
+            _checkpointNoteRefs.Clear();
+            _checkpointCommittedAtUtc.Clear();
+            _checkpointCorrelationId = null;
+        }
+
         return complete;
     }
 
@@ -520,7 +591,8 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             tenantRef,
             "process",
             includeBearer: true,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            notificationPhase: RecoveryNotificationIdentity.CheckpointPhase).ConfigureAwait(false);
         JsonElement root = process.RootElement;
         if (!root.GetProperty("submitted").GetBoolean())
         {
@@ -540,6 +612,11 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 "Subscription committed-before-outage checkpoint did not return observedAtUtc.");
         }
 
+        await _durableState.WaitForMailboxIntakeAsync(
+            RecoveryValidationTopology.StorageTenantRef,
+            intakeId,
+            cancellationToken).ConfigureAwait(false);
+        _subscriptionCheckpointIntakeRef = intakeId;
         DateTimeOffset committedAtUtc = observed.GetDateTimeOffset().ToUniversalTime();
         return new RecoveryOperationCheckpoint(1, committedAtUtc, intakeId);
     }
@@ -547,17 +624,17 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     /// <inheritdoc />
     public async ValueTask ExpireSubscriptionAsync(string tenantRef, CancellationToken cancellationToken)
     {
-        // The simulator's counters are process-lifetime absolutes and are never reset by fault/restore. Capture a
-        // baseline so reconciliation asserts on what THIS scenario produced; comparing the raw totals made a rerun
-        // (or the scoped-outage graph scenario running first) report a fabricated data-loss breach.
-        using JsonDocument baseline = await SendSandboxControlAsync(
+        using JsonDocument cleanBoundary = await SendSandboxControlAsync(
             tenantRef,
-            "status",
+            "restore",
             includeBearer: false,
-            cancellationToken,
-            HttpMethod.Get).ConfigureAwait(false);
-        _subscriptionSubmittedBaseline = baseline.RootElement.GetProperty("submitted").GetInt32();
-        _subscriptionFailuresBaseline = baseline.RootElement.GetProperty("recoverableFailures").GetInt32();
+            cancellationToken).ConfigureAwait(false);
+        if (RecoverySandboxRestoreResponse.WasPreviouslyFaulted(cleanBoundary.RootElement) ||
+            RecoverySandboxRestoreResponse.IsCurrentlyFaulted(cleanBoundary.RootElement))
+        {
+            throw new InvalidOperationException("The subscription boundary was not clean before fault injection.");
+        }
+
         _affectedTenantSentinel = SubscriptionSentinel(
             RecoveryValidationTopology.StorageTenantRef,
             "recovery-subscription-affected-sentinel");
@@ -590,7 +667,8 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             tenantRef,
             "process",
             includeBearer: true,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            notificationPhase: RecoveryNotificationIdentity.RecoveryPhase).ConfigureAwait(false);
         JsonElement root = response.RootElement;
         if (root.GetProperty("submitted").GetBoolean() ||
             !string.Equals(root.GetProperty("reasonCode").GetString(), "graph_subscription_expired", StringComparison.Ordinal))
@@ -642,7 +720,8 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             tenantRef,
             "process",
             includeBearer: true,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            notificationPhase: RecoveryNotificationIdentity.RecoveryPhase).ConfigureAwait(false);
         if (!process.RootElement.GetProperty("submitted").GetBoolean())
         {
             string kind = process.RootElement.GetProperty("kind").GetString() ?? "unknown";
@@ -669,7 +748,8 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             tenantRef,
             "process",
             includeBearer: true,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            notificationPhase: RecoveryNotificationIdentity.RecoveryPhase).ConfigureAwait(false);
         _duplicateProbeIntakeRef = duplicateProbe.RootElement.GetProperty("intakeId").GetString();
         if (!duplicateProbe.RootElement.GetProperty("submitted").GetBoolean() ||
             string.IsNullOrWhiteSpace(_duplicateProbeIntakeRef))
@@ -677,11 +757,25 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             throw new InvalidOperationException("The duplicate-notification probe did not reach the real Worker submission path.");
         }
 
-        bool duplicateAggregateCommitted = !await _durableState.RemainsAbsentAsync(
+        Task<bool> duplicateAggregateAbsent = _durableState.RemainsAbsentAsync(
             RecoveryValidationTopology.StorageTenantRef,
             _duplicateProbeIntakeRef,
             AbsenceConfirmationWindow,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken);
+        Task<bool> controlTenantAggregateAbsent = _durableState.RemainsAbsentAsync(
+            RecoveryValidationTopology.ControlTenantRef,
+            _reconciledIntakeRef,
+            AbsenceConfirmationWindow,
+            cancellationToken);
+        Task<bool> controlTenantReadModelsAbsent = RemainsIntakeReadModelsAbsentAsync(
+            RecoveryValidationTopology.ControlTenantRef,
+            _reconciledIntakeRef,
+            AbsenceConfirmationWindow,
+            cancellationToken);
+        bool[] isolationOutcomes = await Task.WhenAll(
+            duplicateAggregateAbsent,
+            controlTenantAggregateAbsent,
+            controlTenantReadModelsAbsent).ConfigureAwait(false);
         bool recoveredAggregateStillCommitted = await _durableState.IsMailboxIntakeCommittedAsync(
             RecoveryValidationTopology.StorageTenantRef,
             _reconciledIntakeRef,
@@ -699,47 +793,42 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 cancellationToken)
             .ConfigureAwait(false);
 
-        DateTimeOffset recoveredAtUtc = process.RootElement.GetProperty("observedAtUtc").GetDateTimeOffset().ToUniversalTime();
-        using JsonDocument status = await SendSandboxControlAsync(
-            tenantRef,
-            "status",
-            includeBearer: false,
-            cancellationToken,
-            HttpMethod.Get).ConfigureAwait(false);
-        JsonElement root = status.RootElement;
-
-        // Isolation is proven by independent sentinel equality across affected/control tenants — not by the sandbox
-        // rejecting a foreign route (tenant-alpha) that never owned the scenario data.
+        // Isolation combines sentinel preservation with exact generated-identity absence in the control tenant. A new
+        // cross-tenant row no longer passes merely because the two fixed sentinel rows stayed unchanged.
         bool isolated = Equals(affectedSentinel, _affectedTenantSentinel) &&
-            Equals(controlSentinel, _controlTenantSentinel);
-        int submitted = root.GetProperty("submitted").GetInt32() - _subscriptionSubmittedBaseline;
-        int failures = root.GetProperty("recoverableFailures").GetInt32() - _subscriptionFailuresBaseline;
+            Equals(controlSentinel, _controlTenantSentinel) &&
+            isolationOutcomes[1] &&
+            isolationOutcomes[2];
+        // Duplication is a distinct dimension from silent loss: a recovery that lost data (recoveredAggregateStillCommitted
+        // false) is a NoSilentLoss breach, not evidence of duplication. Mirrors the Graph scoped-outage sibling's
+        // same-id-or-still-present check, which does not condition on recovery success either.
         bool noDuplicateProjection = !string.Equals(_duplicateProbeIntakeRef, _reconciledIntakeRef, StringComparison.Ordinal) &&
-            !duplicateAggregateCommitted &&
-            recoveredAggregateStillCommitted;
+            isolationOutcomes[0];
         return new RecoverySubscriptionEndState(
-            recoveredAtUtc,
+            UtcNow,
             DeliveredCount: recoveredAggregateStillCommitted ? 1 : 0,
             NoSilentLoss: recoveredAggregateStillCommitted,
             NoDuplicateSideEffects: noDuplicateProjection,
             TenantIsolationPreserved: isolated,
-            UnauthorizedMutationAbsent: _subscriptionFaultLeftStateUnchanged && failures >= 1 && submitted >= 2);
+            UnauthorizedMutationAbsent: _subscriptionFaultLeftStateUnchanged);
     }
 
     /// <inheritdoc />
     public async ValueTask<bool> CleanupSubscriptionScenarioAsync(string tenantRef, CancellationToken cancellationToken)
     {
+        (string Tenant, string? Intake)[] cleanupTargets =
+        [
+            (_affectedTenantSentinel?.TenantId ?? string.Empty, _affectedTenantSentinel?.IntakeId),
+            (_controlTenantSentinel?.TenantId ?? string.Empty, _controlTenantSentinel?.IntakeId),
+            (RecoveryValidationTopology.StorageTenantRef, _subscriptionCheckpointIntakeRef),
+            (RecoveryValidationTopology.StorageTenantRef, _reconciledIntakeRef),
+            (RecoveryValidationTopology.StorageTenantRef, _duplicateProbeIntakeRef),
+        ];
         // Erase FIRST, then restore in finally. Running restore ahead of erase stranded rows when restore failed;
         // running erase without finally left the simulator faulted when erase threw.
         try
         {
-            foreach ((string cleanupTenant, string? cleanupIntake) in new[]
-            {
-                (_affectedTenantSentinel?.TenantId ?? string.Empty, _affectedTenantSentinel?.IntakeId),
-                (_controlTenantSentinel?.TenantId ?? string.Empty, _controlTenantSentinel?.IntakeId),
-                (RecoveryValidationTopology.StorageTenantRef, _reconciledIntakeRef),
-                (RecoveryValidationTopology.StorageTenantRef, _duplicateProbeIntakeRef),
-            })
+            foreach ((string cleanupTenant, string? cleanupIntake) in cleanupTargets)
             {
                 if (!string.IsNullOrWhiteSpace(cleanupTenant) && !string.IsNullOrWhiteSpace(cleanupIntake))
                 {
@@ -761,41 +850,39 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         }
 
         bool complete = true;
-        foreach ((string cleanupTenant, string? cleanupIntake) in new[]
-        {
-            (_affectedTenantSentinel?.TenantId ?? string.Empty, _affectedTenantSentinel?.IntakeId),
-            (_controlTenantSentinel?.TenantId ?? string.Empty, _controlTenantSentinel?.IntakeId),
-        })
+        foreach ((string cleanupTenant, string? cleanupIntake) in cleanupTargets)
         {
             if (string.IsNullOrWhiteSpace(cleanupTenant) || string.IsNullOrWhiteSpace(cleanupIntake))
             {
                 continue;
             }
 
-            ProjectConversationSourceEmailView? remaining = await _readModels
-                .GetSourceEmailAsync(cleanupTenant, cleanupIntake, cancellationToken)
-                .ConfigureAwait(false);
-            complete &= remaining is null;
+            complete &= await AreIntakeReadModelsAbsentAsync(
+                cleanupTenant,
+                cleanupIntake,
+                cancellationToken).ConfigureAwait(false);
         }
 
-        foreach (string? cleanupIntake in new[] { _reconciledIntakeRef, _duplicateProbeIntakeRef })
+        // The reconciled aggregate is append-only and must remain committed; only the fresh duplicate-probe identity
+        // is expected to remain absent in durable state.
+        if (!string.IsNullOrWhiteSpace(_duplicateProbeIntakeRef))
         {
-            if (string.IsNullOrWhiteSpace(cleanupIntake))
-            {
-                continue;
-            }
-
             complete &= await _durableState.RemainsAbsentAsync(
                 RecoveryValidationTopology.StorageTenantRef,
-                cleanupIntake,
+                _duplicateProbeIntakeRef,
                 AbsenceConfirmationWindow,
                 cancellationToken).ConfigureAwait(false);
         }
 
-        _affectedTenantSentinel = null;
-        _controlTenantSentinel = null;
-        _reconciledIntakeRef = null;
-        _duplicateProbeIntakeRef = null;
+        if (complete)
+        {
+            _affectedTenantSentinel = null;
+            _controlTenantSentinel = null;
+            _subscriptionCheckpointIntakeRef = null;
+            _reconciledIntakeRef = null;
+            _duplicateProbeIntakeRef = null;
+        }
+
         return complete;
     }
 
@@ -812,7 +899,61 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         await EraseReadModelAsync(
             ProjectConversationAttachmentSetView.KeyFor(tenantId, intakeId),
             cancellationToken).ConfigureAwait(false);
+        await EraseReadModelAsync(
+            AttachmentIndexKeyFor(tenantId, intakeId),
+            cancellationToken).ConfigureAwait(false);
     }
+
+    private async Task<bool> AreIntakeReadModelsAbsentAsync(
+        string tenantId,
+        string intakeId,
+        CancellationToken cancellationToken)
+    {
+        foreach (string key in IntakeReadModelKeys(tenantId, intakeId))
+        {
+            (bool present, _) = await _readModelEraser
+                .TryReadEtagAsync(ChatBotReadModelStoreNames.StateStoreName, key, cancellationToken)
+                .ConfigureAwait(false);
+            if (present)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private async Task<bool> RemainsIntakeReadModelsAbsentAsync(
+        string tenantId,
+        string intakeId,
+        TimeSpan window,
+        CancellationToken cancellationToken)
+    {
+        Stopwatch timer = Stopwatch.StartNew();
+        do
+        {
+            if (!await AreIntakeReadModelsAbsentAsync(tenantId, intakeId, cancellationToken).ConfigureAwait(false))
+            {
+                return false;
+            }
+
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
+        while (timer.Elapsed < window);
+
+        return await AreIntakeReadModelsAbsentAsync(tenantId, intakeId, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static string[] IntakeReadModelKeys(string tenantId, string intakeId)
+        =>
+        [
+            ProjectConversationSourceEmailView.KeyFor(tenantId, intakeId),
+            ProjectConversationAttachmentSetView.KeyFor(tenantId, intakeId),
+            AttachmentIndexKeyFor(tenantId, intakeId),
+        ];
+
+    private static string AttachmentIndexKeyFor(string tenantId, string intakeId)
+        => $"{tenantId}:project-conversation:{intakeId}:attachments";
 
     private async Task EraseReadModelAsync(string key, CancellationToken cancellationToken)
     {
@@ -970,7 +1111,6 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         // eventually-consistent read path meant a mutation that DID land during the outage, but projected slowly, was
         // recorded as "absent" — i.e. unauthorizedMutationAbsent = true. The asymmetry biased toward passing.
         TimeSpan deadline = expectPresent ? TimeSpan.FromMinutes(1) : AbsenceConfirmationWindow;
-        bool observedAbsent = false;
         while (timer.Elapsed < deadline)
         {
             using HttpResponseMessage response = await GetAuthorizedAsync(
@@ -986,9 +1126,9 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             // Absence must be OBSERVED, never inferred from "not 200". A 401 from an expired bearer or a 5xx from a
             // broken read path is not evidence that an unauthorized mutation is absent — and for presence probes those
             // same statuses are not "not yet projected"; they are verification failures.
-            if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
-                observedAbsent = true;
+                // Keep polling for the full window. A late materialization invalidates absence.
             }
             else
             {
@@ -999,15 +1139,30 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
         }
 
+        // Close the final-delay race: a projection can materialize after the last loop read but before the delay
+        // crosses the deadline. The boundary observation, rather than the preceding sleep, decides the result.
+        using HttpResponseMessage finalResponse = await GetAuthorizedAsync(
+            $"/api/v1/governed-operations/{noteRef}",
+            correlationId,
+            accessToken,
+            cancellationToken).ConfigureAwait(false);
+        if (finalResponse.StatusCode == HttpStatusCode.OK)
+        {
+            return true;
+        }
+
+        if (finalResponse.StatusCode != HttpStatusCode.NotFound)
+        {
+            throw new InvalidOperationException(
+                $"The governed-operation {(expectPresent ? "presence" : "absence")} probe returned an unexpected status {(int)finalResponse.StatusCode}.");
+        }
+
         if (expectPresent)
         {
             throw new TimeoutException("The governed checkpoint projection did not materialize before the scenario deadline.");
         }
 
-        return observedAbsent
-            ? false
-            : throw new InvalidOperationException(
-                "The governed-operation absence probe never observed an explicit rejection.");
+        return false;
     }
 
     private async Task<HttpResponseMessage> GetAuthorizedAsync(
@@ -1027,7 +1182,8 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         string action,
         bool includeBearer,
         CancellationToken cancellationToken,
-        HttpMethod? method = null)
+        HttpMethod? method = null,
+        string? notificationPhase = null)
     {
         using HttpRequestMessage request = SandboxRequest(tenantRef, action, includeBearer, method ?? HttpMethod.Post);
         if (includeBearer)
@@ -1036,6 +1192,14 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 .AcquireMailboxAsync(_application, _mailboxClientSecret, cancellationToken)
                 .ConfigureAwait(false);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", mailboxAccessToken);
+        }
+
+        if (string.Equals(action, "process", StringComparison.Ordinal))
+        {
+            request.Headers.Add(
+                RecoveryNotificationIdentity.HeaderName,
+                notificationPhase ?? throw new InvalidOperationException(
+                    "A recovery notification phase is required for every process action."));
         }
 
         using HttpResponseMessage response = await _sandboxClient.SendAsync(request, cancellationToken).ConfigureAwait(false);

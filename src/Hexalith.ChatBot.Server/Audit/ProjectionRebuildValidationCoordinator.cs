@@ -239,19 +239,28 @@ internal sealed class ProjectionRebuildValidationCoordinator(
         }
         catch (Exception) when (cancellationToken is { IsCancellationRequested: false })
         {
+            DateTimeOffset endedAtUtc = clock.UtcNow;
+            if (endedAtUtc < report.StartedAtUtc)
+            {
+                endedAtUtc = report.StartedAtUtc;
+            }
+
             ProjectionRebuildReport unmeasurable = ProjectionRebuildReport.Unmeasurable(
                 report.TenantRef,
                 report.DatasetRef,
                 report.CorrelationId,
                 report.StartedAtUtc,
-                clock.UtcNow,
+                endedAtUtc,
                 report.ProjectionSchemaVersion);
 
             // Keep WHY it is unmeasurable in the artifact. The verdict model is unchanged — a retention failure is
             // still a stop-ship — but the deviation distinguishes "the sink was unavailable" from "rebuild failed".
+            // Preserve ExecutionAssertions from the completed run so a successful fallback write does not erase the
+            // execution facts that already finished.
             unmeasurable = unmeasurable with
             {
                 Deviations = [.. unmeasurable.Deviations, ProjectionRebuildReport.EvidenceRetentionFailedDeviation],
+                ExecutionAssertions = report.ExecutionAssertions,
             };
             try
             {

@@ -269,7 +269,7 @@ public sealed class FileRecoveryValidationEvidenceSinkTests
             ControllerSecret = "tier3-value",
             RestorationTimeout = TimeSpan.FromMinutes(3),
             EvidenceDirectory = evidenceDirectory,
-            EvidenceLocator = "artifact:live-recovery-validation",
+            EvidenceLocator = "artifact:live-recovery-validation-evidence",
         };
 
     private static string CreateEvidenceDirectory()

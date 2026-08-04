@@ -107,7 +107,7 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
                 expectedDatasetVersion: RequiredValue(ExpectedDatasetVersionVariable),
                 minimumDatasetVolume: (int)PositiveNumber(MinimumDatasetVolumeVariable, unset: null),
                 maximumMeasurableRecoveryCeilingSeconds: PositiveNumber(MaximumMeasurableCeilingSecondsVariable, unset: null),
-                requiredRepositoryCommit: Optional(RequiredCommitVariable))
+                requiredRepositoryCommit: RequiredValue(RequiredCommitVariable))
             : new LiveRecoveryValidationGatePolicy(
                 ExpectedDatasets(required),
                 TargetDeviationsBlockRelease: true,

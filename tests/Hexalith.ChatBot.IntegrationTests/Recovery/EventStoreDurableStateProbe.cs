@@ -10,31 +10,107 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 /// </summary>
 internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDisposable
 {
-    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(250);
-    private readonly HttpClient _client = new()
+    private static readonly TimeSpan DefaultPollInterval = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan DefaultPresenceWindow = TimeSpan.FromMinutes(1);
+    private readonly HttpClient _client = CreateClient(daprHttpEndpoint);
+    private readonly TimeSpan _pollInterval = DefaultPollInterval;
+    private readonly TimeSpan _presenceWindow = DefaultPresenceWindow;
+
+    internal EventStoreDurableStateProbe(
+        Uri daprHttpEndpoint,
+        HttpMessageHandler handler,
+        TimeSpan presenceWindow,
+        TimeSpan pollInterval)
+        : this(daprHttpEndpoint)
     {
-        BaseAddress = new Uri(daprHttpEndpoint.ToString().TrimEnd('/') + '/', UriKind.Absolute),
-        Timeout = TimeSpan.FromSeconds(10),
-    };
+        ArgumentNullException.ThrowIfNull(handler);
+        if (presenceWindow <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(presenceWindow));
+        }
+
+        if (pollInterval <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pollInterval));
+        }
+
+        _client.Dispose();
+        _client = CreateClient(daprHttpEndpoint, handler);
+        _presenceWindow = presenceWindow;
+        _pollInterval = pollInterval;
+    }
 
     public async Task WaitForMailboxIntakeAsync(
         string tenantRef,
         string intakeRef,
         CancellationToken cancellationToken)
+        => await WaitForAggregateAsync(
+            tenantRef,
+            intakeRef,
+            ".MailboxMessageIntakeCaptured",
+            cancellationToken).ConfigureAwait(false);
+
+    public async Task WaitForGovernedNoteAsync(
+        string tenantRef,
+        string noteRef,
+        CancellationToken cancellationToken)
+        => await WaitForAggregateAsync(
+            tenantRef,
+            noteRef,
+            ".GovernedNoteRecorded",
+            cancellationToken).ConfigureAwait(false);
+
+    private async Task WaitForAggregateAsync(
+        string tenantRef,
+        string aggregateRef,
+        string expectedEventTypeSuffix,
+        CancellationToken cancellationToken)
     {
         Stopwatch timer = Stopwatch.StartNew();
-        while (timer.Elapsed < TimeSpan.FromSeconds(30))
+        while (timer.Elapsed < _presenceWindow)
         {
-            if (await IsMailboxIntakeCommittedAsync(tenantRef, intakeRef, cancellationToken).ConfigureAwait(false))
+            if (await TryIsAggregateCommittedTolerantlyAsync(
+                tenantRef,
+                aggregateRef,
+                expectedEventTypeSuffix,
+                cancellationToken).ConfigureAwait(false))
             {
                 return;
             }
 
-            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(_pollInterval, cancellationToken).ConfigureAwait(false);
         }
 
         throw new TimeoutException(
-            $"Mailbox intake aggregate '{tenantRef}:chatbot:{intakeRef}' did not materialize in EventStore actor state.");
+            $"Aggregate '{tenantRef}:chatbot:{aggregateRef}' did not materialize in EventStore actor state.");
+    }
+
+    /// <summary>
+    /// Polls <see cref="IsAggregateCommittedAsync"/> while a genuinely transient metadata/event-content mismatch —
+    /// the two actor-state keys committing via separate writes on an eventually-consistent read path — is tolerated
+    /// as "not yet observed" rather than failing the whole wait closed on its first inconsistent read. One-shot
+    /// callers (<see cref="IsMailboxIntakeCommittedAsync"/>, <see cref="IsGovernedNoteCommittedAsync"/>) deliberately
+    /// do not get this tolerance: outside a sustained poll, an inconsistent read must fail closed rather than be
+    /// silently reinterpreted as absence.
+    /// </summary>
+    private async Task<bool> TryIsAggregateCommittedTolerantlyAsync(
+        string tenantRef,
+        string aggregateRef,
+        string expectedEventTypeSuffix,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await IsAggregateCommittedAsync(
+                tenantRef,
+                aggregateRef,
+                expectedEventTypeSuffix,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -48,6 +124,31 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
         string intakeRef,
         TimeSpan window,
         CancellationToken cancellationToken)
+        => await RemainsAggregateAbsentAsync(
+            tenantRef,
+            intakeRef,
+            ".MailboxMessageIntakeCaptured",
+            window,
+            cancellationToken).ConfigureAwait(false);
+
+    public async Task<bool> RemainsGovernedNoteAbsentAsync(
+        string tenantRef,
+        string noteRef,
+        TimeSpan window,
+        CancellationToken cancellationToken)
+        => await RemainsAggregateAbsentAsync(
+            tenantRef,
+            noteRef,
+            ".GovernedNoteRecorded",
+            window,
+            cancellationToken).ConfigureAwait(false);
+
+    private async Task<bool> RemainsAggregateAbsentAsync(
+        string tenantRef,
+        string aggregateRef,
+        string expectedEventTypeSuffix,
+        TimeSpan window,
+        CancellationToken cancellationToken)
     {
         if (window <= TimeSpan.Zero)
         {
@@ -57,47 +158,95 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
         Stopwatch timer = Stopwatch.StartNew();
         do
         {
-            if (await IsMailboxIntakeCommittedAsync(tenantRef, intakeRef, cancellationToken).ConfigureAwait(false))
+            // Tolerate a transient metadata/event-content mismatch mid-window: it can be a commit still settling
+            // across the two separately-written actor-state keys, which the next iteration (or the final closing
+            // read below) will observe once consistent, rather than a reason to abort the whole sustained-absence
+            // assertion.
+            if (await TryIsAggregateCommittedTolerantlyAsync(
+                tenantRef,
+                aggregateRef,
+                expectedEventTypeSuffix,
+                cancellationToken).ConfigureAwait(false))
             {
                 return false;
             }
 
-            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(_pollInterval, cancellationToken).ConfigureAwait(false);
         }
         while (timer.Elapsed < window);
 
-        return true;
+        // A commit can land during the final delay after the loop condition was last checked. One final observation
+        // closes that boundary instead of turning the sleep itself into proof of absence. Unlike the mid-window
+        // polls above, this closing read is NOT tolerant: a still-inconsistent read at the very end of the window is
+        // anomalous rather than merely slow, and must fail closed like any other one-shot check.
+        return !await IsAggregateCommittedAsync(
+            tenantRef,
+            aggregateRef,
+            expectedEventTypeSuffix,
+            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<bool> IsMailboxIntakeCommittedAsync(
         string tenantRef,
         string intakeRef,
         CancellationToken cancellationToken)
+        => await IsAggregateCommittedAsync(
+            tenantRef,
+            intakeRef,
+            ".MailboxMessageIntakeCaptured",
+            cancellationToken).ConfigureAwait(false);
+
+    public async Task<bool> IsGovernedNoteCommittedAsync(
+        string tenantRef,
+        string noteRef,
+        CancellationToken cancellationToken)
+        => await IsAggregateCommittedAsync(
+            tenantRef,
+            noteRef,
+            ".GovernedNoteRecorded",
+            cancellationToken).ConfigureAwait(false);
+
+    private async Task<bool> IsAggregateCommittedAsync(
+        string tenantRef,
+        string aggregateRef,
+        string expectedEventTypeSuffix,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantRef);
-        ArgumentException.ThrowIfNullOrWhiteSpace(intakeRef);
+        ArgumentException.ThrowIfNullOrWhiteSpace(aggregateRef);
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedEventTypeSuffix);
 
-        string actorId = $"{tenantRef}:chatbot:{intakeRef}";
+        string actorId = $"{tenantRef}:chatbot:{aggregateRef}";
         JsonElement? metadata = await ReadActorStateAsync(
             actorId,
             $"{actorId}:metadata",
             cancellationToken).ConfigureAwait(false);
-        if (metadata is null || !TryGetInt64(metadata.Value, "CurrentSequence", out long currentSequence) || currentSequence < 1)
+        if (metadata is null)
         {
             return false;
+        }
+
+        if (!TryGetInt64(metadata.Value, "CurrentSequence", out long currentSequence) || currentSequence < 1)
+        {
+            throw new InvalidOperationException($"EventStore metadata for aggregate '{actorId}' is incomplete or invalid.");
         }
 
         JsonElement? persistedEvent = await ReadActorStateAsync(
             actorId,
             $"{actorId}:events:1",
             cancellationToken).ConfigureAwait(false);
-        return persistedEvent is not null &&
-            string.Equals(GetString(persistedEvent.Value, "TenantId"), tenantRef, StringComparison.Ordinal) &&
-            string.Equals(GetString(persistedEvent.Value, "Domain"), "chatbot", StringComparison.Ordinal) &&
-            string.Equals(GetString(persistedEvent.Value, "AggregateId"), intakeRef, StringComparison.Ordinal) &&
+        if (persistedEvent is null ||
+            !string.Equals(GetString(persistedEvent.Value, "TenantId"), tenantRef, StringComparison.Ordinal) ||
+            !string.Equals(GetString(persistedEvent.Value, "Domain"), "chatbot", StringComparison.Ordinal) ||
+            !string.Equals(GetString(persistedEvent.Value, "AggregateId"), aggregateRef, StringComparison.Ordinal) ||
             GetString(persistedEvent.Value, "EventTypeName")?.EndsWith(
-                ".MailboxMessageIntakeCaptured",
-                StringComparison.Ordinal) == true;
+                expectedEventTypeSuffix,
+                StringComparison.Ordinal) != true)
+        {
+            throw new InvalidOperationException($"EventStore event state for aggregate '{actorId}' is incomplete or inconsistent.");
+        }
+
+        return true;
     }
 
     public void Dispose() => _client.Dispose();
@@ -125,20 +274,36 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
         string content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(content))
         {
-            return null;
+            throw new InvalidOperationException(
+                $"EventStore actor-state probe returned an empty successful body for aggregate '{actorId}'.");
         }
 
         try
         {
             using JsonDocument document = JsonDocument.Parse(content);
-            return document.RootElement.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined
-                ? null
-                : document.RootElement.Clone();
+            if (document.RootElement.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            {
+                throw new InvalidOperationException(
+                    $"EventStore actor-state probe returned a null successful body for aggregate '{actorId}'.");
+            }
+
+            return document.RootElement.Clone();
         }
-        catch (JsonException)
+        catch (JsonException exception)
         {
-            return null;
+            throw new InvalidOperationException(
+                $"EventStore actor-state probe returned malformed JSON for aggregate '{actorId}'.",
+                exception);
         }
+    }
+
+    private static HttpClient CreateClient(Uri endpoint, HttpMessageHandler? handler = null)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        HttpClient client = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: true);
+        client.BaseAddress = new Uri(endpoint.ToString().TrimEnd('/') + '/', UriKind.Absolute);
+        client.Timeout = TimeSpan.FromSeconds(10);
+        return client;
     }
 
     private static string? GetString(JsonElement element, string propertyName)

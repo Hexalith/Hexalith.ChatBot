@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 
 using Hexalith.ChatBot.RecoverySandbox;
@@ -60,5 +61,59 @@ public sealed class RecoverySandboxContractTests
         RecoverySandboxAuthorization.Authorized("replay-test:other", TenantRef, secret, secret).ShouldBeFalse();
         RecoverySandboxAuthorization.Authorized(TenantRef, TenantRef, secret, presentedSecret: null).ShouldBeFalse();
         RecoverySandboxAuthorization.Authorized(TenantRef, TenantRef, secret, " ").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void NotificationIdentitySeparatesCheckpointFromRecoveryButKeepsRecoveryReplayStable()
+    {
+        string checkpoint = RecoveryNotificationIdentity.Compose(
+            "provider-message",
+            "continuity",
+            RecoveryNotificationIdentity.CheckpointPhase);
+        string recovery = RecoveryNotificationIdentity.Compose(
+            "provider-message",
+            "continuity",
+            RecoveryNotificationIdentity.RecoveryPhase);
+
+        checkpoint.ShouldNotBe(recovery);
+        RecoveryNotificationIdentity.Compose(
+            "provider-message",
+            "continuity",
+            RecoveryNotificationIdentity.RecoveryPhase).ShouldBe(recovery);
+    }
+
+    [Theory]
+    [InlineData("unknown", "recovery")]
+    [InlineData("graph", "unknown")]
+    public void NotificationIdentityRejectsOpenEndedLaneOrPhase(string lane, string phase)
+        => Should.Throw<InvalidOperationException>(() => RecoveryNotificationIdentity.Compose(
+            "provider-message",
+            lane,
+            phase));
+
+    [Theory]
+    [InlineData(HttpStatusCode.RequestTimeout, true)]
+    [InlineData(HttpStatusCode.TooManyRequests, true)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, true)]
+    [InlineData(HttpStatusCode.BadRequest, false)]
+    [InlineData(HttpStatusCode.Unauthorized, false)]
+    public void RecoveryTokenStatusClassificationIsFailClosed(HttpStatusCode statusCode, bool retryable)
+        => RecoveryAccessTokenProvider.IsRetryableStatus(statusCode).ShouldBe(retryable);
+
+    [Fact]
+    public void ScopeStampValidationAcceptsOnlyStrictlyOrderedNonDefaultBounds()
+    {
+        DateTimeOffset observed = new(2026, 8, 4, 10, 0, 0, TimeSpan.Zero);
+        AspireScopedOutageOperations.RequireNonDegenerateScopeStamps(
+            observed,
+            observed.AddMilliseconds(1),
+            "Graph");
+
+        _ = Should.Throw<InvalidOperationException>(() => AspireScopedOutageOperations
+            .RequireNonDegenerateScopeStamps(default, observed, "Graph"));
+        _ = Should.Throw<InvalidOperationException>(() => AspireScopedOutageOperations
+            .RequireNonDegenerateScopeStamps(observed, observed, "Graph"));
+        _ = Should.Throw<InvalidOperationException>(() => AspireScopedOutageOperations
+            .RequireNonDegenerateScopeStamps(observed, observed.AddMilliseconds(-1), "Graph"));
     }
 }
