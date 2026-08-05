@@ -42,19 +42,23 @@ internal sealed class RecoveryScopedOutageState
     }
 
     /// <summary>
-    /// Restores the dependency and resets completed effects for a fresh idempotency exercise. Returns both the
-    /// pre-clear <c>prior</c> snapshot (so dirty-boundary checks stay reachable) and the post-clear <c>current</c>
-    /// snapshot (so callers can assert cleanliness without a follow-up status read when they only hold this body).
+    /// Restores the dependency and resets completed effects for a fresh idempotency exercise. Returns the pre-clear
+    /// <c>prior</c> snapshot (so dirty-boundary checks stay reachable), the post-clear <c>current</c> snapshot (so
+    /// callers can assert cleanliness without a follow-up status read when they only hold this body), and
+    /// <c>crossTenantEffectDetectedBeforeRestore</c> — whether any tenant other than <paramref name="expectedTenantRef"/>
+    /// had a recorded effect before the ledger was cleared. A leak that happened during the fault window is otherwise
+    /// erased by this same clear before a caller can observe it.
     /// </summary>
-    public object Restore(string dependency, DateTimeOffset atUtc)
+    public object Restore(string dependency, string expectedTenantRef, DateTimeOffset atUtc)
     {
         lock (_gate)
         {
             object prior = SnapshotCore(dependency);
+            bool crossTenantEffectDetectedBeforeRestore = HasCrossTenantEffect(dependency, expectedTenantRef);
             _ = _faulted.Remove(dependency);
             _restoredAtUtc[dependency] = atUtc.ToUniversalTime();
             _completedEffects.Remove(dependency);
-            return new { prior, current = SnapshotCore(dependency) };
+            return new { prior, current = SnapshotCore(dependency), crossTenantEffectDetectedBeforeRestore };
         }
     }
 

@@ -185,6 +185,80 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
     }
 
     [Fact]
+    public async Task RestorationOnlyFailurePreservesTheRestorationDiagnosticNotABareCancel()
+    {
+        // Injection and observation succeed cleanly; only restoration fails. Combine's cancel-preferring branch must
+        // not apply here (there is no OperationCanceledException to prefer), and the real restoration failure must
+        // survive as the returned exception's inner exception rather than being replaced or discarded.
+        RecordingOperations operations = new() { ThrowOnEventStoreStart = true };
+        LiveContinuityDrillScenarioRunner runner = new(operations, Options());
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() => runner.RunAsync(
+            ContinuityDrillScenarios.EventStoreOutage,
+            Tenant,
+            Correlation,
+            TestContext.Current.CancellationToken).AsTask());
+
+        thrown.InnerException.ShouldNotBeNull();
+        thrown.InnerException.Message.ShouldBe("start failed");
+        operations.Calls.ShouldContain("cleanup-eventstore");
+    }
+
+    [Fact]
+    public async Task SubscriptionRestorationOnlyFailurePreservesTheRestorationDiagnosticNotABareCancel()
+    {
+        RecordingOperations operations = new() { ThrowOnRestoreSubscription = true };
+        LiveContinuityDrillScenarioRunner runner = new(operations, Options());
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() => runner.RunAsync(
+            ContinuityDrillScenarios.M365SubscriptionFailure,
+            Tenant,
+            Correlation,
+            TestContext.Current.CancellationToken).AsTask());
+
+        thrown.InnerException.ShouldNotBeNull();
+        thrown.InnerException.Message.ShouldBe("restore-subscription failed");
+        operations.Calls.ShouldContain("cleanup-subscription");
+    }
+
+    [Fact]
+    public async Task SeedFailureStillReachesCleanupAndNeverInjectsTheFault()
+    {
+        // Seed is placed inside the outer try specifically so a failure there still reaches cleanup in finally
+        // (see the inline comment at the call site) — a regression that moved it outside would strand no real
+        // sandbox state (nothing was seeded), but would also silently skip the cleanup call this test pins.
+        RecordingOperations operations = new() { ThrowOnSeed = true };
+        LiveContinuityDrillScenarioRunner runner = new(operations, Options());
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() => runner.RunAsync(
+            ContinuityDrillScenarios.EventStoreOutage,
+            Tenant,
+            Correlation,
+            TestContext.Current.CancellationToken).AsTask());
+
+        thrown.Message.ShouldBe("seed failed");
+        operations.Calls.ShouldContain("cleanup-eventstore");
+        operations.Calls.ShouldNotContain("stop-eventstore");
+    }
+
+    [Fact]
+    public async Task CheckpointFailureStillReachesCleanupAndNeverExpiresTheSubscription()
+    {
+        RecordingOperations operations = new() { ThrowOnCheckpoint = true };
+        LiveContinuityDrillScenarioRunner runner = new(operations, Options());
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() => runner.RunAsync(
+            ContinuityDrillScenarios.M365SubscriptionFailure,
+            Tenant,
+            Correlation,
+            TestContext.Current.CancellationToken).AsTask());
+
+        thrown.Message.ShouldBe("checkpoint failed");
+        operations.Calls.ShouldContain("cleanup-subscription");
+        operations.Calls.ShouldNotContain("expire-subscription");
+    }
+
+    [Fact]
     public async Task SubSecondReversedRtoBoundsClampToZero()
     {
         RecordingOperations operations = new()
@@ -327,7 +401,10 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
         public bool ThrowOnEventStoreStop { get; init; }
         public bool ThrowOnEventStoreStart { get; init; }
         public bool ThrowOnExpireSubscription { get; init; }
+        public bool ThrowOnRestoreSubscription { get; init; }
         public bool ThrowOnEventStoreCleanup { get; init; }
+        public bool ThrowOnSeed { get; init; }
+        public bool ThrowOnCheckpoint { get; init; }
         public CancellationTokenSource? CancelObservationToken { get; init; }
         public int EventStoreReconstructableCount { get; init; } = 1;
         public bool SubscriptionNoSilentLoss { get; init; } = true;
@@ -341,7 +418,9 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
         public ValueTask<RecoveryOperationCheckpoint> SeedCommittedOperationAsync(string tenantRef, string correlationId, CancellationToken cancellationToken)
         {
             Calls.Add("seed");
-            return ValueTask.FromResult(new RecoveryOperationCheckpoint(1, Started, "operation-001"));
+            return ThrowOnSeed
+                ? ValueTask.FromException<RecoveryOperationCheckpoint>(new InvalidOperationException("seed failed"))
+                : ValueTask.FromResult(new RecoveryOperationCheckpoint(1, Started, "operation-001"));
         }
 
         public ValueTask StopEventStoreAsync(CancellationToken cancellationToken)
@@ -410,7 +489,9 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
             CancellationToken cancellationToken)
         {
             Calls.Add("checkpoint-subscription");
-            return ValueTask.FromResult(new RecoveryOperationCheckpoint(1, Started, "subscription-bound-001"));
+            return ThrowOnCheckpoint
+                ? ValueTask.FromException<RecoveryOperationCheckpoint>(new InvalidOperationException("checkpoint failed"))
+                : ValueTask.FromResult(new RecoveryOperationCheckpoint(1, Started, "subscription-bound-001"));
         }
 
         public ValueTask ExpireSubscriptionAsync(string tenantRef, CancellationToken cancellationToken)
@@ -430,7 +511,9 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
         public ValueTask RestoreSubscriptionAsync(string tenantRef, CancellationToken cancellationToken)
         {
             Calls.Add("restore-subscription");
-            return ValueTask.CompletedTask;
+            return ThrowOnRestoreSubscription
+                ? ValueTask.FromException(new InvalidOperationException("restore-subscription failed"))
+                : ValueTask.CompletedTask;
         }
 
         public ValueTask<RecoverySubscriptionEndState> ReconcileSubscriptionAsync(string tenantRef, string correlationId, CancellationToken cancellationToken)

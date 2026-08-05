@@ -31,4 +31,13 @@ internal static class RecoverySandboxRestoreResponse
         throw new InvalidOperationException(
             "The recovery sandbox Restore response must carry a composite 'prior' snapshot.");
     }
+
+    /// <summary>
+    /// Returns whether the scoped-outage sandbox observed an effect recorded outside the expected tenant before this
+    /// restore cleared the affected dependency's effect ledger. Only the scoped (non-Identity, non-Graph) restore
+    /// response carries this field; absence means the boundary does not track a per-tenant effect ledger and no
+    /// pre-restore leak signal is available from this call.
+    /// </summary>
+    public static bool CrossTenantEffectDetectedBeforeRestore(JsonElement root)
+        => root.TryGetProperty("crossTenantEffectDetectedBeforeRestore", out JsonElement flag) && flag.GetBoolean();
 }

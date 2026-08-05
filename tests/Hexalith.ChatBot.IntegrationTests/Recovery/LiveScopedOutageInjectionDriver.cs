@@ -40,6 +40,7 @@ internal sealed class LiveScopedOutageInjectionDriver(
         DateTimeOffset startedAtUtc = operations.UtcNow;
         ScopedOutageFaultObservation? observation = null;
         ScopedOutageRecoveryEndState? endState = null;
+        bool crossTenantEffectDetectedBeforeRestore = false;
         Exception? failure = null;
         Exception? cleanupFailure = null;
         bool cleanupComplete = false;
@@ -65,7 +66,9 @@ internal sealed class LiveScopedOutageInjectionDriver(
                 using CancellationTokenSource restoration = new(options.RestorationTimeout);
                 try
                 {
-                    await operations.RestoreAsync(dependency, testTenantRef, restoration.Token).ConfigureAwait(false);
+                    crossTenantEffectDetectedBeforeRestore = await operations
+                        .RestoreAsync(dependency, testTenantRef, restoration.Token)
+                        .ConfigureAwait(false);
                 }
                 catch (Exception exception)
                 {
@@ -139,6 +142,11 @@ internal sealed class LiveScopedOutageInjectionDriver(
 
         ScopedOutageFaultObservation completedObservation = observation!;
         ScopedOutageRecoveryEndState completedEndState = endState!;
+
+        // A leak that happened during the fault window is wiped from the sandbox's effect ledger by restoration
+        // before VerifyRecoveryAsync's post-restore probes can see it. RestoreAsync captures that ledger state before
+        // it clears, so isolation must fail here even when the post-restore checks alone would report clean.
+        bool crossTenantLeakageDetected = crossTenantEffectDetectedBeforeRestore || completedEndState.CrossTenantLeakageDetected;
         TimeSpan recordingLatency = completedObservation.ScopeRecordedAtUtc - completedObservation.DependencyFailureObservedAtUtc;
         if (recordingLatency < TimeSpan.Zero)
         {
@@ -152,7 +160,7 @@ internal sealed class LiveScopedOutageInjectionDriver(
         return new ScopedOutageDegradationMeasurement(
             expectedScope,
             completedObservation.ObservedScope,
-            completedEndState.CrossTenantLeakageDetected,
+            crossTenantLeakageDetected,
             completedObservation.UnauthorizedMutationDetected,
             completedEndState.SilentDataLossDetected,
             completedEndState.AffectedOperationRecovered,
@@ -165,7 +173,7 @@ internal sealed class LiveScopedOutageInjectionDriver(
                 FaultObserved: observation is not null,
                 RecoveryObserved: endState is not null,
                 IndependentControlSucceeded: completedObservation.IndependentControlSucceeded,
-                TenantIsolationPreserved: !completedEndState.CrossTenantLeakageDetected,
+                TenantIsolationPreserved: !crossTenantLeakageDetected,
                 UnauthorizedMutationAbsent: !completedObservation.UnauthorizedMutationDetected,
                 StateReconstructable: !completedEndState.SilentDataLossDetected &&
                     !completedEndState.DuplicateSideEffectDetected,

@@ -89,6 +89,12 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
         ArgumentNullException.ThrowIfNull(value);
         ArgumentNullException.ThrowIfNull(etag);
         ThrowIfWriteRejected();
+        int nextWrite = Volatile.Read(ref _writes) + 1;
+        if (FailOnWriteNumber is int failAt && nextWrite == failAt)
+        {
+            throw new InvalidOperationException("Injected read-model write failure.");
+        }
+
         string compositeKey = CompositeKey(storeName, key);
         while (true)
         {

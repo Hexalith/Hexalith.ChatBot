@@ -71,8 +71,12 @@ public sealed class LiveProjectionRebuildDriverTests
             [Source(tenantRef)],
             worm.EnumerateChain(tenantRef),
             TestContext.Current.CancellationToken);
-        // Seed wrote the baseline; reject further writes so rebuild fails mid-partition and must skip erase.
-        readModels.RejectWrites = true;
+        // Seed wrote the baseline (2 writes: source + governed record). Let the rebuild's first fresh-partition
+        // write (the reconstructed source) land, then fail on its second (the governed record) — rejecting every
+        // write instead would leave zero fresh keys ever written, so a regression that erased them anyway would not
+        // fail this test.
+        int writesAfterSeed = readModels.Writes;
+        readModels.FailOnWriteNumber = writesAfterSeed + 2;
         int erasesBefore = readModels.Erases;
         LiveProjectionRebuildDriver driver = new(
             [Source(tenantRef)],
@@ -98,14 +102,18 @@ public sealed class LiveProjectionRebuildDriverTests
             freshTenant,
             [Source(tenantRef)],
             worm.EnumerateChain(tenantRef).ToArray());
+        bool anyFreshKeyPresent = false;
         foreach (string key in freshKeys)
         {
             (bool present, _) = await readModels
                 .TryReadEtagAsync(ChatBotReadModelStoreNames.StateStoreName, key, TestContext.Current.CancellationToken);
-            // At least the failed write may leave zero or partial keys; erase must not have run.
-            _ = present;
+            anyFreshKeyPresent |= present;
         }
 
+        // The property this test is named for: the write that landed before the injected failure is still there,
+        // because erase was skipped. A regression that erased on failure regardless would leave every fresh key
+        // absent and fail this assertion.
+        anyFreshKeyPresent.ShouldBeTrue();
         readModels.Erases.ShouldBe(erasesBefore);
     }
 

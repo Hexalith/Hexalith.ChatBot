@@ -197,6 +197,27 @@ public sealed class LiveScopedOutageInjectionDriverTests
     }
 
     [Fact]
+    public async Task ACrossTenantEffectDetectedBeforeRestoreFailsIsolationEvenWhenThePostRestoreCheckReportsClean()
+    {
+        // Restoration clears the sandbox's effect ledger for the affected dependency, so a leak that happened during
+        // the fault window (the highest-risk moment) is otherwise invisible to VerifyRecoveryAsync's post-restore
+        // probes. RestoreAsync must report what it observed before clearing, and the driver must fail closed on it
+        // even though the fake's VerifyRecoveryAsync (unconditionally CrossTenantLeakageDetected: false) alone would
+        // report a clean run.
+        RecordingOperations operations = new() { CrossTenantEffectDetectedBeforeRestore = true };
+        LiveScopedOutageInjectionDriver driver = new(operations, Options());
+
+        ScopedOutageDegradationMeasurement measurement = await driver.InjectAndMeasureAsync(
+            ScopedOutageDependencies.CommandExecution,
+            RecoveryValidationTopology.LogicalTenantRef,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken);
+
+        measurement.CrossTenantLeakageDetected.ShouldBeTrue();
+        measurement.ExecutionAssertions!.TenantIsolationPreserved.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task FailedIndependentControlFailsClosedAfterRestoreAndCleanup()
     {
         RecordingOperations operations = new() { IndependentControlSucceeded = false };
@@ -344,6 +365,8 @@ public sealed class LiveScopedOutageInjectionDriverTests
 
         public bool FailRestoration { get; init; }
 
+        public bool CrossTenantEffectDetectedBeforeRestore { get; init; }
+
         public bool FailCleanup { get; init; }
 
         public bool FailCheckpoint { get; init; }
@@ -431,13 +454,13 @@ public sealed class LiveScopedOutageInjectionDriverTests
                 _ => throw new InvalidOperationException("The test fixture received an unknown scoped-outage dependency."),
             };
 
-        public ValueTask RestoreAsync(string dependency, string tenantRef, CancellationToken cancellationToken)
+        public ValueTask<bool> RestoreAsync(string dependency, string tenantRef, CancellationToken cancellationToken)
         {
             RestoreTokenWasCanceled.Add(cancellationToken.IsCancellationRequested);
             Restored.Add(dependency);
             return FailRestoration
-                ? ValueTask.FromException(new InvalidOperationException("restore-failed"))
-                : ValueTask.CompletedTask;
+                ? ValueTask.FromException<bool>(new InvalidOperationException("restore-failed"))
+                : ValueTask.FromResult(CrossTenantEffectDetectedBeforeRestore);
         }
 
         public ValueTask<ScopedOutageRecoveryEndState> VerifyRecoveryAsync(

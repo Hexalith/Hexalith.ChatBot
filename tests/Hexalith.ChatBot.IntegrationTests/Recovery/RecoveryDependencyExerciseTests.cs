@@ -48,7 +48,7 @@ public sealed class RecoveryDependencyExerciseTests
         scope.ObservedScope.ShouldBe(expectedScope);
         scope.ScopeRecordedAtUtc.ShouldBeGreaterThanOrEqualTo(scope.DependencyFailureObservedAtUtc);
 
-        string restoreJson = JsonSerializer.Serialize(state.Restore(dependency, DateTimeOffset.UtcNow));
+        string restoreJson = JsonSerializer.Serialize(state.Restore(dependency, "replay-test:recovery-validation", DateTimeOffset.UtcNow));
         using JsonDocument restoreDocument = JsonDocument.Parse(restoreJson);
         RecoverySandboxRestoreResponse.WasPreviouslyFaulted(restoreDocument.RootElement).ShouldBeTrue();
         RecoverySandboxRestoreResponse.IsCurrentlyFaulted(restoreDocument.RootElement).ShouldBeFalse();

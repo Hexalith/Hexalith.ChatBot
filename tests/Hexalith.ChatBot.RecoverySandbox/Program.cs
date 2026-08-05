@@ -202,7 +202,7 @@ app.MapPost(
             return Results.NotFound();
         }
 
-        return Results.Ok(state.Restore(dependency, DateTimeOffset.UtcNow));
+        return Results.Ok(state.Restore(dependency, requestedTenant, DateTimeOffset.UtcNow));
     });
 
 app.MapPost(

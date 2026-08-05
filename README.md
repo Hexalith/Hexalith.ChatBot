@@ -88,3 +88,9 @@ Run the AppHost after local DAPR/Redis prerequisites are available:
 ```bash
 dotnet run --project src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj
 ```
+
+The AppHost renders the Keycloak realm on every run — including ordinary local development unrelated to Story 12.15's live-recovery lane — and fails closed if `ChatBot:LiveRecoveryValidation:MailboxClientSecret` is not configured. Supply a secret (ASCII letters/digits/`-`/`_` only, at least 32 characters) before running, e.g.:
+
+```bash
+dotnet user-secrets set ChatBot:LiveRecoveryValidation:MailboxClientSecret "<32+ char value>" --project src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj
+```

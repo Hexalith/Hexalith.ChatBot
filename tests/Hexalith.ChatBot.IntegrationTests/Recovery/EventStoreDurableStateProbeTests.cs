@@ -74,6 +74,59 @@ public sealed class EventStoreDurableStateProbeTests
     }
 
     [Fact]
+    public async Task PresenceWaitPerformsFinalReadAfterBoundaryDelay()
+    {
+        const string tenant = "recovery-validation";
+        const string intake = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
+        using SequenceHttpMessageHandler handler = new((requestNumber, _) => requestNumber switch
+        {
+            // The one in-loop poll observes absence. The commit lands only after that poll's delay elapses; the
+            // presence window itself is shorter than the delay, so only the final closing read can observe it.
+            1 => new HttpResponseMessage(HttpStatusCode.NotFound),
+            2 => SequenceHttpMessageHandler.Json("{\"currentSequence\":1}"),
+            _ => SequenceHttpMessageHandler.Json(
+                "{\"tenantId\":\"recovery-validation\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}"),
+        });
+        using EventStoreDurableStateProbe probe = new(
+            Endpoint,
+            handler,
+            TimeSpan.FromMilliseconds(1),
+            TimeSpan.FromMilliseconds(20));
+
+        await probe.WaitForMailboxIntakeAsync(tenant, intake, TestContext.Current.CancellationToken);
+
+        handler.Requests.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task PresenceWaitsFinalReadIsNotToleratedFailsClosedWithTheRealDiagnostic()
+    {
+        const string tenant = "recovery-validation";
+        const string intake = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
+        using SequenceHttpMessageHandler handler = new((requestNumber, _) => requestNumber switch
+        {
+            // The in-loop poll observes absence; the closing read after the boundary delay hits a persistent
+            // metadata/event-content mismatch. Unlike a mid-window poll, this must fail closed with the underlying
+            // InvalidOperationException instead of being reinterpreted as "still absent" and swallowed into a
+            // generic TimeoutException.
+            1 => new HttpResponseMessage(HttpStatusCode.NotFound),
+            2 => SequenceHttpMessageHandler.Json("{\"currentSequence\":1}"),
+            _ => SequenceHttpMessageHandler.Json(
+                "{\"tenantId\":\"tenant-other\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}"),
+        });
+        using EventStoreDurableStateProbe probe = new(
+            Endpoint,
+            handler,
+            TimeSpan.FromMilliseconds(1),
+            TimeSpan.FromMilliseconds(20));
+
+        // A bug that reverts to swallowing the closing read's failure would surface this as a bare TimeoutException
+        // instead, which ThrowAsync<InvalidOperationException> below would correctly reject.
+        _ = await Should.ThrowAsync<InvalidOperationException>(
+            () => probe.WaitForMailboxIntakeAsync(tenant, intake, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task AbsenceWindowPerformsFinalReadAfterBoundaryDelay()
     {
         const string tenant = "recovery-validation";

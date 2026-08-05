@@ -343,7 +343,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
     }
 
     /// <inheritdoc />
-    public async ValueTask RestoreAsync(string dependency, string tenantRef, CancellationToken cancellationToken)
+    public async ValueTask<bool> RestoreAsync(string dependency, string tenantRef, CancellationToken cancellationToken)
     {
         if (string.Equals(dependency, ScopedOutageDependencies.Identity, StringComparison.Ordinal))
         {
@@ -357,7 +357,10 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
                 .WaitForResourceHealthyAsync(_securityResource.Name, cancellationToken)
                 .ConfigureAwait(false);
             await WaitForIdentityAsync(cancellationToken).ConfigureAwait(false);
-            return;
+
+            // Identity leak detection compares sentinel read models directly (see ObserveFaultAsync/VerifyRecoveryAsync)
+            // rather than the scoped-outage effect ledger, so restore does not clear anything this check would see.
+            return false;
         }
 
         if (string.Equals(dependency, ScopedOutageDependencies.Graph, StringComparison.Ordinal))
@@ -368,7 +371,9 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
                 throw new InvalidOperationException("The Graph boundary remained faulted after restore.");
             }
 
-            return;
+            // Graph leak detection also compares sentinel read models (see ObserveFaultAsync/VerifyRecoveryAsync), not
+            // the scoped-outage effect ledger this restore call clears.
+            return false;
         }
 
         using JsonDocument scopedRestored = await SendScopedAsync(dependency, tenantRef, "restore", correlationId: null, cancellationToken).ConfigureAwait(false);
@@ -376,6 +381,11 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         {
             throw new InvalidOperationException($"The scoped dependency '{dependency}' remained faulted after restore.");
         }
+
+        // Read before the sandbox's effect ledger clear is lost to the caller: a cross-tenant write during the fault
+        // window (the highest-risk moment) must be observable here, since VerifyRecoveryAsync's post-restore probes
+        // cannot see anything this restore already erased.
+        return RecoverySandboxRestoreResponse.CrossTenantEffectDetectedBeforeRestore(scopedRestored.RootElement);
     }
 
     /// <inheritdoc />

@@ -81,6 +81,19 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
             await Task.Delay(_pollInterval, cancellationToken).ConfigureAwait(false);
         }
 
+        // Close the same final-delay race RemainsAggregateAbsentAsync closes, and — unlike the tolerant mid-window
+        // polls above — do NOT swallow a persistent inconsistency here. A commit that lands during the last delay
+        // must still be observed as present, and a still-inconsistent read at the very end of the window is
+        // anomalous rather than merely slow: it must fail closed with its real diagnostic, not a generic timeout.
+        if (await IsAggregateCommittedAsync(
+            tenantRef,
+            aggregateRef,
+            expectedEventTypeSuffix,
+            cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
         throw new TimeoutException(
             $"Aggregate '{tenantRef}:chatbot:{aggregateRef}' did not materialize in EventStore actor state.");
     }

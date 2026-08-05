@@ -18,13 +18,29 @@ public sealed class RecoverySandboxContractTests
         RecoveryScopedOutageState state = new();
         _ = state.Fault("ai-provider", DateTimeOffset.UtcNow);
 
-        string json = JsonSerializer.Serialize(state.Restore("ai-provider", DateTimeOffset.UtcNow));
+        string json = JsonSerializer.Serialize(state.Restore("ai-provider", TenantRef, DateTimeOffset.UtcNow));
         using JsonDocument document = JsonDocument.Parse(json);
         JsonElement root = document.RootElement;
 
         RecoverySandboxRestoreResponse.WasPreviouslyFaulted(root).ShouldBeTrue();
         RecoverySandboxRestoreResponse.IsCurrentlyFaulted(root).ShouldBeFalse();
+        RecoverySandboxRestoreResponse.CrossTenantEffectDetectedBeforeRestore(root).ShouldBeFalse();
         state.IsFaulted("ai-provider").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ScopedRestoreReportsAnEffectRecordedOutsideTheExpectedTenantBeforeClearingIt()
+    {
+        RecoveryScopedOutageState state = new();
+        _ = state.Fault("ai-provider", DateTimeOffset.UtcNow);
+        _ = state.RecordEffect("ai-provider", "tenant-beta", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        string json = JsonSerializer.Serialize(state.Restore("ai-provider", TenantRef, DateTimeOffset.UtcNow));
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement root = document.RootElement;
+
+        RecoverySandboxRestoreResponse.CrossTenantEffectDetectedBeforeRestore(root).ShouldBeTrue();
+        state.HasCrossTenantEffect("ai-provider", TenantRef).ShouldBeFalse();
     }
 
     [Fact]

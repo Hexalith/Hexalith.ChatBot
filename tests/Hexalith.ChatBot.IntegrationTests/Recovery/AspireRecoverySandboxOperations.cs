@@ -427,10 +427,23 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             checkpoint.OperationRef,
             controlAccessToken,
             cancellationToken).ConfigureAwait(false);
-        bool tenantIsolation = foreignRead.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound &&
-            controlRead.StatusCode == HttpStatusCode.OK &&
-            controlDurable &&
-            crossTenantAbsence.All(static absent => absent);
+
+        // Mirror WaitForGovernedOperationAsync's discipline: isolation must be OBSERVED, never inferred from "not the
+        // expected status". A 401 from an expired bearer or a 5xx from a broken read path is not evidence either way
+        // and must not be silently folded into "isolation failed" alongside a genuine cross-tenant read.
+        if (foreignRead.StatusCode is not (HttpStatusCode.Forbidden or HttpStatusCode.NotFound))
+        {
+            throw new InvalidOperationException(
+                $"The foreign-tenant isolation probe returned an unexpected status {(int)foreignRead.StatusCode}.");
+        }
+
+        if (controlRead.StatusCode != HttpStatusCode.OK)
+        {
+            throw new InvalidOperationException(
+                $"The control-tenant isolation probe returned an unexpected status {(int)controlRead.StatusCode}.");
+        }
+
+        bool tenantIsolation = controlDurable && crossTenantAbsence.All(static absent => absent);
         return new RecoveryEventStoreEndState(UtcNow, reconstructedCount, tenantIsolation, unauthorizedMutationAbsent);
     }
 

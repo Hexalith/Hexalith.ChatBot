@@ -21,8 +21,13 @@ internal interface IScopedOutageSandboxOperations
         string correlationId,
         CancellationToken cancellationToken);
 
-    /// <summary>Restores one closed dependency.</summary>
-    ValueTask RestoreAsync(string dependency, string tenantRef, CancellationToken cancellationToken);
+    /// <summary>
+    /// Restores one closed dependency. Returns whether a cross-tenant effect was detected before restoration
+    /// cleared the affected dependency's effect ledger — restoration must not be the last word on tenant isolation,
+    /// since a leak that happened during the fault window would otherwise be erased before <see cref="VerifyRecoveryAsync"/>
+    /// could observe it.
+    /// </summary>
+    ValueTask<bool> RestoreAsync(string dependency, string tenantRef, CancellationToken cancellationToken);
 
     /// <summary>Verifies affected and control end-state after restoration.</summary>
     ValueTask<ScopedOutageRecoveryEndState> VerifyRecoveryAsync(
