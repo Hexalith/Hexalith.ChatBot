@@ -42,7 +42,11 @@ internal static class OperationStatusHttpResults
             record.FailureReasonCode,
             record.TerminalReasonCode,
             record.OriginalOperationId,
-            record.DuplicateAttemptCount);
+            record.DuplicateAttemptCount,
+            record.WorkflowInstanceId,
+            record.WorkflowStatus,
+            record.WorkflowRetryCount,
+            record.WorkflowLastFailureCode);
 
     private static string Lifecycle(LifecycleState state)
         => state switch
@@ -82,7 +86,11 @@ internal static class OperationStatusHttpResults
         string? FailureReasonCode,
         string? TerminalReasonCode,
         string? OriginalOperationId,
-        int DuplicateAttemptCount);
+        int DuplicateAttemptCount,
+        string? WorkflowInstanceId,
+        string? WorkflowStatus,
+        int WorkflowRetryCount,
+        string? WorkflowLastFailureCode);
 
     private sealed record OperationStatusPartialOutputsWireModel(
         DateTimeOffset AcceptedAt,

@@ -7,7 +7,8 @@ namespace Hexalith.ChatBot.Server.Lifecycle.Workflows;
 internal sealed class DaprCorrectionPropagationCoordinator(
     ICorrectionPropagationWorkflowRuntime runtime,
     ICorrectionPropagationActivityCatalog activityCatalog,
-    IChatBotMetrics? metrics = null) : ICorrectionPropagationCoordinator
+    IChatBotMetrics? metrics = null,
+    ICorrectionPropagationWorkflowStatusSink? statusSink = null) : ICorrectionPropagationCoordinator
 {
     public const string SchemaVersion = "chatbot.association-correction-propagation.v1";
     public const string ResponsibleOwnerRole = "operations";
@@ -17,6 +18,8 @@ internal sealed class DaprCorrectionPropagationCoordinator(
     public static readonly TimeSpan M0M1P95Target = TimeSpan.FromMinutes(10);
 
     private readonly IChatBotMetrics _metrics = metrics ?? NullChatBotMetrics.Instance;
+    private readonly ICorrectionPropagationWorkflowStatusSink _statusSink =
+        statusSink ?? NullCorrectionPropagationWorkflowStatusSink.Instance;
 
     public bool IsReady => runtime.IsAvailable && activityCatalog.IsReady;
 
@@ -44,6 +47,18 @@ internal sealed class DaprCorrectionPropagationCoordinator(
                 request.TenantId,
                 CorrectionPropagationWorkflowStatuses.Started,
                 CorrectionPropagationWorkflowFailureCodes.None);
+            await _statusSink
+                .ReportAsync(
+                    scheduledRequest,
+                    CorrectionPropagationWorkflowStatuses.Started,
+                    workflowRetryCount: 0,
+                    CorrectionPropagationWorkflowFailureCodes.None,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {

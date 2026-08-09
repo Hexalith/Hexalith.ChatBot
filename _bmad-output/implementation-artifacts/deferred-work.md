@@ -153,3 +153,8 @@ Items surfaced by reviews that are real but not actionable in the current change
 - source_spec: `_bmad-output/implementation-artifacts/spec-run-all-tests-and-fix-issues.md`
   summary: Streaming release-readiness evidence remains source-token and synthetic-fixture based rather than production progressive-render execution.
   evidence: The pre-existing readiness pattern searches whole source files for markers, while the cited browser case uses hand-authored `SetContentAsync` HTML; production component wiring, successive response chunks, or Stop behavior can regress without those markers disappearing.
+
+## Deferred from: code review of 8-6-hosted-dapr-workflow-production-binding-and-saga-readiness-validation (2026-08-09)
+
+- **[LOW · durable activity CT]** Workflow activities pass `CancellationToken.None` into EventStore/audit/alert side effects. **Release-claim impact:** host cancellation cannot abort in-flight activity I/O; acceptable under typical Dapr durable-activity semantics if activities remain idempotent. **Owner:** Story 2.9 / correction-propagation runtime. **Closure evidence:** documented durable-activity cancellation policy, or activity-context token plumbing with idempotent compensation tests.
+- **[MEDIUM · terminal failure ownership]** Distinct correction-propagation workflow `Failed` status deferred; Story 2.9 keeps `Correction-delayed` for store/soft failures. **Release-claim impact:** do not cite Story 2.9 for terminal-failure saga evidence. **Owner:** Story 2.10 retry/exhaustion. **Closure evidence:** terminal/exhaustion path with status + tests under 2.10 (or explicit hard-fail design change).

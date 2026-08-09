@@ -11,7 +11,7 @@ public static class CorrectionPropagationWorkflowArchitectureTests
         string[] allowedRoots =
         [
             Path.Combine(root, "src", "Hexalith.ChatBot.Server", "Lifecycle", "Workflows"),
-            Path.Combine(root, "src", "Hexalith.ChatBot.Server", "Gateway"),
+            Path.Combine(root, "src", "Hexalith.ChatBot.Server", "Gateway", "CommandGatewayServiceCollectionExtensions.cs"),
         ];
 
         foreach (string file in Directory.EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories))
@@ -23,7 +23,11 @@ public static class CorrectionPropagationWorkflowArchitectureTests
                 continue;
             }
 
-            allowedRoots.Any(allowed => file.StartsWith(allowed, StringComparison.Ordinal)).ShouldBeTrue(file);
+            bool allowed = allowedRoots.Any(allowed =>
+                file.Equals(allowed, StringComparison.Ordinal) ||
+                file.StartsWith(allowed + Path.DirectorySeparatorChar, StringComparison.Ordinal) ||
+                file.StartsWith(allowed + Path.AltDirectorySeparatorChar, StringComparison.Ordinal));
+            allowed.ShouldBeTrue(file);
         }
     }
 

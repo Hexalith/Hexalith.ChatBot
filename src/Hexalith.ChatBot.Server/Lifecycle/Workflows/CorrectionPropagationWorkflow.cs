@@ -5,80 +5,52 @@ namespace Hexalith.ChatBot.Server.Lifecycle.Workflows;
 internal sealed class CorrectionPropagationWorkflow
     : Workflow<CorrectionPropagationRequest, CorrectionPropagationWorkflowResult>
 {
-    public override async Task<CorrectionPropagationWorkflowResult> RunAsync(
+    public override Task<CorrectionPropagationWorkflowResult> RunAsync(
         WorkflowContext context,
         CorrectionPropagationRequest input)
-    {
-        ArgumentNullException.ThrowIfNull(input);
+        => CorrectionPropagationWorkflowRunner.RunAsync(input, new DaprWorkflowSteps(context));
 
-        WorkflowTaskOptions retryOptions = new(new WorkflowRetryPolicy(
+    private sealed class DaprWorkflowSteps(WorkflowContext context) : ICorrectionPropagationWorkflowSteps
+    {
+        private readonly WorkflowTaskOptions _retryOptions = new(new WorkflowRetryPolicy(
             maxNumberOfAttempts: 5,
             firstRetryInterval: TimeSpan.FromSeconds(2),
             backoffCoefficient: 2.0,
             maxRetryInterval: TimeSpan.FromMinutes(1)));
 
-        context.SetCustomStatus(Progress(input, CorrectionPropagationWorkflowStatuses.Started, 0, CorrectionPropagationWorkflowFailureCodes.None));
+        public DateTimeOffset CurrentUtc => context.CurrentUtcDateTime;
 
-        IReadOnlyList<string> scope = await context
-            .CallActivityAsync<IReadOnlyList<string>>(nameof(CorrectionPropagationScopeActivity), input, retryOptions)
-            .ConfigureAwait(true);
+        public void SetStatus(CorrectionPropagationWorkflowProgress progress)
+            => context.SetCustomStatus(progress);
 
-        await context
-            .CallActivityAsync<bool>(nameof(CorrectionPropagationStartActivity), new CorrectionPropagationStartInput(input, scope), retryOptions)
-            .ConfigureAwait(true);
+        public Task<IReadOnlyList<string>> CallScopeAsync(CorrectionPropagationRequest request)
+            => context.CallActivityAsync<IReadOnlyList<string>>(
+                nameof(CorrectionPropagationScopeActivity),
+                request,
+                _retryOptions);
 
-        List<CorrectionPropagationActivityResult> results = [];
-        foreach (string storeKey in scope)
-        {
-            context.SetCustomStatus(Progress(input, CorrectionPropagationWorkflowStatuses.Retrying, results.Count, CorrectionPropagationWorkflowFailureCodes.None));
-            CorrectionPropagationActivityResult result = await context
-                .CallActivityAsync<CorrectionPropagationActivityResult>(
-                    nameof(CorrectionPropagationRunStoreActivity),
-                    new CorrectionPropagationStoreActivityInput(input, storeKey, context.CurrentUtcDateTime),
-                    retryOptions)
-                .ConfigureAwait(true);
-            results.Add(result);
-        }
+        public Task CallStartAsync(CorrectionPropagationStartInput input)
+            => context.CallActivityAsync<bool>(
+                nameof(CorrectionPropagationStartActivity),
+                input,
+                _retryOptions);
 
-        if (results.All(static result => result.IsSuccessful))
-        {
-            context.SetCustomStatus(Progress(input, CorrectionPropagationWorkflowStatuses.Completed, results.Count, CorrectionPropagationWorkflowFailureCodes.None));
-            await context
-                .CallActivityAsync<bool>(nameof(CorrectionPropagationCompleteActivity), input, retryOptions)
-                .ConfigureAwait(true);
-            return new CorrectionPropagationWorkflowResult(
-                CorrectionPropagationWorkflowStatuses.Completed,
-                results.Count,
-                null,
-                scope);
-        }
+        public Task<CorrectionPropagationActivityResult> CallStoreAsync(CorrectionPropagationStoreActivityInput input)
+            => context.CallActivityAsync<CorrectionPropagationActivityResult>(
+                nameof(CorrectionPropagationRunStoreActivity),
+                input,
+                _retryOptions);
 
-        string delayReason = results
-            .FirstOrDefault(static result => !result.IsSuccessful)?.FailureReasonCode
-            ?? DaprCorrectionPropagationCoordinator.DefaultDelayReasonCode;
-        context.SetCustomStatus(Progress(input, CorrectionPropagationWorkflowStatuses.Delayed, results.Count, delayReason));
-        await context
-            .CallActivityAsync<bool>(nameof(CorrectionPropagationDelayActivity), new CorrectionPropagationDelayInput(input, delayReason), retryOptions)
-            .ConfigureAwait(true);
-        return new CorrectionPropagationWorkflowResult(
-            CorrectionPropagationWorkflowStatuses.Delayed,
-            results.Count,
-            delayReason,
-            scope);
+        public Task CallCompleteAsync(CorrectionPropagationRequest request)
+            => context.CallActivityAsync<bool>(
+                nameof(CorrectionPropagationCompleteActivity),
+                request,
+                _retryOptions);
+
+        public Task<bool> CallDelayAsync(CorrectionPropagationDelayInput input)
+            => context.CallActivityAsync<bool>(
+                nameof(CorrectionPropagationDelayActivity),
+                input,
+                _retryOptions);
     }
-
-    private static CorrectionPropagationWorkflowProgress Progress(
-        CorrectionPropagationRequest request,
-        string status,
-        int retryCount,
-        string failureCode)
-        => new(
-            status,
-            request.WorkflowInstanceId,
-            request.TenantId,
-            request.CorrectionId,
-            request.SourceVersion,
-            retryCount,
-            failureCode,
-            request.CorrelationId);
 }

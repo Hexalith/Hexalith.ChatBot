@@ -6,6 +6,6 @@ internal sealed record CorrectionPropagationWorkflowProgress(
     string TenantId,
     string CorrectionId,
     long SourceVersion,
-    int RetryCount,
+    int StoresCompleted,
     string LastFailureCode,
     string CorrelationId);

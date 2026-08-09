@@ -12,4 +12,5 @@ internal sealed record CorrectionPropagationRequest(
     long SourceVersion,
     string CorrelationId,
     DateTimeOffset StartedAtUtc,
-    DateTimeOffset EstimatedCompletionAtUtc);
+    DateTimeOffset EstimatedCompletionAtUtc,
+    string OperationId = "");

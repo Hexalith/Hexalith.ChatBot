@@ -18,6 +18,7 @@ internal sealed class CorrectionPropagationRunStoreActivity(
         CorrectionPropagationStoreActivityInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(input.Request);
         CorrectionPropagationRequest request = input.Request;
         CorrectionPropagationActivityResult result;
 

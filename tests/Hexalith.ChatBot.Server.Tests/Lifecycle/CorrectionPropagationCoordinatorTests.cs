@@ -171,7 +171,7 @@ public sealed class CorrectionPropagationCoordinatorTests
     }
 
     [Fact]
-    public async Task AFailedAuditWriteSuppressesTheDelayAlert()
+    public async Task AFailedAuditWriteSuppressesTheDelayAlertAndFailsTheWorkflow()
     {
         RecordingWriter writer = new();
         RecordingAlertSink alerts = new();
@@ -184,11 +184,44 @@ public sealed class CorrectionPropagationCoordinatorTests
             new FailingActivity(CorrectionPropagationStoreKeys.AiContextReadiness, StartedAt.AddSeconds(5)),
         ];
 
-        await ExecuteWorkflowActivitiesAsync(Request(), new CorrectionPropagationActivityCatalog(activities), writer, alerts, audit);
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(
+            ExecuteWorkflowActivitiesAsync(Request(), new CorrectionPropagationActivityCatalog(activities), writer, alerts, audit));
 
+        exception.Message.ShouldBe(CorrectionPropagationWorkflowFailureCodes.AuditUnavailable);
         writer.CommandTypes.Last().ShouldBe(nameof(DelayMailboxAssociationCorrectionPropagation));
         audit.PreCommitEnvelopes.ShouldHaveSingleItem();
         alerts.Alerts.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task CoordinatorShouldRewriteEstimatedCompletionForM2Scope()
+    {
+        RecordingWorkflowRuntime runtime = new();
+        CorrectionPropagationActivityCatalog catalog = new(
+            CorrectionPropagationStoreKeys.RequiredM2.Select(static key => new SucceedingActivity(key, StartedAt.AddSeconds(5))));
+        DaprCorrectionPropagationCoordinator coordinator = new(runtime, catalog);
+        CorrectionPropagationRequest request = Request() with
+        {
+            EstimatedCompletionAtUtc = StartedAt.AddMinutes(10),
+        };
+
+        await coordinator.StartAsync(request, TestContext.Current.CancellationToken);
+
+        CorrectionPropagationRequest scheduled = runtime.Scheduled.ShouldHaveSingleItem();
+        scheduled.EstimatedCompletionAtUtc.ShouldBe(CorrectionPropagationSlo.DeadlineFor(catalog.SloScope, request.StartedAtUtc));
+        catalog.SloScope.ShouldBe(CorrectionPropagationScope.M2);
+    }
+
+    [Fact]
+    public async Task CoordinatorShouldPropagateCancellationWithoutRemappingToWorkflowUnavailable()
+    {
+        RecordingWorkflowRuntime runtime = new() { ThrowOnSchedule = new OperationCanceledException() };
+        CorrectionPropagationActivityCatalog catalog = new(
+            CorrectionPropagationStoreKeys.RequiredM0.Select(static key => new SucceedingActivity(key, StartedAt.AddSeconds(5))));
+        DaprCorrectionPropagationCoordinator coordinator = new(runtime, catalog);
+
+        await Should.ThrowAsync<OperationCanceledException>(
+            coordinator.StartAsync(Request(), TestContext.Current.CancellationToken).AsTask());
     }
 
     private static async Task ExecuteWorkflowActivitiesAsync(
@@ -198,37 +231,12 @@ public sealed class CorrectionPropagationCoordinatorTests
         RecordingAlertSink alerts,
         RecordingAuditWriter audit)
     {
-        IReadOnlyList<string> scope = await new CorrectionPropagationScopeActivity(catalog)
-            .RunAsync(null!, request)
-            .ConfigureAwait(false);
-        _ = await new CorrectionPropagationStartActivity(writer)
-            .RunAsync(null!, new CorrectionPropagationStartInput(request, scope))
-            .ConfigureAwait(false);
-        List<CorrectionPropagationActivityResult> results = [];
-        foreach (string storeKey in scope)
-        {
-            results.Add(await new CorrectionPropagationRunStoreActivity(catalog, writer)
-                .RunAsync(
-                    null!,
-                    new CorrectionPropagationStoreActivityInput(request, storeKey, StartedAt.AddSeconds(1)))
-                .ConfigureAwait(false));
-        }
-
-        if (results.All(static result => result.IsSuccessful))
-        {
-            _ = await new CorrectionPropagationCompleteActivity(writer, new FixedClock())
-                .RunAsync(null!, request)
-                .ConfigureAwait(false);
-            return;
-        }
-
-        string delayReason = results.First(static result => !result.IsSuccessful).FailureReasonCode
-            ?? DaprCorrectionPropagationCoordinator.DefaultDelayReasonCode;
-        _ = await new CorrectionPropagationDelayActivity(writer, alerts, audit, new FixedClock())
-            .RunAsync(
-                null!,
-                new CorrectionPropagationDelayInput(request, delayReason))
-            .ConfigureAwait(false);
+        List<CorrectionPropagationWorkflowProgress> statuses = [];
+        ActivityBackedSteps steps = new(catalog, writer, alerts, audit, statuses);
+        _ = await CorrectionPropagationWorkflowRunner.RunAsync(request, steps).ConfigureAwait(false);
+        statuses.ShouldNotBeEmpty();
+        statuses.ShouldAllBe(static status =>
+            status.Status != CorrectionPropagationWorkflowStatuses.Retrying);
     }
 
     private static CorrectionPropagationRequest Request()
@@ -248,7 +256,35 @@ public sealed class CorrectionPropagationCoordinatorTests
             sourceVersion,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             StartedAt,
-            StartedAt.AddMinutes(10));
+            StartedAt.AddMinutes(10),
+            OperationId: "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+    }
+
+    private sealed class ActivityBackedSteps(
+        CorrectionPropagationActivityCatalog catalog,
+        RecordingWriter writer,
+        RecordingAlertSink alerts,
+        RecordingAuditWriter audit,
+        List<CorrectionPropagationWorkflowProgress> statuses) : ICorrectionPropagationWorkflowSteps
+    {
+        public DateTimeOffset CurrentUtc => StartedAt.AddSeconds(1);
+
+        public void SetStatus(CorrectionPropagationWorkflowProgress progress) => statuses.Add(progress);
+
+        public async Task<IReadOnlyList<string>> CallScopeAsync(CorrectionPropagationRequest request)
+            => await new CorrectionPropagationScopeActivity(catalog).RunAsync(null!, request).ConfigureAwait(false);
+
+        public async Task CallStartAsync(CorrectionPropagationStartInput input)
+            => _ = await new CorrectionPropagationStartActivity(writer).RunAsync(null!, input).ConfigureAwait(false);
+
+        public async Task<CorrectionPropagationActivityResult> CallStoreAsync(CorrectionPropagationStoreActivityInput input)
+            => await new CorrectionPropagationRunStoreActivity(catalog, writer).RunAsync(null!, input).ConfigureAwait(false);
+
+        public async Task CallCompleteAsync(CorrectionPropagationRequest request)
+            => _ = await new CorrectionPropagationCompleteActivity(writer, new FixedClock()).RunAsync(null!, request).ConfigureAwait(false);
+
+        public async Task<bool> CallDelayAsync(CorrectionPropagationDelayInput input)
+            => await new CorrectionPropagationDelayActivity(writer, alerts, audit, new FixedClock()).RunAsync(null!, input).ConfigureAwait(false);
     }
 
     private sealed class RecordingWorkflowRuntime : ICorrectionPropagationWorkflowRuntime
@@ -257,8 +293,15 @@ public sealed class CorrectionPropagationCoordinatorTests
 
         public bool IsAvailable { get; init; } = true;
 
+        public Exception? ThrowOnSchedule { get; init; }
+
         public ValueTask ScheduleAsync(CorrectionPropagationRequest request, CancellationToken cancellationToken)
         {
+            if (ThrowOnSchedule is not null)
+            {
+                throw ThrowOnSchedule;
+            }
+
             Scheduled.Add(request);
             return ValueTask.CompletedTask;
         }

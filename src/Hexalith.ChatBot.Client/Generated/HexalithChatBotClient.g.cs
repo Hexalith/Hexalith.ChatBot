@@ -330,7 +330,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-
+                
                     // Operation Path: "api/v1/commands"
                     urlBuilder_.Append("api/v1/commands");
 
@@ -495,7 +495,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-
+                
                     // Operation Path: "api/v1/operations/{operationId}"
                     urlBuilder_.Append("api/v1/operations/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(operationId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -631,7 +631,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-
+                
                     // Operation Path: "api/v1/operations/{operationId}/audit-history"
                     urlBuilder_.Append("api/v1/operations/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(operationId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -770,7 +770,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-
+                
                     // Operation Path: "api/v1/compliance/audit/search"
                     urlBuilder_.Append("api/v1/compliance/audit/search");
 
@@ -905,7 +905,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-
+                
                     // Operation Path: "api/v1/compliance/audit/{auditRecordRef}"
                     urlBuilder_.Append("api/v1/compliance/audit/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(auditRecordRef, System.Globalization.CultureInfo.InvariantCulture)));
@@ -1041,7 +1041,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-
+                
                     // Operation Path: "api/v1/associations/{associationId}/routing-status"
                     urlBuilder_.Append("api/v1/associations/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(associationId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -1187,7 +1187,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-
+                
                     // Operation Path: "api/v1/projects/{projectId}/conversation"
                     urlBuilder_.Append("api/v1/projects/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(projectId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -1341,7 +1341,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-
+                
                     // Operation Path: "api/v1/projects/{projectId}/task-intents/{taskIntentId}"
                     urlBuilder_.Append("api/v1/projects/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(projectId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -1522,7 +1522,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     var field_ = System.Reflection.IntrospectionExtensions.GetTypeInfo(value.GetType()).GetDeclaredField(name);
                     if (field_ != null)
                     {
-                        var attribute = System.Reflection.CustomAttributeExtensions.GetCustomAttribute(field_, typeof(System.Runtime.Serialization.EnumMemberAttribute))
+                        var attribute = System.Reflection.CustomAttributeExtensions.GetCustomAttribute(field_, typeof(System.Runtime.Serialization.EnumMemberAttribute)) 
                             as System.Runtime.Serialization.EnumMemberAttribute;
                         if (attribute != null)
                         {
@@ -1534,7 +1534,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     return converted == null ? string.Empty : converted;
                 }
             }
-            else if (value is bool)
+            else if (value is bool) 
             {
                 return System.Convert.ToString((bool)value, cultureInfo).ToLowerInvariant();
             }
@@ -2161,6 +2161,19 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [Newtonsoft.Json.JsonProperty("duplicateAttemptCount", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public int? DuplicateAttemptCount { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("workflowInstanceId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? WorkflowInstanceId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("workflowStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? WorkflowStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("workflowRetryCount", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int? WorkflowRetryCount { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("workflowLastFailureCode", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ChatBotMessageCode? WorkflowLastFailureCode { get; set; } = default!;
 
         /// <summary>
         /// UTC acceptance timestamp.

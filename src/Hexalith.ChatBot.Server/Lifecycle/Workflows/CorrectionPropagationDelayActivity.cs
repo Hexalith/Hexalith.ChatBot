@@ -12,16 +12,20 @@ internal sealed class CorrectionPropagationDelayActivity(
     IOperatorAlertSink operatorAlertSink,
     IAuditWriter auditWriter,
     ISystemClock clock,
-    IChatBotMetrics? metrics = null)
+    IChatBotMetrics? metrics = null,
+    ICorrectionPropagationWorkflowStatusSink? statusSink = null)
     : WorkflowActivity<CorrectionPropagationDelayInput, bool>
 {
     private readonly IChatBotMetrics _metrics = metrics ?? NullChatBotMetrics.Instance;
+    private readonly ICorrectionPropagationWorkflowStatusSink _statusSink =
+        statusSink ?? NullCorrectionPropagationWorkflowStatusSink.Instance;
 
     public override async Task<bool> RunAsync(
         WorkflowActivityContext context,
         CorrectionPropagationDelayInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(input.Request);
         CorrectionPropagationRequest request = input.Request;
         DateTimeOffset now = clock.UtcNow;
 
@@ -59,6 +63,14 @@ internal sealed class CorrectionPropagationDelayActivity(
                 request.TenantId,
                 CorrectionPropagationWorkflowStatuses.Delayed,
                 CorrectionPropagationWorkflowFailureCodes.AuditUnavailable);
+            await _statusSink
+                .ReportAsync(
+                    request,
+                    CorrectionPropagationWorkflowStatuses.Delayed,
+                    workflowRetryCount: 0,
+                    CorrectionPropagationWorkflowFailureCodes.AuditUnavailable,
+                    CancellationToken.None)
+                .ConfigureAwait(false);
             return false;
         }
 
@@ -78,6 +90,14 @@ internal sealed class CorrectionPropagationDelayActivity(
             request.TenantId,
             CorrectionPropagationWorkflowStatuses.Delayed,
             input.ReasonCode);
+        await _statusSink
+            .ReportAsync(
+                request,
+                CorrectionPropagationWorkflowStatuses.Delayed,
+                workflowRetryCount: 0,
+                input.ReasonCode,
+                CancellationToken.None)
+            .ConfigureAwait(false);
         return true;
     }
 

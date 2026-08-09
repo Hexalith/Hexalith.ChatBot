@@ -1,5 +1,5 @@
 # generated: 2026-07-20T11:30:23+02:00
-# last_updated: 2026-08-04
+# last_updated: 2026-08-09
 # project: chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -37,7 +37,7 @@
 # - Until TE-2 self-validates and the check is required, no subsequent story may move to `done`; stories remain in `review`/`in-progress` without implying product failure.
 
 generated: 2026-07-20T11:30:23+02:00
-last_updated: 2026-08-04
+last_updated: 2026-08-09
 project: chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -77,7 +77,7 @@ development_status:
   2-6-association-decision-recording-evidence-preservation-and-notes: done
   2-7-association-correction-and-supersession: done
   2-8-correction-propagation-contract: done
-  2-9-execute-correction-propagation-reliably-in-production: review
+  2-9-execute-correction-propagation-reliably-in-production: in-progress
   2-10-duplicate-detection-retry-and-failure-states: done
   epic-2-retrospective: done
   epic-3: done

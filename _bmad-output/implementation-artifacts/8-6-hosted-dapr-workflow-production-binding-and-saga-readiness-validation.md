@@ -66,6 +66,27 @@ so that production saga orchestration claims are backed by runtime wiring, obser
   - [x] Add architecture/conformance tests proving UI/CLI/MCP/adapters do not start Dapr workflows directly and no direct mutation of Projects, Conversations, Folders, Memories, or EventStore internals was introduced.
   - [x] Capture saga-readiness evidence in the story completion notes before moving to review: commands run, workflow status/history proof, failure-mode proof, and any skipped Tier-3 prerequisites.
 
+### Review Findings
+
+Canonical Story 2.9 re-review (`a4e8833..716e4cc`, 2026-08-09). Layers: blind-hunter, edge-case-hunter, verification-gap, acceptance-auditor.
+
+- [x] [Review][Patch] Treat deterministic already-exists schedule as idempotent success (narrow catch only; do not swallow generic Dapr errors); emit safe duplicate-schedule-replay metric [`src/Hexalith.ChatBot.Server/Lifecycle/Workflows/DaprCorrectionPropagationWorkflowRuntime.cs:21`] — decided 2026-08-09: option 1 idempotent success
+- [x] [Review][Patch] Wire workflow instance id/status/retry count/last failure code into operation-status projection and `OperationStatusHttpResults.ToWire` (metadata-only) [`src/Hexalith.ChatBot.Server/Gateway/Status/OperationStatusRecord.cs`] — decided 2026-08-09: option 1 wire into status API
+- [x] [Review][Patch] Strengthen Tier-3 primary-path smoke to schedule a deterministic correction-propagation workflow and assert instance status/history (skip only when Docker/Dapr absent; skip-only runs do not unlock done) [`tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:429`] — decided 2026-08-09: option 2 schedule + inspect
+- [x] [Review][Defer] Distinct workflow `Failed` outcome — deferred to Story 2.10 retry/exhaustion; Story 2.9 keeps `Correction-delayed` only for store/soft failures — decided 2026-08-09: option 1 delayed-only
+- [x] [Review][Patch] Pessimistic readiness + clear availability on schedule failure [`src/Hexalith.ChatBot.Server/Lifecycle/Workflows/DaprCorrectionPropagationWorkflowRuntime.cs:12`]
+- [x] [Review][Patch] Honor `CorrectionPropagationDelayActivity` false return (do not complete as Delayed when audit/P2 path fails) [`src/Hexalith.ChatBot.Server/Lifecycle/Workflows/CorrectionPropagationWorkflow.cs:60`]
+- [x] [Review][Patch] Do not remap `OperationCanceledException` to workflow-unavailable [`src/Hexalith.ChatBot.Server/Lifecycle/Workflows/DaprCorrectionPropagationCoordinator.cs:48`]
+- [x] [Review][Patch] Forward `cancellationToken` into `ScheduleNewWorkflowAsync` [`src/Hexalith.ChatBot.Server/Lifecycle/Workflows/DaprCorrectionPropagationWorkflowRuntime.cs:21`]
+- [x] [Review][Patch] Stop publishing store-progress count as `RetryCount` / `retrying` status on first attempts [`src/Hexalith.ChatBot.Server/Lifecycle/Workflows/CorrectionPropagationWorkflow.cs:33`]
+- [x] [Review][Patch] Execute `CorrectionPropagationWorkflow.RunAsync` under test (current helper reimplements orchestration and never runs the workflow) [`tests/Hexalith.ChatBot.Server.Tests/Lifecycle/CorrectionPropagationCoordinatorTests.cs:194`]
+- [x] [Review][Patch] Cover audit-writer and idempotency-store admission deny branches with gateway/API tests [`src/Hexalith.ChatBot.Server/Gateway/Stages/ParticipantAuthorizationStage.cs`]
+- [x] [Review][Patch] Assert M2 `EstimatedCompletionAtUtc` rewrite on the schedule path [`src/Hexalith.ChatBot.Server/Lifecycle/Workflows/DaprCorrectionPropagationCoordinator.cs:36`]
+- [x] [Review][Patch] Null-guard activity `Request` inputs before use [`src/Hexalith.ChatBot.Server/Lifecycle/Workflows/CorrectionPropagationDelayActivity.cs:25`]
+- [x] [Review][Patch] Tighten architecture allowlist so `Dapr.Workflow` cannot land anywhere under `Gateway/` except the registration extension [`tests/Hexalith.ChatBot.Architecture.Tests/CorrectionPropagationWorkflowArchitectureTests.cs:11`]
+- [x] [Review][Patch] Emit or remove unused granular workflow failure-code constants; align lifecycle metrics with real dependency outages [`src/Hexalith.ChatBot.Server/Lifecycle/Workflows/CorrectionPropagationWorkflowFailureCodes.cs`]
+- [x] [Review][Defer] Durable activity `CancellationToken.None` side-effect calls [`src/Hexalith.ChatBot.Server/Lifecycle/Workflows/CorrectionPropagation*Activity.cs`] — deferred, Dapr durable-activity convention; host cancellation is not a reliable activity abort signal
+
 ## Dev Notes
 
 ### Discovery Results
@@ -304,6 +325,7 @@ GPT-5 Codex
 
 - 2026-06-11: Implemented hosted Dapr Workflow binding, production topology wiring, readiness/health/telemetry, saga-safety tests, and moved story to review.
 - 2026-06-11: Senior Developer Review (AI) — auto-fix pass. Completed the Dev Agent Record File List (4 omitted files added) and corrected a stale, security-relevant Aspire actor-boundary comment. No CRITICAL findings; all five ACs verified against implementation and tests. Status → done.
+- 2026-08-09: Canonical Story 2.9 code review — applied 14 patches (idempotent duplicate schedule, operation-status workflow fields, Tier-3 schedule+inspect smoke, readiness/cancellation/delay/retry telemetry/tests). Deferred terminal `Failed` to Story 2.10. Sprint status → in-progress pending retained Tier-3 primary-path evidence.
 
 ## Senior Developer Review (AI)
 

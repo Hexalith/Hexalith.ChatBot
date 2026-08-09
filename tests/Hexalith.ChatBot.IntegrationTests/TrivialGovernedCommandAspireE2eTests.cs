@@ -456,11 +456,76 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             using JsonDocument body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(true));
             body.RootElement.GetProperty("isAvailable").GetBoolean().ShouldBeTrue();
             body.RootElement.GetProperty("status").GetString().ShouldBe("available");
+
+            // Primary-path schedule + inspect: start a deterministic correction-propagation instance through the
+            // chatbot Dapr sidecar workflow HTTP API, then read its runtime status metadata.
+            Uri daprHttp = ResolveChatBotDaprHttpEndpoint(app);
+            string instanceId =
+                $"tier3:correction-propagation:smoke:{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+            using HttpClient daprClient = new() { BaseAddress = daprHttp, Timeout = TimeSpan.FromSeconds(30) };
+            using StringContent scheduleBody = new(
+                """
+                {
+                  "TenantId": "tenant-alpha",
+                  "ActorId": "actor-alpha",
+                  "AssociationId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                  "IntakeId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                  "CorrectionId": "01ARZ3NDEKTSV4RRFFQ69G5FAV:correction:3",
+                  "WorkflowInstanceId": "REPLACE_INSTANCE",
+                  "PriorProjectId": "project-001",
+                  "CorrectedProjectId": "project-002",
+                  "SourceVersion": 3,
+                  "CorrelationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                  "StartedAtUtc": "2026-05-31T09:00:00Z",
+                  "EstimatedCompletionAtUtc": "2026-05-31T09:10:00Z",
+                  "OperationId": "01ARZ3NDEKTSV4RRFFQ69G5FAX"
+                }
+                """.Replace("REPLACE_INSTANCE", instanceId, StringComparison.Ordinal),
+                Encoding.UTF8,
+                "application/json");
+
+            using HttpResponseMessage scheduleResponse = await daprClient
+                .PostAsync(
+                    $"/v1.0-beta1/workflows/dapr/CorrectionPropagationWorkflow/start?instanceID={Uri.EscapeDataString(instanceId)}",
+                    scheduleBody,
+                    cancellationToken)
+                .ConfigureAwait(true);
+            scheduleResponse.StatusCode.ShouldBeOneOf(HttpStatusCode.Accepted, HttpStatusCode.OK);
+
+            using HttpResponseMessage statusResponse = await daprClient
+                .GetAsync(
+                    $"/v1.0-beta1/workflows/dapr/{Uri.EscapeDataString(instanceId)}",
+                    cancellationToken)
+                .ConfigureAwait(true);
+            statusResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+            string statusPayload = await statusResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(true);
+            using JsonDocument statusDoc = JsonDocument.Parse(statusPayload);
+            statusDoc.RootElement.GetProperty("instanceID").GetString().ShouldBe(instanceId);
+            statusPayload.ShouldNotContain("sender@", Case.Insensitive);
+            statusPayload.ShouldNotContain("rawBody", Case.Insensitive);
         }
         finally
         {
             await app.DisposeAsync().ConfigureAwait(true);
         }
+    }
+
+    private static Uri ResolveChatBotDaprHttpEndpoint(DistributedApplication app)
+    {
+        foreach (string candidate in new[] { "chatbot-dapr", "chatbot-dapr-cli", $"{ChatBotResourceName}-dapr" })
+        {
+            try
+            {
+                return app.GetEndpoint(candidate, "http");
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+            {
+                // try next candidate
+            }
+        }
+
+        throw new InvalidOperationException(
+            "Could not resolve the ChatBot Dapr HTTP endpoint required to schedule a correction-propagation workflow.");
     }
 
     [Fact]

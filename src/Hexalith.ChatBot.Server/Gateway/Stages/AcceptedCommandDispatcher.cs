@@ -963,6 +963,9 @@ internal sealed class AcceptedCommandDispatcher(
                 payload.AssociationId,
                 correctionId,
                 propagationSourceVersion);
+            string operationId = string.IsNullOrWhiteSpace(context.Submission.TaskId)
+                ? context.Submission.Request.CommandId
+                : context.Submission.TaskId;
             CorrectionPropagationRequest propagation = new(
                 context.TenantBinding.TenantId,
                 context.Actor.ActorId,
@@ -975,7 +978,8 @@ internal sealed class AcceptedCommandDispatcher(
                 propagationSourceVersion,
                 context.Submission.CorrelationId,
                 clock.UtcNow,
-                clock.UtcNow.Add(DaprCorrectionPropagationCoordinator.M0M1P95Target));
+                clock.UtcNow.Add(DaprCorrectionPropagationCoordinator.M0M1P95Target),
+                operationId);
 
             return new EventStoreDispatchPlan(
                 payload.AssociationId,

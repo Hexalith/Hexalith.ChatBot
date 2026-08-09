@@ -1284,6 +1284,22 @@ components:
           type: integer
           format: int32
           minimum: 0
+        workflowInstanceId:
+          type: string
+          minLength: 1
+          maxLength: 240
+          pattern: "^[a-zA-Z0-9:._-]+$"
+        workflowStatus:
+          type: string
+          minLength: 1
+          maxLength: 80
+          pattern: "^[a-z][a-z0-9-]*$"
+        workflowRetryCount:
+          type: integer
+          format: int32
+          minimum: 0
+        workflowLastFailureCode:
+          $ref: "#/components/schemas/ChatBotMessageCode"
         acceptedAt:
           type: string
           format: date-time

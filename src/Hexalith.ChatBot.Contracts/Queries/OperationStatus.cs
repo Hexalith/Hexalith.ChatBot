@@ -23,4 +23,8 @@ public sealed record OperationStatus(
     string? FailureReasonCode = null,
     string? TerminalReasonCode = null,
     string? OriginalOperationId = null,
-    int DuplicateAttemptCount = 0);
+    int DuplicateAttemptCount = 0,
+    string? WorkflowInstanceId = null,
+    string? WorkflowStatus = null,
+    int WorkflowRetryCount = 0,
+    string? WorkflowLastFailureCode = null);

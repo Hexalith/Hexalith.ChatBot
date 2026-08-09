@@ -294,6 +294,7 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<ICorrectionPropagationCommandWriter, EventStoreCorrectionPropagationCommandWriter>();
         services.TryAddSingleton<ICorrectionPropagationActivityCatalog, CorrectionPropagationActivityCatalog>();
         services.TryAddSingleton<ICorrectionPropagationWorkflowRuntime, UnavailableCorrectionPropagationWorkflowRuntime>();
+        services.TryAddSingleton<ICorrectionPropagationWorkflowStatusSink, OperationStatusWorkflowStatusSink>();
         services.TryAddSingleton<ICorrectionPropagationCoordinator, DaprCorrectionPropagationCoordinator>();
         services.TryAddSingleton<ICorrectedContextReadinessPolicy, ProjectionCorrectedContextReadinessPolicy>();
         services.AddSingleton<ICorrectionPropagationStoreActivity>(static services =>

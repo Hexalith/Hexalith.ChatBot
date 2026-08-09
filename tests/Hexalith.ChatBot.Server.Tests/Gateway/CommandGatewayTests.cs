@@ -4386,6 +4386,80 @@ public sealed class CommandGatewayTests
         Serialized(result.Problem).ShouldNotContain("project-002", Case.Insensitive);
     }
 
+    [Fact]
+    public async Task AssociationCorrectionAuditWriterUnavailableShouldFailClosedBeforeDurableMutation()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(
+                new FixedCorrectionDependencyReadiness(
+                    new AssociationCorrectionDependencyReadinessStatus(
+                        IsWorkflowRuntimeReady: true,
+                        IsProjectionInvalidationReady: true,
+                        IsAuditWriterReady: false,
+                        IsIdempotencyStoreReady: true))),
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(
+                    BoundTenant,
+                    new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+                    new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"),
+                    new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-002")),
+                AssociationCorrectionCommand(),
+                origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.AssociationCorrectionAuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotencyStore.RecordCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task AssociationCorrectionIdempotencyStoreUnavailableShouldFailClosedBeforeDurableMutation()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(
+                new FixedCorrectionDependencyReadiness(
+                    new AssociationCorrectionDependencyReadinessStatus(
+                        IsWorkflowRuntimeReady: true,
+                        IsProjectionInvalidationReady: true,
+                        IsAuditWriterReady: true,
+                        IsIdempotencyStoreReady: false))),
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(
+                    BoundTenant,
+                    new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+                    new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"),
+                    new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-002")),
+                AssociationCorrectionCommand(),
+                origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.DependencyDegraded);
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotencyStore.RecordCount.ShouldBe(0);
+    }
+
     private static string CatalogClientAction(ProblemDetailsClientAction action)
         => action switch
         {

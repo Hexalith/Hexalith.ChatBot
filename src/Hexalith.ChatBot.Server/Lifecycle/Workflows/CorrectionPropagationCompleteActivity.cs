@@ -9,10 +9,13 @@ namespace Hexalith.ChatBot.Server.Lifecycle.Workflows;
 internal sealed class CorrectionPropagationCompleteActivity(
     ICorrectionPropagationCommandWriter writer,
     ISystemClock clock,
-    IChatBotMetrics? metrics = null)
+    IChatBotMetrics? metrics = null,
+    ICorrectionPropagationWorkflowStatusSink? statusSink = null)
     : WorkflowActivity<CorrectionPropagationRequest, bool>
 {
     private readonly IChatBotMetrics _metrics = metrics ?? NullChatBotMetrics.Instance;
+    private readonly ICorrectionPropagationWorkflowStatusSink _statusSink =
+        statusSink ?? NullCorrectionPropagationWorkflowStatusSink.Instance;
 
     public override async Task<bool> RunAsync(
         WorkflowActivityContext context,
@@ -37,6 +40,14 @@ internal sealed class CorrectionPropagationCompleteActivity(
             request.TenantId,
             CorrectionPropagationWorkflowStatuses.Completed,
             CorrectionPropagationWorkflowFailureCodes.None);
+        await _statusSink
+            .ReportAsync(
+                request,
+                CorrectionPropagationWorkflowStatuses.Completed,
+                workflowRetryCount: 0,
+                CorrectionPropagationWorkflowFailureCodes.None,
+                CancellationToken.None)
+            .ConfigureAwait(false);
         return true;
     }
 }
