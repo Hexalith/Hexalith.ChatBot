@@ -4,4 +4,7 @@
     <AssemblyName>Hexalith.ChatBot.StoryEvidenceGate</AssemblyName>
     <RootNamespace>Hexalith.ChatBot.StoryEvidenceGate</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Hexalith.ChatBot.StoryEvidenceGate.Tests" />
+  </ItemGroup>
 </Project>

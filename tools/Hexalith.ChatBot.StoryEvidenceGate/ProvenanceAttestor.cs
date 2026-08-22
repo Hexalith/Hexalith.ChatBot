@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -9,6 +8,19 @@ namespace Hexalith.ChatBot.StoryEvidenceGate;
 /// </summary>
 public static class ProvenanceAttestor
 {
+    internal sealed record AttestationLane(JsonObject Contract, string Checksum);
+
+    internal sealed record AttestationPlan(
+        string StoryKey,
+        string ResultsRoot,
+        string BaseCommit,
+        string HeadCommit,
+        string ImplementationDigest,
+        string RepositoryIdentity,
+        DateTimeOffset ProducedAtUtc,
+        IReadOnlyList<AttestationLane> CurrentRunLanes,
+        IReadOnlyList<string> ResultPaths);
+
     /// <summary>Attests every declared lane whose TRX exists under the results root.</summary>
     /// <param name="repositoryRoot">The root repository.</param>
     /// <param name="contractPath">The evidence contract.</param>
@@ -26,24 +38,108 @@ public static class ProvenanceAttestor
         DateTimeOffset producedAtUtc,
         string? policyPath = null)
     {
+        AttestationPlan plan = PreflightContract(
+            repositoryRoot,
+            contractPath,
+            baseCommit,
+            headCommit,
+            resultsRoot,
+            producedAtUtc,
+            policyPath);
+        WritePlan(plan);
+    }
+
+    internal static AttestationPlan PreflightContract(
+        string repositoryRoot,
+        string contractPath,
+        string baseCommit,
+        string headCommit,
+        string resultsRoot,
+        DateTimeOffset producedAtUtc,
+        string? policyPath = null)
+    {
         ArgumentNullException.ThrowIfNull(baseCommit);
         ArgumentNullException.ThrowIfNull(headCommit);
         JsonObject policy = EvidenceJson.LoadPolicy(
             policyPath ?? Path.Combine(repositoryRoot, "story-evidence-policy.json"));
         JsonObject contract = EvidenceJson.LoadContract(contractPath);
+        StoryEvidenceValidator.ValidatePinnedPolicy(policy);
+        StoryEvidenceValidator.ValidateAttestationContract(contract);
         ScopeEvaluation scope = ScopeEvaluator.Evaluate(repositoryRoot, policy, contract, baseCommit, headCommit);
         JsonArray results = EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid);
+        string repositoryIdentity = EvidenceJson.RequiredString(
+            policy,
+            "repositoryIdentity",
+            GateReason.EvidenceStaleOrUnbound);
+        int maximumCurrentRunAgeMinutes = EvidenceJson.RequiredInteger(
+            policy,
+            "maximumCurrentRunAgeMinutes",
+            GateReason.EvidenceStaleOrUnbound);
+        int maximumFutureClockSkewMinutes = EvidenceJson.RequiredInteger(
+            policy,
+            "maximumFutureClockSkewMinutes",
+            GateReason.EvidenceStaleOrUnbound);
+        List<AttestationLane> currentRunLanes = [];
+        List<string> resultPaths = [];
+        HashSet<string> uniqueResultPaths = new(StringComparer.OrdinalIgnoreCase);
         foreach (JsonNode? node in results)
         {
             JsonObject lane = node as JsonObject
                 ?? throw new GateValidationException(GateReason.MachineResultsInvalid, "results");
+            string trxPath = TrxEvidenceReader.ResolveSafeResultPath(
+                resultsRoot,
+                EvidenceJson.RequiredString(lane, "trx", GateReason.MachineResultsInvalid));
+            string provenancePath = TrxEvidenceReader.ResolveSafeResultPath(
+                resultsRoot,
+                EvidenceJson.RequiredString(lane, "provenance", GateReason.EvidenceStaleOrUnbound));
+            if (!uniqueResultPaths.Add(trxPath) || !uniqueResultPaths.Add(provenancePath))
+            {
+                throw new GateValidationException(GateReason.EvidenceStaleOrUnbound, "result-path-collision");
+            }
+
+            resultPaths.Add(trxPath);
+            resultPaths.Add(provenancePath);
             if (!EvidenceJson.RequiredString(lane, "source", GateReason.EvidenceStaleOrUnbound)
                     .Equals("current-run", StringComparison.Ordinal))
             {
                 continue;
             }
 
-            WriteLane(lane, resultsRoot, baseCommit, headCommit, scope.Digest, producedAtUtc);
+            string checksum = TrxEvidenceReader.PreflightCurrentRun(
+                lane,
+                resultsRoot,
+                repositoryIdentity,
+                maximumCurrentRunAgeMinutes,
+                maximumFutureClockSkewMinutes,
+                producedAtUtc);
+            currentRunLanes.Add(new AttestationLane(lane, checksum));
+        }
+
+        return new AttestationPlan(
+            EvidenceJson.RequiredStoryKey(contract),
+            resultsRoot,
+            baseCommit,
+            headCommit,
+            scope.Digest,
+            repositoryIdentity,
+            producedAtUtc,
+            currentRunLanes,
+            resultPaths);
+    }
+
+    internal static void WritePlan(AttestationPlan plan)
+    {
+        foreach (AttestationLane lane in plan.CurrentRunLanes)
+        {
+            WriteLane(
+                lane.Contract,
+                plan.ResultsRoot,
+                plan.BaseCommit,
+                plan.HeadCommit,
+                plan.ImplementationDigest,
+                plan.RepositoryIdentity,
+                plan.ProducedAtUtc,
+                lane.Checksum);
         }
     }
 
@@ -53,7 +149,9 @@ public static class ProvenanceAttestor
         string baseCommit,
         string headCommit,
         string implementationDigest,
-        DateTimeOffset producedAtUtc)
+        string repositoryIdentity,
+        DateTimeOffset producedAtUtc,
+        string checksum)
     {
         string trxRelative = EvidenceJson.RequiredString(lane, "trx", GateReason.MachineResultsInvalid);
         string provenanceRelative = EvidenceJson.RequiredString(
@@ -78,11 +176,12 @@ public static class ProvenanceAttestor
 
         JsonObject sidecar = new()
         {
-            ["schemaVersion"] = "1.0",
+            ["schemaVersion"] = "2.0",
+            ["repositoryIdentity"] = repositoryIdentity,
             ["baseCommit"] = baseCommit.ToLowerInvariant(),
             ["headCommit"] = headCommit.ToLowerInvariant(),
             ["implementationDigest"] = implementationDigest,
-            ["trxSha256"] = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(trxPath))).ToLowerInvariant(),
+            ["trxSha256"] = checksum,
             ["lane"] = EvidenceJson.RequiredString(lane, "lane", GateReason.MachineResultsInvalid),
             ["source"] = "current-run",
             ["selectors"] = JsonSerializer.SerializeToNode(

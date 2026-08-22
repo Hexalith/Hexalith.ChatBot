@@ -1,12 +1,17 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace Hexalith.ChatBot.StoryEvidenceGate;
 
 /// <summary>
-/// Detects explicit story or sprint-ledger completion transitions without numeric identity inference.
+/// Detects explicit completion candidates before loading any unrelated evidence contract.
 /// </summary>
 public static class TransitionDetector
 {
+    private const string EvidencePrefix = "_bmad-output/implementation-artifacts/evidence/";
+    private const string TechnicalLedgerPath = "_bmad-output/planning-artifacts/technical-enablers.md";
+    private const string SprintPath = "_bmad-output/implementation-artifacts/sprint-status.yaml";
+
     /// <summary>Detects transitions between exact revisions.</summary>
     /// <param name="repositoryRoot">The root repository.</param>
     /// <param name="baseCommit">The exact base revision.</param>
@@ -20,70 +25,89 @@ public static class TransitionDetector
         _ = GitReader.ResolveExactCommit(repositoryRoot, baseCommit);
         _ = GitReader.ResolveExactCommit(repositoryRoot, headCommit);
         IReadOnlyDictionary<string, string> changed = GitReader.Diff(repositoryRoot, baseCommit, headCommit);
-        List<JsonObject> contracts = LoadContracts(repositoryRoot);
         Dictionary<string, TransitionRecord> transitions = new(StringComparer.Ordinal);
+        HashSet<string> terminalContractCandidates = new(StringComparer.Ordinal);
+        HashSet<string> independentlyCompletedCandidates = new(StringComparer.Ordinal);
 
-        foreach (string path in changed.Keys.Where(static path =>
-                     path.StartsWith("_bmad-output/implementation-artifacts/", StringComparison.Ordinal)
-                     && path.EndsWith(".md", StringComparison.Ordinal)
-                     && !path.Contains("/evidence/", StringComparison.Ordinal)))
+        foreach (string path in changed.Keys.Where(IsContractPath))
         {
+            string after = GitReader.Show(repositoryRoot, headCommit, path)
+                ?? throw new GateValidationException(GateReason.StatusMismatch, path);
+            JsonObject contract = EvidenceJson.ParseContract(after, Path.GetFileName(path));
+            bool headBootstrap = EvidenceJson.RequiredBoolean(contract, "bootstrap", GateReason.StatusMismatch);
             string? before = GitReader.Show(repositoryRoot, baseCommit, path);
-            string? after = GitReader.Show(repositoryRoot, headCommit, path);
-            if (after is null)
+            if (headBootstrap)
             {
+                if (before is not null && !ReadBootstrap(before, path))
+                {
+                    throw new GateValidationException(GateReason.StatusMismatch, "bootstrap-regression");
+                }
+
+                AddTransition(transitions, repositoryRoot, contract);
                 continue;
             }
 
-            string afterStatus = MarkdownStoryReader.ReadStatus(after);
-            if (afterStatus is not ("done" or "complete"))
+            if (before is null)
             {
+                string storyKey = EvidenceJson.RequiredStoryKey(contract);
+                terminalContractCandidates.Add(storyKey);
+                AddTransition(transitions, repositoryRoot, contract);
                 continue;
             }
 
-            JsonObject[] matches = contracts.Where(value =>
-                NormalizePath(EvidenceJson.RequiredString(value, "storyPath", GateReason.StatusMismatch))
-                    .Equals(path, StringComparison.Ordinal))
-                .ToArray();
-            if (matches.Length != 1)
+            if (!EvidenceJson.RequiredBoolean(
+                    EvidenceJson.ParseContract(before, Path.GetFileName(path)),
+                    "bootstrap",
+                    GateReason.StatusMismatch))
             {
-                throw new GateValidationException(GateReason.StatusMismatch, path);
-            }
-
-            JsonObject contract = matches[0];
-            string terminalStatus = EvidenceJson.RequiredString(contract, "recordKind", GateReason.StatusMismatch)
-                    .Equals("technicalEnabler", StringComparison.Ordinal)
-                ? EvidenceJson.RequiredString(contract, "persistedStatus", GateReason.StatusMismatch)
-                : "done";
-            if (!afterStatus.Equals(terminalStatus, StringComparison.Ordinal)
-                || (before is not null && MarkdownStoryReader.ReadStatus(before).Equals(terminalStatus, StringComparison.Ordinal)))
-            {
-                continue;
+                throw new GateValidationException(GateReason.StatusMismatch, "completed-contract-change");
             }
 
             AddTransition(transitions, repositoryRoot, contract);
         }
 
-        foreach (JsonObject contract in contracts.Where(value =>
-                     EvidenceJson.RequiredBoolean(value, "bootstrap", GateReason.StatusMismatch)
-                     && EvidenceJson.RequiredString(value, "recordKind", GateReason.StatusMismatch)
-                         .Equals("technicalEnabler", StringComparison.Ordinal)))
+        foreach (string path in changed.Keys.Where(IsStoryPath))
         {
-            string storyKey = EvidenceJson.RequiredString(contract, "storyKey", GateReason.StatusMismatch);
-            string contractPath = $"_bmad-output/implementation-artifacts/evidence/{storyKey}.json";
-            if (changed.ContainsKey(contractPath))
+            string? before = GitReader.Show(repositoryRoot, baseCommit, path);
+            string? after = GitReader.Show(repositoryRoot, headCommit, path);
+            if (after is null)
             {
-                AddTransition(transitions, repositoryRoot, contract);
+                if (before is not null && MarkdownStoryReader.ReadStatus(before) is "done" or "complete")
+                {
+                    throw new GateValidationException(GateReason.StatusMismatch, "story-status-regression");
+                }
+
+                continue;
             }
+
+            string afterStatus = MarkdownStoryReader.ReadStatus(after);
+            string? beforeStatus = before is null ? null : MarkdownStoryReader.ReadStatus(before);
+            if (beforeStatus is "done" or "complete" && afterStatus is not ("done" or "complete"))
+            {
+                throw new GateValidationException(GateReason.StatusMismatch, "story-status-regression");
+            }
+
+            if (afterStatus is not ("done" or "complete")
+                || beforeStatus?.Equals(afterStatus, StringComparison.Ordinal) == true)
+            {
+                continue;
+            }
+
+            JsonObject contract = FindSingleContract(
+                repositoryRoot,
+                candidate => CandidateField(candidate, "storyPath").Equals(path, StringComparison.Ordinal),
+                path);
+            AddTransition(transitions, repositoryRoot, contract);
+            independentlyCompletedCandidates.Add(EvidenceJson.RequiredStoryKey(contract));
         }
 
-        const string TechnicalLedgerPath = "_bmad-output/planning-artifacts/technical-enablers.md";
         if (changed.ContainsKey(TechnicalLedgerPath))
         {
             string before = GitReader.Show(repositoryRoot, baseCommit, TechnicalLedgerPath) ?? string.Empty;
             string after = GitReader.Show(repositoryRoot, headCommit, TechnicalLedgerPath) ?? string.Empty;
             IReadOnlyDictionary<string, string> beforeStatuses = TechnicalEnablerLedgerReader.StatusesFromText(before);
             IReadOnlyDictionary<string, string> afterStatuses = TechnicalEnablerLedgerReader.StatusesFromText(after);
+            RejectTerminalRegressions(beforeStatuses, afterStatuses, "complete", "technical-ledger-regression");
             foreach ((string key, string status) in afterStatuses)
             {
                 if (!status.Equals("complete", StringComparison.Ordinal)
@@ -93,99 +117,167 @@ public static class TransitionDetector
                     continue;
                 }
 
-                JsonObject contract = SingleContract(contracts, "recordLedgerKey", key, technicalEnablerOnly: true);
+                JsonObject contract = FindSingleContract(
+                    repositoryRoot,
+                    candidate => CandidateField(candidate, "recordKind").Equals("technicalEnabler", StringComparison.Ordinal)
+                        && CandidateField(candidate, "recordLedgerKey").Equals(key, StringComparison.Ordinal),
+                    key);
                 AddTransition(transitions, repositoryRoot, contract);
+                independentlyCompletedCandidates.Add(EvidenceJson.RequiredStoryKey(contract));
             }
         }
 
-        const string SprintPath = "_bmad-output/implementation-artifacts/sprint-status.yaml";
         if (changed.ContainsKey(SprintPath))
         {
             string before = GitReader.Show(repositoryRoot, baseCommit, SprintPath) ?? string.Empty;
             string after = GitReader.Show(repositoryRoot, headCommit, SprintPath) ?? string.Empty;
-            IReadOnlyDictionary<string, string> beforeStatuses = ParseStatuses(before);
-            IReadOnlyDictionary<string, string> afterStatuses = ParseStatuses(after);
-            foreach ((string key, string status) in afterStatuses)
-            {
-                if (!status.Equals("done", StringComparison.Ordinal)
-                    || (beforeStatuses.TryGetValue(key, out string? previous)
-                        && previous.Equals("done", StringComparison.Ordinal)))
-                {
-                    continue;
-                }
+            AddSprintStoryCandidates(repositoryRoot, transitions, independentlyCompletedCandidates, before, after);
+            AddSprintActionCandidates(repositoryRoot, transitions, independentlyCompletedCandidates, before, after);
+        }
 
-                JsonObject contract = contracts.SingleOrDefault(value =>
-                    EvidenceJson.RequiredString(value, "sprintStatusKey", GateReason.StatusMismatch)
-                        .Equals(key, StringComparison.Ordinal))
-                    ?? throw new GateValidationException(GateReason.StatusMismatch, key);
-                AddTransition(transitions, repositoryRoot, contract);
-            }
-
-            IReadOnlyDictionary<string, string> beforeActions = SprintLedgerReader.ActionStatusesFromText(before);
-            IReadOnlyDictionary<string, string> afterActions = SprintLedgerReader.ActionStatusesFromText(after);
-            foreach ((string action, string status) in afterActions)
-            {
-                if (!status.Equals("done", StringComparison.Ordinal)
-                    || (beforeActions.TryGetValue(action, out string? previous)
-                        && previous.Equals("done", StringComparison.Ordinal)))
-                {
-                    continue;
-                }
-
-                JsonObject contract = SingleContract(contracts, "sprintStatusKey", action, technicalEnablerOnly: true);
-                AddTransition(transitions, repositoryRoot, contract);
-            }
+        terminalContractCandidates.ExceptWith(independentlyCompletedCandidates);
+        if (terminalContractCandidates.Count != 0)
+        {
+            throw new GateValidationException(GateReason.StatusMismatch, "completed-contract-change");
         }
 
         return transitions.Values.OrderBy(static value => value.StoryKey, StringComparer.Ordinal).ToArray();
     }
 
-    private static JsonObject SingleContract(
-        IEnumerable<JsonObject> contracts,
-        string field,
-        string value,
-        bool technicalEnablerOnly)
+    private static void AddSprintStoryCandidates(
+        string repositoryRoot,
+        IDictionary<string, TransitionRecord> transitions,
+        ISet<string> independentlyCompletedCandidates,
+        string before,
+        string after)
     {
-        JsonObject[] matches = contracts.Where(contract =>
-                (!technicalEnablerOnly
-                    || (EvidenceJson.RequiredString(contract, "recordKind", GateReason.StatusMismatch)
-                            .Equals("technicalEnabler", StringComparison.Ordinal)
-                        && !EvidenceJson.RequiredBoolean(contract, "bootstrap", GateReason.StatusMismatch)))
-                && EvidenceJson.RequiredString(contract, field, GateReason.StatusMismatch)
-                    .Equals(value, StringComparison.Ordinal))
-            .ToArray();
-        return matches.Length == 1
-            ? matches[0]
-            : throw new GateValidationException(GateReason.StatusMismatch, value);
+        IReadOnlyDictionary<string, string> beforeStatuses = SprintLedgerReader.StoryStatusesFromText(before);
+        IReadOnlyDictionary<string, string> afterStatuses = SprintLedgerReader.StoryStatusesFromText(after);
+        RejectTerminalRegressions(beforeStatuses, afterStatuses, "done", "sprint-story-regression");
+        foreach ((string key, string status) in afterStatuses)
+        {
+            if (!status.Equals("done", StringComparison.Ordinal)
+                || (beforeStatuses.TryGetValue(key, out string? previous) && previous.Equals("done", StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            JsonObject contract = FindSingleContract(
+                repositoryRoot,
+                candidate => CandidateField(candidate, "sprintStatusKey").Equals(key, StringComparison.Ordinal),
+                key);
+            AddTransition(transitions, repositoryRoot, contract);
+            independentlyCompletedCandidates.Add(EvidenceJson.RequiredStoryKey(contract));
+        }
     }
 
-    private static List<JsonObject> LoadContracts(string repositoryRoot)
+    private static void AddSprintActionCandidates(
+        string repositoryRoot,
+        IDictionary<string, TransitionRecord> transitions,
+        ISet<string> independentlyCompletedCandidates,
+        string before,
+        string after)
+    {
+        IReadOnlyDictionary<string, string> beforeStatuses = SprintLedgerReader.ActionStatusesFromText(before);
+        IReadOnlyDictionary<string, string> afterStatuses = SprintLedgerReader.ActionStatusesFromText(after);
+        RejectTerminalRegressions(beforeStatuses, afterStatuses, "done", "sprint-action-regression");
+        foreach ((string action, string status) in afterStatuses)
+        {
+            if (!status.Equals("done", StringComparison.Ordinal)
+                || (beforeStatuses.TryGetValue(action, out string? previous) && previous.Equals("done", StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            JsonObject contract = FindSingleContract(
+                repositoryRoot,
+                candidate => CandidateField(candidate, "recordKind").Equals("technicalEnabler", StringComparison.Ordinal)
+                    && CandidateField(candidate, "sprintStatusKey").Equals(action, StringComparison.Ordinal),
+                action);
+            AddTransition(transitions, repositoryRoot, contract);
+            independentlyCompletedCandidates.Add(EvidenceJson.RequiredStoryKey(contract));
+        }
+    }
+
+    private static JsonObject FindSingleContract(
+        string repositoryRoot,
+        Func<JsonObject, bool> predicate,
+        string subject)
     {
         string evidenceRoot = Path.Combine(repositoryRoot, "_bmad-output", "implementation-artifacts", "evidence");
         if (!Directory.Exists(evidenceRoot))
         {
-            return [];
+            throw new GateValidationException(GateReason.StatusMismatch, subject);
         }
 
-        List<JsonObject> contracts = [];
-        HashSet<string> storyKeys = new(StringComparer.Ordinal);
-        HashSet<string> storyPaths = new(StringComparer.Ordinal);
+        List<(string Path, JsonObject Identity)> candidates = [];
         foreach (string path in Directory.EnumerateFiles(evidenceRoot, "*.json", SearchOption.TopDirectoryOnly))
         {
-            JsonObject contract = EvidenceJson.LoadContract(path);
-            string storyKey = EvidenceJson.RequiredString(contract, "storyKey", GateReason.StatusMismatch);
-            string storyPath = NormalizePath(EvidenceJson.RequiredString(contract, "storyPath", GateReason.StatusMismatch));
-            if (!Path.GetFileNameWithoutExtension(path).Equals(storyKey, StringComparison.Ordinal)
-                || !storyKeys.Add(storyKey)
-                || !storyPaths.Add(storyPath))
+            JsonObject? candidate = TryParseIdentity(path);
+            if (candidate is not null)
             {
-                throw new GateValidationException(GateReason.StatusMismatch, "ambiguous-contract-identity");
+                candidates.Add((path, candidate));
             }
-
-            contracts.Add(contract);
         }
 
-        return contracts;
+        List<(string Path, JsonObject Identity)> matches = candidates.Where(candidate => predicate(candidate.Identity)).ToList();
+
+        if (matches.Count != 0)
+        {
+            HashSet<string> activeKeys = matches
+                .Select(match => CandidateField(match.Identity, "storyKey"))
+                .ToHashSet(StringComparer.Ordinal);
+            HashSet<string> activePaths = matches
+                .Select(match => CandidateField(match.Identity, "storyPath"))
+                .ToHashSet(StringComparer.Ordinal);
+            if (candidates.GroupBy(candidate => CandidateField(candidate.Identity, "storyKey"), StringComparer.Ordinal)
+                    .Any(group => activeKeys.Contains(group.Key) && group.Count() > 1)
+                || candidates.GroupBy(candidate => CandidateField(candidate.Identity, "storyPath"), StringComparer.Ordinal)
+                    .Any(group => activePaths.Contains(group.Key) && group.Count() > 1))
+            {
+                throw new GateValidationException(GateReason.StatusMismatch, "duplicate-contract-identity");
+            }
+        }
+
+        if (matches.Count != 1)
+        {
+            throw new GateValidationException(GateReason.StatusMismatch, subject);
+        }
+
+        (string selectedPath, JsonObject selectedIdentity) = matches[0];
+        return EvidenceJson.LoadContract(selectedPath);
+    }
+
+    private static JsonObject? TryParseIdentity(string path)
+    {
+        try
+        {
+            JsonObject? candidate = JsonNode.Parse(
+                File.ReadAllText(path),
+                documentOptions: new JsonDocumentOptions
+                {
+                    AllowTrailingCommas = false,
+                    CommentHandling = JsonCommentHandling.Disallow,
+                }) as JsonObject;
+            return candidate is not null
+                && candidate["storyKey"] is JsonValue
+                && candidate["storyPath"] is JsonValue
+                ? candidate
+                : null;
+        }
+        catch (Exception exception) when (exception is JsonException
+            or IOException
+            or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    private static string CandidateField(JsonObject candidate, string name)
+    {
+        return candidate[name] is JsonValue value && value.TryGetValue(out string? text)
+            ? text.Replace('\\', '/')
+            : string.Empty;
     }
 
     private static void AddTransition(
@@ -194,7 +286,7 @@ public static class TransitionDetector
         JsonObject contract)
     {
         string storyPath = NormalizePath(EvidenceJson.RequiredString(contract, "storyPath", GateReason.StatusMismatch));
-        string storyKey = EvidenceJson.RequiredString(contract, "storyKey", GateReason.StatusMismatch);
+        string storyKey = EvidenceJson.RequiredStoryKey(contract);
         string contractPath = Path.Combine(
             repositoryRoot,
             "_bmad-output",
@@ -220,9 +312,47 @@ public static class TransitionDetector
         transitions.Add(storyKey, record);
     }
 
-    private static IReadOnlyDictionary<string, string> ParseStatuses(string yaml)
+    private static bool IsContractPath(string path)
     {
-        return SprintLedgerReader.StoryStatusesFromText(yaml);
+        string suffix = path.StartsWith(EvidencePrefix, StringComparison.Ordinal)
+            ? path[EvidencePrefix.Length..]
+            : string.Empty;
+        return suffix.Length > 5
+            && !suffix.Contains('/', StringComparison.Ordinal)
+            && suffix.EndsWith(".json", StringComparison.Ordinal);
+    }
+
+    private static bool IsStoryPath(string path) =>
+        path.StartsWith("_bmad-output/implementation-artifacts/", StringComparison.Ordinal)
+        && path.EndsWith(".md", StringComparison.Ordinal)
+        && !path.Contains("/evidence/", StringComparison.Ordinal);
+
+    private static bool ReadBootstrap(string json, string subject)
+    {
+        try
+        {
+            JsonObject value = JsonNode.Parse(json)?.AsObject()
+                ?? throw new JsonException("Contract root is not an object.");
+            return EvidenceJson.RequiredBoolean(value, "bootstrap", GateReason.StatusMismatch);
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
+        {
+            throw new GateValidationException(GateReason.StatusMismatch, subject);
+        }
+    }
+
+    private static void RejectTerminalRegressions(
+        IReadOnlyDictionary<string, string> before,
+        IReadOnlyDictionary<string, string> after,
+        string terminal,
+        string subject)
+    {
+        if (before.Any(pair => pair.Value.Equals(terminal, StringComparison.Ordinal)
+                && (!after.TryGetValue(pair.Key, out string? current)
+                    || !current.Equals(terminal, StringComparison.Ordinal))))
+        {
+            throw new GateValidationException(GateReason.StatusMismatch, subject);
+        }
     }
 
     private static string NormalizePath(string path)
@@ -237,5 +367,4 @@ public static class TransitionDetector
 
         return normalized;
     }
-
 }

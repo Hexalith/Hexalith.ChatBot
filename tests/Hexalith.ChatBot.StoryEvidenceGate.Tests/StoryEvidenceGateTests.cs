@@ -27,6 +27,302 @@ public static class StoryEvidenceGateTests
         report.CheckedItemCount.ShouldBe(3);
     }
 
+    /// <summary>Proves a clean v2 bootstrap hashes every owned HEAD snapshot path.</summary>
+    [Fact]
+    public static void ValidSnapshotBootstrapShouldPassWithoutTerminalMutation()
+    {
+        using GateFixture fixture = new();
+        fixture.UseSnapshotBootstrap();
+
+        GateReport report = fixture.Validate();
+
+        report.Passed.ShouldBeTrue(string.Join(", ", report.Issues.Select(static issue => $"{issue.ReasonCode}:{issue.Subject}")));
+        report.ScopedDiffCount.ShouldBe(6);
+        report.EventPathCount.ShouldBeGreaterThan(0);
+    }
+
+    /// <summary>Proves snapshot evaluation rejects index or worktree drift from exact HEAD.</summary>
+    [Fact]
+    public static void SnapshotWorktreeDriftShouldFailWithScopeReason()
+    {
+        using GateFixture fixture = new();
+        fixture.UseSnapshotBootstrap();
+        File.AppendAllText(fixture.SourcePath, "drift\n");
+
+        fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.ScopeDigestMismatch);
+    }
+
+    /// <summary>Proves a clean committed bootstrap event cannot carry a path outside snapshot ownership.</summary>
+    [Fact]
+    public static void SnapshotBootstrapWithCommittedUnownedPathShouldFailWithScopeReason()
+    {
+        using GateFixture fixture = new();
+        fixture.UseSnapshotBootstrap();
+        fixture.CommitUnownedSnapshotEvent();
+
+        GateIssue issue = fixture.Validate().Issues.Single();
+
+        issue.ReasonCode.ShouldBe(GateReason.ScopeDigestMismatch);
+        issue.Subject.ShouldBe("root:unowned-bootstrap-event.txt");
+    }
+
+    /// <summary>Proves snapshot transition declarations cannot name paths outside root ownership.</summary>
+    [Fact]
+    public static void SnapshotTransitionPathOutsideRootOwnershipShouldFailClosed()
+    {
+        using GateFixture fixture = new();
+        fixture.UseSnapshotBootstrap();
+        fixture.MutateContract(contract =>
+        {
+            JsonArray paths = EvidenceJson.RequiredArray(
+                EvidenceJson.RequiredObject(contract, "scope", GateReason.ScopeDigestMismatch),
+                "transitionPaths",
+                GateReason.ScopeDigestMismatch);
+            paths.Add("unowned-transition.txt");
+        }, refreshEvidence: false);
+
+        GateIssue issue = fixture.Validate().Issues.Single();
+
+        issue.ReasonCode.ShouldBe(GateReason.ScopeDigestMismatch);
+        issue.Subject.ShouldBe("transition-path-ownership");
+    }
+
+    /// <summary>Proves the exact four-path delayed completion event passes independently of the snapshot.</summary>
+    [Fact]
+    public static void ExactSnapshotLifecycleCompletionShouldPass()
+    {
+        using GateFixture fixture = new();
+        fixture.UseSnapshotCompletion();
+
+        GateReport report = fixture.Validate();
+
+        report.Passed.ShouldBeTrue(string.Join(", ", report.Issues.Select(static issue => $"{issue.ReasonCode}:{issue.Subject}")));
+        report.EventPathCount.ShouldBe(4);
+        report.ScopedDiffCount.ShouldBe(6);
+    }
+
+    /// <summary>Proves a fifth event path cannot be hidden by the complete HEAD snapshot.</summary>
+    [Fact]
+    public static void SnapshotCompletionWithExtraEventPathShouldFailDeterministically()
+    {
+        using GateFixture fixture = new();
+        fixture.UseSnapshotCompletion(() => File.AppendAllText(fixture.SourcePath, "unauthorized\n"));
+
+        fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.StatusMismatch);
+    }
+
+    /// <summary>Proves all story bytes other than the exact status value, including frozen intent, remain immutable.</summary>
+    [Fact]
+    public static void SnapshotCompletionWithStoryBodyMutationShouldFailDeterministically()
+    {
+        using GateFixture fixture = new();
+        fixture.UseSnapshotCompletion(() => File.AppendAllText(fixture.StoryPath, "\nunauthorized intent mutation\n"));
+
+        fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.StatusMismatch);
+    }
+
+    /// <summary>Proves unrelated ledger bytes cannot ride beside the authorized TE status mutation.</summary>
+    [Fact]
+    public static void SnapshotCompletionWithUnrelatedLedgerMutationShouldFailDeterministically()
+    {
+        using GateFixture fixture = new();
+        string ledgerPath = Path.Combine(
+            fixture.RepositoryRoot,
+            "_bmad-output",
+            "planning-artifacts",
+            "technical-enablers.md");
+        fixture.UseSnapshotCompletion(() => File.AppendAllText(ledgerPath, "\nunauthorized ledger mutation\n"));
+
+        fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.StatusMismatch);
+    }
+
+    /// <summary>Proves unrelated sprint bytes cannot ride beside the authorized action status mutation.</summary>
+    [Fact]
+    public static void SnapshotCompletionWithUnrelatedSprintMutationShouldFailDeterministically()
+    {
+        using GateFixture fixture = new();
+        fixture.UseSnapshotCompletion(() => File.AppendAllText(fixture.SprintPath, "\nunauthorized sprint mutation\n"));
+
+        fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.StatusMismatch);
+    }
+
+    /// <summary>Proves the completion comparator requires the base digest token to be a JSON string.</summary>
+    [Fact]
+    public static void SnapshotCompletionWithNonStringBaseDigestShouldFailContractTransition()
+    {
+        using GateFixture fixture = new();
+        fixture.UseSnapshotCompletionWithBaseContractMutation(contract =>
+            EvidenceJson.RequiredObject(contract, "scope", GateReason.ScopeDigestMismatch)["implementationDigest"] = 42);
+
+        GateIssue issue = fixture.Validate().Issues.Single();
+
+        issue.ReasonCode.ShouldBe(GateReason.StatusMismatch);
+        issue.Subject.ShouldBe("implementationDigest");
+    }
+
+    /// <summary>Proves completion cannot change any contract field beyond bootstrap and the digest.</summary>
+    [Fact]
+    public static void SnapshotCompletionWithExtraContractMutationShouldFailContractTransition()
+    {
+        using GateFixture fixture = new();
+        fixture.UseSnapshotCompletion(() => fixture.MutateContract(contract =>
+            EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid)[0]!
+                .AsObject()["allowSkipped"] = true, refreshEvidence: false));
+
+        GateIssue issue = fixture.Validate().Issues.Single();
+
+        issue.ReasonCode.ShouldBe(GateReason.StatusMismatch);
+        issue.Subject.ShouldBe("contract-transition");
+    }
+
+    /// <summary>Proves diff-mode primary triggers include working-tree-only owned changes.</summary>
+    [Fact]
+    public static void DiffModeWorkingTreeOnlyPrimaryTriggerShouldRequireAndAcceptBoundLane()
+    {
+        using (GateFixture negative = new())
+        {
+            negative.AddOwnedFile("src/Pages/WorkingTreeOnly.razor", "<p>working tree</p>\n");
+            GateReport report = negative.Validate();
+            report.EventPathCount.ShouldBe(0);
+            report.Issues.Single().ReasonCode.ShouldBe(GateReason.PrimaryPathNotExecuted);
+        }
+
+        using GateFixture positive = new();
+        positive.UseBrowserPrimaryPath("browser-primary");
+        GateReport accepted = positive.Validate();
+        accepted.EventPathCount.ShouldBe(0);
+        accepted.Passed.ShouldBeTrue();
+    }
+
+    /// <summary>Proves Git stdout and stderr are drained concurrently instead of pipe-blocking the gate.</summary>
+    [Fact]
+    public static void GitReaderShouldDrainBothRedirectedStreamsConcurrently()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"git-streams-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            RunGit(temporaryRoot, "init", "--initial-branch=main");
+            RunGit(temporaryRoot, "config", "user.email", "gate@example.invalid");
+            RunGit(temporaryRoot, "config", "user.name", "Story Evidence Gate Tests");
+            string driver = Path.Combine(temporaryRoot, "noisy-textconv.sh");
+            File.WriteAllText(
+                driver,
+                "#!/bin/sh\ni=0\nwhile [ \"$i\" -lt 20000 ]; do\n  printf 'stdout-0123456789abcdef\\n'\n  printf 'stderr-0123456789abcdef\\n' >&2\n  i=$((i + 1))\ndone\n");
+            File.SetUnixFileMode(driver, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            File.WriteAllText(Path.Combine(temporaryRoot, ".gitattributes"), "data.txt diff=noisy\n");
+            File.WriteAllText(Path.Combine(temporaryRoot, "data.txt"), "base\n");
+            RunGit(temporaryRoot, "config", "diff.noisy.textconv", driver);
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: create stream fixture");
+            string baseCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+            File.WriteAllText(Path.Combine(temporaryRoot, "data.txt"), "head\n");
+            RunGit(temporaryRoot, "add", "data.txt");
+            RunGit(temporaryRoot, "commit", "-m", "test: change stream fixture");
+            string headCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+
+            GitCommandResult result = GitReader.Run(temporaryRoot, "diff", baseCommit, headCommit, "--", "data.txt");
+
+            result.ExitCode.ShouldBe(0);
+            result.StandardError.Length.ShouldBeGreaterThan(64 * 1024);
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    /// <summary>Proves a hung allowlisted Git operation is killed and fails with the stable timeout subject.</summary>
+    [Fact]
+    public static void HungAllowlistedGitOperationShouldFailWithinInjectedTimeout()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"git-timeout-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            RunGit(temporaryRoot, "init", "--initial-branch=main");
+            RunGit(temporaryRoot, "config", "user.email", "gate@example.invalid");
+            RunGit(temporaryRoot, "config", "user.name", "Story Evidence Gate Tests");
+            string driver = Path.Combine(temporaryRoot, "hung-textconv.sh");
+            File.WriteAllText(driver, "#!/bin/sh\nwhile :; do sleep 1; done\n");
+            File.SetUnixFileMode(driver, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            File.WriteAllText(Path.Combine(temporaryRoot, ".gitattributes"), "data.txt diff=hung\n");
+            File.WriteAllText(Path.Combine(temporaryRoot, "data.txt"), "base\n");
+            RunGit(temporaryRoot, "config", "diff.hung.textconv", driver);
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: create timeout fixture");
+            string baseCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+            File.WriteAllText(Path.Combine(temporaryRoot, "data.txt"), "head\n");
+            RunGit(temporaryRoot, "add", "data.txt");
+            RunGit(temporaryRoot, "commit", "-m", "test: change timeout fixture");
+            string headCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+            Stopwatch stopwatch = Stopwatch.StartNew();
+
+            GateValidationException exception = Should.Throw<GateValidationException>(() =>
+                GitReader.RunWithTimeout(
+                    temporaryRoot,
+                    TimeSpan.FromMilliseconds(250),
+                    "diff",
+                    baseCommit,
+                    headCommit,
+                    "--",
+                    "data.txt"));
+            stopwatch.Stop();
+
+            exception.ReasonCode.ShouldBe(GateReason.ScopeDigestMismatch);
+            exception.Subject.ShouldBe("git-timeout");
+            stopwatch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    /// <summary>Proves legal Linux backslash filenames cannot alias slash-normalized evidence paths.</summary>
+    [Fact]
+    public static void GitReportedBackslashPathShouldFailClosed()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"git-backslash-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            RunGit(temporaryRoot, "init", "--initial-branch=main");
+            RunGit(temporaryRoot, "config", "user.email", "gate@example.invalid");
+            RunGit(temporaryRoot, "config", "user.name", "Story Evidence Gate Tests");
+            File.WriteAllText(Path.Combine(temporaryRoot, "baseline.txt"), "baseline\n");
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: create path fixture");
+            string headCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+            File.WriteAllText(Path.Combine(temporaryRoot, "unsafe\\path.txt"), "unsafe\n");
+
+            GateValidationException exception = Should.Throw<GateValidationException>(() =>
+                GitReader.WorktreeDiff(temporaryRoot, headCommit));
+
+            exception.ReasonCode.ShouldBe(GateReason.ScopeDigestMismatch);
+            exception.Subject.ShouldBe("git-path");
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
     /// <summary>Proves the repository's exact in-review spelling is an accepted TE bootstrap state.</summary>
     [Fact]
     public static void TechnicalEnablerBootstrapInReviewShouldPass()
@@ -284,8 +580,8 @@ public static class StoryEvidenceGateTests
                 break;
         }
 
-        fixture.RefreshEvidence();
-        fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
+        Should.Throw<GateValidationException>(() => fixture.RefreshEvidence())
+            .ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
     }
 
     /// <summary>Proves TRX counters and individual outcomes must describe the same result set.</summary>
@@ -311,8 +607,8 @@ public static class StoryEvidenceGateTests
                     StringComparison.Ordinal));
         }
 
-        fixture.RefreshEvidence();
-        fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
+        Should.Throw<GateValidationException>(() => fixture.RefreshEvidence())
+            .ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
     }
 
     /// <summary>Proves method selectors accept parameterized result display names.</summary>
@@ -326,7 +622,7 @@ public static class StoryEvidenceGateTests
             EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid)[0]!.AsObject()["selectors"] =
                 new JsonArray("method:GateFixture.Parameterized");
             EvidenceJson.RequiredArray(contract, "mappings", GateReason.CheckedItemEvidenceMismatch)[2]!.AsObject()["assertions"] =
-                new JsonArray(TestName);
+                new JsonArray("GateFixture.Parameterized");
         }, refreshEvidence: false);
         fixture.WriteTrx(2, 2, 2, 0, 0, "Completed", TestName);
         fixture.RefreshEvidence();
@@ -355,9 +651,227 @@ public static class StoryEvidenceGateTests
         using GateFixture fixture = new();
         fixture.MutateContract(contract =>
             EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid)[0]!.AsObject()["selectors"] =
-                new JsonArray("class:MissingFixture"));
+                new JsonArray("class:MissingFixture"), refreshEvidence: false);
 
-        fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
+        Should.Throw<GateValidationException>(() => fixture.Attest())
+            .ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
+    }
+
+    /// <summary>Proves spoofed display names cannot satisfy selectors without the matching testId/TestMethod identity.</summary>
+    [Fact]
+    public static void SpoofedTrxDisplayNameShouldFailWithMachineReason()
+    {
+        using GateFixture fixture = new();
+        File.WriteAllText(
+            fixture.TrxPath,
+            File.ReadAllText(fixture.TrxPath).Replace(
+                "className=\"GateFixture\"",
+                "className=\"Spoofed.Fixture\"",
+                StringComparison.Ordinal));
+        byte[] goodSidecar = File.ReadAllBytes(fixture.ProvenancePath);
+
+        Should.Throw<GateValidationException>(() => fixture.Attest())
+            .ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(goodSidecar);
+    }
+
+    /// <summary>Proves stale and future current-run TRX clocks cannot mint or replace provenance.</summary>
+    [Theory]
+    [InlineData(-120)]
+    [InlineData(10)]
+    public static void InvalidCurrentRunTrxTimeShouldFailWithProvenanceReason(int minutesFromNow)
+    {
+        using GateFixture fixture = new();
+        fixture.WriteTrx(1, 1, 1, 0, 0, "Completed", finishedAtUtc: DateTimeOffset.UtcNow.AddMinutes(minutesFromNow));
+        byte[] goodSidecar = File.ReadAllBytes(fixture.ProvenancePath);
+
+        Should.Throw<GateValidationException>(() => fixture.Attest())
+            .ReasonCode.ShouldBe(GateReason.EvidenceStaleOrUnbound);
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(goodSidecar);
+
+        File.Delete(fixture.ProvenancePath);
+        Should.Throw<GateValidationException>(() => fixture.Attest())
+            .ReasonCode.ShouldBe(GateReason.EvidenceStaleOrUnbound);
+        File.Exists(fixture.ProvenancePath).ShouldBeFalse();
+    }
+
+    /// <summary>Proves malformed, failed, skipped, and spoofed current-run TRX cannot mint or replace provenance.</summary>
+    [Theory]
+    [InlineData("malformed")]
+    [InlineData("failed")]
+    [InlineData("skipped")]
+    [InlineData("spoofed")]
+    public static void InvalidCurrentRunTrxShouldNotMintOrReplaceProvenance(string kind)
+    {
+        using GateFixture fixture = new();
+        switch (kind)
+        {
+            case "malformed":
+                File.WriteAllText(fixture.TrxPath, "not xml");
+                break;
+            case "failed":
+                fixture.WriteTrx(1, 1, 0, 1, 0, "Failed");
+                break;
+            case "skipped":
+                fixture.WriteTrx(1, 0, 0, 0, 1, "Completed");
+                break;
+            case "spoofed":
+                File.WriteAllText(
+                    fixture.TrxPath,
+                    File.ReadAllText(fixture.TrxPath).Replace(
+                        "className=\"GateFixture\"",
+                        "className=\"Spoofed.Fixture\"",
+                        StringComparison.Ordinal));
+                break;
+        }
+
+        byte[] goodSidecar = File.ReadAllBytes(fixture.ProvenancePath);
+        Should.Throw<GateValidationException>(() => fixture.Attest())
+            .ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(goodSidecar);
+
+        File.Delete(fixture.ProvenancePath);
+        Should.Throw<GateValidationException>(() => fixture.Attest())
+            .ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
+        File.Exists(fixture.ProvenancePath).ShouldBeFalse();
+    }
+
+    /// <summary>Proves only the canonical TeamTest 2010 TRX structure can supply machine evidence.</summary>
+    [Theory]
+    [InlineData("root")]
+    [InlineData("namespace")]
+    [InlineData("duplicate-times")]
+    [InlineData("duplicate-result-id")]
+    [InlineData("foreign-local-name")]
+    [InlineData("multiple-test-method")]
+    public static void NonCanonicalTrxStructureShouldFailWithMachineReason(string mutation)
+    {
+        using GateFixture fixture = new();
+        string trx = File.ReadAllText(fixture.TrxPath);
+        trx = mutation switch
+        {
+            "root" => trx.Replace("<TestRun xmlns=", "<InjectedTestRun xmlns=", StringComparison.Ordinal)
+                .Replace("</TestRun>", "</InjectedTestRun>", StringComparison.Ordinal),
+            "namespace" => trx.Replace(
+                "http://microsoft.com/schemas/VisualStudio/TeamTest/2010",
+                "urn:foreign-teamtest",
+                StringComparison.Ordinal),
+            "duplicate-times" => trx.Replace(
+                "  <Results>",
+                $"  <Times start=\"{DateTimeOffset.UtcNow.AddSeconds(-1):O}\" finish=\"{DateTimeOffset.UtcNow:O}\" />\n  <Results>",
+                StringComparison.Ordinal),
+            "duplicate-result-id" => trx.Replace(
+                "  </Results>",
+                "    <UnitTestResult testId=\"test-1\" testName=\"GateFixture.ValidAssertion\" outcome=\"Passed\" />\n  </Results>",
+                StringComparison.Ordinal),
+            "foreign-local-name" => trx.Replace(
+                "  </Results>",
+                "    <foreign:UnitTestResult xmlns:foreign=\"urn:foreign\" testId=\"foreign\" outcome=\"Passed\" />\n  </Results>",
+                StringComparison.Ordinal),
+            "multiple-test-method" => trx.Replace(
+                "</UnitTest>",
+                "<TestMethod className=\"GateFixture\" name=\"Injected\" /></UnitTest>",
+                StringComparison.Ordinal),
+            _ => throw new ArgumentOutOfRangeException(nameof(mutation)),
+        };
+        File.WriteAllText(fixture.TrxPath, trx);
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() => fixture.Attest());
+
+        exception.ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
+    }
+
+    /// <summary>Proves all current-run lanes preflight before any lane sidecar is replaced or minted.</summary>
+    [Fact]
+    public static void MultiLaneInvalidLaterTrxShouldLeaveEverySidecarAtomic()
+    {
+        using GateFixture fixture = new();
+        string secondTrx = Path.Combine(fixture.ResultsRoot, "gate-second.trx");
+        string secondProvenance = Path.Combine(fixture.ResultsRoot, "gate-second.provenance.json");
+        File.Copy(fixture.TrxPath, secondTrx);
+        fixture.MutateContract(contract =>
+        {
+            JsonObject secondLane = EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid)[0]!
+                .DeepClone().AsObject();
+            secondLane["lane"] = "gate-unit-second";
+            secondLane["trx"] = "gate-second.trx";
+            secondLane["provenance"] = "gate-second.provenance.json";
+            secondLane["artifactLocator"] = "file:gate-second.trx";
+            EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid).Add(secondLane);
+        }, refreshEvidence: false);
+        fixture.RefreshEvidence();
+        File.WriteAllText(secondTrx, "not xml");
+        byte[] firstBefore = File.ReadAllBytes(fixture.ProvenancePath);
+        byte[] secondBefore = File.ReadAllBytes(secondProvenance);
+
+        Should.Throw<GateValidationException>(() => fixture.Attest())
+            .ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(firstBefore);
+        File.ReadAllBytes(secondProvenance).ShouldBe(secondBefore);
+
+        File.Delete(fixture.ProvenancePath);
+        File.Delete(secondProvenance);
+        Should.Throw<GateValidationException>(() => fixture.Attest())
+            .ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
+        File.Exists(fixture.ProvenancePath).ShouldBeFalse();
+        File.Exists(secondProvenance).ShouldBeFalse();
+    }
+
+    /// <summary>Proves lane result paths cannot alias or share provenance destinations.</summary>
+    [Theory]
+    [InlineData("same-lane")]
+    [InlineData("shared-provenance")]
+    public static void CollidingAttestationPathsShouldFailBeforeWrites(string kind)
+    {
+        using GateFixture fixture = new();
+        byte[] before = File.ReadAllBytes(fixture.ProvenancePath);
+        fixture.MutateContract(contract =>
+        {
+            JsonObject first = EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid)[0]!.AsObject();
+            if (kind.Equals("same-lane", StringComparison.Ordinal))
+            {
+                first["provenance"] = "gate.trx";
+                return;
+            }
+
+            File.Copy(fixture.TrxPath, Path.Combine(fixture.ResultsRoot, "gate-second.trx"));
+            JsonObject second = first.DeepClone().AsObject();
+            second["lane"] = "gate-unit-second";
+            second["trx"] = "gate-second.trx";
+            second["artifactLocator"] = "file:gate-second.trx";
+            EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid).Add(second);
+        }, refreshEvidence: false);
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() => fixture.Attest());
+
+        exception.ReasonCode.ShouldBe(GateReason.EvidenceStaleOrUnbound);
+        exception.Subject.ShouldBe("result-path-collision");
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(before);
+    }
+
+    /// <summary>Proves invalid pinned policy or contract versions cannot mint or replace provenance.</summary>
+    [Theory]
+    [InlineData("policy")]
+    [InlineData("contract")]
+    public static void InvalidAttestationGrammarShouldNotMintOrReplaceProvenance(string kind)
+    {
+        ArgumentNullException.ThrowIfNull(kind);
+        using GateFixture fixture = new();
+        if (kind.Equals("policy", StringComparison.Ordinal))
+        {
+            fixture.MutatePolicy(policy => policy["maximumCurrentRunAgeMinutes"] = 999);
+        }
+        else
+        {
+            fixture.MutateContract(contract => contract["schemaVersion"] = "1.0", refreshEvidence: false);
+        }
+
+        byte[] before = File.ReadAllBytes(fixture.ProvenancePath);
+        Should.Throw<GateValidationException>(() => fixture.Attest());
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(before);
+        File.Delete(fixture.ProvenancePath);
+        Should.Throw<GateValidationException>(() => fixture.Attest());
+        File.Exists(fixture.ProvenancePath).ShouldBeFalse();
     }
 
     /// <summary>Proves missing machine results fail closed.</summary>
@@ -884,7 +1398,7 @@ public static class StoryEvidenceGateTests
         symlinkA.ShouldNotBe(symlinkB);
     }
 
-    /// <summary>Proves every load-bearing security field remains pinned within policy version 1.0.</summary>
+    /// <summary>Proves every load-bearing security field remains pinned within policy version 2.0.</summary>
     [Theory]
     [InlineData("age")]
     [InlineData("tree-source")]
@@ -897,7 +1411,7 @@ public static class StoryEvidenceGateTests
         {
             if (kind == "age")
             {
-                policy["maximumEvidenceAgeHours"] = 721;
+                policy["maximumRetainedEvidenceAgeHours"] = 721;
             }
             else if (kind == "tree-source")
             {
@@ -996,10 +1510,10 @@ public static class StoryEvidenceGateTests
         fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.GitlinkScopeMismatch);
     }
 
-    /// <summary>Proves report and lifecycle digest exclusions are policy-constrained.</summary>
+    /// <summary>Proves report, scope mode, and event resolution remain policy-constrained.</summary>
     [Theory]
     [InlineData("report")]
-    [InlineData("lifecycle")]
+    [InlineData("scope-mode")]
     [InlineData("event-resolution")]
     public static void InvalidPolicyBoundScopeExclusionShouldFailWithScopeReason(string kind)
     {
@@ -1008,11 +1522,9 @@ public static class StoryEvidenceGateTests
         {
             fixture.MutateContract(contract => contract["reportPath"] = "src/gate.txt", refreshEvidence: false);
         }
-        else if (kind == "lifecycle")
+        else if (kind == "scope-mode")
         {
-            fixture.MutateContract(contract =>
-                EvidenceJson.RequiredObject(contract, "scope", GateReason.ScopeDigestMismatch)["lifecycleBookkeepingFields"] =
-                    new JsonArray("implementationDigest", "payload"), refreshEvidence: false);
+            fixture.MutatePolicy(policy => policy["allowedScopeModes"] = new JsonArray("diff"));
         }
         else
         {
@@ -1022,6 +1534,25 @@ public static class StoryEvidenceGateTests
         }
 
         fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.ScopeDigestMismatch);
+    }
+
+    /// <summary>Proves story identities are validated before they can influence evidence or report paths.</summary>
+    [Fact]
+    public static void TraversalStoryKeyShouldFailBeforeEscapingEvidenceRoots()
+    {
+        using GateFixture fixture = new();
+        fixture.MutateContract(contract =>
+        {
+            contract["storyKey"] = "../../escaped";
+            contract["reportPath"] = "_bmad-output/implementation-artifacts/evidence/reports/../../escaped.json";
+        }, refreshEvidence: false);
+        string escaped = Path.Combine(fixture.RepositoryRoot, "_bmad-output", "implementation-artifacts", "escaped.json");
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() => fixture.Attest());
+
+        exception.ReasonCode.ShouldBe(GateReason.StatusMismatch);
+        exception.Subject.ShouldBe("story-key");
+        File.Exists(escaped).ShouldBeFalse();
     }
 
     /// <summary>Proves nested repository scopes are rejected with the gitlink reason.</summary>
@@ -1040,6 +1571,219 @@ public static class StoryEvidenceGateTests
         }, refreshEvidence: false);
 
         fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.GitlinkScopeMismatch);
+    }
+
+    /// <summary>Proves an unchanged malformed inactive contract cannot stall an unrelated event.</summary>
+    [Fact]
+    public static void UnchangedInactiveMalformedContractShouldBeIgnored()
+    {
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"inactive-contract-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            RunGit(temporaryRoot, "init", "--initial-branch=main");
+            RunGit(temporaryRoot, "config", "user.email", "gate@example.invalid");
+            RunGit(temporaryRoot, "config", "user.name", "Story Evidence Gate Tests");
+            string evidence = Path.Combine(temporaryRoot, "_bmad-output", "implementation-artifacts", "evidence");
+            Directory.CreateDirectory(evidence);
+            File.WriteAllText(Path.Combine(evidence, "inactive.json"), "not-json");
+            File.WriteAllText(Path.Combine(temporaryRoot, "README.md"), "base\n");
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: create inactive malformed contract");
+            string baseCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+            File.WriteAllText(Path.Combine(temporaryRoot, "README.md"), "unrelated\n");
+            RunGit(temporaryRoot, "add", "README.md");
+            RunGit(temporaryRoot, "commit", "-m", "test: make unrelated change");
+            string headCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+
+            TransitionDetector.Detect(temporaryRoot, baseCommit, headCommit).ShouldBeEmpty();
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    /// <summary>Proves changed or selected malformed evidence fails candidate detection closed.</summary>
+    [Theory]
+    [InlineData("changed")]
+    [InlineData("selected")]
+    public static void ActiveMalformedContractShouldFailClosed(string kind)
+    {
+        ArgumentNullException.ThrowIfNull(kind);
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"active-contract-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            RunGit(temporaryRoot, "init", "--initial-branch=main");
+            RunGit(temporaryRoot, "config", "user.email", "gate@example.invalid");
+            RunGit(temporaryRoot, "config", "user.name", "Story Evidence Gate Tests");
+            string artifacts = Path.Combine(temporaryRoot, "_bmad-output", "implementation-artifacts");
+            string evidence = Path.Combine(artifacts, "evidence");
+            Directory.CreateDirectory(evidence);
+            string contract = Path.Combine(evidence, "active.json");
+            string story = Path.Combine(artifacts, "active.md");
+            File.WriteAllText(contract, "not-json");
+            File.WriteAllText(story, "---\ntitle: 'Active'\nstatus: 'review'\n---\n");
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: create malformed candidate base");
+            string baseCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+            if (kind.Equals("changed", StringComparison.Ordinal))
+            {
+                File.WriteAllText(contract, "still-not-json");
+            }
+            else
+            {
+                File.WriteAllText(story, "---\ntitle: 'Active'\nstatus: 'done'\n---\n");
+            }
+
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: activate malformed evidence");
+            string headCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+
+            Should.Throw<GateValidationException>(() => TransitionDetector.Detect(temporaryRoot, baseCommit, headCommit));
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    /// <summary>Proves active duplicate story keys and normalized story paths fail deterministically.</summary>
+    [Theory]
+    [InlineData("story-key")]
+    [InlineData("story-path")]
+    public static void DuplicateActiveCandidateIdentityShouldFailClosed(string identity)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"duplicate-candidate-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            RunGit(temporaryRoot, "init", "--initial-branch=main");
+            RunGit(temporaryRoot, "config", "user.email", "gate@example.invalid");
+            RunGit(temporaryRoot, "config", "user.name", "Story Evidence Gate Tests");
+            string artifacts = Path.Combine(temporaryRoot, "_bmad-output", "implementation-artifacts");
+            string evidence = Path.Combine(artifacts, "evidence");
+            Directory.CreateDirectory(evidence);
+            string story = Path.Combine(artifacts, "unrelated-name.md");
+            File.WriteAllText(story, "---\ntitle: 'Duplicate Candidate'\nstatus: 'review'\n---\n");
+            File.WriteAllText(Path.Combine(evidence, "explicit-transition.json"), TransitionContract());
+            File.WriteAllText(Path.Combine(evidence, "malformed-inactive.json"), "not-json");
+            JsonObject duplicate = new()
+            {
+                ["storyKey"] = identity.Equals("story-key", StringComparison.Ordinal)
+                    ? "explicit-transition"
+                    : "other-transition",
+                ["storyPath"] = identity.Equals("story-path", StringComparison.Ordinal)
+                    ? "_bmad-output\\implementation-artifacts\\unrelated-name.md"
+                    : "_bmad-output/implementation-artifacts/other.md",
+            };
+            File.WriteAllText(Path.Combine(evidence, "duplicate.json"), duplicate.ToJsonString());
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: create duplicate candidate base");
+            string baseCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+            File.WriteAllText(story, "---\ntitle: 'Duplicate Candidate'\nstatus: 'done'\n---\n");
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: activate duplicate candidate");
+            string headCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+
+            GateValidationException exception = Should.Throw<GateValidationException>(() =>
+                TransitionDetector.Detect(temporaryRoot, baseCommit, headCommit));
+
+            exception.ReasonCode.ShouldBe(GateReason.StatusMismatch);
+            exception.Subject.ShouldBe("duplicate-contract-identity");
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    /// <summary>Proves completed records cannot silently regress or be edited outside a real completion event.</summary>
+    [Theory]
+    [InlineData("contract-change")]
+    [InlineData("bootstrap-regression")]
+    [InlineData("story")]
+    [InlineData("story-deletion")]
+    [InlineData("technical-ledger")]
+    [InlineData("sprint-story")]
+    [InlineData("sprint-action")]
+    public static void HistoricalTerminalRecordRegressionShouldFailClosed(string kind)
+    {
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"terminal-regression-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            RunGit(temporaryRoot, "init", "--initial-branch=main");
+            RunGit(temporaryRoot, "config", "user.email", "gate@example.invalid");
+            RunGit(temporaryRoot, "config", "user.name", "Story Evidence Gate Tests");
+            string artifacts = Path.Combine(temporaryRoot, "_bmad-output", "implementation-artifacts");
+            string evidence = Path.Combine(artifacts, "evidence");
+            string planning = Path.Combine(temporaryRoot, "_bmad-output", "planning-artifacts");
+            Directory.CreateDirectory(evidence);
+            Directory.CreateDirectory(planning);
+            string story = Path.Combine(artifacts, "unrelated-name.md");
+            string contract = Path.Combine(evidence, "explicit-transition.json");
+            string ledger = Path.Combine(planning, "technical-enablers.md");
+            string sprint = Path.Combine(artifacts, "sprint-status.yaml");
+            File.WriteAllText(story, "---\ntitle: 'Terminal'\nstatus: 'done'\n---\n");
+            File.WriteAllText(contract, TransitionContract());
+            File.WriteAllText(ledger, "## TE-X — Terminal\n\n- **Status:** complete; protected.\n");
+            File.WriteAllText(
+                sprint,
+                "development_status:\n  explicit-sprint-key: done\naction_items:\n  - epic: 13\n    action: \"TE-X action\"\n    status: done\n");
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: create terminal base");
+            string baseCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+
+            switch (kind)
+            {
+                case "contract-change":
+                    File.WriteAllText(contract, TransitionContract().Replace(
+                        "\"storyTitle\": \"Explicit Transition\"",
+                        "\"storyTitle\": \"Changed Terminal\"",
+                        StringComparison.Ordinal));
+                    break;
+                case "bootstrap-regression":
+                    File.WriteAllText(contract, TransitionContract().Replace(
+                        "\"bootstrap\": false",
+                        "\"bootstrap\": true",
+                        StringComparison.Ordinal));
+                    break;
+                case "story":
+                    File.WriteAllText(story, "---\ntitle: 'Terminal'\nstatus: 'review'\n---\n");
+                    break;
+                case "story-deletion":
+                    File.Delete(story);
+                    break;
+                case "technical-ledger":
+                    File.WriteAllText(ledger, "## TE-X — Terminal\n\n- **Status:** review; regressed.\n");
+                    break;
+                case "sprint-story":
+                    File.WriteAllText(
+                        sprint,
+                        "development_status:\n  explicit-sprint-key: review\naction_items:\n  - epic: 13\n    action: \"TE-X action\"\n    status: done\n");
+                    break;
+                case "sprint-action":
+                    File.WriteAllText(
+                        sprint,
+                        "development_status:\n  explicit-sprint-key: done\naction_items:\n  - epic: 13\n    action: \"TE-X action\"\n    status: open\n");
+                    break;
+            }
+
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: regress terminal record");
+            string headCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+
+            Should.Throw<GateValidationException>(() =>
+                TransitionDetector.Detect(temporaryRoot, baseCommit, headCommit))
+                .ReasonCode.ShouldBe(GateReason.StatusMismatch);
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
     }
 
     /// <summary>Proves each explicit technical-enabler terminal record triggers contract-bound evaluation.</summary>
@@ -1179,7 +1923,7 @@ public static class StoryEvidenceGateTests
     {
         return """
             {
-              "schemaVersion": "1.0",
+              "schemaVersion": "2.0",
               "recordKind": "story",
               "recordLedgerKey": "explicit-sprint-key",
               "storyKey": "explicit-transition",
@@ -1190,9 +1934,10 @@ public static class StoryEvidenceGateTests
               "sprintStatusKey": "explicit-sprint-key",
               "bootstrap": false,
               "scope": {
+                "mode": "diff",
                 "implementationDigest": "unused",
                 "repositories": [],
-                "lifecycleBookkeepingFields": []
+                "transitionPaths": []
               },
               "results": [],
               "primaryPaths": [],
@@ -1207,7 +1952,7 @@ public static class StoryEvidenceGateTests
     {
         return """
             {
-              "schemaVersion": "1.0",
+              "schemaVersion": "2.0",
               "recordKind": "technicalEnabler",
               "recordLedgerKey": "TE-X",
               "storyKey": "bootstrap-contract",
@@ -1218,9 +1963,10 @@ public static class StoryEvidenceGateTests
               "sprintStatusKey": "bootstrap action",
               "bootstrap": true,
               "scope": {
+                "mode": "diff",
                 "implementationDigest": "unused",
                 "repositories": [],
-                "lifecycleBookkeepingFields": []
+                "transitionPaths": []
               },
               "results": [],
               "primaryPaths": [],
@@ -1235,7 +1981,7 @@ public static class StoryEvidenceGateTests
     {
         return """
             {
-              "schemaVersion": "1.0",
+              "schemaVersion": "2.0",
               "recordKind": "technicalEnabler",
               "recordLedgerKey": "TE-X",
               "storyKey": "te-x",
@@ -1246,9 +1992,10 @@ public static class StoryEvidenceGateTests
               "sprintStatusKey": "TE-X action",
               "bootstrap": false,
               "scope": {
+                "mode": "diff",
                 "implementationDigest": "unused",
                 "repositories": [],
-                "lifecycleBookkeepingFields": []
+                "transitionPaths": []
               },
               "results": [],
               "primaryPaths": [],
@@ -1317,23 +2064,15 @@ public static class StoryEvidenceGateTests
         report.PrimaryPaths.ShouldBeEmpty();
     }
 
-    /// <summary>Proves retained locators fail closed when GITHUB_REPOSITORY disagrees with owner/repo.</summary>
+    /// <summary>Proves retained locators bind repository identity to policy rather than ambient Git state.</summary>
     [Fact]
     public static void WrongRetainedRepositoryShouldFailWithProvenanceReason()
     {
-        string? previous = Environment.GetEnvironmentVariable("GITHUB_REPOSITORY");
-        try
-        {
-            Environment.SetEnvironmentVariable("GITHUB_REPOSITORY", "hexalith/other-repo");
-            using GateFixture fixture = new();
-            fixture.UseRetainedEvidence();
+        using GateFixture fixture = new();
+        fixture.UseRetainedEvidence();
+        fixture.SetRetainedRepository("Hexalith/Other.Repository");
 
-            fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.EvidenceStaleOrUnbound);
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("GITHUB_REPOSITORY", previous);
-        }
+        fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.EvidenceStaleOrUnbound);
     }
 
     /// <summary>Proves the validate CLI returns exit code 0 and JSON on a green fixture.</summary>
@@ -1390,6 +2129,185 @@ public static class StoryEvidenceGateTests
 
         exitCode.ShouldBe(2);
         stdout.ShouldContain("\"passed\": false");
+        stdout.ShouldContain(GateReason.StatusMismatch);
+    }
+
+    /// <summary>Proves every command rejects options outside its explicit allowlist.</summary>
+    [Theory]
+    [InlineData("validate")]
+    [InlineData("attest")]
+    [InlineData("detect")]
+    [InlineData("ci")]
+    public static void UnknownCommandOptionShouldReturnTwoWithMetadataOnlyReport(string command)
+    {
+        using GateFixture fixture = new();
+        int exitCode = InvokeMain(
+            fixture,
+            out string stdout,
+            command,
+            "--foreign-option", "sensitive-value");
+
+        exitCode.ShouldBe(2);
+        stdout.ShouldContain(GateReason.StatusMismatch);
+        stdout.ShouldNotContain("sensitive-value");
+    }
+
+    /// <summary>Proves the protected CI entry point succeeds without consuming inactive evidence.</summary>
+    [Fact]
+    public static void CiCommandNoTransitionShouldPass()
+    {
+        using GateFixture fixture = new();
+        string reports = Path.Combine(fixture.ResultsRoot, "reports-no-transition");
+        int exitCode = InvokeMain(
+            fixture,
+            out string stdout,
+            "ci",
+            "--repository-root", fixture.RepositoryRoot,
+            "--base", fixture.BaseCommit,
+            "--head", fixture.BaseCommit,
+            "--results", fixture.ResultsRoot,
+            "--report-directory", reports);
+
+        exitCode.ShouldBe(0);
+        stdout.ShouldContain("no-transition");
+        File.Exists(Path.Combine(reports, "no-transition.json")).ShouldBeTrue();
+    }
+
+    /// <summary>Proves no-transition CI still validates the complete pinned policy before passing.</summary>
+    [Fact]
+    public static void CiCommandPolicyWeakeningShouldFailBeforeNoTransitionReport()
+    {
+        using GateFixture fixture = new();
+        fixture.MutatePolicy(policy => policy["maximumFutureClockSkewMinutes"] = 60);
+        string reports = Path.Combine(fixture.ResultsRoot, "reports-invalid-policy");
+
+        int exitCode = InvokeMain(
+            fixture,
+            out string stdout,
+            "ci",
+            "--repository-root", fixture.RepositoryRoot,
+            "--policy", fixture.PolicyPath,
+            "--base", fixture.BaseCommit,
+            "--head", fixture.BaseCommit,
+            "--results", fixture.ResultsRoot,
+            "--report-directory", reports);
+
+        exitCode.ShouldBe(2);
+        stdout.ShouldContain(GateReason.ScopeDigestMismatch);
+        File.Exists(Path.Combine(reports, "no-transition.json")).ShouldBeFalse();
+    }
+
+    /// <summary>Proves the protected CI entry point attests and accepts an exact snapshot lifecycle event.</summary>
+    [Fact]
+    public static void CiCommandValidSnapshotTransitionShouldPass()
+    {
+        using GateFixture fixture = new();
+        fixture.UseSnapshotCompletion();
+        string reports = Path.Combine(fixture.ResultsRoot, "reports-valid");
+        int exitCode = InvokeMain(
+            fixture,
+            out string stdout,
+            "ci",
+            "--repository-root", fixture.RepositoryRoot,
+            "--policy", fixture.PolicyPath,
+            "--base", fixture.BaseCommit,
+            "--head", fixture.HeadCommit,
+            "--results", fixture.ResultsRoot,
+            "--report-directory", reports);
+
+        exitCode.ShouldBe(0);
+        stdout.ShouldContain("\"eventPathCount\": 4");
+        File.Exists(Path.Combine(reports, "gate-fixture.json")).ShouldBeTrue();
+    }
+
+    /// <summary>Proves a later invalid contract cannot partially attest an earlier valid contract.</summary>
+    [Fact]
+    public static void CiCommandShouldPreflightAllActiveContractsBeforeAnySidecarWrite()
+    {
+        using GateFixture fixture = new();
+        PrepareSecondSnapshotContract(fixture, malformedTrx: true, sharedProvenance: false);
+        byte[] firstBefore = File.ReadAllBytes(fixture.ProvenancePath);
+        string secondProvenance = Path.Combine(fixture.ResultsRoot, "gate-second.provenance.json");
+        string reports = Path.Combine(fixture.ResultsRoot, "reports-two-contracts");
+        string summary = Path.Combine(fixture.ResultsRoot, "two-contract-summary.md");
+        string? originalSummary = Environment.GetEnvironmentVariable("GITHUB_STEP_SUMMARY");
+
+        int exitCode;
+        string stdout;
+        try
+        {
+            Environment.SetEnvironmentVariable("GITHUB_STEP_SUMMARY", summary);
+            exitCode = InvokeMain(
+                fixture,
+                out stdout,
+                "ci",
+                "--repository-root", fixture.RepositoryRoot,
+                "--policy", fixture.PolicyPath,
+                "--base", fixture.BaseCommit,
+                "--head", fixture.HeadCommit,
+                "--results", fixture.ResultsRoot,
+                "--report-directory", reports);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("GITHUB_STEP_SUMMARY", originalSummary);
+        }
+
+        exitCode.ShouldBe(1);
+        stdout.ShouldContain("gate-fixture");
+        stdout.ShouldContain("gate-fixture-second");
+        File.Exists(Path.Combine(reports, "gate-fixture.json")).ShouldBeTrue();
+        File.Exists(Path.Combine(reports, "gate-fixture-second.json")).ShouldBeTrue();
+        File.ReadAllText(summary).ShouldContain("gate-fixture-second");
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(firstBefore);
+        File.Exists(secondProvenance).ShouldBeFalse();
+    }
+
+    /// <summary>Proves active CI contracts cannot share one provenance destination.</summary>
+    [Fact]
+    public static void CiCommandShouldRejectCrossContractResultPathCollisionBeforeWrites()
+    {
+        using GateFixture fixture = new();
+        PrepareSecondSnapshotContract(fixture, malformedTrx: false, sharedProvenance: true);
+        byte[] firstBefore = File.ReadAllBytes(fixture.ProvenancePath);
+        string reports = Path.Combine(fixture.ResultsRoot, "reports-collision");
+
+        int exitCode = InvokeMain(
+            fixture,
+            out string stdout,
+            "ci",
+            "--repository-root", fixture.RepositoryRoot,
+            "--policy", fixture.PolicyPath,
+            "--base", fixture.BaseCommit,
+            "--head", fixture.HeadCommit,
+            "--results", fixture.ResultsRoot,
+            "--report-directory", reports);
+
+        exitCode.ShouldBe(1);
+        stdout.ShouldContain("result-path-collision");
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(firstBefore);
+        File.Exists(Path.Combine(reports, "gate-fixture.json")).ShouldBeTrue();
+        File.Exists(Path.Combine(reports, "gate-fixture-second.json")).ShouldBeTrue();
+    }
+
+    /// <summary>Proves the protected CI entry point rejects an extra lifecycle event path.</summary>
+    [Fact]
+    public static void CiCommandInvalidSnapshotTransitionShouldFail()
+    {
+        using GateFixture fixture = new();
+        fixture.UseSnapshotCompletion(() => File.AppendAllText(fixture.SourcePath, "unauthorized\n"));
+        int exitCode = InvokeMain(
+            fixture,
+            out string stdout,
+            "ci",
+            "--repository-root", fixture.RepositoryRoot,
+            "--policy", fixture.PolicyPath,
+            "--base", fixture.BaseCommit,
+            "--head", fixture.HeadCommit,
+            "--results", fixture.ResultsRoot,
+            "--report-directory", Path.Combine(fixture.ResultsRoot, "reports-invalid"));
+
+        exitCode.ShouldBe(1);
         stdout.ShouldContain(GateReason.StatusMismatch);
     }
 
@@ -1465,6 +2383,57 @@ public static class StoryEvidenceGateTests
         {
             Console.SetOut(original);
         }
+    }
+
+    private static void PrepareSecondSnapshotContract(
+        GateFixture fixture,
+        bool malformedTrx,
+        bool sharedProvenance)
+    {
+        fixture.UseSnapshotBootstrap();
+        const string SecondStoryRelative = "_bmad-output/implementation-artifacts/spec-gate-fixture-second.md";
+        const string SecondContractRelative =
+            "_bmad-output/implementation-artifacts/evidence/gate-fixture-second.json";
+        File.AppendAllText(
+            fixture.StoryPath,
+            $"- `{SecondStoryRelative}`\n- `{SecondContractRelative}`\n");
+        fixture.MutateContract(contract =>
+        {
+            JsonObject repository = EvidenceJson.RequiredArray(
+                EvidenceJson.RequiredObject(contract, "scope", GateReason.ScopeDigestMismatch),
+                "repositories",
+                GateReason.ScopeDigestMismatch)[0]!.AsObject();
+            EvidenceJson.RequiredArray(repository, "includePaths", GateReason.ScopeDigestMismatch).Add(SecondStoryRelative);
+            EvidenceJson.RequiredArray(repository, "includePaths", GateReason.ScopeDigestMismatch).Add(SecondContractRelative);
+        }, refreshEvidence: false);
+
+        string secondStory = Path.Combine(fixture.RepositoryRoot, SecondStoryRelative);
+        string secondContract = Path.Combine(fixture.RepositoryRoot, SecondContractRelative);
+        File.WriteAllText(secondStory, File.ReadAllText(fixture.StoryPath));
+        JsonObject clone = JsonNode.Parse(File.ReadAllText(fixture.ContractPath))!.AsObject();
+        clone["storyKey"] = "gate-fixture-second";
+        clone["storyPath"] = SecondStoryRelative;
+        clone["reportPath"] =
+            "_bmad-output/implementation-artifacts/evidence/reports/gate-fixture-second.json";
+        EvidenceJson.RequiredObject(clone, "scope", GateReason.ScopeDigestMismatch)["transitionPaths"] = new JsonArray(
+            SecondStoryRelative,
+            SecondContractRelative,
+            "_bmad-output/planning-artifacts/technical-enablers.md",
+            "_bmad-output/implementation-artifacts/sprint-status.yaml");
+        JsonObject result = EvidenceJson.RequiredArray(clone, "results", GateReason.MachineResultsInvalid)[0]!.AsObject();
+        result["lane"] = "gate-unit-second";
+        result["trx"] = "gate-second.trx";
+        result["provenance"] = sharedProvenance ? "gate.provenance.json" : "gate-second.provenance.json";
+        result["artifactLocator"] = "file:gate-second.trx";
+        File.WriteAllText(secondContract, clone.ToJsonString(JsonReportWriter.SerializerOptions));
+        string secondTrx = Path.Combine(fixture.ResultsRoot, "gate-second.trx");
+        File.Copy(fixture.TrxPath, secondTrx);
+        if (malformedTrx)
+        {
+            File.WriteAllText(secondTrx, "not xml");
+        }
+
+        fixture.CommitAdditionalHead("test: add second active snapshot contract");
     }
 
     private static string RunGit(string repositoryPath, params string[] arguments)

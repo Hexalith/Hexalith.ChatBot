@@ -1,7 +1,14 @@
 {
-  "schemaVersion": "1.0",
-  "minimumSupportedVersion": "1.0",
-  "maximumEvidenceAgeHours": 720,
+  "schemaVersion": "2.0",
+  "minimumSupportedVersion": "2.0",
+  "repositoryIdentity": "Hexalith/Hexalith.ChatBot",
+  "maximumCurrentRunAgeMinutes": 60,
+  "maximumRetainedEvidenceAgeHours": 720,
+  "maximumFutureClockSkewMinutes": 5,
+  "allowedScopeModes": [
+    "diff",
+    "snapshot-plus-transition"
+  ],
   "acceptedResultFormats": [
     "trx"
   ],
@@ -202,9 +209,6 @@
   },
   "reportExcludedPaths": [
     "_bmad-output/implementation-artifacts/evidence/reports/"
-  ],
-  "allowedLifecycleBookkeepingFields": [
-    "implementationDigest"
   ],
   "exceptions": []
 }

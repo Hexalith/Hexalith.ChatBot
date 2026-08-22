@@ -803,15 +803,33 @@ public static class ScaffoldArchitectureTests
             "tools",
             "Hexalith.ChatBot.StoryEvidenceGate",
             "Program.cs"));
+        string lifecycleValidator = File.ReadAllText(Path.Combine(
+            root,
+            "tools",
+            "Hexalith.ChatBot.StoryEvidenceGate",
+            "LifecycleTransitionValidator.cs"));
+        string trxReader = File.ReadAllText(Path.Combine(
+            root,
+            "tools",
+            "Hexalith.ChatBot.StoryEvidenceGate",
+            "TrxEvidenceReader.cs"));
+        string attestor = File.ReadAllText(Path.Combine(
+            root,
+            "tools",
+            "Hexalith.ChatBot.StoryEvidenceGate",
+            "ProvenanceAttestor.cs"));
 
-        policy.ShouldContain("\"schemaVersion\": \"1.0\"");
+        policy.ShouldContain("\"schemaVersion\": \"2.0\"");
+        policy.ShouldContain("\"repositoryIdentity\": \"Hexalith/Hexalith.ChatBot\"");
+        policy.ShouldContain("\"maximumCurrentRunAgeMinutes\": 60");
+        policy.ShouldContain("\"snapshot-plus-transition\"");
         policy.ShouldContain("\"scope_digest_mismatch\"");
         policy.ShouldContain("\"primary_path_not_executed\"");
         policy.ShouldContain("\"checked_item_evidence_mismatch\"");
         policy.ShouldContain("\"eventBaseHeadResolution\"");
         policy.ShouldContain("\"pullRequestHead\": \"github.event.pull_request.head.sha\"");
         policy.ShouldContain("\"zeroOrUnavailablePushBaseFallback\": \"git rev-parse HEAD^\"");
-        policy.ShouldContain("\"allowedLifecycleBookkeepingFields\"");
+        policy.ShouldNotContain("\"allowedLifecycleBookkeepingFields\"");
         policy.ShouldContain("\"immutableContentSource\": \"git-tree\"");
         policy.ShouldContain("\"worktreeModeSource\": \"git-index\"");
         policy.ShouldContain("\"recognizedLaneBindings\"");
@@ -903,6 +921,14 @@ public static class ScaffoldArchitectureTests
             .ShouldBeLessThan(workflow.IndexOf("Collect transition-declared retained exact-run artifacts", StringComparison.Ordinal));
         Regex.Matches(workflow, "producer-head\\.sha").Count.ShouldBeGreaterThanOrEqualTo(4);
         toolProgram.ShouldContain("GITHUB_STEP_SUMMARY");
+        toolProgram.ShouldContain("\"ci\" => RunCi");
+        lifecycleValidator.ShouldContain("snapshot-plus-transition");
+        lifecycleValidator.ShouldContain("lifecycle-event-paths");
+        lifecycleValidator.ShouldContain("status: 'in-review'");
+        trxReader.ShouldContain("http://microsoft.com/schemas/VisualStudio/TeamTest/2010");
+        trxReader.ShouldContain("RejectForeignStructuralElements");
+        attestor.ShouldContain("PreflightContract");
+        toolProgram.ShouldContain("result-path-collision");
         workflow.ShouldContain("fetch-depth: 0");
         workflow.ShouldContain("StoryEvidenceGate.Tests");
         workflow.ShouldNotContain("git submodule update --init --recursive");

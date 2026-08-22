@@ -6,7 +6,7 @@ namespace Hexalith.ChatBot.StoryEvidenceGate;
 public sealed class GateReport
 {
     /// <summary>Gets or sets the report schema version.</summary>
-    public string SchemaVersion { get; set; } = "1.0";
+    public string SchemaVersion { get; set; } = "2.0";
 
     /// <summary>Gets or sets the evaluated story key.</summary>
     public string StoryKey { get; set; } = string.Empty;
@@ -31,6 +31,9 @@ public sealed class GateReport
 
     /// <summary>Gets or sets the scoped diff count.</summary>
     public int ScopedDiffCount { get; set; }
+
+    /// <summary>Gets or sets the independent base-to-head event-path count.</summary>
+    public int EventPathCount { get; set; }
 
     /// <summary>Gets or sets the checked item count.</summary>
     public int CheckedItemCount { get; set; }

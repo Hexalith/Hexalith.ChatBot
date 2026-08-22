@@ -112,7 +112,7 @@ public static class GitReader
 
         foreach (string path in untracked.StandardOutput.Split('\0', StringSplitOptions.RemoveEmptyEntries))
         {
-            paths[NormalizePath(path)] = "A";
+            AddGitPath(paths, path, "A", allowExistingExactPath: false);
         }
 
         return paths;
@@ -176,22 +176,16 @@ public static class GitReader
         startInfo.ArgumentList.Add(objectId);
         try
         {
-            using Process process = Process.Start(startInfo)
-                ?? throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-process");
-            using MemoryStream output = new();
-            process.StandardOutput.BaseStream.CopyTo(output);
-            _ = process.StandardError.ReadToEnd();
-            WaitForExitOrFail(process);
-            if (process.ExitCode != 0)
-            {
-                throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-blob");
-            }
-
-            return output.ToArray();
+            return ReadBlobAsync(startInfo).GetAwaiter().GetResult();
+        }
+        catch (GateValidationException)
+        {
+            throw;
         }
         catch (Exception exception) when (exception is System.ComponentModel.Win32Exception
             or IOException
-            or UnauthorizedAccessException)
+            or UnauthorizedAccessException
+            or OperationCanceledException)
         {
             throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-process");
         }
@@ -217,7 +211,25 @@ public static class GitReader
     /// <returns>The command result.</returns>
     public static GitCommandResult Run(string repositoryPath, params string[] arguments)
     {
+        return RunWithTimeout(repositoryPath, CommandTimeout, arguments);
+    }
+
+    /// <summary>Runs one allowlisted Git command with an explicit timeout for focused timeout verification.</summary>
+    /// <param name="repositoryPath">The repository path.</param>
+    /// <param name="timeout">The command timeout.</param>
+    /// <param name="arguments">The Git arguments.</param>
+    /// <returns>The command result.</returns>
+    internal static GitCommandResult RunWithTimeout(
+        string repositoryPath,
+        TimeSpan timeout,
+        params string[] arguments)
+    {
         ArgumentNullException.ThrowIfNull(arguments);
+        if (timeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(timeout));
+        }
+
         if (arguments.Length == 0 || !AllowedCommands.Contains(arguments[0]))
         {
             throw new InvalidOperationException("Only allowlisted read-only Git commands may execute.");
@@ -231,37 +243,76 @@ public static class GitReader
 
         try
         {
-            using Process process = Process.Start(startInfo)
-                ?? throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-process");
-            string standardOutput = process.StandardOutput.ReadToEnd();
-            string standardError = process.StandardError.ReadToEnd();
-            WaitForExitOrFail(process);
-            return new GitCommandResult(process.ExitCode, standardOutput, standardError);
+            return RunAsync(startInfo, timeout).GetAwaiter().GetResult();
+        }
+        catch (GateValidationException)
+        {
+            throw;
         }
         catch (Exception exception) when (exception is System.ComponentModel.Win32Exception
             or IOException
-            or UnauthorizedAccessException)
+            or UnauthorizedAccessException
+            or OperationCanceledException)
         {
             throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-process");
         }
     }
 
-    private static void WaitForExitOrFail(Process process)
+    private static async Task<GitCommandResult> RunAsync(ProcessStartInfo startInfo, TimeSpan commandTimeout)
     {
-        if (!process.WaitForExit((int)CommandTimeout.TotalMilliseconds))
+        using Process process = Process.Start(startInfo)
+            ?? throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-process");
+        using CancellationTokenSource timeout = new(commandTimeout);
+        Task<string> standardOutput = process.StandardOutput.ReadToEndAsync(timeout.Token);
+        Task<string> standardError = process.StandardError.ReadToEndAsync(timeout.Token);
+        try
         {
-            try
+            await Task.WhenAll(process.WaitForExitAsync(timeout.Token), standardOutput, standardError).ConfigureAwait(false);
+            return new GitCommandResult(process.ExitCode, standardOutput.Result, standardError.Result);
+        }
+        catch (OperationCanceledException)
+        {
+            Kill(process);
+            throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-timeout");
+        }
+    }
+
+    private static async Task<byte[]> ReadBlobAsync(ProcessStartInfo startInfo)
+    {
+        using Process process = Process.Start(startInfo)
+            ?? throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-process");
+        using CancellationTokenSource timeout = new(CommandTimeout);
+        using MemoryStream output = new();
+        Task copyOutput = process.StandardOutput.BaseStream.CopyToAsync(output, timeout.Token);
+        Task<string> standardError = process.StandardError.ReadToEndAsync(timeout.Token);
+        try
+        {
+            await Task.WhenAll(process.WaitForExitAsync(timeout.Token), copyOutput, standardError).ConfigureAwait(false);
+            if (process.ExitCode != 0)
             {
-                process.Kill(entireProcessTree: true);
-            }
-            catch (Exception exception) when (exception is InvalidOperationException
-                or System.ComponentModel.Win32Exception
-                or NotSupportedException)
-            {
-                // Best-effort kill; still fail closed on timeout.
+                throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-blob");
             }
 
+            return output.ToArray();
+        }
+        catch (OperationCanceledException)
+        {
+            Kill(process);
             throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-timeout");
+        }
+    }
+
+    private static void Kill(Process process)
+    {
+        try
+        {
+            process.Kill(entireProcessTree: true);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException
+            or System.ComponentModel.Win32Exception
+            or NotSupportedException)
+        {
+            // Best-effort kill; the caller still fails closed on timeout.
         }
     }
 
@@ -286,11 +337,33 @@ public static class GitReader
         Dictionary<string, string> result = new(StringComparer.Ordinal);
         for (int index = 0; index < tokens.Length; index += 2)
         {
-            result[NormalizePath(tokens[index + 1])] = tokens[index].Length == 0 ? "M" : tokens[index][..1];
+            AddGitPath(
+                result,
+                tokens[index + 1],
+                tokens[index].Length == 0 ? "M" : tokens[index][..1],
+                allowExistingExactPath: false);
         }
 
         return result;
     }
 
-    private static string NormalizePath(string path) => path.Replace('\\', '/').TrimStart('/');
+    private static void AddGitPath(
+        IDictionary<string, string> paths,
+        string rawPath,
+        string status,
+        bool allowExistingExactPath)
+    {
+        if (rawPath.Contains('\\', StringComparison.Ordinal))
+        {
+            throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-path");
+        }
+
+        string normalized = rawPath.TrimStart('/');
+        if ((!allowExistingExactPath && paths.ContainsKey(normalized)) || normalized.Length == 0)
+        {
+            throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-path-collision");
+        }
+
+        paths[normalized] = status;
+    }
 }

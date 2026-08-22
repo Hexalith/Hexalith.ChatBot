@@ -5,6 +5,16 @@ namespace Hexalith.ChatBot.StoryEvidenceGate;
 /// </summary>
 public sealed class CommandArguments
 {
+    private static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> AllowedOptions =
+        new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
+        {
+            ["validate"] = Set(
+                "repository-root", "policy", "story", "contract", "target-status", "base", "head", "results", "report"),
+            ["attest"] = Set("repository-root", "policy", "contract", "base", "head", "results"),
+            ["detect"] = Set("repository-root", "base", "head", "output"),
+            ["ci"] = Set("repository-root", "policy", "base", "head", "results", "report-directory"),
+        };
+
     private readonly IReadOnlyDictionary<string, string> _values;
 
     private CommandArguments(string command, IReadOnlyDictionary<string, string> values)
@@ -27,6 +37,11 @@ public sealed class CommandArguments
             throw new GateValidationException(GateReason.StatusMismatch, "command");
         }
 
+        if (!AllowedOptions.TryGetValue(args[0], out IReadOnlySet<string>? allowedOptions))
+        {
+            throw new GateValidationException(GateReason.StatusMismatch, "command");
+        }
+
         Dictionary<string, string> values = new(StringComparer.Ordinal);
         for (int index = 1; index < args.Length; index += 2)
         {
@@ -36,7 +51,7 @@ public sealed class CommandArguments
             }
 
             string key = args[index][2..];
-            if (key.Length == 0 || !values.TryAdd(key, args[index + 1]))
+            if (key.Length == 0 || !allowedOptions.Contains(key) || !values.TryAdd(key, args[index + 1]))
             {
                 throw new GateValidationException(GateReason.StatusMismatch, key);
             }
@@ -62,4 +77,6 @@ public sealed class CommandArguments
     /// <param name="name">The option name without dashes.</param>
     /// <returns>The option, when present.</returns>
     public string? Optional(string name) => _values.GetValueOrDefault(name);
+
+    private static IReadOnlySet<string> Set(params string[] values) => values.ToHashSet(StringComparer.Ordinal);
 }

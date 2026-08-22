@@ -15,7 +15,7 @@ public static partial class EvidenceJson
                 "schemaVersion", "recordKind", "recordLedgerKey", "storyKey", "storyTitle", "storyPath", "targetStatus",
                 "persistedStatus", "sprintStatusKey", "bootstrap", "scope", "results", "primaryPaths",
                 "mappings", "outOfScopeDisclosures", "reportPath"),
-            ["scope"] = Set("implementationDigest", "repositories", "lifecycleBookkeepingFields"),
+            ["scope"] = Set("mode", "implementationDigest", "repositories", "transitionPaths"),
             ["repositories"] = Set("name", "path", "baseCommit", "headCommit", "includeWorkingTree", "includePaths"),
             ["results"] = Set(
                 "lane", "trx", "provenance", "artifactLocator", "source", "selectors", "allowSkipped",
@@ -29,10 +29,11 @@ public static partial class EvidenceJson
         new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
         {
             ["root"] = Set(
-                "schemaVersion", "minimumSupportedVersion", "maximumEvidenceAgeHours", "acceptedResultFormats",
+                "schemaVersion", "minimumSupportedVersion", "repositoryIdentity", "maximumCurrentRunAgeMinutes",
+                "maximumRetainedEvidenceAgeHours", "maximumFutureClockSkewMinutes", "allowedScopeModes", "acceptedResultFormats",
                 "requiredStorySections", "mandatoryCheckboxSections", "sourceDigest", "reasonCodes",
                 "storyGrammars", "eventBaseHeadResolution", "primaryPathTriggers", "metadataOnly",
-                "reportExcludedPaths", "allowedLifecycleBookkeepingFields", "exceptions"),
+                "reportExcludedPaths", "exceptions"),
             ["sourceDigest"] = Set(
                 "algorithm", "tuple", "sort", "rootDeclaredSubmodulesOnly", "immutableContentSource",
                 "worktreeModeSource", "symlinkMode"),
@@ -55,7 +56,7 @@ public static partial class EvidenceJson
         {
             ["root"] = Set(
                 "schemaVersion", "baseCommit", "headCommit", "implementationDigest", "trxSha256", "lane",
-                "source", "selectors", "producedAtUtc", "artifactLocator"),
+                "source", "selectors", "producedAtUtc", "artifactLocator", "repositoryIdentity"),
         };
 
     /// <summary>Loads a strict evidence contract.</summary>
@@ -64,10 +65,60 @@ public static partial class EvidenceJson
     public static JsonObject LoadContract(string path)
     {
         JsonObject contract = LoadObject(path, GateReason.ScopeDigestMismatch);
+        ValidateContract(contract);
+        return contract;
+    }
+
+    /// <summary>Parses a strict contract from an exact Git blob.</summary>
+    /// <param name="json">The exact JSON text.</param>
+    /// <param name="subject">The metadata-only source subject.</param>
+    /// <returns>The parsed contract.</returns>
+    public static JsonObject ParseContract(string json, string subject)
+    {
+        JsonObject contract;
+        try
+        {
+            contract = JsonNode.Parse(
+                json,
+                documentOptions: new JsonDocumentOptions
+                {
+                    AllowTrailingCommas = false,
+                    CommentHandling = JsonCommentHandling.Disallow,
+                }) as JsonObject ?? throw new JsonException("Contract root is not an object.");
+        }
+        catch (JsonException)
+        {
+            throw new GateValidationException(GateReason.ScopeDigestMismatch, subject);
+        }
+
+        ValidateContract(contract);
+        return contract;
+    }
+
+    private static void ValidateContract(JsonObject contract)
+    {
         ValidateShape(contract, ContractProperties, "root");
         RejectForbiddenEvidenceFields(contract);
         RejectUnsafeMetadataValues(contract);
-        return contract;
+        _ = RequiredStoryKey(contract);
+    }
+
+    /// <summary>Gets a filename-safe story identity.</summary>
+    public static string RequiredStoryKey(JsonObject contract)
+    {
+        string storyKey = RequiredString(contract, "storyKey", GateReason.StatusMismatch);
+        if (storyKey.Length > 128
+            || storyKey[0] == '-'
+            || storyKey[^1] == '-'
+            || storyKey.Contains("--", StringComparison.Ordinal)
+            || storyKey.Any(static character => !(character is >= 'a' and <= 'z'
+                || character is >= '0' and <= '9'
+                || character == '-')))
+        {
+            throw new GateValidationException(GateReason.StatusMismatch, "story-key");
+        }
+
+        return storyKey;
     }
 
     /// <summary>Loads a strict story-evidence policy.</summary>

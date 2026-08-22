@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Hexalith.ChatBot.StoryEvidenceGate;
 
@@ -117,6 +118,9 @@ public static class Program
         string headCommit = command.Required("head").ToLowerInvariant();
         string resultsRoot = FullPath(repositoryRoot, command.Required("results"));
         string reportDirectory = FullPath(repositoryRoot, command.Required("report-directory"));
+        string policyPath = FullPath(repositoryRoot, command.Optional("policy") ?? "story-evidence-policy.json");
+        JsonObject policy = EvidenceJson.LoadPolicy(policyPath);
+        StoryEvidenceValidator.ValidatePinnedPolicy(policy);
         IReadOnlyList<TransitionRecord> transitions = TransitionDetector.Detect(repositoryRoot, baseCommit, headCommit);
         Directory.CreateDirectory(reportDirectory);
         if (transitions.Count == 0)
@@ -126,7 +130,7 @@ public static class Program
                 StoryKey = "no-transition",
                 BaseCommit = baseCommit,
                 HeadCommit = headCommit,
-                PolicyVersion = "1.0",
+                PolicyVersion = "2.0",
                 Passed = true,
                 EvaluatedAtUtc = DateTimeOffset.UtcNow,
             };
@@ -136,31 +140,93 @@ public static class Program
             return 0;
         }
 
-        string policyPath = FullPath(repositoryRoot, command.Optional("policy") ?? "story-evidence-policy.json");
+        DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
+        Dictionary<string, ProvenanceAttestor.AttestationPlan> plans = new(StringComparer.Ordinal);
+        Dictionary<string, GateValidationException> preflightFailures = new(StringComparer.Ordinal);
+        foreach (TransitionRecord transition in transitions)
+        {
+            try
+            {
+                plans.Add(
+                    transition.StoryKey,
+                    ProvenanceAttestor.PreflightContract(
+                        repositoryRoot,
+                        transition.ContractPath,
+                        baseCommit,
+                        headCommit,
+                        resultsRoot,
+                        nowUtc,
+                        policyPath));
+            }
+            catch (GateValidationException exception)
+            {
+                preflightFailures[transition.StoryKey] = exception;
+            }
+        }
+
+        Dictionary<string, string> pathOwners = new(StringComparer.OrdinalIgnoreCase);
+        foreach ((string storyKey, ProvenanceAttestor.AttestationPlan plan) in plans)
+        {
+            foreach (string resultPath in plan.ResultPaths)
+            {
+                if (pathOwners.TryGetValue(resultPath, out string? owner) && !owner.Equals(storyKey, StringComparison.Ordinal))
+                {
+                    preflightFailures[owner] = new GateValidationException(
+                        GateReason.EvidenceStaleOrUnbound,
+                        "result-path-collision");
+                    preflightFailures[storyKey] = new GateValidationException(
+                        GateReason.EvidenceStaleOrUnbound,
+                        "result-path-collision");
+                }
+                else
+                {
+                    pathOwners[resultPath] = storyKey;
+                }
+            }
+        }
+
+        if (preflightFailures.Count == 0)
+        {
+            foreach ((string storyKey, ProvenanceAttestor.AttestationPlan plan) in plans)
+            {
+                try
+                {
+                    ProvenanceAttestor.WritePlan(plan);
+                }
+                catch (GateValidationException exception)
+                {
+                    preflightFailures[storyKey] = exception;
+                }
+            }
+        }
+
         bool passed = true;
         List<GateReport> reports = [];
         foreach (TransitionRecord transition in transitions)
         {
-            ProvenanceAttestor.AttestContract(
-                repositoryRoot,
-                transition.ContractPath,
-                baseCommit,
-                headCommit,
-                resultsRoot,
-                DateTimeOffset.UtcNow,
-                policyPath);
-            GateReport report = StoryEvidenceValidator.Validate(new GateOptions
+            string reportPath = Path.Combine(reportDirectory, $"{transition.StoryKey}.json");
+            GateReport report;
+            if (preflightFailures.TryGetValue(transition.StoryKey, out GateValidationException? failure))
             {
-                RepositoryRoot = repositoryRoot,
-                PolicyPath = policyPath,
-                StoryPath = Path.Combine(repositoryRoot, transition.StoryPath),
-                ContractPath = transition.ContractPath,
-                TargetStatus = "done",
-                BaseCommit = baseCommit,
-                HeadCommit = headCommit,
-                ResultsRoot = resultsRoot,
-                ReportPath = Path.Combine(reportDirectory, $"{transition.StoryKey}.json"),
-            });
+                report = FailedPreflightReport(transition, baseCommit, headCommit, failure, nowUtc);
+                JsonReportWriter.Write(reportPath, report);
+            }
+            else
+            {
+                report = StoryEvidenceValidator.Validate(new GateOptions
+                {
+                    RepositoryRoot = repositoryRoot,
+                    PolicyPath = policyPath,
+                    StoryPath = Path.Combine(repositoryRoot, transition.StoryPath),
+                    ContractPath = transition.ContractPath,
+                    TargetStatus = "done",
+                    BaseCommit = baseCommit,
+                    HeadCommit = headCommit,
+                    ResultsRoot = resultsRoot,
+                    ReportPath = reportPath,
+                    NowUtc = nowUtc,
+                });
+            }
             reports.Add(report);
             passed &= report.Passed;
             Console.Out.WriteLine(JsonReportWriter.Serialize(report));
@@ -169,6 +235,22 @@ public static class Program
         WriteCiSummary(reports);
         return passed ? 0 : 1;
     }
+
+    private static GateReport FailedPreflightReport(
+        TransitionRecord transition,
+        string baseCommit,
+        string headCommit,
+        GateValidationException exception,
+        DateTimeOffset evaluatedAtUtc) => new()
+        {
+            StoryKey = transition.StoryKey,
+            BaseCommit = baseCommit,
+            HeadCommit = headCommit,
+            PolicyVersion = "2.0",
+            Passed = false,
+            EvaluatedAtUtc = evaluatedAtUtc,
+            Issues = [GateIssue.Create(exception.ReasonCode, exception.Subject)],
+        };
 
     private static void WriteCiSummary(IReadOnlyList<GateReport> reports)
     {
@@ -179,11 +261,11 @@ public static class Program
         }
 
         IEnumerable<string> rows = reports.Select(report =>
-            $"| `{report.StoryKey}` | {(report.Passed ? "pass" : "fail")} | {report.FileListCount} | {report.ScopedDiffCount} | "
+            $"| `{report.StoryKey}` | {(report.Passed ? "pass" : "fail")} | {report.FileListCount} | {report.ScopedDiffCount} | {report.EventPathCount} | "
             + $"{report.Lanes.Sum(static lane => lane.Executed)}/{report.Lanes.Sum(static lane => lane.Passed)} | `{report.BaseCommit}` | `{report.HeadCommit}` |");
         string markdown = "## Story-evidence integrity\n\n"
-            + "| Record | Verdict | File List | Scoped diff | Tests executed/passed | Base | Head |\n"
-            + "| --- | --- | ---: | ---: | ---: | --- | --- |\n"
+            + "| Record | Verdict | File List | Scoped snapshot/diff | Event paths | Tests executed/passed | Base | Head |\n"
+            + "| --- | --- | ---: | ---: | ---: | ---: | --- | --- |\n"
             + string.Join("\n", rows)
             + "\n";
         File.AppendAllText(summaryPath, markdown);

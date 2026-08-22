@@ -1,10 +1,10 @@
 ---
 title: 'TE-2 Mechanical Story-Evidence Integrity Gate'
 type: 'chore'
-created: '2026-08-03'
+created: '2026-08-22'
 status: 'in-review'
-review_loop_iteration: 1
-baseline_commit: 'e14afd950e728bf06a62b1c52ba13ac7ae724282'
+review_loop_iteration: 2
+baseline_commit: 'bef15d1caae4ea50a4d92f7de46e77c79315bcfb'
 context:
   - '{project-root}/_bmad-output/planning-artifacts/sprint-change-proposal-2026-08-03.md'
 ---
@@ -13,54 +13,53 @@ context:
 
 ## Intent
 
-**Problem:** Story completion evidence is manually reconciled, allowing status, File Lists, scoped root/submodule changes, machine results, primary-path execution, and checked work to contradict each other.
+**Problem:** TE-2 proves a fixed implementation diff, so its bootstrap can pass while a later lifecycle-only `review` to `complete` event cannot. Adjacent parser, process, provenance, and transition gaps can also weaken or stall the required check.
 
-**Approach:** Implement approved Technical Enabler TE-2 as a dependency-free .NET 10 fail-closed gate, versioned policy/contract, machine-result CI path, planning hold, self-validation evidence, and developer runbook. `targetStatus=done` means a completion proposal; for `recordKind=technicalEnabler`, the persisted terminal status is `complete`.
+**Approach:** Adopt a policy/contract v2 `snapshot-plus-transition` mode: hash the exact committed HEAD state of every owned TE-2 path, bind fresh evidence to that snapshot, and separately validate the narrow lifecycle event semantically. Harden the existing gate without replacing its digest, report, reason-code, or checked-item architecture.
 
 ## Boundaries & Constraints
 
-**Always:** Treat the approved proposal as authoritative; preserve 13 product epics/112 product stories and historical `done` records; use exact full Git revisions, deterministic SHA-256 scope digests, metadata-only reports, stable reason codes, read-only Git commands, root-declared submodules only, TRX plus checksum/provenance sidecars, and mandatory primary-path/task/AC evidence. Keep TE-2 and its sprint action open while the required protected check is absent.
+**Always:** Preserve 13 product epics, 112 product stories, historical terminal records, exact full Git revisions, deterministic mode-aware SHA-256 digests, metadata-only output, stable reason codes, current/retained provenance, and root-declared-submodule boundaries. Keep TE-2, its ledger record, and sprint action open until an administrator first makes `story-evidence-integrity` required; the later completion change must pass through that protection.
 
-**Ask First:** Any policy weakening, new dependency, mixed-scope waiver, external branch/ruleset mutation, or expansion into product/UX/runtime behavior.
+**Ask First:** Any policy weakening, new dependency, broader lifecycle mutation allowance, external branch/ruleset mutation, privileged GitHub integration, compatibility layer, or change to product/UX/runtime behavior.
 
-**Never:** Initialize/update nested submodules; update dependencies; modify the dirty Conversations/Parties submodules or unrelated Story 12.15/deferred-work changes; infer story identity from numeric prefixes; accept narrative summaries, zero/all-skipped results, fallback-only evidence, stale/wrong-digest artifacts, broad bookkeeping exclusions, secrets/payloads, or automatic status mutation; commit or push.
+**Never:** Use historical-range replay, a split activation enabler, an old report as primary completion proof, mixed-scope waivers, generalized mutation-policy syntax, Git-remote identity inference, GitHub administration tokens, automatic status mutation, nested-submodule operations, dependency updates, commits, or pushes.
 
 ## I/O & Edge-Case Matrix
 
 | Scenario | Input / State | Expected Output / Behavior | Error Handling |
-|----------|--------------|---------------------------|----------------|
-| Valid transition | Exact story/ledger scope, matching diff/File List, bound passing TRX, complete mappings | Exit 0 and deterministic JSON success report | Metadata summary only |
-| Status/scope contradiction | Wrong story/sprint key, head, digest, File List, disclosure, or gitlink | Exit nonzero | Stable status/file/scope/gitlink reason |
-| Invalid results | Missing/malformed/failed/zero/skipped/stale/wrong-SHA TRX or sidecar | Exit nonzero | Stable result/provenance reason |
-| Primary fallback | Triggered browser/SignalR/hosting-assets/Aspire-Dapr/recovery class lacks primary execution | Exit nonzero | `primary_path_not_executed` |
-| Incomplete evidence | Mandatory task/AC unchecked, stale, unmapped, or mapped to failed assertion | Exit nonzero | `checked_item_evidence_mismatch` |
-| Bootstrap | TE-2 ledger in review with completion target and exact self-validation evidence | Gate passes prospectively but does not edit ledger | Remain incomplete until branch protection is active |
+|----------|---------------|----------------------------|----------------|
+| V2 bootstrap | `bootstrap: true`, full clean HEAD snapshot, fresh passing TRX | Validate snapshot without requiring terminal lifecycle mutations; records remain open | Fail closed on scope, digest, result, or provenance mismatch |
+| Delayed completion | Required check active; exact spec, contract, TE ledger, and sprint-action transition | Hash current HEAD snapshot, validate fresh evidence, and accept the four-path semantic delta | Reject missing, extra, or unauthorized mutations |
+| Snapshot drift | Missing/changed mode, bytes, symlink, gitlink, index, worktree, or untracked state | Recompute exact snapshot; no disclosure waiver | `file_list_diff_mismatch`, `gitlink_scope_mismatch`, or `scope_digest_mismatch` |
+| Invalid evidence | Spoofed selector, stale/future TRX, foreign locator, failed/skipped/malformed results | No provenance minted and no completion accepted | `machine_results_invalid` or `evidence_stale_or_unbound` |
+| Inactive malformed contract | No related candidate transition | Ignore it; unrelated/no-transition evaluation succeeds | Active or changed malformed contract fails closed |
 
 </frozen-after-approval>
 
 ## Code Map
 
-- `_bmad-output/planning-artifacts/{technical-enablers.md,epics.md,architecture.md,index.md}` -- approved TE-2 ledger, invariant, canonical inventory, and discovery edits.
-- `_bmad-output/implementation-artifacts/sprint-status.yaml` -- prospective hold/permanent rule; preserve wording and open action.
-- `story-evidence-policy.json` and `_bmad-output/implementation-artifacts/evidence/te-2-mechanical-story-evidence-integrity-gate.json` -- strict grammar, triggers, schemas, bootstrap contract.
-- `tools/Hexalith.ChatBot.StoryEvidenceGate/` -- CLI, story/enabler parsers, Git scope/digest, TRX/provenance, reconciliation, transition detection, JSON reporting; use `ProcessStartInfo.ArgumentList`.
-- `tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/` -- synthetic repositories/TRX/contracts and positive, negative, mutation, multi-repository, retained-evidence, bootstrap coverage.
-- `Hexalith.ChatBot.slnx` and `tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs` -- project and governance integration.
-- `.github/workflows/ci.yml` -- collision-safe machine results, full-history transition bounds, transition-scoped retained/current-primary collection, named `story-evidence-integrity` job/report upload; preserve non-recursive checkout. `.github/workflows/release.yml` is read-only retained-evidence context.
-- `docs/story-evidence-integrity.md` and `README.md` -- exact CLI, grammar, reason codes, retained evidence, submodules, troubleshooting, external prerequisite.
+- `story-evidence-policy.json`, `_bmad-output/implementation-artifacts/evidence/te-2-mechanical-story-evidence-integrity-gate.json` -- v2 grammar, repository/freshness pins, snapshot mode, and exact four transition paths.
+- `tools/Hexalith.ChatBot.StoryEvidenceGate/{EvidenceJson,ScopeEvaluator,ScopeEvaluation,StoryEvidenceValidator}.cs` -- strict schema, full immutable HEAD snapshot, event-path reporting, digest masking, and reconciliation reuse.
+- `tools/Hexalith.ChatBot.StoryEvidenceGate/LifecycleTransitionValidator.cs` -- new focused comparator for exact spec/contract/ledger/action mutations and frozen-block preservation.
+- `tools/Hexalith.ChatBot.StoryEvidenceGate/{TransitionDetector,CommandArguments,Program}.cs` -- candidate-first activation, per-command option allowlists, and protected `ci` entry point.
+- `tools/Hexalith.ChatBot.StoryEvidenceGate/{GitReader,TrxEvidenceReader,ProvenanceAttestor}.cs` -- bounded concurrent process draining, canonical TRX identities, freshness, and repository binding.
+- `tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/{GateFixture,StoryEvidenceGateTests}.cs` -- snapshot/delta, lifecycle mutation, process, TRX, contract activation, and executable CLI matrix.
+- `.github/workflows/ci.yml`, `tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs`, `docs/story-evidence-integrity.md` -- retain producer-head/artifact sequencing and document that no-transition evaluation waits for but does not consume topology evidence.
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] Planning/ledger files -- apply the approved 13/112-preserving hold, TE-2 record, architecture invariant, and index links without closing TE-2/action.
-- [x] Policy/contract/tool -- implement strict schema parsing, status/File List/diff/gitlink/digest/TRX/provenance/primary-path/task-AC reconciliation, transition detection, and metadata-only stable reports.
-- [x] Tests/solution/architecture guard -- add projects and prove every proposal failure class, mutations, dirty/immutable scopes, root gitlink+submodule, current/retained evidence, and TE-2 bootstrap.
-- [x] CI/docs -- collect per-lane TRX+sidecars, run/upload the named gate for transitions or no-transition self-tests, and document the shipped command.
+- [x] Policy/contract/scope -- bump mandatory grammar to v2; snapshot every owned path from exact clean HEAD, expose event-path count separately, strictly mask only `scope.implementationDigest`, and retain diff mode without compatibility scaffolding.
+- [x] Lifecycle/transition/CLI -- enforce the exact four-path semantic transition, byte-identical frozen intent, candidate-first contract loading, and strict command options.
+- [x] Git/TRX/provenance -- drain process streams concurrently under the timeout; resolve selectors through `testId` and `TestMethod`; require fresh current-run times and policy-bound retained repository identity.
+- [x] Tests/docs/evidence -- cover every matrix failure, real `ci` no-transition/valid/invalid paths, refresh runbook and architecture pins, and produce v2 bootstrap evidence while leaving TE-2 open.
 
 **Acceptance Criteria:**
-- Given the proposal matrix, when fixtures mutate each invariant, then the intended stable reason is produced and all valid root-only, multi-repository, current-run, retained exact-digest, primary-path, and bootstrap cases pass.
-- Given Release warnings-as-errors and CI workflow validation, when narrow then broad checks run, then tool/tests/solution/architecture gates pass and machine-derived counts/results are recorded.
-- Given GitHub reports `main` unprotected, when repository acceptance passes, then TE-2/action remain non-complete and the exact external prerequisite is reported.
+- Given a clean v2 bootstrap HEAD, when the gate attests and validates fresh tests, then the complete owned snapshot passes without proposing terminal status.
+- Given branch protection is active and only the four authorized lifecycle records change, when `ci` evaluates completion, then exact HEAD evidence passes; any frozen-intent, unrelated ledger/action, contract, or path mutation fails deterministically.
+- Given no candidate transition, when an unchanged inactive contract is malformed, then detection returns no transition; changed or selected malformed evidence fails closed.
+- Given spoofed TRX identity, stale/future results, foreign retained provenance, unknown CLI options, or blocked Git streams, when evaluated, then the gate fails within its bound using stable metadata-only reasons.
 
 ## Spec Change Log
 
@@ -70,23 +69,22 @@ context:
 - 2026-08-03: Applied the adversarial review patch: exact raw producer heads and retained-artifact collection, collision-safe lanes, fence-aware/ambiguity-safe parsing, policy-bound primary claims/selectors/sources, exact Git tree/index/symlink digest semantics, explicit owned-gitlink scopes at any root-declared depth, internally reconciled TRX results, safe locator/path/metadata handling, and same-version policy mutation guards. Frozen intent remained unchanged.
 - 2026-08-03: Corrected CI artifact scoping after final audit: exact-bound transition detection now precedes artifact collection, inactive retained contracts cannot block unrelated/no-transition runs, and topology success/download/head verification is required only for active contracts declaring the current-run Aspire/Dapr primary lane; the general producer remains mandatory. Frozen intent remained unchanged.
 - 2026-08-03: Replaced synthetic policy-v1 primary selectors with exact shipped browser, SignalR, hosting/assets, Aspire/Dapr, and recovery test classes; fixture TRX names, architecture pins, and runbook producer mappings now prove the bound classes are executable. Frozen intent remained unchanged.
+- 2026-08-22: Review exposed that diff membership made delayed activation impossible and found adjacent fail-closed gaps. Replanned around v2 HEAD snapshot plus semantic lifecycle delta; avoid historical replay and preserve exact hashing, mappings, stable reports/reasons, producer-head checks, and transition-declared artifacts.
+- 2026-08-23: Hardened v2 after review: mode-aware primary triggers, root-owned transition paths, historical terminal-record protection, canonical namespace-strict TRX parsing, policy/contract/path preflight, multi-lane and multi-contract attestation atomicity, safe candidate identities, strict CLI allowlists, and fail-closed Git path normalization. Restored the workflow's ambient repository comparison while retaining policy-bound validation in code. Frozen intent remained unchanged.
 
 ## Design Notes
 
-Contracts use an exact conventional path plus explicit story path/key/title and sprint key; no numeric inference. Canonical digests sort repository/path/mode/blob tuples, preserve immutable Git-tree bytes/modes and worktree index modes, hash symlink target text as mode `120000`, and include two-sided submodule gitlink tuples while excluding only the policy-approved report path and the exact contract's `scope.implementationDigest`. TRX sidecars bind base/head, digest, TRX checksum, lane/source/selectors, timestamp, and the contract-declared artifact locator; attestation writes current-run lanes only.
+`snapshot-plus-transition` reads every `includePath` from the exact HEAD tree and computes the existing sorted repository/path/mode/object digest. `BASE..HEAD` remains a separate event set. Bootstrap validates the full snapshot without terminal mutations; completion requires spec `in-review` to `complete`, contract `bootstrap` true to false plus digest only, TE ledger `review` to `complete`, and sprint action `open` to `done`. All other bytes in those records, especially the frozen block, remain unchanged.
 
-Root contract revisions use explicit `$BASE`/`$HEAD` sources because a tracked contract cannot embed the identifier of the commit that contains itself; reports and provenance persist the resolved full revisions. An immutable scope requires its index, worktree, and non-ignored untracked set to match resolved head before exact tree objects are read. Exact pre-existing local disclosures are accepted only for a worktree preflight and never waive mixed immutable base/head scope.
+Branch protection is the deliberate administrative bootstrap boundary: enable the required check first, then submit completion. The gate does not acquire control-plane credentials to prove or mutate its own protection.
 
 ## Verification
 
 **Commands:**
-- `dotnet build tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj --configuration Release -warnaserror --no-restore` and the equivalent test-project build -- both TE-2 projects clean.
-- `dotnet test tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj --configuration Release --no-restore --logger "trx;LogFileName=story-evidence-gate.trx" --results-directory TestResults/story-evidence-gate -m:1 /nr:false` -- matrix green with machine counts.
-- `dotnet run --project tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj --configuration Release --no-build -- attest|validate ...` -- exact-digest prospective TE-2 self-validation green.
-- `UseHexalithProjectReferences=true dotnet build Hexalith.ChatBot.slnx --configuration Release --no-restore -warnaserror -m:1 /nr:false` and CI-compatible per-project tests -- broad repository acceptance attempted and blockers recorded below.
-- `actionlint .github/workflows/ci.yml .github/workflows/release.yml`, the exact 44-path `git diff --check`, and broad `git diff --check` -- workflow/scoped checks green; broad blocker recorded below.
-
-**Recorded results (2026-08-03):** focused gate matrix 109 total / 109 executed / 109 passed / 0 failed / 0 skipped; TE-2 prospective self-validation passed with 44 File List paths, 44 scoped diff paths, and 7/7 checked-item mappings. The three TE-2/submodule CI architecture guards passed 3/3, `actionlint` passed, and the exact 44-path diff check is clean. Across the previously recorded 14 CI test projects, machine output remains 3,135 total / 3,125 passed / 5 failed / 5 skipped: unrelated dirty recovery-sandbox work causes 1/74 architecture failures, and existing shared-catalog drift (`bunit` 2.8.6 versus expected 2.8.4-preview) causes 4/227 UI-test failures; all other projects pass, including browser E2E at 141/141. The serialized solution Release build succeeds without warnings-as-errors with 26 MSB3277 warnings, while the required `-warnaserror` build fails on existing Microsoft.IdentityModel 8.19.2/8.22.0 reference conflicts; the targeted architecture run still passes its 3/3 selected guards while emitting those existing dependency-conflict diagnostics. Broad `git diff --check` fails on the unrelated Story 12.15 whitespace finding at `tests/Hexalith.ChatBot.RecoverySandbox/Program.cs:284`. GitHub reports `main` unprotected, the branch-protection endpoint returns 404, and the repository has no rulesets. These repository/external blockers keep the TE-2 spec `in-review`, its ledger entry in `review`, TE-2.5 in progress, and the sprint action open.
+- `dotnet build tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj --configuration Release -warnaserror --no-restore` -- tool builds cleanly.
+- `dotnet test tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj --configuration Release --no-restore --logger "trx;LogFileName=story-evidence-gate.trx" --results-directory TestResults/story-evidence-gate -m:1 /nr:false` -- full focused matrix passes with no skipped tests.
+- `dotnet run --project tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj --configuration Release --no-build -- ci ...` -- v2 bootstrap self-validation passes and emits metadata-only reports.
+- `actionlint .github/workflows/ci.yml .github/workflows/release.yml` and `git diff --check` -- workflows and scoped changes are clean.
 
 ## File List
 
@@ -120,6 +118,7 @@ Root contract revisions use explicit `$BASE`/`$HEAD` sources because a tracked c
 - `tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj`
 - `tools/Hexalith.ChatBot.StoryEvidenceGate/JsonReportWriter.cs`
 - `tools/Hexalith.ChatBot.StoryEvidenceGate/LaneResult.cs`
+- `tools/Hexalith.ChatBot.StoryEvidenceGate/LifecycleTransitionValidator.cs`
 - `tools/Hexalith.ChatBot.StoryEvidenceGate/MarkdownStoryReader.cs`
 - `tools/Hexalith.ChatBot.StoryEvidenceGate/PrimaryPathVerdict.cs`
 - `tools/Hexalith.ChatBot.StoryEvidenceGate/Program.cs`
@@ -137,55 +136,49 @@ Root contract revisions use explicit `$BASE`/`$HEAD` sources because a tracked c
 
 ## Suggested Review Order
 
-**Policy and gate entry points**
+**Protected entry point**
 
-- Versioned primary-path and provenance rules define the fail-closed contract.
-  [`story-evidence-policy.json:64`](../../story-evidence-policy.json#L64)
+- Batch preflight keeps multi-contract CI fail-closed while still reporting every candidate.
+  [`Program.cs:115`](../../tools/Hexalith.ChatBot.StoryEvidenceGate/Program.cs#L115)
 
-- CI orchestration detects exact completion transitions before attesting or validating evidence.
-  [`Program.cs:111`](../../tools/Hexalith.ChatBot.StoryEvidenceGate/Program.cs#L111)
+- Candidate-first detection protects terminal history without loading unrelated malformed contracts.
+  [`TransitionDetector.cs:20`](../../tools/Hexalith.ChatBot.StoryEvidenceGate/TransitionDetector.cs#L20)
 
-- Reconciliation binds identity, policy, status, scope, results, primary paths, and checked work.
-  [`StoryEvidenceValidator.cs:126`](../../tools/Hexalith.ChatBot.StoryEvidenceGate/StoryEvidenceValidator.cs#L126)
+**Snapshot and lifecycle contract**
 
-**Exact scope and machine provenance**
-
-- Canonical hashing preserves Git tree modes, symlinks, gitlinks, and contract-only lifecycle exclusions.
+- Mode-aware evaluation separates exact HEAD ownership from the narrow committed event.
   [`ScopeEvaluator.cs:20`](../../tools/Hexalith.ChatBot.StoryEvidenceGate/ScopeEvaluator.cs#L20)
 
-- TRX parsing rejects inconsistent counters, nonpassing results, unsafe paths, and unbound provenance.
-  [`TrxEvidenceReader.cs:24`](../../tools/Hexalith.ChatBot.StoryEvidenceGate/TrxEvidenceReader.cs#L24)
+- Four semantic replacements enforce the delayed TE-2 completion boundary byte-for-byte.
+  [`LifecycleTransitionValidator.cs:21`](../../tools/Hexalith.ChatBot.StoryEvidenceGate/LifecycleTransitionValidator.cs#L21)
 
-- Transition detection reconciles product stories, enabler records, sprint keys, and open actions.
-  [`TransitionDetector.cs:15`](../../tools/Hexalith.ChatBot.StoryEvidenceGate/TransitionDetector.cs#L15)
+- The v2 contract declares 45 owned paths and exactly four transition paths.
+  [`te-2-mechanical-story-evidence-integrity-gate.json:13`](evidence/te-2-mechanical-story-evidence-integrity-gate.json#L13)
 
-**CI enforcement and lifecycle**
+**Evidence trust boundary**
 
-- The uniquely named job binds raw producer heads and transition-declared artifacts only.
-  [`ci.yml:96`](../../.github/workflows/ci.yml#L96)
+- Attestation validates every lane and destination before any provenance write begins.
+  [`ProvenanceAttestor.cs:52`](../../tools/Hexalith.ChatBot.StoryEvidenceGate/ProvenanceAttestor.cs#L52)
 
-- TE-2 remains review-only until self-validation and protected-check activation both hold.
-  [`technical-enablers.md:34`](../planning-artifacts/technical-enablers.md#L34)
+- Canonical TeamTest structure prevents namespace, identity, counter, and freshness spoofing.
+  [`TrxEvidenceReader.cs:119`](../../tools/Hexalith.ChatBot.StoryEvidenceGate/TrxEvidenceReader.cs#L119)
 
-- The product plan keeps 13 epics and 112 stories under prospective enforcement.
-  [`epics.md:622`](../planning-artifacts/epics.md#L622)
+- Safe story keys prevent contract and report paths from escaping their roots.
+  [`EvidenceJson.cs:107`](../../tools/Hexalith.ChatBot.StoryEvidenceGate/EvidenceJson.cs#L107)
 
-- Architecture makes evidence integrity a metadata-only gated state transition.
-  [`architecture.md:641`](../planning-artifacts/architecture.md#L641)
+**Policy and verification**
 
-**Evidence, documentation, and verification**
+- Pinned policy validation also runs before no-transition success or attestation.
+  [`StoryEvidenceValidator.cs:151`](../../tools/Hexalith.ChatBot.StoryEvidenceGate/StoryEvidenceValidator.cs#L151)
 
-- The bootstrap contract declares the exact 44-path scope and seven checked mappings.
-  [`te-2 evidence:1`](evidence/te-2-mechanical-story-evidence-integrity-gate.json#L1)
+- Lifecycle tests prove exact completion and reject every broader contract mutation.
+  [`StoryEvidenceGateTests.cs:92`](../../tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/StoryEvidenceGateTests.cs#L92)
 
-- The runbook documents contract grammar, retained artifacts, commands, and troubleshooting.
-  [`story-evidence-integrity.md:1`](../../docs/story-evidence-integrity.md#L1)
+- Multi-contract tests prove invalid later evidence cannot partially mint provenance.
+  [`StoryEvidenceGateTests.cs:2225`](../../tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/StoryEvidenceGateTests.cs#L2225)
 
-- Mutation fixtures exercise positive, negative, multi-repository, retained, and bootstrap behavior.
-  [`StoryEvidenceGateTests.cs:12`](../../tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/StoryEvidenceGateTests.cs#L12)
-
-- Architecture assertions freeze CI naming, raw-head binding, artifact sequencing, and non-recursion.
+- Architecture pins keep the policy, workflow, and gate integration mechanically present.
   [`ScaffoldArchitectureTests.cs:763`](../../tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs#L763)
 
-- Solution integration keeps the dependency-free tool and its tests in normal builds.
-  [`Hexalith.ChatBot.slnx:28`](../../Hexalith.ChatBot.slnx#L28)
+- The runbook explains operational invariants and the external branch-protection prerequisite.
+  [`story-evidence-integrity.md:44`](../../docs/story-evidence-integrity.md#L44)

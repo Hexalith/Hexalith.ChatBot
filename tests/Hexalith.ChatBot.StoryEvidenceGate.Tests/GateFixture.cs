@@ -39,6 +39,9 @@ internal sealed class GateFixture : IDisposable
             SprintPath,
             $"development_status:\naction_items:\n  - epic: 13\n    action: \"{ActionText}\"\n    owner: \"Amelia / Murat\"\n    status: open\n");
         File.WriteAllText(technicalLedgerPath, "# Technical Enablers\n\n## TE-X — Gate Fixture\n\n- **Status:** review; bootstrap pending.\n");
+        string workflowPath = Path.Combine(RepositoryRoot, ".github", "workflows", "ci.yml");
+        Directory.CreateDirectory(Path.GetDirectoryName(workflowPath)!);
+        File.WriteAllText(workflowPath, "name: fixture\n");
         RunGit("add", ".");
         RunGit("commit", "-m", "test: create fixture baseline");
         BaseCommit = RunGit("rev-parse", "HEAD").Trim();
@@ -122,6 +125,116 @@ internal sealed class GateFixture : IDisposable
             StoryPath,
             File.ReadAllText(StoryPath).Replace("status: 'in-progress'", $"status: '{status}'", StringComparison.Ordinal));
         RefreshEvidence();
+    }
+
+    /// <summary>Commits a clean v2 snapshot-plus-transition bootstrap.</summary>
+    public void UseSnapshotBootstrap()
+    {
+        File.WriteAllText(StoryPath, StoryText(
+                ".github/workflows/ci.yml",
+                "_bmad-output/implementation-artifacts/sprint-status.yaml",
+                "_bmad-output/planning-artifacts/technical-enablers.md",
+                "src/gate.txt")
+            .Replace("status: 'in-progress'", "status: 'in-review'", StringComparison.Ordinal));
+        MutateContract(contract =>
+        {
+            JsonObject scope = EvidenceJson.RequiredObject(contract, "scope", GateReason.ScopeDigestMismatch);
+            scope["mode"] = "snapshot-plus-transition";
+            scope["transitionPaths"] = new JsonArray(
+                "_bmad-output/implementation-artifacts/spec-gate-fixture.md",
+                "_bmad-output/implementation-artifacts/evidence/gate-fixture.json",
+                "_bmad-output/planning-artifacts/technical-enablers.md",
+                "_bmad-output/implementation-artifacts/sprint-status.yaml");
+            JsonObject repository = EvidenceJson.RequiredArray(
+                scope,
+                "repositories",
+                GateReason.ScopeDigestMismatch)[0]!.AsObject();
+            repository["includeWorkingTree"] = false;
+            repository["includePaths"] = new JsonArray(
+                ".github/workflows/ci.yml",
+                "_bmad-output/implementation-artifacts/spec-gate-fixture.md",
+                "_bmad-output/implementation-artifacts/evidence/gate-fixture.json",
+                "_bmad-output/implementation-artifacts/sprint-status.yaml",
+                "_bmad-output/planning-artifacts/technical-enablers.md",
+                "src/gate.txt");
+            contract["outOfScopeDisclosures"] = new JsonArray();
+            EvidenceJson.RequiredArray(contract, "mappings", GateReason.CheckedItemEvidenceMismatch)[1]!
+                .AsObject()["paths"] = new JsonArray("_bmad-output/planning-artifacts/technical-enablers.md");
+        }, refreshEvidence: false);
+        RunGit("add", "src/gate.txt");
+        RunGit("add", "_bmad-output/implementation-artifacts/spec-gate-fixture.md");
+        RunGit("add", "_bmad-output/implementation-artifacts/evidence/gate-fixture.json");
+        RunGit("add", "_bmad-output/implementation-artifacts/sprint-status.yaml");
+        RunGit("add", "_bmad-output/planning-artifacts/technical-enablers.md");
+        RunGit("commit", "-m", "test: commit snapshot bootstrap");
+        HeadCommit = RunGit("rev-parse", "HEAD").Trim();
+        BindCommittedSnapshotDigest("test: bind snapshot bootstrap digest");
+    }
+
+    /// <summary>Commits an unowned path into an otherwise clean snapshot bootstrap event.</summary>
+    public void CommitUnownedSnapshotEvent()
+    {
+        const string RelativePath = "unowned-bootstrap-event.txt";
+        File.WriteAllText(Path.Combine(RepositoryRoot, RelativePath), "unowned event\n");
+        RunGit("add", RelativePath);
+        RunGit("commit", "-m", "test: commit unowned snapshot event");
+        HeadCommit = RunGit("rev-parse", "HEAD").Trim();
+    }
+
+    /// <summary>Commits the exact four-record completion transition from a clean snapshot bootstrap.</summary>
+    /// <param name="additionalMutation">An optional unauthorized mutation for negative tests.</param>
+    public void UseSnapshotCompletion(Action? additionalMutation = null)
+    {
+        UseSnapshotBootstrap();
+        CompleteSnapshot(additionalMutation);
+    }
+
+    /// <summary>Commits a mutated bootstrap base before exercising the exact completion comparator.</summary>
+    public void UseSnapshotCompletionWithBaseContractMutation(
+        Action<JsonObject> baseContractMutation,
+        Action? additionalMutation = null)
+    {
+        ArgumentNullException.ThrowIfNull(baseContractMutation);
+        UseSnapshotBootstrap();
+        MutateContract(baseContractMutation, refreshEvidence: false);
+        RunGit("add", "_bmad-output/implementation-artifacts/evidence/gate-fixture.json");
+        RunGit("commit", "-m", "test: commit mutated snapshot base");
+        HeadCommit = RunGit("rev-parse", "HEAD").Trim();
+        CompleteSnapshot(additionalMutation);
+    }
+
+    /// <summary>Commits additional prepared snapshot paths and advances the fixture head.</summary>
+    public void CommitAdditionalHead(string message)
+    {
+        RunGit("add", ".");
+        RunGit("commit", "-m", message);
+        HeadCommit = RunGit("rev-parse", "HEAD").Trim();
+    }
+
+    private void CompleteSnapshot(Action? additionalMutation)
+    {
+        BaseCommit = HeadCommit;
+        string ledgerPath = Path.Combine(RepositoryRoot, "_bmad-output", "planning-artifacts", "technical-enablers.md");
+        File.WriteAllText(
+            StoryPath,
+            File.ReadAllText(StoryPath).Replace("status: 'in-review'", "status: 'complete'", StringComparison.Ordinal));
+        File.WriteAllText(
+            ledgerPath,
+            File.ReadAllText(ledgerPath).Replace("- **Status:** review", "- **Status:** complete", StringComparison.Ordinal));
+        File.WriteAllText(
+            SprintPath,
+            File.ReadAllText(SprintPath).Replace("    status: open", "    status: done", StringComparison.Ordinal));
+        MutateContract(contract =>
+        {
+            contract["bootstrap"] = false;
+            EvidenceJson.RequiredObject(contract, "scope", GateReason.ScopeDigestMismatch)["implementationDigest"] =
+                new string('0', 64);
+        }, refreshEvidence: false);
+        additionalMutation?.Invoke();
+        RunGit("add", ".");
+        RunGit("commit", "-m", "test: commit snapshot completion event");
+        HeadCommit = RunGit("rev-parse", "HEAD").Trim();
+        BindCommittedSnapshotDigest("test: bind snapshot completion digest");
     }
 
     /// <summary>Adds another owned file and reconciles it into scope, the File List, and a task mapping.</summary>
@@ -213,38 +326,63 @@ internal sealed class GateFixture : IDisposable
         int failed,
         int skipped,
         string summaryOutcome,
-        string testName = "GateFixture.ValidAssertion")
+        string testName = "GateFixture.ValidAssertion",
+        DateTimeOffset? finishedAtUtc = null)
     {
         StringBuilder results = new();
+        StringBuilder definitions = new();
+        int testId = 0;
         for (int index = 0; index < passed; index++)
         {
             string name = index == 0 ? testName : $"{testName}.Case{index + 1}";
-            results.AppendLine($"    <UnitTestResult testName=\"{name}\" outcome=\"Passed\" />");
+            AppendResult(results, definitions, ++testId, name, "Passed");
         }
 
         for (int index = 0; index < failed; index++)
         {
-            results.AppendLine($"    <UnitTestResult testName=\"{testName}.Failed{index + 1}\" outcome=\"Failed\" />");
+            AppendResult(results, definitions, ++testId, $"{testName}.Failed{index + 1}", "Failed");
         }
 
         for (int index = 0; index < skipped; index++)
         {
-            results.AppendLine($"    <UnitTestResult testName=\"{testName}.Skipped{index + 1}\" outcome=\"NotExecuted\" />");
+            AppendResult(results, definitions, ++testId, $"{testName}.Skipped{index + 1}", "NotExecuted");
         }
 
+        DateTimeOffset finish = finishedAtUtc ?? DateTimeOffset.UtcNow;
         File.WriteAllText(
             TrxPath,
             $"""
             <?xml version="1.0" encoding="utf-8"?>
             <TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+              <Times start="{finish.AddSeconds(-1):O}" finish="{finish:O}" />
               <Results>
             {results.ToString().TrimEnd()}
               </Results>
+              <TestDefinitions>
+            {definitions.ToString().TrimEnd()}
+              </TestDefinitions>
               <ResultSummary outcome="{summaryOutcome}">
                 <Counters total="{total}" executed="{executed}" passed="{passed}" failed="{failed}" error="0" timeout="0" aborted="0" inconclusive="0" notExecuted="{skipped}" />
               </ResultSummary>
             </TestRun>
             """);
+    }
+
+    private static void AppendResult(
+        StringBuilder results,
+        StringBuilder definitions,
+        int testId,
+        string displayName,
+        string outcome)
+    {
+        string canonical = displayName.Split('(', 2)[0];
+        int methodSeparator = canonical.LastIndexOf('.');
+        string className = methodSeparator > 0 ? canonical[..methodSeparator] : "Synthetic.Tests";
+        string methodName = methodSeparator > 0 ? canonical[(methodSeparator + 1)..] : canonical;
+        string id = $"test-{testId}";
+        results.AppendLine($"    <UnitTestResult testId=\"{id}\" testName=\"{displayName}\" outcome=\"{outcome}\" />");
+        definitions.AppendLine(
+            $"    <UnitTest id=\"{id}\" name=\"{displayName}\"><TestMethod className=\"{className}\" name=\"{methodName}\" /></UnitTest>");
     }
 
     /// <summary>Refreshes the canonical digest and provenance sidecar.</summary>
@@ -599,7 +737,7 @@ internal sealed class GateFixture : IDisposable
         lane["source"] = "retained";
         lane["trx"] = "retained/12345/gate-evidence/gate.trx";
         lane["provenance"] = "retained/12345/gate-evidence/gate.provenance.json";
-        lane["artifactLocator"] = "github-actions://hexalith/chatbot/runs/12345/artifacts/gate-evidence";
+        lane["artifactLocator"] = "github-actions://Hexalith/Hexalith.ChatBot/runs/12345/artifacts/gate-evidence";
         EvidenceJson.RequiredObject(contract, "scope", GateReason.ScopeDigestMismatch)["implementationDigest"] = new string('0', 64);
         WriteContract(contract);
         JsonObject policy = EvidenceJson.LoadPolicy(PolicyPath);
@@ -616,6 +754,29 @@ internal sealed class GateFixture : IDisposable
         sidecar["source"] = "retained";
         sidecar["artifactLocator"] = EvidenceJson.RequiredString(lane, "artifactLocator", GateReason.EvidenceStaleOrUnbound);
         sidecar["producedAtUtc"] = DateTimeOffset.UtcNow.ToString("O");
+        File.WriteAllText(ProvenancePath, sidecar.ToJsonString(JsonReportWriter.SerializerOptions));
+    }
+
+    /// <summary>Rebinds retained metadata to a repository identity for negative policy tests.</summary>
+    public void SetRetainedRepository(string repositoryIdentity)
+    {
+        JsonObject contract = ReadContract();
+        JsonObject lane = EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid)[0]!.AsObject();
+        string locator = $"github-actions://{repositoryIdentity}/runs/12345/artifacts/gate-evidence";
+        lane["artifactLocator"] = locator;
+        EvidenceJson.RequiredObject(contract, "scope", GateReason.ScopeDigestMismatch)["implementationDigest"] = new string('0', 64);
+        WriteContract(contract);
+        ScopeEvaluation evaluation = ScopeEvaluator.Evaluate(
+            RepositoryRoot,
+            EvidenceJson.LoadPolicy(PolicyPath),
+            contract,
+            BaseCommit,
+            HeadCommit);
+        EvidenceJson.RequiredObject(contract, "scope", GateReason.ScopeDigestMismatch)["implementationDigest"] = evaluation.Digest;
+        WriteContract(contract);
+        JsonObject sidecar = JsonNode.Parse(File.ReadAllText(ProvenancePath))!.AsObject();
+        sidecar["implementationDigest"] = evaluation.Digest;
+        sidecar["artifactLocator"] = locator;
         File.WriteAllText(ProvenancePath, sidecar.ToJsonString(JsonReportWriter.SerializerOptions));
     }
 
@@ -751,7 +912,7 @@ internal sealed class GateFixture : IDisposable
     {
         return new JsonObject
         {
-            ["schemaVersion"] = "1.0",
+            ["schemaVersion"] = "2.0",
             ["recordKind"] = "technicalEnabler",
             ["recordLedgerKey"] = "TE-X",
             ["storyKey"] = "gate-fixture",
@@ -763,8 +924,9 @@ internal sealed class GateFixture : IDisposable
             ["bootstrap"] = true,
             ["scope"] = new JsonObject
             {
+                ["mode"] = "diff",
                 ["implementationDigest"] = new string('0', 64),
-                ["lifecycleBookkeepingFields"] = new JsonArray("implementationDigest"),
+                ["transitionPaths"] = new JsonArray(),
                 ["repositories"] = new JsonArray(new JsonObject
                 {
                     ["name"] = "root",
@@ -849,6 +1011,30 @@ internal sealed class GateFixture : IDisposable
 
     private void WritePassingTrx(string testName = "GateFixture.ValidAssertion") =>
         WriteTrx(1, 1, 1, 0, 0, "Completed", testName);
+
+    private void BindCommittedSnapshotDigest(string commitMessage)
+    {
+        JsonObject contract = ReadContract();
+        ScopeEvaluation evaluation = ScopeEvaluator.Evaluate(
+            RepositoryRoot,
+            EvidenceJson.LoadPolicy(PolicyPath),
+            contract,
+            BaseCommit,
+            HeadCommit);
+        EvidenceJson.RequiredObject(contract, "scope", GateReason.ScopeDigestMismatch)["implementationDigest"] = evaluation.Digest;
+        WriteContract(contract);
+        RunGit("add", "_bmad-output/implementation-artifacts/evidence/gate-fixture.json");
+        RunGit("commit", "-m", commitMessage);
+        HeadCommit = RunGit("rev-parse", "HEAD").Trim();
+        ProvenanceAttestor.AttestContract(
+            RepositoryRoot,
+            ContractPath,
+            BaseCommit,
+            HeadCommit,
+            ResultsRoot,
+            DateTimeOffset.UtcNow,
+            PolicyPath);
+    }
 
     private static string PrimaryTestClass(string pathClass) => pathClass switch
     {

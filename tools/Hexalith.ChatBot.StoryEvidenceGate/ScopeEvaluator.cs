@@ -25,15 +25,26 @@ public static partial class ScopeEvaluator
         string headCommit)
     {
         JsonObject scopeNode = EvidenceJson.RequiredObject(contract, "scope", GateReason.ScopeDigestMismatch);
-        HashSet<string> lifecycleFields = EvidenceJson
-            .RequiredStrings(scopeNode, "lifecycleBookkeepingFields", GateReason.ScopeDigestMismatch)
-            .ToHashSet(StringComparer.Ordinal);
-        HashSet<string> allowedLifecycleFields = EvidenceJson
-            .RequiredStrings(policy, "allowedLifecycleBookkeepingFields", GateReason.ScopeDigestMismatch)
-            .ToHashSet(StringComparer.Ordinal);
-        if (!lifecycleFields.SetEquals(allowedLifecycleFields))
+        string mode = EvidenceJson.RequiredString(scopeNode, "mode", GateReason.ScopeDigestMismatch);
+        IReadOnlyList<string> allowedModes = EvidenceJson.RequiredStrings(
+            policy,
+            "allowedScopeModes",
+            GateReason.ScopeDigestMismatch);
+        if (!allowedModes.SequenceEqual(["diff", "snapshot-plus-transition"], StringComparer.Ordinal)
+            || !allowedModes.Contains(mode, StringComparer.Ordinal))
         {
-            throw new GateValidationException(GateReason.ScopeDigestMismatch, "lifecycle-bookkeeping-fields");
+            throw new GateValidationException(GateReason.ScopeDigestMismatch, "scope-mode");
+        }
+
+        string[] transitionPaths = EvidenceJson.RequiredStrings(
+                scopeNode,
+                "transitionPaths",
+                GateReason.ScopeDigestMismatch)
+            .Select(NormalizeFilePath)
+            .ToArray();
+        if (transitionPaths.Distinct(StringComparer.Ordinal).Count() != transitionPaths.Length)
+        {
+            throw new GateValidationException(GateReason.ScopeDigestMismatch, "transition-paths");
         }
 
         IReadOnlyList<RepositoryScope> scopes = ParseScopes(scopeNode);
@@ -41,6 +52,11 @@ public static partial class ScopeEvaluator
 
         RepositoryScope rootScope = scopes.SingleOrDefault(static scope => scope.Path == ".")
             ?? throw new GateValidationException(GateReason.ScopeDigestMismatch, "root-scope");
+        if (mode.Equals("snapshot-plus-transition", StringComparison.Ordinal)
+            && transitionPaths.Any(path => !rootScope.IncludePaths.Contains(path)))
+        {
+            throw new GateValidationException(GateReason.ScopeDigestMismatch, "transition-path-ownership");
+        }
         string normalizedBase = GitReader.ResolveExactCommit(repositoryRoot, baseCommit);
         string normalizedHead = GitReader.ResolveExactCommit(repositoryRoot, headCommit);
         string boundRootBase = BindRootRevision(rootScope.BaseCommit, "$BASE", normalizedBase);
@@ -53,6 +69,10 @@ public static partial class ScopeEvaluator
         }
 
         Dictionary<string, string> disclosures = ParseDisclosures(contract);
+        if (mode.Equals("snapshot-plus-transition", StringComparison.Ordinal) && disclosures.Count != 0)
+        {
+            throw new GateValidationException(GateReason.ScopeDigestMismatch, "snapshot-disclosures");
+        }
         string reportPath = NormalizeFilePath(EvidenceJson.RequiredString(
             contract,
             "reportPath",
@@ -61,7 +81,7 @@ public static partial class ScopeEvaluator
             policy,
             "reportExcludedPaths",
             GateReason.ScopeDigestMismatch);
-        string storyKey = EvidenceJson.RequiredString(contract, "storyKey", GateReason.StatusMismatch);
+        string storyKey = EvidenceJson.RequiredStoryKey(contract);
         string evidenceContractPath = $"_bmad-output/implementation-artifacts/evidence/{storyKey}.json";
         if (reportPrefixes.Count != 1
             || !reportPath.Equals($"{reportPrefixes[0]}{storyKey}.json", StringComparison.Ordinal))
@@ -92,6 +112,7 @@ public static partial class ScopeEvaluator
         }
 
         ValidateGitlinks(repositoryRoot, scopes, resolvedRevisions);
+        List<ChangedPath> eventPaths = [];
         List<ChangedPath> ownedChanges = [];
         foreach (RepositoryScope repositoryScope in scopes)
         {
@@ -99,6 +120,66 @@ public static partial class ScopeEvaluator
                 ? repositoryRoot
                 : Path.Combine(repositoryRoot, repositoryScope.Path);
             (string resolvedBase, string resolvedHead) = resolvedRevisions[repositoryScope.Name];
+
+            Dictionary<string, string> committedChanges = new(
+                GitReader.Diff(repositoryPath, resolvedBase, resolvedHead),
+                StringComparer.Ordinal);
+            if (mode.Equals("snapshot-plus-transition", StringComparison.Ordinal))
+            {
+                string? unownedEventPath = committedChanges.Keys
+                    .Where(path => !repositoryScope.IncludePaths.Contains(path))
+                    .Order(StringComparer.Ordinal)
+                    .FirstOrDefault();
+                if (unownedEventPath is not null)
+                {
+                    throw new GateValidationException(
+                        GateReason.ScopeDigestMismatch,
+                        $"{repositoryScope.Name}:{unownedEventPath}");
+                }
+            }
+
+            foreach ((string path, string status) in committedChanges.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
+            {
+                eventPaths.Add(CreateEventPath(
+                    repositoryPath,
+                    repositoryScope.Name,
+                    path,
+                    status,
+                    resolvedBase,
+                    resolvedHead));
+            }
+
+            if (mode.Equals("snapshot-plus-transition", StringComparison.Ordinal))
+            {
+                if (repositoryScope.IncludeWorkingTree)
+                {
+                    throw new GateValidationException(GateReason.ScopeDigestMismatch, "snapshot-working-tree");
+                }
+
+                IReadOnlyDictionary<string, string> dirtyPaths = GitReader.WorktreeDiff(repositoryPath, resolvedHead);
+                if (dirtyPaths.Count != 0)
+                {
+                    string dirtyPath = dirtyPaths.Keys.Order(StringComparer.Ordinal).First();
+                    throw new GateValidationException(
+                        GateReason.ScopeDigestMismatch,
+                        $"{repositoryScope.Name}:{dirtyPath}");
+                }
+
+                foreach (string path in repositoryScope.IncludePaths.Order(StringComparer.Ordinal))
+                {
+                    ownedChanges.Add(CreateChangedPath(
+                        repositoryPath,
+                        repositoryScope.Name,
+                        path,
+                        committedChanges.GetValueOrDefault(path, "S"),
+                        resolvedHead,
+                        immutable: true,
+                        maskImplementationDigest: repositoryScope.Path == "."
+                            && path.Equals(evidenceContractPath, StringComparison.Ordinal)));
+                }
+
+                continue;
+            }
 
             if (!repositoryScope.IncludeWorkingTree)
             {
@@ -112,9 +193,6 @@ public static partial class ScopeEvaluator
                 }
             }
 
-            Dictionary<string, string> committedChanges = new(
-                GitReader.Diff(repositoryPath, resolvedBase, resolvedHead),
-                StringComparer.Ordinal);
             Dictionary<string, string> allChanges = new(committedChanges, StringComparer.Ordinal);
             if (repositoryScope.IncludeWorkingTree)
             {
@@ -135,9 +213,8 @@ public static partial class ScopeEvaluator
                         status,
                         resolvedHead,
                         immutable: !repositoryScope.IncludeWorkingTree,
-                        removeLifecycleFields: repositoryScope.Path == "."
-                            && path.Equals(evidenceContractPath, StringComparison.Ordinal),
-                        lifecycleFields));
+                        maskImplementationDigest: repositoryScope.Path == "."
+                            && path.Equals(evidenceContractPath, StringComparison.Ordinal)));
                     continue;
                 }
 
@@ -167,7 +244,7 @@ public static partial class ScopeEvaluator
 
         ValidateCurrentGitlinks(scopes, ownedChanges, resolvedRevisions);
         string digest = ComputeDigest(ownedChanges);
-        return new ScopeEvaluation(scopes, ownedChanges, digest);
+        return new ScopeEvaluation(scopes, ownedChanges, eventPaths, digest);
     }
 
     /// <summary>Gets the path strings used to reconcile the story File List.</summary>
@@ -176,11 +253,27 @@ public static partial class ScopeEvaluator
     public static IReadOnlySet<string> FileListPaths(ScopeEvaluation evaluation)
     {
         ArgumentNullException.ThrowIfNull(evaluation);
+        return RootRelativePaths(evaluation, evaluation.ChangedPaths);
+    }
+
+    /// <summary>Gets the base-to-head event paths used to evaluate primary-path triggers.</summary>
+    /// <param name="evaluation">The evaluated scope.</param>
+    /// <returns>Root-relative event paths, with submodule paths prefixed.</returns>
+    public static IReadOnlySet<string> EventPaths(ScopeEvaluation evaluation)
+    {
+        ArgumentNullException.ThrowIfNull(evaluation);
+        return RootRelativePaths(evaluation, evaluation.EventPaths);
+    }
+
+    private static IReadOnlySet<string> RootRelativePaths(
+        ScopeEvaluation evaluation,
+        IReadOnlyList<ChangedPath> paths)
+    {
         Dictionary<string, string> roots = evaluation.Scopes.ToDictionary(
             static scope => scope.Name,
             static scope => scope.Path,
             StringComparer.Ordinal);
-        return evaluation.ChangedPaths
+        return paths
             .Select(change => roots[change.Repository] == "."
                 ? change.Path
                 : $"{roots[change.Repository]}/{change.Path}")
@@ -286,8 +379,7 @@ public static partial class ScopeEvaluator
         string status,
         string resolvedHead,
         bool immutable,
-        bool removeLifecycleFields,
-        IReadOnlySet<string> lifecycleFields)
+        bool maskImplementationDigest)
     {
         string fullPath = Path.GetFullPath(Path.Combine(repositoryPath, path));
         if (!fullPath.StartsWith(Path.GetFullPath(repositoryPath) + Path.DirectorySeparatorChar, StringComparison.Ordinal)
@@ -320,7 +412,7 @@ public static partial class ScopeEvaluator
             }
 
             byte[] treeBytes = GitReader.BlobBytes(repositoryPath, entry.Value.ObjectId);
-            byte[] canonicalTreeBytes = CanonicalBytes(treeBytes, removeLifecycleFields, lifecycleFields);
+            byte[] canonicalTreeBytes = CanonicalBytes(treeBytes, maskImplementationDigest);
             string treeObjectId = Convert.ToHexString(SHA256.HashData(canonicalTreeBytes)).ToLowerInvariant();
             return new ChangedPath(repositoryName, path, status, entry.Value.Mode, treeObjectId);
         }
@@ -350,7 +442,7 @@ public static partial class ScopeEvaluator
             throw new GateValidationException(GateReason.FileListDiffMismatch, path);
         }
 
-        byte[] bytes = CanonicalBytes(File.ReadAllBytes(fullPath), removeLifecycleFields, lifecycleFields);
+        byte[] bytes = CanonicalBytes(File.ReadAllBytes(fullPath), maskImplementationDigest);
         string objectId = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
         string mode = GitReader.IndexMode(repositoryPath, path) ?? GetUntrackedMode(fullPath);
         if (mode is not ("100644" or "100755"))
@@ -361,27 +453,44 @@ public static partial class ScopeEvaluator
         return new ChangedPath(repositoryName, path, status, mode, objectId);
     }
 
+    private static ChangedPath CreateEventPath(
+        string repositoryPath,
+        string repositoryName,
+        string path,
+        string status,
+        string resolvedBase,
+        string resolvedHead)
+    {
+        (string Mode, string ObjectId)? entry = GitReader.TreeEntry(repositoryPath, resolvedHead, path)
+            ?? GitReader.TreeEntry(repositoryPath, resolvedBase, path);
+        return new ChangedPath(
+            repositoryName,
+            path,
+            status,
+            entry?.Mode ?? string.Empty,
+            entry?.ObjectId ?? string.Empty);
+    }
+
     private static byte[] CanonicalBytes(
         byte[] bytes,
-        bool removeLifecycleFields,
-        IReadOnlySet<string> lifecycleFields)
+        bool maskImplementationDigest)
     {
-        if (!removeLifecycleFields)
+        if (!maskImplementationDigest)
         {
             return bytes;
         }
 
         try
         {
-            return MaskLifecycleValues(bytes, lifecycleFields);
+            return MaskImplementationDigest(bytes);
         }
         catch (JsonException)
         {
-            return bytes;
+            throw new GateValidationException(GateReason.ScopeDigestMismatch, "implementation-digest-mask");
         }
     }
 
-    private static byte[] MaskLifecycleValues(byte[] bytes, IReadOnlySet<string> lifecycleFields)
+    private static byte[] MaskImplementationDigest(byte[] bytes)
     {
         Utf8JsonReader reader = new(bytes, new JsonReaderOptions
         {
@@ -390,9 +499,9 @@ public static partial class ScopeEvaluator
         });
         int scopeDepth = -1;
         bool nextObjectIsScope = false;
-        string? lifecycleProperty = null;
+        bool implementationDigestProperty = false;
         List<(int Start, int End)> spans = [];
-        HashSet<string> found = new(StringComparer.Ordinal);
+        int found = 0;
         while (reader.Read())
         {
             if (reader.TokenType == JsonTokenType.PropertyName)
@@ -401,11 +510,9 @@ public static partial class ScopeEvaluator
                 nextObjectIsScope = scopeDepth < 0
                     && reader.CurrentDepth == 1
                     && name.Equals("scope", StringComparison.Ordinal);
-                lifecycleProperty = scopeDepth >= 0
+                implementationDigestProperty = scopeDepth >= 0
                     && reader.CurrentDepth == scopeDepth + 1
-                    && lifecycleFields.Contains(name)
-                    ? name
-                    : null;
+                    && name.Equals("implementationDigest", StringComparison.Ordinal);
                 continue;
             }
 
@@ -419,15 +526,15 @@ public static partial class ScopeEvaluator
                 nextObjectIsScope = false;
             }
 
-            if (lifecycleProperty is not null)
+            if (implementationDigestProperty)
             {
-                if (reader.TokenType != JsonTokenType.String || !found.Add(lifecycleProperty))
+                if (reader.TokenType != JsonTokenType.String || ++found != 1)
                 {
-                    throw new JsonException("Invalid lifecycle field.");
+                    throw new JsonException("Invalid implementation digest field.");
                 }
 
                 spans.Add((checked((int)reader.TokenStartIndex), checked((int)reader.BytesConsumed)));
-                lifecycleProperty = null;
+                implementationDigestProperty = false;
             }
 
             if (scopeDepth >= 0 && reader.TokenType == JsonTokenType.EndObject && reader.CurrentDepth == scopeDepth)
@@ -436,12 +543,12 @@ public static partial class ScopeEvaluator
             }
         }
 
-        if (!found.SetEquals(lifecycleFields))
+        if (found != 1)
         {
-            throw new JsonException("Missing lifecycle field.");
+            throw new JsonException("Missing implementation digest field.");
         }
 
-        byte[] replacement = "\"lifecycle-excluded\""u8.ToArray();
+        byte[] replacement = "\"implementation-digest-masked\""u8.ToArray();
         using MemoryStream output = new();
         int offset = 0;
         foreach ((int start, int end) in spans.OrderBy(static span => span.Start))

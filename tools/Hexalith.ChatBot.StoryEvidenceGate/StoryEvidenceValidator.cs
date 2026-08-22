@@ -26,7 +26,7 @@ public static class StoryEvidenceValidator
         {
             JsonObject policy = EvidenceJson.LoadPolicy(options.PolicyPath);
             JsonObject contract = EvidenceJson.LoadContract(options.ContractPath);
-            report.StoryKey = EvidenceJson.RequiredString(contract, "storyKey", GateReason.StatusMismatch);
+            report.StoryKey = EvidenceJson.RequiredStoryKey(contract);
             string expectedContractPath =
                 $"_bmad-output/implementation-artifacts/evidence/{report.StoryKey}.json";
             if (!NormalizePath(Path.GetRelativePath(options.RepositoryRoot, options.ContractPath))
@@ -59,14 +59,17 @@ public static class StoryEvidenceValidator
             report.ImplementationDigest = scope.Digest;
             report.RepositoryScopes = scope.Scopes.Select(static value => value.Path).ToArray();
             IReadOnlySet<string> changedPaths = ScopeEvaluator.FileListPaths(scope);
+            IReadOnlySet<string> eventPaths = ScopeEvaluator.EventPaths(scope);
             report.FileListCount = story.FileList.Count;
             report.ScopedDiffCount = changedPaths.Count;
+            report.EventPathCount = eventPaths.Count;
             if (!story.FileList.SetEquals(changedPaths))
             {
                 throw new GateValidationException(GateReason.FileListDiffMismatch, "file-list");
             }
 
             JsonObject scopeNode = EvidenceJson.RequiredObject(contract, "scope", GateReason.ScopeDigestMismatch);
+            string scopeMode = EvidenceJson.RequiredString(scopeNode, "mode", GateReason.ScopeDigestMismatch);
             string declaredDigest = EvidenceJson.RequiredString(
                 scopeNode,
                 "implementationDigest",
@@ -76,13 +79,18 @@ public static class StoryEvidenceValidator
                 throw new GateValidationException(GateReason.ScopeDigestMismatch, "implementation-digest");
             }
 
-            int maximumAge = EvidenceJson.RequiredInteger(
-                policy,
-                "maximumEvidenceAgeHours",
-                GateReason.EvidenceStaleOrUnbound);
-            List<LaneResult> lanes = ReadResults(options, contract, scope.Digest, maximumAge);
+            LifecycleTransitionValidator.Validate(
+                options.RepositoryRoot,
+                contract,
+                options.BaseCommit,
+                options.HeadCommit,
+                scope.EventPaths);
+            List<LaneResult> lanes = ReadResults(options, policy, contract, scope.Digest);
             report.Lanes = lanes;
-            report.PrimaryPaths = ValidatePrimaryPaths(policy, contract, story, changedPaths, lanes);
+            IReadOnlySet<string> primaryTriggerPaths = scopeMode.Equals("snapshot-plus-transition", StringComparison.Ordinal)
+                ? eventPaths
+                : changedPaths;
+            report.PrimaryPaths = ValidatePrimaryPaths(policy, contract, story, primaryTriggerPaths, lanes);
             (int checkedItems, int mappedItems) = ValidateMappings(contract, story, changedPaths, lanes);
             report.CheckedItemCount = checkedItems;
             report.MappedItemCount = mappedItems;
@@ -125,16 +133,37 @@ public static class StoryEvidenceValidator
 
     private static void ValidateVersionsAndReasons(JsonObject policy, JsonObject contract)
     {
+        ValidatePinnedPolicy(policy);
+        ValidateAttestationContract(contract);
+    }
+
+    internal static void ValidateAttestationContract(JsonObject contract)
+    {
+        if (!EvidenceJson.RequiredString(contract, "schemaVersion", GateReason.ScopeDigestMismatch)
+                .Equals("2.0", StringComparison.Ordinal))
+        {
+            throw new GateValidationException(GateReason.ScopeDigestMismatch, "schema-version");
+        }
+
+        _ = EvidenceJson.RequiredStoryKey(contract);
+    }
+
+    internal static void ValidatePinnedPolicy(JsonObject policy)
+    {
         string policyVersion = EvidenceJson.RequiredString(policy, "schemaVersion", GateReason.ScopeDigestMismatch);
         string minimumVersion = EvidenceJson.RequiredString(
             policy,
             "minimumSupportedVersion",
             GateReason.ScopeDigestMismatch);
-        string contractVersion = EvidenceJson.RequiredString(contract, "schemaVersion", GateReason.ScopeDigestMismatch);
-        if (!policyVersion.Equals("1.0", StringComparison.Ordinal)
-            || !minimumVersion.Equals("1.0", StringComparison.Ordinal)
-            || !contractVersion.Equals("1.0", StringComparison.Ordinal)
-            || EvidenceJson.RequiredInteger(policy, "maximumEvidenceAgeHours", GateReason.ScopeDigestMismatch) != 720)
+        if (!policyVersion.Equals("2.0", StringComparison.Ordinal)
+            || !minimumVersion.Equals("2.0", StringComparison.Ordinal)
+            || !EvidenceJson.RequiredString(policy, "repositoryIdentity", GateReason.ScopeDigestMismatch)
+                .Equals("Hexalith/Hexalith.ChatBot", StringComparison.Ordinal)
+            || EvidenceJson.RequiredInteger(policy, "maximumCurrentRunAgeMinutes", GateReason.ScopeDigestMismatch) != 60
+            || EvidenceJson.RequiredInteger(policy, "maximumRetainedEvidenceAgeHours", GateReason.ScopeDigestMismatch) != 720
+            || EvidenceJson.RequiredInteger(policy, "maximumFutureClockSkewMinutes", GateReason.ScopeDigestMismatch) != 5
+            || !EvidenceJson.RequiredStrings(policy, "allowedScopeModes", GateReason.ScopeDigestMismatch)
+                .SequenceEqual(["diff", "snapshot-plus-transition"], StringComparer.Ordinal))
         {
             throw new GateValidationException(GateReason.ScopeDigestMismatch, "schema-version");
         }
@@ -176,8 +205,6 @@ public static class StoryEvidenceValidator
                 .SetEquals(["Execution", "Tasks / Subtasks"])
             || !EvidenceJson.RequiredStrings(policy, "reportExcludedPaths", GateReason.ScopeDigestMismatch)
                 .SequenceEqual(["_bmad-output/implementation-artifacts/evidence/reports/"], StringComparer.Ordinal)
-            || !EvidenceJson.RequiredStrings(policy, "allowedLifecycleBookkeepingFields", GateReason.ScopeDigestMismatch)
-                .SequenceEqual(["implementationDigest"], StringComparer.Ordinal)
             || EvidenceJson.RequiredArray(policy, "exceptions", GateReason.EvidencePayloadForbidden).Count != 0)
         {
             throw new GateValidationException(GateReason.ScopeDigestMismatch, "policy-grammar");
@@ -505,9 +532,9 @@ public static class StoryEvidenceValidator
 
     private static List<LaneResult> ReadResults(
         GateOptions options,
+        JsonObject policy,
         JsonObject contract,
-        string implementationDigest,
-        int maximumAge)
+        string implementationDigest)
     {
         JsonArray results = EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid);
         if (results.Count == 0)
@@ -532,7 +559,10 @@ public static class StoryEvidenceValidator
                 options.BaseCommit,
                 options.HeadCommit,
                 implementationDigest,
-                maximumAge,
+                EvidenceJson.RequiredString(policy, "repositoryIdentity", GateReason.EvidenceStaleOrUnbound),
+                EvidenceJson.RequiredInteger(policy, "maximumCurrentRunAgeMinutes", GateReason.EvidenceStaleOrUnbound),
+                EvidenceJson.RequiredInteger(policy, "maximumRetainedEvidenceAgeHours", GateReason.EvidenceStaleOrUnbound),
+                EvidenceJson.RequiredInteger(policy, "maximumFutureClockSkewMinutes", GateReason.EvidenceStaleOrUnbound),
                 options.NowUtc));
         }
 
