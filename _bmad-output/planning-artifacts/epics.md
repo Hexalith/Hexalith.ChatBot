@@ -320,7 +320,7 @@ Hexalith.ChatBot turns project email threads into structured, auditable workspac
 - .NET Aspire 13.3.x AppHost (K8s/AKS + Helm deploy in 13.3 — relevant to M2 ops).
 - Blazor + Fluent UI v5 (RC, via Hexalith.FrontComposer — Roslyn source-gen, Fluxor, REST commands/queries + SignalR projection-nudge, contract-first annotations). ⚠️ Fluent UI v5 still RC — inherited pre-GA, pinned.
 - CLI: System.CommandLine 2.0.x wrapping `Hexalith.ChatBot.Client` **[M1]**.
-- MCP: ModelContextProtocol 1.4.1 from the shared `Hexalith.Builds` catalog; the implemented ChatBot MCP adapter uses stdio transport, wraps `Hexalith.ChatBot.Client`, and translates tools to commands/queries without local governance **[M1]**.
+- MCP: ModelContextProtocol 2.2.0 from the shared `Hexalith.Builds` catalog; the implemented ChatBot MCP adapter uses stdio transport, wraps `Hexalith.ChatBot.Client`, and translates tools to commands/queries without local governance **[M1]**.
 - AI context / vector store: Hexalith.Memories (Redis Vector / FalkorDB) for scoped AI context + vector indexes **[M2, NFR9a isolation]**.
 - Testing: xUnit v3 3.2.x, Shouldly, NSubstitute, Testcontainers; three-tier (unit / DAPR integration / Aspire E2E); conformance + isolation + idempotency as release gates; Playwright + axe-core for UI E2E.
 

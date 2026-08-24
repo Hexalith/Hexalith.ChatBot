@@ -59,7 +59,12 @@ jobs:
       - name: Restore
         run: dotnet restore Hexalith.ChatBot.slnx
       - name: Build
-        run: dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release
+        # -m:1 serializes project builds. Several referenced submodule projects
+        # (Hexalith.Projects.Client.Generation, Hexalith.FrontComposer.Shell) are reached by more
+        # than one path in the graph, and parallel nodes intermittently raced writing their
+        # obj/ outputs, failing this required step with MSB4018 GenerateDepsFile /
+        # GetAssemblyAttributes "used by another process" errors.
+        run: dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -m:1
       - name: Test
         shell: bash
         run: |
