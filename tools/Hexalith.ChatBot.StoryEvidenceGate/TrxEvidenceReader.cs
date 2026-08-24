@@ -116,6 +116,26 @@ public static class TrxEvidenceReader
         return checksum;
     }
 
+    /// <summary>
+    /// Validates the complete producer-owned lane grammar without reading result or provenance bytes.
+    /// </summary>
+    internal static void PreflightDefinition(
+        JsonObject resultContract,
+        string resultsRoot,
+        string repositoryIdentity)
+    {
+        ResultDefinition definition = ReadDefinition(resultContract);
+        ValidateLocator(
+            definition.Source,
+            definition.ArtifactLocator,
+            definition.TrxRelative,
+            definition.ProvenanceRelative,
+            repositoryIdentity,
+            definition.Lane);
+        _ = ResolveSafeResultPath(resultsRoot, definition.TrxRelative);
+        _ = ResolveSafeResultPath(resultsRoot, definition.ProvenanceRelative);
+    }
+
     private static LaneResult ValidateTrx(
         ResultDefinition definition,
         byte[] trxBytes,
@@ -252,6 +272,22 @@ public static class TrxEvidenceReader
         if (selectors.Count == 0)
         {
             throw new GateValidationException(GateReason.MachineResultsInvalid, lane);
+        }
+
+        foreach (string selector in selectors)
+        {
+            string value = selector.StartsWith("class:", StringComparison.Ordinal)
+                ? selector["class:".Length..]
+                : selector.StartsWith("method:", StringComparison.Ordinal)
+                    ? selector["method:".Length..]
+                    : string.Empty;
+            if (value.Length == 0
+                || value.Any(static character => !(char.IsAsciiLetterOrDigit(character)
+                    || character is '_' or '.' or '+' or '`'))
+                || !(char.IsAsciiLetter(value[0]) || value[0] == '_'))
+            {
+                throw new GateValidationException(GateReason.MachineResultsInvalid, lane);
+            }
         }
 
         return new ResultDefinition(

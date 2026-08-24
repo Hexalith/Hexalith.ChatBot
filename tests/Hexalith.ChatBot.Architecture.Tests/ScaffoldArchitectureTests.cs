@@ -766,6 +766,7 @@ public static class ScaffoldArchitectureTests
         string policy = File.ReadAllText(Path.Combine(root, "story-evidence-policy.json"));
         string workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "ci.yml"));
         string releaseWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "release.yml"));
+        string daprInstaller = File.ReadAllText(Path.Combine(root, ".github", "scripts", "install-dapr-cli.sh"));
         string browserPrimarySource = File.ReadAllText(Path.Combine(
             root,
             "tests",
@@ -828,7 +829,9 @@ public static class ScaffoldArchitectureTests
         policy.ShouldContain("\"checked_item_evidence_mismatch\"");
         policy.ShouldContain("\"eventBaseHeadResolution\"");
         policy.ShouldContain("\"pullRequestHead\": \"github.event.pull_request.head.sha\"");
-        policy.ShouldContain("\"zeroOrUnavailablePushBaseFallback\": \"git rev-parse HEAD^\"");
+        policy.ShouldContain("\"zeroPushBaseFallback\": \"git rev-parse HEAD^\"");
+        policy.ShouldContain("\"unavailableNonZeroPushBase\": \"fail\"");
+        policy.ShouldContain("\"nonPushEventRange\": \"github.sha..github.sha\"");
         policy.ShouldNotContain("\"allowedLifecycleBookkeepingFields\"");
         policy.ShouldContain("\"immutableContentSource\": \"git-tree\"");
         policy.ShouldContain("\"worktreeModeSource\": \"git-index\"");
@@ -844,6 +847,9 @@ public static class ScaffoldArchitectureTests
             "\"selector\": \"class:Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests\"");
         policy.ShouldContain(
             "\"selector\": \"class:Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests\"");
+        policy.ShouldContain("\"trx\": \"recovery-primary/live-recovery-validation.trx\"");
+        policy.ShouldContain(
+            "\"provenance\": \"recovery-primary/live-recovery-validation.provenance.json\"");
         policy.ShouldContain("\".github/workflows/ci.yml\"");
         policy.ShouldContain("\".github/workflows/release.yml\"");
         policy.ShouldContain("\"src/Hexalith.ChatBot.AppHost/**\"");
@@ -869,6 +875,7 @@ public static class ScaffoldArchitectureTests
         workflow.ShouldContain("story-evidence-integrity:");
         workflow.ShouldContain("name: story-evidence-integrity");
         workflow.ShouldContain("needs: [build, topology-acceptance]\n    if: always()");
+        workflow.ShouldContain("timeout-minutes: 360");
         workflow.ShouldContain("if: needs.build.result != 'success'");
         workflow.ShouldContain(
             "if: steps.artifacts.outputs.requires_topology == 'true' && needs.topology-acceptance.result != 'success'");
@@ -877,18 +884,55 @@ public static class ScaffoldArchitectureTests
             .Count.ShouldBeGreaterThanOrEqualTo(3);
         workflow.ShouldContain("actions: read");
         workflow.ShouldContain("declare -A seen_lanes=()");
+        workflow.ShouldContain("find tests -type f -name '*.csproj'");
+        workflow.ShouldContain("No test projects were discovered under tests/");
         workflow.ShouldContain("Colliding test lane");
-        workflow.ShouldContain("Detect proposed completion transitions");
-        workflow.ShouldContain("--output \"$TRANSITIONS_PATH\"");
+        workflow.ShouldContain("Non-zero push base %s is unavailable; refusing a one-commit fallback.");
+        workflow.ShouldContain("base_sha=\"$head_sha\"");
+        workflow.ShouldContain("Plan proposed completion production");
+        workflow.ShouldContain("--configuration Release --no-build -- plan");
+        workflow.ShouldContain("--output \"$PRODUCTION_PLAN_PATH\"");
         workflow.ShouldContain("Resolve transition-declared artifact requirements");
-        workflow.ShouldContain("done < <(jq -r '.[].contractPath' \"$TRANSITIONS_PATH\")");
-        workflow.ShouldContain("requires_topology=false");
-        workflow.ShouldContain(".source == \"current-run\" and .lane == \"aspire-dapr-primary\"");
+        workflow.ShouldContain(".requiresTopology");
+        workflow.ShouldContain(".requiresRecovery");
+        workflow.ShouldContain(".retainedLocators[]?");
+        workflow.ShouldNotContain(".source == \"current-run\" and .lane == \"recovery-primary\"");
         workflow.ShouldContain("requires_topology=%s");
+        workflow.ShouldContain("requires_recovery=%s");
         workflow.ShouldContain(
             "- name: Download transition-declared current topology primary result\n"
             + "        if: steps.artifacts.outputs.requires_topology == 'true'");
         workflow.ShouldContain("name: topology-acceptance-evidence");
+        workflow.ShouldContain(
+            "- name: Setup DAPR CLI for transition-declared current recovery primary\n"
+            + "        if: steps.artifacts.outputs.requires_recovery == 'true'");
+        workflow.ShouldContain(
+            "- name: Produce transition-declared current recovery primary result\n"
+            + "        if: steps.artifacts.outputs.requires_recovery == 'true'");
+        workflow.ShouldContain(
+            "--results-directory \"${{ runner.temp }}/raw-recovery-results\"");
+        workflow.ShouldContain(
+            "- name: Stop DAPR runtime for transition-declared current recovery primary\n"
+            + "        if: always() && steps.artifacts.outputs.requires_recovery == 'true'");
+        workflow.ShouldContain("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: \"265\"");
+        workflow.ShouldNotContain("HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT: story-evidence-integrity-reports");
+        workflow.ShouldContain("timeout-minutes: 280");
+        workflow.ShouldContain("elapsed_seconds >= 2400");
+        workflow.ShouldContain("job_start_epoch + (330 * 60)");
+        workflow.ShouldContain("remaining_seconds - 900");
+        workflow.ShouldContain("timeout --signal=INT --kill-after=15m");
+        workflow.ShouldContain("dapr init --runtime-version 1.18.0");
+        workflow.ShouldContain("actions/upload-artifact@v7");
+        workflow.ShouldContain("actions/download-artifact@v8");
+        workflow.ShouldContain(
+            "- name: Setup checksum-pinned DAPR CLI\n"
+            + "        run: bash .github/scripts/install-dapr-cli.sh");
+        daprInstaller.ShouldContain("dapr_version=\"1.18.0\"");
+        daprInstaller.ShouldContain("2a94739e0aa101289d88418225319562bc6800db273b3d9cf819a0efd1ea1bfe");
+        daprInstaller.ShouldContain("sha256sum --check --strict");
+        workflow.ShouldContain("sanitize-recovery-trx");
+        workflow.ShouldContain(
+            "--output \"${{ runner.temp }}/machine-results/recovery-primary/live-recovery-validation.trx\"");
         workflow.ShouldContain(
             "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests."
             + "TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology");
@@ -897,6 +941,11 @@ public static class ScaffoldArchitectureTests
             "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests."
             + "TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology");
         releaseWorkflow.ShouldContain("trx;LogFileName=topology-acceptance.trx");
+        releaseWorkflow.ShouldContain(
+            "semantic-release:\n"
+            + "    needs:\n"
+            + "      - topology-acceptance\n"
+            + "      - live-recovery-evidence-gate");
         workflow.ShouldContain(
             "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests."
             + "LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate");
@@ -915,10 +964,36 @@ public static class ScaffoldArchitectureTests
         workflow.ShouldContain(
             "- name: Verify topology producer artifact binds the exact event head when transition-declared\n"
             + "        if: steps.artifacts.outputs.requires_topology == 'true'");
-        workflow.IndexOf("Resolve exact transition bounds", StringComparison.Ordinal)
-            .ShouldBeLessThan(workflow.IndexOf("Detect proposed completion transitions", StringComparison.Ordinal));
-        workflow.IndexOf("Detect proposed completion transitions", StringComparison.Ordinal)
-            .ShouldBeLessThan(workflow.IndexOf("Collect transition-declared retained exact-run artifacts", StringComparison.Ordinal));
+        int resolveBoundsIndex = workflow.IndexOf("Resolve exact transition bounds", StringComparison.Ordinal);
+        int detectTransitionsIndex = workflow.IndexOf("Plan proposed completion production", StringComparison.Ordinal);
+        int collectArtifactsIndex = workflow.IndexOf(
+            "Collect transition-declared retained exact-run artifacts",
+            StringComparison.Ordinal);
+        int produceCurrentRecoveryIndex = workflow.IndexOf(
+            "Produce transition-declared current recovery primary result",
+            StringComparison.Ordinal);
+        int stopCurrentRecoveryIndex = workflow.IndexOf(
+            "Stop DAPR runtime for transition-declared current recovery primary",
+            StringComparison.Ordinal);
+        int sanitizeCurrentRecoveryIndex = workflow.IndexOf(
+            "Project recovery result into metadata-only completion TRX",
+            StringComparison.Ordinal);
+        int attestTransitionsIndex = workflow.IndexOf(
+            "Attest and evaluate proposed completion transitions",
+            StringComparison.Ordinal);
+        resolveBoundsIndex.ShouldBeGreaterThanOrEqualTo(0);
+        detectTransitionsIndex.ShouldBeGreaterThanOrEqualTo(0);
+        collectArtifactsIndex.ShouldBeGreaterThanOrEqualTo(0);
+        produceCurrentRecoveryIndex.ShouldBeGreaterThanOrEqualTo(0);
+        stopCurrentRecoveryIndex.ShouldBeGreaterThanOrEqualTo(0);
+        sanitizeCurrentRecoveryIndex.ShouldBeGreaterThanOrEqualTo(0);
+        attestTransitionsIndex.ShouldBeGreaterThanOrEqualTo(0);
+        resolveBoundsIndex.ShouldBeLessThan(detectTransitionsIndex);
+        detectTransitionsIndex.ShouldBeLessThan(produceCurrentRecoveryIndex);
+        produceCurrentRecoveryIndex.ShouldBeLessThan(stopCurrentRecoveryIndex);
+        stopCurrentRecoveryIndex.ShouldBeLessThan(sanitizeCurrentRecoveryIndex);
+        sanitizeCurrentRecoveryIndex.ShouldBeLessThan(collectArtifactsIndex);
+        collectArtifactsIndex.ShouldBeLessThan(attestTransitionsIndex);
         Regex.Matches(workflow, "producer-head\\.sha").Count.ShouldBeGreaterThanOrEqualTo(4);
         toolProgram.ShouldContain("GITHUB_STEP_SUMMARY");
         toolProgram.ShouldContain("\"ci\" => RunCi");

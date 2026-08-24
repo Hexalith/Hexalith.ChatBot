@@ -12,6 +12,8 @@ public sealed class CommandArguments
                 "repository-root", "policy", "story", "contract", "target-status", "base", "head", "results", "report"),
             ["attest"] = Set("repository-root", "policy", "contract", "base", "head", "results"),
             ["detect"] = Set("repository-root", "base", "head", "output"),
+            ["plan"] = Set("repository-root", "policy", "base", "head", "results", "output"),
+            ["sanitize-recovery-trx"] = Set("repository-root", "input", "output"),
             ["ci"] = Set("repository-root", "policy", "base", "head", "results", "report-directory"),
         };
 

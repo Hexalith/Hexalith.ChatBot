@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 using Hexalith.ChatBot.Server.Audit;
 
 using Shouldly;
@@ -124,12 +126,16 @@ public static class LiveRecoveryValidationArchitectureTests
         int prefixStart = policy.IndexOf("ReplayTestTenantPrefix = \"", StringComparison.Ordinal);
         prefixStart.ShouldBeGreaterThan(-1);
         prefixStart += "ReplayTestTenantPrefix = \"".Length;
-        string prefix = policy[prefixStart..policy.IndexOf('"', prefixStart)];
+        int prefixEnd = policy.IndexOf('"', prefixStart);
+        prefixEnd.ShouldBeGreaterThan(-1);
+        string prefix = policy[prefixStart..prefixEnd];
         prefix.ShouldBe("replay-test:");
 
         // Doubly opted in: `Enabled=true` alone must never compose the destructive sandbox.
-        composer.ShouldContain("Development");
-        composer.ShouldContain("Testing");
+        Regex.IsMatch(
+            composer,
+            @"\(!string\.Equals\(environmentName,\s*""Development"",\s*StringComparison\.OrdinalIgnoreCase\)\s*&&\s*!string\.Equals\(environmentName,\s*""Testing"",\s*StringComparison\.OrdinalIgnoreCase\)\)",
+            RegexOptions.CultureInvariant).ShouldBeTrue("Development and Testing must be joined by AND in the fail-closed environment guard.");
         composer.ShouldNotContain("WithExternalHttpEndpoints");
         sandbox.ShouldContain("RecoveryScopedOutageState.Contains(dependency)");
         sandbox.ShouldContain("RecoverySandboxAuthorization.Authorized(");
@@ -150,6 +156,15 @@ public static class LiveRecoveryValidationArchitectureTests
             source.ShouldContain("LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate");
             source.ShouldContain("if: always()");
             source.ShouldContain("path: TestResults");
+            source.ShouldContain("Initialize metadata-only live recovery attempt envelope");
+            source.ShouldContain("Finalize metadata-only live recovery attempt envelope");
+            source.ShouldContain("live-recovery-producer-attempt");
+            source.ShouldContain("if-no-files-found: error");
+            source.ShouldContain("actions/upload-artifact@v7");
+            source.ShouldContain("actions/download-artifact@v8");
+            source.ShouldContain("bash .github/scripts/install-dapr-cli.sh");
+            source.ShouldContain("dapr init --runtime-version 1.18.0");
+            source.ShouldNotContain("dapr/setup-dapr@v2");
         }
 
         string ci = ReadProjectFile(".github/workflows/ci.yml");
@@ -194,7 +209,7 @@ public static class LiveRecoveryValidationArchitectureTests
             source.ShouldContain("needs: live-recovery-validation");
             // Producer failure must still reach the independent judge; skip only when the producer was skipped.
             source.ShouldContain("if: always() && needs.live-recovery-validation.result != 'skipped'");
-            source.ShouldContain("actions/download-artifact@v4");
+            source.ShouldContain("actions/download-artifact@v8");
             source.ShouldContain("RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess");
             source.ShouldContain("HEXALITH_CHATBOT_RECOVERY_EVIDENCE_REQUIRED");
 

@@ -41,10 +41,10 @@ public static partial class EvidenceJson
                 "name", "titleSource", "statusSource", "tasksSection", "acceptanceSection", "fileListSection"),
             ["eventBaseHeadResolution"] = Set(
                 "schemaVersion", "pullRequestBase", "pullRequestHead", "pushBase", "pushHead",
-                "zeroOrUnavailablePushBaseFallback"),
+                "zeroPushBaseFallback", "unavailableNonZeroPushBase", "nonPushEventRange"),
             ["primaryPathTriggers"] = Set(
                 "class", "pathPatterns", "claimPatterns", "recognizedLanes", "recognizedLaneBindings"),
-            ["recognizedLaneBindings"] = Set("lane", "selector", "sources"),
+            ["recognizedLaneBindings"] = Set("lane", "selector", "trx", "provenance", "sources"),
             ["metadataOnly"] = Set(
                 "forbiddenFieldNames", "allowedArtifactFields", "allowedLocatorSchemes", "maximumStringLength",
                 "redactedFailureSubject"),

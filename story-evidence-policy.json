@@ -46,7 +46,9 @@
     "pullRequestHead": "github.event.pull_request.head.sha",
     "pushBase": "github.event.before",
     "pushHead": "github.sha",
-    "zeroOrUnavailablePushBaseFallback": "git rev-parse HEAD^"
+    "zeroPushBaseFallback": "git rev-parse HEAD^",
+    "unavailableNonZeroPushBase": "fail",
+    "nonPushEventRange": "github.sha..github.sha"
   },
   "sourceDigest": {
     "algorithm": "SHA-256",
@@ -178,9 +180,10 @@
         {
           "lane": "recovery-primary",
           "selector": "class:Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests",
+          "trx": "recovery-primary/live-recovery-validation.trx",
+          "provenance": "recovery-primary/live-recovery-validation.provenance.json",
           "sources": [
-            "current-run",
-            "retained"
+            "current-run"
           ]
         }
       ]

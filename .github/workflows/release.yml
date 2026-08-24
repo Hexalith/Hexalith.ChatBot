@@ -27,6 +27,8 @@ jobs:
     name: required Aspire + DAPR topology acceptance
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     env:
       HEXALITH_CHATBOT_TIER3: "1"
       HEXALITH_CHATBOT_TIER3_REQUIRED: "1"
@@ -42,10 +44,10 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.302
-      - name: Setup DAPR CLI
-        uses: dapr/setup-dapr@v2
+      - name: Setup checksum-pinned DAPR CLI
+        run: bash .github/scripts/install-dapr-cli.sh
       - name: Initialize DAPR runtime
-        run: dapr init
+        run: dapr init --runtime-version 1.18.0
       - name: Record DAPR runtime state
         run: docker ps --format '{{.Names}}\t{{.Status}}\t{{.Ports}}' --filter name=dapr_
       # This step is the M2 stop-ship gate (Story 12.14, AC3), not only a topology smoke test. Its final leg polls the
@@ -67,7 +69,7 @@ jobs:
           --results-directory TestResults
       - name: Upload topology acceptance evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-topology-acceptance-evidence
           path: TestResults
@@ -105,6 +107,22 @@ jobs:
       HEXALITH_CHATBOT_TIER3_REQUIRED: "1"
       ChatBotServiceGrants__LifetimeDays: "90"
     steps:
+      - name: Initialize metadata-only live recovery attempt envelope
+        env:
+          ATTEMPT_PATH: TestResults/workflow-attempt/producer-attempt.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$ATTEMPT_PATH")"
+          jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg commit "$GITHUB_SHA" \
+            --arg workflow "$GITHUB_WORKFLOW" \
+            --arg job "$GITHUB_JOB" \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg startedAtUtc "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            '{schemaVersion:"1.0",kind:"live-recovery-producer-attempt",repository:$repository,commit:$commit,workflow:$workflow,job:$job,runId:$runId,runAttempt:$runAttempt,startedAtUtc:$startedAtUtc,completedAtUtc:null,producerOutcome:"not-started"}' \
+            > "$ATTEMPT_PATH"
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -115,11 +133,12 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.302
-      - name: Setup DAPR CLI
-        uses: dapr/setup-dapr@v2
+      - name: Setup checksum-pinned DAPR CLI
+        run: bash .github/scripts/install-dapr-cli.sh
       - name: Initialize DAPR runtime
-        run: dapr init
+        run: dapr init --runtime-version 1.18.0
       - name: Run all live recovery coordinators and retain evidence
+        id: recovery
         run: >-
           dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
           -m:1
@@ -129,13 +148,28 @@ jobs:
           --settings live-recovery.runsettings
           --logger "trx;LogFileName=live-recovery-validation.trx"
           --results-directory TestResults
+      - name: Finalize metadata-only live recovery attempt envelope
+        if: always()
+        env:
+          ATTEMPT_PATH: TestResults/workflow-attempt/producer-attempt.json
+          PRODUCER_OUTCOME: ${{ steps.recovery.outcome }}
+        run: |
+          set -euo pipefail
+          temporary_path="${ATTEMPT_PATH}.tmp"
+          jq \
+            --arg completedAtUtc "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --arg producerOutcome "${PRODUCER_OUTCOME:-skipped}" \
+            '.completedAtUtc=$completedAtUtc | .producerOutcome=$producerOutcome' \
+            "$ATTEMPT_PATH" > "$temporary_path"
+          mv "$temporary_path" "$ATTEMPT_PATH"
       - name: Upload live recovery reports, manifests, and raw test evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-live-recovery-validation-evidence
           path: TestResults
           retention-days: 30
+          if-no-files-found: error
       - name: Stop DAPR runtime
         if: always()
         run: dapr uninstall --all
@@ -177,7 +211,7 @@ jobs:
         with:
           dotnet-version: 10.0.302
       - name: Download retained live recovery evidence
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-live-recovery-validation-evidence
           path: RetainedEvidence
@@ -193,7 +227,7 @@ jobs:
           --results-directory GateResults
       - name: Upload the gate decision
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-live-recovery-evidence-gate-decision
           path: GateResults

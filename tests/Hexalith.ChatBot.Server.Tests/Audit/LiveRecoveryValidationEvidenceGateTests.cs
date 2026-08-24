@@ -270,11 +270,22 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
     }
 
     [Fact]
-    public void AManifestWithNullMembersYieldsAReasonCodeRatherThanAnException()
+    public void AManifestWithANullRunIdYieldsAReasonCodeRatherThanAnException()
     {
         LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
         RecoveryValidationEvidenceManifest[] evidence = complete.Evidence.ToArray();
-        evidence[0] = evidence[0] with { RunId = null!, Assertions = null! };
+        evidence[0] = evidence[0] with { RunId = null! };
+
+        Should.NotThrow(() => Evaluate(complete with { Evidence = evidence }))
+            .StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:invalid_evidence");
+    }
+
+    [Fact]
+    public void AManifestWithNullAssertionsYieldsAReasonCodeRatherThanAnException()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        RecoveryValidationEvidenceManifest[] evidence = complete.Evidence.ToArray();
+        evidence[0] = evidence[0] with { Assertions = null! };
 
         Should.NotThrow(() => Evaluate(complete with { Evidence = evidence }))
             .StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.Continuity}:invalid_evidence");
@@ -283,7 +294,7 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
     [Fact]
     public void AManifestInvalidOnlyViaANonDictionaryFieldIsExcludedFromJobGradingNotJustInvalidEvidence()
     {
-        // AManifestWithNullMembersYieldsAReasonCodeRatherThanAnException nulls a dictionary, which the older
+        // AManifestWithNullAssertionsYieldsAReasonCodeRatherThanAnException nulls a dictionary, which the older
         // null-dictionary check inside EvaluateJob already excludes regardless of Validate(). This corrupts only a
         // non-dictionary field (RunId) with every dictionary intact and a safety assertion deliberately false, so
         // only the newer Validate()-based invalidManifests exclusion — not the null-dictionary check — can be
@@ -531,6 +542,7 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
             evidence.Add(manifest);
         }
 
+        mutated.ShouldBeTrue($"No manifest was found for live recovery job '{jobId}'.");
         return complete with { Evidence = evidence };
     }
 

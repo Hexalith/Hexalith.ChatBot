@@ -148,6 +148,229 @@ public static class StoryEvidenceValidator
         _ = EvidenceJson.RequiredStoryKey(contract);
     }
 
+    internal static ScopeEvaluation PreflightProductionContract(GateOptions options, JsonObject policy, JsonObject contract)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(policy);
+        ArgumentNullException.ThrowIfNull(contract);
+        ValidatePinnedPolicy(policy);
+        ValidateAttestationContract(contract);
+        string storyKey = EvidenceJson.RequiredStoryKey(contract);
+        string expectedContractPath = $"_bmad-output/implementation-artifacts/evidence/{storyKey}.json";
+        if (!NormalizePath(Path.GetRelativePath(options.RepositoryRoot, options.ContractPath))
+                .Equals(expectedContractPath, StringComparison.Ordinal))
+        {
+            throw new GateValidationException(GateReason.StatusMismatch, "contract-path");
+        }
+
+        StoryRecord story = MarkdownStoryReader.Read(options.StoryPath);
+        if (story.FileList.Count == 0)
+        {
+            throw new GateValidationException(GateReason.FileListDiffMismatch, "file-list-section");
+        }
+
+        if (story.MandatoryItems.Count == 0 || !story.MandatoryItems.SetEquals(story.CheckedItems))
+        {
+            throw new GateValidationException(GateReason.CheckedItemEvidenceMismatch, "unchecked-mandatory-item");
+        }
+
+        ValidateStatus(options, contract, story);
+        ScopeEvaluation scope = ScopeEvaluator.Evaluate(
+            options.RepositoryRoot,
+            policy,
+            contract,
+            options.BaseCommit.ToLowerInvariant(),
+            options.HeadCommit.ToLowerInvariant());
+        IReadOnlySet<string> changedPaths = ScopeEvaluator.FileListPaths(scope);
+        if (!story.FileList.SetEquals(changedPaths))
+        {
+            throw new GateValidationException(GateReason.FileListDiffMismatch, "file-list");
+        }
+
+        string declaredDigest = EvidenceJson.RequiredString(
+            EvidenceJson.RequiredObject(contract, "scope", GateReason.ScopeDigestMismatch),
+            "implementationDigest",
+            GateReason.ScopeDigestMismatch);
+        if (!declaredDigest.Equals(scope.Digest, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new GateValidationException(GateReason.ScopeDigestMismatch, "implementation-digest");
+        }
+
+        LifecycleTransitionValidator.Validate(
+            options.RepositoryRoot,
+            contract,
+            options.BaseCommit,
+            options.HeadCommit,
+            scope.EventPaths);
+        string scopeMode = EvidenceJson.RequiredString(
+            EvidenceJson.RequiredObject(contract, "scope", GateReason.ScopeDigestMismatch),
+            "mode",
+            GateReason.ScopeDigestMismatch);
+        IReadOnlySet<string> primaryTriggerPaths = scopeMode.Equals(
+            "snapshot-plus-transition",
+            StringComparison.Ordinal)
+            ? ScopeEvaluator.EventPaths(scope)
+            : changedPaths;
+        ValidateProductionDeclarations(
+            options.ResultsRoot,
+            policy,
+            contract,
+            story,
+            primaryTriggerPaths);
+        ValidateMappingDeclarations(contract, story, changedPaths);
+        return scope;
+    }
+
+    private static void ValidateProductionDeclarations(
+        string resultsRoot,
+        JsonObject policy,
+        JsonObject contract,
+        StoryRecord story,
+        IReadOnlySet<string> primaryTriggerPaths)
+    {
+        JsonArray results = EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid);
+        if (results.Count == 0)
+        {
+            throw new GateValidationException(GateReason.MachineResultsInvalid, "results");
+        }
+
+        Dictionary<string, JsonObject> resultContracts = new(StringComparer.Ordinal);
+        HashSet<string> resultPaths = new(StringComparer.OrdinalIgnoreCase);
+        string repositoryIdentity = EvidenceJson.RequiredString(
+            policy,
+            "repositoryIdentity",
+            GateReason.EvidenceStaleOrUnbound);
+        foreach (JsonNode? node in results)
+        {
+            JsonObject result = node as JsonObject
+                ?? throw new GateValidationException(GateReason.MachineResultsInvalid, "results");
+            TrxEvidenceReader.PreflightDefinition(result, resultsRoot, repositoryIdentity);
+            string lane = EvidenceJson.RequiredString(result, "lane", GateReason.MachineResultsInvalid);
+            if (!resultContracts.TryAdd(lane, result))
+            {
+                throw new GateValidationException(GateReason.MachineResultsInvalid, "duplicate-lane");
+            }
+
+            string trxPath = TrxEvidenceReader.ResolveSafeResultPath(
+                resultsRoot,
+                EvidenceJson.RequiredString(result, "trx", GateReason.MachineResultsInvalid));
+            string provenancePath = TrxEvidenceReader.ResolveSafeResultPath(
+                resultsRoot,
+                EvidenceJson.RequiredString(result, "provenance", GateReason.EvidenceStaleOrUnbound));
+            if (!resultPaths.Add(trxPath) || !resultPaths.Add(provenancePath))
+            {
+                throw new GateValidationException(GateReason.EvidenceStaleOrUnbound, "result-path-collision");
+            }
+        }
+
+        Dictionary<string, JsonObject> triggers = new(StringComparer.Ordinal);
+        HashSet<string> requiredClasses = new(StringComparer.Ordinal);
+        foreach (JsonNode? node in EvidenceJson.RequiredArray(
+                     policy,
+                     "primaryPathTriggers",
+                     GateReason.PrimaryPathNotExecuted))
+        {
+            JsonObject trigger = node as JsonObject
+                ?? throw new GateValidationException(GateReason.PrimaryPathNotExecuted, "primaryPathTriggers");
+            string pathClass = EvidenceJson.RequiredString(trigger, "class", GateReason.PrimaryPathNotExecuted);
+            triggers[pathClass] = trigger;
+            IReadOnlyList<string> patterns = EvidenceJson.RequiredStrings(
+                trigger,
+                "pathPatterns",
+                GateReason.PrimaryPathNotExecuted);
+            IReadOnlyList<string> claims = EvidenceJson.RequiredStrings(
+                trigger,
+                "claimPatterns",
+                GateReason.PrimaryPathNotExecuted);
+            if (primaryTriggerPaths.Any(path => patterns.Any(pattern => GlobMatch(path, pattern)))
+                || claims.Any(claim => story.EvidenceText.Contains(claim, StringComparison.OrdinalIgnoreCase)))
+            {
+                requiredClasses.Add(pathClass);
+            }
+        }
+
+        Dictionary<string, string> declarations = new(StringComparer.Ordinal);
+        foreach (JsonNode? node in EvidenceJson.RequiredArray(
+                     contract,
+                     "primaryPaths",
+                     GateReason.PrimaryPathNotExecuted))
+        {
+            JsonObject declaration = node as JsonObject
+                ?? throw new GateValidationException(GateReason.PrimaryPathNotExecuted, "primaryPaths");
+            string pathClass = EvidenceJson.RequiredString(declaration, "class", GateReason.PrimaryPathNotExecuted);
+            string lane = EvidenceJson.RequiredString(declaration, "lane", GateReason.PrimaryPathNotExecuted);
+            if (!declarations.TryAdd(pathClass, lane))
+            {
+                throw new GateValidationException(GateReason.PrimaryPathNotExecuted, pathClass);
+            }
+
+            requiredClasses.Add(pathClass);
+        }
+
+        foreach (string requiredClass in requiredClasses)
+        {
+            if (!triggers.TryGetValue(requiredClass, out JsonObject? trigger)
+                || !declarations.TryGetValue(requiredClass, out string? laneName)
+                || !EvidenceJson.RequiredStrings(
+                        trigger,
+                        "recognizedLanes",
+                        GateReason.PrimaryPathNotExecuted)
+                    .Contains(laneName, StringComparer.Ordinal)
+                || !resultContracts.TryGetValue(laneName, out JsonObject? result))
+            {
+                throw new GateValidationException(GateReason.PrimaryPathNotExecuted, requiredClass);
+            }
+
+            JsonObject binding = EvidenceJson.RequiredArray(
+                trigger,
+                "recognizedLaneBindings",
+                GateReason.PrimaryPathNotExecuted)[0]!.AsObject();
+            string? pinnedTrx = binding["trx"] is null
+                ? null
+                : EvidenceJson.RequiredString(binding, "trx", GateReason.PrimaryPathNotExecuted);
+            string? pinnedProvenance = binding["provenance"] is null
+                ? null
+                : EvidenceJson.RequiredString(binding, "provenance", GateReason.PrimaryPathNotExecuted);
+            if (!EvidenceJson.RequiredString(binding, "lane", GateReason.PrimaryPathNotExecuted)
+                    .Equals(laneName, StringComparison.Ordinal)
+                || !string.Equals(
+                    EvidenceJson.RequiredNullableString(result, "primaryPathClass", GateReason.PrimaryPathNotExecuted),
+                    requiredClass,
+                    StringComparison.Ordinal)
+                || !EvidenceJson.RequiredStrings(result, "selectors", GateReason.PrimaryPathNotExecuted)
+                    .Contains(
+                        EvidenceJson.RequiredString(binding, "selector", GateReason.PrimaryPathNotExecuted),
+                        StringComparer.Ordinal)
+                || !EvidenceJson.RequiredStrings(binding, "sources", GateReason.PrimaryPathNotExecuted)
+                    .Contains(
+                        EvidenceJson.RequiredString(result, "source", GateReason.EvidenceStaleOrUnbound),
+                        StringComparer.Ordinal)
+                || (pinnedTrx is not null
+                    && !EvidenceJson.RequiredString(result, "trx", GateReason.PrimaryPathNotExecuted)
+                        .Equals(pinnedTrx, StringComparison.Ordinal))
+                || (pinnedProvenance is not null
+                    && !EvidenceJson.RequiredString(result, "provenance", GateReason.PrimaryPathNotExecuted)
+                        .Equals(pinnedProvenance, StringComparison.Ordinal)))
+            {
+                throw new GateValidationException(GateReason.PrimaryPathNotExecuted, requiredClass);
+            }
+        }
+
+        foreach ((string laneName, JsonObject result) in resultContracts)
+        {
+            string? primaryPathClass = EvidenceJson.RequiredNullableString(
+                result,
+                "primaryPathClass",
+                GateReason.PrimaryPathNotExecuted);
+            if (primaryPathClass is not null
+                && (!declarations.TryGetValue(primaryPathClass, out string? declaredLane)
+                    || !declaredLane.Equals(laneName, StringComparison.Ordinal)))
+            {
+                throw new GateValidationException(GateReason.PrimaryPathNotExecuted, primaryPathClass);
+            }
+        }
+    }
+
     internal static void ValidatePinnedPolicy(JsonObject policy)
     {
         string policyVersion = EvidenceJson.RequiredString(policy, "schemaVersion", GateReason.ScopeDigestMismatch);
@@ -236,7 +459,14 @@ public static class StoryEvidenceValidator
 
     private static void ValidatePrimaryPolicy(JsonObject policy)
     {
-        Dictionary<string, (string[] Paths, string Claim, string Lane, string Selector, string[] Sources)> expected =
+        Dictionary<string, (
+            string[] Paths,
+            string Claim,
+            string Lane,
+            string Selector,
+            string? Trx,
+            string? Provenance,
+            string[] Sources)> expected =
             new(StringComparer.Ordinal)
             {
                 ["browser"] = (
@@ -244,18 +474,24 @@ public static class StoryEvidenceValidator
                     "[claim:browser]",
                     "browser-primary",
                     "class:Hexalith.ChatBot.UI.E2E.Tests.RealRenderCrossSurfaceE2ETests",
+                    null,
+                    null,
                     ["current-run"]),
                 ["signalr"] = (
                     ["src/**/*Hub*.cs", "src/**/*SignalR*.cs", "tests/**/*SignalR*.cs"],
                     "[claim:signalr]",
                     "signalr-primary",
                     "class:Hexalith.ChatBot.Server.Tests.Projections.ChatBotProjectConversationHubE2ETests",
+                    null,
+                    null,
                     ["current-run"]),
                 ["hosting-assets"] = (
                     ["src/**/*AppHost*", "src/**/wwwroot/**", "src/**/*.css", "src/**/App.razor"],
                     "[claim:hosting-assets]",
                     "hosting-assets-primary",
                     "class:Hexalith.ChatBot.UI.E2E.Tests.FrontComposerShellIntegrationE2ETests",
+                    null,
+                    null,
                     ["current-run"]),
                 ["aspire-dapr"] = (
                     [
@@ -265,13 +501,17 @@ public static class StoryEvidenceValidator
                     "[claim:aspire-dapr]",
                     "aspire-dapr-primary",
                     "class:Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests",
+                    null,
+                    null,
                     ["current-run"]),
                 ["recovery"] = (
                     ["tests/**/Recovery/**", ".github/workflows/ci.yml", ".github/workflows/release.yml"],
                     "[claim:recovery]",
                     "recovery-primary",
                     "class:Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests",
-                    ["current-run", "retained"]),
+                    "recovery-primary/live-recovery-validation.trx",
+                    "recovery-primary/live-recovery-validation.provenance.json",
+                    ["current-run"]),
             };
         JsonArray triggers = EvidenceJson.RequiredArray(policy, "primaryPathTriggers", GateReason.ScopeDigestMismatch);
         if (triggers.Count != expected.Count)
@@ -305,12 +545,25 @@ public static class StoryEvidenceValidator
                     .Equals(configured.Lane, StringComparison.Ordinal)
                 || !EvidenceJson.RequiredString(binding, "selector", GateReason.ScopeDigestMismatch)
                     .Equals(configured.Selector, StringComparison.Ordinal)
+                || !OptionalPinnedString(binding, "trx", configured.Trx)
+                || !OptionalPinnedString(binding, "provenance", configured.Provenance)
                 || !EvidenceJson.RequiredStrings(binding, "sources", GateReason.ScopeDigestMismatch)
                     .SequenceEqual(configured.Sources, StringComparer.Ordinal))
             {
                 throw new GateValidationException(GateReason.ScopeDigestMismatch, "primary-lane-policy");
             }
         }
+    }
+
+    private static bool OptionalPinnedString(JsonObject value, string name, string? expected)
+    {
+        if (expected is null)
+        {
+            return !value.ContainsKey(name);
+        }
+
+        return EvidenceJson.RequiredString(value, name, GateReason.ScopeDigestMismatch)
+            .Equals(expected, StringComparison.Ordinal);
     }
 
     private static void ValidateMetadataPolicy(JsonObject policy)
@@ -414,9 +667,19 @@ public static class StoryEvidenceValidator
                 .Equals("github.sha", StringComparison.Ordinal)
             || !EvidenceJson.RequiredString(
                     resolution,
-                    "zeroOrUnavailablePushBaseFallback",
+                    "zeroPushBaseFallback",
                     GateReason.ScopeDigestMismatch)
-                .Equals("git rev-parse HEAD^", StringComparison.Ordinal))
+                .Equals("git rev-parse HEAD^", StringComparison.Ordinal)
+            || !EvidenceJson.RequiredString(
+                    resolution,
+                    "unavailableNonZeroPushBase",
+                    GateReason.ScopeDigestMismatch)
+                .Equals("fail", StringComparison.Ordinal)
+            || !EvidenceJson.RequiredString(
+                    resolution,
+                    "nonPushEventRange",
+                    GateReason.ScopeDigestMismatch)
+                .Equals("github.sha..github.sha", StringComparison.Ordinal))
         {
             throw new GateValidationException(GateReason.ScopeDigestMismatch, "event-base-head-resolution");
         }
@@ -582,7 +845,11 @@ public static class StoryEvidenceValidator
         IReadOnlyList<LaneResult> lanes)
     {
         Dictionary<string, IReadOnlySet<string>> recognizedLanes = new(StringComparer.Ordinal);
-        Dictionary<string, (string Selector, IReadOnlySet<string> Sources)> recognizedBindings = new(StringComparer.Ordinal);
+        Dictionary<string, (
+            string Selector,
+            string? Trx,
+            string? Provenance,
+            IReadOnlySet<string> Sources)> recognizedBindings = new(StringComparer.Ordinal);
         HashSet<string> requiredClasses = new(StringComparer.Ordinal);
         JsonArray triggers = EvidenceJson.RequiredArray(
             policy,
@@ -606,6 +873,12 @@ public static class StoryEvidenceValidator
                 GateReason.PrimaryPathNotExecuted)[0]!.AsObject();
             recognizedBindings[pathClass] = (
                 EvidenceJson.RequiredString(binding, "selector", GateReason.PrimaryPathNotExecuted),
+                binding["trx"] is null
+                    ? null
+                    : EvidenceJson.RequiredString(binding, "trx", GateReason.PrimaryPathNotExecuted),
+                binding["provenance"] is null
+                    ? null
+                    : EvidenceJson.RequiredString(binding, "provenance", GateReason.PrimaryPathNotExecuted),
                 EvidenceJson.RequiredStrings(binding, "sources", GateReason.PrimaryPathNotExecuted)
                     .ToHashSet(StringComparer.Ordinal));
             IReadOnlyList<string> claims = EvidenceJson.RequiredStrings(
@@ -636,13 +909,26 @@ public static class StoryEvidenceValidator
         }
 
         List<PrimaryPathVerdict> verdicts = [];
+        JsonArray resultContracts = EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid);
         foreach (string requiredClass in requiredClasses.Order(StringComparer.Ordinal))
         {
+            JsonObject? laneContract = resultContracts
+                .OfType<JsonObject>()
+                .SingleOrDefault(candidate => declarations.TryGetValue(requiredClass, out string? declared)
+                    && EvidenceJson.RequiredString(candidate, "lane", GateReason.MachineResultsInvalid)
+                        .Equals(declared, StringComparison.Ordinal));
             if (!declarations.TryGetValue(requiredClass, out string? laneName)
                 || !recognizedLanes.TryGetValue(requiredClass, out IReadOnlySet<string>? allowed)
                 || !allowed.Contains(laneName)
                 || !recognizedBindings.TryGetValue(requiredClass, out var binding)
                 || lanes.SingleOrDefault(lane => lane.Lane.Equals(laneName, StringComparison.Ordinal)) is not LaneResult lane
+                || laneContract is null
+                || (binding.Trx is not null
+                    && !EvidenceJson.RequiredString(laneContract, "trx", GateReason.PrimaryPathNotExecuted)
+                        .Equals(binding.Trx, StringComparison.Ordinal))
+                || (binding.Provenance is not null
+                    && !EvidenceJson.RequiredString(laneContract, "provenance", GateReason.PrimaryPathNotExecuted)
+                        .Equals(binding.Provenance, StringComparison.Ordinal))
                 || !string.Equals(lane.PrimaryPathClass, requiredClass, StringComparison.Ordinal)
                 || !lane.Selectors.Contains(binding.Selector, StringComparer.Ordinal)
                 || !binding.Sources.Contains(lane.Source)
@@ -719,6 +1005,47 @@ public static class StoryEvidenceValidator
         }
 
         return (story.CheckedItems.Count, mappedIds.Count);
+    }
+
+    private static void ValidateMappingDeclarations(
+        JsonObject contract,
+        StoryRecord story,
+        IReadOnlySet<string> changedPaths)
+    {
+        JsonArray mappings = EvidenceJson.RequiredArray(
+            contract,
+            "mappings",
+            GateReason.CheckedItemEvidenceMismatch);
+        HashSet<string> mappedIds = new(StringComparer.Ordinal);
+        foreach (JsonNode? node in mappings)
+        {
+            JsonObject mapping = node as JsonObject
+                ?? throw new GateValidationException(GateReason.CheckedItemEvidenceMismatch, "mappings");
+            string id = EvidenceJson.RequiredString(mapping, "id", GateReason.CheckedItemEvidenceMismatch);
+            string kind = EvidenceJson.RequiredString(mapping, "kind", GateReason.CheckedItemEvidenceMismatch);
+            IReadOnlyList<string> paths = EvidenceJson.RequiredStrings(
+                mapping,
+                "paths",
+                GateReason.CheckedItemEvidenceMismatch);
+            IReadOnlyList<string> assertions = EvidenceJson.RequiredStrings(
+                mapping,
+                "assertions",
+                GateReason.CheckedItemEvidenceMismatch);
+            if (!mappedIds.Add(id)
+                || !story.MandatoryItems.Contains(id)
+                || (kind.Equals("task", StringComparison.Ordinal) != id.StartsWith("task-", StringComparison.Ordinal))
+                || (kind.Equals("acceptanceCriterion", StringComparison.Ordinal) != id.StartsWith("ac-", StringComparison.Ordinal))
+                || (paths.Count == 0 && assertions.Count == 0)
+                || paths.Any(path => !changedPaths.Contains(NormalizePath(path))))
+            {
+                throw new GateValidationException(GateReason.CheckedItemEvidenceMismatch, id);
+            }
+        }
+
+        if (!mappedIds.SetEquals(story.MandatoryItems))
+        {
+            throw new GateValidationException(GateReason.CheckedItemEvidenceMismatch, "mapping-coverage");
+        }
     }
 
     private static bool GlobMatch(string path, string pattern)

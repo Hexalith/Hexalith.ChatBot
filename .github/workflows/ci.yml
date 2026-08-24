@@ -64,7 +64,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t projects < <(find tests -mindepth 2 -maxdepth 2 -name '*.csproj' -print | sort)
+          mapfile -t projects < <(find tests -type f -name '*.csproj' -print | sort)
+          if (( ${#projects[@]} == 0 )); then
+            printf 'No test projects were discovered under tests/.\n' >&2
+            exit 1
+          fi
           declare -A seen_lanes=()
           for project in "${projects[@]}"; do
             lane="$(basename "${project%.csproj}")"
@@ -87,7 +91,7 @@ jobs:
           printf '%s\n' "$(git rev-parse HEAD)" > TestResults/producer-head.sha
       - name: Upload collision-safe machine results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: machine-test-results
           path: TestResults
@@ -98,10 +102,16 @@ jobs:
     needs: [build, topology-acceptance]
     if: always()
     runs-on: ubuntu-latest
+    # The recovery producer has a 265-minute in-process deadline. It may start only
+    # within the first 40 minutes, preserving 15 minutes to unwind and 30 minutes
+    # for cleanup, sanitization, attestation, validation, and upload.
+    timeout-minutes: 360
     permissions:
       contents: read
       actions: read
     steps:
+      - name: Record completion job budget origin
+        run: date +%s > "${{ runner.temp }}/story-evidence-job-start.epoch"
       - name: Checkout full transition history
         uses: actions/checkout@v4
         with:
@@ -118,7 +128,7 @@ jobs:
         if: needs.build.result != 'success'
         run: exit 1
       - name: Download machine results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: machine-test-results
           path: ${{ runner.temp }}/machine-results
@@ -142,12 +152,24 @@ jobs:
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             base_sha="$PR_BASE"
             head_sha="$PR_HEAD"
-          elif [[ -n "${PUSH_BASE:-}" && ! "$PUSH_BASE" =~ ^0+$ ]] && git cat-file -e "${PUSH_BASE}^{commit}"; then
-            base_sha="$PUSH_BASE"
+          elif [[ "$EVENT_NAME" == "push" ]]; then
             head_sha="$PUSH_HEAD"
+            if [[ -z "${PUSH_BASE:-}" || "$PUSH_BASE" =~ ^0+$ ]]; then
+              base_sha="$(git rev-parse HEAD^)"
+            elif git cat-file -e "${PUSH_BASE}^{commit}"; then
+              base_sha="$PUSH_BASE"
+            else
+              printf 'Non-zero push base %s is unavailable; refusing a one-commit fallback.\n' "$PUSH_BASE" >&2
+              exit 1
+            fi
+          elif [[ "$EVENT_NAME" == "schedule" || "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            # These events do not propose a lifecycle transition. Use an empty exact range instead of
+            # re-evaluating HEAD^..HEAD as though the latest commit had just been pushed again.
+            head_sha="$PUSH_HEAD"
+            base_sha="$head_sha"
           else
-            head_sha="$PUSH_HEAD"
-            base_sha="$(git rev-parse HEAD^)"
+            printf 'Unsupported story-evidence event %s.\n' "$EVENT_NAME" >&2
+            exit 1
           fi
           checked_out_head="$(git rev-parse HEAD)"
           if [[ "$checked_out_head" != "$head_sha" ]]; then
@@ -155,49 +177,98 @@ jobs:
             exit 1
           fi
           printf 'base=%s\nhead=%s\n' "$base_sha" "$head_sha" >> "$GITHUB_OUTPUT"
-      - name: Detect proposed completion transitions
+      - name: Plan proposed completion production
         env:
-          TRANSITIONS_PATH: ${{ runner.temp }}/story-evidence-transitions.json
+          PRODUCTION_PLAN_PATH: ${{ runner.temp }}/story-evidence-production-plan.json
         run: >-
           dotnet run --project tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj
-          --configuration Release --no-build -- detect
+          --configuration Release --no-build -- plan
           --base "${{ steps.bounds.outputs.base }}"
           --head "${{ steps.bounds.outputs.head }}"
-          --output "$TRANSITIONS_PATH"
+          --results "${{ runner.temp }}/machine-results"
+          --output "$PRODUCTION_PLAN_PATH"
       - name: Resolve transition-declared artifact requirements
         id: artifacts
         shell: bash
         env:
-          TRANSITIONS_PATH: ${{ runner.temp }}/story-evidence-transitions.json
+          PRODUCTION_PLAN_PATH: ${{ runner.temp }}/story-evidence-production-plan.json
           RETAINED_LOCATORS_PATH: ${{ runner.temp }}/story-evidence-retained-locators.txt
         run: |
           set -euo pipefail
-          requires_topology=false
-          : > "$RETAINED_LOCATORS_PATH"
-          while IFS= read -r contract; do
-            [[ -z "$contract" ]] && continue
-            if [[ ! -f "$contract" ]]; then
-              printf 'Detected transition contract is missing.\n' >&2
-              exit 1
-            fi
-            if jq -e '.results[]? | select(.source == "current-run" and .lane == "aspire-dapr-primary")' \
-                "$contract" > /dev/null; then
-              requires_topology=true
-            fi
-            jq -r '.results[]? | select(.source == "retained") | .artifactLocator' \
-              "$contract" >> "$RETAINED_LOCATORS_PATH"
-          done < <(jq -r '.[].contractPath' "$TRANSITIONS_PATH")
-          sort -u -o "$RETAINED_LOCATORS_PATH" "$RETAINED_LOCATORS_PATH"
-          printf 'requires_topology=%s\n' "$requires_topology" >> "$GITHUB_OUTPUT"
+          requires_topology="$(jq -r '.requiresTopology' "$PRODUCTION_PLAN_PATH")"
+          requires_recovery="$(jq -r '.requiresRecovery' "$PRODUCTION_PLAN_PATH")"
+          jq -r '.retainedLocators[]?' "$PRODUCTION_PLAN_PATH" > "$RETAINED_LOCATORS_PATH"
+          printf 'requires_topology=%s\nrequires_recovery=%s\n' \
+            "$requires_topology" "$requires_recovery" >> "$GITHUB_OUTPUT"
       - name: Require successful topology producer when transition-declared
         if: steps.artifacts.outputs.requires_topology == 'true' && needs.topology-acceptance.result != 'success'
         run: exit 1
       - name: Download transition-declared current topology primary result
         if: steps.artifacts.outputs.requires_topology == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: topology-acceptance-evidence
           path: ${{ runner.temp }}/machine-results/topology-primary
+      - name: Setup DAPR CLI for transition-declared current recovery primary
+        if: steps.artifacts.outputs.requires_recovery == 'true'
+        run: bash .github/scripts/install-dapr-cli.sh
+      - name: Preserve recovery cleanup and publication reserve
+        if: steps.artifacts.outputs.requires_recovery == 'true'
+        run: |
+          set -euo pipefail
+          job_start_epoch=$(cat "${{ runner.temp }}/story-evidence-job-start.epoch")
+          elapsed_seconds=$(($(date +%s) - job_start_epoch))
+          if (( elapsed_seconds >= 2400 )); then
+            printf 'Recovery producer refused after %s seconds; the 30-minute cleanup/publication reserve would be unsafe.\n' \
+              "$elapsed_seconds" >&2
+            exit 1
+          fi
+          printf '%s\n' "$((job_start_epoch + (330 * 60)))" \
+            > "${{ runner.temp }}/story-evidence-closeout-deadline.epoch"
+      - name: Initialize DAPR runtime for transition-declared current recovery primary
+        if: steps.artifacts.outputs.requires_recovery == 'true'
+        timeout-minutes: 10
+        run: dapr init --runtime-version 1.18.0
+      - name: Produce transition-declared current recovery primary result
+        if: steps.artifacts.outputs.requires_recovery == 'true'
+        timeout-minutes: 280
+        env:
+          HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: "265"
+          HEXALITH_CHATBOT_TIER3: "1"
+          HEXALITH_CHATBOT_TIER3_REQUIRED: "1"
+          ChatBotServiceGrants__LifetimeDays: "90"
+        run: |
+          set -euo pipefail
+          closeout_deadline=$(cat "${{ runner.temp }}/story-evidence-closeout-deadline.epoch")
+          remaining_seconds=$((closeout_deadline - $(date +%s)))
+          if (( remaining_seconds <= 900 )); then
+            printf 'Recovery producer refused with only %s seconds before fixed closeout.\n' \
+              "$remaining_seconds" >&2
+            exit 1
+          fi
+          interrupt_after_seconds=$((remaining_seconds - 900))
+          if (( interrupt_after_seconds > 15900 )); then
+            interrupt_after_seconds=15900
+          fi
+          timeout --signal=INT --kill-after=15m "${interrupt_after_seconds}s" \
+            dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj \
+            -m:1 \
+            --configuration Release \
+            --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" \
+            --logger "console;verbosity=detailed" \
+            --settings live-recovery.runsettings \
+            --logger "trx;LogFileName=live-recovery-validation.trx" \
+            --results-directory "${{ runner.temp }}/raw-recovery-results"
+      - name: Stop DAPR runtime for transition-declared current recovery primary
+        if: always() && steps.artifacts.outputs.requires_recovery == 'true'
+        run: dapr uninstall --all
+      - name: Project recovery result into metadata-only completion TRX
+        if: steps.artifacts.outputs.requires_recovery == 'true'
+        run: >-
+          dotnet run --project tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj
+          --configuration Release --no-build -- sanitize-recovery-trx
+          --input "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.trx"
+          --output "${{ runner.temp }}/machine-results/recovery-primary/live-recovery-validation.trx"
       - name: Collect transition-declared retained exact-run artifacts
         shell: bash
         env:
@@ -250,11 +321,12 @@ jobs:
           --report-directory "${{ runner.temp }}/story-evidence-reports"
       - name: Upload story-evidence reports and provenance sidecars
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: story-evidence-integrity-reports
           path: |
             ${{ runner.temp }}/story-evidence-reports
+            ${{ runner.temp }}/machine-results/recovery-primary
             ${{ runner.temp }}/machine-results/**/*.provenance.json
           retention-days: 30
 
@@ -263,6 +335,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     env:
       HEXALITH_CHATBOT_TIER3: "1"
       HEXALITH_CHATBOT_TIER3_REQUIRED: "1"
@@ -284,10 +358,10 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.302
-      - name: Setup DAPR CLI
-        uses: dapr/setup-dapr@v2
+      - name: Setup checksum-pinned DAPR CLI
+        run: bash .github/scripts/install-dapr-cli.sh
       - name: Initialize DAPR runtime
-        run: dapr init
+        run: dapr init --runtime-version 1.18.0
       - name: Record DAPR runtime state
         run: docker ps --format '{{.Names}}\t{{.Status}}\t{{.Ports}}' --filter name=dapr_
       - name: Run required tenant-bound topology smoke
@@ -302,7 +376,7 @@ jobs:
         run: printf '%s\n' "$(git rev-parse HEAD)" > TestResults/producer-head.sha
       - name: Upload topology acceptance evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: topology-acceptance-evidence
           path: TestResults
@@ -340,6 +414,22 @@ jobs:
       HEXALITH_CHATBOT_TIER3_REQUIRED: "1"
       ChatBotServiceGrants__LifetimeDays: "90"
     steps:
+      - name: Initialize metadata-only live recovery attempt envelope
+        env:
+          ATTEMPT_PATH: TestResults/workflow-attempt/producer-attempt.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$ATTEMPT_PATH")"
+          jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg commit "$GITHUB_SHA" \
+            --arg workflow "$GITHUB_WORKFLOW" \
+            --arg job "$GITHUB_JOB" \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg startedAtUtc "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            '{schemaVersion:"1.0",kind:"live-recovery-producer-attempt",repository:$repository,commit:$commit,workflow:$workflow,job:$job,runId:$runId,runAttempt:$runAttempt,startedAtUtc:$startedAtUtc,completedAtUtc:null,producerOutcome:"not-started"}' \
+            > "$ATTEMPT_PATH"
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -350,11 +440,12 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.302
-      - name: Setup DAPR CLI
-        uses: dapr/setup-dapr@v2
+      - name: Setup checksum-pinned DAPR CLI
+        run: bash .github/scripts/install-dapr-cli.sh
       - name: Initialize DAPR runtime
-        run: dapr init
+        run: dapr init --runtime-version 1.18.0
       - name: Run all live recovery coordinators and retain evidence
+        id: recovery
         run: >-
           dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
           -m:1
@@ -364,13 +455,28 @@ jobs:
           --settings live-recovery.runsettings
           --logger "trx;LogFileName=live-recovery-validation.trx"
           --results-directory TestResults
+      - name: Finalize metadata-only live recovery attempt envelope
+        if: always()
+        env:
+          ATTEMPT_PATH: TestResults/workflow-attempt/producer-attempt.json
+          PRODUCER_OUTCOME: ${{ steps.recovery.outcome }}
+        run: |
+          set -euo pipefail
+          temporary_path="${ATTEMPT_PATH}.tmp"
+          jq \
+            --arg completedAtUtc "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --arg producerOutcome "${PRODUCER_OUTCOME:-skipped}" \
+            '.completedAtUtc=$completedAtUtc | .producerOutcome=$producerOutcome' \
+            "$ATTEMPT_PATH" > "$temporary_path"
+          mv "$temporary_path" "$ATTEMPT_PATH"
       - name: Upload live recovery reports, manifests, and raw test evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: live-recovery-validation-evidence
           path: TestResults
           retention-days: 30
+          if-no-files-found: error
       - name: Stop DAPR runtime
         if: always()
         run: dapr uninstall --all
@@ -411,7 +517,7 @@ jobs:
         with:
           dotnet-version: 10.0.302
       - name: Download retained live recovery evidence
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: live-recovery-validation-evidence
           path: RetainedEvidence
@@ -427,7 +533,7 @@ jobs:
           --results-directory GateResults
       - name: Upload the gate decision
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: live-recovery-evidence-gate-decision
           path: GateResults

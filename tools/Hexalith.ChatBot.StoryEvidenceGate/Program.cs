@@ -22,6 +22,8 @@ public static class Program
                 "validate" => Validate(command, repositoryRoot),
                 "attest" => Attest(command, repositoryRoot),
                 "detect" => Detect(command, repositoryRoot),
+                "plan" => Plan(command, repositoryRoot),
+                "sanitize-recovery-trx" => SanitizeRecoveryTrx(command, repositoryRoot),
                 "ci" => RunCi(command, repositoryRoot),
                 _ => throw new GateValidationException(GateReason.StatusMismatch, "command"),
             };
@@ -234,6 +236,36 @@ public static class Program
 
         WriteCiSummary(reports);
         return passed ? 0 : 1;
+    }
+
+    private static int Plan(CommandArguments command, string repositoryRoot)
+    {
+        CompletionProductionPlan plan = CompletionProductionPlanner.Plan(
+            repositoryRoot,
+            FullPath(repositoryRoot, command.Optional("policy") ?? "story-evidence-policy.json"),
+            command.Required("base").ToLowerInvariant(),
+            command.Required("head").ToLowerInvariant(),
+            FullPath(repositoryRoot, command.Required("results")));
+        string json = JsonSerializer.Serialize(plan, JsonReportWriter.SerializerOptions);
+        if (command.Optional("output") is string output)
+        {
+            string path = FullPath(repositoryRoot, output);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)
+                ?? throw new InvalidOperationException("Production-plan output has no parent directory."));
+            File.WriteAllText(path, json);
+        }
+
+        Console.Out.WriteLine(json);
+        return 0;
+    }
+
+    private static int SanitizeRecoveryTrx(CommandArguments command, string repositoryRoot)
+    {
+        RecoveryTrxSanitizer.Sanitize(
+            FullPath(repositoryRoot, command.Required("input")),
+            FullPath(repositoryRoot, command.Required("output")));
+        Console.Out.WriteLine("{\"passed\":true,\"operation\":\"sanitize-recovery-trx\"}");
+        return 0;
     }
 
     private static GateReport FailedPreflightReport(

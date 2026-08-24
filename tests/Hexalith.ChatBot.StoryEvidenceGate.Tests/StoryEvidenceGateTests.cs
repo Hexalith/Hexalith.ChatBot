@@ -1403,6 +1403,7 @@ public static class StoryEvidenceGateTests
     [InlineData("age")]
     [InlineData("tree-source")]
     [InlineData("primary-selector")]
+    [InlineData("primary-result-path")]
     [InlineData("metadata-bound")]
     public static void SameVersionSecurityPolicyMutationShouldFail(string kind)
     {
@@ -1424,6 +1425,13 @@ public static class StoryEvidenceGateTests
                     EvidenceJson.RequiredArray(policy, "primaryPathTriggers", GateReason.ScopeDigestMismatch)[0]!.AsObject(),
                     "recognizedLaneBindings",
                     GateReason.ScopeDigestMismatch)[0]!.AsObject()["selector"] = "class:Generic";
+            }
+            else if (kind == "primary-result-path")
+            {
+                EvidenceJson.RequiredArray(
+                    EvidenceJson.RequiredArray(policy, "primaryPathTriggers", GateReason.ScopeDigestMismatch)[4]!.AsObject(),
+                    "recognizedLaneBindings",
+                    GateReason.ScopeDigestMismatch)[0]!.AsObject()["trx"] = "recovery-primary/other.trx";
             }
             else
             {
@@ -2036,19 +2044,357 @@ public static class StoryEvidenceGateTests
         issue.Subject.ShouldBe("duplicate-lane");
     }
 
-    /// <summary>Proves recovery-primary accepts a retained source binding allowed by policy.</summary>
+    /// <summary>Proves recovery-primary rejects retained evidence even when its provenance is otherwise valid.</summary>
     [Fact]
-    public static void RecoveryPrimaryRetainedSourceShouldPass()
+    public static void RecoveryPrimaryRetainedSourceShouldFail()
     {
         using GateFixture fixture = new();
         fixture.UsePrimaryPath("tests/Module/Recovery/Scenario.cs", "recovery", "recovery-primary");
         fixture.UseRetainedEvidence();
 
         GateReport report = fixture.Validate();
-        report.Passed.ShouldBeTrue(string.Join(", ", report.Issues.Select(static issue => $"{issue.ReasonCode}:{issue.Subject}")));
-        report.PrimaryPaths.ShouldContain(static verdict =>
-            verdict.PathClass.Equals("recovery", StringComparison.Ordinal) && verdict.Executed);
+        report.Passed.ShouldBeFalse();
+        report.Issues.Single().ReasonCode.ShouldBe(GateReason.PrimaryPathNotExecuted);
+        report.Issues.Single().Subject.ShouldBe("recovery");
     }
+
+    /// <summary>Proves a current-run recovery primary cannot drift from the producer-owned result paths.</summary>
+    [Theory]
+    [InlineData("trx")]
+    [InlineData("provenance")]
+    public static void RecoveryPrimaryWrongPinnedResultPathShouldFail(string field)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        using GateFixture fixture = new();
+        fixture.UsePrimaryPath("tests/Module/Recovery/Scenario.cs", "recovery", "recovery-primary");
+        if (field.Equals("trx", StringComparison.Ordinal))
+        {
+            File.Copy(
+                fixture.TrxPath,
+                Path.Combine(fixture.ResultsRoot, "recovery-primary", "other.trx"));
+        }
+
+        fixture.MutateContract(contract =>
+        {
+            JsonObject lane = EvidenceJson.RequiredArray(
+                contract,
+                "results",
+                GateReason.MachineResultsInvalid)[0]!.AsObject();
+            lane[field] = field.Equals("trx", StringComparison.Ordinal)
+                ? "recovery-primary/other.trx"
+                : "recovery-primary/other.provenance.json";
+            if (field.Equals("trx", StringComparison.Ordinal))
+            {
+                lane["artifactLocator"] = "file:recovery-primary/other.trx";
+            }
+        });
+
+        GateIssue issue = fixture.Validate().Issues.Single();
+        issue.ReasonCode.ShouldBe(GateReason.PrimaryPathNotExecuted);
+        issue.Subject.ShouldBe("recovery");
+    }
+
+    /// <summary>Proves a complete recovery declaration produces the destructive plan only after strict preflight.</summary>
+    [Fact]
+    public static void CompletionProductionPlannerShouldAuthorizeOneValidRecoveryProducer()
+    {
+        using GateFixture fixture = new();
+        fixture.UseProductCompletion();
+        fixture.UseClaimPrimaryPath("recovery", "recovery-primary");
+        fixture.CommitStrictImmutableCompletion();
+
+        CompletionProductionPlan plan = CompletionProductionPlanner.Plan(
+            fixture.RepositoryRoot,
+            fixture.PolicyPath,
+            fixture.BaseCommit,
+            fixture.HeadCommit,
+            fixture.ResultsRoot);
+
+        plan.RequiresRecovery.ShouldBeTrue();
+        plan.RequiresTopology.ShouldBeFalse();
+        plan.RetainedLocators.ShouldBeEmpty();
+    }
+
+    /// <summary>Proves malformed secondary lanes cannot survive preflight and authorize the valid recovery lane.</summary>
+    [Fact]
+    public static void CompletionProductionPlannerShouldRejectMalformedSecondaryLaneBeforeRecovery()
+    {
+        using GateFixture fixture = new();
+        fixture.UseProductCompletion();
+        fixture.UseClaimPrimaryPath("recovery", "recovery-primary");
+        fixture.MutateContract(contract => EvidenceJson.RequiredArray(
+            contract,
+            "results",
+            GateReason.MachineResultsInvalid).Add(new JsonObject
+            {
+                ["lane"] = "malformed-secondary",
+                ["trx"] = "secondary/result.trx",
+                ["provenance"] = "secondary/result.provenance.json",
+                ["artifactLocator"] = "file:wrong-result.trx",
+                ["source"] = "current-run",
+                ["selectors"] = new JsonArray("class:GateFixture"),
+                ["allowSkipped"] = false,
+                ["primaryPathClass"] = null,
+            }), refreshEvidence: false);
+        fixture.CommitStrictImmutableCompletion(attest: false);
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() =>
+            CompletionProductionPlanner.Plan(
+                fixture.RepositoryRoot,
+                fixture.PolicyPath,
+                fixture.BaseCommit,
+                fixture.HeadCommit,
+                fixture.ResultsRoot));
+
+        exception.ReasonCode.ShouldBe(GateReason.EvidenceStaleOrUnbound);
+        exception.Subject.ShouldBe("malformed-secondary");
+    }
+
+    /// <summary>Proves duplicate recovery declarations fail closed before a producer can be started.</summary>
+    [Fact]
+    public static void CompletionProductionPlannerShouldRejectRecoveryMultiplicity()
+    {
+        using GateFixture fixture = new();
+        fixture.UseProductCompletion();
+        fixture.UseClaimPrimaryPath("recovery", "recovery-primary");
+        fixture.MutateContract(contract => EvidenceJson.RequiredArray(
+            contract,
+            "results",
+            GateReason.MachineResultsInvalid).Add(new JsonObject
+            {
+                ["lane"] = "recovery-primary",
+                ["trx"] = "recovery-primary/duplicate.trx",
+                ["provenance"] = "recovery-primary/duplicate.provenance.json",
+                ["artifactLocator"] = "file:recovery-primary/duplicate.trx",
+                ["source"] = "current-run",
+                ["selectors"] = new JsonArray(
+                    "class:Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests"),
+                ["allowSkipped"] = false,
+                ["primaryPathClass"] = "recovery",
+            }), refreshEvidence: false);
+        fixture.CommitStrictImmutableCompletion(attest: false);
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() =>
+            CompletionProductionPlanner.Plan(
+                fixture.RepositoryRoot,
+                fixture.PolicyPath,
+                fixture.BaseCommit,
+                fixture.HeadCommit,
+                fixture.ResultsRoot));
+
+        exception.ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
+        exception.Subject.ShouldBe("duplicate-lane");
+    }
+
+    /// <summary>Proves two lane fields cannot resolve to the same producer-owned result path.</summary>
+    [Fact]
+    public static void CompletionProductionPlannerShouldRejectResultPathCollisionBeforeRecovery()
+    {
+        using GateFixture fixture = new();
+        fixture.UseProductCompletion();
+        fixture.UseClaimPrimaryPath("recovery", "recovery-primary");
+        fixture.MutateContract(contract => EvidenceJson.RequiredArray(
+            contract,
+            "results",
+            GateReason.MachineResultsInvalid).Add(new JsonObject
+            {
+                ["lane"] = "colliding-secondary",
+                ["trx"] = "recovery-primary/live-recovery-validation.trx",
+                ["provenance"] = "secondary/result.provenance.json",
+                ["artifactLocator"] = "file:recovery-primary/live-recovery-validation.trx",
+                ["source"] = "current-run",
+                ["selectors"] = new JsonArray("class:GateFixture"),
+                ["allowSkipped"] = false,
+                ["primaryPathClass"] = null,
+            }), refreshEvidence: false);
+        fixture.CommitStrictImmutableCompletion(attest: false);
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() =>
+            CompletionProductionPlanner.Plan(
+                fixture.RepositoryRoot,
+                fixture.PolicyPath,
+                fixture.BaseCommit,
+                fixture.HeadCommit,
+                fixture.ResultsRoot));
+
+        exception.ReasonCode.ShouldBe(GateReason.EvidenceStaleOrUnbound);
+        exception.Subject.ShouldBe("result-path-collision");
+    }
+
+    /// <summary>Proves a triggered recovery class cannot authorize a differently bound lane.</summary>
+    [Fact]
+    public static void CompletionProductionPlannerShouldRejectWrongPrimaryBindingBeforeRecovery()
+    {
+        using GateFixture fixture = new();
+        fixture.UseProductCompletion();
+        fixture.UseClaimPrimaryPath("recovery", "recovery-primary");
+        fixture.MutateContract(contract => EvidenceJson.RequiredArray(
+            contract,
+            "primaryPaths",
+            GateReason.PrimaryPathNotExecuted)[0]!.AsObject()["lane"] = "wrong-primary", refreshEvidence: false);
+        fixture.CommitStrictImmutableCompletion(attest: false);
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() =>
+            CompletionProductionPlanner.Plan(
+                fixture.RepositoryRoot,
+                fixture.PolicyPath,
+                fixture.BaseCommit,
+                fixture.HeadCommit,
+                fixture.ResultsRoot));
+
+        exception.ReasonCode.ShouldBe(GateReason.PrimaryPathNotExecuted);
+        exception.Subject.ShouldBe("recovery");
+    }
+
+    /// <summary>Proves retained locators are collected only after their repository and exact artifact path bind.</summary>
+    [Fact]
+    public static void CompletionProductionPlannerShouldCollectValidatedRetainedLocator()
+    {
+        using GateFixture fixture = new();
+        fixture.UseProductCompletion();
+        fixture.UseRetainedEvidence();
+        fixture.CommitStrictImmutableCompletion(attest: false);
+
+        CompletionProductionPlan plan = CompletionProductionPlanner.Plan(
+            fixture.RepositoryRoot,
+            fixture.PolicyPath,
+            fixture.BaseCommit,
+            fixture.HeadCommit,
+            fixture.ResultsRoot);
+
+        plan.RetainedLocators.ShouldBe(
+        [
+            "github-actions://Hexalith/Hexalith.ChatBot/runs/12345/artifacts/gate-evidence",
+        ]);
+        plan.RequiresRecovery.ShouldBeFalse();
+    }
+
+    /// <summary>Proves raw recovery diagnostics are removed before the completion TRX can be attested or uploaded.</summary>
+    [Fact]
+    public static void RecoveryTrxSanitizerShouldProjectOnlyBoundMetadata()
+    {
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"recovery-sanitize-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            string input = Path.Combine(temporaryRoot, "raw.trx");
+            string output = Path.Combine(temporaryRoot, "sanitized.trx");
+            DateTimeOffset finish = DateTimeOffset.UtcNow;
+            File.WriteAllText(
+                input,
+                $"""
+                <?xml version="1.0" encoding="utf-8"?>
+                <TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+                  <Times start="{finish.AddSeconds(-1):O}" finish="{finish:O}" />
+                  <Results>
+                    <UnitTestResult testId="recovery-1" outcome="Passed">
+                      <Output><StdOut>Bearer tenant-secret-payload</StdOut></Output>
+                    </UnitTestResult>
+                  </Results>
+                  <TestDefinitions>
+                    <UnitTest id="recovery-1">
+                      <TestMethod className="Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests" name="LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" />
+                    </UnitTest>
+                  </TestDefinitions>
+                  <ResultSummary outcome="Completed">
+                    <Counters total="1" executed="1" passed="1" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" notExecuted="0" />
+                  </ResultSummary>
+                </TestRun>
+                """);
+
+            RecoveryTrxSanitizer.Sanitize(input, output);
+
+            string sanitized = File.ReadAllText(output);
+            sanitized.ShouldContain("LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate");
+            sanitized.ShouldNotContain("Output");
+            sanitized.ShouldNotContain("Bearer");
+            sanitized.ShouldNotContain("secret");
+            sanitized.ShouldNotContain("payload");
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    /// <summary>Proves hostile or ambiguous TRX structures never become completion evidence.</summary>
+    [Theory]
+    [InlineData("dtd")]
+    [InlineData("duplicate-result")]
+    [InlineData("failed-outcome")]
+    [InlineData("wrong-class")]
+    [InlineData("counter-mismatch")]
+    [InlineData("reversed-time")]
+    [InlineData("foreign-structure")]
+    public static void RecoveryTrxSanitizerShouldRejectAdversarialInput(string mutation)
+    {
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"recovery-sanitize-negative-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            DateTimeOffset finish = DateTimeOffset.UtcNow;
+            string trx = RecoverySanitizerTrx(finish);
+            trx = mutation switch
+            {
+                "dtd" => trx.Replace(
+                    "<?xml version=\"1.0\" encoding=\"utf-8\"?>",
+                    "<?xml version=\"1.0\" encoding=\"utf-8\"?><!DOCTYPE TestRun [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]>",
+                    StringComparison.Ordinal),
+                "duplicate-result" => trx.Replace(
+                    "</Results>",
+                    "<UnitTestResult testId=\"recovery-2\" outcome=\"Passed\" /></Results>",
+                    StringComparison.Ordinal),
+                "failed-outcome" => trx.Replace("outcome=\"Passed\"", "outcome=\"Failed\"", StringComparison.Ordinal),
+                "wrong-class" => trx.Replace(
+                    "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests",
+                    "Hexalith.ChatBot.IntegrationTests.Recovery.ImpostorTests",
+                    StringComparison.Ordinal),
+                "counter-mismatch" => trx.Replace("passed=\"1\"", "passed=\"2\"", StringComparison.Ordinal),
+                "reversed-time" => trx.Replace(
+                    $"start=\"{finish.AddSeconds(-1):O}\" finish=\"{finish:O}\"",
+                    $"start=\"{finish:O}\" finish=\"{finish.AddSeconds(-1):O}\"",
+                    StringComparison.Ordinal),
+                "foreign-structure" => trx.Replace(
+                    "<Results>",
+                    "<foreign:Results xmlns:foreign=\"urn:foreign\" /><Results>",
+                    StringComparison.Ordinal),
+                _ => throw new ArgumentOutOfRangeException(nameof(mutation)),
+            };
+            string input = Path.Combine(temporaryRoot, "raw.trx");
+            string output = Path.Combine(temporaryRoot, "sanitized.trx");
+            File.WriteAllText(input, trx);
+
+            GateValidationException exception = Should.Throw<GateValidationException>(() =>
+                RecoveryTrxSanitizer.Sanitize(input, output));
+
+            exception.ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
+            exception.Subject.ShouldBe("recovery-sanitize");
+            File.Exists(output).ShouldBeFalse();
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    private static string RecoverySanitizerTrx(DateTimeOffset finish) =>
+        $"""
+        <?xml version="1.0" encoding="utf-8"?>
+        <TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+          <Times start="{finish.AddSeconds(-1):O}" finish="{finish:O}" />
+          <Results>
+            <UnitTestResult testId="recovery-1" outcome="Passed" />
+          </Results>
+          <TestDefinitions>
+            <UnitTest id="recovery-1">
+              <TestMethod className="Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests" name="LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" />
+            </UnitTest>
+          </TestDefinitions>
+          <ResultSummary outcome="Completed">
+            <Counters total="1" executed="1" passed="1" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" notExecuted="0" />
+          </ResultSummary>
+        </TestRun>
+        """;
 
     /// <summary>Proves a Server *Dapr* path no longer forces the aspire-dapr primary lane.</summary>
     [Fact]
@@ -2326,6 +2672,30 @@ public static class StoryEvidenceGateTests
 
         exitCode.ShouldBe(0);
         stdout.TrimStart().ShouldStartWith("[");
+    }
+
+    /// <summary>Proves the side-effect-free planner emits only validated producer requirements.</summary>
+    [Fact]
+    public static void PlanCommandNoTransitionShouldReturnEmptyRequirements()
+    {
+        using GateFixture fixture = new();
+        string output = Path.Combine(fixture.ResultsRoot, "production-plan.json");
+        int exitCode = InvokeMain(
+            fixture,
+            out string stdout,
+            "plan",
+            "--repository-root", fixture.RepositoryRoot,
+            "--policy", fixture.PolicyPath,
+            "--base", fixture.BaseCommit,
+            "--head", fixture.HeadCommit,
+            "--results", fixture.ResultsRoot,
+            "--output", output);
+
+        exitCode.ShouldBe(0);
+        stdout.ShouldContain("\"requiresTopology\": false");
+        stdout.ShouldContain("\"requiresRecovery\": false");
+        stdout.ShouldContain("\"retainedLocators\": []");
+        File.Exists(output).ShouldBeTrue();
     }
 
     /// <summary>Proves attest honors --policy and returns a success envelope.</summary>

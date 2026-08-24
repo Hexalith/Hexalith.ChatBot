@@ -419,6 +419,7 @@ internal sealed class GateFixture : IDisposable
     /// <param name="lane">The declared lane.</param>
     public void UsePrimaryPath(string relativePath, string pathClass, string lane)
     {
+        BindPinnedResultPaths(pathClass);
         File.Delete(SourcePath);
         SourcePath = Path.Combine(RepositoryRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(SourcePath)!);
@@ -440,10 +441,15 @@ internal sealed class GateFixture : IDisposable
                 ["class"] = pathClass,
                 ["lane"] = lane,
             });
-            EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid)[0]!.AsObject()["lane"] = lane;
-            EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid)[0]!.AsObject()["primaryPathClass"] = pathClass;
-            EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid)[0]!.AsObject()["selectors"] =
+            JsonObject result = EvidenceJson.RequiredArray(
+                contract,
+                "results",
+                GateReason.MachineResultsInvalid)[0]!.AsObject();
+            result["lane"] = lane;
+            result["primaryPathClass"] = pathClass;
+            result["selectors"] =
                 new JsonArray($"class:{testClass}");
+            ApplyPinnedResultPaths(result, pathClass);
             EvidenceJson.RequiredArray(contract, "mappings", GateReason.CheckedItemEvidenceMismatch)[0]!.AsObject()["paths"] =
                 new JsonArray(relativePath);
             EvidenceJson.RequiredArray(contract, "mappings", GateReason.CheckedItemEvidenceMismatch)[2]!.AsObject()["assertions"] =
@@ -456,6 +462,7 @@ internal sealed class GateFixture : IDisposable
     /// <summary>Adds an explicit fence-free claim and a policy-bound primary lane without a path trigger.</summary>
     public void UseClaimPrimaryPath(string pathClass, string lane)
     {
+        BindPinnedResultPaths(pathClass);
         File.AppendAllText(StoryPath, $"\n[claim:{pathClass}]\n");
         string testClass = PrimaryTestClass(pathClass);
         MutateContract(contract =>
@@ -469,11 +476,39 @@ internal sealed class GateFixture : IDisposable
             result["lane"] = lane;
             result["primaryPathClass"] = pathClass;
             result["selectors"] = new JsonArray($"class:{testClass}");
+            ApplyPinnedResultPaths(result, pathClass);
             EvidenceJson.RequiredArray(contract, "mappings", GateReason.CheckedItemEvidenceMismatch)[2]!.AsObject()["assertions"] =
                 new JsonArray($"{testClass}.ValidAssertion");
         }, refreshEvidence: false);
         WritePassingTrx($"{testClass}.ValidAssertion");
         RefreshEvidence();
+    }
+
+    private void BindPinnedResultPaths(string pathClass)
+    {
+        if (!pathClass.Equals("recovery", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        TrxPath = Path.Combine(ResultsRoot, "recovery-primary", "live-recovery-validation.trx");
+        ProvenancePath = Path.Combine(
+            ResultsRoot,
+            "recovery-primary",
+            "live-recovery-validation.provenance.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(TrxPath)!);
+    }
+
+    private static void ApplyPinnedResultPaths(JsonObject result, string pathClass)
+    {
+        if (!pathClass.Equals("recovery", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        result["trx"] = "recovery-primary/live-recovery-validation.trx";
+        result["provenance"] = "recovery-primary/live-recovery-validation.provenance.json";
+        result["artifactLocator"] = "file:recovery-primary/live-recovery-validation.trx";
     }
 
     /// <summary>Adds a claim phrase inside a fenced example.</summary>
@@ -821,7 +856,7 @@ internal sealed class GateFixture : IDisposable
     }
 
     /// <summary>Commits an immutable scope whose contract forbids all worktree/index drift.</summary>
-    public void CommitStrictImmutableCompletion()
+    public void CommitStrictImmutableCompletion(bool attest = true)
     {
         JsonObject contract = ReadContract();
         JsonObject repository = EvidenceJson.RequiredArray(
@@ -851,14 +886,17 @@ internal sealed class GateFixture : IDisposable
         RunGit("add", "_bmad-output/implementation-artifacts/evidence/gate-fixture.json");
         RunGit("commit", "-m", "test: bind strict immutable digest");
         HeadCommit = RunGit("rev-parse", "HEAD").Trim();
-        ProvenanceAttestor.AttestContract(
-            RepositoryRoot,
-            ContractPath,
-            BaseCommit,
-            HeadCommit,
-            ResultsRoot,
-            DateTimeOffset.UtcNow,
-            PolicyPath);
+        if (attest)
+        {
+            ProvenanceAttestor.AttestContract(
+                RepositoryRoot,
+                ContractPath,
+                BaseCommit,
+                HeadCommit,
+                ResultsRoot,
+                DateTimeOffset.UtcNow,
+                PolicyPath);
+        }
     }
 
     /// <summary>Commits an unrelated path despite disclosing it as pre-existing local work.</summary>

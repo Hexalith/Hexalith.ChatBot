@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-08-01, Story 12.15). Winston owns the architecture decision and sandbox-suitability conclusion; Murat owns authenticity review of the resulting Tier-3 evidence.
+Proposed (2026-08-01, Story 12.15). Winston owns the architecture decision and sandbox-suitability conclusion; Murat owns authenticity review of the resulting Tier-3 evidence. Winston approved the non-circular `recovery-primary` completion-provenance slice on 2026-08-24; that approval does not authenticate a hosted run or ratify A10.
 
 This ADR moves to **Accepted** when Story 12.15 reaches `done`. It was briefly marked Accepted on 2026-08-01 and returned to Proposed by the round-4 review: the story is still `in-progress` with open evidence-integrity and residual decisions. The matrix below reflects the post-remediation seams; residuals that remain open are named explicitly. Withdrawal from Accepted follows the same rule in reverse — a review that re-opens a matrix row or a residual returns this ADR to Proposed.
 
@@ -83,13 +83,25 @@ The rebuild driver receives narrow source/evidence interfaces rather than a gene
 
 The canonical reports remain the verdict authority. A metadata-only manifest adds run/scenario ULIDs, UTC bounds, repository/topology/configuration versions, safe tenant and dataset locators, configured corpus volume, per-scenario exercised dataset volume, driver mode, fault/restore/cleanup actions, expected/observed scope, measurements and targets, verdict dimensions, assertions, coverage, deviations, durable residual identifiers, and raw-artifact locators.
 
-The required lanes use `if: always()` artifact upload and an explicit 30-day retention policy. They upload the raw `.trx` plus generated reports/manifests under `TestResults` on pass or failure. State-store assertions are captured in those report verdicts; the lane does not currently claim separate logs, traces, metrics, or state snapshots. Local ignored `TestResults` files are diagnostic only and are not repository-retained evidence.
+The required lanes initialize a metadata-only workflow-attempt envelope before checkout, finalize it under `if: always()`, and use `if: always()` artifact upload with `if-no-files-found: error` and an explicit 30-day retention policy. They upload the raw `.trx` plus generated reports/manifests under `TestResults` when produced and always retain the workflow envelope on an ordinary runner/step failure. State-store assertions are captured in the domain report verdicts; the workflow envelope is diagnostic and cannot substitute for the domain attempt summary. The lane does not currently claim separate logs, traces, metrics, or state snapshots. Local ignored `TestResults` files are diagnostic only and are not repository-retained evidence.
 
 Evidence older than `MaximumEvidenceAge` (8 days, matching the 7-day cadence) is rejected as `stale_result`. Note the asymmetry with the 30-day artifact retention: an artifact aged 8–30 days is still downloadable but is no longer citable for ratification.
 
 The gate fails closed on disabled required validation, never-run/incomplete/stale/future evidence, a newer incomplete attempt, exception or timeout failure, `Unmeasurable`, divergence, containment breach, unalerted serious breach (unmeasurable / structural / target-deviation only — `cleanup_incomplete` and failed safety assertions are gate-only stop-ships without an `unalerted_breach` obligation), zero population, zero scenario coverage, missing dataset/scenario provenance, missing artifact locators, or `cleanup-complete: false` (`{job}:cleanup_incomplete`). Measurable RPO/RTO misses, rebuild-duration misses, and late scope recording remain distinct target deviations and are governed by their A10/NFR decision; the gate never relabels them as met/equivalent/contained.
 
 Reports, logs, traces, screenshots, filenames, and CI artifacts exclude message bodies, attachment content, tokens, secrets, credentials, raw claims, and other tenant payloads. Metadata is passed through existing sanitization conventions and stable reason tokens.
+
+## Story-completion provenance lifecycle
+
+`recovery-primary` has one TE-2 completion path: **transition-declared `current-run` production** inside the exact-head `story-evidence-integrity` job. At most one active contract may declare the logical lane, the exact bound `LiveContinuityAspireE2eTests` class selector, `source: current-run`, `trx: recovery-primary/live-recovery-validation.trx`, `provenance: recovery-primary/live-recovery-validation.provenance.json`, and its exact `file:` locator. The repository-owned side-effect-free `plan` command validates pinned policy, status/lifecycle, scope digest, File List, checked mapping declarations, collision-free paths, and this exact single-consumer binding before any destructive setup. Only its validated plan can enable DAPR initialization and the live recovery sweep; ordinary runs with no completion transition do not execute this additional producer.
+
+The completion path and the exact-head topology producer it consumes install a checksum-pinned Dapr CLI 1.18.0 archive, initialize runtime 1.18.0, and exchange evidence with current artifact-action majors. Recovery's raw TRX is staged outside all upload paths. After the live class and DAPR cleanup succeed, `RecoveryTrxSanitizer` projects only the bound test identity, times, counters, IDs, and passing outcome into the canonical completion TRX; raw output/error diagnostics are never published. The attestor then binds exact base/head, implementation digest, sanitized-TRX checksum, selector, source, timestamp, and locator into the sidecar. Validation consumes that sidecar in the same exact-head job. The 360-minute job fixes closeout at minute 330, refuses DAPR initialization at or after minute 40, caps initialization/live execution at 10/280 minutes, sets the in-process deadline to 265 minutes, and dynamically interrupts production early enough to preserve 15 minutes of unwind before fixed closeout. Producer, timeout, skip/no-test, cleanup, projection, attestation, or validation failure leaves the completion check red.
+
+This ordering is non-circular: the tracked contract contains no future GitHub run ID, artifact ID, artifact name, or upload digest. `scope.implementationDigest` remains the only masked contract field. GitHub assigns artifact identity only after upload, so the 30-day, deletable/expiring archive is downstream retention rather than an attestation input. Completion-run operational reports/manifests remain unpublished diagnostics and cannot be cited for A10.
+
+Scheduled CI and release recovery artifacts retain their existing operational purpose: the independent recovery evidence gate and A10 review. They intentionally do not mint TE-2 retained sidecars, and policy does not accept `retained` as a `recovery-primary` source. A future retained completion path would require a separate ADR, policy-version change, producer-side attestation before immutable upload, rerun-attempt-safe locator identity, and mutation/adversarial tests; it is not an alternate implementation of this decision.
+
+**Winston architecture sign-off (2026-08-24): approved for implementation and review.** The lifecycle has one statically validated producer plan, one canonical consumer/path pair, one metadata-only TRX publication owner, one attestation authority, a fixed cleanup reserve, deterministic pre-upload identity, and no contract-digest cycle. This is an architecture approval of the provenance boundary only. The overall ADR remains Proposed, A10 remains provisional, and Murat's independent authenticity review remains required before Story 12.15 can reach `done`.
 
 ## Sandbox suitability and residuals
 
@@ -113,7 +125,7 @@ Story 12.15 leaves A10/NFR56 provisional at `RecoveryTargets.MaxRpo` (15 minutes
 
 Ratification requires a complete passing scheduled-CI or release artifact plus its hosted run/artifact locator recorded in the PRD decision log, **and** is bounded by the 180-second measurable ceiling above: a passing hosted run ratifies recovery within the ceiling, not RTO ≤ 4 hours. Ratifying the 4-hour target requires either a lane whose restoration budget reaches it or a separately evidenced pre-production drill.
 
-**Un-ratification.** A ratified A10 returns to provisional when the cited artifact passes the 30-day retention boundary without a successor, when a later required run is not passing, or when a hosted run returns `Unmeasurable` or a structural breach. Architecture/DevOps owns that transition and records it in the decision log.
+**Un-ratification.** A ratified A10 returns to provisional when the cited artifact passes the 8-day `MaximumEvidenceAge` freshness boundary without a successor, when a later required run is not passing, or when a hosted run returns `Unmeasurable` or a structural breach. The artifact remains downloadable through day 30 for investigation, but it cannot support ratification after day 8. Architecture/DevOps owns that transition and records it in the decision log.
 
 Even a passing sandbox run cannot close `RV-EXT-M365`, `RV-DURABLE-WORM`, `RV-PROD-CONTROL`, `RV-PROVIDER-SCALE`, `RV-MEASURABLE-CEILING`, `RV-EVIDENCE-KINDS`, or `RV-REBUILD-WORM`. Tightening or loosening still requires the PRD decision, this ADR, and `RecoveryTargets` to change together with retained evidence, rationale, and approval.
 
@@ -121,6 +133,7 @@ Even a passing sandbox run cannot close `RV-EXT-M365`, `RV-DURABLE-WORM`, `RV-PR
 
 - Ordinary deployments remain non-destructive and retain inert deferred live-driver defaults.
 - The destructive scheduler is the Tier-3/release workflow (CI: scheduled/manual; release: per-commit non-cancelling concurrency — N concurrent 5.5-hour jobs accepted rather than a cancellable shared queue), never `PeriodicEnforcementBackgroundService` and never a second product hosted service.
+- A story-completion transition may additionally run the same live class inside `story-evidence-integrity`, but only when its active contract declares current-run `recovery-primary`; this is evidence production, not a product scheduler.
 - AppHost lifecycle control stays outside ChatBot; the bounded sandbox controller can affect only closed provider/component switches for the dedicated test tenant.
 - A sandbox pass narrows uncertainty but does not erase the named external-service, durability, scale, or production-control residuals.
 - Successful, missed, and unmeasurable reports become inspectable evidence before aggregate reduction without changing evaluator semantics.

@@ -145,7 +145,8 @@ public sealed class LiveContinuityAspireE2eTests
                 // ceiling and is published in every manifest.
                 PerScenarioTimeout = TimeSpan.FromMinutes(25),
                 RestorationTimeout = TimeSpan.FromMinutes(3),
-                WorkflowTimeout = TimeSpan.FromHours(5),
+                WorkflowTimeout = RecoveryWorkflowTimeout(
+                    Environment.GetEnvironmentVariable("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES")),
                 EvidenceDirectory = evidenceDirectory,
                 EvidenceLocator = EvidenceArtifactLocator(),
             };
@@ -455,6 +456,23 @@ public sealed class LiveContinuityAspireE2eTests
         return locator;
     }
 
+    internal static TimeSpan RecoveryWorkflowTimeout(string? configured)
+    {
+        const int DefaultMinutes = 300;
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return TimeSpan.FromMinutes(DefaultMinutes);
+        }
+
+        if (!int.TryParse(configured, out int minutes) || minutes is < 1 or > DefaultMinutes)
+        {
+            throw new InvalidOperationException(
+                "HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES must be an integer from 1 through 300.");
+        }
+
+        return TimeSpan.FromMinutes(minutes);
+    }
+
     private static void RequireTier3Runtime()
     {
         bool available = string.Equals(Environment.GetEnvironmentVariable("HEXALITH_CHATBOT_TIER3"), "1", StringComparison.Ordinal) &&
@@ -635,23 +653,54 @@ public sealed class LiveContinuityAspireE2eTests
         string body = $$"""
             {"commandId":"{{ChatBotCommandId.New().Value}}","commandType":"CaptureMailboxMessageIntake","command":{"intakeId":"not-a-ulid","source":{"providerMessageId":"probe","mailboxId":"probe","receivedAtUtc":"2026-08-01T00:00:00Z"},"recipients":[],"attachments":[]},"origin":"mailbox","requestSchemaVersion":"v1"}
             """;
-        using HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands")
+        while (true)
         {
-            Content = new StringContent(body, Encoding.UTF8, "application/json"),
-        };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        request.Headers.Add("X-Correlation-Id", ChatBotCorrelationId.New().Value);
-        using HttpResponseMessage response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                using HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands")
+                {
+                    Content = new StringContent(body, Encoding.UTF8, "application/json"),
+                };
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                request.Headers.Add("X-Correlation-Id", ChatBotCorrelationId.New().Value);
+                using HttpResponseMessage response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
-        // Decision 3 option 1: only post-admission validation failures prove admission without enqueueing work.
-        if (response.StatusCode is not (
-            HttpStatusCode.BadRequest or
-            HttpStatusCode.UnprocessableEntity))
-        {
-            throw new InvalidOperationException(
-                $"The recovery mailbox admission probe returned an unexpected status {(int)response.StatusCode}.");
+                // Decision 3 option 1: only post-admission validation failures prove admission without enqueueing work.
+                if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity)
+                {
+                    return;
+                }
+
+                // Resource Healthy means the adapter endpoint is serving, not that the EventStore/DAPR command spine
+                // behind admission has finished warming up. That path intentionally returns 503 until it is ready,
+                // matching the ordinary Tier-3 acceptance test's first-command retry discipline.
+                if (!IsTransientMailboxAdmissionStatus(response.StatusCode))
+                {
+                    throw new InvalidOperationException(
+                        $"The recovery mailbox admission probe returned an unexpected status {(int)response.StatusCode}.");
+                }
+            }
+            catch (HttpRequestException)
+            {
+                // The endpoint or its DAPR command path is still starting; retry inside the existing startup budget.
+            }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // A per-request HttpClient timeout is transient while the command path warms up.
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken).ConfigureAwait(false);
         }
     }
+
+    /// <summary>Classifies only startup statuses that can become healthy without changing the probe request.</summary>
+    internal static bool IsTransientMailboxAdmissionStatus(HttpStatusCode statusCode)
+        => statusCode is HttpStatusCode.RequestTimeout
+            or HttpStatusCode.TooManyRequests
+            or HttpStatusCode.BadGateway
+            or HttpStatusCode.ServiceUnavailable
+            or HttpStatusCode.GatewayTimeout
+        || (int)statusCode >= 500;
 
     /// <summary>
     /// Companion to <see cref="AssertMailboxTokenAdmissionAsync"/>: proves the auth-before-validation pipeline
