@@ -249,6 +249,37 @@ static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration
 
     realm = realm.Replace(recoveryClientSecretPlaceholder, recoveryClientSecret, StringComparison.Ordinal);
 
+    // Cleanup below is ProcessExit-only, which never fires on SIGKILL/OOM-kill/a hard container stop, so a killed
+    // prior run can leave a secret-bearing directory behind (still owner-only per the mode set below — a
+    // disk-accumulation gap, not a confidentiality one). Sweep leftovers older than staleAfter before creating this
+    // run's directory rather than only at exit. The age gate (not an unconditional sweep) matters here as much as in
+    // production: this same function runs concurrently across many DistributedApplicationTestingBuilder-backed test
+    // classes in this repo's own test suite, and an unconditional delete-everything-matching-this-glob would race a
+    // concurrent run's still-live directory. A crashed run is stale for hours; a concurrent test run is stale for
+    // milliseconds.
+    TimeSpan staleAfter = TimeSpan.FromHours(1);
+    DateTime staleBefore = DateTime.UtcNow - staleAfter;
+    foreach (string staleDirectory in Directory.EnumerateDirectories(Path.GetTempPath(), "hexalith-chatbot-keycloak-*"))
+    {
+        try
+        {
+            if (Directory.GetLastWriteTimeUtc(staleDirectory) >= staleBefore)
+            {
+                continue;
+            }
+
+            Directory.Delete(staleDirectory, recursive: true);
+        }
+        catch (IOException)
+        {
+            // Best effort: a locked or already-removed directory must never fail this run's startup.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Same rationale as above.
+        }
+    }
+
     // Created 0700 by CreateTempSubdirectory rather than 0755-then-chmod, and with a random name rather than the
     // process id. The previous shape lost the race it existed to win: CreateDirectory and WriteAllText both completed
     // at the default umask before SetUnixFileMode narrowed them, leaving the literal client secret world-readable on

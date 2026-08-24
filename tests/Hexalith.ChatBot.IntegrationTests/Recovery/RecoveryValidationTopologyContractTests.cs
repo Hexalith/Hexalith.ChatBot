@@ -341,6 +341,54 @@ public sealed class RecoveryValidationTopologyContractTests
     }
 
     [Fact]
+    public async Task PrepareKeycloakRealmImportWritesTheRenderedRealmWithOwnerOnlyPermissionsAtAnUnpredictablePath()
+    {
+        // Regression guard for the vulnerability this shape fixed: a predictable {temp}/hexalith-chatbot-keycloak/
+        // {pid} path plus a default-umask create-then-chmod race previously left the literal client secret
+        // world-readable. Nothing here asserted the successfully-generated file's permissions or path shape, so a
+        // future refactor could silently drop UnixCreateMode with no test failing.
+        string tempPath = Path.GetTempPath();
+        HashSet<string> before = Directory
+            .EnumerateDirectories(tempPath, "hexalith-chatbot-keycloak-*")
+            .ToHashSet(StringComparer.Ordinal);
+
+        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        string? generatedDirectory = null;
+        try
+        {
+            generatedDirectory = Directory
+                .EnumerateDirectories(tempPath, "hexalith-chatbot-keycloak-*")
+                .Except(before, StringComparer.Ordinal)
+                .SingleOrDefault();
+            generatedDirectory.ShouldNotBeNull(
+                "PrepareKeycloakRealmImport must create exactly one new hexalith-chatbot-keycloak-* temp subdirectory.");
+
+            // A fixed {pid} suffix is the predictable shape the fix replaced; CreateTempSubdirectory's random suffix
+            // must never collapse back to it.
+            Path.GetFileName(generatedDirectory)
+                .ShouldNotBe("hexalith-chatbot-keycloak-" + Environment.ProcessId, "the directory name must not be predictable.");
+
+            string realmFile = Path.Combine(generatedDirectory, "hexalith-realm.json");
+            File.Exists(realmFile).ShouldBeTrue();
+
+            if (!OperatingSystem.IsWindows())
+            {
+                File.GetUnixFileMode(realmFile).ShouldBe(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+        }
+        finally
+        {
+            await builder.DisposeAsync().ConfigureAwait(true);
+            if (generatedDirectory is not null)
+            {
+                Directory.Delete(generatedDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void RecoverySandboxKeepsLogicalControlLocatorSeparateFromPhysicalCommandTenant()
     {
         string appHost = File.ReadAllText(Path.Combine(

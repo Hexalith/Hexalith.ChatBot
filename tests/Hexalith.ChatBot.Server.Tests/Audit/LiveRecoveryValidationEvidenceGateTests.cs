@@ -228,6 +228,48 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
     }
 
     [Fact]
+    public void EvidenceWithADivergentDatasetRefIsNotOneCoherentAttempt()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        RecoveryValidationEvidenceManifest[] evidence = complete.Evidence.ToArray();
+        evidence[0] = evidence[0] with { DatasetRef = "other-baseline" };
+
+        Evaluate(complete with { Evidence = evidence }).StopShipReasons.ShouldContain("attempt_evidence_incoherent");
+    }
+
+    [Fact]
+    public void EvidenceWithADivergentDatasetVersionIsNotOneCoherentAttempt()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        RecoveryValidationEvidenceManifest[] evidence = complete.Evidence.ToArray();
+        evidence[0] = evidence[0] with { DatasetVersion = "v2" };
+
+        Evaluate(complete with { Evidence = evidence }).StopShipReasons.ShouldContain("attempt_evidence_incoherent");
+    }
+
+    [Fact]
+    public void EvidenceWithADivergentConfiguredDatasetVolumeIsNotOneCoherentAttempt()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        RecoveryValidationEvidenceManifest[] evidence = complete.Evidence.ToArray();
+        evidence[0] = evidence[0] with { ConfiguredDatasetVolume = evidence[0].ConfiguredDatasetVolume + 1 };
+
+        Evaluate(complete with { Evidence = evidence }).StopShipReasons.ShouldContain("attempt_evidence_incoherent");
+    }
+
+    [Fact]
+    public void EvidenceWithAGenuinelyDifferentRepositoryCommitIsNotOneCoherentAttempt()
+    {
+        // Complements RepositoryCommitCoherenceIsCaseInsensitive: that test proves a case-only difference does NOT
+        // trip the check; this proves a real divergence does.
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        RecoveryValidationEvidenceManifest[] evidence = complete.Evidence.ToArray();
+        evidence[0] = evidence[0] with { RepositoryCommit = new string('a', 40) };
+
+        Evaluate(complete with { Evidence = evidence }).StopShipReasons.ShouldContain("attempt_evidence_incoherent");
+    }
+
+    [Fact]
     public void AManifestWithNullMembersYieldsAReasonCodeRatherThanAnException()
     {
         LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();

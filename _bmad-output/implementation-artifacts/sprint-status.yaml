@@ -37,7 +37,7 @@
 # - Until TE-2 self-validates and the check is required, no subsequent story may move to `done`; stories remain in `review`/`in-progress` without implying product failure.
 
 generated: 2026-07-20T11:30:23+02:00
-last_updated: 2026-08-09
+last_updated: 2026-08-24
 project: chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -173,7 +173,7 @@ development_status:
   12-12-projection-rebuild-validation: done
   12-13-scoped-outage-degradation-validation: done
   12-14-wire-the-m2-audit-and-recovery-runtime-scheduler: done
-  12-15-stand-up-live-recovery-continuity-fault-injection-drivers-and-recalibrate-a10: review
+  12-15-stand-up-live-recovery-continuity-fault-injection-drivers-and-recalibrate-a10: in-progress
   12-16-bind-the-live-hexalith-memories-derived-store-backing: backlog
   epic-12-retrospective: done
   # Legacy Epics 10/12/13 are consolidated here; each surface returns to review under corrected live-route acceptance.

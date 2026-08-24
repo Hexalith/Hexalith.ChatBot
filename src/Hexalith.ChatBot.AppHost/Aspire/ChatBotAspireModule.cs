@@ -274,6 +274,12 @@ internal static class ChatBotAspireModule
         ArgumentNullException.ThrowIfNull(adminServer);
         ArgumentNullException.ThrowIfNull(adminUi);
 
+        // Reads configuration only (no resource-state dependency on AddHexalithChatBot having already run), so this
+        // call is safe and cheap even though AddHexalithChatBot already validates the full SidecarAppIds set today.
+        // It closes the gap for any composition root that calls AddEventStoreAdmin without a preceding
+        // AddHexalithChatBot on the same builder.
+        ValidateUniqueInternalGrpcPorts(builder.Configuration);
+
         // Admin.Server is an inbound DAPR service-invocation target (the Admin.UI calls it), so disable the
         // Aspire HTTP-endpoint proxy — the sidecar's app-port must equal the app's Kestrel listener (same
         // rationale as the spine resources). It references the actor state store ("statestore") for direct
