@@ -316,7 +316,7 @@ opinionated platform**, not a greenfield free choice of stack.
 | Hosting / composition | .NET **Aspire 13.3.x** AppHost (K8s/AKS + Helm deploy in 13.3 — relevant to M2 ops) | Latest 13.3 (2026-05-07); EventStore/Tenants/Folders on 13.3.x |
 | UI | Blazor + **Fluent UI v5 (RC, via FrontComposer)** — Roslyn source-gen, Fluxor, REST + SignalR projection-nudge, contract-first | ⚠️ Still RC May 2026 — inherited pre-GA dependency, pinned, do not upgrade casually |
 | CLI surface (M1) | System.CommandLine 2.0.x wrapping `Hexalith.ChatBot.Client` | Per Folders pin; verify at scaffold |
-| MCP surface (M1) | **ModelContextProtocol 1.4.1**; the implemented ChatBot MCP adapter uses stdio server transport, wraps `Hexalith.ChatBot.Client`, and translates tools to commands/queries without local governance | Pinned in the shared Builds catalog and evaluated through the consumer wrapper; architecture tests assert the evaluated pin and adapter boundary |
+| MCP surface (M1) | **ModelContextProtocol 2.2.0**; the implemented ChatBot MCP adapter uses stdio server transport, wraps `Hexalith.ChatBot.Client`, and translates tools to commands/queries without local governance | Pinned in the shared Builds catalog and evaluated through the consumer wrapper; architecture tests assert the evaluated pin and adapter boundary |
 | AI context / vector store | Hexalith.Memories (Redis Vector / FalkorDB) for scoped AI context + vector indexes (M2, NFR9a isolation) | Existing module |
 | Testing | xUnit **v3** 3.2.x, Shouldly, NSubstitute, Testcontainers; three-tier (unit / DAPR integration / Aspire E2E); conformance + isolation + idempotency as release gates | Greenfield module → v3 |
 | Code organization | Fixed module boundaries; strict Contracts→Server direction; CLI/MCP/UI depend only on Client; governance interfaces `internal` in Server (mechanical FR81a parity guarantee, NetArchTest-verifiable) | Platform convention |
@@ -409,7 +409,7 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
   from it on recovery — cannot block-the-commit AND derive-the-chain on the same write). Completeness (NFR50a)
   = reconstructability, verified by a scheduled production assertion that rebuilds state and diffs the projection.
 - **Surfaces:** EventStore command/query + REST; CLI (M1); MCP server (M1, shared-catalog-pinned
-  ModelContextProtocol 1.4.1 with stdio transport in the current implementation);
+  ModelContextProtocol 2.2.0 with stdio transport in the current implementation);
   SignalR projection-nudge (re-query on nudge, never trust payload).
 
 ### Frontend Architecture
@@ -873,7 +873,7 @@ projection → SignalR nudge → UI.
 ### Coherence Validation ✅
 
 **Decision Compatibility:** All technology choices are platform-native and version-verified current (July 2026):
-.NET 10.0.302, Aspire 13.3.x, DAPR 1.17.x, MCP SDK 1.4.1 (shared-catalog-pinned), xUnit v3. No contradictory decisions remain —
+.NET 10.0.302, Aspire 13.3.x, DAPR 1.17.x, MCP SDK 2.2.0 (shared-catalog-pinned), xUnit v3. No contradictory decisions remain —
 notably the apparent **NFR15a (fail-closed incl. "audit down") × NFR49a (WORM hash-chain) contradiction is
 resolved** by the two-phase audit model (pre-commit fail-closed gate vs post-commit reconcile-from-event-log).
 Two coherence caveats, both owned: **Fluent UI v5 is still RC** (inherited pre-GA, pinned, do-not-upgrade);

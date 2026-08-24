@@ -89,7 +89,10 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
 
             // AC3 — real composed structures exist: the FrontComposer shell skip link, the single main landmark,
             // the route heading, and genuine Fluent components inside the content region.
-            (await page.Locator("a.fc-skip-link[href=\"#fc-main-content\"]").CountAsync())
+            // The shell renders a route-qualified fragment href (FrontComposerShell's MainContentHref =>
+            // GetCurrentRouteFragmentHref("fc-main-content")), so match the fragment suffix rather than an
+            // exact "#fc-main-content" value. The nav skip link ends in "#fc-nav" and cannot collide.
+            (await page.Locator("a.fc-skip-link[href$=\"#fc-main-content\"]").CountAsync())
                 .ShouldBe(1, $"[{surface.Key}] the FrontComposer shell skip link must target #fc-main-content.");
             (await page.Locator("#fc-main-content[role=\"main\"]").CountAsync())
                 .ShouldBe(1, $"[{surface.Key}] exactly one #fc-main-content main landmark must exist.");

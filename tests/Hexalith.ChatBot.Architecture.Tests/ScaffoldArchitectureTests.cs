@@ -270,7 +270,7 @@ public static class ScaffoldArchitectureTests
             .Select(static element => element.Attribute("Include")?.Value)
             .ShouldBe(["Microsoft.Extensions.Hosting", "ModelContextProtocol"], ignoreOrder: true);
 
-        PackageCatalogTestHelper.Version("ModelContextProtocol").ShouldBe("1.4.1");
+        PackageCatalogTestHelper.Version("ModelContextProtocol").ShouldBe("2.2.0");
 
         string[] forbidden =
         [
