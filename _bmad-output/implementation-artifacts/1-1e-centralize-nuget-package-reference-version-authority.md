@@ -1,5 +1,6 @@
 ---
 baseline_commit: 9567f43d61478192cf30d0cef08aa63857ae8796
+status: in-progress
 ---
 
 # Story 1.1e: Centralize NuGet Package-Reference Version Authority
@@ -459,6 +460,8 @@ GPT-5 Codex
 
 ### Debug Log References
 
+- 2026-08-23 authorized baseline repair: Jerome explicitly authorized the narrow cross-repository source/test/configuration and eventual gitlink changes required to produce a mutually compatible Story 1.1e graph. No stage, commit, push, fetch, remote Git operation, recursive/nested initialization, `.slnx` removal, local version override, or weakened analyzer/build/test gate was authorized or performed. The prepared graph is functionally green for Builds, EventStore, Tenants, Commons, PolymorphicSerializations, Projects, Memories, Timesheets, and Works. FrontComposer's package/rc5 behavior is green and its only remaining failure is an immutable Builds-SHA lockstep assertion; Folders, Conversations, and Parties retain only explicitly classified non-story planning/gitlink regression failures. The new target validation matrix, exact source baselines, repair scope, package evidence, and required immutable landing order are recorded in `_bmad-output/implementation-artifacts/1-1e-standalone-validation-evidence-2026-08-23.md`. Because uncommitted Builds, PolymorphicSerializations, Parties, Memories, Timesheets, and Works commits and their future gitlinks do not yet have hashes, AC5's exact-commit standalone/umbrella proof remains unchecked and the story stays `in-progress`.
+- 2026-08-23 exact standalone-checkout attempt at frozen ChatBot `bd652e3`: all twelve authority/consumer rows were cloned outside the umbrella, detached at their recorded pins, initialized only at explicit root-declared paths, and audited clean with dependency-owned nested submodules uninitialized. Four rows are fully green (EventStore, Tenants, Projects, Memories). The all-green resumption gate is still unsatisfied: Builds' Dapr fixture is 28/29 on PowerShell 7.6.2 and 7.5.2; FrontComposer retains one unrelated analyzer-inventory governance failure after `npm ci`; Folders' Release package mode lacks APIs used by the pinned source; Conversations' direct Builds pin lacks override protection and Conformance retains two planning-integrity failures; Parties and Timesheets restore fail NU1506 from catalog/local-row collisions in pinned direct dependencies; Commons' direct Builds pin lacks the Diagnostics.Abstractions row and fails NU1010; PolymorphicSerializations lacks override protection and fails 26 deterministic IDE0065 diagnostics. Every standalone tree is clean after validation. The complete command, pin, dependency, test, and gate record is `_bmad-output/implementation-artifacts/1-1e-standalone-validation-evidence-2026-08-23.md`. AC5 forbids the final ChatBot stage until all rows pass, so no umbrella command, pointer/catalog workaround, completion checkbox, or sprint transition was made.
 - 2026-07-20 Correct Course disposition approved by Jerome: independent validation is now performed from isolated standalone consumer checkouts at the exact commits pinned by one recorded ChatBot baseline. Each standalone repository may initialize only dependencies declared by its own root `.gitmodules`, with explicit non-recursive pathspecs; Timesheets may initialize its direct `Hexalith.Works` dependency there. This does not authorize nested initialization inside ChatBot, any `.gitmodules` or gitlink change, an umbrella-level Works checkout, or dependency-project removal from consumer `.slnx` files. The observed `bd652e3` pin matrix and exact resumption evidence are recorded in the standalone-checkout validation gate; prior umbrella-nested evidence remains historical only.
 - 2026-07-20 completion-evidence continuation at ChatBot `82af7d3` / Builds `e4ae82d`: Builds restore and warning-as-error Release build pass with zero warnings/errors; its three test projects pass 64/64, validator fixtures pass 14/14 central, 16/16 consumer-authority, 7/7 exception, 48/48 authoritative-catalog, and 29/29 Dapr scenarios, and production validation passes the 283-entry catalog, exact 15-entry exception inventory, eight Dapr identities at `1.18.4`, Builds' six projects, and all twelve consumers across 279 projects (285 total). EventStore, Projects CI, Memories, and PolymorphicSerializations canonical Release restores/builds pass; focused green evidence includes EventStore Client 679/679 and Server 2762 passed with 25 skipped, Tenants Server 738/738, Folders Server 565/565 and UI 521/521, Conversations' package-relevant project lanes, Projects 656/656, Memories EventStore 129/129 and Web 492/492, Commons 200/200, Timesheets Server 420/420, and PolymorphicSerializations 15/15. ChatBot restore and serialized warning-as-error Release build pass with zero warnings/errors, and all 13 test projects pass 2936 tests with only the three explicitly skipped live-topology integration tests. This supersedes the prior umbrella planning-integrity blocker: Architecture is now 63/63 and UI E2E is 140/140. Independent completion remains blocked because Tenants, FrontComposer, Folders, Conversations, Parties, and Commons `.slnx` files directly enumerate projects beneath intentionally uninitialized nested gitlinks; Timesheets has an unconditional source reference to `Hexalith.Works.Contracts` but ChatBot declares no root sibling Works checkout. A solution-ownership trial made the six Release builds green, but repository governance tests explicitly require those external projects as direct solution members for Debug navigation/release support, so the trial and its two project-path probes were fully reversed. Package-focused regressions also retain partial-checkout assumptions (FrontComposer 2371/2377, Parties Client 135/137, Memories Server 2739 passed/2 failed/1 skipped, and Conversations Conformance 397/400, including unrelated planning drift). No nested submodule was initialized, no dependency was changed, all generated screenshot changes were reversed, every owning repository is clean, and `git diff --check` passes.
 - 2026-07-19 architecture correction directed by Jerome: Hexalith submodules must never initialize submodules nested beneath them. Every nested checkout initialized during the completion-evidence attempt was deinitialized with exact, non-recursive pathspecs in Tenants, FrontComposer, Folders, Commons, Parties, Conversations, and Timesheets. `git submodule status` now reports every nested gitlink with the `-` prefix, while all ChatBot root-declared submodules remain initialized. The uncommitted duplicate `AssemblyInfo.cs` in Commons' nested Polymorphic checkout was removed by deinitialization; the authoritative source change remains only in ChatBot's root-level `references/Hexalith.PolymorphicSerializations`. The canonical-build evidence obtained from initialized nested checkouts is invalid for the corrected architecture and does not satisfy the remaining task. Dependency resolution must use a module's own `references/` only in a standalone checkout and the superproject sibling directory via `../references/` when embedded.
@@ -488,6 +491,8 @@ GPT-5 Codex
 
 ### Completion Notes List
 
+- The authorized 2026-08-23 repair prepares the complete compatible content without weakening package authority. Builds now validates 285 catalog packages and passes 146/146 tests plus all catalog/audit/consumer/exception/Dapr/workflow fixtures; PolymorphicSerializations passes 15/15 under strict analyzers; Memories passes 4,819 with one documented skip using StackExchange.Redis 3.1.13 supported APIs; Timesheets passes 788 with four documented skips; and newly root-declared Works has no local `PackageVersion` row, passes authority 13/13, builds with zero warnings/errors, and passes 686 with four documented Aspire-infrastructure skips. Timesheets and Works each produce five package artifacts with promoted dependencies inspected and no NU1109. FrontComposer is on the user-requested latest Fluent V5 rc5 content (`5.0.0-rc.5-26219.1`). Final completion remains intentionally withheld until authorized commits create immutable Builds/Polymorphic/Works/consumer/root identities and the exact standalone plus unchanged umbrella matrix can be rerun.
+- The 2026-08-23 isolated rerun proves the standalone architecture itself works: every recorded consumer can initialize only its own direct dependencies while all dependency-owned nested submodules remain uninitialized, including Timesheets' exact permitted Works/Builds pins. It also proves the recorded `bd652e3` graph is not a completable AC5 baseline: only 4/12 rows are fully green and several consumer-owned direct Builds/dependency pins predate the authority migration. The evidence dossier is published, but the final ChatBot lane remains deliberately unrun because the story's ordered gate requires every standalone row to be green first.
 - Jerome's 2026-07-20 Correct Course directive resolves the architecture choice left open by the prior continuation: validate Builds and all eleven pinned external consumers in isolated standalone checkouts, then rerun ChatBot as the twelfth consumer and final umbrella lane. The final task remains unchecked until the exact identity/isolation, direct-root-dependency, canonical build/test, package-governance, clean-tree, and PASS-table evidence defined above is captured at one verified pin matrix. No manifest, solution-membership, dependency, source, or gitlink change is part of this correction.
 - The 2026-07-20 continuation clears the former umbrella regression blocker: the complete ChatBot restore/build and 13-project regression sweep are green (2936 passed, three deliberate live-topology skips), and every package-authority validator remains green across all 285 projects. Story 1.1e stays `in-progress` only because the ordered independent-consumer gate is not satisfiable in the current umbrella checkout without a broader architecture choice. Six consumer solutions intentionally expose nested dependency projects that the no-nested-initialization invariant leaves absent, while Timesheets requires Works source that ChatBot does not declare at the root. Removing those solution members conflicts with repository-owned governance contracts and was fully reversed. Completion now requires an explicit decision to validate those repositories from standalone checkouts, redesign their solution/fixture path contracts, or add an authorized umbrella-level Works dependency; no such choice is inferred by this story.
 - Nested-submodule initialization has been fully reversed following Jerome's architecture correction. All nested gitlinks are uninitialized and their temporary working-tree gitlink changes are gone. The prior canonical consumer-build evidence that depended on those checkouts is historical only; Story 1.1e remains `in-progress` pending compliant `references/` versus `../references/` dependency resolution and renewed evidence.
@@ -510,6 +515,69 @@ GPT-5 Codex
 
 ### File List
 
+- 2026-08-23 authorized repair additions (the earlier migration list follows):
+- `references/Hexalith.Builds/Tools/package-version-audit.json`
+- `references/Hexalith.Builds/Tools/test-dapr-package-version-validator.ps1`
+- `references/Hexalith.FrontComposer/_bmad-output/contracts/analyzer-policy-exception-ledger-v1.json`
+- `references/Hexalith.FrontComposer/tests/Hexalith.FrontComposer.Contracts.UI.Tests/PackageBoundaryTests.cs`
+- `references/Hexalith.FrontComposer/tests/Hexalith.FrontComposer.Shell.Tests/Components/Layout/Story11BootstrapShellRenderTests.cs`
+- `references/Hexalith.FrontComposer/tests/Hexalith.FrontComposer.Shell.Tests/Components/Layout/Story14ShellStringOwnershipTests.cs`
+- `references/Hexalith.FrontComposer/tests/Hexalith.FrontComposer.Shell.Tests/Generated/BadgeProjectionRenderTests.cs`
+- `references/Hexalith.FrontComposer/tests/Hexalith.FrontComposer.Shell.Tests/Generated/CounterStoryVerificationTests.CounterProjectionView_LoadedState_RendersColumnsAndFormatting.verified.txt`
+- `references/Hexalith.FrontComposer/tests/Hexalith.FrontComposer.Shell.Tests/Generated/CounterStoryVerificationTests.StatusProjectionView_NullAndBooleanValues_RenderSnapshot.verified.txt`
+- `references/Hexalith.FrontComposer/tests/Hexalith.FrontComposer.Shell.Tests/Generated/CounterStoryVerificationTests.cs`
+- `references/Hexalith.FrontComposer/tests/Hexalith.FrontComposer.Shell.Tests/Generated/ExpandInRowGeneratedGridTests.cs`
+- `references/Hexalith.FrontComposer/tests/Hexalith.FrontComposer.Shell.Tests/Generated/GeneratedComponentTestBase.cs`
+- `references/Hexalith.FrontComposer/tests/Hexalith.FrontComposer.Shell.Tests/Generated/WidePriorityProjectionRenderTests.cs`
+- `references/Hexalith.FrontComposer/tests/Hexalith.FrontComposer.Shell.Tests/Governance/FluentConformanceTests.cs`
+- `references/Hexalith.FrontComposer/tests/Hexalith.FrontComposer.SourceTools.Tests/Integration/PackagedAnalyzerConsumerTests.cs`
+- `references/Hexalith.FrontComposer/tests/Hexalith.FrontComposer.Testing.Tests/PackageBoundaryTests.cs`
+- `references/Hexalith.Parties/tests/Hexalith.Parties.Ci.Tests/CommonsHttpRestoreRoutingTests.cs`
+- `references/Hexalith.Parties/tests/Hexalith.Parties.Contracts.Tests/Package/ContractsPackageTests.cs`
+- `references/Hexalith.Parties/tests/Hexalith.Parties.UI.Tests/GdprDestructiveButtonTests.cs`
+- `references/Hexalith.PolymorphicSerializations/.editorconfig`
+- `references/Hexalith.PolymorphicSerializations/src/libraries/Hexalith.PolymorphicSerializations.CodeGenerators/AssemblyInfo.cs`
+- `references/Hexalith.Memories/src/Hexalith.Memories.Server/Activities/Ingestion/ReleaseDedupKeyIfOwnedActivity.cs`
+- `references/Hexalith.Memories/src/Hexalith.Memories.Server/Export/TenantExportService.cs`
+- `references/Hexalith.Memories/src/Hexalith.Memories.Server/Tenants/TenantIsolationVerifier.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Indexing/IndexGraphActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Indexing/VerifyConsistencyActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Ingestion/ReleaseDedupKeyIfOwnedActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Tenants/DeleteFalkorDbBatchActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Tenants/DeleteFalkorDbGraphActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Tenants/DeleteFalkorDbGraphFinalizerActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Tenants/DeleteRediSearchActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Tenants/DeleteRediSearchIndexActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Tenants/DeleteRedisVectorActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Tenants/DeleteRedisVectorIndexActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Tenants/ProvisionRediSearchActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Tenants/ProvisionRedisVectorActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Cases/CaseActivityServiceTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Cases/RecordCaseActivityActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Endpoints/MemoryUnitLookupEndpointTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Endpoints/SearchEndpointDegradationTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Export/TenantExportServiceTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Graph/GraphTraversalServiceTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/HealthChecks/FalkorDbHealthCheckTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/HealthChecks/RediSearchHealthCheckTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/HealthChecks/RedisVectorHealthCheckTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Ingestion/IngestDedupReservationTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Ingestion/SourceUriMemoryUnitLookupTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/RedisExceptionFactory.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/RedisExceptionFactoryTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Search/SemanticSearchServiceTests.cs`
+- `references/Hexalith.Timesheets/.editorconfig`
+- `references/Hexalith.Timesheets/tests/Hexalith.Timesheets.ArchitectureTests/FitnessTests/DependencyDirectionTests.cs`
+- `references/Hexalith.Timesheets/tests/Hexalith.Timesheets.IntegrationTests/MagicLinkConfirmationHttpBoundaryTests.cs`
+- `references/Hexalith.Works/.editorconfig`
+- `references/Hexalith.Works/Directory.Build.props`
+- `references/Hexalith.Works/Directory.Packages.props`
+- `references/Hexalith.Works/src/Hexalith.Works.AppHost/ProjectMetadataPaths.cs`
+- `references/Hexalith.Works/src/Hexalith.Works.Contracts/Hexalith.Works.Contracts.csproj`
+- `references/Hexalith.Works/tests/Hexalith.Works.ArchitectureTests/FitnessTests/EventStoreApiSurfaceCharacterizationTests.cs`
+- `references/Hexalith.Works/tests/Hexalith.Works.ArchitectureTests/FitnessTests/RepositoryRoot.cs`
+- `references/Hexalith.Works/tests/Hexalith.Works.IntegrationTests/WorksDomainEventProcessorTests.cs`
+- `_bmad-output/implementation-artifacts/1-1e-standalone-validation-evidence-2026-08-23.md`
 - `_bmad-output/implementation-artifacts/1-1e-centralize-nuget-package-reference-version-authority.md`
 - `_bmad-output/implementation-artifacts/epic-1-context.md`
 - `_bmad-output/implementation-artifacts/spec-1-1e-initialize-hexalith-works-submodule.md`
@@ -661,6 +729,8 @@ GPT-5 Codex
 
 ### Change Log
 
+- 2026-08-23: Used Jerome's explicit cross-repository baseline-repair authorization to prepare and validate the mutually compatible target graph without local version overrides, nested initialization, solution removal, or weakened gates. Added Builds authority/audit coverage for Works' `FsCheck` dependency, completed Fluent V5 rc5, StackExchange.Redis 3.1.13, strict Polymorphic analyzer, Parties package, Timesheets, and Works compatibility repairs, and published the target matrix plus required immutable landing order. Story remains `in-progress` because the uncommitted owning-repository commits and final root gitlink baseline do not yet have immutable hashes.
+- 2026-08-23: Executed the Correct Course standalone-checkout contract against exact baseline `bd652e3`, published the full identity/dependency/command/gate dossier, and retained `in-progress` status because only 4/12 standalone rows are fully green. The final ChatBot stage remains unrun by the story's ordered AC5 gate.
 - 2026-07-20: Adopted Jerome's standalone-checkout correction for independent validation. Recorded the `bd652e3` observed pin matrix, made checkout-root semantics explicit, permitted Timesheets' own root-declared Works only in standalone Timesheets, prohibited ChatBot nested initialization and manifest/solution workarounds, and defined the exact evidence dossier required before the final umbrella stage resumes. Story and sprint status remain `in-progress` pending that renewed evidence.
 - 2026-07-20: Re-ran all package-authority, independent-consumer, and umbrella evidence at root `82af7d3`. ChatBot is fully green (zero-warning Release build; 2936 tests passed and three live-topology skips), clearing the prior planning-regression blocker. The remaining independent gate still conflicts with the no-nested-submodule invariant and Timesheets' absent umbrella-level Works dependency; a broader solution-ownership trial was reversed after repository governance contracts proved it out of scope. Story and sprint status remain `in-progress`.
 - 2026-07-19: Reversed all nested-submodule initialization after Jerome clarified the repository invariant. Every nested gitlink is uninitialized again; ChatBot root-declared submodules remain initialized. Invalidated the canonical-build evidence that depended on nested checkouts and kept Story 1.1e `in-progress` pending sibling `../references/` resolution.
