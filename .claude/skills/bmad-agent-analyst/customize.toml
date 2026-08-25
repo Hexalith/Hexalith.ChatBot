@@ -100,6 +100,6 @@ description = "Working Backwards PRFAQ challenge — forge and stress-test produ
 skill = "bmad-prfaq"
 
 [[agent.menu]]
-code = "DP"
-description = "Analyze an existing project to produce documentation for human and LLM consumption"
-skill = "bmad-document-project"
+code = "PC"
+description = "Set up or refresh this repo's agent instructions — verified commands, policy, conventions, pitfalls (setup, refresh, record, audit)"
+skill = "bmad-project-context"
