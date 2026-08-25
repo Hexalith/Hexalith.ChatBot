@@ -38,4 +38,36 @@ internal static class ChatBotDomainServiceIdentity
 
     /// <summary>The configuration section that may override the identity without a code change.</summary>
     public const string ConfigurationSection = "ChatBot:ProjectionIdentity";
+
+    /// <summary>
+    /// Resolves the app id by precedence: explicit ChatBot configuration, then the SDK's own configuration key,
+    /// then the DAPR-supplied app id, and only then the pinned constant.
+    /// </summary>
+    /// <param name="configured">The <c>ChatBot:ProjectionIdentity:AppId</c> value, if any.</param>
+    /// <param name="sdkConfigured">The <c>EventStore:DomainService:AppId</c> value, if any.</param>
+    /// <param name="daprAppId">The <c>DAPR_APP_ID</c> environment value, if any.</param>
+    /// <returns>The app id to present to EventStore.</returns>
+    public static string ResolveAppId(string? configured, string? sdkConfigured, string? daprAppId)
+        => FirstUsable(configured, sdkConfigured, daprAppId) ?? AppId;
+
+    /// <summary>Resolves the service version by the same precedence, minus the DAPR-supplied value.</summary>
+    /// <param name="configured">The <c>ChatBot:ProjectionIdentity:ServiceVersion</c> value, if any.</param>
+    /// <param name="sdkConfigured">The <c>EventStore:DomainService:ServiceVersion</c> value, if any.</param>
+    /// <returns>The service version to present to EventStore.</returns>
+    public static string ResolveServiceVersion(string? configured, string? sdkConfigured)
+        => FirstUsable(configured, sdkConfigured) ?? ServiceVersion;
+
+    /// <summary>
+    /// Whether a resolved identity component is usable. EventStore compares these verbatim, so anything that is
+    /// not a safe stable identifier can only ever produce a silent capability refusal.
+    /// </summary>
+    /// <param name="value">The resolved component.</param>
+    /// <returns><see langword="true"/> when the component can participate in the comparison.</returns>
+    public static bool IsUsableIdentityComponent(string? value)
+        => !string.IsNullOrWhiteSpace(value)
+            && value.Length <= 128
+            && value.All(static c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.');
+
+    private static string? FirstUsable(params string?[] candidates)
+        => candidates.FirstOrDefault(static candidate => !string.IsNullOrWhiteSpace(candidate))?.Trim();
 }

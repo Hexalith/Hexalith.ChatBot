@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -348,11 +349,12 @@ public static class LiveRecoveryValidationArchitectureTests
         // The release must depend on the independent gate, not merely on the run that produced the evidence.
         release.ShouldContain("- live-recovery-evidence-gate");
 
-        // A substring match on the raw text passed on a file the test platform rejects outright: an XML comment
-        // may not contain the double-hyphen digraph, and the header comment carried it twice, so every required
-        // live-recovery lane aborted with "Settings file provided does not conform to required format" while this
-        // guard stayed green. Parse the document first, then read the setting out of the parsed tree, so the guard
-        // fails on malformed XML as well as on a missing or false value.
+        // Three layers, because each is strictly weaker than the lane's real requirement:
+        //   1. the document parses (catches the double-hyphen digraph that broke every lane), and
+        //   2. TreatNoTestsAsError is actually true in the parsed tree, and
+        //   3. the TEST PLATFORM accepts it — a well-formed but schema-invalid settings file reproduces the same
+        //      "guard green, required lane dead" class, so parsing alone is not the bar.
+        // Layer 3 lives in RunSettingsIsAcceptedByTheTestPlatform below.
         string runSettingsPath = Path.Combine(RepositoryRoot(), "live-recovery.runsettings");
         XDocument runSettings = Should.NotThrow(() => XDocument.Load(runSettingsPath, LoadOptions.None));
         XElement? treatNoTestsAsError = runSettings
@@ -362,6 +364,53 @@ public static class LiveRecoveryValidationArchitectureTests
         treatNoTestsAsError.ShouldNotBeNull();
         bool.TryParse(treatNoTestsAsError.Value.Trim(), out bool treatNoTestsAsErrorValue).ShouldBeTrue();
         treatNoTestsAsErrorValue.ShouldBeTrue();
+    }
+
+    /// <summary>
+    /// Proves the test platform itself accepts the run settings, not merely that it is well-formed XML.
+    /// </summary>
+    /// <remarks>
+    /// The lane needs `dotnet test --settings live-recovery.runsettings` to start. A file can parse cleanly and
+    /// still be rejected ("Settings file provided does not conform to required format"), which is the same
+    /// guard-green/lane-dead failure class the parse check was added for. This runs the real runner against the
+    /// real file with a filter that matches nothing, and asserts the platform did not reject the settings.
+    /// </remarks>
+    [Fact]
+    public static void RunSettingsIsAcceptedByTheTestPlatform()
+    {
+        string repositoryRoot = RepositoryRoot();
+        using Process process = new()
+        {
+            StartInfo = new ProcessStartInfo("dotnet")
+            {
+                WorkingDirectory = repositoryRoot,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            },
+        };
+        foreach (string argument in new[]
+        {
+            "test",
+            Path.Combine("tests", "Hexalith.ChatBot.Architecture.Tests", "Hexalith.ChatBot.Architecture.Tests.csproj"),
+            "--no-build",
+            "--filter",
+            "FullyQualifiedName=Hexalith.ChatBot.Architecture.Tests.RunSettingsPlatformAcceptanceProbe",
+            "--settings",
+            "live-recovery.runsettings",
+        })
+        {
+            process.StartInfo.ArgumentList.Add(argument);
+        }
+
+        _ = process.Start();
+        string output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
+        _ = process.WaitForExit(TimeSpan.FromMinutes(5));
+
+        output.ShouldNotContain(
+            "does not conform to required format",
+            Case.Insensitive,
+            "the test platform rejected the run settings, so every lane that passes it dies before running.");
     }
 
     [Fact]

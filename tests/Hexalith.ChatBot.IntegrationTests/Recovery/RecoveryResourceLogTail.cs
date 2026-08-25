@@ -10,19 +10,34 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 /// </summary>
 /// <remarks>
 /// The recovery lane previously discarded every resource log, so a persistent <c>503</c> at the mailbox admission
-/// probe carried no reason code and could not be distinguished from a slow start. The tail is bounded, is read only
-/// when a failure is already being reported, and is never written to an evidence manifest, report, or artifact — it
-/// is diagnostic test output only.
+/// probe carried no reason code and could not be distinguished from a slow start.
+/// </remarks>
+/// <remarks>
+/// <para>
+/// <b>Metadata only.</b> An earlier revision rendered raw captured lines into the exception message, and the lane
+/// that throws it uploads its whole <c>TestResults</c> directory — including the detailed console log — as the
+/// retained evidence artifact. Raw resource logs therefore reached uploaded evidence, breaking the same
+/// metadata-only obligation this story enforces everywhere else.
+/// </para>
+/// <para>
+/// Captured content is now never rendered. <see cref="Render"/> emits only derived metadata: how many lines were
+/// captured, and the distinct logger categories and stable <c>Stage=</c> tokens observed. Those name where to look
+/// without carrying message bodies, identifiers, payloads or claims into an artifact.
+/// </para>
 /// </remarks>
 internal sealed class RecoveryResourceLogTail : IAsyncDisposable
 {
     private readonly Task _captureTask;
     private readonly ConcurrentQueue<string> _lines = new();
+    private static readonly TimeSpan DrainBudget = TimeSpan.FromSeconds(5);
+    private const int MaximumRenderedTokens = 20;
+    private const int MaximumTokenLength = 128;
     private readonly int _maximumLines;
     private readonly string _resourceName;
     private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly CancellationTokenSource _stopSource;
     private int _stopRequested;
+    private volatile string? _captureFault;
 
     private RecoveryResourceLogTail(
         string resourceName,
@@ -32,7 +47,11 @@ internal sealed class RecoveryResourceLogTail : IAsyncDisposable
     {
         _resourceName = resourceName;
         _maximumLines = maximumLines;
-        _stopSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        // Deliberately NOT linked to the caller's token. Both tails are started under the startup CTS, and that is
+        // the very CTS whose expiry triggers the diagnostic they exist to explain — a linked capture would be
+        // cancelled by its own trigger and render an empty tail exactly when it is needed.
+        _stopSource = new CancellationTokenSource();
         _captureTask = CaptureAsync(logBatches);
     }
 
@@ -64,22 +83,59 @@ internal sealed class RecoveryResourceLogTail : IAsyncDisposable
         }
     }
 
-    /// <summary>Renders the retained tail, newest last, for a failure message or test output.</summary>
-    /// <param name="matching">When supplied, keeps only lines containing this token (ordinal, case-insensitive).</param>
-    /// <returns>The rendered tail.</returns>
-    public string Render(string? matching = null)
+    /// <summary>Renders derived, metadata-only evidence from the retained tail.</summary>
+    /// <returns>Counts and observed categories/stages — never captured content.</returns>
+    public string Render()
     {
-        IEnumerable<string> lines = _lines;
-        if (!string.IsNullOrWhiteSpace(matching))
+        string[] captured = [.. _lines];
+        string fault = _captureFault is { Length: > 0 } observed ? $" captureFault={observed}" : string.Empty;
+        if (captured.Length == 0)
         {
-            lines = lines.Where(line => line.Contains(matching, StringComparison.OrdinalIgnoreCase));
+            return $"[{_resourceName}] no captured log lines.{fault}";
         }
 
-        string[] rendered = [.. lines];
-        return rendered.Length == 0
-            ? $"[{_resourceName}] no captured log lines."
-            : $"[{_resourceName}] last {rendered.Length} captured line(s):{Environment.NewLine}"
-                + string.Join(Environment.NewLine, rendered);
+        string[] categories = [.. captured
+            .Select(line => Extract(line, "\"Category\":\"", "\""))
+            .Where(static value => value is not null)
+            .Select(static value => value!)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .Take(MaximumRenderedTokens)];
+        string[] stages = [.. captured
+            .Select(line => Extract(line, "Stage=", ","))
+            .Where(static value => value is not null)
+            .Select(static value => value!)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .Take(MaximumRenderedTokens)];
+
+        return $"[{_resourceName}] capturedLines={captured.Length}"
+            + $" categories=[{string.Join('|', categories)}]"
+            + $" stages=[{string.Join('|', stages)}]"
+            + fault;
+    }
+
+    /// <summary>Pulls one bounded, delimiter-fenced token out of a captured line.</summary>
+    private static string? Extract(string line, string prefix, string terminator)
+    {
+        int start = line.IndexOf(prefix, StringComparison.Ordinal);
+        if (start < 0)
+        {
+            return null;
+        }
+
+        start += prefix.Length;
+        int end = line.IndexOf(terminator, start, StringComparison.Ordinal);
+        int length = end < 0 ? line.Length - start : end - start;
+        if (length <= 0 || length > MaximumTokenLength)
+        {
+            return null;
+        }
+
+        string token = line[start..(start + length)];
+
+        // Defence in depth: only emit tokens that are safe stable identifiers, never free text.
+        return token.All(static c => char.IsLetterOrDigit(c) || c is '.' or '-' or '_') ? token : null;
     }
 
     /// <summary>Cancels and drains the capture loop.</summary>
@@ -93,11 +149,14 @@ internal sealed class RecoveryResourceLogTail : IAsyncDisposable
 
         try
         {
-            await _captureTask.ConfigureAwait(false);
+            // Bounded: an enumerator that does not observe cancellation promptly must not hang the lane at scope
+            // exit — the same unbounded-join pathology this change set removes from the EventStore host. Nothing
+            // is rethrown, because disposal runs while a real failure may already be unwinding.
+            await _captureTask.WaitAsync(DrainBudget).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (Exception)
         {
-            // Shutdown is the expected end of the capture loop.
+            // Includes TimeoutException from the drain budget and any capture fault. Diagnostics never win.
         }
         finally
         {
@@ -136,8 +195,11 @@ internal sealed class RecoveryResourceLogTail : IAsyncDisposable
         }
         catch (Exception exception)
         {
-            _started.TrySetException(exception);
-            throw;
+            // A diagnostic helper must never be able to become the failure. Rethrowing here surfaced at scope exit
+            // and REPLACED the genuine test failure already unwinding — the precise way this session kept losing
+            // diagnoses. The fault is retained as renderable metadata instead, and the capture ends quietly.
+            _captureFault = exception.GetType().Name;
+            _started.TrySetResult();
         }
     }
 }

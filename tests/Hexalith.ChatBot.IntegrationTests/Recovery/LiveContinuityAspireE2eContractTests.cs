@@ -70,4 +70,27 @@ public sealed class LiveContinuityAspireE2eContractTests
     [InlineData("", false)]
     public void MailboxAdmissionProofRequiresTheDispatchUnavailableProblemType(string problemDetails, bool expected)
         => LiveContinuityAspireE2eTests.IsDispatchUnavailableProblem(problemDetails).ShouldBe(expected);
+
+    /// <summary>
+    /// The admission proof requires BOTH the dispatch-unavailable problem type AND a 503; the body predicate alone
+    /// would accept that document under any status, which is not what the production check does.
+    /// </summary>
+    /// <param name="statusCode">The status observed alongside the dispatch-unavailable body.</param>
+    /// <param name="expectedAdmissionProof">Whether that pair proves admission.</param>
+    [Theory]
+    [InlineData(HttpStatusCode.ServiceUnavailable, true)]
+    [InlineData(HttpStatusCode.InternalServerError, false)]
+    [InlineData(HttpStatusCode.BadGateway, false)]
+    public void MailboxAdmissionProofRequiresServiceUnavailableAlongsideTheProblemType(
+        HttpStatusCode statusCode,
+        bool expectedAdmissionProof)
+    {
+        const string body =
+            "{\"type\":\"https://hexalith.dev/errors/chatbot/dispatch-unavailable\",\"status\":503}";
+
+        bool provesAdmission = statusCode == HttpStatusCode.ServiceUnavailable
+            && LiveContinuityAspireE2eTests.IsDispatchUnavailableProblem(body);
+
+        provesAdmission.ShouldBe(expectedAdmissionProof);
+    }
 }

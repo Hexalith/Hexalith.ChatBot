@@ -17,13 +17,12 @@ namespace Hexalith.ChatBot.Server.Tests.Projections;
 /// (<c>Hexalith.ChatBot.Server</c>) — never the DAPR app id EventStore registers and invokes this service under —
 /// and the SDK answered <c>400 UnsupportedCapability</c> to every operational-index refresh. Post-cutover that
 /// stops the projection checkpoint advancing at all, because advancement requires the named fenced completion, so
-/// the poller re-delivers the same aggregates indefinitely. These tests exist so the identity cannot silently
-/// regress to the assembly name or to blank.
+/// the poller re-delivers the same aggregates indefinitely.
 /// </remarks>
 public sealed class ChatBotProjectionIdentityTests
 {
     [Fact]
-    public void ResolvedIdentityIsNonEmptyAndMatchesTheDaprAppIdEventStoreInvokes()
+    public void ResolvedIdentityIsUsableAndIsNotTheAssemblyName()
     {
         using WebApplicationFactory<Program> factory = new();
 
@@ -31,36 +30,59 @@ public sealed class ChatBotProjectionIdentityTests
             .GetRequiredService<IOptions<DomainProjectionIdentityOptions>>()
             .Value;
 
-        // The defect was an identity that resolved to the assembly name; the SDK compares it to the caller's
-        // registered DAPR app id and refuses the whole capability on mismatch.
-        identity.AppId.ShouldNotBeNullOrWhiteSpace();
-        identity.ServiceVersion.ShouldNotBeNullOrWhiteSpace();
+        ChatBotDomainServiceIdentity.IsUsableIdentityComponent(identity.AppId).ShouldBeTrue();
+        ChatBotDomainServiceIdentity.IsUsableIdentityComponent(identity.ServiceVersion).ShouldBeTrue();
         identity.AppId.ShouldNotBe(typeof(Program).Assembly.GetName().Name);
         identity.AppId.ShouldBe(ChatBotDomainServiceIdentity.AppId);
-        identity.ServiceVersion.ShouldBe(ChatBotDomainServiceIdentity.ServiceVersion);
-        Should.NotThrow(identity.Validate);
     }
+
+    /// <summary>
+    /// Precedence is the whole point: an unconditional override silently kills <c>EventStore:DomainService</c>
+    /// binding and <c>DAPR_APP_ID</c>, so any prefixed, canary or multi-instance deployment reintroduces the
+    /// mismatch this exists to prevent.
+    /// </summary>
+    /// <param name="chatBotConfigured">The ChatBot-specific override.</param>
+    /// <param name="sdkConfigured">The SDK's own configuration key.</param>
+    /// <param name="daprAppId">The DAPR-supplied app id.</param>
+    /// <param name="expected">The app id that must win.</param>
+    [Theory]
+    [InlineData("chatbot-canary", "chatbot-sdk", "chatbot-dapr", "chatbot-canary")]
+    [InlineData(null, "chatbot-sdk", "chatbot-dapr", "chatbot-sdk")]
+    [InlineData(null, null, "chatbot-dapr", "chatbot-dapr")]
+    [InlineData(null, null, null, "chatbot")]
+    [InlineData("   ", "  ", "chatbot-dapr", "chatbot-dapr")]
+    public void AppIdPrecedenceIsExplicitConfigThenSdkConfigThenDaprThenConstant(
+        string? chatBotConfigured,
+        string? sdkConfigured,
+        string? daprAppId,
+        string expected)
+        => ChatBotDomainServiceIdentity.ResolveAppId(chatBotConfigured, sdkConfigured, daprAppId).ShouldBe(expected);
 
     [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void ABlankConfiguredIdentityFallsBackToTheDaprAppIdRatherThanTheAssemblyName(string configured)
-    {
-        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder => builder.UseSetting(
-                $"{ChatBotDomainServiceIdentity.ConfigurationSection}:AppId",
-                configured));
+    [InlineData("v2", null, "v2")]
+    [InlineData(null, "v3", "v3")]
+    [InlineData(null, null, "v1")]
+    public void ServiceVersionPrecedenceFollowsTheSameOrder(string? configured, string? sdkConfigured, string expected)
+        => ChatBotDomainServiceIdentity.ResolveServiceVersion(configured, sdkConfigured).ShouldBe(expected);
 
-        DomainProjectionIdentityOptions identity = factory.Services
-            .GetRequiredService<IOptions<DomainProjectionIdentityOptions>>()
-            .Value;
-
-        identity.AppId.ShouldBe(ChatBotDomainServiceIdentity.AppId);
-        Should.NotThrow(identity.Validate);
-    }
+    /// <summary>
+    /// The validation must be reachable: EventStore compares these verbatim, so an identity that is not a safe
+    /// stable identifier can only ever produce a silent capability refusal.
+    /// </summary>
+    /// <param name="candidate">The component under test.</param>
+    /// <param name="expected">Whether it is usable.</param>
+    [Theory]
+    [InlineData("chatbot", true)]
+    [InlineData("chatbot-canary.1", true)]
+    [InlineData("", false)]
+    [InlineData("   ", false)]
+    [InlineData("chat bot", false)]
+    [InlineData("chatbot/v1", false)]
+    public void OnlySafeStableIdentifiersAreUsable(string candidate, bool expected)
+        => ChatBotDomainServiceIdentity.IsUsableIdentityComponent(candidate).ShouldBe(expected);
 
     [Fact]
-    public void AConfiguredIdentityOverridesTheDefaultSoADeployedVersionCanDiffer()
+    public void AConfiguredIdentityOverridesTheDefaultEndToEnd()
     {
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>

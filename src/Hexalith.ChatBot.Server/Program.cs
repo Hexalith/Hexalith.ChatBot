@@ -20,30 +20,33 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 _ = builder.AddEventStoreDomainService(typeof(GovernedOperationAggregate).Assembly);
 
-// Pin the identity EventStore negotiates named projections against. The SDK derives an unconfigured AppId from
-// DAPR_APP_ID, falling back to the .NET application name ("Hexalith.ChatBot.Server"), which is never the DAPR app
-// id EventStore registers and invokes this service under - so the SDK answers 400 UnsupportedCapability on every
-// operational-index refresh. Post-cutover that is not a lost optimisation: the projection checkpoint can then only
-// advance through the named fenced completion, so it never advances and the poller re-delivers forever.
-// This overrides the derived default rather than only filling an empty one, and ValidateOnStart is deliberate -
-// a blank identity must fail startup, not degrade silently.
+// Resolve the identity EventStore negotiates named projections against. The SDK derives an unconfigured AppId
+// from DAPR_APP_ID, falling back to the .NET application name ("Hexalith.ChatBot.Server"), which is never the DAPR
+// app id EventStore registers and invokes this service under - so the SDK answers 400 UnsupportedCapability on
+// every operational-index refresh. Post-cutover that is not a lost optimisation: the projection checkpoint can then
+// only advance through the named fenced completion, so it never advances and the poller re-delivers forever.
+//
+// Precedence matters: an unconditional override would silently kill both EventStore:DomainService binding and
+// DAPR_APP_ID, so any per-environment prefix, canary or multi-instance deployment would reintroduce the very
+// mismatch this exists to prevent. Explicit configuration wins, then the DAPR-supplied app id, and the pinned
+// constant is only a last-resort fallback for hosts that supply neither.
 _ = builder.Services
     .AddOptions<DomainProjectionIdentityOptions>()
     .PostConfigure(options =>
     {
-        string? configuredAppId = builder.Configuration[$"{ChatBotDomainServiceIdentity.ConfigurationSection}:AppId"];
-        string? configuredVersion =
-            builder.Configuration[$"{ChatBotDomainServiceIdentity.ConfigurationSection}:ServiceVersion"];
-        options.AppId = string.IsNullOrWhiteSpace(configuredAppId)
-            ? ChatBotDomainServiceIdentity.AppId
-            : configuredAppId;
-        options.ServiceVersion = string.IsNullOrWhiteSpace(configuredVersion)
-            ? ChatBotDomainServiceIdentity.ServiceVersion
-            : configuredVersion;
+        options.AppId = ChatBotDomainServiceIdentity.ResolveAppId(
+            builder.Configuration[$"{ChatBotDomainServiceIdentity.ConfigurationSection}:AppId"],
+            builder.Configuration["EventStore:DomainService:AppId"],
+            Environment.GetEnvironmentVariable("DAPR_APP_ID"));
+        options.ServiceVersion = ChatBotDomainServiceIdentity.ResolveServiceVersion(
+            builder.Configuration[$"{ChatBotDomainServiceIdentity.ConfigurationSection}:ServiceVersion"],
+            builder.Configuration["EventStore:DomainService:ServiceVersion"]);
     })
     .Validate(
-        static options => !string.IsNullOrWhiteSpace(options.AppId) && !string.IsNullOrWhiteSpace(options.ServiceVersion),
-        "The ChatBot projection identity requires a non-empty AppId and ServiceVersion.")
+        static options => ChatBotDomainServiceIdentity.IsUsableIdentityComponent(options.AppId)
+            && ChatBotDomainServiceIdentity.IsUsableIdentityComponent(options.ServiceVersion),
+        "The ChatBot projection identity requires an AppId and ServiceVersion that are safe stable identifiers; "
+        + "EventStore compares them verbatim and refuses the whole named-projection capability on any mismatch.")
     .ValidateOnStart();
 _ = builder.Services.AddChatBotCommandGateway();
 _ = builder.AddEventStoreDomainTelemetry("chatbot");

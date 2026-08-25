@@ -454,11 +454,20 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 _faultProbeNoteRef,
                 AbsenceConfirmationWindow,
                 cancellationToken);
+            // Positive control first: the checkpoint notes are known-present server writes in the same partition.
+            await AssertProjectionChannelReadsServerWritesAsync(
+                RecoveryValidationTopology.StorageTenantRef,
+                _checkpointNoteRefs[0],
+                cancellationToken).ConfigureAwait(false);
             bool projectionFaultAbsent = await RemainsGovernedOperationProjectionAbsentAsync(
                 RecoveryValidationTopology.StorageTenantRef,
                 _faultProbeNoteRef,
                 cancellationToken).ConfigureAwait(false);
-            unauthorizedMutationAbsent = projectionFaultAbsent && await durableFaultAbsent.ConfigureAwait(false);
+            // Always await the durable half, even when the projection half already decided the outcome: short
+            // circuiting left a started task unobserved on the NFR59 path, so a fault in it surfaced as an
+            // unobserved task exception instead of a verdict input.
+            bool durableAbsent = await durableFaultAbsent.ConfigureAwait(false);
+            unauthorizedMutationAbsent = projectionFaultAbsent && durableAbsent;
         }
 
         List<Task<bool>> crossTenantAbsenceChecks = _checkpointNoteRefs
@@ -542,25 +551,27 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         // failing hosted run cannot say which of the five sub-checks did not hold. Only stable check names are
         // recorded — never an identifier, a tenant or a payload — and they go to stderr, not to any report.
         List<string> incompleteChecks = [];
+        // Read presence through the projection channel, not the read API. A governed operation that is missing
+        // answers 403 safe-not-found, which threw past the TimeoutException handlers below and took the whole
+        // cleanup — and its RECOVERY_CLEANUP_INCOMPLETE diagnostic — out with it, so three of the five sub-checks
+        // could never be reported and the diagnostic could not fire in the case it exists for.
         foreach (string noteRef in _checkpointNoteRefs)
         {
             try
             {
-                if (!await WaitForGovernedOperationAsync(
-                    noteRef,
-                    _checkpointCorrelationId,
-                    expectPresent: true,
-                    userAccessToken,
-                    cancellationToken).ConfigureAwait(false))
+                GovernedOperationView? view = await _governedOperationProjections
+                    .GetAsync(RecoveryValidationTopology.StorageTenantRef, noteRef, cancellationToken)
+                    .ConfigureAwait(false);
+                if (view is null)
                 {
                     complete = false;
                     incompleteChecks.Add("checkpoint-note-not-present");
                 }
             }
-            catch (TimeoutException)
+            catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 complete = false;
-                incompleteChecks.Add("checkpoint-note-presence-timeout");
+                incompleteChecks.Add("checkpoint-note-presence-faulted");
             }
         }
 
@@ -568,21 +579,19 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         {
             try
             {
-                if (!await WaitForGovernedOperationAsync(
-                    _controlTenantNoteRef,
-                    _checkpointCorrelationId,
-                    expectPresent: true,
-                    controlAccessToken,
-                    cancellationToken).ConfigureAwait(false))
+                GovernedOperationView? controlView = await _governedOperationProjections
+                    .GetAsync(RecoveryValidationTopology.ControlTenantRef, _controlTenantNoteRef, cancellationToken)
+                    .ConfigureAwait(false);
+                if (controlView is null)
                 {
                     complete = false;
                     incompleteChecks.Add("control-note-not-present");
                 }
             }
-            catch (TimeoutException)
+            catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 complete = false;
-                incompleteChecks.Add("control-note-presence-timeout");
+                incompleteChecks.Add("control-note-presence-faulted");
             }
         }
 
@@ -653,8 +662,10 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 incompleteChecks.Add("erased-projection-still-present");
             }
         }
-        catch (InvalidOperationException)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            // Symmetric with the fault-probe branch above: both now read Dapr directly and can throw Dapr or
+            // HTTP exceptions, not only InvalidOperationException.
             complete = false;
             incompleteChecks.Add("post-erase-absence-faulted");
         }
@@ -1239,6 +1250,36 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     /// <param name="noteRef">The governed note that must never have landed.</param>
     /// <param name="cancellationToken">Cancels the observation.</param>
     /// <returns><see langword="true"/> when the projection stayed absent for the whole window.</returns>
+    /// <summary>
+    /// Proves the projection channel can actually read a view the SERVER wrote, before any absence result from it
+    /// is believed.
+    /// </summary>
+    /// <remarks>
+    /// Without this, the absence probe is vacuous by construction: point it at the wrong tenant partition or the
+    /// wrong component and every call returns "absent", so "no unauthorized mutation landed" and "erasure
+    /// succeeded" both pass while observing nothing at all. A known-present read through the same store, same
+    /// component and same key shape is what makes a subsequent null a fact rather than an artefact.
+    /// </remarks>
+    /// <param name="tenantRef">The tenant partition the absence probe will read.</param>
+    /// <param name="presentNoteRef">A governed note the server is known to have projected.</param>
+    /// <param name="cancellationToken">Cancels the control read.</param>
+    /// <returns>A task that completes when the channel is proven readable.</returns>
+    private async Task AssertProjectionChannelReadsServerWritesAsync(
+        string tenantRef,
+        string presentNoteRef,
+        CancellationToken cancellationToken)
+    {
+        GovernedOperationView? control = await _governedOperationProjections
+            .GetAsync(tenantRef, presentNoteRef, cancellationToken)
+            .ConfigureAwait(false);
+        if (control is null)
+        {
+            throw new InvalidOperationException(
+                "The governed-operation projection channel could not read a view the server is known to have "
+                + "written, so no absence observed through it can be trusted.");
+        }
+    }
+
     private async Task<bool> RemainsGovernedOperationProjectionAbsentAsync(
         string tenantRef,
         string noteRef,
@@ -1265,6 +1306,9 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             .GetAsync(tenantRef, noteRef, cancellationToken)
             .ConfigureAwait(false);
 
+        // The loop always sets observedAtLeastOnce on its first iteration, so it only guarded the case where the
+        // window was zero — and there the method would otherwise report a null final read as "present". Keep the
+        // explicit requirement that at least one in-window read completed.
         return observedAtLeastOnce && finalView is null;
     }
 

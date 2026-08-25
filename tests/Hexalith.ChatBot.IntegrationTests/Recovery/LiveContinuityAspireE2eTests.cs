@@ -802,7 +802,7 @@ public sealed class LiveContinuityAspireE2eTests
                 && type.ValueKind == JsonValueKind.String
                 && string.Equals(
                     type.GetString(),
-                    "https://hexalith.dev/errors/chatbot/dispatch-unavailable",
+                    ChatBotProblemTypes.DispatchUnavailable,
                     StringComparison.Ordinal);
         }
         catch (JsonException)

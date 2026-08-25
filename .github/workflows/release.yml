@@ -62,6 +62,7 @@ jobs:
       - name: Run required tenant-bound topology smoke and M2 stop-ship gate
         run: >-
           dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
+          -m:1
           --configuration Release
           --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
           --logger "console;verbosity=detailed"

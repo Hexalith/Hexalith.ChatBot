@@ -280,6 +280,7 @@ jobs:
       - name: Run gate self-tests with current-run TRX
         run: >-
           dotnet test tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj
+          -m:1
           --configuration Release
           --logger "trx;LogFileName=story-evidence-gate.trx"
           --results-directory "${{ runner.temp }}/machine-results/story-evidence-gate"
@@ -406,6 +407,7 @@ jobs:
       - name: Run required tenant-bound topology smoke
         run: >-
           dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
+          -m:1
           --configuration Release
           --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
           --logger "console;verbosity=detailed"

@@ -241,16 +241,20 @@ public sealed class LiveScopedOutageInjectionDriverTests
     /// <param name="unobserved">Whether the control probe timed out rather than answering a non-202.</param>
     /// <param name="expectedCause">The cause the driver must name.</param>
     [Theory]
-    [InlineData(true, "was never observed")]
-    [InlineData(false, "was refused")]
+    [InlineData(true, "was never observed", "client-timeout")]
+    [InlineData(true, "was never observed", "transport-ConnectionError")]
+    [InlineData(false, "was refused", "status-503")]
+    [InlineData(false, "was refused", "status-403")]
     public async Task IndependentControlFailureNamesWhetherTheProbeWasAnsweredOrNegative(
         bool unobserved,
-        string expectedCause)
+        string expectedCause,
+        string cause)
     {
         RecordingOperations operations = new()
         {
             IndependentControlSucceeded = false,
             IndependentControlUnobserved = unobserved,
+            IndependentControlCause = cause,
         };
         LiveScopedOutageInjectionDriver driver = new(operations, Options());
 
@@ -261,8 +265,9 @@ public sealed class LiveScopedOutageInjectionDriverTests
                 "01ARZ3NDEKTSV4RRFFQ69G5FAW",
                 TestContext.Current.CancellationToken).AsTask());
 
-        // Both shapes must stay fail-closed; only the reported cause differs.
+        // Both shapes must stay fail-closed; only the reported cause differs, and the cause itself is reported.
         failure.ToString().ShouldContain(expectedCause);
+        failure.ToString().ShouldContain($"(cause={cause})");
         operations.Restored.ShouldContain(ScopedOutageDependencies.Graph);
         operations.Cleaned.ShouldContain(ScopedOutageDependencies.Graph);
     }
@@ -411,6 +416,8 @@ public sealed class LiveScopedOutageInjectionDriverTests
 
         public bool IndependentControlUnobserved { get; init; }
 
+        public string? IndependentControlCause { get; init; }
+
         public CancellationTokenSource? CancelObservationToken { get; init; }
 
         public TimeSpan? ScopeRecordingSkew { get; init; }
@@ -473,6 +480,7 @@ public sealed class LiveScopedOutageInjectionDriverTests
                 UnauthorizedMutationDetected: false)
             {
                 IndependentControlUnobserved = IndependentControlUnobserved,
+                IndependentControlCause = IndependentControlCause,
             });
         }
 

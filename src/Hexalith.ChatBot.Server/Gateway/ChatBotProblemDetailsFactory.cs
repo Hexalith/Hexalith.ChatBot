@@ -67,7 +67,7 @@ internal sealed class ChatBotProblemDetailsFactory(
 
         return redactionStage.Apply(new ProblemDetails
         {
-            Type = "https://hexalith.dev/errors/chatbot/dispatch-unavailable",
+            Type = ChatBotProblemTypes.DispatchUnavailable,
             Title = entry.Headline,
             Status = StatusCodes.Status503ServiceUnavailable,
             Category = ProblemDetailsCategory.Internal_error,

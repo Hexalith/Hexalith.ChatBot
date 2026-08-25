@@ -15,6 +15,10 @@
   architecture guard asserts the fully-qualified name appears in the workflow YAML, not that a test with that
   name exists, so it stays green through the rename.
 
+  Note on this file's own history: while it was malformed the lanes did NOT fail silently. A rejected settings
+  file makes `dotnet test` exit non-zero and those jobs went red. What kept it unnoticed is that the recovery
+  lanes in ci.yml run only on `schedule` and `workflow_dispatch`, so ordinary pushes never executed them.
+
   Every `dotnet test` invocation in the live-recovery lanes must pass this file through the settings switch.
 -->
 <RunSettings>
