@@ -109,6 +109,14 @@ public sealed class LiveContinuityAspireE2eTests
             startup.CancelAfter(TimeSpan.FromMinutes(5));
             internalGrpcReservations.Release();
             await application.StartAsync(startup.Token).ConfigureAwait(true);
+
+            // Before the readiness waits, because readiness depends on it: a fresh store reports EventStore
+            // Unhealthy until the store-global writer protocol is activated, so waiting for health first would
+            // deadlock. Driven through the same admin endpoint a real deployment uses.
+            await RecoveryWriterProtocolProvisioner
+                .ActivateAsync(application, ResolvedRepositoryCommit(), startup.Token)
+                .ConfigureAwait(true);
+
             foreach (string resource in new[] { "security", "eventstore", "chatbot", "recovery-sandbox" })
             {
                 await application.ResourceNotifications.WaitForResourceHealthyAsync(resource, startup.Token).ConfigureAwait(true);

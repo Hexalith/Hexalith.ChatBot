@@ -40,6 +40,29 @@ internal static class RecoveryAccessTokenProvider
         return await AcquireTokenAsync(application, fields, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Mints the realm's global-administrator bearer, used only to provision store-global EventStore state that a
+    /// fresh deployment must activate before it can become ready.
+    /// </summary>
+    /// <param name="application">The composed topology.</param>
+    /// <param name="cancellationToken">Cancels acquisition.</param>
+    /// <returns>The global-administrator bearer.</returns>
+    public static async Task<string> AcquireGlobalAdministratorAsync(
+        DistributedApplication application,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<string, string> fields = new()
+        {
+            // The EventStore admin API validates tokens issued for its own client, not ChatBot's.
+            ["grant_type"] = "password",
+            ["client_id"] = "hexalith-eventstore",
+            ["username"] = "admin-user",
+            ["password"] = "admin-pass",
+            ["scope"] = "openid",
+        };
+        return await AcquireTokenAsync(application, fields, cancellationToken).ConfigureAwait(false);
+    }
+
     public static async Task<string> AcquireControlAsync(
         DistributedApplication application,
         CancellationToken cancellationToken)
