@@ -8,6 +8,9 @@
     <UserSecretsId>hexalith-chatbot</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Hexalith.ChatBot.IntegrationTests" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Aspire.Hosting" />
     <PackageReference Include="Aspire.Hosting.Keycloak" />
     <PackageReference Include="Aspire.Hosting.Redis" />

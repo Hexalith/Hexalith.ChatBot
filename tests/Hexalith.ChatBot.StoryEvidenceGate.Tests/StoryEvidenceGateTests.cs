@@ -2326,6 +2326,10 @@ public static class StoryEvidenceGateTests
     [InlineData("counter-mismatch")]
     [InlineData("reversed-time")]
     [InlineData("foreign-structure")]
+    [InlineData("summary-outcome")]
+    [InlineData("broken-id-crosslink")]
+    [InlineData("passed-but-run-aborted")]
+    [InlineData("not-runnable")]
     public static void RecoveryTrxSanitizerShouldRejectAdversarialInput(string mutation)
     {
         string temporaryRoot = Path.Combine(Path.GetTempPath(), $"recovery-sanitize-negative-{Guid.NewGuid():N}");
@@ -2345,6 +2349,22 @@ public static class StoryEvidenceGateTests
                     "<UnitTestResult testId=\"recovery-2\" outcome=\"Passed\" /></Results>",
                     StringComparison.Ordinal),
                 "failed-outcome" => trx.Replace("outcome=\"Passed\"", "outcome=\"Failed\"", StringComparison.Ordinal),
+                "summary-outcome" => trx.Replace(
+                    "<ResultSummary outcome=\"Completed\">",
+                    "<ResultSummary outcome=\"Failed\">",
+                    StringComparison.Ordinal),
+                "broken-id-crosslink" => trx.Replace(
+                    "<UnitTest id=\"recovery-1\">",
+                    "<UnitTest id=\"recovery-9\">",
+                    StringComparison.Ordinal),
+                "passed-but-run-aborted" => trx.Replace(
+                    "notExecuted=\"0\"",
+                    "notExecuted=\"0\" passedButRunAborted=\"1\"",
+                    StringComparison.Ordinal),
+                "not-runnable" => trx.Replace(
+                    "notExecuted=\"0\"",
+                    "notExecuted=\"0\" notRunnable=\"2\"",
+                    StringComparison.Ordinal),
                 "wrong-class" => trx.Replace(
                     "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests",
                     "Hexalith.ChatBot.IntegrationTests.Recovery.ImpostorTests",
@@ -2375,6 +2395,219 @@ public static class StoryEvidenceGateTests
         {
             Directory.Delete(temporaryRoot, recursive: true);
         }
+    }
+
+
+    /// <summary>
+    /// Proves the sanitizer's output is actually admitted by the reader that must consume it.
+    /// </summary>
+    /// <remarks>
+    /// The two ends of the only completion path were never joined by a test: the sanitizer was asserted with
+    /// string matches and the reader with fixture-written TRX files, so a shape mismatch would surface only after
+    /// a multi-hour hosted run.
+    /// </remarks>
+    [Fact]
+    public static void SanitizedRecoveryTrxShouldBeAcceptedByTheReaderThatConsumesIt()
+    {
+        // The completion path is: producer TRX -> RecoveryTrxSanitizer -> TrxEvidenceReader. Those two ends were
+        // only ever asserted separately -- the sanitizer with string matches, the reader with fixture-written
+        // files -- so a shape mismatch between them would surface only after a multi-hour hosted run.
+        string resultsRoot = Path.Combine(Path.GetTempPath(), $"recovery-roundtrip-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(resultsRoot, "recovery-primary"));
+        try
+        {
+            string raw = Path.Combine(resultsRoot, "raw.trx");
+            string sanitized = Path.Combine(resultsRoot, "recovery-primary", "live-recovery-validation.trx");
+            DateTimeOffset producedAtUtc = DateTimeOffset.UtcNow;
+            File.WriteAllText(raw, RecoverySanitizerTrx(producedAtUtc));
+
+            RecoveryTrxSanitizer.Sanitize(raw, sanitized);
+            File.Delete(raw);
+
+            JsonObject laneContract = new()
+            {
+                ["lane"] = "recovery-primary",
+                ["trx"] = "recovery-primary/live-recovery-validation.trx",
+                ["provenance"] = "recovery-primary/live-recovery-validation.provenance.json",
+                ["artifactLocator"] = "file:recovery-primary/live-recovery-validation.trx",
+                ["source"] = "current-run",
+                ["selectors"] = new JsonArray(
+                    "class:Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests"),
+                ["allowSkipped"] = false,
+                ["primaryPathClass"] = "recovery",
+            };
+
+            string checksum = TrxEvidenceReader.PreflightCurrentRun(
+                laneContract,
+                resultsRoot,
+                "Hexalith/Hexalith.ChatBot",
+                60,
+                5,
+                producedAtUtc);
+
+            checksum.Length.ShouldBe(64, "the reader must admit the sanitizer's output and checksum it.");
+        }
+        finally
+        {
+            Directory.Delete(resultsRoot, recursive: true);
+        }
+    }
+
+    /// <summary>Proves a failed or absent producer attempt still yields a metadata-only retained record.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public static void RecoveryAttemptSummarizerShouldRetainMetadataForAFailedProducer(bool trxPresent)
+    {
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"recovery-summary-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            string input = Path.Combine(temporaryRoot, "raw.trx");
+            string output = Path.Combine(temporaryRoot, "summary.json");
+            if (trxPresent)
+            {
+                File.WriteAllText(
+                    input,
+                    RecoverySanitizerTrx(DateTimeOffset.UtcNow)
+                        .Replace("outcome=\"Passed\"", "outcome=\"Failed\"", StringComparison.Ordinal)
+                        .Replace(
+                            "<UnitTestResult testId=\"recovery-1\" outcome=\"Failed\" />",
+                            "<UnitTestResult testId=\"recovery-1\" outcome=\"Failed\"><Output><StdOut>Bearer tenant-secret-payload</StdOut></Output></UnitTestResult>",
+                            StringComparison.Ordinal));
+            }
+
+            RecoveryAttemptSummarizer.Summarize(input, "failure", output);
+
+            string summary = File.ReadAllText(output);
+            summary.ShouldContain("live-recovery-attempt-summary");
+            summary.ShouldContain("\"producerOutcome\": \"failure\"");
+            summary.ShouldContain(trxPresent ? "\"trxPresent\": true" : "\"trxPresent\": false");
+            summary.ShouldNotContain("Bearer");
+            summary.ShouldNotContain("secret");
+            summary.ShouldNotContain("payload");
+            summary.ShouldNotContain("StdOut");
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    /// <summary>Proves an unparseable outcome token cannot reach the retained record verbatim.</summary>
+    [Fact]
+    public static void RecoveryAttemptSummarizerShouldNormalizeAnUnknownOutcome()
+    {
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"recovery-summary-token-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            string output = Path.Combine(temporaryRoot, "summary.json");
+            RecoveryAttemptSummarizer.Summarize(
+                Path.Combine(temporaryRoot, "absent.trx"),
+                "$(curl evil)",
+                output);
+
+            string summary = File.ReadAllText(output);
+            summary.ShouldContain("\"producerOutcome\": \"unknown\"");
+            summary.ShouldNotContain("curl");
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    /// <summary>Proves a lane may raise its own current-run ceiling but never lower the global floor.</summary>
+    [Fact]
+    public static void PerLaneCurrentRunCeilingShouldRaiseOnlyForDeclaringLanes()
+    {
+        using GateFixture fixture = new();
+        JsonObject policy = EvidenceJson.LoadPolicy(fixture.PolicyPath);
+
+        EvidenceJson.ResolveCurrentRunAgeMinutes(policy, "recovery-primary").ShouldBe(360);
+        EvidenceJson.ResolveCurrentRunAgeMinutes(policy, "story-evidence-gate").ShouldBe(60);
+    }
+
+    /// <summary>Proves a lane ceiling below the global floor, or an absurd one, fails closed.</summary>
+    [Theory]
+    [InlineData(30)]
+    [InlineData(4321)]
+    public static void PerLaneCurrentRunCeilingShouldRejectOutOfRangeOverrides(int minutes)
+    {
+        using GateFixture fixture = new();
+        fixture.MutatePolicy(policy =>
+        {
+            foreach (JsonNode? trigger in EvidenceJson.RequiredArray(
+                policy,
+                "primaryPathTriggers",
+                GateReason.ScopeDigestMismatch))
+            {
+                foreach (JsonNode? binding in EvidenceJson.RequiredArray(
+                    (JsonObject)trigger!,
+                    "recognizedLaneBindings",
+                    GateReason.ScopeDigestMismatch))
+                {
+                    ((JsonObject)binding!)["maximumCurrentRunAgeMinutes"] = minutes;
+                }
+            }
+        });
+
+        JsonObject mutated = EvidenceJson.LoadPolicy(fixture.PolicyPath);
+
+        GateValidationException exception = Should.Throw<GateValidationException>(
+            () => EvidenceJson.ResolveCurrentRunAgeMinutes(mutated, "recovery-primary"));
+        exception.Subject.ShouldBe("lane-current-run-age");
+    }
+
+    /// <summary>Proves a transition-declared current-run topology lane requires its producer.</summary>
+    [Fact]
+    public static void CompletionProductionPlannerShouldRequireTopologyForAspireDaprPrimary()
+    {
+        using GateFixture fixture = new();
+        fixture.UseProductCompletion();
+        fixture.UseClaimPrimaryPath("aspire-dapr", "aspire-dapr-primary");
+        fixture.CommitStrictImmutableCompletion();
+
+        CompletionProductionPlan plan = CompletionProductionPlanner.Plan(
+            fixture.RepositoryRoot,
+            fixture.PolicyPath,
+            fixture.BaseCommit,
+            fixture.HeadCommit,
+            fixture.ResultsRoot);
+
+        plan.RequiresTopology.ShouldBeTrue();
+        plan.RequiresRecovery.ShouldBeFalse();
+    }
+
+    /// <summary>Proves a mapping naming an unchanged path cannot authorize the destructive producer.</summary>
+    [Fact]
+    public static void CompletionProductionPlannerShouldRejectUnchangedMappingPathBeforeRecovery()
+    {
+        using GateFixture fixture = new();
+        fixture.UseProductCompletion();
+        fixture.UseClaimPrimaryPath("recovery", "recovery-primary");
+        fixture.MutateContract(
+            contract =>
+            {
+                JsonArray mappings = EvidenceJson.RequiredArray(
+                    contract,
+                    "mappings",
+                    GateReason.CheckedItemEvidenceMismatch);
+                ((JsonObject)mappings[0]!)["paths"] = new JsonArray("src/Never/Changed/Here.cs");
+            },
+            refreshEvidence: false);
+        fixture.CommitStrictImmutableCompletion(attest: false);
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() =>
+            CompletionProductionPlanner.Plan(
+                fixture.RepositoryRoot,
+                fixture.PolicyPath,
+                fixture.BaseCommit,
+                fixture.HeadCommit,
+                fixture.ResultsRoot));
+
+        exception.ReasonCode.ShouldBe(GateReason.CheckedItemEvidenceMismatch);
     }
 
     private static string RecoverySanitizerTrx(DateTimeOffset finish) =>

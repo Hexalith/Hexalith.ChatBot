@@ -52,7 +52,7 @@ The flow ends in immutable upload and AD-2 requires upload, but the spine does n
 | Fixes the real divergence points for the level below and misses none | **Fail** | H1 leaves the central contract/producer path and active-contract multiplicity unresolved. |
 | Every AD Rule is enforceable and prevents its stated divergence | **Partial** | AD-1 and AD-3 pass. AD-2 is internally sound except for H1. AD-4 is clear for strict JSON evidence but overbroad for raw TRX (M2). |
 | Nothing under Deferred could let two units diverge | **Pass** | Retained completion is excluded with a concrete revisit condition; hosted headroom and authenticity/A10 are outcome questions rather than competing implementation choices. |
-| Named technology is verified-current | **Pass** | Pins agree with `global.json` and the workflow: .NET SDK 10.0.302, upload/download-artifact v4, setup-dapr v2, and the 360-minute job budget. The run memlog records the 2026-08-24 GitHub Actions verification. |
+| Named technology is verified-current | **Pass** | Pins agree with `global.json` and the workflow: .NET SDK 10.0.302, upload-artifact v7 / download-artifact v8, the checksum-pinned Dapr CLI script (`setup-dapr` was retired), and the 360-minute job budget. (Corrected 2026-08-25: this row still named the pre-remediation v4/v2 stack that the remediation section below had already replaced.) The run memlog records the 2026-08-24 GitHub Actions verification. |
 | Ratifies rather than contradicts the brownfield codebase | **Partial** | AD-1, AD-3, attestation ordering, permissions, and failure closure ratify the implementation. H1 and M1 contradict concrete producer/reporting behavior. |
 | Covers the driving capability/spec | **Pass within declared scope** | The spine covers Story 12.15's recovery-primary completion provenance and its retained operational-evidence boundary. Recovery authenticity, production equivalence, and A10 recalibration are explicitly outside this slice. |
 | Does not weaken or contradict inherited invariants | **Pass** | No formal parent `ARCHITECTURE-SPINE.md` is inherited. The companion architecture's current-run-only recovery-primary rule and scheduled/release separation agree with AD-1 through AD-3. |
@@ -105,7 +105,7 @@ Evidence: `ARCHITECTURE-SPINE.md` Retention convention and Deferred; `.github/wo
 ### Re-run evidence
 
 - Deterministic spine lint: **PASS**, zero findings.
-- `Hexalith.ChatBot.StoryEvidenceGate.Tests`: **182 passed, 0 failed, 0 skipped**.
+- `Hexalith.ChatBot.StoryEvidenceGate.Tests`: **195 passed, 0 failed, 0 skipped**.
 - `bash -n .github/scripts/install-dapr-cli.sh`: **PASS**.
 - `actionlint .github/workflows/ci.yml`: **PASS**.
 - Current platform pins independently checked against the official release pages: `actions/upload-artifact@v7`, `actions/download-artifact@v8`, and Dapr CLI/runtime 1.18.0 are current published majors/releases on 2026-08-24.

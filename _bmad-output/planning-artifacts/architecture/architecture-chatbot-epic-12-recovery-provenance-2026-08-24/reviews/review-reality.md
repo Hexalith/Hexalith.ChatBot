@@ -125,7 +125,7 @@ AD-5's **fixed 30-minute reserve** is not literally enforced by the current arit
 ### Re-review checks
 
 - `actionlint .github/workflows/ci.yml .github/workflows/release.yml` — passed.
-- `dotnet test tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj --configuration Release --no-restore` — 182/182 passed on SDK 10.0.302.
+- `dotnet test tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj --configuration Release --no-restore` — 195/195 passed on SDK 10.0.302.
 - Focused `StoryEvidenceIntegrityGateShouldRemainFailClosedAndMachineBound` architecture test — passed.
 - Full architecture project — 72 passed, 1 failed on an unrelated stale `ModelContextProtocol` version assertion (`1.4.1` expected, `2.2.0` actual); it does not change the R1–R7 dispositions but prevents claiming a clean full architecture suite.
 

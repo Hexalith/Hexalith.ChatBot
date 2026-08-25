@@ -1,6 +1,6 @@
 {
-  "schemaVersion": "2.0",
-  "minimumSupportedVersion": "2.0",
+  "schemaVersion": "2.1",
+  "minimumSupportedVersion": "2.1",
   "repositoryIdentity": "Hexalith/Hexalith.ChatBot",
   "maximumCurrentRunAgeMinutes": 60,
   "maximumRetainedEvidenceAgeHours": 720,
@@ -87,6 +87,7 @@
       "recognizedLaneBindings": [
         {
           "lane": "browser-primary",
+          "maximumCurrentRunAgeMinutes": 360,
           "selector": "class:Hexalith.ChatBot.UI.E2E.Tests.RealRenderCrossSurfaceE2ETests",
           "sources": [
             "current-run"
@@ -110,6 +111,7 @@
       "recognizedLaneBindings": [
         {
           "lane": "signalr-primary",
+          "maximumCurrentRunAgeMinutes": 360,
           "selector": "class:Hexalith.ChatBot.Server.Tests.Projections.ChatBotProjectConversationHubE2ETests",
           "sources": [
             "current-run"
@@ -134,6 +136,7 @@
       "recognizedLaneBindings": [
         {
           "lane": "hosting-assets-primary",
+          "maximumCurrentRunAgeMinutes": 360,
           "selector": "class:Hexalith.ChatBot.UI.E2E.Tests.FrontComposerShellIntegrationE2ETests",
           "sources": [
             "current-run"
@@ -156,6 +159,7 @@
       "recognizedLaneBindings": [
         {
           "lane": "aspire-dapr-primary",
+          "maximumCurrentRunAgeMinutes": 360,
           "selector": "class:Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests",
           "sources": [
             "current-run"
@@ -179,6 +183,7 @@
       "recognizedLaneBindings": [
         {
           "lane": "recovery-primary",
+          "maximumCurrentRunAgeMinutes": 360,
           "selector": "class:Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests",
           "trx": "recovery-primary/live-recovery-validation.trx",
           "provenance": "recovery-primary/live-recovery-validation.provenance.json",

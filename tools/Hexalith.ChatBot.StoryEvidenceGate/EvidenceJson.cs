@@ -44,7 +44,8 @@ public static partial class EvidenceJson
                 "zeroPushBaseFallback", "unavailableNonZeroPushBase", "nonPushEventRange"),
             ["primaryPathTriggers"] = Set(
                 "class", "pathPatterns", "claimPatterns", "recognizedLanes", "recognizedLaneBindings"),
-            ["recognizedLaneBindings"] = Set("lane", "selector", "trx", "provenance", "sources"),
+            ["recognizedLaneBindings"] = Set(
+                "lane", "selector", "trx", "provenance", "sources", "maximumCurrentRunAgeMinutes"),
             ["metadataOnly"] = Set(
                 "forbiddenFieldNames", "allowedArtifactFields", "allowedLocatorSchemes", "maximumStringLength",
                 "redactedFailureSubject"),
@@ -219,6 +220,95 @@ public static partial class EvidenceJson
         }
 
         return result;
+    }
+
+    /// <summary>Gets an optional integer, or null when the property is absent or JSON null.</summary>
+    /// <param name="value">The parent object.</param>
+    /// <param name="name">The property name.</param>
+    /// <param name="reasonCode">The failure reason.</param>
+    /// <returns>The integer value, or null.</returns>
+    public static int? OptionalInteger(JsonObject value, string name, string reasonCode)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        if (!value.TryGetPropertyValue(name, out JsonNode? node) || node is null)
+        {
+            return null;
+        }
+
+        if (node is not JsonValue jsonValue || !jsonValue.TryGetValue(out int result))
+        {
+            throw new GateValidationException(reasonCode, name);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Resolves the effective current-run freshness ceiling for one lane.
+    /// </summary>
+    /// <remarks>
+    /// The global <c>maximumCurrentRunAgeMinutes</c> encodes "produced by this run, minutes ago", which a
+    /// structurally multi-hour lane such as the live recovery drill can never satisfy. A binding may raise its own
+    /// ceiling to the age it can legitimately reach, but never lower it below the global floor: the tight bound
+    /// stays in force for every lane that can meet it. All bindings for the lane are consulted, and disagreeing
+    /// overrides fail closed rather than letting the first one win.
+    /// </remarks>
+    /// <param name="policy">The pinned policy.</param>
+    /// <param name="laneName">The lane being evaluated.</param>
+    /// <returns>The effective ceiling in minutes.</returns>
+    public static int ResolveCurrentRunAgeMinutes(JsonObject policy, string laneName)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        int globalCeiling = RequiredInteger(
+            policy,
+            "maximumCurrentRunAgeMinutes",
+            GateReason.EvidenceStaleOrUnbound);
+        if (policy["primaryPathTriggers"] is not JsonArray triggers)
+        {
+            return globalCeiling;
+        }
+
+        int? resolved = null;
+        foreach (JsonNode? triggerNode in triggers)
+        {
+            if (triggerNode is not JsonObject trigger
+                || trigger["recognizedLaneBindings"] is not JsonArray bindings)
+            {
+                continue;
+            }
+
+            foreach (JsonNode? bindingNode in bindings)
+            {
+                if (bindingNode is not JsonObject binding
+                    || !RequiredString(binding, "lane", GateReason.EvidenceStaleOrUnbound)
+                        .Equals(laneName, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                int? candidate = OptionalInteger(
+                    binding,
+                    "maximumCurrentRunAgeMinutes",
+                    GateReason.EvidenceStaleOrUnbound);
+                if (candidate is null)
+                {
+                    continue;
+                }
+
+                if (candidate.Value < globalCeiling
+                    || candidate.Value > 1440
+                    || (resolved is not null && resolved.Value != candidate.Value))
+                {
+                    throw new GateValidationException(
+                        GateReason.EvidenceStaleOrUnbound,
+                        "lane-current-run-age");
+                }
+
+                resolved = candidate.Value;
+            }
+        }
+
+        return resolved ?? globalCeiling;
     }
 
     /// <summary>Gets a required object.</summary>

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.Versioning;
 using System.Security.AccessControl;
@@ -251,34 +252,16 @@ static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration
 
     // Cleanup below is ProcessExit-only, which never fires on SIGKILL/OOM-kill/a hard container stop, so a killed
     // prior run can leave a secret-bearing directory behind (still owner-only per the mode set below — a
-    // disk-accumulation gap, not a confidentiality one). Sweep leftovers older than staleAfter before creating this
-    // run's directory rather than only at exit. The age gate (not an unconditional sweep) matters here as much as in
-    // production: this same function runs concurrently across many DistributedApplicationTestingBuilder-backed test
-    // classes in this repo's own test suite, and an unconditional delete-everything-matching-this-glob would race a
-    // concurrent run's still-live directory. A crashed run is stale for hours; a concurrent test run is stale for
-    // milliseconds.
-    TimeSpan staleAfter = TimeSpan.FromHours(1);
-    DateTime staleBefore = DateTime.UtcNow - staleAfter;
-    foreach (string staleDirectory in Directory.EnumerateDirectories(Path.GetTempPath(), "hexalith-chatbot-keycloak-*"))
-    {
-        try
-        {
-            if (Directory.GetLastWriteTimeUtc(staleDirectory) >= staleBefore)
-            {
-                continue;
-            }
-
-            Directory.Delete(staleDirectory, recursive: true);
-        }
-        catch (IOException)
-        {
-            // Best effort: a locked or already-removed directory must never fail this run's startup.
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // Same rationale as above.
-        }
-    }
+    // disk-accumulation gap, not a confidentiality one). Sweep leftovers before creating this run's directory rather
+    // than only at exit.
+    //
+    // Liveness is decided by the owner process recorded in the directory, never by its modification time. The realm
+    // file is written once at startup and never touched again, so mtime measures age, not death: a live session
+    // older than any fixed threshold — the multi-hour recovery lane, or a full IntegrationTests run — looks exactly
+    // like a crashed one. This function runs concurrently across many DistributedApplicationTestingBuilder-backed
+    // test classes in this repo's own suite, so an age-based sweep would delete a still-live run's secret-bearing
+    // directory out from under its Keycloak container.
+    SweepAbandonedKeycloakRealmDirectories();
 
     // Created 0700 by CreateTempSubdirectory rather than 0755-then-chmod, and with a random name rather than the
     // process id. The previous shape lost the race it existed to win: CreateDirectory and WriteAllText both completed
@@ -288,6 +271,7 @@ static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration
     // under another owner failed topology startup outright.
     string generatedDirectory = Directory.CreateTempSubdirectory("hexalith-chatbot-keycloak-").FullName;
     string generatedRealmPath = Path.Combine(generatedDirectory, "hexalith-realm.json");
+    WriteKeycloakRealmOwnerMarker(generatedDirectory);
 
     // This rendered realm is the only artifact that carries a literal client secret, so it must never exist at
     // world-readable permissions even briefly, and it must not outlive the process that needed it. CreateNew makes the
@@ -349,4 +333,104 @@ static void ApplyWindowsRealmFileAcl(string path)
     security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
     security.AddAccessRule(new FileSystemAccessRule(owner, FileSystemRights.FullControl, AccessControlType.Allow));
     new FileInfo(path).SetAccessControl(security);
+}
+
+// The name is the ownership record. The realm file is written once and never touched again, so its modification
+// time says how old a session is, not whether it is still running -- a distinction that matters because the
+// recovery lane legitimately runs for hours. Recording the owning process (and its start time, so a recycled pid
+// cannot impersonate it) lets the sweep delete only directories whose owner is genuinely gone.
+static void WriteKeycloakRealmOwnerMarker(string directory)
+{
+    try
+    {
+        using Process current = Process.GetCurrentProcess();
+        File.WriteAllText(
+            Path.Combine(directory, "owner.marker"),
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"{current.Id}:{current.StartTime.ToUniversalTime():O}"));
+    }
+    catch (Exception exception) when (exception is IOException
+        or UnauthorizedAccessException
+        or InvalidOperationException
+        or System.ComponentModel.Win32Exception)
+    {
+        // Best effort. A missing marker is read as "still live" by the sweep, which only forgoes cleanup.
+    }
+}
+
+static void SweepAbandonedKeycloakRealmDirectories()
+{
+    foreach (string candidate in Directory.EnumerateDirectories(
+        Path.GetTempPath(),
+        "hexalith-chatbot-keycloak-*"))
+    {
+        try
+        {
+            if (IsKeycloakRealmOwnerAlive(candidate))
+            {
+                continue;
+            }
+
+            Directory.Delete(candidate, recursive: true);
+        }
+        catch (IOException)
+        {
+            // Best effort: a locked or already-removed directory must never fail this run's startup.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Same rationale as above.
+        }
+    }
+}
+
+// Fail safe: anything that cannot be positively established as abandoned is treated as live. Deleting a live
+// session's realm directory breaks a running topology, whereas keeping an abandoned one costs only disk.
+static bool IsKeycloakRealmOwnerAlive(string directory)
+{
+    string markerPath = Path.Combine(directory, "owner.marker");
+    if (!File.Exists(markerPath))
+    {
+        return true;
+    }
+
+    string[] parts;
+    try
+    {
+        parts = File.ReadAllText(markerPath).Split(':', 2);
+    }
+    catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+    {
+        return true;
+    }
+
+    if (parts.Length != 2
+        || !int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out int ownerProcessId)
+        || !DateTimeOffset.TryParse(
+            parts[1],
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind,
+            out DateTimeOffset ownerStartedAtUtc))
+    {
+        return false;
+    }
+
+    try
+    {
+        using Process owner = Process.GetProcessById(ownerProcessId);
+        return Math.Abs(
+            (owner.StartTime.ToUniversalTime() - ownerStartedAtUtc.UtcDateTime).TotalSeconds) < 1.0;
+    }
+    catch (ArgumentException)
+    {
+        // No process carries that identifier: the owner is gone.
+        return false;
+    }
+    catch (Exception exception) when (exception is InvalidOperationException
+        or System.ComponentModel.Win32Exception)
+    {
+        // The process exists but its start time is unreadable (foreign owner, or it exited mid-inspection).
+        return true;
+    }
 }

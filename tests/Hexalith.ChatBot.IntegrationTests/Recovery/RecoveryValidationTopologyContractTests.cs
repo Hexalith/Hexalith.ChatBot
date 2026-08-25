@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
 
 using Aspire.Hosting;
@@ -5,6 +7,10 @@ using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
 
 using CommunityToolkit.Aspire.Hosting.Dapr;
+
+using Hexalith.ChatBot.AppHost.Aspire;
+
+using Microsoft.Extensions.Configuration;
 
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Projections;
@@ -358,12 +364,20 @@ public sealed class RecoveryValidationTopologyContractTests
         string? generatedDirectory = null;
         try
         {
-            generatedDirectory = Directory
+            // Identify this run's directory by its owner marker rather than by "the only new one". Nothing in this
+            // assembly disables xUnit collection parallelism, and several other classes build
+            // DistributedApplicationTestingBuilder topologies that call the same function, so a bare
+            // SingleOrDefault() would throw on a concurrent run's directory -- and the finally block below would
+            // then delete it.
+            string ownerPrefix = Environment.ProcessId.ToString(CultureInfo.InvariantCulture) + ":";
+            string[] candidates = [.. Directory
                 .EnumerateDirectories(tempPath, "hexalith-chatbot-keycloak-*")
                 .Except(before, StringComparer.Ordinal)
-                .SingleOrDefault();
-            generatedDirectory.ShouldNotBeNull(
-                "PrepareKeycloakRealmImport must create exactly one new hexalith-chatbot-keycloak-* temp subdirectory.");
+                .Where(directory => OwnerMarkerStartsWith(directory, ownerPrefix))];
+            candidates.Length.ShouldBe(
+                1,
+                "PrepareKeycloakRealmImport must create exactly one new owner-marked hexalith-chatbot-keycloak-* temp subdirectory.");
+            generatedDirectory = candidates[0];
 
             // A fixed {pid} suffix is the predictable shape the fix replaced; CreateTempSubdirectory's random suffix
             // must never collapse back to it.
@@ -385,6 +399,122 @@ public sealed class RecoveryValidationTopologyContractTests
             {
                 Directory.Delete(generatedDirectory, recursive: true);
             }
+        }
+    }
+
+
+    [Fact]
+    public async Task PrepareKeycloakRealmImportSweepsAbandonedRealmDirectoriesAndSparesLiveOnes()
+    {
+        // The sweep decides liveness from the recorded owner process, never from modification time. The realm file
+        // is written once and never touched again, so an mtime gate deleted the secret-bearing directory of any
+        // session outliving its threshold -- including the multi-hour recovery lane and a concurrent test class.
+        // Both directions are asserted: without the "spares live ones" half, inverting the gate would still pass.
+        string tempPath = Path.GetTempPath();
+        string abandoned = Directory.CreateTempSubdirectory("hexalith-chatbot-keycloak-").FullName;
+        string live = Directory.CreateTempSubdirectory("hexalith-chatbot-keycloak-").FullName;
+        await File.WriteAllTextAsync(
+            Path.Combine(abandoned, "owner.marker"),
+            "this-is-not-a-valid-owner-marker",
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
+        using (Process current = Process.GetCurrentProcess())
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(live, "owner.marker"),
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"{current.Id}:{current.StartTime.ToUniversalTime():O}"),
+                TestContext.Current.CancellationToken).ConfigureAwait(true);
+        }
+
+        HashSet<string> before = Directory
+            .EnumerateDirectories(tempPath, "hexalith-chatbot-keycloak-*")
+            .ToHashSet(StringComparer.Ordinal);
+        string? generatedDirectory = null;
+        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        try
+        {
+            Directory.Exists(abandoned).ShouldBeFalse(
+                "a directory whose owner cannot be established as live must be swept.");
+            Directory.Exists(live).ShouldBeTrue(
+                "a directory whose owner process is still running must never be swept, however old it is.");
+
+            string ownerPrefix = Environment.ProcessId.ToString(CultureInfo.InvariantCulture) + ":";
+            generatedDirectory = Directory
+                .EnumerateDirectories(tempPath, "hexalith-chatbot-keycloak-*")
+                .Except(before, StringComparer.Ordinal)
+                .FirstOrDefault(directory => OwnerMarkerStartsWith(directory, ownerPrefix));
+            generatedDirectory.ShouldNotBeNull("this run must record its own owner marker.");
+        }
+        finally
+        {
+            await builder.DisposeAsync().ConfigureAwait(true);
+            foreach (string? directory in new[] { generatedDirectory, live, abandoned })
+            {
+                if (directory is not null && Directory.Exists(directory))
+                {
+                    Directory.Delete(directory, recursive: true);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Proves <c>AddEventStoreAdmin</c>'s own port guard rejects a collision, independently of
+    /// <c>AddHexalithChatBot</c>.
+    /// </summary>
+    /// <remarks>
+    /// The guard was added for composition roots that call <c>AddEventStoreAdmin</c> without a preceding
+    /// <c>AddHexalithChatBot</c>, but no test reached it: the only production caller always calls
+    /// <c>AddHexalithChatBot</c> first, so deleting the guard failed nothing.
+    /// </remarks>
+    [Fact]
+    public void ValidateUniqueInternalGrpcPortsRejectsACollisionWithoutTheChatBotComposition()
+    {
+        IConfiguration colliding = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Dapr:InternalGrpcPorts:eventstore"] = "41101",
+                ["Dapr:InternalGrpcPorts:eventstore-admin"] = "41101",
+            })
+            .Build();
+
+        InvalidOperationException exception = Should.Throw<InvalidOperationException>(
+            () => ChatBotAspireModule.ValidateUniqueInternalGrpcPorts(colliding));
+
+        exception.Message.ShouldContain("41101");
+    }
+
+    /// <summary>Proves distinct ports and absent configuration both pass the same guard.</summary>
+    [Fact]
+    public void ValidateUniqueInternalGrpcPortsAcceptsDistinctAndUnconfiguredPorts()
+    {
+        IConfiguration distinct = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Dapr:InternalGrpcPorts:eventstore"] = "41101",
+                ["Dapr:InternalGrpcPorts:eventstore-admin"] = "41102",
+            })
+            .Build();
+
+        Should.NotThrow(() => ChatBotAspireModule.ValidateUniqueInternalGrpcPorts(distinct));
+        Should.NotThrow(() => ChatBotAspireModule.ValidateUniqueInternalGrpcPorts(
+            new ConfigurationBuilder().Build()));
+    }
+
+    private static bool OwnerMarkerStartsWith(string directory, string ownerPrefix)
+    {
+        string markerPath = Path.Combine(directory, "owner.marker");
+        try
+        {
+            return File.Exists(markerPath)
+                && File.ReadAllText(markerPath).StartsWith(ownerPrefix, StringComparison.Ordinal);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
         }
     }
 

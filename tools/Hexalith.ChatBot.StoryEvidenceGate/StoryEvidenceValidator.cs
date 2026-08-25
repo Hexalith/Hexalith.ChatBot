@@ -378,8 +378,8 @@ public static class StoryEvidenceValidator
             policy,
             "minimumSupportedVersion",
             GateReason.ScopeDigestMismatch);
-        if (!policyVersion.Equals("2.0", StringComparison.Ordinal)
-            || !minimumVersion.Equals("2.0", StringComparison.Ordinal)
+        if (!policyVersion.Equals("2.1", StringComparison.Ordinal)
+            || !minimumVersion.Equals("2.1", StringComparison.Ordinal)
             || !EvidenceJson.RequiredString(policy, "repositoryIdentity", GateReason.ScopeDigestMismatch)
                 .Equals("Hexalith/Hexalith.ChatBot", StringComparison.Ordinal)
             || EvidenceJson.RequiredInteger(policy, "maximumCurrentRunAgeMinutes", GateReason.ScopeDigestMismatch) != 60
@@ -823,7 +823,9 @@ public static class StoryEvidenceValidator
                 options.HeadCommit,
                 implementationDigest,
                 EvidenceJson.RequiredString(policy, "repositoryIdentity", GateReason.EvidenceStaleOrUnbound),
-                EvidenceJson.RequiredInteger(policy, "maximumCurrentRunAgeMinutes", GateReason.EvidenceStaleOrUnbound),
+                EvidenceJson.ResolveCurrentRunAgeMinutes(
+                    policy,
+                    EvidenceJson.RequiredString(laneContract, "lane", GateReason.MachineResultsInvalid)),
                 EvidenceJson.RequiredInteger(policy, "maximumRetainedEvidenceAgeHours", GateReason.EvidenceStaleOrUnbound),
                 EvidenceJson.RequiredInteger(policy, "maximumFutureClockSkewMinutes", GateReason.EvidenceStaleOrUnbound),
                 options.NowUtc));

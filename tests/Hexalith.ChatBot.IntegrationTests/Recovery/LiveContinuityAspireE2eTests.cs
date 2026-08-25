@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -464,7 +465,12 @@ public sealed class LiveContinuityAspireE2eTests
             return TimeSpan.FromMinutes(DefaultMinutes);
         }
 
-        if (!int.TryParse(configured, out int minutes) || minutes is < 1 or > DefaultMinutes)
+        if (!int.TryParse(
+                configured,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out int minutes)
+            || minutes is < 1 or > DefaultMinutes)
         {
             throw new InvalidOperationException(
                 "HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES must be an integer from 1 through 300.");
@@ -653,6 +659,7 @@ public sealed class LiveContinuityAspireE2eTests
         string body = $$"""
             {"commandId":"{{ChatBotCommandId.New().Value}}","commandType":"CaptureMailboxMessageIntake","command":{"intakeId":"not-a-ulid","source":{"providerMessageId":"probe","mailboxId":"probe","receivedAtUtc":"2026-08-01T00:00:00Z"},"recipients":[],"attachments":[]},"origin":"mailbox","requestSchemaVersion":"v1"}
             """;
+        HttpStatusCode? lastStatus = null;
         while (true)
         {
             try
@@ -674,6 +681,7 @@ public sealed class LiveContinuityAspireE2eTests
                 // Resource Healthy means the adapter endpoint is serving, not that the EventStore/DAPR command spine
                 // behind admission has finished warming up. That path intentionally returns 503 until it is ready,
                 // matching the ordinary Tier-3 acceptance test's first-command retry discipline.
+                lastStatus = response.StatusCode;
                 if (!IsTransientMailboxAdmissionStatus(response.StatusCode))
                 {
                     throw new InvalidOperationException(
@@ -689,18 +697,37 @@ public sealed class LiveContinuityAspireE2eTests
                 // A per-request HttpClient timeout is transient while the command path warms up.
             }
 
-            await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw new InvalidOperationException(
+                    "The recovery mailbox admission probe never admitted inside the startup budget; last observed "
+                    + (lastStatus is null
+                        ? "no HTTP response."
+                        : $"status {(int)lastStatus.Value}."));
+            }
         }
     }
 
     /// <summary>Classifies only startup statuses that can become healthy without changing the probe request.</summary>
+    /// <remarks>
+    /// Enumerated rather than a <c>&gt;= 500</c> catch-all. The catch-all made every clause below unreachable and
+    /// contradicted this summary: it also retried statuses that never become healthy on their own -- notably
+    /// <c>501 NotImplemented</c> and <c>505 HttpVersionNotSupported</c> -- burning the whole startup budget on a
+    /// permanent misconfiguration and discarding the status code that would have named it.
+    /// <c>500 InternalServerError</c> stays transient: the command spine genuinely returns it while warming.
+    /// </remarks>
     internal static bool IsTransientMailboxAdmissionStatus(HttpStatusCode statusCode)
         => statusCode is HttpStatusCode.RequestTimeout
             or HttpStatusCode.TooManyRequests
+            or HttpStatusCode.InternalServerError
             or HttpStatusCode.BadGateway
             or HttpStatusCode.ServiceUnavailable
             or HttpStatusCode.GatewayTimeout
-        || (int)statusCode >= 500;
+            or HttpStatusCode.InsufficientStorage;
 
     /// <summary>
     /// Companion to <see cref="AssertMailboxTokenAdmissionAsync"/>: proves the auth-before-validation pipeline

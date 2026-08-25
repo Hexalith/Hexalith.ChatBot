@@ -17,16 +17,33 @@ public static class RecoveryTrxSanitizer
     private static readonly XNamespace TeamTestNamespace =
         "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";
 
+    /// <summary>The largest raw producer TRX admitted, in bytes.</summary>
+    /// <remarks>
+    /// The producer runs with <c>console;verbosity=detailed</c> for hours, so its raw TRX has no natural size
+    /// bound. Refusing an oversized document with a reason code beats an <see cref="OutOfMemoryException"/> that
+    /// discards a completed drill's evidence.
+    /// </remarks>
+    internal const long MaximumTrxBytes = 64L * 1024 * 1024;
+
+    /// <summary>The largest raw producer TRX admitted, in characters.</summary>
+    internal const long MaximumTrxCharacters = 50_000_000;
+
     /// <summary>Writes a deterministic payload-free projection of one passing recovery result.</summary>
     public static void Sanitize(string inputPath, string outputPath)
     {
         XDocument source;
         try
         {
+            if (new FileInfo(inputPath).Length > MaximumTrxBytes)
+            {
+                throw new GateValidationException(GateReason.MachineResultsInvalid, "recovery-sanitize");
+            }
+
             XmlReaderSettings settings = new()
             {
                 DtdProcessing = DtdProcessing.Prohibit,
                 XmlResolver = null,
+                MaxCharactersInDocument = MaximumTrxCharacters,
             };
             using FileStream stream = File.OpenRead(inputPath);
             using XmlReader reader = XmlReader.Create(stream, settings);
@@ -34,7 +51,9 @@ public static class RecoveryTrxSanitizer
         }
         catch (Exception exception) when (exception is XmlException
             or IOException
-            or UnauthorizedAccessException)
+            or UnauthorizedAccessException
+            or NotSupportedException
+            or OutOfMemoryException)
         {
             throw new GateValidationException(GateReason.MachineResultsInvalid, "recovery-sanitize");
         }
@@ -82,7 +101,12 @@ public static class RecoveryTrxSanitizer
             || Counter(counters, "timeout") != 0
             || Counter(counters, "aborted") != 0
             || Counter(counters, "inconclusive") != 0
-            || Counter(counters, "notExecuted") != 0)
+            || Counter(counters, "notExecuted") != 0
+            || OptionalCounter(counters, "notRunnable") != 0
+            || OptionalCounter(counters, "warning") != 0
+            || OptionalCounter(counters, "passedButRunAborted") != 0
+            || OptionalCounter(counters, "disconnected") != 0
+            || OptionalCounter(counters, "pending") != 0)
         {
             throw new GateValidationException(GateReason.MachineResultsInvalid, "recovery-sanitize");
         }
@@ -164,6 +188,10 @@ public static class RecoveryTrxSanitizer
             throw new GateValidationException(GateReason.MachineResultsInvalid, "recovery-sanitize");
         }
     }
+
+    /// <summary>Reads a counter that vstest may omit; absent reads as zero, malformed fails closed.</summary>
+    private static int OptionalCounter(XElement counters, string name) =>
+        counters.Attribute(name) is null ? 0 : Counter(counters, name);
 
     private static int Counter(XElement counters, string name) =>
         int.TryParse(Attribute(counters, name), NumberStyles.None, CultureInfo.InvariantCulture, out int value)

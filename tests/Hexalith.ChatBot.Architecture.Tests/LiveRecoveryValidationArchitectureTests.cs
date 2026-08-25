@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 using Hexalith.ChatBot.Server.Audit;
@@ -141,6 +142,116 @@ public static class LiveRecoveryValidationArchitectureTests
         sandbox.ShouldContain("RecoverySandboxAuthorization.Authorized(");
         sandbox.ShouldContain("X-Recovery-Controller-Secret");
         sandbox.ShouldNotContain("{resource}");
+    }
+
+    /// <summary>
+    /// The attempt envelope must be written where <c>actions/checkout</c> cannot delete it.
+    /// </summary>
+    /// <remarks>
+    /// It was written to a workspace-relative <c>TestResults/</c> path immediately before checkout, which deletes
+    /// every entry in the workspace when no <c>.git</c> is present. The always-run finalize step then ran
+    /// <c>jq</c> on a missing file under <c>set -euo pipefail</c>, reddening both producer jobs on every run --
+    /// including a run whose drill passed. Presence assertions could not see it; only the path can.
+    /// </remarks>
+    [Fact]
+    public static void ProducerAttemptEnvelope_ShouldSurviveCheckout()
+    {
+        foreach (string workflow in new[] { ".github/workflows/ci.yml", ".github/workflows/release.yml" })
+        {
+            string source = ReadProjectFile(workflow);
+            source.ShouldContain("ATTEMPT_PATH: ${{ runner.temp }}/workflow-attempt/producer-attempt.json");
+            source.ShouldNotContain("ATTEMPT_PATH: TestResults/");
+            foreach (Match match in Regex.Matches(source, @"ATTEMPT_PATH: (?<path>.+)"))
+            {
+                match.Groups["path"].Value.StartsWith("${{ runner.temp }}", StringComparison.Ordinal)
+                    .ShouldBeTrue(
+                        "a pre-checkout marker written into the workspace is deleted by actions/checkout.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Every recovery producer must bound itself strictly inside its external interrupt.
+    /// </summary>
+    /// <remarks>
+    /// The in-process deadline exists so a hung scenario unwinds its own fault in <c>finally</c>. When it equals
+    /// the external <c>timeout</c> bound the signal always wins -- the in-process clock starts later, inside
+    /// <c>dotnet test</c> -- and the guard is unreachable. The scheduled and release producers had no in-process
+    /// bound, no wrapper and no step timeout at all.
+    /// </remarks>
+    [Fact]
+    public static void RecoveryProducers_ShouldBoundInProcessDeadlineStrictlyInsideTheExternalInterrupt()
+    {
+        foreach (string workflow in new[] { ".github/workflows/ci.yml", ".github/workflows/release.yml" })
+        {
+            string source = ReadProjectFile(workflow);
+            MatchCollection declared = Regex.Matches(
+                source,
+                @"HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: ""(?<minutes>\d+)""");
+            declared.Count.ShouldBeGreaterThan(
+                0,
+                $"{workflow} must bound its recovery producer in-process.");
+            foreach (Match match in declared)
+            {
+                int inProcessMinutes = int.Parse(match.Groups["minutes"].Value, CultureInfo.InvariantCulture);
+                inProcessMinutes.ShouldBeLessThan(
+                    280,
+                    "the in-process deadline must expire before the external SIGINT, or it can never fire.");
+            }
+
+            source.ShouldContain("timeout --signal=INT --kill-after=15m");
+        }
+    }
+
+    /// <summary>
+    /// The only current-run lane produced inside the completion job must be produced after the drill.
+    /// </summary>
+    /// <remarks>
+    /// Inserting an up-to-four-hour producer ahead of the attestation clock pushed every earlier current-run lane
+    /// past the 60-minute freshness ceiling, so the completion path failed <c>evidence_stale_or_unbound</c> on
+    /// lanes that had passed. Ordering fixes the in-job lane; the upstream lanes carry an explicit per-lane
+    /// ceiling instead.
+    /// </remarks>
+    [Fact]
+    public static void CompletionJob_ShouldProduceItsInJobCurrentRunLaneAfterTheRecoveryProducer()
+    {
+        string ci = ReadProjectFile(".github/workflows/ci.yml");
+        int producerIndex = ci.IndexOf(
+            "- name: Produce transition-declared current recovery primary result",
+            StringComparison.Ordinal);
+        int selfTestIndex = ci.IndexOf(
+            "- name: Run gate self-tests with current-run TRX",
+            StringComparison.Ordinal);
+        producerIndex.ShouldBeGreaterThan(0);
+        selfTestIndex.ShouldBeGreaterThan(
+            producerIndex,
+            "the in-job current-run TRX must be produced after the drill, or it is hours stale at attestation.");
+    }
+
+    /// <summary>
+    /// A lane's freshness ceiling must cover the producer budget the workflow grants it.
+    /// </summary>
+    /// <remarks>
+    /// These two numbers live in different files and were only ever asserted independently, so nothing noticed
+    /// that the workflow authorized a producer four times longer than the evidence it produced was allowed to be.
+    /// </remarks>
+    [Fact]
+    public static void RecoveryLaneCeiling_ShouldCoverTheWorkflowProducerBudget()
+    {
+        string policy = ReadProjectFile("story-evidence-policy.json");
+        string ci = ReadProjectFile(".github/workflows/ci.yml");
+        int laneCeiling = Regex
+            .Matches(policy, @"""maximumCurrentRunAgeMinutes"": (?<minutes>\d+)")
+            .Select(match => int.Parse(match.Groups["minutes"].Value, CultureInfo.InvariantCulture))
+            .Max();
+        int longestProducer = Regex
+            .Matches(ci, @"HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: ""(?<minutes>\d+)""")
+            .Select(match => int.Parse(match.Groups["minutes"].Value, CultureInfo.InvariantCulture))
+            .Max();
+
+        laneCeiling.ShouldBeGreaterThan(
+            longestProducer,
+            "recovery evidence would be stale on arrival if its ceiling did not exceed the producer budget.");
     }
 
     [Fact]

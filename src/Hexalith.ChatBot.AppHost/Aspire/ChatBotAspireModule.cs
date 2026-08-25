@@ -126,7 +126,7 @@ internal static class ChatBotAspireModule
     /// anything in static state, so parallel test compositions with different overrides never observe each other.
     /// </summary>
     /// <param name="configuration">The builder's configuration, read once per composition.</param>
-    private static void ValidateUniqueInternalGrpcPorts(IConfiguration configuration)
+    internal static void ValidateUniqueInternalGrpcPorts(IConfiguration configuration)
     {
         Dictionary<int, string> appIdByPort = new();
         foreach (string appId in SidecarAppIds)

@@ -820,9 +820,10 @@ public static class ScaffoldArchitectureTests
             "Hexalith.ChatBot.StoryEvidenceGate",
             "ProvenanceAttestor.cs"));
 
-        policy.ShouldContain("\"schemaVersion\": \"2.0\"");
+        policy.ShouldContain("\"schemaVersion\": \"2.1\"");
         policy.ShouldContain("\"repositoryIdentity\": \"Hexalith/Hexalith.ChatBot\"");
         policy.ShouldContain("\"maximumCurrentRunAgeMinutes\": 60");
+        policy.ShouldContain("\"maximumCurrentRunAgeMinutes\": 360");
         policy.ShouldContain("\"snapshot-plus-transition\"");
         policy.ShouldContain("\"scope_digest_mismatch\"");
         policy.ShouldContain("\"primary_path_not_executed\"");
@@ -908,15 +909,19 @@ public static class ScaffoldArchitectureTests
             + "        if: steps.artifacts.outputs.requires_recovery == 'true'");
         workflow.ShouldContain(
             "- name: Produce transition-declared current recovery primary result\n"
+            + "        id: recovery\n"
             + "        if: steps.artifacts.outputs.requires_recovery == 'true'");
         workflow.ShouldContain(
             "--results-directory \"${{ runner.temp }}/raw-recovery-results\"");
         workflow.ShouldContain(
             "- name: Stop DAPR runtime for transition-declared current recovery primary\n"
             + "        if: always() && steps.artifacts.outputs.requires_recovery == 'true'");
-        workflow.ShouldContain("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: \"265\"");
+        workflow.ShouldContain("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: \"250\"");
         workflow.ShouldNotContain("HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT: story-evidence-integrity-reports");
-        workflow.ShouldContain("timeout-minutes: 280");
+        workflow.ShouldContain("HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT: completion-recovery-evidence");
+        workflow.ShouldContain("summarize-recovery-attempt");
+        workflow.ShouldContain("No test lanes executed; refusing to report a green required job.");
+        workflow.ShouldContain("timeout-minutes: 285");
         workflow.ShouldContain("elapsed_seconds >= 2400");
         workflow.ShouldContain("job_start_epoch + (330 * 60)");
         workflow.ShouldContain("remaining_seconds - 900");

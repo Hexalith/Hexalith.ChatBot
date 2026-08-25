@@ -24,6 +24,7 @@ public static class Program
                 "detect" => Detect(command, repositoryRoot),
                 "plan" => Plan(command, repositoryRoot),
                 "sanitize-recovery-trx" => SanitizeRecoveryTrx(command, repositoryRoot),
+                "summarize-recovery-attempt" => SummarizeRecoveryAttempt(command, repositoryRoot),
                 "ci" => RunCi(command, repositoryRoot),
                 _ => throw new GateValidationException(GateReason.StatusMismatch, "command"),
             };
@@ -132,7 +133,7 @@ public static class Program
                 StoryKey = "no-transition",
                 BaseCommit = baseCommit,
                 HeadCommit = headCommit,
-                PolicyVersion = "2.0",
+                PolicyVersion = "2.1",
                 Passed = true,
                 EvaluatedAtUtc = DateTimeOffset.UtcNow,
             };
@@ -259,6 +260,16 @@ public static class Program
         return 0;
     }
 
+    private static int SummarizeRecoveryAttempt(CommandArguments command, string repositoryRoot)
+    {
+        RecoveryAttemptSummarizer.Summarize(
+            FullPath(repositoryRoot, command.Required("input")),
+            command.Optional("outcome") ?? "unknown",
+            FullPath(repositoryRoot, command.Required("output")));
+        Console.Out.WriteLine("{\"passed\":true,\"operation\":\"summarize-recovery-attempt\"}");
+        return 0;
+    }
+
     private static int SanitizeRecoveryTrx(CommandArguments command, string repositoryRoot)
     {
         RecoveryTrxSanitizer.Sanitize(
@@ -278,7 +289,7 @@ public static class Program
             StoryKey = transition.StoryKey,
             BaseCommit = baseCommit,
             HeadCommit = headCommit,
-            PolicyVersion = "2.0",
+            PolicyVersion = "2.1",
             Passed = false,
             EvaluatedAtUtc = evaluatedAtUtc,
             Issues = [GateIssue.Create(exception.ReasonCode, exception.Subject)],

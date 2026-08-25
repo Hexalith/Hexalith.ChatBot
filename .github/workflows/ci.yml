@@ -83,6 +83,7 @@ jobs:
             fi
             seen_lanes[$lane]="$project"
           done
+          executed=0
           for project in "${projects[@]}"; do
             if [[ "$project" == *"Hexalith.ChatBot.RecoverySandbox.csproj" ]]; then
               continue
@@ -92,7 +93,12 @@ jobs:
             dotnet test "$project" --no-build --configuration Release \
               --logger "trx;LogFileName=${lane}.trx" --results-directory "$output"
             sha256sum "${output}/${lane}.trx" > "${output}/${lane}.trx.sha256"
+            executed=$((executed + 1))
           done
+          if (( executed == 0 )); then
+            printf 'No test lanes executed; refusing to report a green required job.\n' >&2
+            exit 1
+          fi
           printf '%s\n' "$(git rev-parse HEAD)" > TestResults/producer-head.sha
       - name: Upload collision-safe machine results
         if: always()
@@ -137,12 +143,6 @@ jobs:
         with:
           name: machine-test-results
           path: ${{ runner.temp }}/machine-results
-      - name: Run gate self-tests with current-run TRX
-        run: >-
-          dotnet test tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj
-          --configuration Release
-          --logger "trx;LogFileName=story-evidence-gate.trx"
-          --results-directory "${{ runner.temp }}/machine-results/story-evidence-gate"
       - name: Resolve exact transition bounds
         id: bounds
         shell: bash
@@ -235,10 +235,15 @@ jobs:
         timeout-minutes: 10
         run: dapr init --runtime-version 1.18.0
       - name: Produce transition-declared current recovery primary result
+        id: recovery
         if: steps.artifacts.outputs.requires_recovery == 'true'
-        timeout-minutes: 280
+        timeout-minutes: 285
         env:
-          HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: "265"
+          HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT: completion-recovery-evidence
+          # Strictly inside the 265-minute SIGINT below, which is itself inside the 285-minute step bound.
+          # Equal inner and outer bounds meant the external signal always won and the in-process cleanup
+          # guard documented in LiveContinuityAspireE2eTests was unreachable.
+          HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: "250"
           HEXALITH_CHATBOT_TIER3: "1"
           HEXALITH_CHATBOT_TIER3_REQUIRED: "1"
           ChatBotServiceGrants__LifetimeDays: "90"
@@ -267,6 +272,25 @@ jobs:
       - name: Stop DAPR runtime for transition-declared current recovery primary
         if: always() && steps.artifacts.outputs.requires_recovery == 'true'
         run: dapr uninstall --all
+      # Produced AFTER the drill on purpose. This is the only current-run lane produced inside this job, so
+      # running it here keeps it inside the global 60-minute freshness ceiling even when the recovery producer
+      # has just consumed four hours. The upstream build/topology lanes cannot be refreshed by ordering --
+      # their TRX finish timestamps are fixed in the jobs that produced them -- so they carry an explicit
+      # per-lane ceiling in story-evidence-policy.json instead of relaxing the global bound for everyone.
+      - name: Run gate self-tests with current-run TRX
+        run: >-
+          dotnet test tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj
+          --configuration Release
+          --logger "trx;LogFileName=story-evidence-gate.trx"
+          --results-directory "${{ runner.temp }}/machine-results/story-evidence-gate"
+      - name: Summarize recovery attempt into metadata-only failure record
+        if: always() && steps.artifacts.outputs.requires_recovery == 'true'
+        run: >-
+          dotnet run --project tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj
+          --configuration Release --no-build -- summarize-recovery-attempt
+          --input "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.trx"
+          --outcome "${{ steps.recovery.outcome }}"
+          --output "${{ runner.temp }}/recovery-attempt/recovery-attempt-summary.json"
       - name: Project recovery result into metadata-only completion TRX
         if: steps.artifacts.outputs.requires_recovery == 'true'
         run: >-
@@ -274,6 +298,16 @@ jobs:
           --configuration Release --no-build -- sanitize-recovery-trx
           --input "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.trx"
           --output "${{ runner.temp }}/machine-results/recovery-primary/live-recovery-validation.trx"
+      - name: Upload metadata-only recovery attempt evidence
+        if: always() && steps.artifacts.outputs.requires_recovery == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: completion-recovery-evidence
+          path: |
+            ${{ runner.temp }}/recovery-attempt
+            ${{ runner.temp }}/machine-results/recovery-primary
+          retention-days: 30
+          if-no-files-found: error
       - name: Collect transition-declared retained exact-run artifacts
         shell: bash
         env:
@@ -421,7 +455,7 @@ jobs:
     steps:
       - name: Initialize metadata-only live recovery attempt envelope
         env:
-          ATTEMPT_PATH: TestResults/workflow-attempt/producer-attempt.json
+          ATTEMPT_PATH: ${{ runner.temp }}/workflow-attempt/producer-attempt.json
         run: |
           set -euo pipefail
           mkdir -p "$(dirname "$ATTEMPT_PATH")"
@@ -451,19 +485,27 @@ jobs:
         run: dapr init --runtime-version 1.18.0
       - name: Run all live recovery coordinators and retain evidence
         id: recovery
-        run: >-
-          dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
-          -m:1
-          --configuration Release
-          --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate"
-          --logger "console;verbosity=detailed"
-          --settings live-recovery.runsettings
-          --logger "trx;LogFileName=live-recovery-validation.trx"
-          --results-directory TestResults
+        # Bounded ladder, innermost first, so the in-process `finally` always wins the race to unwind a
+        # half-injected fault: in-process deadline 265m < SIGINT 280m < step 300m < job 330m. Without the
+        # inner margin the runner kills the process mid-injection and no restoration step ever runs.
+        timeout-minutes: 300
+        env:
+          HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: "265"
+        run: |
+          set -euo pipefail
+          timeout --signal=INT --kill-after=15m 16800s \
+            dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj \
+            -m:1 \
+            --configuration Release \
+            --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" \
+            --logger "console;verbosity=detailed" \
+            --settings live-recovery.runsettings \
+            --logger "trx;LogFileName=live-recovery-validation.trx" \
+            --results-directory TestResults
       - name: Finalize metadata-only live recovery attempt envelope
         if: always()
         env:
-          ATTEMPT_PATH: TestResults/workflow-attempt/producer-attempt.json
+          ATTEMPT_PATH: ${{ runner.temp }}/workflow-attempt/producer-attempt.json
           PRODUCER_OUTCOME: ${{ steps.recovery.outcome }}
         run: |
           set -euo pipefail
@@ -479,7 +521,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: live-recovery-validation-evidence
-          path: TestResults
+          path: |
+            TestResults
+            ${{ runner.temp }}/workflow-attempt
           retention-days: 30
           if-no-files-found: error
       - name: Stop DAPR runtime

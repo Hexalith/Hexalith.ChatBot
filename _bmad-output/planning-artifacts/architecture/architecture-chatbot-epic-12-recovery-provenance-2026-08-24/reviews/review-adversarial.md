@@ -142,7 +142,7 @@ AD-5 now owns a concrete nested budget, and the corrected workflow comment match
 ### Verification evidence
 
 - Deterministic spine lint: 0 findings.
-- `Hexalith.ChatBot.StoryEvidenceGate.Tests`: 182 passed, 0 failed, 0 skipped.
+- `Hexalith.ChatBot.StoryEvidenceGate.Tests`: 195 passed, 0 failed, 0 skipped.
 - `actionlint .github/workflows/ci.yml`: passed.
 
 No further adversarial remediation is required for ADV-1–ADV-5.

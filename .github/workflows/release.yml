@@ -109,7 +109,7 @@ jobs:
     steps:
       - name: Initialize metadata-only live recovery attempt envelope
         env:
-          ATTEMPT_PATH: TestResults/workflow-attempt/producer-attempt.json
+          ATTEMPT_PATH: ${{ runner.temp }}/workflow-attempt/producer-attempt.json
         run: |
           set -euo pipefail
           mkdir -p "$(dirname "$ATTEMPT_PATH")"
@@ -139,19 +139,27 @@ jobs:
         run: dapr init --runtime-version 1.18.0
       - name: Run all live recovery coordinators and retain evidence
         id: recovery
-        run: >-
-          dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
-          -m:1
-          --configuration Release
-          --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate"
-          --logger "console;verbosity=detailed"
-          --settings live-recovery.runsettings
-          --logger "trx;LogFileName=live-recovery-validation.trx"
-          --results-directory TestResults
+        # Bounded ladder, innermost first, so the in-process `finally` always wins the race to unwind a
+        # half-injected fault: in-process deadline 265m < SIGINT 280m < step 300m < job 330m. Without the
+        # inner margin the runner kills the process mid-injection and no restoration step ever runs.
+        timeout-minutes: 300
+        env:
+          HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: "265"
+        run: |
+          set -euo pipefail
+          timeout --signal=INT --kill-after=15m 16800s \
+            dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj \
+            -m:1 \
+            --configuration Release \
+            --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" \
+            --logger "console;verbosity=detailed" \
+            --settings live-recovery.runsettings \
+            --logger "trx;LogFileName=live-recovery-validation.trx" \
+            --results-directory TestResults
       - name: Finalize metadata-only live recovery attempt envelope
         if: always()
         env:
-          ATTEMPT_PATH: TestResults/workflow-attempt/producer-attempt.json
+          ATTEMPT_PATH: ${{ runner.temp }}/workflow-attempt/producer-attempt.json
           PRODUCER_OUTCOME: ${{ steps.recovery.outcome }}
         run: |
           set -euo pipefail
@@ -167,7 +175,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: release-live-recovery-validation-evidence
-          path: TestResults
+          path: |
+            TestResults
+            ${{ runner.temp }}/workflow-attempt
           retention-days: 30
           if-no-files-found: error
       - name: Stop DAPR runtime

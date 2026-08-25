@@ -71,10 +71,6 @@ public static class ProvenanceAttestor
             policy,
             "repositoryIdentity",
             GateReason.EvidenceStaleOrUnbound);
-        int maximumCurrentRunAgeMinutes = EvidenceJson.RequiredInteger(
-            policy,
-            "maximumCurrentRunAgeMinutes",
-            GateReason.EvidenceStaleOrUnbound);
         int maximumFutureClockSkewMinutes = EvidenceJson.RequiredInteger(
             policy,
             "maximumFutureClockSkewMinutes",
@@ -109,7 +105,9 @@ public static class ProvenanceAttestor
                 lane,
                 resultsRoot,
                 repositoryIdentity,
-                maximumCurrentRunAgeMinutes,
+                EvidenceJson.ResolveCurrentRunAgeMinutes(
+                    policy,
+                    EvidenceJson.RequiredString(lane, "lane", GateReason.MachineResultsInvalid)),
                 maximumFutureClockSkewMinutes,
                 producedAtUtc);
             currentRunLanes.Add(new AttestationLane(lane, checksum));

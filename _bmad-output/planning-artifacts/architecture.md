@@ -312,7 +312,7 @@ opinionated platform**, not a greenfield free choice of stack.
 |---|---|---|
 | Language & runtime | C# 14 / `net10.0`, SDK `10.0.302` (LTS), nullable, warnings-as-errors, shared Builds-owned package catalog | GA, released 2026-07-14; matches all siblings |
 | Persistence / write model | Hexalith.EventStore (CQRS/ES, `{tenant}:{domain}:{aggregateId}`, persist-then-publish, pure Handle/Apply, rejections-as-events, ULIDs, `system` platform tenant) | Foundation submodule |
-| Messaging / orchestration | DAPR 1.17.x — at-least-once pub/sub (CloudEvents), actors via `IActorStateManager`, deny-by-default ACLs; canonical Epic 2 owns both the correction-propagation coordinator seam and minimum hosted Dapr Workflow production binding | Matches sibling pins |
+| Messaging / orchestration | DAPR 1.18.x — at-least-once pub/sub (CloudEvents), actors via `IActorStateManager`, deny-by-default ACLs; canonical Epic 2 owns both the correction-propagation coordinator seam and minimum hosted Dapr Workflow production binding | Matches sibling pins |
 | Hosting / composition | .NET **Aspire 13.3.x** AppHost (K8s/AKS + Helm deploy in 13.3 — relevant to M2 ops) | Latest 13.3 (2026-05-07); EventStore/Tenants/Folders on 13.3.x |
 | UI | Blazor + **Fluent UI v5 (RC, via FrontComposer)** — Roslyn source-gen, Fluxor, REST + SignalR projection-nudge, contract-first | ⚠️ Still RC May 2026 — inherited pre-GA dependency, pinned, do not upgrade casually |
 | CLI surface (M1) | System.CommandLine 2.0.x wrapping `Hexalith.ChatBot.Client` | Per Folders pin; verify at scaffold |
@@ -873,7 +873,7 @@ projection → SignalR nudge → UI.
 ### Coherence Validation ✅
 
 **Decision Compatibility:** All technology choices are platform-native and version-verified current (July 2026):
-.NET 10.0.302, Aspire 13.3.x, DAPR 1.17.x, MCP SDK 2.2.0 (shared-catalog-pinned), xUnit v3. No contradictory decisions remain —
+.NET 10.0.302, Aspire 13.3.x, DAPR 1.18.x, MCP SDK 2.2.0 (shared-catalog-pinned), xUnit v3. No contradictory decisions remain —
 notably the apparent **NFR15a (fail-closed incl. "audit down") × NFR49a (WORM hash-chain) contradiction is
 resolved** by the two-phase audit model (pre-commit fail-closed gate vs post-commit reconcile-from-event-log).
 Two coherence caveats, both owned: **Fluent UI v5 is still RC** (inherited pre-GA, pinned, do-not-upgrade);
