@@ -29,7 +29,12 @@ _ = builder.AddEventStoreDomainService(typeof(GovernedOperationAggregate).Assemb
 // Precedence matters: an unconditional override would silently kill both EventStore:DomainService binding and
 // DAPR_APP_ID, so any per-environment prefix, canary or multi-instance deployment would reintroduce the very
 // mismatch this exists to prevent. Explicit configuration wins, then the DAPR-supplied app id, and the pinned
-// constant is only a last-resort fallback for hosts that supply neither.
+// constant is the fallback for hosts that supply NO value at all.
+//
+// A supplied-but-malformed value is NOT silently replaced by the constant: it fails ValidateOnStart and the host
+// does not boot. That is deliberate. A shape-valid but wrong identity is refused verbatim by EventStore and stalls
+// the projection checkpoint forever with nothing logged as an error, so a loud crash-loop is strictly easier to
+// diagnose than the outage the alternative produces.
 _ = builder.Services
     .AddOptions<DomainProjectionIdentityOptions>()
     .PostConfigure(options =>
@@ -41,6 +46,13 @@ _ = builder.Services
         options.ServiceVersion = ChatBotDomainServiceIdentity.ResolveServiceVersion(
             builder.Configuration[$"{ChatBotDomainServiceIdentity.ConfigurationSection}:ServiceVersion"],
             builder.Configuration["EventStore:DomainService:ServiceVersion"]);
+
+        // The gate below validates SHAPE; EventStore compares the VALUE ordinally. Nothing else recorded which
+        // identity this host actually resolved, so a well-formed but WRONG value was invisible from the outside --
+        // which is how the original capability refusal went unnoticed. Metadata only, emitted once.
+        Console.Out.WriteLine(
+            $"chatbot.projection-identity appId={options.AppId} serviceVersion={options.ServiceVersion} "
+            + $"pinnedAppId={ChatBotDomainServiceIdentity.AppId}");
     })
     .Validate(
         static options => ChatBotDomainServiceIdentity.IsUsableIdentityComponent(options.AppId)

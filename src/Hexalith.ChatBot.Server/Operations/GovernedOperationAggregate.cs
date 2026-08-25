@@ -1672,6 +1672,36 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             return DomainResult.NoOp();
         }
 
+        // AC3 requires cancellation to validate response/generation identity, active state and expected version BEFORE
+        // mutation, and AC4 requires invalid targets to fail closed. Previously the handler checked only that each id
+        // was a well-formed token, so a cancellation naming a response and generation that never existed was accepted
+        // and projected as a governed "stopped" AI outcome.
+        ActiveAiResponseGeneration? generation = state?.FindActiveAiResponseGeneration(command.ResponseId, command.GenerationId);
+        if (generation is null)
+        {
+            // Unknown identity, or a generation that already reached a terminal outcome: nothing to stop.
+            return DomainResult.Rejection(new IRejectionEvent[]
+            {
+                new TaskIntentCaptureRejected(command.CancellationId, "ai_response_generation_not_active"),
+            });
+        }
+
+        if (!string.Equals(generation.ProjectId, command.ProjectId, StringComparison.Ordinal))
+        {
+            return DomainResult.Rejection(new IRejectionEvent[]
+            {
+                new TaskIntentCaptureRejected(command.CancellationId, "ai_response_cancellation_project_mismatch"),
+            });
+        }
+
+        if (command.ExpectedSourceVersion < generation.StartedSourceVersion)
+        {
+            return DomainResult.Rejection(new IRejectionEvent[]
+            {
+                new TaskIntentCaptureRejected(command.CancellationId, "ai_response_cancellation_stale_version"),
+            });
+        }
+
         return DomainResult.Success(new IEventPayload[]
         {
             new AiResponseGenerationCancellationRequested(

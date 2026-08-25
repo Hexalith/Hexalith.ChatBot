@@ -1,11 +1,12 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
+@using Hexalith.ChatBot.Client.Generated
 @inject ChatBotUiTextLocalizer UiText
 @inject Hexalith.ChatBot.UI.Services.ProjectConversationService ConversationService
+@inject ChatBotCultureFormatter Culture
 
 <article class="chatbot-approval-conversation-item"
          data-chatbot-conversation-item-kind="@Item.Kind"
          data-chatbot-conversation-item-id="@Item.ItemId"
-         tabindex="0"
          aria-label="@AccessibleLabel">
     <FluentCard Class="chatbot-approval-conversation-item__surface">
         <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.75rem">
@@ -15,20 +16,42 @@
                          Class="chatbot-approval-conversation-item__header">
                 <ChatBotEvidenceChip State="@EvidenceState"
                                      Text="@EvidenceSummary"
-                                     StableId="@Item.ItemId" />
-                <ChatBotRiskChip RiskClass="@RiskActionClass"
-                                 PolicyReason="@RiskSummary" />
+                                     StableId="@Item.ItemId"
+                                     CanOpenEvidence="@CanOpenEvidence"
+                                     UnavailableReason="@EvidenceUnavailableReason"
+                                     OnActivate="@OpenWhyThisProjectAsync" />
+                @if (RiskActionClass is ChatBotRiskActionClass known)
+                {
+                    <ChatBotRiskChip RiskClass="@known"
+                                     PolicyReason="@RiskSummary" />
+                }
                 @foreach (ApprovalEvidenceChip chip in ApprovalEvidenceChips)
                 {
-                    <FluentButton Appearance="ButtonAppearance.Subtle"
-                                  Type="ButtonType.Button"
-                                  Class="chatbot-chip chatbot-chip--evidence"
-                                  data-chatbot-approval-evidence-freshness="@chip.Freshness"
-                                  aria-disabled="@chip.AriaDisabled"
-                                  aria-label="@chip.AccessibleLabel">
-                        <FluentText As="TextTag.Span" Class="chatbot-chip__label">@chip.Reference</FluentText>
-                        <FluentText As="TextTag.Span" Class="chatbot-chip__status">@UiText.ApprovalEvidenceFreshnessLabel(chip.Freshness)</FluentText>
-                    </FluentButton>
+                    @if (chip.IsExpired)
+                    {
+                        @* Expired evidence cannot be opened. Render it as text rather than an aria-disabled
+                           button: a focusable control that swallows every activation is a dead tab stop. *@
+                        <FluentStack Orientation="Orientation.Horizontal"
+                                     HorizontalGap="0.25rem"
+                                     Class="chatbot-chip chatbot-chip--evidence"
+                                     data-chatbot-approval-evidence-freshness="@chip.Freshness"
+                                     aria-label="@chip.AccessibleLabel">
+                            <FluentText As="TextTag.Span" Class="chatbot-chip__label">@chip.Reference</FluentText>
+                            <FluentText As="TextTag.Span" Class="chatbot-chip__status">@UiText.ApprovalEvidenceFreshnessLabel(chip.Freshness)</FluentText>
+                        </FluentStack>
+                    }
+                    else
+                    {
+                        <FluentButton Appearance="ButtonAppearance.Subtle"
+                                      Type="ButtonType.Button"
+                                      Class="chatbot-chip chatbot-chip--evidence"
+                                      data-chatbot-approval-evidence-freshness="@chip.Freshness"
+                                      aria-label="@chip.AccessibleLabel"
+                                      OnClick="OpenWhyThisProjectAsync">
+                            <FluentText As="TextTag.Span" Class="chatbot-chip__label">@chip.Reference</FluentText>
+                            <FluentText As="TextTag.Span" Class="chatbot-chip__status">@UiText.ApprovalEvidenceFreshnessLabel(chip.Freshness)</FluentText>
+                        </FluentButton>
+                    }
                 }
                 <FluentText As="TextTag.Span" Class="chatbot-approval-conversation-item__status">@UiText.ApprovalStatusLabel(Item.ApprovalStatus)</FluentText>
                 <ChatBotActorBadge Category="ChatBotActorCategory.BackgroundWorker"
@@ -84,66 +107,77 @@
         @MetadataRow(ChatBotUiTextKey.ApprovalRetryabilityLabel, Item.ApprovalRetryability)
         @MetadataRow(ChatBotUiTextKey.ApprovalSupersedesLabel, Item.SupersedesApprovalId)
         @MetadataRow(ChatBotUiTextKey.ApprovalSupersededByLabel, Item.SupersededByApprovalId)
-        @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], ResolvedSafeNextAction)
-        @CodeRow(UiText[ChatBotUiTextKey.RedactionStateLabel], Item.RedactionState)
-        @CodeRow(UiText[ChatBotUiTextKey.RetentionClassLabel], Item.RetentionClass)
-        @CodeRow(UiText[ChatBotUiTextKey.SchemaVersionLabel], Item.SchemaVersion)
-        @CodeRow(UiText[ChatBotUiTextKey.SourceVersionLabel], Item.SourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))
-        @CodeRow(UiText[ChatBotUiTextKey.CorrelationIdLabel], Item.CorrelationId)
+        @* These go through MetadataRow like every row above: calling CodeRow directly bypassed the blank
+           guard and rendered a label followed by an empty <code> box. *@
+        @MetadataRow(ChatBotUiTextKey.SafeNextActionsLabel, ResolvedSafeNextAction)
+        @MetadataRow(ChatBotUiTextKey.RedactionStateLabel, Item.RedactionState)
+        @MetadataRow(ChatBotUiTextKey.RetentionClassLabel, Item.RetentionClass)
+        @MetadataRow(ChatBotUiTextKey.SchemaVersionLabel, Item.SchemaVersion)
+        @MetadataRow(ChatBotUiTextKey.SourceVersionLabel, Item.SourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))
+        @MetadataRow(ChatBotUiTextKey.CorrelationIdLabel, Item.CorrelationId)
     </FluentStack>
     @if (ShouldExplainPolicy)
     {
-        <p class="chatbot-approval-conversation-item__reason" tabindex="0">
+        <p class="chatbot-approval-conversation-item__reason">
             <strong>@UiText[ChatBotUiTextKey.WhyUnavailable]</strong> @UiText[ChatBotUiTextKey.ApprovalPolicyUnavailableReason]
         </p>
     }
     @if (ShouldExplainAudit)
     {
-        <p class="chatbot-approval-conversation-item__reason" tabindex="0">
+        <p class="chatbot-approval-conversation-item__reason">
             <strong>@UiText[ChatBotUiTextKey.WhyUnavailable]</strong> @UiText[ChatBotUiTextKey.ApprovalAuditUnavailableReason]
         </p>
     }
     @if (IsPendingApproval)
     {
         <div class="chatbot-approval-conversation-item__actions" aria-label="@UiText[ChatBotUiTextKey.ApprovalDecisionKindLabel]">
+            @* Approve mirrors the domain gate (GovernedOperationAggregate.ApprovalDisabledReason +
+               AiActionApprovalGate). Reject/revise/cancel stay enabled: the server admits them under
+               HasReviewAuthority where Approve is refused, and refusing or withdrawing is the safe direction.
+               Do not "tidy" these into one symmetric predicate. *@
             <FluentButton Type="ButtonType.Button"
                           Appearance="ButtonAppearance.Primary"
+                          Class="chatbot-touch-target-primary"
                           aria-disabled="@ApproveAriaDisabled"
-                          aria-describedby="@ApproveReasonId"
+                          aria-describedby="@ApproveDescribedBy"
                           OnClick="ApproveAsync">
                 @UiText.ApprovalDecisionKindLabel("approve")
             </FluentButton>
             <FluentButton Type="ButtonType.Button"
                           Appearance="ButtonAppearance.Outline"
+                          Class="chatbot-touch-target-primary"
                           OnClick="RejectAsync">
                 @UiText.ApprovalDecisionKindLabel("reject")
             </FluentButton>
             <FluentButton Type="ButtonType.Button"
                           Appearance="ButtonAppearance.Outline"
+                          Class="chatbot-touch-target-primary"
                           OnClick="RequestRevisionAsync">
                 @UiText.ApprovalDecisionKindLabel("request-revision")
             </FluentButton>
             <FluentButton Type="ButtonType.Button"
                           Appearance="ButtonAppearance.Outline"
+                          Class="chatbot-touch-target-primary"
                           OnClick="CancelAsync">
                 @UiText.ApprovalDecisionKindLabel("cancel")
             </FluentButton>
         </div>
         @if (!CanApprove)
         {
-            <p id="@ApproveReasonId" class="chatbot-approval-conversation-item__reason" tabindex="0">
+            <p id="@ApproveReasonId" class="chatbot-approval-conversation-item__reason">
                 <strong>@UiText[ChatBotUiTextKey.WhyUnavailable]</strong> @UiText.ApprovalDisabledReasonLabel(ResolvedApproveDisabledReason)
             </p>
         }
     }
-    @if (!string.IsNullOrWhiteSpace(DecisionStatus))
-    {
-        <p class="chatbot-approval-conversation-item__reason"
-           tabindex="-1"
-           aria-live="@DecisionLiveRegion">
-            @DecisionStatus
-        </p>
-    }
+    @* The live region is rendered unconditionally and only its text changes. Creating the region and its
+       first text in the same render pass means assistive technology never observes the mutation, so neither
+       the blocked message nor the decision result was ever announced. *@
+    <p class="chatbot-approval-conversation-item__reason chatbot-approval-conversation-item__decision-status"
+       @ref="_decisionStatusElement"
+       tabindex="-1"
+       aria-live="@DecisionLiveRegion">
+        @DecisionStatus
+    </p>
     <ChatBotConversationItemReviewHistory ItemId="@Item.ItemId"
                                           Entries="@Item.ReviewHistory" />
         </FluentStack>
@@ -153,6 +187,18 @@
 @code {
     [Parameter]
     public ProjectConversationItemModel Item { get; set; } = default!;
+
+    /// <summary>Raised when the reviewer asks to open the supporting evidence for this approval.</summary>
+    [Parameter]
+    public EventCallback<ProjectConversationItemModel> OnWhyThisProjectRequested { get; set; }
+
+    private ElementReference _decisionStatusElement;
+
+    private bool _decisionInFlight;
+
+    private bool _shouldFocusDecisionStatus;
+
+    private int _blockedAttempts;
 
     private string ResolvedSafeNextAction
         => string.IsNullOrWhiteSpace(Item.SafeNextAction) ? "none" : Item.SafeNextAction;
@@ -164,21 +210,47 @@
     private bool IsPendingApproval
         => string.Equals(Item.ApprovalStatus, "pending", StringComparison.OrdinalIgnoreCase);
 
+    // Any projected disabled reason blocks approval. The previous three-item deny-list let policy-blocked,
+    // duplicate-decision, conflicting-decision, dependency-degraded and awaiting-other-actor through to a
+    // server rejection the surface then failed to explain.
     private bool CanApprove
         => IsPendingApproval &&
-            !string.Equals(ResolvedApproveDisabledReason, "evidence-expired", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(ResolvedApproveDisabledReason, "insufficient-authority", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(ResolvedApproveDisabledReason, "corrected-context-invalidated", StringComparison.OrdinalIgnoreCase) &&
+            !_decisionInFlight &&
+            string.IsNullOrWhiteSpace(Item.ApprovalDisabledReason) &&
+            !HasExpiredEvidence &&
             !IsUnavailableReferenceStatus(Item.ApprovalAuditStatus);
 
     private string ApproveAriaDisabled => CanApprove ? "false" : "true";
 
     private string ApproveReasonId => $"chatbot-approval-{Item.ItemId}-approve-reason";
 
+    // Only reference the reason element when it is actually rendered; a constant aria-describedby dangles
+    // whenever approval is permitted.
+    private string? ApproveDescribedBy => CanApprove ? null : ApproveReasonId;
+
+    // Mirrors GovernedOperationAggregate.ApprovalDisabledReason: the domain treats a freshness list that does
+    // not line up with the evidence list as expired for approval, so the surface must too — otherwise Approve
+    // is offered exactly where the server will refuse it.
+    private bool HasExpiredEvidence
+        => Item.ApprovalEvidenceFreshnessStates.Count != Item.ApprovalEvidenceReferences.Count ||
+            Item.ApprovalEvidenceFreshnessStates.Any(static state => string.Equals(state, "expired", StringComparison.OrdinalIgnoreCase));
+
+    private bool CanOpenEvidence
+        => OnWhyThisProjectRequested.HasDelegate && Item.ApprovalEvidenceReferences.Count > 0 && !HasExpiredEvidence;
+
+    private string? EvidenceUnavailableReason
+        => HasExpiredEvidence ? UiText.ApprovalDisabledReasonLabel("evidence-expired") : null;
+
+    // Order matters: report the cause that actually blocks. audit-unavailable is a defined reason and was
+    // previously unreachable, so a redacted/unavailable audit was explained as "state-not-permitted".
     private string ResolvedApproveDisabledReason
-        => Item.ApprovalEvidenceFreshnessStates.Any(static state => string.Equals(state, "expired", StringComparison.OrdinalIgnoreCase))
+        => HasExpiredEvidence
             ? "evidence-expired"
-            : string.IsNullOrWhiteSpace(Item.ApprovalDisabledReason) ? "state-not-permitted" : Item.ApprovalDisabledReason;
+            : !string.IsNullOrWhiteSpace(Item.ApprovalDisabledReason)
+                ? Item.ApprovalDisabledReason
+                : IsUnavailableReferenceStatus(Item.ApprovalAuditStatus)
+                    ? "audit-unavailable"
+                    : "state-not-permitted";
 
     private string? DisplayPolicySnapshotId
         => string.Equals(Item.ApprovalPolicySnapshotVisibility, "authorized", StringComparison.OrdinalIgnoreCase)
@@ -205,9 +277,7 @@
         => Item.ApprovalAiRiskActionClasses.Count > 0 ? Item.ApprovalAiRiskActionClasses : Item.ApprovalRiskActionClasses;
 
     private ChatBotEvidenceState EvidenceState
-        => Item.ApprovalEvidenceFreshnessStates.Any(static state => string.Equals(state, "expired", StringComparison.OrdinalIgnoreCase))
-            ? ChatBotEvidenceState.Unavailable
-            : ChatBotEvidenceState.Available;
+        => HasExpiredEvidence ? ChatBotEvidenceState.Unavailable : ChatBotEvidenceState.Available;
 
     private IReadOnlyList<ApprovalEvidenceChip> ApprovalEvidenceChips
         => Item.ApprovalEvidenceReferences
@@ -216,16 +286,19 @@
                 string freshness = index < Item.ApprovalEvidenceFreshnessStates.Count
                     ? Item.ApprovalEvidenceFreshnessStates[index]
                     : "expired";
-                string ariaDisabled = string.Equals(freshness, "expired", StringComparison.OrdinalIgnoreCase) ? "true" : "false";
+                bool isExpired = string.Equals(freshness, "expired", StringComparison.OrdinalIgnoreCase);
                 return new ApprovalEvidenceChip(
                     reference,
                     freshness,
-                    ariaDisabled,
+                    isExpired,
                     $"{reference}, {UiText.ApprovalEvidenceFreshnessLabel(freshness)}");
             })
             .ToArray();
 
-    private ChatBotRiskActionClass RiskActionClass
+    // Null when no known risk-action class matches. Defaulting to ProjectMutating made the chip assert a
+    // specific risk for an item whose class the surface does not recognise; the raw class still renders in the
+    // metadata rows above.
+    private ChatBotRiskActionClass? RiskActionClass
         => DisplayRiskActionClasses.FirstOrDefault(static value => string.Equals(value, "exposes-files", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "file-exposing", StringComparison.OrdinalIgnoreCase)) is not null
             ? ChatBotRiskActionClass.FileExposing
             : DisplayRiskActionClasses.FirstOrDefault(static value => string.Equals(value, "acts-on-behalf", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "participant-representing", StringComparison.OrdinalIgnoreCase)) is not null
@@ -236,7 +309,9 @@
                         ? ChatBotRiskActionClass.TaskCreating
                         : DisplayRiskActionClasses.FirstOrDefault(static value => string.Equals(value, "sends-external", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "externally-visible", StringComparison.OrdinalIgnoreCase)) is not null
                             ? ChatBotRiskActionClass.ExternallyVisible
-                            : ChatBotRiskActionClass.ProjectMutating;
+                            : DisplayRiskActionClasses.FirstOrDefault(static value => string.Equals(value, "mutates-project", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "project-mutating", StringComparison.OrdinalIgnoreCase)) is not null
+                                ? ChatBotRiskActionClass.ProjectMutating
+                                : null;
 
     private string AccessibleLabel
         => UiText.Get(
@@ -245,9 +320,11 @@
             UiText.ApprovalStatusLabel(Item.ApprovalStatus),
             FormatDisplayUtc(Item.OccurredAt));
 
+    // Anything that is not an explicit "authorized" suppresses the snapshot id, so anything that is not
+    // "authorized" must also carry the explanation — otherwise a blank or unrecognised visibility makes the row
+    // vanish with no reason given.
     private bool ShouldExplainPolicy
-        => string.Equals(Item.ApprovalPolicySnapshotVisibility, "redacted", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(Item.ApprovalPolicySnapshotVisibility, "unavailable", StringComparison.OrdinalIgnoreCase);
+        => !string.Equals(Item.ApprovalPolicySnapshotVisibility, "authorized", StringComparison.OrdinalIgnoreCase);
 
     private bool ShouldExplainAudit
         => IsUnavailableReferenceStatus(Item.ApprovalAuditStatus);
@@ -269,32 +346,89 @@
     private Task BlockApproveAsync()
     {
         DecisionLiveRegion = "assertive";
-        DecisionStatus = UiText.ApprovalDisabledReasonLabel(ResolvedApproveDisabledReason);
+
+        // The attempt counter keeps repeated blocked clicks distinguishable: an identical string is not a
+        // live-region mutation, so the second and later attempts produced no feedback at all.
+        _blockedAttempts++;
+        DecisionStatus = _blockedAttempts == 1
+            ? UiText.ApprovalDisabledReasonLabel(ResolvedApproveDisabledReason)
+            : $"{UiText.ApprovalDisabledReasonLabel(ResolvedApproveDisabledReason)} ({_blockedAttempts.ToString(System.Globalization.CultureInfo.CurrentCulture)})";
+        _shouldFocusDecisionStatus = true;
         return Task.CompletedTask;
+    }
+
+    private async Task OpenWhyThisProjectAsync()
+        => await OnWhyThisProjectRequested.InvokeAsync(Item).ConfigureAwait(true);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_shouldFocusDecisionStatus)
+        {
+            return;
+        }
+
+        // EXPERIENCE.md: a submitted, blocked or failed decision moves focus to its status so the outcome is
+        // reachable without hunting for it.
+        _shouldFocusDecisionStatus = false;
+        await _decisionStatusElement.FocusAsync().ConfigureAwait(true);
     }
 
     private async Task SubmitDecisionAsync(Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind decision)
     {
+        // A second activation before the first completes would submit a duplicate governed decision.
+        if (_decisionInFlight)
+        {
+            return;
+        }
+
+        _decisionInFlight = true;
         try
         {
             _ = await ConversationService
                 .SubmitApprovalDecisionAsync(Item, decision)
-                .ConfigureAwait(false);
+                // ConfigureAwait(true): the continuation assigns render-visible fields and must resume on the
+                // renderer's synchronization context.
+                .ConfigureAwait(true);
             DecisionLiveRegion = "polite";
-            DecisionStatus = UiText.ApprovalDecisionKindLabel(decision switch
-            {
-                Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.Approve => "approve",
-                Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.Reject => "reject",
-                Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.RequestRevision => "request-revision",
-                _ => "cancel",
-            });
+            DecisionStatus = UiText.ApprovalDecisionKindLabel(DecisionToken(decision));
         }
         catch (InvalidOperationException)
+        {
+            // The local guard in ProjectConversationService: the item is missing the metadata the command needs.
+            DecisionLiveRegion = "assertive";
+            DecisionStatus = UiText.ApprovalDisabledReasonLabel("state-not-permitted");
+        }
+        catch (HexalithChatBotApiException<ProblemDetails> problem)
+        {
+            // A catalog-backed, already-redacted server refusal (authority, already-decided, version drift).
+            // Without this the exception escaped into the renderer and took the item down silently.
+            DecisionLiveRegion = "assertive";
+            DecisionStatus = UiText.ApprovalDisabledReasonLabel(
+                string.IsNullOrWhiteSpace(problem.Result?.Code) ? "state-not-permitted" : problem.Result.Code);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             DecisionLiveRegion = "assertive";
             DecisionStatus = UiText.ApprovalDisabledReasonLabel("projection-pending");
         }
+        finally
+        {
+            _decisionInFlight = false;
+            _shouldFocusDecisionStatus = true;
+        }
     }
+
+    private static string DecisionToken(Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind decision)
+        => decision switch
+        {
+            Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.Approve => "approve",
+            Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.Reject => "reject",
+            Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.RequestRevision => "request-revision",
+            Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.Cancel => "cancel",
+
+            // Never announce an unrecognised decision as a cancellation.
+            _ => throw new ArgumentOutOfRangeException(nameof(decision)),
+        };
 
     private static bool IsUnavailableReferenceStatus(string? status)
         => string.Equals(status, "redacted", StringComparison.OrdinalIgnoreCase) ||
@@ -314,11 +448,21 @@
     private RenderFragment? MetadataListRow(string labelKey, IReadOnlyList<string> values)
         => values.Count == 0 ? null : CodeRow(UiText[labelKey], string.Join(", ", values));
 
+    // Labels and values are positional pairs. Joining them independently when the lengths differ renders two
+    // lists of different arity side by side as though they corresponded, so fall back to the tokens alone.
     private RenderFragment? MetadataListLabelValueRow(string labelKey, IReadOnlyList<string> labels, IReadOnlyList<string> values)
-        => values.Count == 0 ? null : LabelTextCodeRow(UiText[labelKey], string.Join(", ", labels), string.Join(", ", values));
+        => values.Count == 0
+            ? null
+            : labels.Count == values.Count
+                ? LabelTextCodeRow(UiText[labelKey], string.Join(", ", labels), string.Join(", ", values))
+                : CodeRow(UiText[labelKey], string.Join(", ", values));
 
     private RenderFragment? TimestampRow(string labelKey, DateTimeOffset? value)
         => value is null ? null : TimeRow(UiText[labelKey], value.Value);
+
+    // Display timestamps go through the injected culture formatter; the machine value in @datetime stays
+    // invariant ISO-8601.
+    private string FormatDisplayUtc(DateTimeOffset timestamp) => Culture.FormatDateTime(timestamp);
 
     private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
         <FluentText Weight="TextWeight.Semibold">@label</FluentText>
@@ -331,7 +475,7 @@
         <code class="chatbot-code">@token</code>
     </FluentStack>;
 
-    private static RenderFragment TimeRow(string label, DateTimeOffset value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+    private RenderFragment TimeRow(string label, DateTimeOffset value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
         <FluentText Weight="TextWeight.Semibold">@label</FluentText>
         <time datetime="@FormatUtc(value)">@FormatDisplayUtc(value)</time>
     </FluentStack>;
@@ -339,12 +483,9 @@
     private static string FormatUtc(DateTimeOffset timestamp)
         => timestamp.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture);
 
-    private static string FormatDisplayUtc(DateTimeOffset timestamp)
-        => timestamp.ToUniversalTime().ToString("u", System.Globalization.CultureInfo.InvariantCulture);
-
     private sealed record ApprovalEvidenceChip(
         string Reference,
         string Freshness,
-        string AriaDisabled,
+        bool IsExpired,
         string AccessibleLabel);
 }

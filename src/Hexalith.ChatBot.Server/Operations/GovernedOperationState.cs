@@ -33,6 +33,12 @@ public sealed class GovernedOperationState
     private readonly HashSet<string> _projectConversationMessageIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _aiResponseCancellationIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _lowRiskAiExecutionIds = new(StringComparer.Ordinal);
+
+    // In-flight AI response generations, keyed "{responseId}:{generationId}" (proposal id : execution id -- the same
+    // pair the project-conversation projection exposes as AiResponseProgress.ResponseId / .GenerationId). Populated when
+    // a generation starts and removed when it reaches any terminal outcome, so the governed Stop/Cancel handler can bind
+    // the target to a real, still-active generation instead of accepting whatever identity the client sends.
+    private readonly Dictionary<string, ActiveAiResponseGeneration> _activeAiResponseGenerations = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ApprovedAiActionExecutionStarted> _approvedAiExecutions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, OutboundDraftCreated> _outboundDrafts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, OutboundApprovalRequested> _outboundApprovalRequests = new(StringComparer.Ordinal);
@@ -105,6 +111,17 @@ public sealed class GovernedOperationState
     public IReadOnlySet<string> AiResponseCancellationIds => _aiResponseCancellationIds;
 
     public IReadOnlySet<string> LowRiskAiExecutionIds => _lowRiskAiExecutionIds;
+
+    public IReadOnlyDictionary<string, ActiveAiResponseGeneration> ActiveAiResponseGenerations => _activeAiResponseGenerations;
+
+    /// <summary>Gets the still-active generation for a response/generation pair, or null when none is in flight.</summary>
+    public ActiveAiResponseGeneration? FindActiveAiResponseGeneration(string responseId, string generationId)
+        => _activeAiResponseGenerations.TryGetValue(AiResponseGenerationKey(responseId, generationId), out ActiveAiResponseGeneration? active)
+            ? active
+            : null;
+
+    internal static string AiResponseGenerationKey(string responseId, string generationId)
+        => $"{responseId}:{generationId}";
 
     public IReadOnlyDictionary<string, ApprovedAiActionExecutionStarted> ApprovedAiExecutions => _approvedAiExecutions;
 
@@ -348,13 +365,38 @@ public sealed class GovernedOperationState
     {
         ArgumentNullException.ThrowIfNull(e);
         _ = _lowRiskAiExecutionIds.Add(e.ExecutionId);
+
+        // A started low-risk assistance execution IS the in-flight AI response the project-conversation surface renders
+        // as non-terminal "rendering" progress, so it is the generation the Stop control can act on.
+        _activeAiResponseGenerations[AiResponseGenerationKey(e.ProposalId, e.ExecutionId)] = new ActiveAiResponseGeneration(
+            e.ProposalId,
+            e.ExecutionId,
+            e.ProjectId,
+            e.ExpectedProposalSourceVersion,
+            e.CorrelationId);
     }
 
     public void Apply(LowRiskAiAssistanceRoutedToApproval e)
     {
         ArgumentNullException.ThrowIfNull(e);
         _ = _lowRiskAiExecutionIds.Add(e.Record.ExecutionId);
+        CompleteAiResponseGeneration(e.Record.ProposalId, e.Record.ExecutionId);
     }
+
+    public void Apply(LowRiskAiAssistanceExecutionSucceeded e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        CompleteAiResponseGeneration(e.Record.ProposalId, e.Record.ExecutionId);
+    }
+
+    public void Apply(LowRiskAiAssistanceExecutionFailed e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        CompleteAiResponseGeneration(e.Record.ProposalId, e.Record.ExecutionId);
+    }
+
+    private void CompleteAiResponseGeneration(string proposalId, string executionId)
+        => _activeAiResponseGenerations.Remove(AiResponseGenerationKey(proposalId, executionId));
 
     public void Apply(ApprovedAiActionExecutionStarted e)
     {

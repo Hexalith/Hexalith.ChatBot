@@ -65,6 +65,7 @@ jobs:
           -m:1
           --configuration Release
           --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
+          --settings live-recovery.runsettings
           --logger "console;verbosity=detailed"
           --logger "trx;LogFileName=topology-acceptance.trx"
           --results-directory TestResults

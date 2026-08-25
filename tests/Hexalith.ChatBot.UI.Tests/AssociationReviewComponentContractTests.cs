@@ -119,6 +119,7 @@ public sealed class AssociationReviewComponentContractTests
     {
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor");
         string actions = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor");
+        string banner = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor");
         string row = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationCandidateRow.razor");
         string comparison = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationEvidenceComparison.razor");
 
@@ -159,8 +160,14 @@ public sealed class AssociationReviewComponentContractTests
         comparison.ShouldContain("<FluentText", Case.Sensitive);
         comparison.ShouldContain("data-chatbot-association-comparison=\"true\"");
         comparison.ShouldContain("<article");
-        comparison.ShouldContain("<dl");
         comparison.ShouldContain("<code");
+
+        // The <dl> dump was replaced by a Fluent key-value block. The previous assertion here checked for
+        // "<dl" and passed only because those characters appear in a code comment describing the removal -
+        // while Story13DefinitionListMigrationTests forbids the element in this very file. Assert the
+        // replacement structure and the element's absence instead.
+        comparison.ShouldContain("CodeRow(", Case.Sensitive);
+        StripComments(comparison).ShouldNotContain("<dl");
     }
 
     [Fact]
@@ -171,7 +178,11 @@ public sealed class AssociationReviewComponentContractTests
         actions.ShouldContain("<ChatBotStatusBanner", Case.Sensitive);
         actions.ShouldContain("StableId=\"association-review-validation\"");
         actions.ShouldContain("StateFamily=\"@ChatBotFeedbackStateFamily.ValidationError\"");
-        actions.ShouldContain("aria-describedby=\"association-review-validation\"");
+        // The banner renders id="@StableId", so this reference resolves to a real element; it is composed at
+        // runtime by DecisionNoteDescribedBy rather than hardcoded.
+        actions.ShouldContain("DecisionNoteDescribedBy", Case.Sensitive);
+        actions.ShouldContain("association-review-validation association-decision-note-counter");
+        banner.ShouldContain("id=\"@StableId\"");
         // ARIA state attributes must resolve to explicit "true"/"false" strings, not a .NET bool (which Blazor
         // would drop entirely when false). See DecisionNoteInvalidText/CorrectionRationaleInvalidText.
         actions.ShouldContain("aria-invalid=\"@DecisionNoteInvalidText\"");
@@ -408,5 +419,75 @@ public sealed class AssociationReviewComponentContractTests
         }
 
         return count;
+    }
+
+    /// <summary>
+    /// The suppression rule was verified only at the service layer. These assert it at the two components that
+    /// actually render evidence: a restricted item shows the localized placeholder, and neither the evidence
+    /// kind/reference nor a reference-derived id is emitted.
+    /// </summary>
+    [Fact]
+    public void EvidenceRenderersSuppressRestrictedEvidenceAndNeverDeriveIdsFromTheReference()
+    {
+        foreach (string path in new[]
+        {
+            "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationCandidateRow.razor",
+            "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationEvidenceComparison.razor",
+        })
+        {
+            string source = StripComments(ReadProjectFile(path));
+
+            // Kind/Reference render only on the Available branch.
+            source.ShouldContain("evidence.State is ChatBotEvidenceState.Available");
+            source.ShouldContain("AssociationReviewEvidenceRestricted");
+
+            // The chip must not advertise an open affordance for evidence it cannot open.
+            source.ShouldContain("CanOpenEvidence=\"@(evidence.State is ChatBotEvidenceState.Available)\"");
+            source.ShouldNotContain("CanOpenEvidence=\"true\"");
+
+            // Ids are derived from the project id and position, never from the free-text reference - the chip
+            // renders its reason id precisely when the evidence is restricted.
+            source.ShouldContain("EvidenceStableId(");
+            source.ShouldNotContain("{evidence.Reference}");
+        }
+    }
+
+    /// <summary>
+    /// The candidate row is a role="radio"; nesting another interactive control inside it is invalid markup
+    /// and breaks the radio's accessible name.
+    /// </summary>
+    [Fact]
+    public void EvidenceChipsAreNotNestedInsideTheCandidateRadio()
+    {
+        string row = StripComments(ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationCandidateRow.razor"));
+
+        int closeButton = row.IndexOf("</FluentButton>", StringComparison.Ordinal);
+        int chip = row.IndexOf("<ChatBotEvidenceChip", StringComparison.Ordinal);
+
+        closeButton.ShouldBeGreaterThan(-1);
+        chip.ShouldBeGreaterThan(closeButton, "evidence chips must render after the radio button closes");
+    }
+
+    /// <summary>
+    /// Removes Razor and C# comments so a source-text assertion cannot be satisfied by prose describing the
+    /// very markup it is meant to prove exists.
+    /// </summary>
+    private static string StripComments(string source)
+    {
+        string withoutRazor = System.Text.RegularExpressions.Regex.Replace(
+            source,
+            @"@\*.*?\*@",
+            string.Empty,
+            System.Text.RegularExpressions.RegexOptions.Singleline);
+        string withoutBlock = System.Text.RegularExpressions.Regex.Replace(
+            withoutRazor,
+            @"/\*.*?\*/",
+            string.Empty,
+            System.Text.RegularExpressions.RegexOptions.Singleline);
+        return System.Text.RegularExpressions.Regex.Replace(
+            withoutBlock,
+            @"^\s*//.*$",
+            string.Empty,
+            System.Text.RegularExpressions.RegexOptions.Multiline);
     }
 }

@@ -11,11 +11,8 @@ public sealed class AssociationDecisionRecordingE2ETests
     public async Task AssociationDecision_ConfirmedCandidate_SubmitsMetadataOnlyCommandAndRequeriesStatus()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
-        if (harness is null)
-        {
-            AssertHappyPathFixtureWithoutBrowser();
-            return;
-        }
+        Assert.SkipWhen(harness is null, BrowserHarness.UnavailableReason);
+        ArgumentNullException.ThrowIfNull(harness);
 
         await using (harness)
         {
@@ -48,11 +45,8 @@ public sealed class AssociationDecisionRecordingE2ETests
     public async Task AssociationDecision_FailClosedStates_BlockDurableWriteAndSuppressRestrictedEvidence()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
-        if (harness is null)
-        {
-            AssertFailClosedFixtureWithoutBrowser();
-            return;
-        }
+        Assert.SkipWhen(harness is null, BrowserHarness.UnavailableReason);
+        ArgumentNullException.ThrowIfNull(harness);
 
         await using (harness)
         {
@@ -247,27 +241,56 @@ public sealed class AssociationDecisionRecordingE2ETests
                   </section>
         """;
 
-    private static void AssertHappyPathFixtureWithoutBrowser()
-    {
-        string fixture = BuildAssociationDecisionFixture(AssociationDecisionFixtureScenario.HappyPath);
-        fixture.ShouldContain("AssociateEmailToProject");
-        fixture.ShouldContain("origin: 'Ui'");
-        fixture.ShouldContain("GetAssociationRoutingStatusAsync re-query count");
-        fixture.ShouldContain("MailboxEmailAssociationConfirmed");
-        fixture.ShouldContain("metadata_only");
-        AssertMetadataOnly(fixture);
-    }
 
-    private static void AssertFailClosedFixtureWithoutBrowser()
+
+    /// <summary>
+    /// AC3 names desktop, tablet, and phone in English and French plus forced-colors. Nothing in this suite
+    /// exercised any of them: the context was created with no viewport, no locale, and no forced-colors.
+    /// </summary>
+    [Theory]
+    [InlineData(1440, 900, "en-US", ForcedColors.None)]
+    [InlineData(1024, 768, "en-US", ForcedColors.None)]
+    [InlineData(390, 844, "en-US", ForcedColors.None)]
+    [InlineData(1440, 900, "fr-FR", ForcedColors.None)]
+    [InlineData(390, 844, "fr-FR", ForcedColors.None)]
+    [InlineData(1440, 900, "en-US", ForcedColors.Active)]
+    public async Task AssociationDecision_RemainsUsableAcrossViewportsLocalesAndForcedColors(
+        int width,
+        int height,
+        string locale,
+        ForcedColors forcedColors)
     {
-        string fixture = BuildAssociationDecisionFixture(AssociationDecisionFixtureScenario.FailClosed);
-        fixture.ShouldContain("No durable decision was written.");
-        fixture.ShouldContain("evidence-expired");
-        fixture.ShouldContain("already-decided");
-        fixture.ShouldContain("audit-unavailable");
-        fixture.ShouldContain("not-authorized");
-        fixture.ShouldContain("Durable decision writes: 0");
-        AssertMetadataOnly(fixture);
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync(
+            new ViewportSize { Width = width, Height = height },
+            locale,
+            forcedColors);
+        Assert.SkipWhen(harness is null, BrowserHarness.UnavailableReason);
+        ArgumentNullException.ThrowIfNull(harness);
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildAssociationDecisionFixture(AssociationDecisionFixtureScenario.HappyPath));
+
+            ILocator candidate = harness.Page.GetByRole(AriaRole.Radio).First;
+            await WaitForVisibleAsync(candidate);
+
+            // The decision controls must stay reachable and hit-target sized at every width.
+            foreach (string action in new[] { "Choose candidate", "Reject all", "Defer" })
+            {
+                ILocator button = harness.Page.GetByRole(AriaRole.Button, new() { NameString = action });
+                await WaitForVisibleAsync(button);
+                LocatorBoundingBoxResult? box = await button.BoundingBoxAsync();
+                box.ShouldNotBeNull();
+                box.Height.ShouldBeGreaterThanOrEqualTo(24f, $"{action} at {width}x{height} {locale}");
+            }
+
+            // Nothing may overflow the viewport horizontally on any surface.
+            int scrollWidth = await harness.Page.EvaluateAsync<int>("() => document.documentElement.scrollWidth");
+            scrollWidth.ShouldBeLessThanOrEqualTo(width + 1, $"horizontal overflow at {width}x{height} {locale}");
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            AssertMetadataOnly(bodyText);
+        }
     }
 
     private static void AssertMetadataOnly(string text)
@@ -329,7 +352,14 @@ public sealed class AssociationDecisionRecordingE2ETests
 
         public IPage Page { get; }
 
-        public static async Task<BrowserHarness?> TryStartAsync()
+        /// <summary>Reason surfaced on the skip when no browser could be started.</summary>
+        public const string UnavailableReason =
+            "No Chrome/Chromium executable found. Set CHROME_EXECUTABLE_PATH to run the browser-backed assertions.";
+
+        public static async Task<BrowserHarness?> TryStartAsync(
+            ViewportSize? viewport = null,
+            string? locale = null,
+            ForcedColors forcedColors = ForcedColors.None)
         {
             string? chromeExecutable = ResolveChromeExecutable();
             if (chromeExecutable is null)
@@ -349,11 +379,17 @@ public sealed class AssociationDecisionRecordingE2ETests
                     ExecutablePath = chromeExecutable,
                     Args = ["--no-sandbox", "--disable-dev-shm-usage"],
                 }).ConfigureAwait(false);
-                context = await browser.NewContextAsync(new() { ReducedMotion = ReducedMotion.Reduce }).ConfigureAwait(false);
+                context = await browser.NewContextAsync(new()
+                {
+                    ReducedMotion = ReducedMotion.Reduce,
+                    ViewportSize = viewport,
+                    Locale = locale,
+                    ForcedColors = forcedColors,
+                }).ConfigureAwait(false);
                 IPage page = await context.NewPageAsync().ConfigureAwait(false);
                 return new BrowserHarness(playwright, browser, context, page);
             }
-            catch (PlaywrightException)
+            catch (Exception)
             {
                 if (context is not null)
                 {
@@ -377,6 +413,10 @@ public sealed class AssociationDecisionRecordingE2ETests
             _playwright.Dispose();
         }
 
+        /// <summary>
+        /// Probing a single hardcoded path meant a machine with Chromium but no google-chrome silently ran
+        /// no browser at all. Returning null here now produces a visible skip rather than a green run.
+        /// </summary>
         private static string? ResolveChromeExecutable()
         {
             string? configured = Environment.GetEnvironmentVariable("CHROME_EXECUTABLE_PATH");
@@ -385,8 +425,20 @@ public sealed class AssociationDecisionRecordingE2ETests
                 return File.Exists(configured) ? configured : null;
             }
 
-            const string linuxChrome = "/usr/bin/google-chrome";
-            return File.Exists(linuxChrome) ? linuxChrome : null;
+            string[] candidates =
+            [
+                "/usr/bin/google-chrome",
+                "/usr/bin/google-chrome-stable",
+                "/usr/bin/chromium",
+                "/usr/bin/chromium-browser",
+                "/snap/bin/chromium",
+                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                "/Applications/Chromium.app/Contents/MacOS/Chromium",
+                @"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                @"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            ];
+
+            return Array.Find(candidates, File.Exists);
         }
     }
 }

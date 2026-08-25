@@ -94,15 +94,20 @@ internal sealed class RecoveryResourceLogTail : IAsyncDisposable
             return $"[{_resourceName}] no captured log lines.{fault}";
         }
 
+        // Extracted from the DEFAULT console formatter's shape, which is what these resources actually emit:
+        // `level: Some.Logger.Category[eventId]`. The previous extractor looked for a JSON `"Category":"` field and
+        // a `Stage=` token; no JSON console formatter is configured anywhere in this topology and `Stage=` appears
+        // nowhere in the repository, so every render produced `categories=[] stages=[]` -- a line count standing in
+        // for the cause it was added to name.
         string[] categories = [.. captured
-            .Select(line => Extract(line, "\"Category\":\"", "\""))
+            .Select(static line => ExtractCategory(line))
             .Where(static value => value is not null)
             .Select(static value => value!)
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .Take(MaximumRenderedTokens)];
-        string[] stages = [.. captured
-            .Select(line => Extract(line, "Stage=", ","))
+        string[] levels = [.. captured
+            .Select(static line => ExtractLevel(line))
             .Where(static value => value is not null)
             .Select(static value => value!)
             .Distinct(StringComparer.Ordinal)
@@ -110,32 +115,45 @@ internal sealed class RecoveryResourceLogTail : IAsyncDisposable
             .Take(MaximumRenderedTokens)];
 
         return $"[{_resourceName}] capturedLines={captured.Length}"
+            + $" levels=[{string.Join('|', levels)}]"
             + $" categories=[{string.Join('|', categories)}]"
-            + $" stages=[{string.Join('|', stages)}]"
             + fault;
     }
 
-    /// <summary>Pulls one bounded, delimiter-fenced token out of a captured line.</summary>
-    private static string? Extract(string line, string prefix, string terminator)
+    /// <summary>Pulls the logger category out of a default-console-formatter line.</summary>
+    /// <param name="line">One captured log line.</param>
+    /// <returns>The category, or <see langword="null"/> when the line is not in that shape.</returns>
+    private static string? ExtractCategory(string line)
     {
-        int start = line.IndexOf(prefix, StringComparison.Ordinal);
-        if (start < 0)
+        int separator = line.IndexOf(": ", StringComparison.Ordinal);
+        if (separator < 0)
         {
             return null;
         }
 
-        start += prefix.Length;
-        int end = line.IndexOf(terminator, start, StringComparison.Ordinal);
-        int length = end < 0 ? line.Length - start : end - start;
-        if (length <= 0 || length > MaximumTokenLength)
-        {
-            return null;
-        }
+        int open = line.IndexOf('[', separator);
+        return open < 0 ? null : SafeToken(line[(separator + 2)..open]);
+    }
 
-        string token = line[start..(start + length)];
+    /// <summary>Pulls the log level out of a default-console-formatter line.</summary>
+    /// <param name="line">One captured log line.</param>
+    /// <returns>The level, or <see langword="null"/> when the line is not in that shape.</returns>
+    private static string? ExtractLevel(string line)
+    {
+        int separator = line.IndexOf(": ", StringComparison.Ordinal);
+        return separator <= 0 ? null : SafeToken(line[..separator]);
+    }
 
-        // Defence in depth: only emit tokens that are safe stable identifiers, never free text.
-        return token.All(static c => char.IsLetterOrDigit(c) || c is '.' or '-' or '_') ? token : null;
+    /// <summary>Admits only bounded, safe stable identifiers -- never free text.</summary>
+    /// <param name="token">The candidate token.</param>
+    /// <returns>The token when it is a safe identifier, otherwise <see langword="null"/>.</returns>
+    private static string? SafeToken(string token)
+    {
+        string trimmed = token.Trim();
+        return trimmed.Length is > 0 and <= MaximumTokenLength
+            && trimmed.All(static c => char.IsLetterOrDigit(c) || c is '.' or '-' or '_')
+                ? trimmed
+                : null;
     }
 
     /// <summary>Cancels and drains the capture loop.</summary>

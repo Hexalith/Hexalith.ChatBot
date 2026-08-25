@@ -53,7 +53,10 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
             return;
         }
 
-        string correlationId = $"ui-composer:{action.ProjectId}:{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+        // Millisecond resolution collided: SubmissionToken hashes this straight into the MessageId/TaskIntentId and the
+        // aggregate dedups on that, so two sends in the same project in the same millisecond (two tabs, two users) made
+        // the second one vanish as a replay -- the exact silent drop the SubmissionToken comment warns about.
+        string correlationId = $"ui-composer:{action.ProjectId}:{Guid.NewGuid():N}";
         try
         {
             CommandSubmissionResponse response = action.Mode is ProjectConversationComposerMode.AskAi
@@ -107,7 +110,28 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
             return Task.CompletedTask;
         }
 
-        ProjectConversationAiResponseNudgeModel nudge = BuildReQueryNudge(conversation);
+        // Tenant fail-closed. The action has always carried TenantId and this method's contract claimed to fail closed
+        // on it, but nothing compared it -- the guard existed only in the comment. Compared only when the loaded
+        // conversation actually carries a tenant, so the no-JWT dev/test posture (null TenantContext) still nudges.
+        if (!string.IsNullOrWhiteSpace(conversation.TenantContext) &&
+            !string.Equals(conversation.TenantContext, action.TenantId, StringComparison.Ordinal))
+        {
+            return Task.CompletedTask;
+        }
+
+        ProjectConversationAiResponseProgressModel? latest = LatestAiResponseProgress(conversation);
+        if (latest is null)
+        {
+            // No AI-response progress row to advance past. Synthesizing a nudge here produced a CONSTANT record
+            // (ResponseId/GenerationId empty, SourceVersion/Sequence pinned to 1), so after the first signal every
+            // later one deduped against itself and ordinary conversation changes -- a new message, a completed
+            // attachment scan -- refreshed exactly once per page load. The signal is the only change evidence that
+            // exists in that case, so re-query authoritative server state directly.
+            dispatcher.Dispatch(new LoadProjectConversationAction(conversation.ProjectId));
+            return Task.CompletedTask;
+        }
+
+        ProjectConversationAiResponseNudgeModel nudge = BuildReQueryNudge(conversation, latest);
 
         // Benign duplicate / no-advance re-signal: the tenant-wide, at-least-once change broadcast routinely delivers
         // signals (duplicate deliveries, or changes to OTHER conversations in the same tenant) that do not advance THIS
@@ -145,27 +169,28 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
         return Task.CompletedTask;
     }
 
-    private static ProjectConversationAiResponseNudgeModel BuildReQueryNudge(ProjectConversationModel conversation)
-    {
-        ProjectConversationAiResponseProgressModel? latest = conversation.Items
+    private static ProjectConversationAiResponseProgressModel? LatestAiResponseProgress(ProjectConversationModel conversation)
+        => conversation.Items
             .Select(static item => item.AiResponseProgress)
             .OfType<ProjectConversationAiResponseProgressModel>()
             .OrderByDescending(static progress => progress.SourceVersion)
             .ThenByDescending(static progress => progress.Sequence)
             .FirstOrDefault();
 
-        return new ProjectConversationAiResponseNudgeModel(
+    private static ProjectConversationAiResponseNudgeModel BuildReQueryNudge(
+        ProjectConversationModel conversation,
+        ProjectConversationAiResponseProgressModel latest)
+        => new(
             conversation.ProjectId,
-            latest?.ConversationId ?? conversation.ProjectId,
-            latest?.ResponseId ?? string.Empty,
-            latest?.GenerationId ?? string.Empty,
-            latest?.CorrelationId ?? conversation.CorrelationId,
-            (latest?.SourceVersion ?? 0) + 1,
-            (latest?.Sequence ?? 0) + 1,
-            latest?.State ?? string.Empty,
+            latest.ConversationId,
+            latest.ResponseId,
+            latest.GenerationId,
+            latest.CorrelationId,
+            latest.SourceVersion + 1,
+            latest.Sequence + 1,
+            latest.State,
             "metadata_only",
             "metadata_only");
-    }
 
     [EffectMethod]
     public Task HandleAiResponseReconnectAsync(ProjectConversationAiResponseReconnectAction action, IDispatcher dispatcher)

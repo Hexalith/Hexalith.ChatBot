@@ -243,14 +243,17 @@ public sealed class ProjectConversationEffectsTests
         afterRenderingReload.IsCancellingAiResponse.ShouldBeTrue();
         afterRenderingReload.CancellingResponseId.ShouldBe(ResponseId);
 
-        // Terminal but not a verified stop (failed) must NOT clear the cancelling state.
-        afterFailedReload.IsCancellingAiResponse.ShouldBeTrue();
-        afterFailedReload.CancellingResponseId.ShouldBe(ResponseId);
+        // Terminal but not a verified stop (the stop raced natural completion/failure): the tracking CLEARS -- leaving it
+        // set stranded the Stop control disabled for every later generation -- but no stop is announced.
+        afterFailedReload.IsCancellingAiResponse.ShouldBeFalse();
+        afterFailedReload.CancellingResponseId.ShouldBeNull();
+        afterFailedReload.VerifiedStopAnnouncementGenerationId.ShouldBeNull();
 
-        // Only a server-verified terminal stop flips it and clears the tracked identity.
+        // Only a server-verified terminal stop clears the tracked identity AND publishes the announcement token.
         afterStoppedReload.IsCancellingAiResponse.ShouldBeFalse();
         afterStoppedReload.CancellingResponseId.ShouldBeNull();
         afterStoppedReload.CancellingGenerationId.ShouldBeNull();
+        afterStoppedReload.VerifiedStopAnnouncementGenerationId.ShouldBe(GenerationId);
     }
 
     private static ProjectConversationAiResponseProgressModel ActiveProgress()
@@ -268,6 +271,144 @@ public sealed class ProjectConversationEffectsTests
             "metadata_only",
             "metadata_only",
             false);
+
+    [Fact]
+    public async Task ComposerEffectShouldRouteMessageAndAskAiModesToTheirOwnGovernedCommands()
+    {
+        // Nothing previously executed this branch, so inverting the ternary -- routing a plain "Send" down the risky
+        // AI-proposal path, or an Ask-AI request down the plain append path -- broke no test. [AC2]
+        StubChatBotClient messageClient = new();
+        RecordingDispatcher messageDispatcher = new();
+        await new ProjectConversationEffects(new ProjectConversationService(messageClient), EmptyState())
+            .HandleSubmitComposerAsync(
+                new SubmitProjectConversationComposerAction(
+                    "project-001",
+                    ProjectConversationComposerMode.Message,
+                    "a plain message",
+                    "en-US",
+                    10),
+                messageDispatcher);
+
+        StubChatBotClient askAiClient = new();
+        RecordingDispatcher askAiDispatcher = new();
+        await new ProjectConversationEffects(new ProjectConversationService(askAiClient), EmptyState())
+            .HandleSubmitComposerAsync(
+                new SubmitProjectConversationComposerAction(
+                    "project-001",
+                    ProjectConversationComposerMode.AskAi,
+                    "please draft a reply",
+                    "en-US",
+                    10),
+                askAiDispatcher);
+
+        messageClient.LastSubmittedCommand.ShouldBeOfType<RecordProjectConversationMessage>();
+        askAiClient.LastSubmittedCommand.ShouldBeOfType<ProposeAIAction>();
+        messageClient.LastSubmitOrigin.ShouldBe(ChatBotSurfaceOrigin.Ui);
+        askAiClient.LastSubmitOrigin.ShouldBe(ChatBotSurfaceOrigin.Ui);
+        messageDispatcher.Actions.OfType<ProjectConversationSubmissionAcceptedAction>().ShouldHaveSingleItem();
+        askAiDispatcher.Actions.OfType<ProjectConversationSubmissionAcceptedAction>().ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task ComposerEffectShouldRejectBlankTextBeforeReachingTheGovernedClient()
+    {
+        StubChatBotClient client = new();
+        RecordingDispatcher dispatcher = new();
+
+        await new ProjectConversationEffects(new ProjectConversationService(client), EmptyState())
+            .HandleSubmitComposerAsync(
+                new SubmitProjectConversationComposerAction(
+                    "project-001",
+                    ProjectConversationComposerMode.Message,
+                    "   ",
+                    "en-US",
+                    10),
+                dispatcher);
+
+        dispatcher.Actions.OfType<ProjectConversationComposerValidationFailedAction>().Single()
+            .ErrorCode.ShouldBe(ProjectConversationEffects.EmptyComposerCode);
+        client.LastSubmittedCommand.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ComposerEffectShouldGiveEverySubmissionADistinctCorrelationIdWithinTheSameMillisecond()
+    {
+        // A millisecond-resolution correlation id is hashed straight into the MessageId the aggregate dedups on, so two
+        // sends inside one millisecond made the second vanish as a replay.
+        StubChatBotClient first = new();
+        StubChatBotClient second = new();
+        SubmitProjectConversationComposerAction action = new(
+            "project-001",
+            ProjectConversationComposerMode.Message,
+            "same text",
+            "en-US",
+            10);
+
+        await new ProjectConversationEffects(new ProjectConversationService(first), EmptyState())
+            .HandleSubmitComposerAsync(action, new RecordingDispatcher());
+        await new ProjectConversationEffects(new ProjectConversationService(second), EmptyState())
+            .HandleSubmitComposerAsync(action, new RecordingDispatcher());
+
+        RecordProjectConversationMessage firstMessage = first.LastSubmittedCommand.ShouldBeOfType<RecordProjectConversationMessage>();
+        RecordProjectConversationMessage secondMessage = second.LastSubmittedCommand.ShouldBeOfType<RecordProjectConversationMessage>();
+        secondMessage.MessageId.ShouldNotBe(firstMessage.MessageId);
+    }
+
+    [Fact]
+    public async Task ProjectionSignalShouldRequeryDirectlyWhenTheConversationCarriesNoAiProgressRow()
+    {
+        // With no progress row the synthesized nudge was a CONSTANT record, so after the first signal every later one
+        // deduped against itself and ordinary conversation changes refreshed exactly once per page load.
+        ProjectConversationModel withoutProgress = await ConversationWithoutProgressAsync();
+        FakeState loaded = new(new ProjectConversationState(false, withoutProgress, null));
+
+        RecordingDispatcher first = new();
+        await new ProjectConversationEffects(new ProjectConversationService(new StubChatBotClient()), loaded)
+            .HandleProjectionSignalAsync(new ProjectConversationProjectionSignalReceivedAction("project-001", "tenant-001"), first);
+
+        RecordingDispatcher second = new();
+        await new ProjectConversationEffects(new ProjectConversationService(new StubChatBotClient()), loaded)
+            .HandleProjectionSignalAsync(new ProjectConversationProjectionSignalReceivedAction("project-001", "tenant-001"), second);
+
+        // Every signal re-queries; none is swallowed by nudge dedup.
+        first.Actions.OfType<LoadProjectConversationAction>().Single().ProjectId.ShouldBe("project-001");
+        second.Actions.OfType<LoadProjectConversationAction>().Single().ProjectId.ShouldBe("project-001");
+        first.Actions.OfType<ProjectConversationAiResponseNudgeReceivedAction>().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task VerifiedStopShouldPublishADurableAnnouncementTokenForThisSessionsCancellation()
+    {
+        // The announcement gate used to live in a Stop-control field, so the remount caused by the post-stop re-query
+        // swallowed "Response stopped" entirely. The token is store-owned so it survives a remount. [AC4]
+        ProjectConversationState cancelling = new(false, null, null)
+        {
+            IsCancellingAiResponse = true,
+            CancellingResponseId = ResponseId,
+            CancellingGenerationId = GenerationId,
+        };
+
+        ProjectConversationState afterStoppedReload = ProjectConversationReducers.ReduceLoaded(
+            cancelling,
+            new ProjectConversationLoadedAction(await ConversationWithProgressAsync(AiResponseProgressState.Stopped, isTerminal: true)));
+
+        afterStoppedReload.VerifiedStopAnnouncementGenerationId.ShouldBe(GenerationId);
+
+        // A historically stopped response the user did not cancel in this session publishes no token.
+        ProjectConversationState notCancelling = new(false, null, null);
+        ProjectConversationState afterHistoricReload = ProjectConversationReducers.ReduceLoaded(
+            notCancelling,
+            new ProjectConversationLoadedAction(await ConversationWithProgressAsync(AiResponseProgressState.Stopped, isTerminal: true)));
+
+        afterHistoricReload.VerifiedStopAnnouncementGenerationId.ShouldBeNull();
+    }
+
+    private static async Task<ProjectConversationModel> ConversationWithoutProgressAsync()
+    {
+        StubChatBotClient client = new() { IncludeAiResponseProgress = false };
+        ProjectConversationService service = new(client);
+        return await service.GetProjectConversationAsync("project-001").ConfigureAwait(false);
+    }
 
     private static ProjectConversationAiResponseNudgeModel Nudge(long sourceVersion, long sequence, string redaction)
         => new(
@@ -309,6 +450,8 @@ public sealed class ProjectConversationEffectsTests
         public AiResponseProgressState ProgressState { get; init; } = AiResponseProgressState.Rendering;
 
         public bool ProgressIsTerminal { get; init; }
+
+        public bool IncludeAiResponseProgress { get; init; } = true;
 
         public IChatBotCommand? LastSubmittedCommand { get; private set; }
 
@@ -375,7 +518,7 @@ public sealed class ProjectConversationEffectsTests
                         ProjectId = projectId,
                         ProjectDisplayName = "Authorized Project",
                         SafeNextAction = "review-ai-action",
-                        AiResponseProgress = new AiResponseProgress
+                        AiResponseProgress = !IncludeAiResponseProgress ? null : new AiResponseProgress
                         {
                             ProjectId = projectId,
                             ConversationId = "conversation-001",

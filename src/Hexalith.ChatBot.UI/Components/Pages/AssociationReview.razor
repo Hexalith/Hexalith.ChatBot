@@ -30,6 +30,11 @@
                           HeadingId="association-review-title"
                           Description="@UiText[ChatBotUiTextKey.AssociationReviewSafeNextAction]" />
 
+            @* aria-busy lives on the region whose content is being replaced and clears on the same node when
+               content swaps in, so assistive technology is told the region is settling rather than empty. *@
+            <div class="chatbot-association-review__body"
+                 aria-busy="@BusyText"
+                 aria-label="@UiText[ChatBotUiTextKey.AssociationReviewLoadingBusy]">
             @if (State.Value.IsLoading)
             {
                 <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
@@ -37,18 +42,47 @@
                                      AccessibleLabel="@UiText[ChatBotUiTextKey.AssociationReviewLoading]"
                                      StableId="association-review-loading"
                                      StateFamily="@ChatBotFeedbackStateFamily.LoadingColdLoad" />
+                <FluentSkeleton Height="128px" Width="100%" Shape="SkeletonShape.Rectangle" />
             }
 
             @if (State.Value.ErrorCode is { } error)
             {
-                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Danger"
-                                     Message="@UiText[ChatBotUiTextKey.SubmissionFailed]"
-                                     AccessibleLabel="@UiText[ChatBotUiTextKey.SubmissionFailedAccessible]"
+                @* The summary owns the focus target and precedes the panel it describes, so a validation or
+                   failure summary is reached before the fields it is about. *@
+                <div @ref="_errorSummary" tabindex="-1" class="chatbot-association-review__summary">
+                <ChatBotStatusBanner Kind="@FailureKind(error)"
+                                     Message="@FailureMessage(error)"
+                                     AccessibleLabel="@FailureMessage(error)"
                                      StableId="association-review-failed"
-                                     StateFamily="@ChatBotFeedbackStateFamily.RetryableFailure"
+                                     StateFamily="@AssociationReviewFailureCatalog.StateFamily(error)"
                                      AnnouncementKey="@($"association-review-failed-{error}")">
-                    @UiText.Get(ChatBotUiTextKey.SubmissionFailedBodyTemplate, error)
+                    @FailureBody(error)
                 </ChatBotStatusBanner>
+                </div>
+
+                @if (State.Value.ErrorScope is AssociationReviewErrorScope.Load
+                     && AssociationReviewFailureCatalog.IsRetryable(error))
+                {
+                    @* A banner that claims RetryableFailure must actually offer the retry. *@
+                    <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.AssociationReviewLoadFailedRetry]"
+                                           AccessibleLabel="@UiText[ChatBotUiTextKey.AssociationReviewLoadFailedRetry]"
+                                           StableId="association-review-retry"
+                                           State="@(State.Value.IsLoading ? ChatBotGovernedActionState.DisabledWithReason : ChatBotGovernedActionState.Enabled)"
+                                           DisabledReason="@UiText[ChatBotUiTextKey.AssociationReviewLoading]"
+                                           Appearance="ButtonAppearance.Outline"
+                                           OnActivate="@RetryLoad" />
+                }
+            }
+
+            @if (State.Value.LastAcceptedOperation is { } accepted && State.Value.ErrorCode is null)
+            {
+                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Success"
+                                     Message="@UiText.Get(ChatBotUiTextKey.AssociationReviewOperationAcceptedTemplate, accepted.CommandId)"
+                                     AccessibleLabel="@UiText.Get(ChatBotUiTextKey.AssociationReviewOperationAcceptedTemplate, accepted.CommandId)"
+                                     StableId="association-review-accepted"
+                                     StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
+                                     AnnouncementKey="@($"association-review-accepted-{accepted.CommandId}")"
+                                     LiveRegionPoliteness="@ChatBotLiveRegionPoliteness.Polite" />
             }
 
             @if (Review is { } review)
@@ -81,15 +115,48 @@
                             @foreach (AssociationCandidateModel candidate in review.Candidates)
                             {
                                 <ChatBotAssociationCandidateRow Candidate="@candidate"
+                                                                ThresholdBand="@review.ThresholdBand"
                                                                 IsSelected="@IsSelected(candidate)"
-                                                                OnSelected="@SelectCandidate" />
+                                                                TabbableIndex="@RovingTabIndex(candidate)"
+                                                                OnSelected="@SelectCandidate"
+                                                                OnMove="@MoveSelection" />
                             }
                         </FluentStack>
                     </section>
                 }
 
+                @if (State.Value.PendingDecisionCode is { } pending)
+                {
+                    <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Warning"
+                                         Message="@UiText[ChatBotUiTextKey.AssociationReviewConfirmTitle]"
+                                         AccessibleLabel="@UiText[ChatBotUiTextKey.AssociationReviewConfirmTitle]"
+                                         StableId="association-review-confirm"
+                                         StateFamily="@ChatBotFeedbackStateFamily.ValidationError"
+                                         LiveRegionPoliteness="@ChatBotLiveRegionPoliteness.Assertive">
+                        @UiText.Get(ChatBotUiTextKey.AssociationReviewConfirmBodyTemplate, PendingDecisionLabel(pending))
+                    </ChatBotStatusBanner>
+                    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.75rem" Class="chatbot-association-confirm">
+                        <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.AssociationReviewConfirmSubmit]"
+                                               AccessibleLabel="@UiText[ChatBotUiTextKey.AssociationReviewConfirmSubmit]"
+                                               StableId="association-review-confirm-submit"
+                                               State="@(State.Value.IsSubmitting ? ChatBotGovernedActionState.DisabledWithReason : ChatBotGovernedActionState.Enabled)"
+                                               DisabledReason="@UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonSubmitInFlight]"
+                                               Appearance="ButtonAppearance.Primary"
+                                               OnActivate="@ConfirmDecision" />
+                        <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.AssociationReviewConfirmCancel]"
+                                               AccessibleLabel="@UiText[ChatBotUiTextKey.AssociationReviewConfirmCancel]"
+                                               StableId="association-review-confirm-cancel"
+                                               State="@ChatBotGovernedActionState.Enabled"
+                                               DisabledReason=""
+                                               Appearance="ButtonAppearance.Outline"
+                                               OnActivate="@CancelDecision" />
+                    </FluentStack>
+                }
+
                 <ChatBotAssociationReviewActions HasSelectedCandidate="@(State.Value.SelectedCandidate is not null)"
                                                  IsTerminal="@review.IsTerminal"
+                                                 IsSubmitting="@State.Value.IsSubmitting"
+                                                 HasAuthorizedCandidates="@review.HasAuthorizedCandidates"
                                                  CanCorrect="@CanCorrect(review)"
                                                  DisabledReasons="@review.DisabledActionReasonCodes"
                                                  DecisionNote="@State.Value.DecisionNote"
@@ -107,9 +174,10 @@
                                                  ValidationErrorCode="@State.Value.ValidationErrorCode"
                                                  OnDecisionNoteChanged="@UpdateDecisionNote"
                                                  OnCorrectionRationaleChanged="@UpdateCorrectionRationale"
-                                                 OnPreview="@PreviewDecision"
+                                                 OnRequestDecision="@RequestDecision"
                                                  OnSubmitCorrection="@SubmitCorrection" />
             }
+            </div>
         </FluentStack>
         </FcPageLayout>
     </MainContent>
@@ -122,7 +190,7 @@
                the duplicate inner <h2> headings are removed (the accordion item Header is the heading). *@
             <FluentAccordion ExpandMode="AccordionExpandMode.Multi" Block="true">
                 <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.AssociationReviewComparison]" HeadingLevel="2" Expanded="true">
-                    <ChatBotAssociationEvidenceComparison Candidate="@State.Value.SelectedCandidate" ShowHeading="false" />
+                    <ChatBotAssociationEvidenceComparison Candidate="@State.Value.SelectedCandidate" ThresholdBand="@review.ThresholdBand" ShowHeading="false" />
                 </FluentAccordionItem>
                 <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.AssociationReviewSourceMetadata]" HeadingLevel="2" Expanded="true">
                     <section class="chatbot-section" aria-label="@UiText[ChatBotUiTextKey.AssociationReviewSourceMetadata]">
@@ -149,6 +217,9 @@
 
     private AssociationReviewModel? Review => State.Value.Review;
 
+    private ElementReference? _errorSummary;
+    private string? _announcedErrorCode;
+
     protected override void OnParametersSet()
     {
         base.OnParametersSet();
@@ -158,35 +229,132 @@
         }
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender).ConfigureAwait(true);
+
+        // A validation or failure summary must take focus so the reviewer lands on the reason rather than
+        // discovering it only if they happen to scroll. Guarded on the code so re-renders do not steal focus
+        // back while the same error is still on screen.
+        string? current = State.Value.ValidationErrorCode ?? State.Value.ErrorCode;
+        if (string.Equals(current, _announcedErrorCode, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _announcedErrorCode = current;
+        if (current is { Length: > 0 } && _errorSummary is { } summary)
+        {
+            await summary.FocusAsync().ConfigureAwait(true);
+        }
+    }
+
+    private string BusyText => State.Value.IsLoading ? "true" : "false";
+
     private string ReviewStateLabel
         => Review is null
             ? UiText[ChatBotUiTextKey.AssociationReviewLoading]
-            : $"{Review.LifecycleState} · {Review.Outcome} · {Formatter.FormatConfidence(Review.ConfidenceScore)}";
+            : UiText.Get(
+                ChatBotUiTextKey.AssociationReviewStateSummaryTemplate,
+                UiText.AssociationLifecycleStateLabel(Review.LifecycleState),
+                UiText.AssociationOutcomeLabel(Review.Outcome),
+                Formatter.FormatConfidence(Review.ConfidenceScore));
 
     private ChatBotFeedbackKind StatusKind
         => Review switch
         {
             null => ChatBotFeedbackKind.Info,
-            { IsTerminal: true } => ChatBotFeedbackKind.Warning,
+            { IsTerminalSuccess: true } => ChatBotFeedbackKind.Success,
+            { IsTerminalFailure: true } => ChatBotFeedbackKind.Warning,
             { HasAuthorizedCandidates: false } => ChatBotFeedbackKind.Warning,
             { IsStaleOrDegraded: true } => ChatBotFeedbackKind.Warning,
             _ => ChatBotFeedbackKind.Info,
         };
 
+    // A settled association is the goal of this surface, not a policy failure. Degradation is checked before
+    // the successful terminal states so a stale/degraded success still surfaces the degraded signal.
     private ChatBotFeedbackStateFamily FeedbackState
         => Review switch
         {
-            { IsTerminal: true } => ChatBotFeedbackStateFamily.TerminalPolicyFailure,
-            { HasAuthorizedCandidates: false } => ChatBotFeedbackStateFamily.BlockedAction,
+            { IsTerminalFailure: true } => ChatBotFeedbackStateFamily.TerminalPolicyFailure,
             { IsStaleOrDegraded: true } => ChatBotFeedbackStateFamily.DependencyDegraded,
+            { IsPropagationBlocking: true } => ChatBotFeedbackStateFamily.DependencyDegraded,
+            { IsTerminalSuccess: true } => ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending,
+            { HasAuthorizedCandidates: false } => ChatBotFeedbackStateFamily.BlockedAction,
             _ => ChatBotFeedbackStateFamily.CurrentUserAiProposalReady,
         };
+
+    private ChatBotFeedbackKind FailureKind(string code)
+        => AssociationReviewFailureCatalog.StateFamily(code) switch
+        {
+            ChatBotFeedbackStateFamily.DependencyDegraded => ChatBotFeedbackKind.Warning,
+            _ => ChatBotFeedbackKind.Danger,
+        };
+
+    private string FailureMessage(string code)
+        => AssociationReviewFailureCatalog.StateFamily(code) switch
+        {
+            ChatBotFeedbackStateFamily.BlockedAction => UiText[ChatBotUiTextKey.AssociationReviewFailureUnauthorized],
+            ChatBotFeedbackStateFamily.TerminalPolicyFailure => UiText[ChatBotUiTextKey.AssociationReviewFailureTerminalPolicy],
+            ChatBotFeedbackStateFamily.DependencyDegraded => UiText[ChatBotUiTextKey.AssociationReviewFailureDependencyDegraded],
+            _ => UiText[ChatBotUiTextKey.SubmissionFailed],
+        };
+
+    // A failed read and a failed write are opposite messages: "submission did not complete" on a read failure
+    // tells the reviewer a command was sent when none was, and invites a duplicate.
+    private string FailureBody(string code)
+        => State.Value.ErrorScope is AssociationReviewErrorScope.Load
+            ? UiText.Get(ChatBotUiTextKey.AssociationReviewLoadFailedBodyTemplate, code)
+            : AssociationReviewFailureCatalog.IsRetryable(code)
+                ? UiText.Get(ChatBotUiTextKey.SubmissionFailedBodyTemplate, code)
+                : FailureMessage(code);
+
+    private string PendingDecisionLabel(string decisionCode)
+        => UiText[decisionCode switch
+        {
+            "choose-candidate" => ChatBotUiTextKey.AssociationReviewActionChooseCandidate,
+            "reject-all" => ChatBotUiTextKey.AssociationReviewActionRejectAll,
+            "defer" => ChatBotUiTextKey.AssociationReviewActionDefer,
+            _ => ChatBotUiTextKey.AssociationReviewActionMarkNeedsReview,
+        }];
 
     private bool IsSelected(AssociationCandidateModel candidate)
         => string.Equals(State.Value.SelectedCandidateId, candidate.ProjectId, StringComparison.Ordinal);
 
+    // ARIA radiogroup: exactly one tab stop. The checked radio is tabbable; when nothing is selected the first
+    // candidate is, so the group is always reachable.
+    private int RovingTabIndex(AssociationCandidateModel candidate)
+        => IsSelected(candidate)
+            || (State.Value.SelectedCandidate is null
+                && Review is { Candidates.Count: > 0 } review
+                && ReferenceEquals(review.Candidates[0], candidate))
+                    ? 0
+                    : -1;
+
     private void SelectCandidate(string candidateId)
         => Dispatcher.Dispatch(new SelectAssociationCandidateAction(candidateId));
+
+    /// <summary>Arrow-key navigation required by the radiogroup pattern.</summary>
+    private void MoveSelection((string CandidateId, int Delta) move)
+    {
+        if (Review is not { Candidates.Count: > 0 } review)
+        {
+            return;
+        }
+
+        int current = 0;
+        for (int index = 0; index < review.Candidates.Count; index++)
+        {
+            if (string.Equals(review.Candidates[index].ProjectId, move.CandidateId, StringComparison.Ordinal))
+            {
+                current = index;
+                break;
+            }
+        }
+
+        int next = (current + move.Delta + review.Candidates.Count) % review.Candidates.Count;
+        Dispatcher.Dispatch(new SelectAssociationCandidateAction(review.Candidates[next].ProjectId));
+    }
 
     private void UpdateDecisionNote(string decisionNote)
         => Dispatcher.Dispatch(new UpdateAssociationDecisionNoteAction(decisionNote));
@@ -194,14 +362,26 @@
     private void UpdateCorrectionRationale(string correctionRationale)
         => Dispatcher.Dispatch(new UpdateAssociationCorrectionRationaleAction(correctionRationale));
 
-    private void PreviewDecision(string decisionCode)
-        => Dispatcher.Dispatch(new PreviewAssociationDecisionAction(decisionCode));
+    private void RetryLoad()
+        => Dispatcher.Dispatch(new LoadAssociationReviewAction(AssociationId));
+
+    // Opens the confirmation only. Nothing durable is written until ConfirmDecision.
+    private void RequestDecision(string decisionCode)
+        => Dispatcher.Dispatch(new RequestAssociationDecisionAction(decisionCode));
+
+    private void ConfirmDecision()
+        => Dispatcher.Dispatch(new ConfirmAssociationDecisionAction());
+
+    private void CancelDecision()
+        => Dispatcher.Dispatch(new CancelAssociationDecisionAction());
 
     private void SubmitCorrection()
         => Dispatcher.Dispatch(new SubmitAssociationCorrectionAction());
 
+    // Mirrors AssociationReviewModelExtensions.CanCorrect exactly - the effect is the authority, and a second
+    // copy here previously rendered an enabled submit in lifecycles the effect always rejected.
     private static bool CanCorrect(AssociationReviewModel review)
-        => review.LifecycleState is "Associated" or "Corrected" or "Correcting" or "Correction-delayed";
+        => AssociationReviewModelExtensions.CanCorrect(review.LifecycleState);
 
     // Story 13.4: the former source-metadata <dl> renders as a structured
     // Fluent key-value block. Every value (association/conversation ids, lifecycle/reason/next-action tokens,

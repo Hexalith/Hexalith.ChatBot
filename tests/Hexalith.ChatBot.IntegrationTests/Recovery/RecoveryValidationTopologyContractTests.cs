@@ -413,8 +413,22 @@ public sealed class RecoveryValidationTopologyContractTests
         string tempPath = Path.GetTempPath();
         string abandoned = Directory.CreateTempSubdirectory("hexalith-chatbot-keycloak-").FullName;
         string live = Directory.CreateTempSubdirectory("hexalith-chatbot-keycloak-").FullName;
+        string unreadable = Directory.CreateTempSubdirectory("hexalith-chatbot-keycloak-").FullName;
+        string markerless = Directory.CreateTempSubdirectory("hexalith-chatbot-keycloak-").FullName;
+
+        // A WELL-FORMED marker naming a process that no longer exists. This is the case the sweep exists for and
+        // the one the PID-liveness design was chosen to detect; the previous fixture used an unparseable string,
+        // which only ever exercised the parse-failure branch and left Process.GetProcessById untested.
         await File.WriteAllTextAsync(
             Path.Combine(abandoned, "owner.marker"),
+            string.Create(CultureInfo.InvariantCulture, $"{DeadProcessId()}:{DateTimeOffset.UtcNow.AddHours(-2):O}"),
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
+
+        // Unreadable and absent markers are NOT evidence of abandonment. A marker is written non-atomically only
+        // for an instant, but a concurrently starting AppHost reading it in that instant must not delete a live
+        // run's secret-bearing directory -- the race the owner-marker scheme exists to remove.
+        await File.WriteAllTextAsync(
+            Path.Combine(unreadable, "owner.marker"),
             "this-is-not-a-valid-owner-marker",
             TestContext.Current.CancellationToken).ConfigureAwait(true);
         using (Process current = Process.GetCurrentProcess())
@@ -437,9 +451,13 @@ public sealed class RecoveryValidationTopologyContractTests
         try
         {
             Directory.Exists(abandoned).ShouldBeFalse(
-                "a directory whose owner cannot be established as live must be swept.");
+                "a directory whose recorded owner process is gone must be swept.");
             Directory.Exists(live).ShouldBeTrue(
                 "a directory whose owner process is still running must never be swept, however old it is.");
+            Directory.Exists(unreadable).ShouldBeTrue(
+                "an unparseable marker is not evidence of abandonment; deleting on it races a marker being written.");
+            Directory.Exists(markerless).ShouldBeTrue(
+                "a directory with no marker yet is a run that has just created it, and must be spared.");
 
             string ownerPrefix = Environment.ProcessId.ToString(CultureInfo.InvariantCulture) + ":";
             generatedDirectory = Directory
@@ -451,7 +469,7 @@ public sealed class RecoveryValidationTopologyContractTests
         finally
         {
             await builder.DisposeAsync().ConfigureAwait(true);
-            foreach (string? directory in new[] { generatedDirectory, live, abandoned })
+            foreach (string? directory in new[] { generatedDirectory, live, abandoned, unreadable, markerless })
             {
                 if (directory is not null && Directory.Exists(directory))
                 {
@@ -487,6 +505,42 @@ public sealed class RecoveryValidationTopologyContractTests
         exception.Message.ShouldContain("41101");
     }
 
+    /// <summary>
+    /// <c>AddEventStoreAdmin</c> must actually invoke the port guard, not merely be able to.
+    /// </summary>
+    /// <remarks>
+    /// The two theories around this one call <c>ValidateUniqueInternalGrpcPorts</c> DIRECTLY, so they prove the
+    /// validator rejects a collision -- not that <c>AddEventStoreAdmin</c> calls it. Deleting the call site leaves
+    /// both of them green, which is exactly the "silently removable" property the original finding named and which
+    /// widening the method's visibility did not close.
+    /// <para>
+    /// This assertion is deliberately scoped to the <c>AddEventStoreAdmin</c> method body rather than the whole
+    /// file, so an occurrence elsewhere cannot satisfy it. It is still source-scan evidence, which is weaker than
+    /// executing the composition: invoking the method for real needs a <c>HexalithChatBotResources</c> and two
+    /// project resource builders, i.e. a full topology. That residual is recorded in <c>deferred-work.md</c>
+    /// rather than left implied.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void AddEventStoreAdminBodyInvokesThePortGuard()
+    {
+        string source = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "src",
+            "Hexalith.ChatBot.AppHost",
+            "Aspire",
+            "ChatBotAspireModule.cs"));
+        int start = source.IndexOf("public static void AddEventStoreAdmin(", StringComparison.Ordinal);
+        start.ShouldBeGreaterThan(0, "AddEventStoreAdmin must exist to carry the guard.");
+        int next = source.IndexOf("\n    public static ", start + 1, StringComparison.Ordinal);
+        string body = next > start ? source[start..next] : source[start..];
+
+        body.Contains("ValidateUniqueInternalGrpcPorts(builder.Configuration)", StringComparison.Ordinal)
+            .ShouldBeTrue(
+                "AddEventStoreAdmin must invoke the port guard itself; a composition root that calls it without a "
+                + "preceding AddHexalithChatBot otherwise loses port-collision protection for its two sidecars.");
+    }
+
     /// <summary>Proves distinct ports and absent configuration both pass the same guard.</summary>
     [Fact]
     public void ValidateUniqueInternalGrpcPortsAcceptsDistinctAndUnconfiguredPorts()
@@ -502,6 +556,22 @@ public sealed class RecoveryValidationTopologyContractTests
         Should.NotThrow(() => ChatBotAspireModule.ValidateUniqueInternalGrpcPorts(distinct));
         Should.NotThrow(() => ChatBotAspireModule.ValidateUniqueInternalGrpcPorts(
             new ConfigurationBuilder().Build()));
+    }
+
+    /// <summary>Returns a process id that is reliably not running, for the dead-owner sweep fixture.</summary>
+    /// <returns>An exited process's identifier.</returns>
+    private static int DeadProcessId()
+    {
+        // Start and reap a trivial process, then reuse its id: the id is genuinely gone, and unlike a guessed
+        // constant it cannot collide with a live process on the runner.
+        using Process probe = Process.Start(new ProcessStartInfo("dotnet", "--version")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        })!;
+        probe.WaitForExit();
+        return probe.Id;
     }
 
     private static bool OwnerMarkerStartsWith(string directory, string ownerPrefix)

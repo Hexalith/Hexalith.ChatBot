@@ -27,17 +27,87 @@ public sealed class ProjectConversationStateTests
             "none");
         ProjectConversationState state = new(false, priorConversation, null);
 
-        ProjectConversationState loading = ProjectConversationReducers.ReduceLoad(state);
+        // Switching to a DIFFERENT project drops the prior conversation.
+        ProjectConversationState switching = ProjectConversationReducers.ReduceLoad(
+            state,
+            new LoadProjectConversationAction("project-beta"));
         ProjectConversationState failed = ProjectConversationReducers.ReduceFailed(
             state,
             new ProjectConversationFailedAction("authorization_denied"));
 
-        loading.IsLoading.ShouldBeTrue();
-        loading.Conversation.ShouldBeNull();
+        switching.IsLoading.ShouldBeTrue();
+        switching.Conversation.ShouldBeNull();
         failed.IsLoading.ShouldBeFalse();
         failed.Conversation.ShouldBeNull();
         failed.ErrorCode.ShouldBe("authorization_denied");
     }
+
+    [Fact]
+    public void SameProjectReloadShouldKeepTheRenderedConversationAndOpenWhyPanel()
+    {
+        // A nudge / reconnect / post-submit / post-cancel re-query re-loads the conversation already on screen. Blanking
+        // it there unmounted the stream, the composer and the Stop control mid-generation, destroying focus and any
+        // typed draft, and silently closed the reviewer's open Why panel. Only a genuine project switch may clear.
+        ProjectConversationModel conversation = Conversation("project-alpha");
+        ProjectConversationState state = new(false, conversation, null)
+        {
+            WhyPanelProjectId = "project-alpha",
+            WhyPanelAssociationId = "association-001",
+            LastAcceptedAiResponseNudge = null,
+        };
+
+        ProjectConversationState reloading = ProjectConversationReducers.ReduceLoad(
+            state,
+            new LoadProjectConversationAction("project-alpha"));
+
+        reloading.IsLoading.ShouldBeTrue();
+        reloading.Conversation.ShouldBe(conversation);
+        reloading.WhyPanelProjectId.ShouldBe("project-alpha");
+        reloading.WhyPanelAssociationId.ShouldBe("association-001");
+    }
+
+    [Fact]
+    public void CrossProjectNudgeShouldFailClosedWhileNoConversationIsLoaded()
+    {
+        // The cross-project guard used to be skipped whenever Conversation was null, so a foreign-project nudge was
+        // accepted for the whole window in which a reload was in flight.
+        ProjectConversationState noConversation = new(false, null, null);
+        ProjectConversationAiResponseNudgeModel foreign = new(
+            "project-OTHER",
+            "conversation-001",
+            "response-001",
+            "generation-001",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+            11,
+            5,
+            "rendering",
+            "metadata_only",
+            "metadata_only");
+
+        ProjectConversationState result = ProjectConversationReducers.ReduceAiResponseNudge(
+            noConversation,
+            new ProjectConversationAiResponseNudgeReceivedAction(foreign));
+
+        result.LastAcceptedAiResponseNudge.ShouldBeNull();
+        result.StreamingErrorCode.ShouldBe("ai-response-nudge-unsafe");
+    }
+
+    private static ProjectConversationModel Conversation(string projectId) => new(
+        projectId,
+        "Project Alpha",
+        null,
+        "Current",
+        "Associated",
+        [],
+        null,
+        false,
+        25,
+        "m365-mailbox-intake",
+        "metadata_only",
+        "collaboration_input",
+        "chatbot.project-conversation-response.v1",
+        "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+        "none");
 
     [Fact]
     public void ComposerReducersShouldTrackSubmittingAcceptedAndValidationStates()

@@ -101,7 +101,12 @@ public sealed class Story13DefinitionListMigrationTests
 
             // Positive: data is composed through a structured FluentStack (AC1). Single-column opaque lists may
             // render FluentStack-of-<code> rows; key-value blocks render FluentStack + FluentText — both qualify.
-            if (!content.Contains("FluentStack", StringComparison.Ordinal))
+            //
+            // The row-helper DEFINITIONS are excluded before this check. A bare Contains("FluentStack") was
+            // satisfied by the private CodeRow/TextRow/TimeRow RenderFragment bodies alone, so every call site
+            // could be deleted — rendering no data at all — and this guard still passed. Requiring a FluentStack
+            // outside the helper bodies means the markup must actually compose something.
+            if (!StripRowHelperDefinitions(content).Contains("FluentStack", StringComparison.Ordinal))
             {
                 missingFluent.Add(surface);
             }
@@ -216,7 +221,8 @@ public sealed class Story13DefinitionListMigrationTests
             }
 
             // AC3: genuine opaque tokens keep <code class="chatbot-code"> — monospace must not be blanket-removed.
-            if (!content.Contains("chatbot-code", StringComparison.Ordinal))
+            // Helper definitions excluded for the same reason as the FluentStack check above.
+            if (!StripRowHelperDefinitions(content).Contains("chatbot-code", StringComparison.Ordinal))
             {
                 missingTokenMonospace.Add(surface);
             }
@@ -340,4 +346,21 @@ public sealed class Story13DefinitionListMigrationTests
 
         throw new InvalidOperationException("Could not locate repository root.");
     }
+
+    /// <summary>
+    /// Removes the private row-helper RenderFragment definitions (<c>CodeRow</c>, <c>TextRow</c>, <c>TimeRow</c>,
+    /// <c>LabelTextCodeRow</c> and their <c>…If</c> variants) so the positive markup assertions read only the
+    /// call sites. Without this, a file whose every helper invocation was deleted still contained both
+    /// "FluentStack" and "chatbot-code" inside the helper bodies and passed while rendering nothing.
+    /// </summary>
+    /// <param name="content">The raw .razor content.</param>
+    /// <returns>The content with row-helper definitions removed.</returns>
+    private static string StripRowHelperDefinitions(string content)
+        => RowHelperDefinition.Replace(content, string.Empty);
+
+    private static readonly System.Text.RegularExpressions.Regex RowHelperDefinition = new(
+        @"private\s+(?:static\s+)?RenderFragment\??\s+(?:Code|Text|Time|LabelText)\w*\s*\([^)]*\)\s*=>@?<FluentStack[\s\S]*?</FluentStack>;",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant,
+        TimeSpan.FromSeconds(5));
+
 }

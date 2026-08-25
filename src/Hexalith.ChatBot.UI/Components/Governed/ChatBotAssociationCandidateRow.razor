@@ -10,6 +10,8 @@
               aria-label="@AccessibleLabel"
               data-chatbot-association-candidate="@Candidate.ProjectId"
               data-chatbot-selected="@IsSelectedText"
+              tabindex="@TabbableIndex"
+              @onkeydown="HandleKeyDownAsync"
               OnClick="SelectAsync">
     <FluentBadge Class="chatbot-association-candidate__rank"
                  Appearance="BadgeAppearance.Tint"
@@ -17,23 +19,25 @@
     <span class="chatbot-association-candidate__body">
         <span class="chatbot-association-candidate__title">@Candidate.DisplayLabel</span>
         <span class="chatbot-association-candidate__meta">
-            @UiText[ChatBotUiTextKey.ConfidenceBandWithin] · @Formatter.FormatConfidence(Candidate.ConfidenceScore)
+            @UiText.ConfidenceBandLabel(ThresholdBand) · @Formatter.FormatConfidence(Candidate.ConfidenceScore)
         </span>
         <span class="chatbot-association-candidate__reasons">
             @string.Join(", ", Candidate.ReasonCodes)
         </span>
     </span>
-    <span class="chatbot-association-candidate__evidence">
-        @foreach (AssociationEvidenceModel evidence in Candidate.Evidence)
-        {
-            <ChatBotEvidenceChip Text="@EvidenceText(evidence)"
-                                 State="@evidence.State"
-                                 CanOpenEvidence="true"
-                                 UnavailableReason="@evidence.UnavailableReason"
-                                 StableId="@($"candidate-{Candidate.Rank}-{evidence.Reference}")" />
-        }
-    </span>
 </FluentButton>
+@* The chips sit outside the radio. Nested interactive controls are invalid HTML, and while they were inside
+   the button every chip activation also selected the candidate. *@
+<span class="chatbot-association-candidate__evidence">
+    @foreach (AssociationEvidenceModel evidence in Candidate.Evidence)
+    {
+        <ChatBotEvidenceChip Text="@EvidenceText(evidence)"
+                             State="@evidence.State"
+                             CanOpenEvidence="@(evidence.State is ChatBotEvidenceState.Available)"
+                             UnavailableReason="@evidence.UnavailableReason"
+                             StableId="@EvidenceStableId(evidence)" />
+    }
+</span>
 
 @code {
     [Parameter, EditorRequired]
@@ -42,8 +46,20 @@
     [Parameter]
     public bool IsSelected { get; set; }
 
+    /// <summary>Gets or sets the review's threshold band wire token, used to label the candidate's confidence.</summary>
+    [Parameter]
+    public string? ThresholdBand { get; set; }
+
+    /// <summary>Gets or sets the roving tabindex: 0 for the group's single tab stop, -1 for the rest.</summary>
+    [Parameter]
+    public int TabbableIndex { get; set; }
+
     [Parameter]
     public EventCallback<string> OnSelected { get; set; }
+
+    /// <summary>Raised with this candidate's id and a direction when an arrow key moves within the group.</summary>
+    [Parameter]
+    public EventCallback<(string CandidateId, int Delta)> OnMove { get; set; }
 
     private string IsSelectedText => IsSelected ? "true" : "false";
 
@@ -59,6 +75,42 @@
             ? $"{evidence.Kind} {evidence.Reference}"
             : UiText[ChatBotUiTextKey.AssociationReviewEvidenceRestricted];
 
+    /// <summary>
+    /// Derives a stable id from the candidate's project id and the evidence position rather than the evidence
+    /// reference. The reference is free text that can repeat or contain characters invalid in an id - and for
+    /// restricted evidence it is exactly the value this surface must not emit, yet the chip renders the id
+    /// only when the evidence is unavailable, redacted, or unauthorized.
+    /// </summary>
+    private string EvidenceStableId(AssociationEvidenceModel evidence)
+    {
+        int index = 0;
+        for (int position = 0; position < Candidate.Evidence.Count; position++)
+        {
+            if (ReferenceEquals(Candidate.Evidence[position], evidence))
+            {
+                index = position;
+                break;
+            }
+        }
+
+        return $"candidate-{Candidate.ProjectId}-{index}";
+    }
+
     private async Task SelectAsync()
         => await OnSelected.InvokeAsync(Candidate.ProjectId).ConfigureAwait(true);
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        int delta = args.Key switch
+        {
+            "ArrowDown" or "ArrowRight" => 1,
+            "ArrowUp" or "ArrowLeft" => -1,
+            _ => 0,
+        };
+
+        if (delta != 0)
+        {
+            await OnMove.InvokeAsync((Candidate.ProjectId, delta)).ConfigureAwait(true);
+        }
+    }
 }

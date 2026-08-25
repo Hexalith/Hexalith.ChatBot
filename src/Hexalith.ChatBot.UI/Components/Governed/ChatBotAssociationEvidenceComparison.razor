@@ -34,7 +34,7 @@
                     </h3>
                     <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
                         @CodeRow(UiText[ChatBotUiTextKey.ProjectLabel], Candidate.ProjectId)
-                        @TextRow(UiText[ChatBotUiTextKey.ConfidenceBandWithin], Formatter.FormatConfidence(Candidate.ConfidenceScore))
+                        @TextRow(UiText.ConfidenceBandLabel(ThresholdBand), Formatter.FormatConfidence(Candidate.ConfidenceScore))
                         @CodeRow(UiText[ChatBotUiTextKey.ReasonCodesLabel], string.Join(", ", Candidate.ReasonCodes))
                     </FluentStack>
 
@@ -43,9 +43,9 @@
                         {
                             <ChatBotEvidenceChip Text="@EvidenceText(evidence)"
                                                  State="@evidence.State"
-                                                 CanOpenEvidence="true"
+                                                 CanOpenEvidence="@(evidence.State is ChatBotEvidenceState.Available)"
                                                  UnavailableReason="@evidence.UnavailableReason"
-                                                 StableId="@($"comparison-{Candidate.Rank}-{evidence.Reference}")" />
+                                                 StableId="@EvidenceStableId(Candidate, evidence)" />
                         }
                     </FluentStack>
                 </FluentStack>
@@ -66,12 +66,35 @@
     [Parameter]
     public bool ShowHeading { get; set; } = true;
 
+    /// <summary>Gets or sets the review's threshold band wire token, used to label the candidate's confidence.</summary>
+    [Parameter]
+    public string? ThresholdBand { get; set; }
+
     private string EvidenceText(AssociationEvidenceModel evidence)
         => evidence.State is ChatBotEvidenceState.Available
             ? $"{evidence.Kind} {evidence.Reference}"
             : UiText[ChatBotUiTextKey.AssociationReviewEvidenceRestricted];
 
-    // Story 13.4: the former <dl> candidate metadata renders as a structured
+    /// <summary>
+    /// Derives a stable id from the project id and evidence position, never from the evidence reference -
+    /// which is free text and, for restricted evidence, the value the surface must not emit.
+    /// </summary>
+    private static string EvidenceStableId(AssociationCandidateModel candidate, AssociationEvidenceModel evidence)
+    {
+        int index = 0;
+        for (int position = 0; position < candidate.Evidence.Count; position++)
+        {
+            if (ReferenceEquals(candidate.Evidence[position], evidence))
+            {
+                index = position;
+                break;
+            }
+        }
+
+        return $"comparison-{candidate.ProjectId}-{index}";
+    }
+
+    // Story 13.4: the candidate metadata renders as a structured
     // Fluent key-value block. Project id and reason codes are opaque tokens and keep <code class="chatbot-code">;
     // the formatted confidence band renders as plain FluentText (AC3).
     private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">

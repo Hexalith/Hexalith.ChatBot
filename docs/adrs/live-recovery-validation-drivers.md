@@ -135,10 +135,22 @@ Even a passing sandbox run cannot close `RV-EXT-M365`, `RV-DURABLE-WORM`, `RV-PR
 changes shipped delivery behaviour, and it must not be read as an accepted architecture decision until Winston
 signs it off.
 
-**Decision taken in code, pending that ratification:** `src/Hexalith.ChatBot.Server/Program.cs` now pins
-`DomainProjectionIdentityOptions` to the DAPR app id `chatbot` and service version `v1`
-(`ChatBotDomainServiceIdentity`), overridable through `ChatBot:ProjectionIdentity`, and fails startup if either is
-blank.
+**Decision taken in code, pending that ratification:** `src/Hexalith.ChatBot.Server/Program.cs` resolves
+`DomainProjectionIdentityOptions` through a **four-tier precedence chain** — `ChatBot:ProjectionIdentity`, then
+`EventStore:DomainService`, then the `DAPR_APP_ID` environment value, and only then the pinned constants
+`chatbot` / `v1` (`ChatBotDomainServiceIdentity`). *(Corrected 2026-08-26: this paragraph previously described a
+two-tier pin "overridable through `ChatBot:ProjectionIdentity`" that "fails startup if either is blank". Both
+halves understated the change. Two further channels override the constants, and the startup gate is not a
+blank check: `IsUsableIdentityComponent` also rejects any value over 128 characters or outside `[A-Za-z0-9._-]`,
+enforced by `.ValidateOnStart()`. That is a new hard startup-abort path for **every** deployment, and it was not
+described in the record Winston is being asked to ratify.)*
+
+**Fail-fast is deliberate.** A malformed candidate is **not** skipped in favour of the next tier: it is returned
+by the resolver and rejected by the gate, so the host does not boot. Falling through would substitute a silent
+wrong identity for a noisy refusal — and a shape-valid but wrong identity is refused verbatim by EventStore,
+which post-cutover stalls the projection checkpoint indefinitely with nothing logged as an error. The resolved
+identity is also written to stdout once at startup, because nothing previously recorded which identity the host
+actually chose.
 
 **Why this is a behaviour change, not configuration tidying.** The identity is what EventStore's named-projection
 capability negotiation matches on. Pinning it switches this service from the legacy projection-delivery path onto
@@ -170,8 +182,15 @@ projections are delivered and checkpointed for a shipped service, which is why i
    governed-operation read model erased during recovery cleanup is re-created inside the absence window and the
    continuity drill reports `cleanup-complete: false` — the single reason the release evidence gate stop-ships.
 
-**Guard against silent regression:** `ChatBotProjectionIdentityTests` asserts the resolved identity is non-blank,
-equals the DAPR app id, is *not* the assembly name, survives a blank configured override, and honours a real one.
+**Guard against silent regression:** `ChatBotProjectionIdentityTests` asserts the resolved identity is usable, is
+*not* the assembly name, honours the full precedence chain, refuses an unusable configured value at startup
+(`AnUnusableConfiguredIdentityFailsStartup`), and does not fall through on a malformed candidate. The
+**cross-assembly** invariant — that `ChatBotDomainServiceIdentity.AppId` equals the topology's
+`ChatBotAspireModule.AppId` — is asserted separately in `ChatBotDomainServiceIdentityContractTests`, the only
+assembly that sees both. *(Corrected 2026-08-26: this line previously credited `ChatBotProjectionIdentityTests`
+with asserting the identity "equals the DAPR app id". It asserts equality with the ChatBot constant the value came
+from, which is circular; and that assertion is now conditioned on `DAPR_APP_ID` being unset, because the variable
+sits above the constant in the precedence chain and the unconditional form failed for environmental reasons.)*
 
 **Explicitly not taken:** the alternative of treating "no identity configured" as capability-absent inside the SDK
 (mirroring its `404` handling) was rejected — the SDK contract is not being reopened by this story.

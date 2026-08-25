@@ -31,12 +31,18 @@
         }
     </div>
 
-    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" aria-label="@UiText[ChatBotUiTextKey.ApprovalQueuePriorityScoreLabel]">
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" role="group" aria-label="@UiText[ChatBotUiTextKey.ApprovalQueuePriorityScoreLabel]">
         @foreach (string row in ShownPriorityMetadata)
         {
             <code class="chatbot-code">@row</code>
         }
     </FluentStack>
+
+    @* Decision D4 (2026-08-26): bound to ChatBotApprovalQueuePriorityContract.CreateDefault(), a design-time
+       fixture. Labelled as sample data until the split-out story wires it to a real query. *@
+    <p class="chatbot-body" data-approval-priority-sample-data="true">
+        <code class="chatbot-code">sample-data:not-a-live-query</code>
+    </p>
 
     <table class="chatbot-approval-priority-table"
            data-approval-priority-table="true"
@@ -57,28 +63,28 @@
             {
                 <tr data-approval-group-row="@row.GroupKey">
                     <td class="chatbot-labelled-row">
-                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityScoreLabel]</span>
+                        <span class="chatbot-row-label" aria-hidden="true">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityScoreLabel]</span>
                         <span class="chatbot-priority-label">@row.PriorityLabel</span>
                         <code class="chatbot-code" data-approval-priority-explanation="@row.GroupKey">@row.PriorityExplanation</code>
                     </td>
                     <td class="chatbot-labelled-row">
-                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityGroupHeaderLabel]</span>
+                        <span class="chatbot-row-label" aria-hidden="true">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityGroupHeaderLabel]</span>
                         <code class="chatbot-code">@row.GroupKey</code>
                     </td>
                     <td class="chatbot-labelled-row">
-                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityRequesterLabel]</span>
+                        <span class="chatbot-row-label" aria-hidden="true">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityRequesterLabel]</span>
                         <code class="chatbot-code">@row.RequesterRef</code>
                     </td>
                     <td class="chatbot-labelled-row">
-                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityCommandLabel]</span>
+                        <span class="chatbot-row-label" aria-hidden="true">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityCommandLabel]</span>
                         <code class="chatbot-code">@row.CommandRef</code>
                     </td>
                     <td class="chatbot-labelled-row">
-                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityProjectLabel]</span>
+                        <span class="chatbot-row-label" aria-hidden="true">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityProjectLabel]</span>
                         <code class="chatbot-code">@row.ProjectRef</code>
                     </td>
                     <td class="chatbot-labelled-row">
-                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityItemCountLabel]</span>
+                        <span class="chatbot-row-label" aria-hidden="true">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityItemCountLabel]</span>
                         <span data-approval-group-item-count="@row.GroupKey">@row.ItemCount</span>
                     </td>
                     <td class="chatbot-labelled-row">

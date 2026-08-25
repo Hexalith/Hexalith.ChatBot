@@ -5,7 +5,10 @@
     <FluentCard Class="chatbot-project-context-header__surface">
     <div class="chatbot-project-context-header__identity">
         <span class="chatbot-metadata">@UiText[ChatBotUiTextKey.ProjectLabel]</span>
-        <h2 class="chatbot-project-context-header__title">@ProjectName</h2>
+        @* Not a heading: this block renders BEFORE the FcPageHeader page heading in DOM order, so an <h2> here made
+           the first heading a screen-reader user meets outrank the page title. The project name keeps its visual
+           prominence via the title class and stays reachable through the header landmark's accessible name. *@
+        <p class="chatbot-project-context-header__title">@ProjectName</p>
         <span class="chatbot-metadata"><code class="chatbot-code">@ProjectId</code></span>
     </div>
     @if (!string.IsNullOrWhiteSpace(TenantContext))

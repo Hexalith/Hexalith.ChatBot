@@ -2,7 +2,10 @@
 @inject ChatBotAnnouncementDeduplicationState AnnouncementDeduplication
 @inject ChatBotUiTextLocalizer UiText
 
-<FluentMessageBar Class="chatbot-status"
+@* An id (not only data-chatbot-stable-id) so callers can point aria-describedby / aria-labelledby at this banner.
+   Without it every aria-describedby referencing a banner's stable id was a dangling reference. *@
+<FluentMessageBar id="@StableId"
+                  Class="chatbot-status"
                   Intent="@Intent"
                   AllowDismiss="false"
                   Title="@UiText.FeedbackKindLabel(Kind)"

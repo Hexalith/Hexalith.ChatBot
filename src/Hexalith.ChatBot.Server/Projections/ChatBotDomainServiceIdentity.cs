@@ -41,21 +41,22 @@ internal static class ChatBotDomainServiceIdentity
 
     /// <summary>
     /// Resolves the app id by precedence: explicit ChatBot configuration, then the SDK's own configuration key,
-    /// then the DAPR-supplied app id, and only then the pinned constant.
+    /// then the DAPR-supplied app id, and only then the pinned constant. The constant is the fallback for hosts
+    /// that supply NO value; it is not a fallback for a supplied-but-malformed one, which fails startup instead.
     /// </summary>
     /// <param name="configured">The <c>ChatBot:ProjectionIdentity:AppId</c> value, if any.</param>
     /// <param name="sdkConfigured">The <c>EventStore:DomainService:AppId</c> value, if any.</param>
     /// <param name="daprAppId">The <c>DAPR_APP_ID</c> environment value, if any.</param>
     /// <returns>The app id to present to EventStore.</returns>
     public static string ResolveAppId(string? configured, string? sdkConfigured, string? daprAppId)
-        => FirstUsable(configured, sdkConfigured, daprAppId) ?? AppId;
+        => FirstNonBlank(configured, sdkConfigured, daprAppId) ?? AppId;
 
     /// <summary>Resolves the service version by the same precedence, minus the DAPR-supplied value.</summary>
     /// <param name="configured">The <c>ChatBot:ProjectionIdentity:ServiceVersion</c> value, if any.</param>
     /// <param name="sdkConfigured">The <c>EventStore:DomainService:ServiceVersion</c> value, if any.</param>
     /// <returns>The service version to present to EventStore.</returns>
     public static string ResolveServiceVersion(string? configured, string? sdkConfigured)
-        => FirstUsable(configured, sdkConfigured) ?? ServiceVersion;
+        => FirstNonBlank(configured, sdkConfigured) ?? ServiceVersion;
 
     /// <summary>
     /// Whether a resolved identity component is usable. EventStore compares these verbatim, so anything that is
@@ -68,6 +69,21 @@ internal static class ChatBotDomainServiceIdentity
             && value.Length <= 128
             && value.All(static c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.');
 
-    private static string? FirstUsable(params string?[] candidates)
+    /// <summary>
+    /// Returns the first non-blank candidate, WITHOUT filtering for usability.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not <c>FirstUsable</c>. A malformed higher-precedence candidate is NOT skipped: it is returned
+    /// and then rejected by the <c>ValidateOnStart</c> gate in <c>Program.cs</c>, so the host fails to boot rather
+    /// than quietly resolving to a different identity than the operator configured. That is the intended
+    /// direction. EventStore compares this value verbatim, and a shape-valid but wrong identity produces a
+    /// permanently refused named-projection capability: post-cutover the projection checkpoint never advances and
+    /// the poller re-delivers the same aggregates indefinitely, with no error anywhere. A crash-loop is loud and
+    /// immediately diagnosable; that outage is neither, and this repository has already been unable to diagnose it
+    /// once. Falling through to the pinned constant would substitute a silent wrong answer for a noisy refusal.
+    /// </remarks>
+    /// <param name="candidates">Candidates in precedence order.</param>
+    /// <returns>The first non-blank candidate, trimmed, or <see langword="null"/> when all are blank.</returns>
+    private static string? FirstNonBlank(params string?[] candidates)
         => candidates.FirstOrDefault(static candidate => !string.IsNullOrWhiteSpace(candidate))?.Trim();
 }

@@ -4,23 +4,37 @@ namespace Hexalith.ChatBot.UI.State.ProjectConversation;
 
 public static class ProjectConversationReducers
 {
-    [ReducerMethod(typeof(LoadProjectConversationAction))]
-    public static ProjectConversationState ReduceLoad(ProjectConversationState state)
+    // A re-query is NOT a cold load. Nudge, reconnect, post-submit and post-cancel reloads all dispatch
+    // LoadProjectConversationAction for the conversation already on screen; blanking Conversation there would unmount
+    // the stream, the composer and the Stop control mid-generation, destroying focus and any typed draft (AC3's
+    // "stable control remains keyboard reachable" and AC4's "focus returns to composer"). So the prior conversation --
+    // and the reviewer's open Why panel -- survive a same-project reload and are replaced only when Loaded/Failed
+    // resolves. A genuine project switch still clears everything, including the nudge watermark and any cancellation
+    // tracked against the project being left.
+    [ReducerMethod]
+    public static ProjectConversationState ReduceLoad(ProjectConversationState state, LoadProjectConversationAction action)
     {
         ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(action);
+        bool switchingProject = state.Conversation is { } current &&
+            !string.Equals(current.ProjectId, action.ProjectId, StringComparison.Ordinal);
         return state with
         {
             IsLoading = true,
-            Conversation = null,
+            Conversation = switchingProject ? null : state.Conversation,
             ErrorCode = null,
             ComposerValidationErrorCode = null,
             SubmissionErrorCode = null,
-            IsWhyPanelLoading = false,
-            WhyPanel = null,
-            WhyPanelProjectId = null,
-            WhyPanelAssociationId = null,
-            WhyPanelErrorCode = null,
+            IsWhyPanelLoading = switchingProject ? false : state.IsWhyPanelLoading,
+            WhyPanel = switchingProject ? null : state.WhyPanel,
+            WhyPanelProjectId = switchingProject ? null : state.WhyPanelProjectId,
+            WhyPanelAssociationId = switchingProject ? null : state.WhyPanelAssociationId,
+            WhyPanelErrorCode = switchingProject ? null : state.WhyPanelErrorCode,
             StreamingErrorCode = null,
+            LastAcceptedAiResponseNudge = switchingProject ? null : state.LastAcceptedAiResponseNudge,
+            IsCancellingAiResponse = switchingProject ? false : state.IsCancellingAiResponse,
+            CancellingResponseId = switchingProject ? null : state.CancellingResponseId,
+            CancellingGenerationId = switchingProject ? null : state.CancellingGenerationId,
         };
     }
 
@@ -29,20 +43,42 @@ public static class ProjectConversationReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
-        bool verifiedCancel = state.CancellingResponseId is not null &&
-            action.Conversation.Items.Any(item =>
-                string.Equals(item.AiResponseProgress?.ResponseId, state.CancellingResponseId, StringComparison.Ordinal) &&
-                string.Equals(item.AiResponseProgress?.GenerationId, state.CancellingGenerationId, StringComparison.Ordinal) &&
-                item.AiResponseProgress is { IsTerminal: true } &&
-                ProjectConversationAiResponseProgressStates.IsVerifiedStop(item.AiResponseProgress.State));
+        // The tracked generation reached SOME terminal state (stopped/cancelled, but also completed/failed/unavailable
+        // when the stop raced natural completion). Tracking must clear on any of them: gating only on a verified stop
+        // left IsCancellingAiResponse true forever after a race, and because the Stop control's Disabled binding reads
+        // that flag, every LATER generation rendered a permanently disabled Stop for the life of the circuit. [AC4]
+        ProjectConversationAiResponseProgressModel? trackedTerminal = state.CancellingResponseId is null
+            ? null
+            : action.Conversation.Items
+                .Select(static item => item.AiResponseProgress)
+                .OfType<ProjectConversationAiResponseProgressModel>()
+                .FirstOrDefault(progress =>
+                    string.Equals(progress.ResponseId, state.CancellingResponseId, StringComparison.Ordinal) &&
+                    string.Equals(progress.GenerationId, state.CancellingGenerationId, StringComparison.Ordinal) &&
+                    progress.IsTerminal);
+
+        // ...but "Response stopped" is announced only for a server-verified stop. A generation that completed or failed
+        // on its own is terminal without being a stop, so it clears the tracking silently.
+        bool verifiedCancel = trackedTerminal is not null &&
+            ProjectConversationAiResponseProgressStates.IsVerifiedStop(trackedTerminal.State);
+        bool trackingResolved = trackedTerminal is not null;
         return state with
         {
             IsLoading = false,
             Conversation = action.Conversation,
             ErrorCode = null,
-            IsCancellingAiResponse = verifiedCancel ? false : state.IsCancellingAiResponse,
-            CancellingResponseId = verifiedCancel ? null : state.CancellingResponseId,
-            CancellingGenerationId = verifiedCancel ? null : state.CancellingGenerationId,
+            IsCancellingAiResponse = trackingResolved ? false : state.IsCancellingAiResponse,
+            CancellingResponseId = trackingResolved ? null : state.CancellingResponseId,
+            CancellingGenerationId = trackingResolved ? null : state.CancellingGenerationId,
+
+            // A fresh authoritative read supersedes a transient "reconnected" notice; leaving it set made a genuine
+            // terminal stopped/completed row keep rendering as "Reconnected" (StreamingStatusText takes precedence).
+            StreamingNotice = null,
+
+            // Hand the Stop control a durable, store-owned announcement token for THIS session's verified stop.
+            VerifiedStopAnnouncementGenerationId = verifiedCancel
+                ? state.CancellingGenerationId
+                : state.VerifiedStopAnnouncementGenerationId,
         };
     }
 
@@ -94,6 +130,7 @@ public static class ProjectConversationReducers
             ComposerValidationErrorCode = null,
             SubmissionErrorCode = null,
             StreamingNotice = null,
+            VerifiedStopAnnouncementGenerationId = null,
         };
     }
 
@@ -175,6 +212,7 @@ public static class ProjectConversationReducers
             CancellingGenerationId = action.GenerationId,
             StreamingErrorCode = null,
             StreamingNotice = null,
+            VerifiedStopAnnouncementGenerationId = null,
         };
     }
 
@@ -259,8 +297,10 @@ public static class ProjectConversationReducers
 
     private static bool IsAcceptableNudge(ProjectConversationState state, ProjectConversationAiResponseNudgeModel nudge)
     {
-        if (state.Conversation is not null &&
-            !string.Equals(state.Conversation.ProjectId, nudge.ProjectId, StringComparison.Ordinal))
+        // Fail closed on project identity. Guarding on "Conversation is not null" meant the cross-project check was
+        // skipped for the whole window in which a reload is in flight, so a foreign-project nudge was accepted there.
+        if (state.Conversation is not { } loaded ||
+            !string.Equals(loaded.ProjectId, nudge.ProjectId, StringComparison.Ordinal))
         {
             return false;
         }

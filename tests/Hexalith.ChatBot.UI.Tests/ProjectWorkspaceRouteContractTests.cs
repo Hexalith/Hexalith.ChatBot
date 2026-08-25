@@ -37,7 +37,13 @@ public sealed class ProjectWorkspaceRouteContractTests
         workspace.ShouldContain("data-chatbot-responsive-fixture=\"project-workspace\"");
         workspace.ShouldContain("id=\"project-workspace-title\"");
         workspace.ShouldContain("ChatBotProjectConversationWorkspace");
-        workspace.ShouldContain("ProjectWorkspaceAuthorizedRecentProject");
+        // The landing route must not ship fabricated "authorized recents". They were untranslated English literals,
+        // filtered by neither tenant nor authorization, with deep links that 403/404 -- the ungoverned fallback AC1
+        // forbids. This assertion previously REQUIRED that fixture to be present.
+        workspace.ShouldNotContain("ProjectWorkspaceAuthorizedRecentProject");
+        workspace.ShouldNotContain("data-chatbot-authorized-recents-fixture");
+        workspace.ShouldNotContain("Alpha project");
+        workspace.ShouldContain("ProjectWorkspaceStateNoProjectSelected");
         workspace.ShouldNotContain("<FrontComposerShell", Case.Sensitive);
         workspace.ShouldNotContain("<FluentProviders", Case.Sensitive);
         workspace.ShouldNotContain("StoreInitializer", Case.Sensitive);

@@ -16,7 +16,7 @@
                 <ChatBotEvidenceChip State="@EvidenceState"
                                      Text="@EvidenceText"
                                      UnavailableReason="@UnavailableReason"
-                                     StableId="@($"{Item.ItemId}-attachment-evidence")" />
+                                     StableId="@($"{Item.ItemId}{ScopeSuffix}-attachment-evidence")" />
                 <FluentText As="TextTag.Span" Class="chatbot-attachment-conversation-item__status">@LocalizedStatus</FluentText>
                 <ChatBotActorBadge Category="ChatBotActorCategory.MailboxEvent"
                                    DisplayLabel="@UiText[ChatBotUiTextKey.AttachmentActorLabel]" />
@@ -67,7 +67,7 @@
         <ChatBotEvidenceChip State="@EvidenceState"
                              Text="@EvidenceText"
                              UnavailableReason="@UnavailableReason"
-                             StableId="@($"{Item.ItemId}-attachment-evidence-chip")" />
+                             StableId="@($"{Item.ItemId}{ScopeSuffix}-attachment-evidence-chip")" />
         <ChatBotEvidenceChip State="ChatBotEvidenceState.Redacted"
                              Text="@RedactionLabel" />
         <ChatBotEvidenceChip State="@StatusEvidenceState"
@@ -143,7 +143,17 @@
     private string AccessibleLabel
         => UiText.Get(ChatBotUiTextKey.ProjectConversationAttachmentItemAccessible, UiText[ChatBotUiTextKey.AttachmentActorLabel], DisplayName, LocalizedStatus, Item.LifecycleState);
 
-    private string UnavailableReasonId => $"attachment-{Item.ItemId}-unavailable-reason";
+    /// <summary>
+    /// Optional scope discriminator for element ids and stable ids. The same attachment is rendered both inline in the
+    /// conversation stream and in the complementary Files panel; without a scope both renders emit the same DOM ids,
+    /// which is invalid HTML and cross-wires every aria reference between the two copies.
+    /// </summary>
+    [Parameter]
+    public string? IdScope { get; set; }
+
+    private string ScopeSuffix => string.IsNullOrWhiteSpace(IdScope) ? string.Empty : $"-{IdScope}";
+
+    private string UnavailableReasonId => $"attachment-{Item.ItemId}{ScopeSuffix}-unavailable-reason";
 
     private string MetadataOrUnavailable(string? value)
         => string.IsNullOrWhiteSpace(value)

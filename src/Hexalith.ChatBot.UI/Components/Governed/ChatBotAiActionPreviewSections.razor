@@ -1,13 +1,13 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
 @inject ChatBotUiTextLocalizer UiText
 
-@if (Sections.Count > 0)
+@if (Item is not null && Sections.Count > 0)
 {
     <section class="chatbot-ai-action-preview"
              data-chatbot-ai-action-preview="metadata-only"
              aria-label="@UiText.Get(ChatBotUiTextKey.AiActionPreviewAccessible, Item.ItemId)">
         <h3 class="chatbot-ai-action-preview__title">@UiText[ChatBotUiTextKey.AiActionPreviewTitle]</h3>
-        <p class="chatbot-ai-action-preview__reason" tabindex="0">
+        <p class="chatbot-ai-action-preview__reason">
             @UiText[ChatBotUiTextKey.AiActionPreviewMetadataOnlyReason]
         </p>
         @foreach (AiActionPreviewSection section in Sections)
@@ -15,8 +15,7 @@
             <section class="chatbot-ai-action-preview__section"
                      data-chatbot-ai-action-preview-section="@section.Kind"
                      aria-label="@section.Title"
-                     aria-disabled="@section.AriaDisabled"
-                     tabindex="0">
+                     data-chatbot-ai-action-preview-blocked="@section.AriaDisabled">
                 <h4 class="chatbot-ai-action-preview__section-title">@section.Title</h4>
                 <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
                     @MetadataRow(ChatBotUiTextKey.AiActionPreviewStateLabel, section.State)
@@ -42,8 +41,13 @@
     [Parameter]
     public ProjectConversationItemModel Item { get; set; } = default!;
 
-    private IReadOnlyList<AiActionPreviewSection> Sections
-        => BuildSections();
+    private IReadOnlyList<AiActionPreviewSection>? _sections;
+
+    // Cached per parameter set: as an expression-bodied property this re-ran BuildSections() — four record
+    // allocations plus LINQ — on every access, which is at least twice per render.
+    private IReadOnlyList<AiActionPreviewSection> Sections => _sections ??= BuildSections();
+
+    protected override void OnParametersSet() => _sections = null;
 
     private IReadOnlyList<AiActionPreviewSection> BuildSections()
     {
@@ -66,7 +70,7 @@
                 CommandName: null,
                 AllowlistVersion: null,
                 PolicySnapshot: null,
-                AuditStatus: Item.ApprovalAuditStatus ?? Item.AiAuditStatus,
+                AuditStatus: FirstNonBlank(Item.ApprovalAuditStatus, Item.AiAuditStatus),
                 ExpectedPostState: Item.ApprovalExpectedPostStateRedactionState,
                 GeneratedVisibility: null,
                 SafeNextAction: ResolvedSafeNextAction),
@@ -144,17 +148,16 @@
     private static string RedactionFor(string? visibleValue, string? redactionState)
         => !string.IsNullOrWhiteSpace(redactionState)
             ? redactionState
-            : string.IsNullOrWhiteSpace(visibleValue) ? "unavailable" : "metadata_only";
+            : string.IsNullOrWhiteSpace(visibleValue) ? "unavailable" : "metadata-only";
 
+    // Inverted to an available-reason allowlist. As a denylist, any reason outside the seven listed values
+    // (rate-limited, state-not-permitted, policy-blocked, …) made a blocked preview report state "available".
+    // A blank reason means "nothing is blocking"; anything else is treated as blocking until it is known safe.
     private static bool IsUnavailableReason(string? reason)
-        => reason is not null &&
-            (reason.Equals("redacted", StringComparison.OrdinalIgnoreCase) ||
-             reason.Equals("unavailable", StringComparison.OrdinalIgnoreCase) ||
-             reason.Equals("not-authorized", StringComparison.OrdinalIgnoreCase) ||
-             reason.Equals("not-yet-produced", StringComparison.OrdinalIgnoreCase) ||
-             reason.Equals("evidence-expired", StringComparison.OrdinalIgnoreCase) ||
-             reason.Equals("projection-pending", StringComparison.OrdinalIgnoreCase) ||
-             reason.Equals("audit-unavailable", StringComparison.OrdinalIgnoreCase));
+        => !string.IsNullOrWhiteSpace(reason) &&
+            !reason.Equals("available", StringComparison.OrdinalIgnoreCase) &&
+            !reason.Equals("allowed", StringComparison.OrdinalIgnoreCase) &&
+            !reason.Equals("none", StringComparison.OrdinalIgnoreCase);
 
     private static string NormalizeReason(string? reason)
         => string.IsNullOrWhiteSpace(reason) ? "unavailable" : reason;

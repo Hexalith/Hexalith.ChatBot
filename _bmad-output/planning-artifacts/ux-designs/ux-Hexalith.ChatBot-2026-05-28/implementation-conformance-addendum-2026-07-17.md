@@ -35,7 +35,13 @@ Microsoft Fluent UI v5 → Hexalith.FrontComposer → DESIGN.md → EXPERIENCE.m
 - Do not render module-owned page chrome that competes with the shell. The legacy `.chatbot-page-header`, `.chatbot-page`, and `.chatbot-command-bar` patterns remain prohibited.
 - Use `FluentStack`, `FluentCard`, `FluentGrid`, and `FluentDataGrid` according to content semantics. Primary business data must not render as a monospace `<dl>` dump.
 - A page-like surface with two or more sibling titled sections groups those sections in one `FluentAccordion`, with the primary section expanded by default, unless the content is a single primary grid, form, or workflow.
-- The Fluent-control and FrontComposer-layout guards are separate, non-vacuous, shrink-only governance checks with empty offender lists. Documented carve-outs: none.
+- The Fluent-control and FrontComposer-layout guards are separate, non-vacuous, shrink-only governance checks with empty offender lists.
+
+**Documented carve-outs to the accordion rule (added 2026-08-26, Story 13.3 code review, decision 7):**
+
+- **Association Review (`/association-review/{id}`) main content.** The candidate radiogroup ("Candidate projects") and the decision bar ("Safe next actions") are sibling titled sections, but together they are one primary workflow rather than two browsable sections: the reviewer must see the candidates and the actions at once to decide, and collapsing either half hides part of a single decision. They stay outside the accordion; the complementary panel (evidence comparison + source metadata) is grouped in a `FluentAccordion` as the rule requires. Recorded here so the page and this addendum agree - the page previously asserted this carve-out locally while this document said carve-outs were none.
+
+No other carve-out is documented. A surface claiming one must add it here.
 
 ## Surface-local acceptance
 

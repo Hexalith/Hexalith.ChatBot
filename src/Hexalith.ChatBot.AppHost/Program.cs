@@ -344,11 +344,18 @@ static void WriteKeycloakRealmOwnerMarker(string directory)
     try
     {
         using Process current = Process.GetCurrentProcess();
+
+        // Written to a sibling temp name and MOVED into place. File.WriteAllText truncates then writes, so a
+        // concurrently starting AppHost could read a zero-length or partial marker mid-write. Move is atomic within
+        // a directory, so the marker is either absent or complete -- never torn.
+        string markerPath = Path.Combine(directory, "owner.marker");
+        string stagingPath = Path.Combine(directory, "owner.marker.tmp");
         File.WriteAllText(
-            Path.Combine(directory, "owner.marker"),
+            stagingPath,
             string.Create(
                 CultureInfo.InvariantCulture,
                 $"{current.Id}:{current.StartTime.ToUniversalTime():O}"));
+        File.Move(stagingPath, markerPath, overwrite: true);
     }
     catch (Exception exception) when (exception is IOException
         or UnauthorizedAccessException
@@ -361,9 +368,22 @@ static void WriteKeycloakRealmOwnerMarker(string directory)
 
 static void SweepAbandonedKeycloakRealmDirectories()
 {
-    foreach (string candidate in Directory.EnumerateDirectories(
-        Path.GetTempPath(),
-        "hexalith-chatbot-keycloak-*"))
+    // Materialized inside its own guard: the per-item try below sits in the loop BODY, so a throw from the
+    // enumerator's first MoveNext (a missing or unreadable temp path) escaped it and aborted AppHost startup --
+    // the opposite of the "must never fail this run's startup" contract the inner catches state.
+    string[] candidates;
+    try
+    {
+        candidates = Directory.GetDirectories(Path.GetTempPath(), "hexalith-chatbot-keycloak-*");
+    }
+    catch (Exception exception) when (exception is IOException
+        or UnauthorizedAccessException
+        or DirectoryNotFoundException)
+    {
+        return;
+    }
+
+    foreach (string candidate in candidates)
     {
         try
         {
@@ -413,7 +433,10 @@ static bool IsKeycloakRealmOwnerAlive(string directory)
             DateTimeStyles.RoundtripKind,
             out DateTimeOffset ownerStartedAtUtc))
     {
-        return false;
+        // LIVE, not abandoned. This branch used to return false and delete, inverting the fail-safe stated three
+        // lines above for the one class of evidence most likely to be transient: a marker being written right now.
+        // Deleting a live session's realm directory breaks a running topology; keeping an unreadable one costs disk.
+        return true;
     }
 
     try

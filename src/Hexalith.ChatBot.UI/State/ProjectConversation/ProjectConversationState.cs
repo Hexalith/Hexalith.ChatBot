@@ -19,4 +19,9 @@ public sealed record ProjectConversationState(
     string? StreamingNotice = null,
     bool IsCancellingAiResponse = false,
     string? CancellingResponseId = null,
-    string? CancellingGenerationId = null);
+    string? CancellingGenerationId = null,
+
+    // Set only when a typed read confirms a server-verified stop for a cancellation THIS session requested, so the
+    // "Response stopped" announcement survives a Stop-control remount and is never raised for a historically stopped
+    // response or another actor's stop. Cleared by the next composer submission or cancellation request. [AC4]
+    string? VerifiedStopAnnouncementGenerationId = null);

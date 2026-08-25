@@ -313,7 +313,7 @@ opinionated platform**, not a greenfield free choice of stack.
 | Language & runtime | C# 14 / `net10.0`, SDK `10.0.302` (LTS), nullable, warnings-as-errors, shared Builds-owned package catalog | GA, released 2026-07-14; matches all siblings |
 | Persistence / write model | Hexalith.EventStore (CQRS/ES, `{tenant}:{domain}:{aggregateId}`, persist-then-publish, pure Handle/Apply, rejections-as-events, ULIDs, `system` platform tenant) | Foundation submodule |
 | Messaging / orchestration | DAPR 1.18.x — at-least-once pub/sub (CloudEvents), actors via `IActorStateManager`, deny-by-default ACLs; canonical Epic 2 owns both the correction-propagation coordinator seam and minimum hosted Dapr Workflow production binding | Matches sibling pins |
-| Hosting / composition | .NET **Aspire 13.3.x** AppHost (K8s/AKS + Helm deploy in 13.3 — relevant to M2 ops) | Latest 13.3 (2026-05-07); EventStore/Tenants/Folders on 13.3.x |
+| Hosting / composition | .NET **Aspire 13.4.6** AppHost (K8s/AKS + Helm deploy — relevant to M2 ops) | 13.4.6 as declared by the AppHost SDK (corrected 2026-08-26: this row still named 13.3.x while the AppHost had moved, and Story 12.15's resource-command work requires 13.4.6) |
 | UI | Blazor + **Fluent UI v5 (RC, via FrontComposer)** — Roslyn source-gen, Fluxor, REST + SignalR projection-nudge, contract-first | ⚠️ Still RC May 2026 — inherited pre-GA dependency, pinned, do not upgrade casually |
 | CLI surface (M1) | System.CommandLine 2.0.x wrapping `Hexalith.ChatBot.Client` | Per Folders pin; verify at scaffold |
 | MCP surface (M1) | **ModelContextProtocol 2.2.0**; the implemented ChatBot MCP adapter uses stdio server transport, wraps `Hexalith.ChatBot.Client`, and translates tools to commands/queries without local governance | Pinned in the shared Builds catalog and evaluated through the consumer wrapper; architecture tests assert the evaluated pin and adapter boundary |
@@ -459,7 +459,7 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 
 ### Infrastructure & Deployment
 
-- **Composition (platform/local shim):** .NET Aspire 13.3.x local AppHost shim; DAPR components (`statestore` for EventStore
+- **Composition (platform/local shim):** .NET Aspire 13.4.6 local AppHost shim; DAPR components (`statestore` for EventStore
   actor/status/archive/checkpoint state, `chatbot-statestore` for ChatBot read models and coarse idempotency,
   `chatbot-pubsub` for Redis pub/sub, plus the ChatBot workflow state store for hosted saga coordination);
   production deny-by-default `accesscontrol.yaml`; local mTLS-off `accesscontrol.local.yaml`; canonical Story 2.9 binds
@@ -473,7 +473,7 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
   Reads during correction check the aggregate flag and block or serve `stale=true`;
   `ReindexVectors(tenantId, correctionId, sourceVersion)` remains an M2 activity and must be idempotent +
   version-guarded.
-- **Deploy / recovery:** SDK-container images; Aspire 13.3 K8s/AKS + Helm (M2); RPO ≤ 15 min / RTO ≤ 4 hr
+- **Deploy / recovery:** SDK-container images; Aspire 13.4 K8s/AKS + Helm (M2); RPO ≤ 15 min / RTO ≤ 4 hr
   provisional per A10 pending a retained hosted run locator (Story 12.15); replay/simulation against an isolated test tenant (FR95a, M2).
 - **Observability:** OpenTelemetry; structured emission always-on (dashboards trim-able, emission is not);
   published SLOs (M2).
@@ -836,7 +836,7 @@ projection → SignalR nudge → UI.
   mTLS/Sentry. AppHost edits require Aspire restart.
 - **Build:** `dotnet build Hexalith.ChatBot.slnx`; shared Builds-owned package versions, exclusive-authority
   validation, and warnings-as-errors gate.
-- **Deploy:** SDK-container images per packable host; Aspire 13.3 K8s/AKS + Helm publish target [M2]; semantic-
+- **Deploy:** SDK-container images per packable host; Aspire 13.4 K8s/AKS + Helm publish target [M2]; semantic-
   release on merge to main.
 
 ### Domain-Module CI/CD Invariant
@@ -873,7 +873,7 @@ projection → SignalR nudge → UI.
 ### Coherence Validation ✅
 
 **Decision Compatibility:** All technology choices are platform-native and version-verified current (July 2026):
-.NET 10.0.302, Aspire 13.3.x, DAPR 1.18.x, MCP SDK 2.2.0 (shared-catalog-pinned), xUnit v3. No contradictory decisions remain —
+.NET 10.0.302, Aspire 13.4.6, DAPR 1.18.x, MCP SDK 2.2.0 (shared-catalog-pinned), xUnit v3. No contradictory decisions remain —
 notably the apparent **NFR15a (fail-closed incl. "audit down") × NFR49a (WORM hash-chain) contradiction is
 resolved** by the two-phase audit model (pre-commit fail-closed gate vs post-commit reconcile-from-event-log).
 Two coherence caveats, both owned: **Fluent UI v5 is still RC** (inherited pre-GA, pinned, do-not-upgrade);

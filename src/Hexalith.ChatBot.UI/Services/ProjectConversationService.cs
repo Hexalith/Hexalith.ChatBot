@@ -219,7 +219,10 @@ public sealed class ProjectConversationService(IChatBotClient client)
             "ui-requester",
             AppendConversationMessageCommandName,
             "project-conversation",
-            Math.Max(1, expectedSourceVersion),
+            // Previously Math.Max(1, ...): a legitimately observed version 0 (an empty project) was rewritten to 1,
+            // asserting a version the client never read -- and the sibling SubmitUserMessageAsync path on the same
+            // submit button passed the observed value through, so one button carried two concurrency semantics.
+            expectedSourceVersion,
             [$"composer:{fingerprint}"],
             [$"project:{projectId}"],
             [],
@@ -285,7 +288,11 @@ public sealed class ProjectConversationService(IChatBotClient client)
             throw new InvalidOperationException("AI response cancellation metadata is incomplete.");
         }
 
-        string cancellationId = $"ai-response-cancel:{SubmissionToken(progress.CorrelationId)}:{progress.Sequence}";
+        // Bind the key to the response AND generation it targets. Keyed on correlation id + sequence alone, two
+        // different generations that happened to reuse a (CorrelationId, Sequence) pair collapsed onto the same
+        // cancellation id, and the aggregate answered the second one with a NoOp the effect reports as success.
+        string cancellationId =
+            $"ai-response-cancel:{SubmissionToken($"{progress.CorrelationId}:{progress.ResponseId}:{progress.GenerationId}")}:{progress.Sequence}";
         CancelAiResponseGenerationCommand command = new(
             progress.ProjectId,
             progress.ConversationId,

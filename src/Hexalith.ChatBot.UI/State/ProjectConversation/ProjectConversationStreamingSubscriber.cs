@@ -13,7 +13,7 @@ internal sealed class ProjectConversationStreamingSubscriber(ChatBotHubEndpoint 
     /// <summary>The kebab projection type the signal pertains to (informational; the hub is tenant-grouped).</summary>
     public const string ProjectConversationProjectionType = "project-conversation";
 
-    private const string HubPath = "/hubs/chatbot/project-conversation-changes";
+    private const string RelativeHubPath = "hubs/chatbot/project-conversation-changes";
     private const string ProjectConversationChangedClientMethod = "ProjectConversationChanged";
     private const string JoinTenantHubMethod = "JoinTenant";
 
@@ -45,6 +45,12 @@ internal sealed class ProjectConversationStreamingSubscriber(ChatBotHubEndpoint 
 
         if (_connection is not null && string.Equals(_subscribedTenant, tenantId, StringComparison.Ordinal))
         {
+            // Same tenant, live connection: keep it, but ALWAYS refresh the callbacks. They close over the caller's
+            // current project id, and returning without rebinding them left the previous project's closures in place
+            // after an in-tenant project switch -- change signals were then discarded as cross-project and a reconnect
+            // re-queried the project the user had navigated away from.
+            _onChanged = onProjectConversationChanged;
+            _onReconnected = onReconnected;
             return;
         }
 
@@ -52,23 +58,34 @@ internal sealed class ProjectConversationStreamingSubscriber(ChatBotHubEndpoint 
 
         _onChanged = onProjectConversationChanged;
         _onReconnected = onReconnected;
-        _subscribedTenant = tenantId;
 
-        HubConnection connection = new HubConnectionBuilder()
-            .WithUrl(
-                new Uri(_endpoint.BaseAddress, HubPath),
-                options =>
-                {
-                    // JWT-on deployments forward the caller's bearer token so the server binds the tenant claim and the
-                    // hub fails closed cross-tenant; null in the no-JWT dev/test posture (anonymous joins allowed there).
-                    if (_endpoint.AccessTokenProvider is { } accessTokenProvider)
+        HubConnection connection;
+        try
+        {
+            connection = new HubConnectionBuilder()
+                .WithUrl(
+                    HubUri(_endpoint.BaseAddress),
+                    options =>
                     {
-                        options.AccessTokenProvider = accessTokenProvider;
-                    }
-                })
-            .WithAutomaticReconnect()
-            .Build();
+                        // JWT-on deployments forward the caller's bearer token so the server binds the tenant claim and the
+                        // hub fails closed cross-tenant; null in the no-JWT dev/test posture (anonymous joins allowed there).
+                        if (_endpoint.AccessTokenProvider is { } accessTokenProvider)
+                        {
+                            options.AccessTokenProvider = accessTokenProvider;
+                        }
+                    })
+                .WithAutomaticReconnect()
+                .Build();
+        }
+        catch (Exception)
+        {
+            // Uri construction / builder failure must not escape into OnAfterRenderAsync and break the surface.
+            _subscribedTenant = null;
+            return;
+        }
+
         _connection = connection;
+        _subscribedTenant = tenantId;
 
         _ = connection.On<string>(ProjectConversationChangedClientMethod, signalTenantId =>
         {
@@ -95,11 +112,31 @@ internal sealed class ProjectConversationStreamingSubscriber(ChatBotHubEndpoint 
         {
             // Advisory transport: a failed connect/join (hub unmapped / unauthorized) must not break the surface; the
             // typed read continues to drive rendering and the next user action re-queries.
+            //
+            // Tear the dead connection down rather than leaving it assigned. WithAutomaticReconnect does not retry a
+            // failed INITIAL start, so keeping _connection/_subscribedTenant set made every later call short-circuit on
+            // the "already subscribed" branch above and streaming stayed off for the rest of the session after a single
+            // transient blip at page load.
+            await DisposeConnectionAsync().ConfigureAwait(false);
         }
     }
 
     /// <inheritdoc/>
     public async ValueTask DisposeAsync() => await DisposeConnectionAsync().ConfigureAwait(false);
+
+    // Resolve the hub path against the base address WITHOUT discarding a path prefix. An absolute "/hubs/..." path
+    // replaces the whole base path, so a deployment served under e.g. https://host/chatbot/ dialled https://host/hubs/...
+    // and 404'd silently.
+    private static Uri HubUri(Uri baseAddress)
+    {
+        string basePath = baseAddress.AbsoluteUri;
+        if (!basePath.EndsWith('/'))
+        {
+            basePath += "/";
+        }
+
+        return new Uri(new Uri(basePath, UriKind.Absolute), RelativeHubPath);
+    }
 
     private async Task JoinTenantAsync()
     {

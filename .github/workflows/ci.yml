@@ -182,6 +182,15 @@ jobs:
             exit 1
           fi
           printf 'base=%s\nhead=%s\n' "$base_sha" "$head_sha" >> "$GITHUB_OUTPUT"
+      # Builds the gate tool for every `--no-build` step below. The gate self-tests used to sit here and
+      # supplied this build as a side effect; moving them after the drill (so their TRX is a fresh in-job
+      # current-run lane) removed the only build in this job and left `plan --no-build` with no assembly.
+      # An explicit build keeps the two concerns independent.
+      - name: Build the story-evidence gate tool
+        run: >-
+          dotnet build tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj
+          --configuration Release
+          -m:1
       - name: Plan proposed completion production
         env:
           PRODUCTION_PLAN_PATH: ${{ runner.temp }}/story-evidence-production-plan.json
@@ -275,9 +284,22 @@ jobs:
       # Produced AFTER the drill on purpose. This is the only current-run lane produced inside this job, so
       # running it here keeps it inside the global 60-minute freshness ceiling even when the recovery producer
       # has just consumed four hours. The upstream build/topology lanes cannot be refreshed by ordering --
-      # their TRX finish timestamps are fixed in the jobs that produced them -- so they carry an explicit
-      # per-lane ceiling in story-evidence-policy.json instead of relaxing the global bound for everyone.
+      # their TRX finish timestamps are fixed in the jobs that produced them -- so EVERY declared primary lane
+      # carries an explicit 360-minute per-lane ceiling in story-evidence-policy.json.
+      #
+      # Stated plainly, because an earlier version of this comment claimed the opposite: this IS the global bound
+      # relaxed for every declared lane, expressed per-lane. The 2026-08-25 decision asked for the ceiling on
+      # recovery-primary only, on the premise that reordering would keep the fast lanes fresh. That premise was
+      # wrong -- reordering refreshes only the in-job story-evidence-gate lane, because the other four finish in
+      # the upstream build job and age by the whole drill. Note the inversion this leaves: recovery-primary's TRX
+      # is sanitized minutes before attestation, so the wide window buys IT nothing and the four upstream lanes
+      # are what actually consume the relaxation. Ratified 2026-08-26; the ceiling is pinned in
+      # StoryEvidenceValidator so it cannot be widened without a code change.
       - name: Run gate self-tests with current-run TRX
+        # always(): this step is also the build prerequisite for the always()-guarded summarizer below. Without
+        # it, GitHub's implied success() skips this step the moment the drill fails, and ADV-3's failure summary
+        # -- the whole point of which is to survive a failed drill -- has no assembly to run.
+        if: always()
         run: >-
           dotnet test tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj
           -m:1
@@ -307,8 +329,14 @@ jobs:
           path: |
             ${{ runner.temp }}/recovery-attempt
             ${{ runner.temp }}/machine-results/recovery-primary
+            ${{ github.workspace }}/TestResults/live-recovery
           retention-days: 30
-          if-no-files-found: error
+          # warn, not error: this upload is always(), and on the failure path it exists for, the summarizer and
+          # sanitizer outputs may not exist. Failing here would mask the recovery failure behind an artifact error.
+          # The manifests directory is included because every completion manifest stamps
+          # artifact:completion-recovery-evidence as its locator -- without it the locator named an artifact that
+          # contained none of the evidence it pointed at, which is ADV-4's defect through a different door.
+          if-no-files-found: warn
       - name: Collect transition-declared retained exact-run artifacts
         shell: bash
         env:
@@ -410,6 +438,7 @@ jobs:
           -m:1
           --configuration Release
           --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
+          --settings live-recovery.runsettings
           --logger "console;verbosity=detailed"
           --logger "trx;LogFileName=topology-acceptance.trx"
           --results-directory TestResults

@@ -42,7 +42,33 @@ public sealed record AssociationReviewModel(
 {
     public bool HasAuthorizedCandidates => Candidates.Count > 0;
 
-    public bool IsTerminal => LifecycleState is "Associated" or "Corrected" or "Rejected" or "Failed" or "Skipped";
+    /// <summary>
+    /// Gets a value indicating whether the association reached a terminal state, whether the outcome was a
+    /// success or a failure. Action gating uses this; user-facing feedback must not, because a terminal
+    /// success and a terminal failure are opposite messages. Use <see cref="IsTerminalSuccess"/> or
+    /// <see cref="IsTerminalFailure"/> to choose feedback.
+    /// </summary>
+    public bool IsTerminal => IsTerminalSuccess || IsTerminalFailure;
+
+    /// <summary>
+    /// Gets a value indicating whether the association settled on a successful terminal outcome. These
+    /// states are the goal of the review, not a policy failure.
+    /// </summary>
+    public bool IsTerminalSuccess => LifecycleState is "Associated" or "Corrected";
+
+    /// <summary>
+    /// Gets a value indicating whether the association settled on a terminal outcome that denied, failed, or
+    /// skipped the association.
+    /// </summary>
+    public bool IsTerminalFailure => LifecycleState is "Rejected" or "Failed" or "Skipped";
+
+    /// <summary>
+    /// Gets a value indicating whether the association was deferred. Deferred is deliberately NOT terminal:
+    /// the shipped consequence copy promises the item "remains visible for later review", so a deferred
+    /// association stays re-decidable from this surface. Pinned by
+    /// <c>AssociationReviewModelTests.DeferredIsNotTerminalSoTheItemStaysReDecidable</c>.
+    /// </summary>
+    public bool IsDeferred => LifecycleState is "Deferred";
 
     public bool IsPropagationBlocking => LifecycleState is "Correcting" or "Correction-delayed" || IsCorrectedContextStale;
 

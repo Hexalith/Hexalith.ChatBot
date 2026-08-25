@@ -33,8 +33,54 @@ public sealed class ChatBotProjectionIdentityTests
         ChatBotDomainServiceIdentity.IsUsableIdentityComponent(identity.AppId).ShouldBeTrue();
         ChatBotDomainServiceIdentity.IsUsableIdentityComponent(identity.ServiceVersion).ShouldBeTrue();
         identity.AppId.ShouldNotBe(typeof(Program).Assembly.GetName().Name);
-        identity.AppId.ShouldBe(ChatBotDomainServiceIdentity.AppId);
+
+        // Asserting equality with the pinned constant would make this test environment-dependent: DAPR_APP_ID sits
+        // ABOVE the constant in the precedence chain, so any developer or agent running under `dapr run` -- and any
+        // runner that exports it -- would turn the story's headline regression guard red for a correctly behaving
+        // service. Assert the property that actually matters and hold the constant only when nothing overrides it.
+        if (Environment.GetEnvironmentVariable("DAPR_APP_ID") is null or "")
+        {
+            identity.AppId.ShouldBe(ChatBotDomainServiceIdentity.AppId);
+        }
     }
+
+    /// <summary>
+    /// The <c>ValidateOnStart</c> gate must actually refuse an unusable configured identity.
+    /// </summary>
+    /// <remarks>
+    /// Without this, deleting <c>.Validate(...)</c> and <c>.ValidateOnStart()</c> from <c>Program.cs</c> failed
+    /// nothing: the predicate was covered only in isolation, and both host-level tests configured valid values. A
+    /// deployment with a malformed AppId would then boot and have every operational-index refresh refused, which
+    /// post-cutover is a permanently stalled projection checkpoint.
+    /// </remarks>
+    [Theory]
+    [InlineData("AppId", "chat bot")]
+    [InlineData("AppId", "chatbot/v1")]
+    [InlineData("ServiceVersion", "v 1")]
+    public void AnUnusableConfiguredIdentityFailsStartup(string component, string value)
+    {
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.UseSetting(
+                $"{ChatBotDomainServiceIdentity.ConfigurationSection}:{component}",
+                value));
+
+        _ = Should.Throw<OptionsValidationException>(() => factory.Services
+            .GetRequiredService<IOptions<DomainProjectionIdentityOptions>>()
+            .Value);
+    }
+
+    /// <summary>
+    /// A malformed candidate must NOT fall through to the next precedence tier.
+    /// </summary>
+    /// <remarks>
+    /// The resolver deliberately selects the first non-blank candidate without filtering for usability, so a
+    /// malformed value reaches the startup gate and fails the host rather than silently resolving to a different
+    /// identity than the operator configured. Pin that direction: making the resolver skip malformed candidates
+    /// would substitute a silent wrong answer for a noisy refusal.
+    /// </remarks>
+    [Fact]
+    public void AMalformedHigherPrecedenceCandidateDoesNotFallThroughToTheConstant()
+        => ChatBotDomainServiceIdentity.ResolveAppId("chat bot", null, null).ShouldBe("chat bot");
 
     /// <summary>
     /// Precedence is the whole point: an unconditional override silently kills <c>EventStore:DomainService</c>

@@ -38,6 +38,12 @@ public sealed class LiveContinuityAspireE2eContractTests
     [InlineData(HttpStatusCode.BadRequest, false)]
     [InlineData(HttpStatusCode.Unauthorized, false)]
     [InlineData(HttpStatusCode.UnprocessableEntity, false)]
+
+    // The three statuses the enumeration exists for. Without them, restoring the `>= 500` catch-all passed all
+    // nine original rows, so the change's whole point was asserted only by prose.
+    [InlineData(HttpStatusCode.NotImplemented, false)]
+    [InlineData(HttpStatusCode.HttpVersionNotSupported, false)]
+    [InlineData(HttpStatusCode.InsufficientStorage, true)]
     public void MailboxAdmissionStartupStatusClassificationIsFailClosed(
         HttpStatusCode statusCode,
         bool expectedTransient)
@@ -88,9 +94,10 @@ public sealed class LiveContinuityAspireE2eContractTests
         const string body =
             "{\"type\":\"https://hexalith.dev/errors/chatbot/dispatch-unavailable\",\"status\":503}";
 
-        bool provesAdmission = statusCode == HttpStatusCode.ServiceUnavailable
-            && LiveContinuityAspireE2eTests.IsDispatchUnavailableProblem(body);
-
-        provesAdmission.ShouldBe(expectedAdmissionProof);
+        // Drives the PRODUCTION predicate. Recomputing the conjunction inline here asserted the test against its
+        // own re-implementation: deleting the ServiceUnavailable half of the production check left this green.
+        LiveContinuityAspireE2eTests
+            .ProvesMailboxAdmission(statusCode, body)
+            .ShouldBe(expectedAdmissionProof);
     }
 }

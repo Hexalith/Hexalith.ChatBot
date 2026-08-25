@@ -157,7 +157,11 @@ internal sealed class FakeChatBotClient : IChatBotClient
             ProjectDisplayName = "Authorized Project",
             Status = ProjectConversationReadStatus.Current,
             ConversationState = LifecycleState.Associated,
-            Items = [],
+
+            // One pending-approval item so the live route actually mounts ChatBotApprovalConversationItem and
+            // ChatBotAiActionPreviewSections. With an empty list the real-render suite asserted "no <dl> in
+            // main" against a surface that was never instantiated, so every approval assertion passed vacuously.
+            Items = [PendingApprovalItem],
             Page = new ProjectConversationCursorPage
             {
                 NextCursor = null,
@@ -171,6 +175,38 @@ internal sealed class FakeChatBotClient : IChatBotClient
             CorrelationId = CorrelationId,
             SafeNextAction = "none",
         });
+
+    private static ProjectConversationItem PendingApprovalItem => new()
+    {
+        ItemId = "item:approval-001",
+        Kind = ProjectConversationItemKind.ApprovalEvent,
+        ActorKind = ProjectConversationActorKind.SystemDecision,
+        ActorLabel = "ai-mediation-worker",
+        OccurredAt = new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero),
+        LifecycleState = LifecycleState.Associated,
+        ThresholdBand = AssociationThresholdBand.Auto,
+        ConfidenceScore = 0.91,
+        AssociationId = "association:approval-001",
+        SourceMailboxId = "mailbox:shared-1",
+        SourceConversationId = "conversation:approval-001",
+        ApprovalId = "approval:approval-001",
+        ApprovalProposalId = "proposal:approval-001",
+        ApprovalSourceMessageId = "message:approval-001",
+        ApprovalStatus = Hexalith.ChatBot.Client.Generated.ApprovalStatus.Pending,
+        ApprovalEventKind = Hexalith.ChatBot.Client.Generated.ApprovalEventKind.Request,
+        ApprovalRequesterId = "requester:requester-1",
+        ApprovalCommandName = "appendconversationmessage",
+        ApprovalRiskClass = RiskClass.High,
+        ApprovalRiskActionClasses = ["project-mutating"],
+        ApprovalEvidenceReferences = ["evidence:approval-001"],
+        ApprovalEvidenceFreshnessStates = [ApprovalEvidenceFreshness.Fresh],
+        ApprovalAuditStatus = "committed",
+        ApprovalPolicySnapshotVisibility = ProjectConversationItemApprovalPolicySnapshotVisibility.Authorized,
+        ApprovalPolicySnapshotId = "policy:snapshot-1",
+        SourceVersion = 1,
+        CorrelationId = CorrelationId,
+        SafeNextAction = "decide-approval",
+    };
 
     public Task<ComplianceAuditSearchView> SearchComplianceAuditRecordsAsync(
         ComplianceAuditQuery query,

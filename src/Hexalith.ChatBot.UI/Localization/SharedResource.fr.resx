@@ -18,14 +18,32 @@
   <data name="ActorLabel_Human" xml:space="preserve"><value>Humain</value></data>
   <data name="ActorLabel_Service" xml:space="preserve"><value>Service</value></data>
   <data name="ActorLabel_System" xml:space="preserve"><value>Système</value></data>
+  <data name="AssociationLifecycle_Associated" xml:space="preserve"><value>Associée</value></data>
+  <data name="AssociationLifecycle_Corrected" xml:space="preserve"><value>Corrigée</value></data>
+  <data name="AssociationLifecycle_Correcting" xml:space="preserve"><value>Correction en cours</value></data>
+  <data name="AssociationLifecycle_CorrectionDelayed" xml:space="preserve"><value>Correction différée</value></data>
+  <data name="AssociationLifecycle_Deferred" xml:space="preserve"><value>Différée</value></data>
+  <data name="AssociationLifecycle_Failed" xml:space="preserve"><value>Échouée</value></data>
+  <data name="AssociationLifecycle_NeedsReview" xml:space="preserve"><value>À revoir</value></data>
+  <data name="AssociationLifecycle_Proposed" xml:space="preserve"><value>Proposée</value></data>
+  <data name="AssociationLifecycle_Received" xml:space="preserve"><value>Reçue</value></data>
+  <data name="AssociationLifecycle_Rejected" xml:space="preserve"><value>Rejetée</value></data>
+  <data name="AssociationLifecycle_Skipped" xml:space="preserve"><value>Ignorée</value></data>
+  <data name="AssociationLifecycle_Unknown" xml:space="preserve"><value>État non reconnu</value></data>
+  <data name="AssociationOutcome_Ambiguous" xml:space="preserve"><value>Ambiguë</value></data>
+  <data name="AssociationOutcome_Auto" xml:space="preserve"><value>Automatique</value></data>
+  <data name="AssociationOutcome_AutoAssociated" xml:space="preserve"><value>Associée automatiquement</value></data>
+  <data name="AssociationOutcome_CandidatesGenerated" xml:space="preserve"><value>Candidats proposés</value></data>
+  <data name="AssociationOutcome_FailedClosed" xml:space="preserve"><value>Échec fermé</value></data>
+  <data name="AssociationOutcome_Unknown" xml:space="preserve"><value>Résultat non reconnu</value></data>
   <data name="AssociationReview_Action_ChooseCandidate" xml:space="preserve"><value>Choisir le candidat</value></data>
-  <data name="AssociationReview_Action_ChooseCandidate_Consequence" xml:space="preserve"><value>L'association rattachera ce message au projet sélectionné quand l'enregistrement de décision sera disponible.</value></data>
+  <data name="AssociationReview_Action_ChooseCandidate_Consequence" xml:space="preserve"><value>L'association rattache ce message au projet sélectionné et inscrit la décision dans la piste d'audit.</value></data>
   <data name="AssociationReview_Action_Defer" xml:space="preserve"><value>Différer</value></data>
   <data name="AssociationReview_Action_Defer_Consequence" xml:space="preserve"><value>L'élément reste visible pour une revue ultérieure.</value></data>
   <data name="AssociationReview_Action_MarkNeedsReview" xml:space="preserve"><value>Marquer en revue</value></data>
   <data name="AssociationReview_Action_MarkNeedsReview_Consequence" xml:space="preserve"><value>L'élément reste en revue sans projet rattaché.</value></data>
   <data name="AssociationReview_Action_RejectAll" xml:space="preserve"><value>Rejeter tout</value></data>
-  <data name="AssociationReview_Action_RejectAll_Consequence" xml:space="preserve"><value>Aucun candidat n'est choisi ; l'élément reste non résolu jusqu'à ce que l'histoire backend de décision enregistre un résultat terminal.</value></data>
+  <data name="AssociationReview_Action_RejectAll_Consequence" xml:space="preserve"><value>Aucun candidat n'est choisi ; l'élément est enregistré comme rejeté et quitte la file de revue.</value></data>
   <data name="AssociationReview_Candidate_AccessibleLabel" xml:space="preserve"><value>Candidat {0}. Confiance {1}. {2}</value></data>
   <data name="AssociationReview_Candidates" xml:space="preserve"><value>Projets candidats</value></data>
   <data name="AssociationReview_Comparison" xml:space="preserve"><value>Comparaison des preuves</value></data>
@@ -71,6 +89,27 @@
   <data name="AssociationReview_Metadata" xml:space="preserve"><value>Métadonnées d'association</value></data>
   <data name="AssociationReview_SafeNextAction" xml:space="preserve"><value>Revoyez les métadonnées autorisées, puis différez ou escaladez jusqu'à ce que l'enregistrement de décision soit disponible.</value></data>
   <data name="AssociationReview_SourceMetadata" xml:space="preserve"><value>Métadonnées source</value></data>
+  <data name="AssociationReview_Candidate_FallbackLabelTemplate" xml:space="preserve"><value>Projet candidat {0}</value></data>
+  <data name="AssociationReview_Confirm_BodyTemplate" xml:space="preserve"><value>Vous allez enregistrer : {0}. Cette décision est inscrite dans la piste d'audit et ne peut pas être annulée depuis cet écran.</value></data>
+  <data name="AssociationReview_Confirm_Cancel" xml:space="preserve"><value>Annuler</value></data>
+  <data name="AssociationReview_Confirm_Submit" xml:space="preserve"><value>Enregistrer la décision</value></data>
+  <data name="AssociationReview_Confirm_Title" xml:space="preserve"><value>Confirmer cette décision</value></data>
+  <data name="AssociationReview_Correction_PriorProject" xml:space="preserve"><value>Corrigé depuis le projet</value></data>
+  <data name="AssociationReview_DisabledReason_SubmitInFlight" xml:space="preserve"><value>Une décision est déjà en cours d'enregistrement. Attendez la fin.</value></data>
+  <data name="AssociationReview_Failure_DependencyDegraded" xml:space="preserve"><value>Une dépendance est dégradée, le résultat peut donc être différé. Rien n'a été perdu.</value></data>
+  <data name="AssociationReview_Failure_TerminalPolicy" xml:space="preserve"><value>Cette association est close par la politique et ne peut plus être décidée ici.</value></data>
+  <data name="AssociationReview_Failure_Unauthorized" xml:space="preserve"><value>Vous n'êtes pas autorisé à décider de cette association. Aucune décision n'a été enregistrée.</value></data>
+  <data name="AssociationReview_LoadFailed_BodyTemplate" xml:space="preserve"><value>Cette association n'a pas pu être chargée (code : {0}). Rien n'a été soumis.</value></data>
+  <data name="AssociationReview_LoadFailed_Retry" xml:space="preserve"><value>Réessayer le chargement</value></data>
+  <data name="AssociationReview_Loading_Busy" xml:space="preserve"><value>Chargement de la revue d'association</value></data>
+  <data name="AssociationReview_NoteCounterTemplate" xml:space="preserve"><value>{0} caractères sur {1}</value></data>
+  <data name="AssociationReview_Operation_AcceptedTemplate" xml:space="preserve"><value>Enregistré. Opération {0} ; la projection d'audit est en cours de rattrapage.</value></data>
+  <data name="AssociationReview_Operation_Label" xml:space="preserve"><value>Opération</value></data>
+  <data name="AssociationReview_PropagationEta_Label" xml:space="preserve"><value>Fin estimée</value></data>
+  <data name="AssociationReview_StateSummaryTemplate" xml:space="preserve"><value>{0}. Résultat {1}. Confiance {2}.</value></data>
+  <data name="AssociationReview_Validation_CorrectionSourceRequired" xml:space="preserve"><value>Le projet d'origine de cette association est inconnu ; elle ne peut pas être corrigée ici.</value></data>
+  <data name="AssociationReview_Validation_CorrectionTargetUnchanged" xml:space="preserve"><value>Cette association pointe déjà vers le projet sélectionné.</value></data>
+  <data name="AssociationReview_Validation_UnsupportedWireValue" xml:space="preserve"><value>Cette association utilise un état que cet écran ne reconnaît pas encore.</value></data>
   <data name="AssociationReview_Title" xml:space="preserve"><value>Revue d'association</value></data>
   <data name="AssociationReview_Validation_CandidateRequired" xml:space="preserve"><value>Sélectionnez un candidat avant de prévisualiser cette décision.</value></data>
   <data name="AssociationReview_Validation_DecisionUnavailable" xml:space="preserve"><value>L'enregistrement de décision n'est pas encore disponible.</value></data>
@@ -858,6 +897,7 @@
   <data name="ComplianceAudit_PhoneSummary" xml:space="preserve"><value>Le résumé d'audit de conformité est disponible sur téléphone.</value></data>
   <data name="ComplianceAudit_PhoneGuidance" xml:space="preserve"><value>L'analyse d'audit dense et l'édition de rétention nécessitent un écran plus grand ; le résumé et l'escalade sûre restent accessibles.</value></data>
   <data name="ProjectConversation_Composer_Accepted" xml:space="preserve"><value>Commande acceptée ; actualisation de projection en attente.</value></data>
+  <data name="ProjectConversation_Composer_Rejected" xml:space="preserve"><value>Votre message n'a pas été accepté. Consultez la raison ci-dessous, puis réessayez.</value></data>
   <data name="ProjectConversation_Composer_AskAiMode" xml:space="preserve"><value>Demander à l'IA</value></data>
   <data name="ProjectConversation_Composer_DegradedReason" xml:space="preserve"><value>Le composeur est désactivé pendant la dégradation des dépendances de conversation.</value></data>
   <data name="ProjectConversation_Composer_DisabledReason" xml:space="preserve"><value>Le composeur est désactivé jusqu'à disponibilité de la conversation gouvernée.</value></data>
@@ -875,6 +915,7 @@
   <data name="ProjectConversation_Streaming_Cancelling" xml:space="preserve"><value>Arrêt de la réponse ; attente de la vérification serveur.</value></data>
   <data name="ProjectConversation_Streaming_Completed" xml:space="preserve"><value>Réponse terminée.</value></data>
   <data name="ProjectConversation_Streaming_DisabledReason" xml:space="preserve"><value>L'arrêt est indisponible tant que la réponse active n'est pas vérifiée.</value></data>
+  <data name="ProjectConversation_Streaming_IdleReason" xml:space="preserve"><value>Aucune réponse n'est en cours de génération, il n'y a donc rien à arrêter.</value></data>
   <data name="ProjectConversation_Streaming_Progress" xml:space="preserve"><value>Réponse en cours.</value></data>
   <data name="ProjectConversation_Streaming_Reconnected" xml:space="preserve"><value>Reconnecté ; actualisation de l'état de réponse.</value></data>
   <data name="ProjectConversation_Streaming_Retry" xml:space="preserve"><value>Réessayer l'actualisation de réponse.</value></data>

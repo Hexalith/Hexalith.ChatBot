@@ -60,6 +60,50 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
             _ => throw new ArgumentOutOfRangeException(nameof(band), band, null),
         });
 
+    /// <summary>
+    /// Resolves a localized band label from the wire token. The surface receives threshold bands as wire
+    /// strings, so the typed <see cref="ConfidenceBandLabel(ThresholdBand)"/> overload cannot be reached from
+    /// a view model without this hop - which is why every candidate previously rendered the hardcoded
+    /// "within threshold" label regardless of its real band.
+    /// </summary>
+    public string ConfidenceBandLabel(string? wireBand)
+        => Get(wireBand switch
+        {
+            "below" or "Below" => ChatBotUiTextKey.ConfidenceBandBelow,
+            "within" or "Within" => ChatBotUiTextKey.ConfidenceBandWithin,
+            "above" or "Above" => ChatBotUiTextKey.ConfidenceBandAbove,
+            "critical" or "Critical" => ChatBotUiTextKey.ConfidenceBandCritical,
+            _ => ChatBotUiTextKey.ConfidenceBandWithin,
+        });
+
+    public string AssociationLifecycleStateLabel(string? lifecycleState)
+        => Get(lifecycleState switch
+        {
+            "Received" => ChatBotUiTextKey.AssociationLifecycleReceived,
+            "Proposed" => ChatBotUiTextKey.AssociationLifecycleProposed,
+            "Associated" => ChatBotUiTextKey.AssociationLifecycleAssociated,
+            "Rejected" => ChatBotUiTextKey.AssociationLifecycleRejected,
+            "Deferred" => ChatBotUiTextKey.AssociationLifecycleDeferred,
+            "NeedsReview" => ChatBotUiTextKey.AssociationLifecycleNeedsReview,
+            "Failed" => ChatBotUiTextKey.AssociationLifecycleFailed,
+            "Skipped" => ChatBotUiTextKey.AssociationLifecycleSkipped,
+            "Corrected" => ChatBotUiTextKey.AssociationLifecycleCorrected,
+            "Correcting" => ChatBotUiTextKey.AssociationLifecycleCorrecting,
+            "Correction-delayed" => ChatBotUiTextKey.AssociationLifecycleCorrectionDelayed,
+            _ => ChatBotUiTextKey.AssociationLifecycleUnknown,
+        });
+
+    public string AssociationOutcomeLabel(string? outcome)
+        => Get(outcome switch
+        {
+            "auto-associated" => ChatBotUiTextKey.AssociationOutcomeAutoAssociated,
+            "candidates-generated" => ChatBotUiTextKey.AssociationOutcomeCandidatesGenerated,
+            "failed-closed" or "fail-closed" => ChatBotUiTextKey.AssociationOutcomeFailedClosed,
+            "auto" => ChatBotUiTextKey.AssociationOutcomeAuto,
+            "ambiguous" => ChatBotUiTextKey.AssociationOutcomeAmbiguous,
+            _ => ChatBotUiTextKey.AssociationOutcomeUnknown,
+        });
+
     public string EvidenceStateLabel(ChatBotEvidenceState state)
         => Get(ChatBotGovernedUiText.GetEvidenceStateResourceKey(state));
 

@@ -47,35 +47,11 @@ else
                 <section class="chatbot-section chatbot-project-picker" aria-labelledby="project-workspace-picker-title">
                     <h2 id="project-workspace-picker-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ProjectWorkspacePickerTitle]</h2>
                     <p class="chatbot-body">@UiText[ChatBotUiTextKey.ProjectWorkspaceRecentsDescription]</p>
-                    <div class="chatbot-project-recents" aria-label="@UiText[ChatBotUiTextKey.ProjectWorkspaceRecentsTitle]">
-                        @foreach (ProjectWorkspaceAuthorizedRecentProject project in AuthorizedRecentProjects)
-                        {
-                            <article class="chatbot-labelled-row-list"
-                                     data-chatbot-project-recent="@project.StableId"
-                                     data-chatbot-authorized-recents-fixture="true">
-                                <h3 class="chatbot-section-title">@project.DisplayName</h3>
-                                <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
-                                    @CodeRow(UiText[ChatBotUiTextKey.ProjectLabel], project.ProjectId)
-                                    @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], project.State)
-                                    @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], project.SafeNextAction)
-                                </FluentStack>
-                                <FluentStack Orientation="Orientation.Horizontal" Wrap="true">
-                                    <FluentAnchorButton Appearance="ButtonAppearance.Outline"
-                                                        Class="chatbot-touch-target-primary"
-                                                        Href="@($"?projectId={project.ProjectId}")"
-                                                        aria-label="@UiText.Get(ChatBotUiTextKey.ProjectWorkspaceAuthorizedRecentProjectAccessible, project.DisplayName)">
-                                        @UiText[ChatBotUiTextKey.ProjectWorkspaceOpenProject]
-                                    </FluentAnchorButton>
-                                    <FluentAnchorButton Appearance="ButtonAppearance.Outline"
-                                                        Class="chatbot-touch-target-primary"
-                                                        Href="@($"/projects/{project.ProjectId}/conversation")"
-                                                        aria-label="@UiText.Get(ChatBotUiTextKey.ProjectWorkspaceDeepLinkAccessible, project.DisplayName)">
-                                        @UiText[ChatBotUiTextKey.ProjectWorkspaceOpenDeepLink]
-                                    </FluentAnchorButton>
-                                </FluentStack>
-                            </article>
-                        }
-                    </div>
+                    @* The three hard-coded "Alpha/Beta/Gamma" fixture projects that used to render here were removed:
+                       they were untranslated English literals, filtered by neither tenant nor authorization, and their
+                       deep links 403/404 on click -- exactly the ungoverned fallback AC1 forbids on the live route. No
+                       governed authorized-recents read exists yet, so the surface shows its no-project-selected state
+                       until one does. *@
                 </section>
             </FluentStack>
             </FcPageLayout>
@@ -104,28 +80,8 @@ else
 }
 
 @code {
-    private static readonly ProjectWorkspaceAuthorizedRecentProject[] AuthorizedRecentProjects =
-    [
-        new("recent-project-alpha", "project-alpha", "Alpha project", "active", "open"),
-        new("recent-project-beta", "project-beta", "Beta project", "empty", "review-context"),
-        new("recent-project-gamma", "project-gamma", "Gamma project", "degraded", "retry-later"),
-    ];
 
     [SupplyParameterFromQuery(Name = "projectId")]
     public string? ProjectId { get; set; }
 
-    // Story 13.4: the former per-card <dl> renders as a structured Fluent
-    // key-value block (label FluentText + opaque <code> token). project id / lifecycle-state token /
-    // safe-next-action token are all opaque tokens, so each keeps the monospace <code> (AC3).
-    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
-        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <code class="chatbot-code">@value</code>
-    </FluentStack>;
-
-    private sealed record ProjectWorkspaceAuthorizedRecentProject(
-        string StableId,
-        string ProjectId,
-        string DisplayName,
-        string State,
-        string SafeNextAction);
 }

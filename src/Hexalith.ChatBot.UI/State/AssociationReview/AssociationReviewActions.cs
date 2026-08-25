@@ -12,9 +12,20 @@ public sealed record UpdateAssociationDecisionNoteAction(string DecisionNote);
 
 public sealed record UpdateAssociationCorrectionRationaleAction(string CorrectionRationale);
 
-public sealed record PreviewAssociationDecisionAction(string DecisionCode);
+/// <summary>
+/// Asks the surface to confirm a decision before anything durable happens. This action alone never submits a
+/// command; it only opens the confirmation for <paramref name="DecisionCode"/>. The durable submit runs only
+/// on <see cref="ConfirmAssociationDecisionAction"/>.
+/// </summary>
+public sealed record RequestAssociationDecisionAction(string DecisionCode);
 
-public sealed record AssociationDecisionPreviewRejectedAction(string ValidationErrorCode);
+/// <summary>Abandons a pending decision without submitting anything.</summary>
+public sealed record CancelAssociationDecisionAction;
+
+/// <summary>Submits the pending decision. This is the only action that writes a durable decision command.</summary>
+public sealed record ConfirmAssociationDecisionAction;
+
+public sealed record AssociationDecisionValidationRejectedAction(string ValidationErrorCode);
 
 public sealed record AssociationDecisionSubmittedAction(AssociationDecisionSubmitResult Result);
 

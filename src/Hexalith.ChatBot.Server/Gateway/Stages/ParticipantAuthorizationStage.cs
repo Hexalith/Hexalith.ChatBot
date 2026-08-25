@@ -509,11 +509,17 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized);
         }
 
+        // The project-conversation write commands were absent from this gate, so any authenticated tenant member could
+        // append a message to -- or cancel an AI generation in -- a project they hold no chatbot:project-owner claim
+        // for. Story 13.2 AC3 names authorization as a pre-mutation validation for cancellation, and the aggregate
+        // performs no project authorization of its own.
         if ((string.Equals(submission.Request.CommandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal) ||
                 string.Equals(submission.Request.CommandType, nameof(ExecuteApprovedAIAction), StringComparison.Ordinal) ||
                 string.Equals(submission.Request.CommandType, nameof(RequestOutboundSendApproval), StringComparison.Ordinal) ||
                 string.Equals(submission.Request.CommandType, nameof(DecideOutboundApproval), StringComparison.Ordinal) ||
-                string.Equals(submission.Request.CommandType, nameof(ExecuteApprovedOutboundDraft), StringComparison.Ordinal)) &&
+                string.Equals(submission.Request.CommandType, nameof(ExecuteApprovedOutboundDraft), StringComparison.Ordinal) ||
+                string.Equals(submission.Request.CommandType, nameof(CancelAiResponseGeneration), StringComparison.Ordinal) ||
+                string.Equals(submission.Request.CommandType, nameof(RecordProjectConversationMessage), StringComparison.Ordinal)) &&
             !CanReadProject(actor.Principal, submission.Request.Command))
         {
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);

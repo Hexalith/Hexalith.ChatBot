@@ -25,12 +25,12 @@
                      Class="chatbot-project-conversation"
                      aria-labelledby="@HeadingId"
                      data-chatbot-responsive-fixture="@ResponsiveFixture">
-            <FcPageHeader Eyebrow="S1"
+            <FcPageHeader Eyebrow="@UiText[ChatBotUiTextKey.ProjectConversationAuthorizedProject]"
                           Heading="@HeadingText"
                           HeadingId="@HeadingId"
                           PageTitle="@PageTitle" />
 
-            @if (ShowProjectSwitchSuccess && Conversation is not null && !State.Value.IsLoading && State.Value.ErrorCode is null)
+            @if (ShowProjectSwitchSuccess && _switchedProject && Conversation is not null && !State.Value.IsLoading && State.Value.ErrorCode is null)
             {
                 <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Success"
                                      Message="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateProjectSwitchSuccess]"
@@ -40,6 +40,10 @@
                                      AnnouncementKey="@($"project-workspace-switch-{ProjectId}")" />
             }
 
+            @* Accessibility floor: busy regions set AND clear aria-busy on the same labelled node. *@
+            <div class="chatbot-project-conversation__body"
+                 aria-busy="@(State.Value.IsLoading ? "true" : "false")"
+                 aria-labelledby="@HeadingId">
             @if (State.Value.IsLoading)
             {
                 <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Info"
@@ -51,7 +55,10 @@
                 </ChatBotStatusBanner>
             }
 
-            @if (State.Value.ErrorCode is not null)
+            @* A load failure is not automatically a denial. Collapsing transport failures, 5xx and dependency
+               degradation into "Access blocked" told the contributor they lack authorization -- a wrong and
+               non-actionable reason -- and offered no retry. Only genuine authorization codes render the denial. *@
+            @if (State.Value.ErrorCode is not null && IsUnauthorizedError)
             {
                 <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Danger"
                                      Message="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateUnauthorizedRedacted]"
@@ -65,6 +72,28 @@
                                      ReasonText="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateUnauthorizedRedacted]"
                                      SafeNextAction="@UiText[ChatBotUiTextKey.ProjectWorkspaceUnauthorizedNextAction]"
                                      StableId="project-workspace-unauthorized" />
+            }
+            else if (State.Value.ErrorCode is not null)
+            {
+                <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Warning"
+                                     Message="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateDependencyDegraded]"
+                                     AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateDependencyDegraded]"
+                                     StableId="project-conversation-retryable"
+                                     StateFamily="ChatBotFeedbackStateFamily.RetryableFailure"
+                                     AnnouncementKey="project-conversation-failed-retryable">
+                    <code class="chatbot-code">@State.Value.ErrorCode</code>
+                </ChatBotStatusBanner>
+                <ChatBotBlockedState Reason="ChatBotBlockedReason.FailedDependency"
+                                     ReasonText="@UiText[ChatBotUiTextKey.FailureStatusRetryable]"
+                                     SafeNextAction="@UiText[ChatBotUiTextKey.FailureNextActionRetryLater]"
+                                     StableId="project-workspace-retryable" />
+                <FluentButton Type="ButtonType.Button"
+                              Appearance="ButtonAppearance.Outline"
+                              Class="chatbot-touch-target-primary"
+                              OnClick="@RetryLoad"
+                              data-chatbot-stable-id="project-conversation-retry">
+                    @UiText[ChatBotUiTextKey.FailureNextActionRetryLater]
+                </FluentButton>
             }
 
             @if (Conversation is { } conversation)
@@ -119,6 +148,7 @@
                                              Disabled="@State.Value.IsCancellingAiResponse"
                                              DisabledReason="@StopDisabledReason"
                                              StopVerified="@LatestStopVerified"
+                                             VerifiedStopAnnouncementGenerationId="@State.Value.VerifiedStopAnnouncementGenerationId"
                                              StableId="project-conversation-ai-response-stop"
                                              FocusReturnTargetId="project-conversation-composer-input"
                                              OnStop="@StopActiveAiResponse" />
@@ -128,10 +158,12 @@
                                          DisabledReasonCode="@ComposerDisabledReasonCode"
                                          IsSubmitting="@State.Value.IsSubmitting"
                                          ValidationErrorCode="@State.Value.ComposerValidationErrorCode"
+                                         SubmissionErrorCode="@State.Value.SubmissionErrorCode"
                                          PendingSubmission="@State.Value.PendingSubmission"
                                          OnModeChanged="@SetComposerMode"
                                          OnSubmit="@SubmitComposer" />
             }
+            </div>
         </FluentStack>
         </FcPageLayout>
     </MainContent>
@@ -186,10 +218,14 @@
                     <section class="chatbot-section" aria-label="@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelTitle]">
                         @if (AttachmentItems.Any())
                         {
-                            <div class="chatbot-project-file-list" aria-label="@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelTitle]">
+                            <div class="chatbot-project-file-list"
+                                 role="group"
+                                 aria-label="@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelTitle]">
                                 @foreach (ProjectConversationItemModel attachment in AttachmentItems)
                                 {
-                                    <ChatBotAttachmentConversationItem Item="@attachment" />
+                                    @* Same attachment also renders inline in the stream; scope the ids so the two
+                                       copies do not emit duplicate DOM ids and cross-wire their aria references. *@
+                                    <ChatBotAttachmentConversationItem Item="@attachment" IdScope="files-panel" />
                                 }
                             </div>
                         }
@@ -240,10 +276,29 @@
             ? UiText[ChatBotUiTextKey.ProjectConversationMetadata]
             : ComplementaryLabel;
 
+    private string? _requestedProjectId;
+    private bool _switchedProject;
+
+    // Dispatch a load once per project id. The previous guard re-fired on every parameter set while a load was in
+    // flight or had failed (Conversation stays null in both cases), re-issuing the same failing request. It also
+    // reported a "project switch" on the very first load of a deep link, where nothing was switched.
     protected override void OnParametersSet()
     {
         base.OnParametersSet();
-        if (!string.IsNullOrWhiteSpace(ProjectId) && Conversation?.ProjectId != ProjectId)
+        if (string.IsNullOrWhiteSpace(ProjectId) ||
+            string.Equals(_requestedProjectId, ProjectId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _switchedProject = _requestedProjectId is not null;
+        _requestedProjectId = ProjectId;
+        Dispatcher.Dispatch(new LoadProjectConversationAction(ProjectId));
+    }
+
+    private void RetryLoad()
+    {
+        if (!string.IsNullOrWhiteSpace(ProjectId))
         {
             Dispatcher.Dispatch(new LoadProjectConversationAction(ProjectId));
         }
@@ -262,10 +317,24 @@
     // Once the conversation (and its tenant) is loaded, join the project-conversation projection-changed group so AI
     // response progress changes nudge a typed re-query. The signal is advisory and carries no response/version/sequence,
     // so the callback dispatches a signal action that the effect fails closed and turns into an authoritative re-query.
+    private int _subscribing;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await base.OnAfterRenderAsync(firstRender);
-        if (_streamingSubscriber is { } subscriber && !string.IsNullOrWhiteSpace(ProjectId))
+        if (_streamingSubscriber is not { } subscriber || string.IsNullOrWhiteSpace(ProjectId))
+        {
+            return;
+        }
+
+        // EnsureSubscribedAsync is awaited, but renders can overlap it; without this guard several HubConnections
+        // could be built concurrently and all but the last leaked undisposed.
+        if (Interlocked.Exchange(ref _subscribing, 1) == 1)
+        {
+            return;
+        }
+
+        try
         {
             string project = ProjectId;
             string? tenant = Conversation?.TenantContext;
@@ -282,6 +351,10 @@
                     // does not leave the surface on stale in-flight state with an enabled Stop control.
                     _ = InvokeAsync(() => Dispatcher.Dispatch(new ProjectConversationAiResponseReconnectAction(project)));
                 });
+        }
+        finally
+        {
+            _ = Interlocked.Exchange(ref _subscribing, 0);
         }
     }
 
@@ -337,6 +410,8 @@
         {
             { Status: "Blocked" or "Stale" or "Degraded" } => UiText[ChatBotUiTextKey.ProjectWorkspaceStateDependencyDegraded],
             { IsEmpty: true } => UiText[ChatBotUiTextKey.ProjectWorkspaceStateEmptyProject],
+            // Fail closed on an unrecognized/renamed server status instead of presenting it as a healthy conversation.
+            { Status: not "Active" } => UiText[ChatBotUiTextKey.ProjectWorkspaceStateDependencyDegraded],
             not null => UiText[ChatBotUiTextKey.ProjectWorkspaceStateActiveConversation],
             _ => UiText[ChatBotUiTextKey.ProjectWorkspaceStateColdLoad],
         };
@@ -347,6 +422,7 @@
             null => ChatBotFeedbackKind.Info,
             { Status: "Blocked" or "Stale" or "Degraded" } => ChatBotFeedbackKind.Warning,
             { IsEmpty: true } => ChatBotFeedbackKind.Warning,
+            { Status: not "Active" } => ChatBotFeedbackKind.Warning,
             _ => ChatBotFeedbackKind.Info,
         };
 
@@ -356,6 +432,7 @@
             { Status: "Blocked" } => ChatBotFeedbackStateFamily.BlockedAction,
             { Status: "Stale" or "Degraded" } => ChatBotFeedbackStateFamily.DependencyDegraded,
             { IsEmpty: true } => ChatBotFeedbackStateFamily.BlockedAction,
+            { Status: not "Active" } => ChatBotFeedbackStateFamily.DependencyDegraded,
             _ => ChatBotFeedbackStateFamily.CurrentUserAiProposalReady,
         };
 
@@ -373,7 +450,7 @@
 
     private string? ComposerDisabledReasonCode
         => State.Value.ErrorCode is not null
-            ? "unauthorized"
+            ? IsUnauthorizedError ? "unauthorized" : "degraded"
             : Conversation?.Status is "Blocked" or "Stale" or "Degraded"
                 ? "degraded"
                 : State.Value.IsLoading || Conversation is null
@@ -408,7 +485,7 @@
             State.Value.ComposerMode,
             text,
             System.Globalization.CultureInfo.CurrentUICulture.Name,
-            Conversation?.Items.Max(static item => item.SourceVersion) ?? 0));
+            LatestSourceVersion));
 
     private void StopActiveAiResponse()
     {
@@ -418,8 +495,24 @@
         }
     }
 
+    // Items.Max() throws on an empty sequence and SourceVersion is a non-nullable long, so the old
+    // `Conversation?.Items.Max(...) ?? 0` only covered a null Conversation -- submitting the first message on an
+    // empty project (a rendered, composer-enabled state) faulted the circuit before the command reached the gateway.
+    private long LatestSourceVersion
+        => Conversation is { Items.Count: > 0 } conversation
+            ? conversation.Items.Max(static item => item.SourceVersion)
+            : 0;
+
+    // Only genuine authorization codes may render a denial; everything else is retryable/degraded.
+    private bool IsUnauthorizedError
+        => State.Value.ErrorCode is { } code &&
+            (code.Contains("authorization", StringComparison.OrdinalIgnoreCase) ||
+                code.Contains("unauthorized", StringComparison.OrdinalIgnoreCase) ||
+                code.Contains("forbidden", StringComparison.OrdinalIgnoreCase) ||
+                code.Contains("denied", StringComparison.OrdinalIgnoreCase));
+
     private static bool IsStopVerified(ProjectConversationAiResponseProgressModel progress)
-        => progress is { IsTerminal: true, State: "stopped" or "cancelled" };
+        => progress.IsTerminal && ProjectConversationAiResponseProgressStates.IsVerifiedStop(progress.State);
 
     // AC4 (UX-DR32): progress/state must be conveyed by visible text, never motion-only. Maps every metadata-only
     // progress state (including terminal completed/failed/unavailable) plus any degraded/stale/reconnect streaming
@@ -432,6 +525,9 @@
                 "stopped" or "cancelled" => UiText[ChatBotUiTextKey.ProjectConversationStreamingStopped],
                 "completed" => UiText[ChatBotUiTextKey.ProjectConversationStreamingCompleted],
                 "failed" or "unavailable" => UiText[ChatBotUiTextKey.ProjectConversationStreamingUnavailable],
+                // An unrecognized state that the server already marked terminal must not read as "in progress";
+                // only a genuinely non-terminal unknown state maps to progress.
+                _ when progress.IsTerminal => UiText[ChatBotUiTextKey.ProjectConversationStreamingUnavailable],
                 _ => UiText[ChatBotUiTextKey.ProjectConversationStreamingProgress],
             };
 

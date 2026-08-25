@@ -57,7 +57,15 @@
 
     private string CriticalActionValue => CriticalAction ? "true" : "false";
 
-    private string ReasonElementId => $"{StableId}-disabled-reason";
+    // Suffixed with the component instance id: two actions that both keep the default StableId would
+    // otherwise emit the same "-disabled-reason" DOM id and their aria-describedby would resolve to whichever
+    // came first.
+    private readonly string _instanceId = Guid.NewGuid().ToString("N")[..8];
+
+    private string ReasonElementId
+        => string.Equals(StableId, "governed-action", StringComparison.Ordinal)
+            ? $"{StableId}-{_instanceId}-disabled-reason"
+            : $"{StableId}-disabled-reason";
 
     private string? ReasonReferenceId
         => State is ChatBotGovernedActionState.DisabledWithReason ? ReasonElementId : null;

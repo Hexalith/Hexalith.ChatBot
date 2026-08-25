@@ -42,18 +42,51 @@ internal sealed class DeterministicAiActionRiskClassifier : IRiskClassifier
         ProposeAIAction command = ReadProposalCommand(context);
         AiActionCommandMetadata? knownMetadata = AiActionCommandMetadataProvider.TryGet(command.IntendedCommandName);
         bool metadataSupported = knownMetadata is not null;
+        // Server metadata WINS over client-supplied classifier inputs for any command the metadata provider recognizes.
+        // With the client value first, a caller could steer its own risk derivation by declaring e.g.
+        // EffectSurface "read-only" or CommandDefaultRisk LowRisk for a command whose known metadata says otherwise.
+        // The client value is now only a fallback for commands the server has no metadata for.
         return new AiActionRiskInputTuple(
             command.IntendedCommandName,
-            command.ProposedActionClasses ?? knownMetadata?.ActionClasses ?? [],
-            command.EffectSurface ?? knownMetadata?.EffectSurface,
-            command.TenantPolicyClassification ?? knownMetadata?.TenantPolicyClassification,
+            UnionActionClasses(knownMetadata?.ActionClasses, command.ProposedActionClasses),
+            knownMetadata?.EffectSurface ?? command.EffectSurface,
+            knownMetadata?.TenantPolicyClassification ?? command.TenantPolicyClassification,
             RequesterAuthorityClass(context.Actor.Principal),
             command.PolicySnapshotId,
-            command.CommandAllowlistVersion ?? knownMetadata?.CommandAllowlistVersion,
-            command.CommandDefaultRisk ?? knownMetadata?.CommandDefaultRisk,
+            knownMetadata?.CommandAllowlistVersion ?? command.CommandAllowlistVersion,
+            knownMetadata?.CommandDefaultRisk ?? command.CommandDefaultRisk,
             metadataSupported ? "declared" : "unsupported",
             "authorized",
             context.Submission.CorrelationId);
+    }
+
+    // Action classes drive risk UPWARD, so neither side may narrow the other: the server's known classes are always
+    // present (a client cannot de-escalate by omitting one) and any extra class the client declares is kept (a client
+    // may always escalate). Server classes lead so the ordering stays stable.
+    private static IReadOnlyList<AiActionRiskActionClass> UnionActionClasses(
+        IReadOnlyList<AiActionRiskActionClass>? metadataClasses,
+        IReadOnlyList<AiActionRiskActionClass>? declaredClasses)
+    {
+        if (metadataClasses is null || metadataClasses.Count == 0)
+        {
+            return declaredClasses ?? [];
+        }
+
+        if (declaredClasses is null || declaredClasses.Count == 0)
+        {
+            return metadataClasses;
+        }
+
+        List<AiActionRiskActionClass> union = [.. metadataClasses];
+        foreach (AiActionRiskActionClass declared in declaredClasses)
+        {
+            if (!union.Contains(declared))
+            {
+                union.Add(declared);
+            }
+        }
+
+        return union;
     }
 
     private static AiActionRiskInputTuple BuildExecutionInput(ChatBotGatewayContext context)

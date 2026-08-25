@@ -106,24 +106,18 @@ public sealed class LiveContinuityAspireE2eTests
         try
         {
             using CancellationTokenSource startup = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            startup.CancelAfter(TimeSpan.FromMinutes(5));
+
+            // Sized to the bounded work that actually runs under it, not to a round number: the global-administrator
+            // token loop and the writer-protocol activation are each budgeted at 3 minutes, and four resource-health
+            // waits plus two further token loops follow. A 5-minute deadline was already exceeded by the first two
+            // steps alone, so the lane could expire mid-provisioning and surface a bare OperationCanceledException.
+            startup.CancelAfter(TimeSpan.FromMinutes(15));
             internalGrpcReservations.Release();
             await application.StartAsync(startup.Token).ConfigureAwait(true);
 
-            // Before the readiness waits, because readiness depends on it: a fresh store reports EventStore
-            // Unhealthy until the store-global writer protocol is activated, so waiting for health first would
-            // deadlock. Driven through the same admin endpoint a real deployment uses.
-            await RecoveryWriterProtocolProvisioner
-                .ActivateAsync(application, ResolvedRepositoryCommit(), startup.Token)
-                .ConfigureAwait(true);
-
-            foreach (string resource in new[] { "security", "eventstore", "chatbot", "recovery-sandbox" })
-            {
-                await application.ResourceNotifications.WaitForResourceHealthyAsync(resource, startup.Token).ConfigureAwait(true);
-            }
-
-            // Diagnostic only: without a retained tail of the composed resources' own logs, a startup failure on this
-            // lane reported an HTTP status with no cause, and the recovery topology's 503 could not be attributed.
+            // Started FIRST, before provisioning and before the readiness waits. Tails that begin after the health
+            // gate cannot diagnose a startup failure, which is the only failure class they were introduced for --
+            // the freshClientHealth=503 the recovery lane kept reporting with no cause.
             ResourceLoggerService resourceLoggers = application.Services.GetRequiredService<ResourceLoggerService>();
             RecoveryResourceLogTail chatBotLogTail = await RecoveryResourceLogTail
                 .StartAsync("chatbot", resourceLoggers.WatchAsync("chatbot"), 400, startup.Token)
@@ -137,6 +131,18 @@ public sealed class LiveContinuityAspireE2eTests
                 Environment.NewLine,
                 chatBotLogTail.Render(),
                 eventStoreLogTail.Render());
+
+            // Before the readiness waits, because readiness depends on it: a fresh store reports EventStore
+            // Unhealthy until the store-global writer protocol is activated, so waiting for health first would
+            // deadlock. Driven through the same admin endpoint a real deployment uses.
+            await RecoveryWriterProtocolProvisioner
+                .ActivateAsync(application, ResolvedRepositoryCommit(), startup.Token)
+                .ConfigureAwait(true);
+
+            foreach (string resource in new[] { "security", "eventstore", "chatbot", "recovery-sandbox" })
+            {
+                await application.ResourceNotifications.WaitForResourceHealthyAsync(resource, startup.Token).ConfigureAwait(true);
+            }
 
             string mailboxAccessToken = await RecoveryAccessTokenProvider
                 .AcquireMailboxAsync(application, mailboxClientSecret, startup.Token)
@@ -743,8 +749,7 @@ public sealed class LiveContinuityAspireE2eTests
 
                 // The other reachable post-admission outcome (see the remarks above): only the accepted branch of
                 // CommandGateway can emit this type, so observing it proves the bearer was admitted.
-                if (response.StatusCode == HttpStatusCode.ServiceUnavailable
-                    && IsDispatchUnavailableProblem(problemDetails))
+                if (ProvesMailboxAdmission(response.StatusCode, problemDetails))
                 {
                     return;
                 }
@@ -811,6 +816,20 @@ public sealed class LiveContinuityAspireE2eTests
             return false;
         }
     }
+
+    /// <summary>Whether a response pair proves the caller was admitted past the auth boundary.</summary>
+    /// <remarks>
+    /// Both halves are required: the body predicate alone would accept a dispatch-unavailable document under any
+    /// status, which is not what admission means. Exposed rather than inlined so the contract test can drive this
+    /// decision instead of re-implementing it -- an inline copy asserted itself and left the production
+    /// conjunction unpinned.
+    /// </remarks>
+    /// <param name="statusCode">The observed status.</param>
+    /// <param name="problemDetails">The verbatim response body.</param>
+    /// <returns><see langword="true"/> when the pair proves admission.</returns>
+    internal static bool ProvesMailboxAdmission(HttpStatusCode statusCode, string problemDetails)
+        => statusCode == HttpStatusCode.ServiceUnavailable
+            && IsDispatchUnavailableProblem(problemDetails);
 
     /// <summary>Classifies only startup statuses that can become healthy without changing the probe request.</summary>
     /// <remarks>

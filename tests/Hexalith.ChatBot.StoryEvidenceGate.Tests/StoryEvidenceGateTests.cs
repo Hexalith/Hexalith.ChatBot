@@ -2330,6 +2330,9 @@ public static class StoryEvidenceGateTests
     [InlineData("broken-id-crosslink")]
     [InlineData("passed-but-run-aborted")]
     [InlineData("not-runnable")]
+    [InlineData("warning")]
+    [InlineData("disconnected")]
+    [InlineData("pending")]
     public static void RecoveryTrxSanitizerShouldRejectAdversarialInput(string mutation)
     {
         string temporaryRoot = Path.Combine(Path.GetTempPath(), $"recovery-sanitize-negative-{Guid.NewGuid():N}");
@@ -2364,6 +2367,22 @@ public static class StoryEvidenceGateTests
                 "not-runnable" => trx.Replace(
                     "notExecuted=\"0\"",
                     "notExecuted=\"0\" notRunnable=\"2\"",
+                    StringComparison.Ordinal),
+
+                // The remaining three fail-closed counters. Without these rows, deleting any one clause from
+                // RecoveryTrxSanitizer left the suite green while a TRX carrying that counter became completion
+                // evidence -- three of the five guards were silently removable.
+                "warning" => trx.Replace(
+                    "notExecuted=\"0\"",
+                    "notExecuted=\"0\" warning=\"1\"",
+                    StringComparison.Ordinal),
+                "disconnected" => trx.Replace(
+                    "notExecuted=\"0\"",
+                    "notExecuted=\"0\" disconnected=\"1\"",
+                    StringComparison.Ordinal),
+                "pending" => trx.Replace(
+                    "notExecuted=\"0\"",
+                    "notExecuted=\"0\" pending=\"3\"",
                     StringComparison.Ordinal),
                 "wrong-class" => trx.Replace(
                     "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests",

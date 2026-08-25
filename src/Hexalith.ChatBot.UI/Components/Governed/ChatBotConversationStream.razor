@@ -35,7 +35,8 @@
                             }
                             else if (item.IsApprovalEvent)
                             {
-                                <ChatBotApprovalConversationItem Item="@item" />
+                                <ChatBotApprovalConversationItem Item="@item"
+                                                                 OnWhyThisProjectRequested="@OnWhyThisProjectRequested" />
                             }
                             else if (item.IsFailureState)
                             {

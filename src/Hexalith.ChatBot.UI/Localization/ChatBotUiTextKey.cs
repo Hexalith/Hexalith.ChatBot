@@ -188,6 +188,45 @@ public static class ChatBotUiTextKey
     public const string AssociationReviewMetadata = "AssociationReview_Metadata";
     public const string AssociationReviewSafeNextAction = "AssociationReview_SafeNextAction";
     public const string AssociationReviewSourceMetadata = "AssociationReview_SourceMetadata";
+    public const string AssociationLifecycleAssociated = "AssociationLifecycle_Associated";
+    public const string AssociationLifecycleCorrected = "AssociationLifecycle_Corrected";
+    public const string AssociationLifecycleCorrecting = "AssociationLifecycle_Correcting";
+    public const string AssociationLifecycleCorrectionDelayed = "AssociationLifecycle_CorrectionDelayed";
+    public const string AssociationLifecycleDeferred = "AssociationLifecycle_Deferred";
+    public const string AssociationLifecycleFailed = "AssociationLifecycle_Failed";
+    public const string AssociationLifecycleNeedsReview = "AssociationLifecycle_NeedsReview";
+    public const string AssociationLifecycleProposed = "AssociationLifecycle_Proposed";
+    public const string AssociationLifecycleReceived = "AssociationLifecycle_Received";
+    public const string AssociationLifecycleRejected = "AssociationLifecycle_Rejected";
+    public const string AssociationLifecycleSkipped = "AssociationLifecycle_Skipped";
+    public const string AssociationLifecycleUnknown = "AssociationLifecycle_Unknown";
+    public const string AssociationOutcomeAmbiguous = "AssociationOutcome_Ambiguous";
+    public const string AssociationOutcomeAuto = "AssociationOutcome_Auto";
+    public const string AssociationOutcomeAutoAssociated = "AssociationOutcome_AutoAssociated";
+    public const string AssociationOutcomeCandidatesGenerated = "AssociationOutcome_CandidatesGenerated";
+    public const string AssociationOutcomeFailedClosed = "AssociationOutcome_FailedClosed";
+    public const string AssociationOutcomeUnknown = "AssociationOutcome_Unknown";
+    public const string AssociationReviewCandidateFallbackLabelTemplate = "AssociationReview_Candidate_FallbackLabelTemplate";
+    public const string AssociationReviewConfirmTitle = "AssociationReview_Confirm_Title";
+    public const string AssociationReviewConfirmBodyTemplate = "AssociationReview_Confirm_BodyTemplate";
+    public const string AssociationReviewConfirmSubmit = "AssociationReview_Confirm_Submit";
+    public const string AssociationReviewConfirmCancel = "AssociationReview_Confirm_Cancel";
+    public const string AssociationReviewLoadFailedBodyTemplate = "AssociationReview_LoadFailed_BodyTemplate";
+    public const string AssociationReviewLoadFailedRetry = "AssociationReview_LoadFailed_Retry";
+    public const string AssociationReviewFailureUnauthorized = "AssociationReview_Failure_Unauthorized";
+    public const string AssociationReviewFailureTerminalPolicy = "AssociationReview_Failure_TerminalPolicy";
+    public const string AssociationReviewFailureDependencyDegraded = "AssociationReview_Failure_DependencyDegraded";
+    public const string AssociationReviewDisabledReasonSubmitInFlight = "AssociationReview_DisabledReason_SubmitInFlight";
+    public const string AssociationReviewValidationCorrectionSourceRequired = "AssociationReview_Validation_CorrectionSourceRequired";
+    public const string AssociationReviewValidationCorrectionTargetUnchanged = "AssociationReview_Validation_CorrectionTargetUnchanged";
+    public const string AssociationReviewValidationUnsupportedWireValue = "AssociationReview_Validation_UnsupportedWireValue";
+    public const string AssociationReviewOperationAcceptedTemplate = "AssociationReview_Operation_AcceptedTemplate";
+    public const string AssociationReviewOperationLabel = "AssociationReview_Operation_Label";
+    public const string AssociationReviewNoteCounterTemplate = "AssociationReview_NoteCounterTemplate";
+    public const string AssociationReviewStateSummaryTemplate = "AssociationReview_StateSummaryTemplate";
+    public const string AssociationReviewPropagationEtaLabel = "AssociationReview_PropagationEta_Label";
+    public const string AssociationReviewCorrectionPriorProject = "AssociationReview_Correction_PriorProject";
+    public const string AssociationReviewLoadingBusy = "AssociationReview_Loading_Busy";
     public const string AssociationReviewTitle = "AssociationReview_Title";
     public const string AssociationReviewValidationCandidateRequired = "AssociationReview_Validation_CandidateRequired";
     public const string AssociationReviewValidationDecisionUnavailable = "AssociationReview_Validation_DecisionUnavailable";
@@ -440,6 +479,7 @@ public static class ChatBotUiTextKey
     public const string ProjectConversationParticipantItemAccessible = "ProjectConversation_ParticipantItem_Accessible";
     public const string ProjectConversationAttachmentItemAccessible = "ProjectConversation_AttachmentItem_Accessible";
     public const string ProjectConversationComposerAccepted = "ProjectConversation_Composer_Accepted";
+    public const string ProjectConversationComposerRejected = "ProjectConversation_Composer_Rejected";
     public const string ProjectConversationComposerAskAiMode = "ProjectConversation_Composer_AskAiMode";
     public const string ProjectConversationComposerDegradedReason = "ProjectConversation_Composer_DegradedReason";
     public const string ProjectConversationComposerDisabledReason = "ProjectConversation_Composer_DisabledReason";
@@ -457,6 +497,7 @@ public static class ChatBotUiTextKey
     public const string ProjectConversationStreamingCancelling = "ProjectConversation_Streaming_Cancelling";
     public const string ProjectConversationStreamingCompleted = "ProjectConversation_Streaming_Completed";
     public const string ProjectConversationStreamingDisabledReason = "ProjectConversation_Streaming_DisabledReason";
+    public const string ProjectConversationStreamingIdleReason = "ProjectConversation_Streaming_IdleReason";
     public const string ProjectConversationStreamingProgress = "ProjectConversation_Streaming_Progress";
     public const string ProjectConversationStreamingReconnected = "ProjectConversation_Streaming_Reconnected";
     public const string ProjectConversationStreamingRetry = "ProjectConversation_Streaming_Retry";
@@ -1052,6 +1093,45 @@ public static class ChatBotUiTextKey
         AssociationReviewMetadata,
         AssociationReviewSafeNextAction,
         AssociationReviewSourceMetadata,
+        AssociationLifecycleAssociated,
+        AssociationLifecycleCorrected,
+        AssociationLifecycleCorrecting,
+        AssociationLifecycleCorrectionDelayed,
+        AssociationLifecycleDeferred,
+        AssociationLifecycleFailed,
+        AssociationLifecycleNeedsReview,
+        AssociationLifecycleProposed,
+        AssociationLifecycleReceived,
+        AssociationLifecycleRejected,
+        AssociationLifecycleSkipped,
+        AssociationLifecycleUnknown,
+        AssociationOutcomeAmbiguous,
+        AssociationOutcomeAuto,
+        AssociationOutcomeAutoAssociated,
+        AssociationOutcomeCandidatesGenerated,
+        AssociationOutcomeFailedClosed,
+        AssociationOutcomeUnknown,
+        AssociationReviewCandidateFallbackLabelTemplate,
+        AssociationReviewConfirmTitle,
+        AssociationReviewConfirmBodyTemplate,
+        AssociationReviewConfirmSubmit,
+        AssociationReviewConfirmCancel,
+        AssociationReviewLoadFailedBodyTemplate,
+        AssociationReviewLoadFailedRetry,
+        AssociationReviewFailureUnauthorized,
+        AssociationReviewFailureTerminalPolicy,
+        AssociationReviewFailureDependencyDegraded,
+        AssociationReviewDisabledReasonSubmitInFlight,
+        AssociationReviewValidationCorrectionSourceRequired,
+        AssociationReviewValidationCorrectionTargetUnchanged,
+        AssociationReviewValidationUnsupportedWireValue,
+        AssociationReviewOperationAcceptedTemplate,
+        AssociationReviewOperationLabel,
+        AssociationReviewNoteCounterTemplate,
+        AssociationReviewStateSummaryTemplate,
+        AssociationReviewPropagationEtaLabel,
+        AssociationReviewCorrectionPriorProject,
+        AssociationReviewLoadingBusy,
         AssociationReviewTitle,
         AssociationReviewValidationCandidateRequired,
         AssociationReviewValidationDecisionUnavailable,
@@ -1304,6 +1384,7 @@ public static class ChatBotUiTextKey
         ProjectConversationParticipantItemAccessible,
         ProjectConversationAttachmentItemAccessible,
         ProjectConversationComposerAccepted,
+        ProjectConversationComposerRejected,
         ProjectConversationComposerAskAiMode,
         ProjectConversationComposerDegradedReason,
         ProjectConversationComposerDisabledReason,
@@ -1321,6 +1402,7 @@ public static class ChatBotUiTextKey
         ProjectConversationStreamingCancelling,
         ProjectConversationStreamingCompleted,
         ProjectConversationStreamingDisabledReason,
+        ProjectConversationStreamingIdleReason,
         ProjectConversationStreamingProgress,
         ProjectConversationStreamingReconnected,
         ProjectConversationStreamingRetry,

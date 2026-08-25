@@ -105,7 +105,7 @@ Evidence: `ARCHITECTURE-SPINE.md` Retention convention and Deferred; `.github/wo
 ### Re-run evidence
 
 - Deterministic spine lint: **PASS**, zero findings.
-- `Hexalith.ChatBot.StoryEvidenceGate.Tests`: **195 passed, 0 failed, 0 skipped**.
+- `Hexalith.ChatBot.StoryEvidenceGate.Tests`: **182 passed, 0 failed, 0 skipped**. (Superseded 2026-08-25: now 208 passed; the 2026-08-24 observation is left as observed.)
 - `bash -n .github/scripts/install-dapr-cli.sh`: **PASS**.
 - `actionlint .github/workflows/ci.yml`: **PASS**.
 - Current platform pins independently checked against the official release pages: `actions/upload-artifact@v7`, `actions/download-artifact@v8`, and Dapr CLI/runtime 1.18.0 are current published majors/releases on 2026-08-24.

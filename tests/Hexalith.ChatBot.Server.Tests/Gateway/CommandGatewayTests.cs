@@ -4102,6 +4102,14 @@ public sealed class CommandGatewayTests
             problem.Details.Visibility.ShouldBe(ProblemDetailsDetailsVisibility.Metadata_only);
             Serialized(problem).ShouldNotContain("contact_support", Case.Insensitive);
         }
+
+        // Pins the PRODUCER to the shared constant. The constant's value was covered by the Tier-3 contract theory,
+        // but nothing called this factory method, so decoupling line 70 from ChatBotProblemTypes.DispatchUnavailable
+        // left every non-Tier-3 test green while the gateway shipped a 503 the admission probe no longer
+        // recognises -- exactly the drift extracting the constant was meant to end.
+        ProblemDetails dispatchUnavailable = factory.CreateDispatchUnavailable(CorrelationId, TaskId);
+        dispatchUnavailable.Type.ShouldBe(ChatBotProblemTypes.DispatchUnavailable);
+        dispatchUnavailable.Status.ShouldBe(503);
     }
 
     [Fact]

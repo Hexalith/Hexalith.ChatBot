@@ -53,6 +53,9 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     /// is meant to validate.
     /// </remarks>
     private static readonly TimeSpan AbsenceConfirmationWindow = TimeSpan.FromMinutes(1);
+
+    /// <summary>How long a governed-operation projection is given to materialise before presence is a timeout.</summary>
+    private static readonly TimeSpan PresenceConfirmationWindow = TimeSpan.FromMinutes(1);
     private readonly DistributedApplication _application;
     private readonly IResource _eventStoreResource;
     private readonly HttpClient _chatBotClient;
@@ -151,7 +154,10 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             _checkpointNoteRefs.Add(noteRef);
             await SubmitUntilAcceptedAsync(noteRef, commandRef, operationRef, correlationId, userAccessToken, cancellationToken)
                 .ConfigureAwait(false);
-            await WaitForGovernedOperationAsync(noteRef, correlationId, expectPresent: true, userAccessToken, cancellationToken)
+            await WaitForGovernedOperationProjectionAsync(
+                    noteRef,
+                    RecoveryValidationTopology.StorageTenantRef,
+                    cancellationToken)
                 .ConfigureAwait(false);
             await _durableState.WaitForGovernedNoteAsync(
                 RecoveryValidationTopology.StorageTenantRef,
@@ -173,11 +179,9 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 controlAccessToken,
                 cancellationToken)
             .ConfigureAwait(false);
-        await WaitForGovernedOperationAsync(
+        await WaitForGovernedOperationProjectionAsync(
                 controlNoteRef,
-                correlationId,
-                expectPresent: true,
-                controlAccessToken,
+                RecoveryValidationTopology.ControlTenantRef,
                 cancellationToken)
             .ConfigureAwait(false);
         await _durableState.WaitForGovernedNoteAsync(
@@ -415,16 +419,15 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         string controlAccessToken = await RecoveryAccessTokenProvider
             .AcquireControlAsync(_application, cancellationToken).ConfigureAwait(false);
         int reconstructedCount = 0;
+        string? firstReconstructedNoteRef = null;
         foreach (string noteRef in _checkpointNoteRefs)
         {
             bool projectionPresent = false;
             try
             {
-                if (await WaitForGovernedOperationAsync(
+                if (await WaitForGovernedOperationProjectionAsync(
                     noteRef,
-                    checkpoint.OperationRef,
-                    expectPresent: true,
-                    userAccessToken,
+                    RecoveryValidationTopology.StorageTenantRef,
                     cancellationToken).ConfigureAwait(false))
                 {
                     projectionPresent = true;
@@ -434,6 +437,13 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             {
                 // Genuinely not reconstructed within the presence budget — a real partial-loss signal, not every
                 // committed record needs to survive for the loop to keep checking the rest.
+            }
+
+            if (projectionPresent)
+            {
+                // Remember a note the loop OBSERVED present, so the positive control below asserts something this
+                // run actually established rather than assuming note[0] survived.
+                firstReconstructedNoteRef ??= noteRef;
             }
 
             bool durablePresent = await _durableState.IsGovernedNoteCommittedAsync(
@@ -454,11 +464,25 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 _faultProbeNoteRef,
                 AbsenceConfirmationWindow,
                 cancellationToken);
-            // Positive control first: the checkpoint notes are known-present server writes in the same partition.
-            await AssertProjectionChannelReadsServerWritesAsync(
-                RecoveryValidationTopology.StorageTenantRef,
-                _checkpointNoteRefs[0],
-                cancellationToken).ConfigureAwait(false);
+            // Positive control first: prove the channel can read a view this run OBSERVED the server write.
+            // Using _checkpointNoteRefs[0] unconditionally asserted a note the loop above explicitly permits to be
+            // missing ("a real partial-loss signal"), so a drill that genuinely lost the first note reported a
+            // broken observation channel instead of the data loss it had just measured.
+            if (firstReconstructedNoteRef is not null)
+            {
+                await AssertProjectionChannelReadsServerWritesAsync(
+                    RecoveryValidationTopology.StorageTenantRef,
+                    firstReconstructedNoteRef,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                // Nothing was reconstructed at all. There is no known-present write to control against, so the
+                // absence result below cannot be trusted and must not be reported as evidence.
+                throw new InvalidOperationException(
+                    "No checkpoint note was reconstructed, so no positive control exists for the unauthorized-mutation "
+                    + "absence probe and its result cannot be trusted.");
+            }
             bool projectionFaultAbsent = await RemainsGovernedOperationProjectionAbsentAsync(
                 RecoveryValidationTopology.StorageTenantRef,
                 _faultProbeNoteRef,
@@ -501,7 +525,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             controlAccessToken,
             cancellationToken).ConfigureAwait(false);
 
-        // Mirror WaitForGovernedOperationAsync's discipline: isolation must be OBSERVED, never inferred from "not the
+        // Mirror WaitForGovernedOperationProjectionAsync's discipline: isolation must be OBSERVED, never inferred from "not the
         // expected status". A 401 from an expired bearer or a 5xx from a broken read path is not evidence either way
         // and must not be silently folded into "isolation failed" alongside a genuine cross-tenant read.
         if (foreignRead.StatusCode is not (HttpStatusCode.Forbidden or HttpStatusCode.NotFound))
@@ -541,10 +565,10 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             throw new InvalidOperationException("Continuity cleanup lost the correlation identity for its owned state.");
         }
 
-        string userAccessToken = await RecoveryAccessTokenProvider
-            .AcquireAsync(_application, cancellationToken).ConfigureAwait(false);
-        string controlAccessToken = await RecoveryAccessTokenProvider
-            .AcquireControlAsync(_application, cancellationToken).ConfigureAwait(false);
+        // No bearer is acquired here any more: every check below reads the projection channel directly. The two
+        // acquisitions that used to sit here were dead once cleanup moved off the read API, and each carried a
+        // 3-minute retry budget that could throw and abort cleanup before its RECOVERY_CLEANUP_INCOMPLETE
+        // diagnostic could be emitted -- losing the diagnosis in exactly the case it exists for.
         bool complete = true;
 
         // Metadata-only diagnostic: `cleanup-complete: false` reaches the evidence bundle as a single boolean, so a
@@ -559,10 +583,12 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         {
             try
             {
-                GovernedOperationView? view = await _governedOperationProjections
-                    .GetAsync(RecoveryValidationTopology.StorageTenantRef, noteRef, cancellationToken)
-                    .ConfigureAwait(false);
-                if (view is null)
+                // Bounded poll: a single read reported ordinary post-outage projection lag as a missing note and a
+                // spuriously incomplete cleanup.
+                if (!await IsGovernedOperationProjectionPresentAsync(
+                    RecoveryValidationTopology.StorageTenantRef,
+                    noteRef,
+                    cancellationToken).ConfigureAwait(false))
                 {
                     complete = false;
                     incompleteChecks.Add("checkpoint-note-not-present");
@@ -579,10 +605,10 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         {
             try
             {
-                GovernedOperationView? controlView = await _governedOperationProjections
-                    .GetAsync(RecoveryValidationTopology.ControlTenantRef, _controlTenantNoteRef, cancellationToken)
-                    .ConfigureAwait(false);
-                if (controlView is null)
+                if (!await IsGovernedOperationProjectionPresentAsync(
+                    RecoveryValidationTopology.ControlTenantRef,
+                    _controlTenantNoteRef,
+                    cancellationToken).ConfigureAwait(false))
                 {
                     complete = false;
                     incompleteChecks.Add("control-note-not-present");
@@ -1223,6 +1249,53 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     }
 
     /// <summary>
+    /// Proves the projection channel can actually read a view the SERVER wrote, before any absence result from it
+    /// is believed.
+    /// </summary>
+    /// <remarks>
+    /// Without this, the absence probe is vacuous by construction: point it at the wrong tenant partition or the
+    /// wrong component and every call returns "absent", so "no unauthorized mutation landed" and "erasure
+    /// succeeded" both pass while observing nothing at all. A known-present read through the same store, same
+    /// component and same key shape is what makes a subsequent null a fact rather than an artefact.
+    /// </remarks>
+    /// <param name="tenantRef">The tenant partition the absence probe will read.</param>
+    /// <param name="presentNoteRef">A governed note the server is known to have projected.</param>
+    /// <param name="cancellationToken">Cancels the control read.</param>
+    /// <returns>A task that completes when the channel is proven readable.</returns>
+    private async Task AssertProjectionChannelReadsServerWritesAsync(
+        string tenantRef,
+        string presentNoteRef,
+        CancellationToken cancellationToken)
+    {
+        // Bounded poll, not a single read: every other read on this path carries a budget, and an eventually
+        // consistent store returning null once is projection lag, not a broken channel. A single read turned
+        // ordinary lag into a hard, misleading "the channel is broken" abort.
+        Stopwatch timer = Stopwatch.StartNew();
+        while (timer.Elapsed < PresenceConfirmationWindow)
+        {
+            GovernedOperationView? polled = await _governedOperationProjections
+                .GetAsync(tenantRef, presentNoteRef, cancellationToken)
+                .ConfigureAwait(false);
+            if (polled is not null)
+            {
+                return;
+            }
+
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
+
+        GovernedOperationView? control = await _governedOperationProjections
+            .GetAsync(tenantRef, presentNoteRef, cancellationToken)
+            .ConfigureAwait(false);
+        if (control is null)
+        {
+            throw new InvalidOperationException(
+                "The governed-operation projection channel could not read a view the server is known to have "
+                + "written, so no absence observed through it can be trusted.");
+        }
+    }
+
+    /// <summary>
     /// Observes, over the full absence window, that the fault-probe note never materialises in the governed-operation
     /// projection.
     /// </summary>
@@ -1250,36 +1323,6 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     /// <param name="noteRef">The governed note that must never have landed.</param>
     /// <param name="cancellationToken">Cancels the observation.</param>
     /// <returns><see langword="true"/> when the projection stayed absent for the whole window.</returns>
-    /// <summary>
-    /// Proves the projection channel can actually read a view the SERVER wrote, before any absence result from it
-    /// is believed.
-    /// </summary>
-    /// <remarks>
-    /// Without this, the absence probe is vacuous by construction: point it at the wrong tenant partition or the
-    /// wrong component and every call returns "absent", so "no unauthorized mutation landed" and "erasure
-    /// succeeded" both pass while observing nothing at all. A known-present read through the same store, same
-    /// component and same key shape is what makes a subsequent null a fact rather than an artefact.
-    /// </remarks>
-    /// <param name="tenantRef">The tenant partition the absence probe will read.</param>
-    /// <param name="presentNoteRef">A governed note the server is known to have projected.</param>
-    /// <param name="cancellationToken">Cancels the control read.</param>
-    /// <returns>A task that completes when the channel is proven readable.</returns>
-    private async Task AssertProjectionChannelReadsServerWritesAsync(
-        string tenantRef,
-        string presentNoteRef,
-        CancellationToken cancellationToken)
-    {
-        GovernedOperationView? control = await _governedOperationProjections
-            .GetAsync(tenantRef, presentNoteRef, cancellationToken)
-            .ConfigureAwait(false);
-        if (control is null)
-        {
-            throw new InvalidOperationException(
-                "The governed-operation projection channel could not read a view the server is known to have "
-                + "written, so no absence observed through it can be trusted.");
-        }
-    }
-
     private async Task<bool> RemainsGovernedOperationProjectionAbsentAsync(
         string tenantRef,
         string noteRef,
@@ -1312,51 +1355,73 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         return observedAtLeastOnce && finalView is null;
     }
 
-    private async Task<bool> WaitForGovernedOperationAsync(
+    /// <summary>
+    /// Waits, over a bounded budget, for a governed operation to become present in the projection.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Reads the projection channel, not the read API, for the same reason the absence probe and the cleanup
+    /// verification already do: a governed operation that does not exist is refused <c>403 authorization-denied</c>
+    /// by the shipped safe-not-found semantics, never <c>404</c>. Polling the API for presence therefore threw on
+    /// the FIRST read whenever the projection had not landed yet — the ordinary case at seeding and the whole point
+    /// of the budget after an outage — and it threw <see cref="InvalidOperationException"/>, which the
+    /// reconstruction loop's <c>catch (TimeoutException)</c> does not catch. The measurable partial-loss outcome
+    /// this drill exists to report was structurally unreachable: a genuinely lost note aborted the scenario as
+    /// unmeasurable instead of decrementing the reconstructed count.
+    /// </para>
+    /// <para>
+    /// The same store, component and key shape as <see cref="RemainsGovernedOperationProjectionAbsentAsync"/>, so
+    /// presence and absence are decided by one channel and cannot disagree for want of a different reader.
+    /// </para>
+    /// </remarks>
+    /// <param name="noteRef">The governed note to wait for.</param>
+    /// <param name="tenantRef">The tenant partition it was written under.</param>
+    /// <param name="cancellationToken">Cancels the wait.</param>
+    /// <returns><see langword="true"/> once the projection is present.</returns>
+    /// <exception cref="TimeoutException">The projection did not materialise within the budget.</exception>
+    /// <summary>Polls, over the presence budget, for a governed-operation projection without throwing.</summary>
+    /// <param name="tenantRef">The tenant partition to read.</param>
+    /// <param name="noteRef">The governed note to look for.</param>
+    /// <param name="cancellationToken">Cancels the poll.</param>
+    /// <returns><see langword="true"/> when the projection was observed present.</returns>
+    private async Task<bool> IsGovernedOperationProjectionPresentAsync(
+        string tenantRef,
         string noteRef,
-        string correlationId,
-        bool expectPresent,
-        string accessToken,
         CancellationToken cancellationToken)
     {
         Stopwatch timer = Stopwatch.StartNew();
-
-        // Absence gets the same budget as presence. A 5s absence window against a 1min presence window on the same
-        // eventually-consistent read path meant a mutation that DID land during the outage, but projected slowly, was
-        // recorded as "absent" — i.e. unauthorizedMutationAbsent = true. The asymmetry biased toward passing.
-        TimeSpan deadline = expectPresent ? TimeSpan.FromMinutes(1) : AbsenceConfirmationWindow;
-        while (timer.Elapsed < deadline)
+        while (timer.Elapsed < PresenceConfirmationWindow)
         {
-            using HttpResponseMessage response = await GetAuthorizedAsync(
-                $"/api/v1/governed-operations/{noteRef}",
-                correlationId,
-                accessToken,
-                cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode == HttpStatusCode.OK)
+            GovernedOperationView? view = await _governedOperationProjections
+                .GetAsync(tenantRef, noteRef, cancellationToken)
+                .ConfigureAwait(false);
+            if (view is not null)
             {
                 return true;
             }
 
-            // Absence must be OBSERVED, never inferred from "not 200". A 401 from an expired bearer or a 5xx from a
-            // broken read path is not evidence that an unauthorized mutation is absent — and for presence probes those
-            // same statuses are not "not yet projected"; they are verification failures.
-            if (response.StatusCode == HttpStatusCode.NotFound)
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
+
+        return await _governedOperationProjections
+            .GetAsync(tenantRef, noteRef, cancellationToken)
+            .ConfigureAwait(false) is not null;
+    }
+
+    private async Task<bool> WaitForGovernedOperationProjectionAsync(
+        string noteRef,
+        string tenantRef,
+        CancellationToken cancellationToken)
+    {
+        Stopwatch timer = Stopwatch.StartNew();
+        while (timer.Elapsed < PresenceConfirmationWindow)
+        {
+            GovernedOperationView? view = await _governedOperationProjections
+                .GetAsync(tenantRef, noteRef, cancellationToken)
+                .ConfigureAwait(false);
+            if (view is not null)
             {
-                // Keep polling for the full window. A late materialization invalidates absence.
-            }
-            else
-            {
-                // Same reason the mailbox admission probe now carries its problem document: the fail-safe
-                // coordinator reduces whatever is thrown here to `unmeasurable`, so a message without the reason
-                // code leaves a hosted failure undiagnosable. Metadata only — this is ChatBot's redacted
-                // ProblemDetails, bounded, never a tenant payload.
-                string problemDetails = await response.Content
-                    .ReadAsStringAsync(cancellationToken)
-                    .ConfigureAwait(false);
-                throw new InvalidOperationException(
-                    $"The governed-operation {(expectPresent ? "presence" : "absence")} probe returned an unexpected "
-                    + $"status {(int)response.StatusCode}. Response: "
-                    + (problemDetails.Length > 512 ? problemDetails[..512] : problemDetails));
+                return true;
             }
 
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
@@ -1364,28 +1429,13 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
 
         // Close the final-delay race: a projection can materialize after the last loop read but before the delay
         // crosses the deadline. The boundary observation, rather than the preceding sleep, decides the result.
-        using HttpResponseMessage finalResponse = await GetAuthorizedAsync(
-            $"/api/v1/governed-operations/{noteRef}",
-            correlationId,
-            accessToken,
-            cancellationToken).ConfigureAwait(false);
-        if (finalResponse.StatusCode == HttpStatusCode.OK)
-        {
-            return true;
-        }
-
-        if (finalResponse.StatusCode != HttpStatusCode.NotFound)
-        {
-            throw new InvalidOperationException(
-                $"The governed-operation {(expectPresent ? "presence" : "absence")} probe returned an unexpected status {(int)finalResponse.StatusCode}.");
-        }
-
-        if (expectPresent)
-        {
-            throw new TimeoutException("The governed checkpoint projection did not materialize before the scenario deadline.");
-        }
-
-        return false;
+        GovernedOperationView? finalView = await _governedOperationProjections
+            .GetAsync(tenantRef, noteRef, cancellationToken)
+            .ConfigureAwait(false);
+        return finalView is not null
+            ? true
+            : throw new TimeoutException(
+                "The governed checkpoint projection did not materialize before the scenario deadline.");
     }
 
     private async Task<HttpResponseMessage> GetAuthorizedAsync(

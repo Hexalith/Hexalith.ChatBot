@@ -17,7 +17,7 @@ public sealed class AssociationReviewServiceTests
     public async Task ServiceShouldReadRoutingStatusThroughClientAndMapAuthorizedMetadataOnlyCandidates()
     {
         FakeChatBotClient client = new();
-        AssociationReviewService service = new(client);
+        AssociationReviewService service = new(client, AssociationReviewTestText.Create());
 
         AssociationReviewModel review = await service.GetAssociationReviewAsync("01ARZ3NDEKTSV4RRFFQ69G5FAZ", TestContext.Current.CancellationToken);
 
@@ -34,7 +34,7 @@ public sealed class AssociationReviewServiceTests
     public async Task ServiceShouldSubmitChooseCandidateThroughClientAndRefreshRoutingStatus()
     {
         FakeChatBotClient client = new();
-        AssociationReviewService service = new(client);
+        AssociationReviewService service = new(client, AssociationReviewTestText.Create());
         AssociationReviewModel review = await service.GetAssociationReviewAsync("01ARZ3NDEKTSV4RRFFQ69G5FAZ", TestContext.Current.CancellationToken);
 
         AssociationDecisionSubmitResult result = await service.SubmitDecisionAsync(
@@ -57,7 +57,7 @@ public sealed class AssociationReviewServiceTests
     public async Task ServiceShouldSubmitCorrectionThroughClientAndRefreshRoutingStatus()
     {
         FakeChatBotClient client = new();
-        AssociationReviewService service = new(client);
+        AssociationReviewService service = new(client, AssociationReviewTestText.Create());
         AssociationReviewModel review = await service.GetAssociationReviewAsync("01ARZ3NDEKTSV4RRFFQ69G5FAZ", TestContext.Current.CancellationToken);
 
         AssociationCorrectionSubmitResult result = await service.SubmitCorrectionAsync(
@@ -69,7 +69,8 @@ public sealed class AssociationReviewServiceTests
         client.SubmitCount.ShouldBe(1);
         Hexalith.ChatBot.Contracts.Commands.CorrectEmailProjectAssociation command = client.SubmittedCommand
             .ShouldBeOfType<Hexalith.ChatBot.Contracts.Commands.CorrectEmailProjectAssociation>();
-        command.PriorProjectId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FBB");
+        // The server's PriorProjectId, not a guess derived from the candidate list.
+        command.PriorProjectId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FB9");
         command.TargetProjectId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FBC");
         command.CorrectionKind.ShouldBe(Hexalith.ChatBot.Contracts.Enums.AssociationCorrectionKind.ProjectReassignment);
         command.CorrectionRationale.ShouldBe("Safe correction rationale");
@@ -83,7 +84,7 @@ public sealed class AssociationReviewServiceTests
     public async Task ServiceShouldPreserveNoAuthorizedCandidatesAsVisibleReviewState()
     {
         FakeChatBotClient client = new() { ReturnEmptyCandidates = true };
-        AssociationReviewModel review = await new AssociationReviewService(client)
+        AssociationReviewModel review = await new AssociationReviewService(client, AssociationReviewTestText.Create())
             .GetAssociationReviewAsync("01ARZ3NDEKTSV4RRFFQ69G5FAZ", TestContext.Current.CancellationToken);
 
         review.HasAuthorizedCandidates.ShouldBeFalse();
@@ -95,7 +96,7 @@ public sealed class AssociationReviewServiceTests
     public async Task ServiceShouldClassifyRestrictedEvidenceWithoutRelyingOnlyOnUnauthorizedKind()
     {
         FakeChatBotClient client = new() { ReturnRestrictedEvidence = true };
-        AssociationReviewModel review = await new AssociationReviewService(client)
+        AssociationReviewModel review = await new AssociationReviewService(client, AssociationReviewTestText.Create())
             .GetAssociationReviewAsync("01ARZ3NDEKTSV4RRFFQ69G5FAZ", TestContext.Current.CancellationToken);
 
         AssociationEvidenceModel evidence = review.Candidates.Single().Evidence.Single();
@@ -107,11 +108,84 @@ public sealed class AssociationReviewServiceTests
     public async Task ServiceShouldHonorServerRedactionStateEvenWhenEvidenceTextHasNoRestrictionKeyword()
     {
         FakeChatBotClient client = new() { ReturnStructurallyRedactedEvidence = true };
-        AssociationReviewModel review = await new AssociationReviewService(client)
+        AssociationReviewModel review = await new AssociationReviewService(client, AssociationReviewTestText.Create())
             .GetAssociationReviewAsync("01ARZ3NDEKTSV4RRFFQ69G5FAZ", TestContext.Current.CancellationToken);
 
         AssociationEvidenceModel evidence = review.Candidates.Single().Evidence.Single();
         evidence.State.ShouldBe(ChatBotEvidenceState.Redacted);
+    }
+
+    /// <summary>
+    /// The prior project is an assertion written into the audit trail. When the server supplies none, the
+    /// correction must fail closed rather than nominate an arbitrary non-target candidate.
+    /// </summary>
+    [Fact]
+    public async Task ServiceShouldRefuseToInventThePriorProjectWhenTheServerSuppliesNone()
+    {
+        FakeChatBotClient client = new() { OmitPriorProjectId = true };
+        AssociationReviewService service = new(client, AssociationReviewTestText.Create());
+        AssociationReviewModel review = await service.GetAssociationReviewAsync("01ARZ3NDEKTSV4RRFFQ69G5FAZ", TestContext.Current.CancellationToken);
+
+        InvalidOperationException failure = await Should.ThrowAsync<InvalidOperationException>(() =>
+            service.SubmitCorrectionAsync(review, "01ARZ3NDEKTSV4RRFFQ69G5FBC", null, TestContext.Current.CancellationToken));
+
+        failure.Message.ShouldBe("correction-source-required");
+        client.SubmitCount.ShouldBe(0);
+    }
+
+    /// <summary>
+    /// The fingerprint binds the decision to the evidence it was made on, so a candidate whose evidence is
+    /// restricted must not borrow another candidate's fingerprint.
+    /// </summary>
+    [Fact]
+    public async Task ServiceShouldFailClosedRatherThanSignADecisionWithUnusableEvidence()
+    {
+        FakeChatBotClient client = new() { ReturnRestrictedEvidence = true };
+        AssociationReviewService service = new(client, AssociationReviewTestText.Create());
+        AssociationReviewModel review = await service.GetAssociationReviewAsync("01ARZ3NDEKTSV4RRFFQ69G5FAZ", TestContext.Current.CancellationToken);
+
+        InvalidOperationException failure = await Should.ThrowAsync<InvalidOperationException>(() =>
+            service.SubmitDecisionAsync(review, "choose-candidate", review.Candidates.Single().ProjectId, null, TestContext.Current.CancellationToken));
+
+        failure.Message.ShouldBe("stale-evidence");
+        client.SubmitCount.ShouldBe(0);
+    }
+
+    /// <summary>A multi-line note is evidence; normalization must not reflow it onto one line.</summary>
+    [Fact]
+    public async Task ServiceShouldPreserveTheReviewersLineBreaksInADecisionNote()
+    {
+        FakeChatBotClient client = new();
+        AssociationReviewService service = new(client, AssociationReviewTestText.Create());
+        AssociationReviewModel review = await service.GetAssociationReviewAsync("01ARZ3NDEKTSV4RRFFQ69G5FAZ", TestContext.Current.CancellationToken);
+
+        await service.SubmitDecisionAsync(
+            review,
+            "choose-candidate",
+            review.Candidates.Single().ProjectId,
+            "First   line\nSecond line",
+            TestContext.Current.CancellationToken);
+
+        client.SubmittedCommand.ShouldBeOfType<Hexalith.ChatBot.Contracts.Commands.AssociateEmailToProject>()
+            .DecisionNote.ShouldBe("First line\nSecond line");
+    }
+
+    [Fact]
+    public async Task ServiceShouldRejectANoteBeyondTheDocumentedCap()
+    {
+        FakeChatBotClient client = new();
+        AssociationReviewService service = new(client, AssociationReviewTestText.Create());
+        AssociationReviewModel review = await service.GetAssociationReviewAsync("01ARZ3NDEKTSV4RRFFQ69G5FAZ", TestContext.Current.CancellationToken);
+
+        InvalidOperationException failure = await Should.ThrowAsync<InvalidOperationException>(() =>
+            service.SubmitDecisionAsync(
+                review,
+                "choose-candidate",
+                review.Candidates.Single().ProjectId,
+                new string('x', AssociationReviewService.MaximumNoteLength + 1),
+                TestContext.Current.CancellationToken));
+
+        failure.Message.ShouldBe("association-review-note-too-long");
     }
 
     private sealed class FakeChatBotClient : IChatBotClient
@@ -133,6 +207,8 @@ public sealed class AssociationReviewServiceTests
         public bool ReturnStructurallyRedactedEvidence { get; init; }
 
         public bool ReturnCorrectedAssociation { get; set; }
+
+        public bool OmitPriorProjectId { get; init; }
 
         public Task<CommandSubmissionResponse> SubmitAsync(
             IChatBotCommand command,
@@ -176,7 +252,7 @@ public sealed class AssociationReviewServiceTests
         {
             LastAssociationId = associationId;
             RoutingReadCount++;
-            return Task.FromResult(CreateStatus(associationId, ReturnEmptyCandidates, ReturnRestrictedEvidence, ReturnStructurallyRedactedEvidence, ReturnCorrectedAssociation));
+            return Task.FromResult(CreateStatus(associationId, ReturnEmptyCandidates, ReturnRestrictedEvidence, ReturnStructurallyRedactedEvidence, ReturnCorrectedAssociation, OmitPriorProjectId));
         }
 
         public Task<ProjectConversationResponse> GetProjectConversationAsync(
@@ -188,7 +264,8 @@ public sealed class AssociationReviewServiceTests
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
-        private static AssociationRoutingStatus CreateStatus(string associationId, bool empty, bool restrictedEvidence, bool structurallyRedacted, bool corrected)
+        private static AssociationRoutingStatus CreateStatus(string associationId, bool empty, bool restrictedEvidence, bool structurallyRedacted, bool corrected,
+            bool omitPrior)
         {
             AssociationEvidenceReference evidence = new()
             {
@@ -241,6 +318,7 @@ public sealed class AssociationReviewServiceTests
                 NextActionReasonCodes = [ChatBotMessageCode.Association_ambiguous_routed],
                 CorrectedProjectId = corrected ? "01ARZ3NDEKTSV4RRFFQ69G5FBC" : null,
                 PredecessorAssociationId = corrected ? associationId : null,
+                PriorProjectId = omitPrior ? null : "01ARZ3NDEKTSV4RRFFQ69G5FB9",
                 DownstreamImpactStatus = corrected ? "preview-only" : null,
             };
         }

@@ -36,6 +36,19 @@ public static class GovernedOperationsReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
-        return state with { IsSubmitting = false, Error = action.Error };
+        // Clear the previous outcome: leaving it in place renders the failure banner alongside the prior
+        // success's outcome section, audit history and "projection complete" banner, which reads as though the
+        // failed submission had itself succeeded.
+        return state with { IsSubmitting = false, Outcome = null, Error = action.Error };
+    }
+
+    /// <summary>Clears the in-flight flag when a submission was cancelled rather than completed or failed.</summary>
+    /// <param name="state">The current state.</param>
+    /// <returns>The next state.</returns>
+    [ReducerMethod(typeof(GovernedNoteSubmissionCancelledAction))]
+    public static GovernedOperationsState ReduceCancelled(GovernedOperationsState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        return state with { IsSubmitting = false };
     }
 }

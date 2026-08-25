@@ -1,21 +1,11 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
 @inject ChatBotUiTextLocalizer UiText
+@inject ChatBotCultureFormatter Formatter
+@using Hexalith.ChatBot.UI.Services
 
 <section class="chatbot-association-actions" aria-labelledby="association-actions-title">
     <h2 id="association-actions-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</h2>
-    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-field">
-        <FluentLabel Class="chatbot-labelled-row" for="association-decision-note">
-            @UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]
-        </FluentLabel>
-        <FluentTextArea Id="association-decision-note"
-                        Value="@DecisionNote"
-                        ValueChanged="UpdateNote"
-                        Immediate="true"
-                        aria-label="@UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]"
-                        aria-describedby="association-review-validation"
-                        aria-invalid="@DecisionNoteInvalidText" />
-    </FluentStack>
-
+    @* The validation summary precedes the panel it describes, per the error-recovery contract. *@
     @if (!string.IsNullOrWhiteSpace(ValidationErrorCode))
     {
         <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Warning"
@@ -24,6 +14,26 @@
                              StableId="association-review-validation"
                              StateFamily="@ChatBotFeedbackStateFamily.ValidationError" />
     }
+
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-field">
+        <FluentLabel Class="chatbot-labelled-row" for="association-decision-note">
+            @UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]
+        </FluentLabel>
+        <FluentTextArea Id="association-decision-note"
+                        Value="@DecisionNote"
+                        ValueChanged="UpdateNote"
+                        Immediate="true"
+                        Maxlength="@AssociationReviewService.MaximumNoteLength"
+                        aria-label="@UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]"
+                        aria-describedby="@DecisionNoteDescribedBy"
+                        aria-invalid="@DecisionNoteInvalidText" />
+        @* The cap was previously discoverable only by exceeding it and having the submit rejected. *@
+        <FluentText Id="association-decision-note-counter" Class="chatbot-field__counter">
+            @UiText.Get(ChatBotUiTextKey.AssociationReviewNoteCounterTemplate,
+                        (DecisionNote?.Length ?? 0).ToString(System.Globalization.CultureInfo.CurrentCulture),
+                        AssociationReviewService.MaximumNoteLength.ToString(System.Globalization.CultureInfo.CurrentCulture))
+        </FluentText>
+    </FluentStack>
 
     <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.75rem" Class="chatbot-association-actions__bar">
         @foreach (AssociationReviewActionModel action in Actions)
@@ -35,7 +45,7 @@
                                         State="@action.State"
                                         DisabledReason="@action.DisabledReason"
                                         Appearance="ButtonAppearance.Outline"
-                                        OnActivate="@(() => PreviewAsync(action.Code))" />
+                                        OnActivate="@(() => RequestDecisionAsync(action.Code))" />
                 <span class="chatbot-action-consequence">@action.Consequence</span>
             </span>
         }
@@ -54,7 +64,15 @@
             <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
                 @TextRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionAffectedContext], CorrectionAffectedContext)
                 @CodeRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionDownstreamImpact], CorrectionDownstreamImpact)
-                @if (PropagationProgressDenominator is > 0)
+                @if (!string.IsNullOrWhiteSpace(PriorProjectId))
+                {
+                    @CodeRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionPriorProject], PriorProjectId)
+                }
+                @if (PropagationEstimatedCompletionAtUtc is { } eta)
+                {
+                    @TextRow(UiText[ChatBotUiTextKey.AssociationReviewPropagationEtaLabel], Formatter.FormatDateTime(eta))
+                }
+                @if (PropagationProgressNumerator is > 0 || PropagationProgressDenominator is > 0)
                 {
                     @TextRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionPropagationProgress], PropagationProgressText)
                 }
@@ -73,8 +91,14 @@
                                 ValueChanged="UpdateCorrectionRationale"
                                 Immediate="true"
                                 aria-label="@UiText[ChatBotUiTextKey.AssociationReviewCorrectionRationale]"
-                                aria-describedby="association-correction-status"
+                                aria-describedby="association-correction-status association-correction-rationale-counter"
+                                Maxlength="@AssociationReviewService.MaximumNoteLength"
                                 aria-invalid="@CorrectionRationaleInvalidText" />
+                <FluentText Id="association-correction-rationale-counter" Class="chatbot-field__counter">
+                    @UiText.Get(ChatBotUiTextKey.AssociationReviewNoteCounterTemplate,
+                                (CorrectionRationale?.Length ?? 0).ToString(System.Globalization.CultureInfo.CurrentCulture),
+                                AssociationReviewService.MaximumNoteLength.ToString(System.Globalization.CultureInfo.CurrentCulture))
+                </FluentText>
             </FluentStack>
             <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.AssociationReviewCorrectionSubmit]"
                                    AccessibleLabel="@UiText[ChatBotUiTextKey.AssociationReviewCorrectionSubmit]"
@@ -88,16 +112,6 @@
 </section>
 
 @code {
-    private static readonly string[] SpecificDisabledReasonPriority =
-    [
-        "evidence-expired",
-        "not-authorized",
-        "projection-pending",
-        "already-decided",
-        "corrected-context-stale",
-        "correction-delayed",
-    ];
-
     [Parameter]
     public bool HasSelectedCandidate { get; set; }
 
@@ -106,6 +120,18 @@
 
     [Parameter]
     public bool CanCorrect { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether a governed command is already in flight.</summary>
+    [Parameter]
+    public bool IsSubmitting { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether any candidate is authorized. When none is, the surface has
+    /// declined to show the evidence, so choosing or rejecting is not a decision the reviewer can make on
+    /// what they were shown - only defer and mark-needs-review remain.
+    /// </summary>
+    [Parameter]
+    public bool HasAuthorizedCandidates { get; set; } = true;
 
     [Parameter]
     public IReadOnlyList<string> DisabledReasons { get; set; } = [];
@@ -155,8 +181,9 @@
     [Parameter]
     public EventCallback<string> OnCorrectionRationaleChanged { get; set; }
 
+    /// <summary>Raised to ask for confirmation of a decision. Never submits anything by itself.</summary>
     [Parameter]
-    public EventCallback<string> OnPreview { get; set; }
+    public EventCallback<string> OnRequestDecision { get; set; }
 
     [Parameter]
     public EventCallback OnSubmitCorrection { get; set; }
@@ -169,20 +196,32 @@
             "correction-target-required" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionValidationTargetRequired],
             "stale-evidence" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionValidationStaleEvidence],
             "association-review-note-too-long" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionValidationRationaleTooLong],
+            "correction-source-required" => UiText[ChatBotUiTextKey.AssociationReviewValidationCorrectionSourceRequired],
+            "correction-target-unchanged" => UiText[ChatBotUiTextKey.AssociationReviewValidationCorrectionTargetUnchanged],
+            "unsupported-wire-value" => UiText[ChatBotUiTextKey.AssociationReviewValidationUnsupportedWireValue],
+            "terminal-state" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonTerminalState],
+            "not-authorized" or "target-unauthorized" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonNotAuthorized],
+            "policy-blocked" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionPolicyBlocked],
+            "already-decided" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonTerminalState],
             _ => UiText[ChatBotUiTextKey.AssociationReviewValidationDecisionUnavailable],
         };
 
     private IReadOnlyList<AssociationReviewActionModel> Actions =>
     [
         Build("choose-candidate", ChatBotUiTextKey.AssociationReviewActionChooseCandidate, ChatBotUiTextKey.AssociationReviewActionChooseCandidateConsequence, requiresCandidate: true),
-        Build("reject-all", ChatBotUiTextKey.AssociationReviewActionRejectAll, ChatBotUiTextKey.AssociationReviewActionRejectAllConsequence, requiresCandidate: false),
+        Build("reject-all", ChatBotUiTextKey.AssociationReviewActionRejectAll, ChatBotUiTextKey.AssociationReviewActionRejectAllConsequence, requiresCandidate: true),
         Build("defer", ChatBotUiTextKey.AssociationReviewActionDefer, ChatBotUiTextKey.AssociationReviewActionDeferConsequence, requiresCandidate: false),
         Build("mark-needs-review", ChatBotUiTextKey.AssociationReviewActionMarkNeedsReview, ChatBotUiTextKey.AssociationReviewActionMarkNeedsReviewConsequence, requiresCandidate: false),
     ];
 
     private AssociationReviewActionModel Build(string code, string labelKey, string consequenceKey, bool requiresCandidate)
     {
-        string disabledReasonCode = ResolveDisabledReasonCode(requiresCandidate);
+        string disabledReasonCode = AssociationReviewActionPolicy.ResolveDecisionDisabledReasonCode(
+            IsTerminal,
+            IsSubmitting,
+            requiresCandidate,
+            HasSelectedCandidate && HasAuthorizedCandidates,
+            DisabledReasons);
         ChatBotGovernedActionState state = disabledReasonCode.Length == 0
             ? ChatBotGovernedActionState.Enabled
             : ChatBotGovernedActionState.DisabledWithReason;
@@ -196,18 +235,28 @@
     }
 
     private ChatBotGovernedActionState CorrectionActionState
-        => ResolveCorrectionDisabledReasonCode() is { Length: > 0 }
+        => CorrectionDisabledReasonCode is { Length: > 0 }
             ? ChatBotGovernedActionState.DisabledWithReason
             : ChatBotGovernedActionState.Enabled;
 
+    private string CorrectionDisabledReasonCode
+        => AssociationReviewActionPolicy.ResolveCorrectionDisabledReasonCode(
+            CanCorrect,
+            IsSubmitting,
+            HasSelectedCandidate,
+            DisabledReasons);
+
     private string CorrectionDisabledReason
-    {
-        get
-        {
-            string code = ResolveCorrectionDisabledReasonCode();
-            return code.Length == 0 ? string.Empty : DisabledReasonText(code);
-        }
-    }
+        => CorrectionDisabledReasonCode is { Length: > 0 } code ? DisabledReasonText(code) : string.Empty;
+
+    /// <summary>
+    /// The decision-note field is only invalid for errors that field can cause. Marking it aria-invalid for a
+    /// correction-only error told the reviewer the wrong control was at fault.
+    /// </summary>
+    private string DecisionNoteDescribedBy
+        => string.IsNullOrWhiteSpace(ValidationErrorCode) || IsCorrectionValidationError
+            ? "association-decision-note-counter"
+            : "association-review-validation association-decision-note-counter";
 
     private string CorrectionAffectedContext
         => string.IsNullOrWhiteSpace(CorrectedProjectId)
@@ -234,22 +283,22 @@
         };
 
     private ChatBotFeedbackKind CorrectionStatusKind
-        => CorrectionStatusTextKey switch
+        => CorrectionStatus switch
         {
-            ChatBotUiTextKey.AssociationReviewCorrectionStatusSuccess => ChatBotFeedbackKind.Success,
-            ChatBotUiTextKey.AssociationReviewCorrectionStatusPartial => ChatBotFeedbackKind.Warning,
-            ChatBotUiTextKey.AssociationReviewCorrectionStatusBlocked => ChatBotFeedbackKind.Danger,
-            ChatBotUiTextKey.AssociationReviewCorrectionStatusDelayed => ChatBotFeedbackKind.Warning,
+            AssociationCorrectionStatus.Success => ChatBotFeedbackKind.Success,
+            AssociationCorrectionStatus.Blocked => ChatBotFeedbackKind.Danger,
+            AssociationCorrectionStatus.Partial or AssociationCorrectionStatus.Delayed => ChatBotFeedbackKind.Warning,
             _ => ChatBotFeedbackKind.Info,
         };
 
+    // A projection still catching up is a benign accepted-command state, not a degraded dependency. Only
+    // Delayed is an actual degradation.
     private ChatBotFeedbackStateFamily CorrectionFeedbackState
-        => CorrectionStatusTextKey switch
+        => CorrectionStatus switch
         {
-            ChatBotUiTextKey.AssociationReviewCorrectionStatusSuccess => ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending,
-            ChatBotUiTextKey.AssociationReviewCorrectionStatusBlocked => ChatBotFeedbackStateFamily.BlockedAction,
-            ChatBotUiTextKey.AssociationReviewCorrectionStatusDelayed => ChatBotFeedbackStateFamily.DependencyDegraded,
-            _ => ChatBotFeedbackStateFamily.DependencyDegraded,
+            AssociationCorrectionStatus.Blocked => ChatBotFeedbackStateFamily.BlockedAction,
+            AssociationCorrectionStatus.Delayed => ChatBotFeedbackStateFamily.DependencyDegraded,
+            _ => ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending,
         };
 
     private string CorrectionStatusText => UiText[CorrectionStatusTextKey];
@@ -268,38 +317,24 @@
     private string CorrectionRationaleInvalidText
         => IsCorrectionValidationError ? "true" : "false";
 
+    private AssociationCorrectionStatus CorrectionStatus
+        => AssociationReviewActionPolicy.ResolveCorrectionStatus(
+            DisabledReasons,
+            PropagationStatus,
+            DownstreamImpactStatus,
+            CorrectedProjectId,
+            IsCorrectedContextStale);
+
     private string CorrectionStatusTextKey
-        => DisabledReasons.Contains("target-unauthorized", StringComparer.Ordinal)
-            || DisabledReasons.Contains("policy-blocked", StringComparer.Ordinal)
-                ? ChatBotUiTextKey.AssociationReviewCorrectionStatusBlocked
-            : string.Equals(PropagationStatus, "delayed", StringComparison.Ordinal)
-                || DisabledReasons.Contains("correction-delayed", StringComparer.Ordinal)
-                    ? ChatBotUiTextKey.AssociationReviewCorrectionStatusDelayed
-            : string.Equals(DownstreamImpactStatus, "pending", StringComparison.Ordinal)
-                || string.Equals(DownstreamImpactStatus, "correcting", StringComparison.Ordinal)
-                || IsCorrectedContextStale
-                    ? ChatBotUiTextKey.AssociationReviewCorrectionStatusPending
-            : string.Equals(DownstreamImpactStatus, "preview-only", StringComparison.Ordinal)
-                ? ChatBotUiTextKey.AssociationReviewCorrectionStatusPartial
-            : string.IsNullOrWhiteSpace(CorrectedProjectId)
-                ? ChatBotUiTextKey.AssociationReviewCorrectionStatusProjectionPending
-                : ChatBotUiTextKey.AssociationReviewCorrectionStatusSuccess;
-
-    private string ResolveDisabledReasonCode(bool requiresCandidate)
-    {
-        if (IsTerminal || DisabledReasons.Contains("terminal-state", StringComparer.Ordinal))
+        => CorrectionStatus switch
         {
-            return "terminal-state";
-        }
-
-        if (requiresCandidate && !HasSelectedCandidate)
-        {
-            return "candidate-required";
-        }
-
-        return SpecificDisabledReasonPriority.FirstOrDefault(reason => DisabledReasons.Contains(reason, StringComparer.Ordinal))
-            ?? string.Empty;
-    }
+            AssociationCorrectionStatus.Blocked => ChatBotUiTextKey.AssociationReviewCorrectionStatusBlocked,
+            AssociationCorrectionStatus.Delayed => ChatBotUiTextKey.AssociationReviewCorrectionStatusDelayed,
+            AssociationCorrectionStatus.Pending => ChatBotUiTextKey.AssociationReviewCorrectionStatusPending,
+            AssociationCorrectionStatus.Partial => ChatBotUiTextKey.AssociationReviewCorrectionStatusPartial,
+            AssociationCorrectionStatus.ProjectionPending => ChatBotUiTextKey.AssociationReviewCorrectionStatusProjectionPending,
+            _ => ChatBotUiTextKey.AssociationReviewCorrectionStatusSuccess,
+        };
 
     private string DisabledReasonText(string code)
         => code switch
@@ -320,29 +355,12 @@
             "stale-evidence" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionValidationStaleEvidence],
             "target-unauthorized" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionBlockedTarget],
             "terminal-state" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonTerminalState],
+            "submit-in-flight" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonSubmitInFlight],
             _ => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonDecisionCommandNotAvailable],
         };
 
-    private string ResolveCorrectionDisabledReasonCode()
-    {
-        if (!CanCorrect)
-        {
-            return "correction-invalid-lifecycle";
-        }
-
-        if (!HasSelectedCandidate)
-        {
-            return "correction-target-required";
-        }
-
-        return SpecificDisabledReasonPriority
-            .Concat(["target-unauthorized", "policy-blocked", "projection-invalidation-unavailable", "audit-unavailable", "stale-evidence", "already-corrected", "corrected-context-stale", "correction-delayed"])
-            .FirstOrDefault(reason => DisabledReasons.Contains(reason, StringComparer.Ordinal))
-            ?? string.Empty;
-    }
-
-    private async Task PreviewAsync(string code)
-        => await OnPreview.InvokeAsync(code).ConfigureAwait(true);
+    private async Task RequestDecisionAsync(string code)
+        => await OnRequestDecision.InvokeAsync(code).ConfigureAwait(true);
 
     private async Task UpdateNote(string? value)
         => await OnDecisionNoteChanged.InvokeAsync(value ?? string.Empty).ConfigureAwait(true);

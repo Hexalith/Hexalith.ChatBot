@@ -33,14 +33,14 @@
     <div class="chatbot-governed-composer__modes" role="group" aria-label="@UiText[ChatBotUiTextKey.ProjectConversationComposerTitle]">
         <FluentButton Type="ButtonType.Button"
                       Appearance="ButtonAppearance.Outline"
-                      aria-pressed="@(Mode is ProjectConversationComposerMode.Message)"
+                      aria-pressed="@(Mode is ProjectConversationComposerMode.Message ? "true" : "false")"
                       Disabled="@Disabled"
                       OnClick="@(() => OnModeChanged.InvokeAsync(ProjectConversationComposerMode.Message))">
             @UiText[ChatBotUiTextKey.ProjectConversationComposerMessageMode]
         </FluentButton>
         <FluentButton Type="ButtonType.Button"
                       Appearance="ButtonAppearance.Outline"
-                      aria-pressed="@(Mode is ProjectConversationComposerMode.AskAi)"
+                      aria-pressed="@(Mode is ProjectConversationComposerMode.AskAi ? "true" : "false")"
                       Disabled="@Disabled"
                       OnClick="@(() => OnModeChanged.InvokeAsync(ProjectConversationComposerMode.AskAi))">
             @UiText[ChatBotUiTextKey.ProjectConversationComposerAskAiMode]
@@ -56,7 +56,7 @@
                     ValueChanged="OnTextChanged"
                     Immediate="true"
                     Placeholder="@UiText[ChatBotUiTextKey.ProjectConversationComposerPlaceholder]"
-                    aria-describedby="project-conversation-composer-help project-conversation-composer-status"
+                    aria-describedby="@DescribedBy"
                     aria-invalid="@(!string.IsNullOrWhiteSpace(ValidationMessage))"
                     Disabled="@Disabled"
                     @onkeydown:stopPropagation="true" />
@@ -78,6 +78,7 @@
     private ElementReference _validationSummary;
     private string? _focusedValidationErrorCode;
     private string? _focusedPendingCommandId;
+    private bool _awaitingSubmissionReceipt;
 
     [Parameter]
     public ProjectConversationComposerMode Mode { get; set; }
@@ -97,6 +98,13 @@
     [Parameter]
     public ProjectConversationSubmissionReceiptModel? PendingSubmission { get; set; }
 
+    /// <summary>
+    /// Gateway/transport rejection code for the last submission. Previously the store recorded this and no component
+    /// ever read it, so a rejected message produced no visible reason at all. [AC2]
+    /// </summary>
+    [Parameter]
+    public string? SubmissionErrorCode { get; set; }
+
     [Parameter]
     public EventCallback<ProjectConversationComposerMode> OnModeChanged { get; set; }
 
@@ -108,6 +116,8 @@
     private string? ValidationMessage
         => string.IsNullOrWhiteSpace(ValidationErrorCode) ? null : UiText[ChatBotUiTextKey.ProjectConversationComposerValidationRequired];
 
+    private bool HasSubmissionError => !string.IsNullOrWhiteSpace(SubmissionErrorCode);
+
     private string? StatusMessage
         => DisabledReasonCode switch
         {
@@ -115,20 +125,30 @@
             "degraded" => UiText[ChatBotUiTextKey.ProjectConversationComposerDegradedReason],
             not null => UiText[ChatBotUiTextKey.ProjectConversationComposerDisabledReason],
             _ when IsSubmitting => UiText[ChatBotUiTextKey.ProjectConversationComposerSubmitting],
+            // A rejection outranks a stale accepted receipt: reporting "accepted" for a command the gateway refused
+            // is exactly the optimistic success AC2 forbids.
+            _ when HasSubmissionError => UiText[ChatBotUiTextKey.ProjectConversationComposerRejected],
             _ when PendingSubmission is not null => UiText[ChatBotUiTextKey.ProjectConversationComposerAccepted],
             _ => null,
         };
 
     private string? StatusCode
-        => DisabledReasonCode ?? PendingSubmission?.CommandId;
+        => DisabledReasonCode ?? (HasSubmissionError ? SubmissionErrorCode : PendingSubmission?.CommandId);
 
     private ChatBotFeedbackKind StatusKind
-        => DisabledReasonCode is not null ? ChatBotFeedbackKind.Warning : ChatBotFeedbackKind.Info;
+        => DisabledReasonCode is not null || HasSubmissionError
+            ? ChatBotFeedbackKind.Warning
+            : ChatBotFeedbackKind.Info;
 
     private ChatBotFeedbackStateFamily StatusFamily
-        => DisabledReasonCode is not null
+        => DisabledReasonCode is not null || HasSubmissionError
             ? ChatBotFeedbackStateFamily.BlockedAction
             : ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending;
+
+    private string DescribedBy
+        => string.IsNullOrWhiteSpace(ValidationMessage)
+            ? "project-conversation-composer-help project-conversation-composer-status"
+            : "project-conversation-composer-help project-conversation-composer-error project-conversation-composer-status";
 
     // UX-DR34: move focus only when the relevant state first appears, never on every re-render. Re-focusing on
     // each render would yank focus back to the composer while a proposal review panel is being read (a store
@@ -150,23 +170,48 @@
 
         _focusedValidationErrorCode = null;
 
+        // A rejection ends the wait and keeps the draft so the user can correct and retry.
+        if (HasSubmissionError)
+        {
+            _awaitingSubmissionReceipt = false;
+            return;
+        }
+
         if (PendingSubmission is not null &&
             !string.Equals(_focusedPendingCommandId, PendingSubmission.CommandId, StringComparison.Ordinal))
         {
             _focusedPendingCommandId = PendingSubmission.CommandId;
-            await _input.Element.FocusAsync().ConfigureAwait(false);
+
+            // Clear the draft only for a receipt that answers a submission this composer actually made. The store also
+            // routes cancellation receipts through PendingSubmission, and those must not wipe a draft being typed.
+            if (_awaitingSubmissionReceipt)
+            {
+                _awaitingSubmissionReceipt = false;
+                Text = string.Empty;
+            }
+
+            if (!Disabled)
+            {
+                await _input.Element.FocusAsync().ConfigureAwait(false);
+            }
         }
     }
 
     private void OnTextChanged(string? value)
         => Text = value ?? string.Empty;
 
+    // The draft is NOT cleared here. OnSubmit only dispatches; the gateway round-trip happens afterwards in the
+    // effect, so clearing at this point discarded the user's message before admission was known -- and, paired with a
+    // rejection the surface did not render, lost it silently with no way to retry. The text is cleared in
+    // OnAfterRenderAsync only once an accepted receipt for THIS submission arrives. [AC2]
     private async Task SubmitAsync()
     {
-        await OnSubmit.InvokeAsync(Text).ConfigureAwait(false);
-        if (!string.IsNullOrWhiteSpace(Text))
+        if (Disabled || IsSubmitting || _awaitingSubmissionReceipt)
         {
-            Text = string.Empty;
+            return;
         }
+
+        _awaitingSubmissionReceipt = true;
+        await OnSubmit.InvokeAsync(Text).ConfigureAwait(false);
     }
 }

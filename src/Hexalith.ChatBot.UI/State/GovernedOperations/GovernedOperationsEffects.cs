@@ -31,7 +31,10 @@ public sealed class GovernedOperationsEffects(GovernedOperationService service)
         catch (OperationCanceledException)
         {
             // Cancellation (navigation away / component disposal) is not a submission failure: never collapse it
-            // into a generic failure — rethrow so the host observes the cancellation honestly.
+            // into a generic failure — rethrow so the host observes the cancellation honestly. An HttpClient
+            // timeout also arrives here as TaskCanceledException, so clear the in-flight flag first: rethrowing
+            // without it leaves IsSubmitting stuck true and permanently disables the action.
+            dispatcher.Dispatch(new GovernedNoteSubmissionCancelledAction());
             throw;
         }
         catch (HexalithChatBotApiException<ProblemDetails> problem)

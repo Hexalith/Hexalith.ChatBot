@@ -102,10 +102,29 @@ body {
     max-width: min(100%, 70rem);
 }
 
+/* .chatbot-streaming-status carries AC4's requirement that generation progress is conveyed by visible TEXT and never
+   by motion alone, and .chatbot-muted-text carries the composer help and safe-next-action copy. Both were applied in
+   markup with no rule behind them, so they rendered as undifferentiated body text. Visual role is delegated to Fluent
+   semantic tokens (no module-owned colour redefinition). */
+.chatbot-streaming-status {
+    margin: 0;
+    color: var(--colorNeutralForeground2);
+    font-size: var(--fontSizeBase200);
+    line-height: var(--lineHeightBase200);
+}
+
+.chatbot-muted-text {
+    color: var(--colorNeutralForeground3);
+    font-size: var(--fontSizeBase200);
+    line-height: var(--lineHeightBase200);
+}
+
 .chatbot-section-title,
 .chatbot-body,
 .chatbot-metadata,
 .chatbot-code,
+.chatbot-streaming-status,
+.chatbot-muted-text,
 .chatbot-labelled-row,
 .chatbot-project-workspace,
 .chatbot-project-picker,
@@ -295,6 +314,38 @@ body {
         inline-size: 100%;
     }
 
+    /* The dense batch table is unusable at phone width; the stacked summary replaces it. Previously this rule
+       existed only inside an E2E fixture's injected style block, so on the real route the table never hid at
+       phone width and the fallback aside never hid at desktop width -- every viewer, screen readers included,
+       got both. */
+    .chatbot-approval-priority-table {
+        display: none;
+    }
+}
+
+@media (min-width: 600px) {
+    .chatbot-small-screen-fallback {
+        display: none;
+    }
+}
+
+/* The stacked phone layout is the only place the per-cell labels are meaningful; they are aria-hidden because
+   the column headers already name each cell. */
+.chatbot-row-label {
+    display: none;
+}
+
+@media (max-width: 599px) {
+    .chatbot-approval-priority-table .chatbot-labelled-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--chatbot-space-2, 0.5rem);
+    }
+
+    .chatbot-row-label {
+        display: inline;
+        font-weight: 600;
+    }
 }
 
 @media (max-width: 48rem) {

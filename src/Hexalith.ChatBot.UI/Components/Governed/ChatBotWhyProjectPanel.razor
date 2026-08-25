@@ -4,7 +4,7 @@
 
 <aside class="chatbot-why-project-panel"
        role="complementary"
-       aria-label="@UiText.Get(ChatBotUiTextKey.WhyProjectPanelAccessible, Panel.AssociationId)"
+       aria-labelledby="@TitleId"
        data-chatbot-why-project-panel="metadata-only">
     <FluentCard Class="chatbot-why-project-panel__surface">
     <header class="chatbot-why-project-panel__header">
@@ -13,7 +13,10 @@
                       Appearance="ButtonAppearance.Subtle"
                       aria-label="@UiText[ChatBotUiTextKey.WhyProjectCloseAction]"
                       OnClick="CloseAsync">
-            x
+            @* A multiplication sign, hidden from assistive tech: the accessible name comes from aria-label.
+               The previous literal lowercase "x" was read out as the letter. No icon package is referenced by
+               this project, so a glyph is the dependency-free equivalent. *@
+            <span aria-hidden="true">&#215;</span>
         </FluentButton>
     </header>
 
@@ -27,7 +30,7 @@
         @CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectKernelVersionLabel], Panel.KernelVersion)
         @CodeRowIf(UiText[ChatBotUiTextKey.DecisionActorLabel], Panel.DecisionActorId)
         @CodeRowIf(UiText[ChatBotUiTextKey.DecisionActorTypeLabel], Panel.DecisionActorType)
-        @TimeRow(UiText[ChatBotUiTextKey.DecidedAtLabel], Panel.DecisionTimestamp)
+        @TimeRowIf(UiText[ChatBotUiTextKey.DecidedAtLabel], Panel.DecisionTimestamp)
         @CodeRowIf(UiText[ChatBotUiTextKey.SourceProvenanceLabel], Panel.SourceProvenance)
         @CodeRowIf(UiText[ChatBotUiTextKey.SourceVersionLabel], Panel.SourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))
         @CodeRowIf(UiText[ChatBotUiTextKey.CorrelationIdLabel], Panel.CorrelationId)
@@ -38,7 +41,7 @@
 
     @if (Panel.IsCorrectedContextStale || !string.IsNullOrWhiteSpace(Panel.PropagationStatus))
     {
-        <p class="chatbot-why-project-panel__state" tabindex="0">
+        <p class="chatbot-why-project-panel__state">
             <strong>@UiText[ChatBotUiTextKey.WhyProjectCorrectedContextLabel]</strong>
             @CorrectedContextText
         </p>
@@ -59,7 +62,7 @@
         <h3 id="@EvidenceTitleId" class="chatbot-section-title">@UiText[ChatBotUiTextKey.WhyProjectEvidenceTitle]</h3>
         @if (Panel.Evidence.Count == 0)
         {
-            <p class="chatbot-why-project-panel__state" tabindex="0">@UiText[ChatBotUiTextKey.WhyProjectEvidenceUnavailable]</p>
+            <p class="chatbot-why-project-panel__state">@UiText[ChatBotUiTextKey.WhyProjectEvidenceUnavailable]</p>
         }
         else
         {
@@ -67,8 +70,7 @@
                 @foreach (ProjectAssociationWhyEvidenceModel evidence in Panel.Evidence)
                 {
                     <li class="chatbot-why-project-panel__evidence-row"
-                        data-chatbot-evidence-visibility="@evidence.VisibilityState"
-                        tabindex="0">
+                        data-chatbot-evidence-visibility="@evidence.VisibilityState">
                         <div class="chatbot-why-project-panel__evidence-header">
                             <ChatBotEvidenceChip State="@EvidenceState(evidence)"
                                                  Text="@EvidenceLabel(evidence)" />
@@ -85,7 +87,7 @@
                         </FluentStack>
                         @if (EvidenceState(evidence) is not ChatBotEvidenceState.Available)
                         {
-                            <p class="chatbot-why-project-panel__state" tabindex="0">@UiText[ChatBotUiTextKey.WhyProjectEvidenceRedactedExplanation]</p>
+                            <p class="chatbot-why-project-panel__state">@UiText[ChatBotUiTextKey.WhyProjectEvidenceRedactedExplanation]</p>
                         }
                     </li>
                 }
@@ -96,11 +98,12 @@
 </aside>
 
 @code {
-    private const string TitleId = "chatbot-why-project-panel-title";
-    private const string EvidenceTitleId = "chatbot-why-project-panel-evidence-title";
-
     [Parameter]
     public ProjectAssociationWhyPanelModel Panel { get; set; } = default!;
+
+    private string TitleId => $"chatbot-why-project-panel-{Panel.AssociationId}-title";
+
+    private string EvidenceTitleId => $"chatbot-why-project-panel-{Panel.AssociationId}-evidence-title";
 
     [Parameter]
     public EventCallback OnClose { get; set; }
@@ -108,11 +111,16 @@
     [Parameter]
     public EventCallback<string> OnOpenAssociation { get; set; }
 
+    // The summary rows describe the first *visible* evidence entry. Taking Evidence.First() regardless of
+    // visibility surfaced a redacted matched value in the panel header metadata.
+    private ProjectAssociationWhyEvidenceModel? PrimaryVisibleEvidence
+        => Panel.Evidence.FirstOrDefault(static evidence => EvidenceState(evidence) is ChatBotEvidenceState.Available);
+
     private string PrimarySignalClassLabel
-        => SignalClassText(Panel.Evidence.FirstOrDefault()?.SignalClass);
+        => SignalClassText(PrimaryVisibleEvidence?.SignalClass);
 
     private string PrimaryDisplayToken
-        => Panel.Evidence.FirstOrDefault()?.DisplayToken ?? UiText[ChatBotUiTextKey.DecisionUnavailableValue];
+        => PrimaryVisibleEvidence?.DisplayToken ?? UiText[ChatBotUiTextKey.DecisionUnavailableValue];
 
     private string CorrectedContextText
         => UiText.Get(
@@ -122,10 +130,12 @@
             Panel.SafeNextAction);
 
     private static ChatBotEvidenceState EvidenceState(ProjectAssociationWhyEvidenceModel evidence)
+        // Case-insensitive: the ordinal-exact arms let a "Redacted" visibility render as Available with no
+        // redaction explanation.
         => evidence.VisibilityState switch
         {
-            "redacted" => ChatBotEvidenceState.Redacted,
-            "unavailable" => ChatBotEvidenceState.Unavailable,
+            _ when string.Equals(evidence.VisibilityState, "redacted", StringComparison.OrdinalIgnoreCase) => ChatBotEvidenceState.Redacted,
+            _ when string.Equals(evidence.VisibilityState, "unavailable", StringComparison.OrdinalIgnoreCase) => ChatBotEvidenceState.Unavailable,
             _ when string.Equals(evidence.RedactionState, "redacted", StringComparison.OrdinalIgnoreCase) => ChatBotEvidenceState.Redacted,
             _ when string.Equals(evidence.RedactionState, "unavailable", StringComparison.OrdinalIgnoreCase) => ChatBotEvidenceState.Unavailable,
             _ => ChatBotEvidenceState.Available,
@@ -166,10 +176,13 @@
     private static RenderFragment? TextRowIf(string label, string? value)
         => string.IsNullOrWhiteSpace(value) ? null : TextRow(label, value);
 
-    private static RenderFragment TimeRow(string label, DateTimeOffset value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+    private RenderFragment TimeRow(string label, DateTimeOffset value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
         <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <time datetime="@value.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture)">@value.ToUniversalTime().ToString("u", System.Globalization.CultureInfo.InvariantCulture)</time>
+        <time datetime="@value.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture)">@Formatter.FormatDateTime(value)</time>
     </FluentStack>;
+
+    private RenderFragment? TimeRowIf(string label, DateTimeOffset value)
+        => value == default ? null : TimeRow(label, value);
 
     private async Task CloseAsync()
         => await OnClose.InvokeAsync().ConfigureAwait(true);

@@ -547,6 +547,14 @@ public static class StoryEvidenceValidator
                     .Equals(configured.Selector, StringComparison.Ordinal)
                 || !OptionalPinnedString(binding, "trx", configured.Trx)
                 || !OptionalPinnedString(binding, "provenance", configured.Provenance)
+                // The per-lane freshness ceiling was the ONLY recognizedLaneBindings field this function did not
+                // pin. Every sibling (lane/selector/trx/provenance/sources) is hard-pinned against an in-code
+                // constant and the global ceiling is pinned to 60 above, but the override was bounded only by a
+                // <= 1440 range check inside the resolver -- so any lane could be raised to 24 hours by editing
+                // story-evidence-policy.json alone, with no version bump, no reason code and no failing test. That
+                // file is in no trigger's pathPatterns, so such a change need produce no primary-path evidence at
+                // all. Pinning it here is what makes the ceiling tamper-evident.
+                || !OptionalPinnedInteger(binding, "maximumCurrentRunAgeMinutes", ExpectedLaneCurrentRunAgeMinutes)
                 || !EvidenceJson.RequiredStrings(binding, "sources", GateReason.ScopeDigestMismatch)
                     .SequenceEqual(configured.Sources, StringComparer.Ordinal))
             {
@@ -554,6 +562,15 @@ public static class StoryEvidenceValidator
             }
         }
     }
+
+    /// <summary>The per-lane current-run ceiling every declared primary lane must carry, pinned in code.</summary>
+    private const int ExpectedLaneCurrentRunAgeMinutes = 360;
+
+    private static bool OptionalPinnedInteger(JsonObject value, string name, int expected)
+        => value.TryGetPropertyValue(name, out JsonNode? node)
+            && node is JsonValue candidate
+            && candidate.TryGetValue(out int actual)
+            && actual == expected;
 
     private static bool OptionalPinnedString(JsonObject value, string name, string? expected)
     {

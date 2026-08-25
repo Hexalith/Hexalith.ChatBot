@@ -125,7 +125,7 @@ AD-5's **fixed 30-minute reserve** is not literally enforced by the current arit
 ### Re-review checks
 
 - `actionlint .github/workflows/ci.yml .github/workflows/release.yml` — passed.
-- `dotnet test tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj --configuration Release --no-restore` — 195/195 passed on SDK 10.0.302.
+- `dotnet test tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj --configuration Release --no-restore` — 182/182 passed on SDK 10.0.302. (Superseded 2026-08-25: now 208/208; the 2026-08-24 observation is left as observed.)
 - Focused `StoryEvidenceIntegrityGateShouldRemainFailClosedAndMachineBound` architecture test — passed.
 - Full architecture project — 72 passed, 1 failed on an unrelated stale `ModelContextProtocol` version assertion (`1.4.1` expected, `2.2.0` actual); it does not change the R1–R7 dispositions but prevents claiming a clean full architecture suite.
 
@@ -157,7 +157,7 @@ AD-5's **fixed 30-minute reserve** is not literally enforced by the current arit
 - `actionlint .github/workflows/ci.yml .github/workflows/release.yml` — passed.
 - Focused `StoryEvidenceIntegrityGateShouldRemainFailClosedAndMachineBound` architecture test — passed.
 - Local GNU Coreutils probe with ignored `SIGINT` and `--kill-after` — forced `SIGKILL` at the cumulative deadline and returned 137 as documented.
-- The prior 182/182 StoryEvidenceGate test result remains applicable; these final changes are workflow/docs/architecture-test changes, not StoryEvidenceGate production-code changes.
+- The prior 182/182 StoryEvidenceGate test result remains applicable (superseded 2026-08-25: 208/208); these final changes are workflow/docs/architecture-test changes, not StoryEvidenceGate production-code changes.
 
 ### Residuals accepted by this PASS
 

@@ -193,15 +193,47 @@ public static class LiveRecoveryValidationArchitectureTests
             declared.Count.ShouldBeGreaterThan(
                 0,
                 $"{workflow} must bound its recovery producer in-process.");
-            foreach (Match match in declared)
+            // Paired PER PRODUCER STEP, not globally. The previous form compared every in-process deadline against
+            // the hardcoded literal 280, which described only the scheduled/release lane's 16800s SIGINT: lowering
+            // 16800s failed nothing, and the completion lane -- whose interrupt is computed as
+            // remaining_seconds - 900 and capped at 15900s (265 min) -- was never checked against its own bound at
+            // all. A global comparison is also wrong in the other direction: the scheduled lane's 265-minute
+            // deadline is legitimate against its own 280-minute SIGINT but would fail against the completion
+            // lane's 265-minute cap. Each step is therefore matched to the external bound that governs it.
+            string[] stepBlocks = source.Split("\n      - name: ", StringSplitOptions.None);
+            int pairedProducers = 0;
+            foreach (string block in stepBlocks)
             {
-                int inProcessMinutes = int.Parse(match.Groups["minutes"].Value, CultureInfo.InvariantCulture);
+                Match inProcess = Regex.Match(
+                    block,
+                    "HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: \"(?<minutes>[0-9]+)\"");
+                if (!inProcess.Success)
+                {
+                    continue;
+                }
+
+                block.ShouldContain(
+                    "timeout --signal=INT --kill-after=15m",
+                    "every in-process-bounded recovery producer must carry an external interrupt of its own.");
+
+                Match literal = Regex.Match(block, "--kill-after=15m (?<seconds>[0-9]+)s");
+                Match capped = Regex.Match(block, "interrupt_after_seconds > (?<seconds>[0-9]+)");
+                Match external = literal.Success ? literal : capped;
+                external.Success.ShouldBeTrue(
+                    "the external interrupt's own bound must be readable, or this guard asserts nothing.");
+
+                int inProcessMinutes = int.Parse(inProcess.Groups["minutes"].Value, CultureInfo.InvariantCulture);
+                int externalMinutes = int.Parse(external.Groups["seconds"].Value, CultureInfo.InvariantCulture) / 60;
                 inProcessMinutes.ShouldBeLessThan(
-                    280,
-                    "the in-process deadline must expire before the external SIGINT, or it can never fire.");
+                    externalMinutes,
+                    "the in-process deadline must expire before THIS producer's own external SIGINT, or its "
+                    + "cleanup guard can never fire.");
+                pairedProducers++;
             }
 
-            source.ShouldContain("timeout --signal=INT --kill-after=15m");
+            pairedProducers.ShouldBe(
+                declared.Count,
+                $"{workflow} must pair every in-process deadline with an external interrupt in the same step.");
         }
     }
 
@@ -231,29 +263,83 @@ public static class LiveRecoveryValidationArchitectureTests
     }
 
     /// <summary>
-    /// A lane's freshness ceiling must cover the producer budget the workflow grants it.
+    /// The completion job must build the gate tool before the first step that runs it with
+    /// <c>--no-build</c>.
     /// </summary>
     /// <remarks>
-    /// These two numbers live in different files and were only ever asserted independently, so nothing noticed
-    /// that the workflow authorized a producer four times longer than the evidence it produced was allowed to be.
+    /// The gate self-tests are a full <c>dotnet test</c> and used to sit ahead of <c>plan</c>, supplying that
+    /// build as a side effect. Moving them after the drill -- correct on its own terms, since their TRX is an
+    /// in-job current-run lane -- removed the only build in the job, and <c>plan --no-build</c> then had no
+    /// assembly to run. Nothing caught it: this job's steps are pinned by name and by relative position, and
+    /// neither notion can see what a step builds. Pin the dependency itself.
+    /// </remarks>
+    [Fact]
+    public static void CompletionJob_ShouldBuildTheGateToolBeforeItsFirstNoBuildInvocation()
+    {
+        string ci = ReadProjectFile(".github/workflows/ci.yml");
+        int buildIndex = ci.IndexOf(
+            "- name: Build the story-evidence gate tool",
+            StringComparison.Ordinal);
+        int firstNoBuildIndex = ci.IndexOf(
+            "--configuration Release --no-build -- plan",
+            StringComparison.Ordinal);
+        buildIndex.ShouldBeGreaterThan(0, "the completion job must build the gate tool it later runs.");
+        firstNoBuildIndex.ShouldBeGreaterThan(
+            buildIndex,
+            "plan runs the gate tool with --no-build, so a build of that tool must precede it in the job.");
+    }
+
+    /// <summary>
+    /// EVERY declared primary lane must carry the per-lane ceiling, and it must cover the producer budget.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The previous form took <c>Max()</c> over every ceiling in the policy and <c>Max()</c> over every producer
+    /// budget in the workflow and asserted one exceeded the other. That binds nothing to anything: dropping
+    /// <c>recovery-primary</c> back to the global 60 while any unrelated lane kept 360 left it green, which is
+    /// precisely the self-invalidation it was added to prevent.
+    /// </para>
+    /// <para>
+    /// Ratified 2026-08-26: the ceiling is carried by ALL declared lanes, not only <c>recovery-primary</c>. The
+    /// four upstream lanes finish in the <c>build</c> job and age by the whole drill, so they are the ones that
+    /// actually need it; <c>recovery-primary</c> is sanitized minutes before attestation and needs it least. The
+    /// count is asserted so a lane cannot quietly lose its ceiling.
+    /// </para>
     /// </remarks>
     [Fact]
     public static void RecoveryLaneCeiling_ShouldCoverTheWorkflowProducerBudget()
     {
         string policy = ReadProjectFile("story-evidence-policy.json");
         string ci = ReadProjectFile(".github/workflows/ci.yml");
-        int laneCeiling = Regex
-            .Matches(policy, @"""maximumCurrentRunAgeMinutes"": (?<minutes>\d+)")
-            .Select(match => int.Parse(match.Groups["minutes"].Value, CultureInfo.InvariantCulture))
-            .Max();
+
+        int[] laneCeilings =
+        [
+            .. Regex
+                .Matches(policy, "\"maximumCurrentRunAgeMinutes\": (?<minutes>[0-9]+)")
+                .Select(match => int.Parse(match.Groups["minutes"].Value, CultureInfo.InvariantCulture)),
+        ];
+        int declaredLanes = Regex.Matches(policy, "\"recognizedLaneBindings\"").Count;
+
+        // One global bound plus one per declared lane binding. A lane silently losing its ceiling would otherwise
+        // fall back to the global 60 and fail stale on arrival after a multi-hour drill.
+        laneCeilings.Length.ShouldBe(
+            declaredLanes + 1,
+            "every declared primary lane must carry an explicit per-lane current-run ceiling.");
+
         int longestProducer = Regex
-            .Matches(ci, @"HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: ""(?<minutes>\d+)""")
+            .Matches(ci, "HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: \"(?<minutes>[0-9]+)\"")
             .Select(match => int.Parse(match.Groups["minutes"].Value, CultureInfo.InvariantCulture))
             .Max();
 
-        laneCeiling.ShouldBeGreaterThan(
-            longestProducer,
-            "recovery evidence would be stale on arrival if its ceiling did not exceed the producer budget.");
+        // The tightest per-lane ceiling, not the loosest: a lane whose ceiling is below the producer budget is
+        // stale on arrival however generous some other lane's ceiling happens to be.
+        laneCeilings
+            .Where(ceiling => ceiling > 60)
+            .Min()
+            .ShouldBeGreaterThan(
+                longestProducer,
+                "every per-lane ceiling must exceed the longest producer budget the workflow authorizes, or that "
+                + "lane's evidence is stale on arrival.");
     }
 
     [Fact]
@@ -394,8 +480,14 @@ public static class LiveRecoveryValidationArchitectureTests
             "test",
             Path.Combine("tests", "Hexalith.ChatBot.Architecture.Tests", "Hexalith.ChatBot.Architecture.Tests.csproj"),
             "--no-build",
+
+            // Release, matching the configuration CI builds and runs. Without it this defaulted to Debug, so on a
+            // hosted runner the child died on a missing assembly, the rejection message never appeared, and the
+            // assertion passed -- guard-green/lane-dead, the very class this test exists to close.
+            "--configuration",
+            "Release",
             "--filter",
-            "FullyQualifiedName=Hexalith.ChatBot.Architecture.Tests.RunSettingsPlatformAcceptanceProbe",
+            "FullyQualifiedName=Hexalith.ChatBot.Architecture.Tests.LiveRecoveryValidationArchitectureTests.RunSettingsPlatformAcceptanceProbe",
             "--settings",
             "live-recovery.runsettings",
         })
@@ -404,14 +496,45 @@ public static class LiveRecoveryValidationArchitectureTests
         }
 
         _ = process.Start();
-        string output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
-        _ = process.WaitForExit(TimeSpan.FromMinutes(5));
+
+        // Drained concurrently. Reading stdout to completion and only then stderr deadlocks whenever the child
+        // fills the stderr pipe buffer, and the WaitForExit below sits after both reads so it cannot rescue it.
+        Task<string> standardError = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
+        string output = process.StandardOutput.ReadToEnd()
+            + standardError.GetAwaiter().GetResult();
+
+        if (!process.WaitForExit((int)TimeSpan.FromMinutes(5).TotalMilliseconds))
+        {
+            process.Kill(entireProcessTree: true);
+            throw new TimeoutException("The run-settings acceptance probe did not exit within its budget.");
+        }
 
         output.ShouldNotContain(
             "does not conform to required format",
             Case.Insensitive,
             "the test platform rejected the run settings, so every lane that passes it dies before running.");
+
+        // Positive signal, not merely the absence of one error string. Without this the probe passed whenever the
+        // child failed for ANY other reason -- a missing assembly, a localized runner, a crash before startup.
+        process.ExitCode.ShouldBe(
+            0,
+            $"the acceptance probe must actually run under the settings file. Output: {output}");
+        output.ShouldContain(
+            "RunSettingsPlatformAcceptanceProbe",
+            Case.Insensitive,
+            "the named probe test must actually have been selected and executed by the child run.");
     }
+
+    /// <summary>
+    /// The test the acceptance probe selects. Exists so that run resolves to exactly one executed test.
+    /// </summary>
+    /// <remarks>
+    /// The filter previously named a test that did not exist anywhere in the repository, so the child run matched
+    /// nothing. Combined with an assertion that only checked for the absence of one error string, that made the
+    /// whole guard vacuous.
+    /// </remarks>
+    [Fact]
+    public static void RunSettingsPlatformAcceptanceProbe() => true.ShouldBeTrue();
 
     [Fact]
     public static void RunnerBudgetAndCadence_ShouldMatchTheWorkflowValuesTheyDescribe()

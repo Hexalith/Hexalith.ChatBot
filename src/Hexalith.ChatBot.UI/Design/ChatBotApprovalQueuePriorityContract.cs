@@ -63,7 +63,7 @@ public sealed record ChatBotApprovalQueuePriorityContract(
                 && !string.IsNullOrWhiteSpace(row.ProjectRef)
                 && !string.IsNullOrWhiteSpace(row.PriorityLabel)
                 && !string.IsNullOrWhiteSpace(row.PriorityExplanation))
-            && Groups.All(GroupBounded)
+            && GroupsAreBounded
             && ShownPriorityMetadata is { Count: > 0 }
             && ShownPriorityMetadata.All(static value => !string.IsNullOrWhiteSpace(value))
             && PrioritizedHighestFirst
@@ -72,19 +72,30 @@ public sealed record ChatBotApprovalQueuePriorityContract(
     /// <summary>Gets a value indicating whether every group row is bounded: a safe space-free fingerprint/explanation and a per-item count of at least one.</summary>
     public bool GroupsAreBounded => Groups.All(GroupBounded);
 
-    /// <summary>Gets a value indicating whether the rows are ordered highest-priority-first (the dense triage requirement).</summary>
+    /// <summary>
+    /// Gets a value indicating whether the rows are ordered highest-priority-first (the dense triage requirement).
+    /// A row whose priority label is outside the known vocabulary makes this false rather than ranking it 0: an
+    /// unrecognised label previously collapsed every comparison to <c>0 &gt;= 0</c> and satisfied the invariant
+    /// vacuously.
+    /// </summary>
     public bool PrioritizedHighestFirst
-        => Groups
-            .Zip(Groups.Skip(1), static (current, next) => (current, next))
-            .All(static pair => PriorityRank(pair.current) >= PriorityRank(pair.next));
+        => Groups.All(static row => PriorityRank(row) is not null)
+            && Groups
+                .Zip(Groups.Skip(1), static (current, next) => (current, next))
+                .All(static pair => PriorityRank(pair.current) >= PriorityRank(pair.next));
 
     /// <summary>Gets a value indicating whether restricted markers leak into visible metadata.</summary>
+    /// <remarks>
+    /// The scan covers every string the surface renders, not just the group rows: the disabled batch-action
+    /// explanation, the phone-fallback copy and the validation next-action are all displayed and were previously
+    /// outside the leak check.
+    /// </remarks>
     public bool ContainsRestrictedText
-        => RestrictedMarkers is not null
-            && RestrictedMarkers
+        => RestrictedMarkers
                 .Where(static marker => !string.IsNullOrWhiteSpace(marker))
                 .Any(marker =>
                     ShownPriorityMetadata.Any(value => value.Contains(marker, StringComparison.OrdinalIgnoreCase))
+                    || RenderedCopy.Any(value => value.Contains(marker, StringComparison.OrdinalIgnoreCase))
                     || Groups.Any(row =>
                         row.GroupKey.Contains(marker, StringComparison.OrdinalIgnoreCase)
                         || row.RequesterRef.Contains(marker, StringComparison.OrdinalIgnoreCase)
@@ -92,6 +103,22 @@ public sealed record ChatBotApprovalQueuePriorityContract(
                         || row.ProjectRef.Contains(marker, StringComparison.OrdinalIgnoreCase)
                         || row.PriorityLabel.Contains(marker, StringComparison.OrdinalIgnoreCase)
                         || row.PriorityExplanation.Contains(marker, StringComparison.OrdinalIgnoreCase)));
+
+    // Every non-group string the surface renders. Kept beside the leak check so a new rendered field is added here
+    // rather than silently escaping it.
+    private IEnumerable<string> RenderedCopy
+        =>
+        [
+            DisabledBatchAction.ActionName,
+            DisabledBatchAction.DisabledReasonLabel,
+            SmallScreenFallback.ReadOnlySummary,
+            SmallScreenFallback.CurrentStatus,
+            SmallScreenFallback.HandoffLinkLabel,
+            SmallScreenFallback.LargerScreenGuidance,
+            SmallScreenFallback.ReachableExplanation,
+            Validation.SummaryLabel,
+            Validation.SafeNextAction,
+        ];
 
     private static bool GroupBounded(ChatBotApprovalPriorityGroupRow row)
         => row.ItemCount >= 1
@@ -101,14 +128,14 @@ public sealed record ChatBotApprovalQueuePriorityContract(
 
     // The default contract carries pre-ordered rows; the rank is the row's position-independent priority token rendered
     // for sorting display. Higher sorts first.
-    private static int PriorityRank(ChatBotApprovalPriorityGroupRow row)
+    private static int? PriorityRank(ChatBotApprovalPriorityGroupRow row)
         => row.PriorityLabel switch
         {
             "Critical" => 4,
             "High" => 3,
             "Medium" => 2,
             "Low" => 1,
-            _ => 0,
+            _ => null,
         };
 
     /// <summary>Creates the default approval-queue priority contract used by design and bUnit tests.</summary>

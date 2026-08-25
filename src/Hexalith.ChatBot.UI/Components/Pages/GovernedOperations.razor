@@ -54,7 +54,7 @@
                                      AccessibleLabel="@UiText[ChatBotUiTextKey.SubmissionFailedAccessible]"
                                      StableId="governed-note-failed"
                                      StateFamily="@ChatBotFeedbackStateFamily.RetryableFailure"
-                                     AnnouncementKey="@($"governed-note-failed-{error}")">
+                                     AnnouncementKey="@($"governed-note-failed-{error}-{_failureSequence.ToString(System.Globalization.CultureInfo.InvariantCulture)}")">
                     @UiText.Get(ChatBotUiTextKey.SubmissionFailedBodyTemplate, error)
                 </ChatBotStatusBanner>
             }
@@ -75,18 +75,32 @@
                     {
                         string familyToken = OperationalQueueFamilies.ToWireValue(family);
                         <FluentButton Appearance="@(family == SelectedQueueFamily ? ButtonAppearance.Primary : ButtonAppearance.Outline)"
-                                      aria-pressed="@(family == SelectedQueueFamily)"
+                                      aria-pressed="@(family == SelectedQueueFamily ? "true" : "false")"
+                                      aria-label="@($"{UiText[ChatBotUiTextKey.GovernedOperationsQueueFamilyLabel]}: {familyToken}")"
                                       OnClick="@(() => SelectedQueueFamily = family)">
-                            @familyToken
+                            @* The wire token is the family's identity; presenting it as a code token rather than
+                               prose stops it reading as an untranslated sentence. *@
+                            <code class="chatbot-code">@familyToken</code>
                         </FluentButton>
                     }
                 </FluentStack>
 
-                <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel]">
-                    @CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel], "age>0 risk:any confidence:any mailbox:any state:non-terminal next-action:claim")
-                    @CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueSortLabel], "priority desc, item-ref asc, source-version asc")
-                    @TextRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueResultCountLabel], VisibleQueueRows.Length.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                    @CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueuePaginationLabel], "page-size:100")
+                @* Decision D4 (2026-08-26): this queue renders a hard-coded sample set, not a live query. It is
+                   labelled as such until the split-out story wires it to a real query. The filter/sort/pagination
+                   rows previously asserted query provenance that no query produced — the only real filter is the
+                   selected family — so they now describe exactly what the surface does. *@
+                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Warning"
+                                     Message="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel]"
+                                     AccessibleLabel="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel]"
+                                     StableId="operational-queue-sample-data"
+                                     StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
+                                     AnnouncementKey="operational-queue-sample-data">
+                    <code class="chatbot-code">sample-data:not-a-live-query</code>
+                </ChatBotStatusBanner>
+
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" role="group" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel]">
+                    @CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel], $"family:{OperationalQueueFamilies.ToWireValue(SelectedQueueFamily)}")
+                    @TextRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueResultCountLabel], VisibleQueueRows.Length.ToString(System.Globalization.CultureInfo.CurrentCulture))
                 </FluentStack>
 
                 <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
@@ -96,12 +110,23 @@
                                      StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
                                      AnnouncementKey="operational-queue-phone-summary" />
 
-                <div class="chatbot-table" role="table" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsOperationalQueueTitle]">
+                @if (VisibleQueueRows.Length == 0)
+                {
+                    <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
+                                         Message="@UiText[ChatBotUiTextKey.GovernedOperationsQueueResultCountLabel]"
+                                         AccessibleLabel="@UiText[ChatBotUiTextKey.GovernedOperationsQueueResultCountLabel]"
+                                         StableId="operational-queue-empty"
+                                         StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
+                                         AnnouncementKey="@($"operational-queue-empty-{SelectedQueueFamily}")" />
+                }
+
+                @* role="list"/"listitem", not role="table": each row is a key-value stack with no cell children,
+                   and an ARIA row without cells collapses to noise in screen-reader table mode. *@
+                <div class="chatbot-table" role="list" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsOperationalQueueTitle]">
                     @foreach (OperationalQueueFixtureRow row in VisibleQueueRows)
                     {
                         <article class="chatbot-labelled-row-list"
-                                 role="row"
-                                 tabindex="0"
+                                 role="listitem"
                                  data-chatbot-queue-family="@row.FamilyToken"
                                  data-chatbot-queue-ref="@row.QueueRef"
                                  data-chatbot-item-ref="@row.ItemRef"
@@ -117,15 +142,20 @@
                             </FluentStack>
 
                             <FluentStack Orientation="Orientation.Horizontal" Wrap="true">
+                                @* These have no handler and no backing command yet. Presenting them as Enabled
+                                   made critical governed actions swallow the click with no feedback; they carry a
+                                   reachable reason until the split-out story wires them. *@
                                 <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.GovernedOperationsQueuePrimaryAction]"
                                                         AccessibleLabel="@UiText.Get(ChatBotUiTextKey.GovernedOperationsQueuePrimaryActionAccessible, row.ItemRef)"
                                                         StableId="@($"claim-{row.ItemRef}")"
-                                                        State="@ChatBotGovernedActionState.Enabled"
+                                                        State="@ChatBotGovernedActionState.DisabledWithReason"
+                                                        DisabledReason="@UiText[ChatBotUiTextKey.GovernedOperationsQueueDetailUnavailable]"
                                                         CriticalAction="true" />
                                 <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueSecondaryActions]"
                                                         AccessibleLabel="@UiText.Get(ChatBotUiTextKey.GovernedOperationsQueueSecondaryActionsAccessible, row.ItemRef)"
                                                         StableId="@($"secondary-{row.ItemRef}")"
-                                                        State="@ChatBotGovernedActionState.Enabled"
+                                                        State="@ChatBotGovernedActionState.DisabledWithReason"
+                                                        DisabledReason="@UiText[ChatBotUiTextKey.GovernedOperationsQueueDetailUnavailable]"
                                                         Appearance="@ButtonAppearance.Outline"
                                                         CriticalAction="true" />
                                 <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueOpenDetail]"
@@ -158,7 +188,9 @@
                     @* operation-outcome-title is preserved as the focus-landing target id (asserted by
                        ChatBotAccessibilityFocusContractTests); it now lives on the kept <section> element. *@
                     <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.OutcomeTitle]" HeadingLevel="2" Expanded="true">
-                        <section id="operation-outcome-title" class="chatbot-section" aria-label="@UiText[ChatBotUiTextKey.OutcomeTitle]">
+                        @* tabindex="-1": ChatBotAccessibilityFocusContractTests declares this the loaded-content
+                           landing target, and .focus() on a bare <section> is a no-op in every major browser. *@
+                        <section id="operation-outcome-title" class="chatbot-section" tabindex="-1" aria-label="@UiText[ChatBotUiTextKey.OutcomeTitle]">
                     <div class="chatbot-status-group" aria-label="@UiText[ChatBotUiTextKey.OperationStatusSummary]">
                         @if (IsProjectionPending(outcome))
                         {
@@ -167,8 +199,21 @@
                                                  AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectionPendingAccessible]"
                                                  StableId="projection-pending"
                                                  StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
-                                                 AnnouncementKey="@outcome.OperationId">
+                                                 AnnouncementKey="@($"{outcome.OperationId}-{outcome.CompletionStatus}")">
                                 @UiText[ChatBotUiTextKey.ProjectionPending] (<code class="chatbot-code">@outcome.CompletionStatus</code>).
+                            </ChatBotStatusBanner>
+                        }
+                        else if (IsProjectionFailed(outcome))
+                        {
+                            @* A failed completion previously fell through to the success branch and rendered a
+                               green "Projection complete" banner. *@
+                            <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Danger"
+                                                 Message="@UiText[ChatBotUiTextKey.SubmissionFailed]"
+                                                 AccessibleLabel="@UiText[ChatBotUiTextKey.SubmissionFailedAccessible]"
+                                                 StableId="projection-failed"
+                                                 StateFamily="@ChatBotFeedbackStateFamily.RetryableFailure"
+                                                 AnnouncementKey="@($"{outcome.OperationId}-{outcome.CompletionStatus}")">
+                                @UiText[ChatBotUiTextKey.SubmissionFailed] (<code class="chatbot-code">@outcome.CompletionStatus</code>).
                             </ChatBotStatusBanner>
                         }
                         else
@@ -178,7 +223,7 @@
                                                  AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectionCompleteAccessible]"
                                                  StableId="projection-complete"
                                                  StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
-                                                 AnnouncementKey="@outcome.OperationId">
+                                                 AnnouncementKey="@($"{outcome.OperationId}-{outcome.CompletionStatus}")">
                                 @UiText[ChatBotUiTextKey.ProjectionComplete] (<code class="chatbot-code">@outcome.CompletionStatus</code>).
                             </ChatBotStatusBanner>
                         }
@@ -192,6 +237,19 @@
                                                  StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
                                                  AnnouncementKey="@($"{outcome.OperationId}-audit")">
                                 @UiText[ChatBotUiTextKey.AuditStatusCommitted] (<code class="chatbot-code">@outcome.AuditStatus</code>).
+                            </ChatBotStatusBanner>
+                        }
+                        else
+                        {
+                            @* Previously nothing rendered when the audit was not committed: no banner, no
+                               explanation, no next action on a surface whose purpose is freshness-honest status. *@
+                            <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Warning"
+                                                 Message="@UiText[ChatBotUiTextKey.AuditStatusLabel]"
+                                                 AccessibleLabel="@UiText[ChatBotUiTextKey.AuditStatusLabel]"
+                                                 StableId="audit-not-committed"
+                                                 StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
+                                                 AnnouncementKey="@($"{outcome.OperationId}-audit-{outcome.AuditStatus}")">
+                                @UiText[ChatBotUiTextKey.AuditStatusLabel] (<code class="chatbot-code">@outcome.AuditStatus</code>).
                             </ChatBotStatusBanner>
                         }
 
@@ -210,13 +268,14 @@
                         @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], outcome.LifecycleState)
                         @CodeRow(UiText[ChatBotUiTextKey.CompletionStatusLabel], outcome.CompletionStatus)
                         @CodeRow(UiText[ChatBotUiTextKey.AuditStatusLabel], outcome.AuditStatus)
-                        @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], string.Join(", ", outcome.SafeNextActions))
-                        @TextRow(UiText[ChatBotUiTextKey.RetryCountLabel], outcome.RetryCount.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                        @CodeRowIf(UiText[ChatBotUiTextKey.SafeNextActionsLabel], outcome.SafeNextActions.Count == 0 ? null : string.Join(", ", outcome.SafeNextActions))
+                        @TextRow(UiText[ChatBotUiTextKey.RetryCountLabel], outcome.RetryCount.ToString(System.Globalization.CultureInfo.CurrentCulture))
                         @CodeRowIf(UiText[ChatBotUiTextKey.OperationOwnerRoleLabel], outcome.OwnerRole)
                         @TextRowIf(UiText[ChatBotUiTextKey.DuplicateSafetyNoteLabel], outcome.DuplicateSafetyNote)
                     </FluentStack>
 
-                    <h2 class="chatbot-section-title">@UiText[ChatBotUiTextKey.AuditHistoryTitle]</h2>
+                    @* h3, not h2: the enclosing FluentAccordionItem already produced the section's h2. *@
+                    <h3 class="chatbot-section-title">@UiText[ChatBotUiTextKey.AuditHistoryTitle]</h3>
                     <ul class="chatbot-audit-list">
                         @foreach (string entry in outcome.AuditHistory)
                         {
@@ -274,13 +333,34 @@
     private string GovernedOperationsDescription
         => $"{UiText[ChatBotUiTextKey.GovernedOperationsIntro]} ui {UiText[ChatBotUiTextKey.GovernedOperationsIntroSuffix]}";
 
-    private void Submit() => Dispatcher.Dispatch(new SubmitGovernedNoteAction());
+    private int _failureSequence;
+
+    private void Submit()
+    {
+        // Guard the dispatch site: the reducer sets IsSubmitting before the effect runs, so the effect itself
+        // cannot tell a first submit from a duplicate.
+        if (State.Value.IsSubmitting)
+        {
+            return;
+        }
+
+        _failureSequence++;
+        Dispatcher.Dispatch(new SubmitGovernedNoteAction());
+    }
 
     private static bool IsProjectionPending(OperationOutcome outcome)
         => outcome.CompletionStatus.Contains("Pending", StringComparison.OrdinalIgnoreCase);
 
+    // Explicit failure classification. Without it every non-pending status — Failed included — fell through to
+    // the success branch.
+    private static bool IsProjectionFailed(OperationOutcome outcome)
+        => outcome.CompletionStatus.Contains("Failed", StringComparison.OrdinalIgnoreCase) ||
+            outcome.CompletionStatus.Contains("Faulted", StringComparison.OrdinalIgnoreCase) ||
+            outcome.CompletionStatus.Contains("Rejected", StringComparison.OrdinalIgnoreCase);
+
     private static bool IsAuditCommitted(OperationOutcome outcome)
-        => outcome.AuditStatus.Contains("Committed", StringComparison.OrdinalIgnoreCase);
+        => outcome.AuditStatus.Contains("Committed", StringComparison.OrdinalIgnoreCase) &&
+            !outcome.AuditStatus.Contains("NotCommitted", StringComparison.OrdinalIgnoreCase);
 
     private static OperationalQueueFixtureRow Row(
         OperationalQueueFamily family,

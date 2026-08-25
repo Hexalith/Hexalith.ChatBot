@@ -35,6 +35,9 @@ internal static class RecoveryWriterProtocolProvisioner
     private static readonly TimeSpan ActivationBudget = TimeSpan.FromMinutes(3);
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
 
+    /// <summary>How long a Conflict is given to resolve into an observably ready store.</summary>
+    private static readonly TimeSpan ConflictResolutionBudget = TimeSpan.FromMinutes(1);
+
     /// <summary>Activates the writer protocol, or throws if the store cannot be made ready.</summary>
     /// <param name="application">The composed topology.</param>
     /// <param name="cutoverCommit">The provenance recorded in the marker.</param>
@@ -53,7 +56,8 @@ internal static class RecoveryWriterProtocolProvisioner
         // not be accepting yet, and a refused connection here is "not up yet", not a failure to activate.
         using HttpClient client = application.CreateHttpClient("eventstore", "http");
         client.Timeout = TimeSpan.FromSeconds(30);
-        string adminToken = await AcquireAdminTokenWhenAvailableAsync(application, cancellationToken)
+        string adminToken = await RecoveryAccessTokenProvider
+            .AcquireGlobalAdministratorAsync(application, cancellationToken)
             .ConfigureAwait(false);
 
         // Attestations are literal for a disposable sandbox store: nothing predates this topology, so there are no
@@ -74,17 +78,59 @@ internal static class RecoveryWriterProtocolProvisioner
                 };
                 attempt.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
                 using HttpResponseMessage response = await client.SendAsync(attempt, cancellationToken).ConfigureAwait(false);
-                if (response.StatusCode is HttpStatusCode.OK or HttpStatusCode.Conflict)
+                if (response.StatusCode == HttpStatusCode.OK)
                 {
-                    // Conflict means a marker for a different cutover is already current, which still satisfies the
-                    // readiness contract this provisioning exists to satisfy.
                     return;
+                }
+
+                if (response.StatusCode == HttpStatusCode.Conflict)
+                {
+                    // Conflict collapses two very different states. ProjectionDeliveryCutover returns it when a
+                    // marker exists AND (it is current with a different commit) OR (it is not current at all).
+                    // Treating both as success was wrong in each direction: a NON-current marker can never satisfy
+                    // ProjectionDeliveryWriterProtocolHealthCheck, so the run reported "activated" and then hung to
+                    // the startup deadline with a misleading listener-gap diagnostic; and a current-but-FOREIGN
+                    // marker means this run silently inherited another application's cutover -- the shared-Redis
+                    // contamination this provisioning exists to eliminate -- with nothing recording that.
+                    //
+                    // The admin API exposes no marker read-back, so the health check is used as the IsCurrent
+                    // oracle: it reports Healthy exactly when a current marker exists. That distinguishes the two
+                    // cases with what the topology actually offers, and it attributes the failure to the marker
+                    // rather than to the listener.
+                    if (await IsWriterProtocolCurrentAsync(client, cancellationToken).ConfigureAwait(false))
+                    {
+                        // Metadata only: never a payload. Recorded so a reviewer can tell an inherited marker from
+                        // one this run activated -- the provenance the A1 claim depends on.
+                        await Console.Error
+                            .WriteLineAsync(
+                                "RECOVERY_WRITER_PROTOCOL_INHERITED reason=conflict-marker-already-current "
+                                + $"attemptedCutoverCommit={cutoverCommit}")
+                            .ConfigureAwait(false);
+                        return;
+                    }
+
+                    throw new InvalidOperationException(
+                        "The projection delivery writer protocol reported Conflict and the store did not become "
+                        + "ready, so an existing marker is present but NOT current. It can never satisfy the "
+                        + "readiness contract and the drill must not proceed; clear the stale marker before rerunning.");
                 }
 
                 string detail = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 lastOutcome = $"status {(int)response.StatusCode}: {(detail.Length > 256 ? detail[..256] : detail)}";
 
                 // A refusal that is not a startup condition is fatal: activating is a precondition, not best effort.
+                // 503 is retried only while it can still be a warming store: the controller also returns it
+                // PERMANENTLY when IProjectionDeliveryCutover is unregistered, and retrying that for the full budget
+                // is the same defect this change set criticises in IsTransientMailboxAdmissionStatus -- burning the
+                // whole budget on a permanent misconfiguration and discarding the status that would have named it.
+                if (response.StatusCode == HttpStatusCode.ServiceUnavailable
+                    && detail.Contains("capability is not available", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        "The projection delivery cutover capability is not registered on this EventStore host, so the "
+                        + $"writer protocol can never be activated ({lastOutcome}).");
+                }
+
                 if (response.StatusCode is not (HttpStatusCode.ServiceUnavailable or HttpStatusCode.BadGateway
                     or HttpStatusCode.GatewayTimeout or HttpStatusCode.NotFound))
                 {
@@ -109,10 +155,40 @@ internal static class RecoveryWriterProtocolProvisioner
             + $"last attempt: {lastOutcome}.");
     }
 
-    private static async Task<string> AcquireAdminTokenWhenAvailableAsync(
-        DistributedApplication application,
+    /// <summary>Whether the store reports a current writer-protocol marker, using health as the oracle.</summary>
+    /// <remarks>
+    /// <c>ProjectionDeliveryWriterProtocolHealthCheck</c> is Healthy exactly when <c>marker?.IsCurrent == true</c>,
+    /// so a bounded health probe answers the one question the admin API does not expose.
+    /// </remarks>
+    /// <param name="client">A client bound to the EventStore resource.</param>
+    /// <param name="cancellationToken">Cancels the probe.</param>
+    /// <returns><see langword="true"/> when a current marker exists.</returns>
+    private static async Task<bool> IsWriterProtocolCurrentAsync(
+        HttpClient client,
         CancellationToken cancellationToken)
-        => await RecoveryAccessTokenProvider
-            .AcquireGlobalAdministratorAsync(application, cancellationToken)
-            .ConfigureAwait(false);
+    {
+        Stopwatch probe = Stopwatch.StartNew();
+        while (probe.Elapsed < ConflictResolutionBudget)
+        {
+            try
+            {
+                using HttpResponseMessage health = await client
+                    .GetAsync("/health", cancellationToken)
+                    .ConfigureAwait(false);
+                if (health.IsSuccessStatusCode)
+                {
+                    return true;
+                }
+            }
+            catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException
+                && !cancellationToken.IsCancellationRequested)
+            {
+                // Still starting: not evidence either way.
+            }
+
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
+
+        return false;
+    }
 }
