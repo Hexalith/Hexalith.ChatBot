@@ -142,7 +142,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: n/a
 severity: medium
 reason: **[MEDIUM · dataset] ~~`DatasetVolume: 6` vs actual compared resources.~~ Closed 2026-08-04.** Manifests now separate configured corpus volume from per-scenario exercised volume; the canonical closure record and remaining scale limitation are detailed in the `RV-PROVIDER-SCALE` entry below.
-status: open
+status: done 2026-08-26
+resolution: already resolved: src/Hexalith.ChatBot.Server/Audit/RecoveryValidationEvidenceManifest.cs:37-44 distinguishes configured and exercised volumes; tests/Hexalith.ChatBot.IntegrationTests/Recovery/FileRecoveryValidationEvidenceSink.cs:56-60,88-89,142-146 emits 0 for non-dataset lanes and measured rebuild coverage.
 
 ### DW-19: [LOW · rebuild] `ReconstructCapturedEvent` placeholders outside structural digest tuple.
 
@@ -206,7 +207,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: Server tenant policy / live-recovery topology
 severity: low
 reason: **[LOW · ReplayTenantPolicy] Control-name hole `replay-test:tenant-alpha` → physical `tenant-alpha` remains untested in SweepVocabularyTests.** **Release-claim impact:** none while topology hard-codes `replay-test:recovery-validation`; risk if a future caller-influenced label is added. **Owner:** Server tenant policy / live-recovery topology. **Closure evidence:** explicit exclusion test or policy deny-list for control tenants.
-status: open
+status: done 2026-08-26
+resolution: already resolved: tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoverySandboxTopologyComposer.cs:41-46 rejects control-tenant aliases, exercised for replay-test:tenant-alpha/beta at RecoveryValidationTopologyContractTests.cs:165-190.
 
 ### DW-27: [MEDIUM · hygiene D12] ~~EventStore gitlink disclosure was stale.~~ Closed 2026-08-24.
 
@@ -214,7 +216,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: n/a
 severity: medium
 reason: **[MEDIUM · hygiene D12] ~~EventStore gitlink disclosure was stale.~~ Closed 2026-08-24.** The story now records the current superproject gitlink `6b9b349aded823473a14ceb67e26805a3fb40fd8`; no submodule checkout, update, or staging was performed in the remediation pass. (Re-opened and re-closed 2026-08-25: the first closure recorded `da52e2c8…`, which `bab0218` had already superseded in the same commit that wrote the claim.)
-status: open
+status: done 2026-08-26
+resolution: already resolved: _bmad-output/implementation-artifacts/12-15-stand-up-live-recovery-continuity-fault-injection-drivers-and-recalibrate-a10.md:2009 explicitly reclassifies recorded gitlink SHAs as point-in-time observations rather than standing current-head claims.
 
 ### DW-28: [LOW · platform] Windows skips symlink-ancestry / immutable digest / executable-bit gate tests.
 
@@ -262,7 +265,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs
 severity: low
 reason: **[LOW · story-evidence policy] `aspire-dapr` pathPatterns are repo-wide `*Dapr*`/`*Aspire*` globs.** ~~Open~~ **Closed 2026-08-03 (chunk 3cd):** narrowed to `src/Hexalith.ChatBot.AppHost/**` + `tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs`; validator pin + architecture assertions updated; Server `*Dapr*` no longer triggers aspire-dapr primary.
-status: open
+status: done 2026-08-26
+resolution: already resolved: story-evidence-policy.json:148-152 now limits aspire-dapr paths to src/Hexalith.ChatBot.AppHost/** and TrivialGovernedCommandAspireE2ETests.cs.
 
 ### DW-34: [LOW · architecture methodology] ADR prose and substring greps remain the Task 8 methodology.
 
@@ -310,7 +314,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: n/a
 severity: medium
 reason: **[MEDIUM · `RV-PROVIDER-SCALE`] ~~`datasetVolume: 6` still overstates materialized rebuild inputs.~~ Closed 2026-08-04.** Manifests now separate `configuredDatasetVolume` (the six-record corpus provenance anchored by release policy) from per-scenario `datasetVolume`: continuity and scoped-outage evidence report zero because they do not consult the corpus, while projection rebuild reports its compared-resource count. The gate rejects non-zero dataset volume for non-dataset jobs and a rebuild volume that differs from its measured coverage. The broader provider/scale residual remains open below.
-status: open
+status: done 2026-08-26
+resolution: already resolved: src/Hexalith.ChatBot.Server/Audit/LiveRecoveryValidationEvidenceGate.cs:399-409 verifies rebuild volume against measured coverage and requires zero for non-dataset jobs.
 
 ### DW-40: [MEDIUM · `RV-EVIDENCE-KINDS`] Missing logs/traces/metrics/state-end-state evidence kinds remain a platform residual.
 
@@ -398,7 +403,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: n/a
 severity: medium
 reason: **[MEDIUM · workflows chunk / group 3] Independent `live-recovery-evidence-gate` job is skipped when validation fails.** ~~Open~~ **Closed 2026-08-03 (chunk 3ab):** both workflows now use `if: always() && needs.live-recovery-validation.result != 'skipped'`; architecture pins the condition. Prior text: `needs: live-recovery-validation` without failure-path `if` meant a Contained-breach that fails the producing test never reached gate replay.
-status: open
+status: done 2026-08-26
+resolution: already resolved: .github/workflows/ci.yml:574 and .github/workflows/release.yml:197 run the evidence gate with `if: always() && needs.live-recovery-validation.result != 'skipped'`.
 
 ### DW-51: [MEDIUM · chunk 1b/1c] Missing/degenerate scope-monitoring evidence cannot be fail-closed from the live scoped-outage driver alone.
 
@@ -526,14 +532,16 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-14-wire-t
 location: .github/workflows/ci.yml
 severity: medium
 reason: **[MEDIUM · mitigated 2026-07-31; durable fix owed to `Hexalith.Builds`] `Hexalith.EventStore.Gateway` is missing from the shared package catalog.** **Mitigation in place:** the workspace now builds the `references/` submodules from source (`UseHexalithProjectReferences=true`, set as a workflow-level `env:` in `.github/workflows/ci.yml` + `release.yml` and documented as a required local export in `README.md`), which sidesteps the package entirely. Verified: full solution 0 errors/0 warnings and 12 of the 13 test projects green (2,808 passed, 3 skipped), including `Hexalith.ChatBot.IntegrationTests`, which was previously unbuildable; UI E2E was deliberately not re-run (running it regenerates fixture PNGs). **Still owed:** add `PackageVersion Include="Hexalith.EventStore.Gateway"` to `references/Hexalith.Builds/Props/Directory.Packages.props` (it lists twelve sibling `Hexalith.EventStore.*` entries but not this one) and align `HexalithEventStoreVersion` — currently `3.78.0`, which predates Gateway's first release at `3.82.0` — with the checked-out EventStore submodule (`v3.86.0`). Until that lands, package-mode builds of this workspace are impossible and the source-reference switch is load-bearing rather than a preference. Owner: the `Hexalith.Builds` repository. Note the mitigation also changes what CI exercises (submodule source rather than published packages), which is worth confirming is intended.
-status: open
+status: done 2026-08-26
+resolution: already resolved: references/Hexalith.Builds/Props/Directory.Packages.props:8,46 now pins EventStore 3.97.0 and catalogs Hexalith.EventStore.Gateway.
 
 ### DW-67: [RESOLVED 2026-07-31 — retained for history] The `Hexalith.Tenants` submodule bump in commit `30aa887` broke the super-repo build.
 
 origin: migrated from legacy ledger ("Deferred from: code review of 12-14-wire-the-m2-audit-and-recovery-runtime-scheduler (2026-07-31, adversarial re-review of eaee04f..30aa887)"), 2026-08-26
 location: references/Hexalith.Tenants/src/Hexalith.Tenants/Hexalith.Tenants.csproj:22
 reason: **[RESOLVED 2026-07-31 — retained for history] The `Hexalith.Tenants` submodule bump in commit `30aa887` broke the super-repo build.** `dotnet build Hexalith.ChatBot.slnx -c Debug` fails `NU1010` on `references/Hexalith.Tenants/src/Hexalith.Tenants/Hexalith.Tenants.csproj:22`. The old pointer (`41e047e8`) had only an unconditional `ProjectReference` to `Hexalith.EventStore.Gateway`; the new pointer (`625061bd`) added a `PackageReference` fallback conditioned on `'$(HexalithEventStoreFromSource)' != 'true'`. In a super-repo build that submodule's `Directory.Build.props:56` defaults `UseHexalithProjectReferences` to `false`, so the fallback activates and Central Package Management finds no matching `PackageVersion` in the root `Directory.Packages.props` (the `Hexalith.EventStore.Gateway` project does exist on disk, so the ProjectReference branch would resolve if the property were set). Consequence: `Hexalith.ChatBot.IntegrationTests` cannot be rebuilt, so it was not re-verified after the 2026-07-31 code-review remediation. Options: add the missing `PackageVersion`, set `UseHexalithProjectReferences=true` for the super-repo build, or revert/advance the Tenants pointer. Deliberately not fixed during code review — it is a dependency/submodule change. Owner: workspace/dependency owner. See also the standing note that inner submodule `*.slnx` files are standalone-only.
-status: open
+status: done 2026-08-26
+resolution: already resolved: .github/workflows/ci.yml:35 and .github/workflows/release.yml:23 set UseHexalithProjectReferences=true, selecting the existing Tenants project-reference branch.
 
 ### DW-68: [LOW · pre-existing clock assumption] `LastSucceededAtUtc` is not monotonic.
 
@@ -565,7 +573,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-14-wire-t
 location: src/Hexalith.ChatBot.Aspire/ChatBotAspireModule.cs
 severity: low
 reason: **[LOW · pre-existing, outside the solution] `Hexalith.ChatBot.Aspire.Tests` fails on a stale hardcoded source path and nothing runs it.** `ChatBotAspireModuleTests.AspireModuleShouldWireDedicatedWorkflowStateStoreForChatBotSidecar` reads `src/Hexalith.ChatBot.Aspire/ChatBotAspireModule.cs`, which does not exist — the file lives at `src/Hexalith.ChatBot.AppHost/Aspire/ChatBotAspireModule.cs` — so the test throws `FileNotFoundException` (1 failed / 2 passed). Neither the test nor the Aspire source is touched by Story 12.14, and the project is **not listed in `Hexalith.ChatBot.slnx`**, so neither CI nor any completion gate exercises it; the same is true of `Hexalith.ChatBot.ServiceDefaults.Tests` (5 tests, currently green). Surfaced only because the round-2 review ran every test project on disk rather than only the solution's 13. Fix is a one-line path correction, but the real question for the owner is whether these two orphaned projects should be added to the solution or deleted — an untracked test project that nothing runs is worse than no test project. Owner: the build/solution owner.
-status: open
+status: done 2026-08-26
+resolution: already resolved: Commit 079c5a3 deleted the orphaned Hexalith.ChatBot.Aspire.Tests and Hexalith.ChatBot.ServiceDefaults.Tests projects and moved ChatBotAspireModule into AppHost.
 
 ### DW-72: [LOW · deliberate design, unbounded against a hanging store] Probe cleanup has no deadline.
 
@@ -596,14 +605,16 @@ status: open
 origin: migrated from legacy ledger ("Deferred from: code review of 13-1-establish-one-working-fluent-frontcomposer-application-frame (2026-07-21)"), 2026-08-26
 location: FrontComposerShell.razor:104
 reason: **[RESOLVED in this review — was: MEDIUM pre-existing test flake] Story 13.1's live-render acceptance test is flaky — NOT an app defect.** **Resolution:** added a `BoundingBoxWhenReadyAsync` poll-until-non-null helper and routed the banner (`ShellHeaderBandBottomAsync`), route-heading, and settings-button box reads through it in `RealRenderCrossSurfaceE2ETests`; the previously-flaky test now passes 5/5 consecutively and the full class is 3/3. Build 0/0. Original diagnosis follows for the record: `RealRenderCrossSurfaceE2ETests.AllSixSurfaces_ComposeFrontComposerLayout_WithoutLegacyChrome_BelowShellBand` fails intermittently (~2 of 3 runs on the clean committed tree `9462de3`) with `bannerBox`/`settingsBox should not be null`. **Root-caused via live-DOM inspection: the shell banner and `[data-testid="fc-settings-button"]` DO render correctly** (DOM counts `banner=1`, `settings=1` after a hydration settle; `FcSettingsButton` is wired at `FrontComposerShell.razor:104` and `MainLayout` leaves `HeaderEnd` null so it auto-populates). The test reads `BoundingBoxAsync()` on shell-header elements (the banner in `ShellHeaderBandBottomAsync:327`, the settings button at ~:148) immediately after navigation, before the Fluent Blazor **web components hydrate and acquire a layout box**, so the box is intermittently `null`. This is Blazor-Server + Fluent web-component hydration-timing flakiness — pre-existing, not caused by the reviewed diff. It undermines the *reliability* of the story's live-route acceptance gate (a flaky gate passes non-deterministically), which matters for the Epic 13 "primary live route must execute successfully" rule. **Scoped fix (test-only, ChatBot side; no app/shell/submodule change):** `await <locator>.WaitForAsync(new() { State = WaitForSelectorState.Visible })` (or poll-until-non-null) before every shell-header `BoundingBoxAsync()` read — the banner in `ShellHeaderBandBottomAsync`, the settings button, and the route heading. Verified during review: a settings-visible wait alone fixed some runs but not all (the banner box still raced), so the fix must gate the banner read too. Owner: ChatBot UI E2E test.
-status: open
+status: done 2026-08-26
+resolution: already resolved: tests/Hexalith.ChatBot.UI.E2E.Tests/RealRenderCrossSurfaceE2ETests.cs:139-150,441-450 routes heading, settings, and banner box reads through BoundingBoxWhenReadyAsync.
 
 ### DW-76: [RESOLVED — was: MEDIUM · verify-when-live-green] MessageBar aria-live / announcement contract now DOM-verified.
 
 origin: migrated from legacy ledger ("Deferred from: code review of 13-1-establish-one-working-fluent-frontcomposer-application-frame (2026-07-21)"), 2026-08-26
 location: ChatBot UI E2E (optional seeded-terminal capture)
 reason: **[RESOLVED — was: MEDIUM · verify-when-live-green] MessageBar aria-live / announcement contract now DOM-verified.** With the flake above fixed, the live route is green and the single-live-region contract was re-inspected directly on the live DOM (Story 13.1 verify-and-close, 2026-07-21). **Finding: not a defect.** The review's premise — that `FluentMessageBar` "owns its own intent-driven aria-live" that the raw `role`/`aria-live`/`aria-atomic` splat could duplicate or conflict with — does **not** hold in Fluent UI Blazor **v5.0.0-rc.3**: `FluentMessageBar` renders as a `<fluent-message-bar>` custom element whose shadow root is **slots-only** (`shadowRoot` = `<slot name="icon">`, `.content > <slot>`, `.actions`, `<slot name="dismiss">` — **0** `aria-live`, **0** `role="status"/"alert"`). So the host attributes `ChatBotStatusBanner`/`ChatBotBlockedState` splat ARE the single authoritative live-region declaration; there is no component-owned region to compete. **Verified live on two surfaces:** (1) non-announcing/dedup path — the always-present `/` project-workspace banner (`StateFamily=ObservedForOthersRejectionOrQueueUpdate` → InlineStatus/`NoLiveAnnouncement`) resolves to a single element (`data-chatbot-stable-id` count = 1) with **no** `role`, `aria-live="off"`, `aria-atomic="true"`, `data-chatbot-live-announced="false"`, 0 nested light-DOM regions, 0 shadow regions — proving the deterministic dedup outcome reaches the DOM verbatim; (2) announcing path — the `/compliance-audit-investigation` status bar renders `role="status"`/`aria-live="polite"` with 0 shadow-internal regions. **Durable gate added (converts the source-scan-only aria-live coverage into a direct live invariant per epics §3231):** `RealRenderCrossSurfaceE2ETests.StatusMessageBars_ExposeSingleAuthoritativeLiveRegion_WithoutInternalShadowRegion` (live DOM; 4/4 stable, `Skipped:0` = real browser path). **Residual (LOW):** the terminal→`alert`/assertive live *render* is still not directly observed — the metadata-only `FakeChatBotClient` seam renders no terminal/blocked banner by default; the `alert` value is produced by the identical host-attribute projection now proven live for status/off and passes through the same slots-only element, so a seeded blocked/error interaction is the only remaining direct observation. Owner: ChatBot UI E2E (optional seeded-terminal capture).
-status: open
+status: done 2026-08-26
+resolution: already resolved: tests/Hexalith.ChatBot.UI.E2E.Tests/RealRenderCrossSurfaceE2ETests.cs:246-280 directly verifies the single authoritative live region on a real rendered route.
 
 ### DW-77: [MEDIUM · residual, Story 13.8 scope] Fixture-based forced-colors/visual E2E still assert `.chatbot-status__label`.
 
@@ -651,7 +662,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of story-10.6b 
 location: AcceptedCommandDispatcher.cs:605
 severity: low
 reason: **[LOW] Cancel/Stop governed handler validates metadata only, not the target generation.** `CancelAiResponseGeneration` is dispatched to a fresh aggregate keyed by `CancellationId` (`AcceptedCommandDispatcher.cs:605`), so the handler (`GovernedOperationAggregate.cs:1648-1693`) only validates safe-metadata tokens, `ExpectedSourceVersion <= 0`, tenant, and `CancellationId` idempotency — it never confirms the target ResponseId/GenerationId exists, is still in-flight, or belongs to the same project/conversation/session, never compares `ExpectedSourceVersion` to real aggregate state, and the cancel write path is not project-authorized (absent from `ParticipantAuthorizationStage.CanReadProject`). Bounded by server-bound tenant isolation (no cross-tenant fabrication) and read-side project authorization (a fabricated "stopped" row is only observable to a user already authorized to read that project — integrity/state-poisoning, not confidentiality). A robust in-flight guard needs the server-side generation-session lifecycle that arrives with a real async streaming provider (M2+); consistent with the prior-pass deferral. Optional cheap sub-hardening that does NOT need the lifecycle: add `CancelAiResponseGeneration` (and `RecordProjectConversationMessage`) to the `CanReadProject` branch of `ParticipantAuthorizationStage` so the cancel write path is project-owner-authorized like the read side.
-status: open
+status: done 2026-08-26
+resolution: already resolved: src/Hexalith.ChatBot.Server/Operations/GovernedOperationAggregate.cs:1675-1702 validates active generation identity, project, and source version; ParticipantAuthorizationStage.cs:521-522 authorizes both cancellation and conversation-message writes through project access.
 
 ### DW-83: The externally committed Hexalith.Builds gitlink is not reproducible from fetched remote refs.
 
@@ -659,7 +671,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of story-10.6b 
 location: _bmad-output/implementation-artifacts/spec-run-all-tests-and-fix-issues.md
 source_spec: _bmad-output/implementation-artifacts/spec-run-all-tests-and-fix-issues.md
 reason: The externally committed Hexalith.Builds gitlink is not reproducible from fetched remote refs. Evidence: Root points to `e4ae82df6cfcc6511a32fc2ce100070d7924f119`, while the submodule reports local `main` ahead 1/behind 4 and no fetched remote ref contains that commit, so a fresh checkout may be unable to obtain the recorded dependency revision.
-status: open
+status: done 2026-08-26
+resolution: already resolved: Root commit f43bfbcb updates references/Hexalith.Builds to 5c3ff35c, and that exact gitlink is currently reachable from the submodule's origin/main.
 
 ### DW-84: Externally committed Story 13.9 visual artifacts do not reliably prove dark-mode or settled forced-colors rendering.
 
@@ -787,7 +800,8 @@ origin: migrated from legacy ledger ("Deferred from: 12-15 adversarial batch, st
 location: ChatBot Tier-3 harness
 severity: low
 reason: **[LOW · api-hygiene] C10 (second half) — `RecoveryResourceLogTail.Render(string? matching)` exposes a filter no call site uses.** **Not covered:** the tail is always rendered wholly unfiltered; the parameter is dead surface that invites a future caller to assume filtering happens. *(The first half — sharing the dispatch-unavailable type URI as one constant — is done.)* **Owner:** ChatBot Tier-3 harness.
-status: open
+status: done 2026-08-26
+resolution: already resolved: tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryResourceLogTail.cs:88 now exposes parameterless Render(); commit b35f3eb3 removed the unused matching filter.
 
 ### DW-100: [MEDIUM · test-design] D2 — three of four checkpoint-refusal reason codes are unasserted.
 
@@ -811,7 +825,8 @@ origin: migrated from legacy ledger ("Deferred from: 12-15 adversarial batch, st
 location: ChatBot Tier-3 harness
 severity: low
 reason: **[LOW · dead-code] D6 — `WaitForGovernedOperationAsync`'s absence path is unreachable.** After moving absence onto the projection channel, all five call sites pass `expectPresent: true`. **Not covered:** the parameter, the `AbsenceConfirmationWindow` branch, the "absence" wording and the trailing `return false` are dead, and the retained comment documents a path that no longer exists — so a future reader can reasonably believe absence is still observed there. **Fix:** remove the parameter or keep one caller exercising it. **Owner:** ChatBot Tier-3 harness.
-status: open
+status: done 2026-08-26
+resolution: already resolved: Commit 90c84cd7 removed the expectPresent/absence surface; tests/Hexalith.ChatBot.IntegrationTests/Recovery/AspireRecoverySandboxOperations.cs:1387 now has the presence-only IsGovernedOperationProjectionPresentAsync.
 
 ### DW-103: [MEDIUM · claim-accuracy] The mailbox admission probe's retained warm-up comment describes a barrier the code no longer provides.
 
@@ -1005,7 +1020,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15 patch 
 location: src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor:198
 severity: high
 reason: **[HIGH · build] The solution does not build at `HEAD`, so `Hexalith.ChatBot.Architecture.Tests` cannot be run at all.** `src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor:198` dispatches `PreviewAssociationDecisionAction`, a type defined nowhere in `src/` or in any `references/*` submodule — checked at both the pre- and post-bump gitlinks, so the four submodule moves in the Story 12.15 delta did not cause it. It was introduced by Story 13.3 (`0f3bfc8`) and is present at `476f1de`, i.e. it predates this delta. `Hexalith.ChatBot.Architecture.Tests` `ProjectReference`s `Hexalith.ChatBot.UI`, so the whole architecture suite is unbuildable. **Not covered:** the story's claimed `Architecture 78/0/0` verification is not reproducible at `HEAD`, and the two architecture guards changed by the 2026-08-26 patch application — the pairwise deadline ladder and the per-lane ceiling coverage — were verified by replicating their assertion logic against the real `ci.yml`, `release.yml` and `story-evidence-policy.json` rather than by executing them. That is derived evidence, not an executed test. **Owner:** Story 13.3 / ChatBot UI. **Closure evidence:** `dotnet build Hexalith.ChatBot.slnx --configuration Release` succeeds and `Hexalith.ChatBot.Architecture.Tests` runs green, at which point both guards should be executed and their counts recorded.
-status: open
+status: done 2026-08-26
+resolution: already resolved: Commit 90c84cd7 removed the undefined PreviewAssociationDecisionAction dispatch; src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewActions.cs:20,26 and AssociationReview.razor:370,373 now use defined request/confirm actions.
 
 ### DW-128: [MEDIUM · test-design] `AddEventStoreAdmin`'s port-guard call site is pinned by a method-body source scan, not by execution.
 
