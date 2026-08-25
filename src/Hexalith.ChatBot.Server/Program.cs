@@ -19,6 +19,32 @@ using OpenTelemetry.Metrics;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 _ = builder.AddEventStoreDomainService(typeof(GovernedOperationAggregate).Assembly);
+
+// Pin the identity EventStore negotiates named projections against. The SDK derives an unconfigured AppId from
+// DAPR_APP_ID, falling back to the .NET application name ("Hexalith.ChatBot.Server"), which is never the DAPR app
+// id EventStore registers and invokes this service under - so the SDK answers 400 UnsupportedCapability on every
+// operational-index refresh. Post-cutover that is not a lost optimisation: the projection checkpoint can then only
+// advance through the named fenced completion, so it never advances and the poller re-delivers forever.
+// This overrides the derived default rather than only filling an empty one, and ValidateOnStart is deliberate -
+// a blank identity must fail startup, not degrade silently.
+_ = builder.Services
+    .AddOptions<DomainProjectionIdentityOptions>()
+    .PostConfigure(options =>
+    {
+        string? configuredAppId = builder.Configuration[$"{ChatBotDomainServiceIdentity.ConfigurationSection}:AppId"];
+        string? configuredVersion =
+            builder.Configuration[$"{ChatBotDomainServiceIdentity.ConfigurationSection}:ServiceVersion"];
+        options.AppId = string.IsNullOrWhiteSpace(configuredAppId)
+            ? ChatBotDomainServiceIdentity.AppId
+            : configuredAppId;
+        options.ServiceVersion = string.IsNullOrWhiteSpace(configuredVersion)
+            ? ChatBotDomainServiceIdentity.ServiceVersion
+            : configuredVersion;
+    })
+    .Validate(
+        static options => !string.IsNullOrWhiteSpace(options.AppId) && !string.IsNullOrWhiteSpace(options.ServiceVersion),
+        "The ChatBot projection identity requires a non-empty AppId and ServiceVersion.")
+    .ValidateOnStart();
 _ = builder.Services.AddChatBotCommandGateway();
 _ = builder.AddEventStoreDomainTelemetry("chatbot");
 _ = builder.Services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddMeter(ChatBotMetrics.MeterName));

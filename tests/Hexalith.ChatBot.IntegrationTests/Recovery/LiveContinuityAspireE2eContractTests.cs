@@ -44,4 +44,30 @@ public sealed class LiveContinuityAspireE2eContractTests
     {
         LiveContinuityAspireE2eTests.IsTransientMailboxAdmissionStatus(statusCode).ShouldBe(expectedTransient);
     }
+
+    /// <summary>
+    /// The admission proof is the problem <c>type</c>. <c>dispatch-unavailable</c> is emitted only from
+    /// <c>CommandGateway</c>'s accepted branch, so it proves admission; <c>audit-unavailable</c> (the pre-commit
+    /// denial), an authorization denial, a body that is not a problem document, and a matching <c>code</c> under a
+    /// different <c>type</c> must not.
+    /// </summary>
+    /// <param name="problemDetails">The verbatim response body.</param>
+    /// <param name="expected">Whether the body proves the caller was admitted.</param>
+    [Theory]
+    [InlineData(
+        "{\"type\":\"https://hexalith.dev/errors/chatbot/dispatch-unavailable\",\"status\":503,\"code\":\"audit_unavailable\"}",
+        true)]
+    [InlineData(
+        "{\"type\":\"https://hexalith.dev/errors/chatbot/audit-unavailable\",\"status\":503,\"code\":\"audit_unavailable\"}",
+        false)]
+    [InlineData(
+        "{\"type\":\"https://hexalith.dev/errors/chatbot/authorization-denied\",\"status\":403,\"code\":\"authorization_denied\"}",
+        false)]
+    [InlineData("{\"code\":\"audit_unavailable\"}", false)]
+    [InlineData("{\"type\":\"https://hexalith.dev/errors/chatbot/dispatch-unavailable-x\"}", false)]
+    [InlineData("[\"dispatch-unavailable\"]", false)]
+    [InlineData("not json at all", false)]
+    [InlineData("", false)]
+    public void MailboxAdmissionProofRequiresTheDispatchUnavailableProblemType(string problemDetails, bool expected)
+        => LiveContinuityAspireE2eTests.IsDispatchUnavailableProblem(problemDetails).ShouldBe(expected);
 }

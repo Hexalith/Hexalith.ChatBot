@@ -21,7 +21,13 @@ internal sealed class CapturingContinuityDrillScenarioRunner(IContinuityDrillSce
         {
             return await inner.RunAsync(scenario, testTenantRef, correlationId, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        // An internal deadline (a per-scenario CTS, a restoration budget, or an HttpClient timeout, which surfaces
+        // as TaskCanceledException) is a genuine scenario failure, not a caller cancellation — but the previous
+        // filter excluded every OperationCanceledException, so such a failure was dropped here and reduced by the
+        // fail-safe coordinator to an unmeasurable report with no retained cause. Only a cancellation that the
+        // CALLER actually requested is passed through silently.
+        catch (Exception exception) when (exception is not OperationCanceledException
+            || !cancellationToken.IsCancellationRequested)
         {
             // Stable token only — do not embed exception.Message (can leak into uploaded .trx outside metadata-only reports).
             _failures.Add(new InvalidOperationException($"Live scenario '{scenario}' failed.", exception));

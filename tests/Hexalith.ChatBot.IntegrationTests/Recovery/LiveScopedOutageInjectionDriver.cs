@@ -76,10 +76,26 @@ internal sealed class LiveScopedOutageInjectionDriver(
                 }
             }
 
-            if (failure is null && (observation is null || !observation.IndependentControlSucceeded))
+            // Two different breaches used to share one message, so a failing run could not tell "the application
+            // never observed the injected fault" apart from "the unaffected control operation stopped working" —
+            // the second is the containment evidence NFR58 turns on. Same fail-closed outcome, distinguishable cause.
+            if (failure is null && observation is null)
             {
                 failure = new InvalidOperationException(
-                    "The scoped-outage fault or independent control operation was not observed.");
+                    $"The scoped-outage fault on '{dependency}' produced no application observation.");
+            }
+
+            if (failure is null && !observation!.IndependentControlSucceeded)
+            {
+                // Same fail-closed outcome either way; only the cause differs. "Never answered" is a missing
+                // observation to investigate, "did not succeed" is negative containment evidence.
+                string cause = observation.IndependentControlCause is { Length: > 0 } observed
+                    ? $" (cause={observed})"
+                    : string.Empty;
+                failure = new InvalidOperationException(
+                    observation.IndependentControlUnobserved
+                        ? $"The independent control operation was never observed while '{dependency}' was faulted.{cause}"
+                        : $"The independent control operation was refused while '{dependency}' was faulted.{cause}");
             }
 
             if (failure is null)

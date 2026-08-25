@@ -2,14 +2,20 @@
 <!--
   Run settings for the required live-recovery validation and evidence-gate lanes.
 
-  TreatNoTestsAsError is the point of this file. `dotnet test --filter "FullyQualifiedName=..."` prints
-  "No test matches the given testcase filter" and exits 0, so renaming or moving either lane's test turned a
-  REQUIRED job into a silent no-op: the gate job still checked out, still downloaded the evidence artifact,
-  ran zero tests, reported success, and semantic-release published with nothing evaluated. The architecture
-  guard asserts the fully-qualified name appears in the workflow YAML, not that a test with that name exists,
-  so it stays green through the rename.
+  XML forbids the double-hyphen digraph inside a comment, and the test platform rejects the whole file when it
+  appears ("Settings file provided does not conform to required format"), which silently kills every required
+  live-recovery lane before a single test runs. So the command-line switches named below are written without
+  their two leading dashes: read "filter" as the dotnet test filter switch and "settings" as the dotnet test
+  settings switch.
 
-  Every `dotnet test` invocation in the live-recovery lanes must pass `--settings live-recovery.runsettings`.
+  TreatNoTestsAsError is the point of this file. `dotnet test` with a filter switch of "FullyQualifiedName=..."
+  prints "No test matches the given testcase filter" and exits 0, so renaming or moving either lane's test
+  turned a REQUIRED job into a silent no-op: the gate job still checked out, still downloaded the evidence
+  artifact, ran zero tests, reported success, and semantic-release published with nothing evaluated. The
+  architecture guard asserts the fully-qualified name appears in the workflow YAML, not that a test with that
+  name exists, so it stays green through the rename.
+
+  Every `dotnet test` invocation in the live-recovery lanes must pass this file through the settings switch.
 -->
 <RunSettings>
   <RunConfiguration>

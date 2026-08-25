@@ -64,6 +64,10 @@ internal static class RecoveryAccessTokenProvider
         using FormUrlEncodedContent form = new(fields);
         string formBody = await form.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         Stopwatch timer = Stopwatch.StartNew();
+        // Retained so the timeout below can name what Keycloak actually did for three minutes. Without it, an
+        // identity provider that was never listening and one that answered 503 produced the identical message,
+        // and the fail-safe coordinator then reduced both to the same causeless `unmeasurable` report.
+        string lastAttemptOutcome = "no attempt completed";
         using HttpClient client = new() { BaseAddress = security, Timeout = TimeSpan.FromSeconds(15) };
         while (timer.Elapsed < TimeSpan.FromMinutes(3))
         {
@@ -99,20 +103,25 @@ internal static class RecoveryAccessTokenProvider
                 {
                     throw new InvalidOperationException("Keycloak rejected a dedicated recovery identity.");
                 }
+
+                lastAttemptOutcome = $"status {(int)response.StatusCode}";
             }
-            catch (HttpRequestException)
+            catch (HttpRequestException exception)
             {
                 // Keycloak realm import is not ready yet.
+                lastAttemptOutcome = $"transport failure ({exception.HttpRequestError})";
             }
             catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 // Per-attempt listener timeout; retry within the overall bound.
+                lastAttemptOutcome = "per-attempt 15s client timeout";
             }
 
             await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken).ConfigureAwait(false);
         }
 
-        throw new TimeoutException("Keycloak did not issue a dedicated recovery bearer before the deadline.");
+        throw new TimeoutException(
+            $"Keycloak did not issue a dedicated recovery bearer before the deadline; last attempt: {lastAttemptOutcome}.");
     }
 
     internal static bool IsRetryableStatus(HttpStatusCode statusCode)

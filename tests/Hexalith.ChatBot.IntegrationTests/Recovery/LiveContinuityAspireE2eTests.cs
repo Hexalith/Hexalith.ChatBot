@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -20,6 +21,8 @@ using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Client.Projections;
+
+using Microsoft.Extensions.DependencyInjection;
 
 using Shouldly;
 
@@ -111,13 +114,30 @@ public sealed class LiveContinuityAspireE2eTests
                 await application.ResourceNotifications.WaitForResourceHealthyAsync(resource, startup.Token).ConfigureAwait(true);
             }
 
+            // Diagnostic only: without a retained tail of the composed resources' own logs, a startup failure on this
+            // lane reported an HTTP status with no cause, and the recovery topology's 503 could not be attributed.
+            ResourceLoggerService resourceLoggers = application.Services.GetRequiredService<ResourceLoggerService>();
+            RecoveryResourceLogTail chatBotLogTail = await RecoveryResourceLogTail
+                .StartAsync("chatbot", resourceLoggers.WatchAsync("chatbot"), 400, startup.Token)
+                .ConfigureAwait(true);
+            await using ConfiguredAsyncDisposable chatBotLogTailScope = chatBotLogTail.ConfigureAwait(true);
+            RecoveryResourceLogTail eventStoreLogTail = await RecoveryResourceLogTail
+                .StartAsync("eventstore", resourceLoggers.WatchAsync("eventstore"), 200, startup.Token)
+                .ConfigureAwait(true);
+            await using ConfiguredAsyncDisposable eventStoreLogTailScope = eventStoreLogTail.ConfigureAwait(true);
+            string ServerDiagnostics() => string.Join(
+                Environment.NewLine,
+                chatBotLogTail.Render(),
+                eventStoreLogTail.Render());
+
             string mailboxAccessToken = await RecoveryAccessTokenProvider
                 .AcquireMailboxAsync(application, mailboxClientSecret, startup.Token)
                 .ConfigureAwait(true);
             string controlAccessToken = await RecoveryAccessTokenProvider
                 .AcquireControlAsync(application, startup.Token)
                 .ConfigureAwait(true);
-            await AssertMailboxTokenAdmissionAsync(application, mailboxAccessToken, startup.Token).ConfigureAwait(true);
+            await AssertMailboxTokenAdmissionAsync(application, mailboxAccessToken, ServerDiagnostics, startup.Token)
+                .ConfigureAwait(true);
             await AssertInvalidMailboxBearerIsRejectedBeforeAdmissionAsync(application, startup.Token).ConfigureAwait(true);
             using DaprClient recoveryDaprClient = new DaprClientBuilder()
                 .UseGrpcEndpoint(application.GetEndpoint("chatbot-dapr-cli", "grpc").ToString())
@@ -649,9 +669,28 @@ public sealed class LiveContinuityAspireE2eTests
     /// audience, expiry and server-side scope enforcement were all invisible, and ChatBot could have stopped
     /// validating token signatures entirely while this probe still passed.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The admission proof is the emitted problem <c>type</c>, not a status class. Requiring <c>400</c>/<c>422</c>
+    /// was unsatisfiable for every possible input: <see cref="ChatBotProblemDetailsFactory"/> emits only
+    /// <c>401</c>, <c>403</c>, <c>409</c> and <c>503</c>, and the deliberately invalid <c>IntakeId</c> below is
+    /// rejected inside <c>AcceptedCommandDispatcher.BuildPlanAsync</c>, whose
+    /// <see cref="InvalidOperationException"/> <c>CommandGateway</c> classifies as a transient dispatch outage.
+    /// The lane therefore retried a permanent, correct-by-design <c>503</c> until its startup budget expired.
+    /// </para>
+    /// <para>
+    /// <c>dispatch-unavailable</c> is emitted from exactly one place — the <c>catch</c> around
+    /// <c>dispatcher.DispatchAsync</c>, which is reachable only after <c>admissionDecision.IsAccepted</c> — so it is
+    /// categorical proof that the bearer cleared authentication, authorization, tenant binding and the service-client
+    /// grant. That is a strictly more specific assertion than "the status was 400 or 422", and unlike it, reachable.
+    /// A credential rejection (<c>401</c>/<c>403</c>) and the pre-commit <c>audit-unavailable</c> denial are
+    /// deliberately NOT accepted: both are emitted before or instead of admission acceptance.
+    /// </para>
+    /// </remarks>
     private static async Task AssertMailboxTokenAdmissionAsync(
         DistributedApplication application,
         string accessToken,
+        Func<string> serverDiagnostics,
         CancellationToken cancellationToken)
     {
         using HttpClient client = application.CreateHttpClient("chatbot");
@@ -660,6 +699,11 @@ public sealed class LiveContinuityAspireE2eTests
             {"commandId":"{{ChatBotCommandId.New().Value}}","commandType":"CaptureMailboxMessageIntake","command":{"intakeId":"not-a-ulid","source":{"providerMessageId":"probe","mailboxId":"probe","receivedAtUtc":"2026-08-01T00:00:00Z"},"recipients":[],"attachments":[]},"origin":"mailbox","requestSchemaVersion":"v1"}
             """;
         HttpStatusCode? lastStatus = null;
+        // The probe used to report only the status code, so a persistent 503 could not be told apart from a slow
+        // start and never named its own reason code. ChatBot answers this path with a redacted ProblemDetails whose
+        // `type`/`code` distinguishes dispatch-unavailable from audit-unavailable; retaining a bounded copy of the
+        // last one turns the failure into a diagnosis. It is test output only and never reaches an evidence artifact.
+        string? lastProblemDetails = null;
         while (true)
         {
             try
@@ -682,10 +726,26 @@ public sealed class LiveContinuityAspireE2eTests
                 // behind admission has finished warming up. That path intentionally returns 503 until it is ready,
                 // matching the ordinary Tier-3 acceptance test's first-command retry discipline.
                 lastStatus = response.StatusCode;
+                string problemDetails = await response.Content
+                    .ReadAsStringAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                lastProblemDetails = problemDetails.Length > 512
+                    ? problemDetails[..512]
+                    : problemDetails;
+
+                // The other reachable post-admission outcome (see the remarks above): only the accepted branch of
+                // CommandGateway can emit this type, so observing it proves the bearer was admitted.
+                if (response.StatusCode == HttpStatusCode.ServiceUnavailable
+                    && IsDispatchUnavailableProblem(problemDetails))
+                {
+                    return;
+                }
+
                 if (!IsTransientMailboxAdmissionStatus(response.StatusCode))
                 {
                     throw new InvalidOperationException(
-                        $"The recovery mailbox admission probe returned an unexpected status {(int)response.StatusCode}.");
+                        $"The recovery mailbox admission probe returned an unexpected status {(int)response.StatusCode}. "
+                        + $"Response: {lastProblemDetails}{Environment.NewLine}{serverDiagnostics()}");
                 }
             }
             catch (HttpRequestException)
@@ -707,8 +767,40 @@ public sealed class LiveContinuityAspireE2eTests
                     "The recovery mailbox admission probe never admitted inside the startup budget; last observed "
                     + (lastStatus is null
                         ? "no HTTP response."
-                        : $"status {(int)lastStatus.Value}."));
+                        : $"status {(int)lastStatus.Value}. Response: {lastProblemDetails}")
+                    + Environment.NewLine
+                    + serverDiagnostics());
             }
+        }
+    }
+
+    /// <summary>
+    /// Recognises the one problem type that <c>CommandGateway</c> can only emit after admission accepted the caller.
+    /// </summary>
+    /// <param name="problemDetails">The verbatim response body.</param>
+    /// <returns><see langword="true"/> when the body is a dispatch-unavailable problem document.</returns>
+    internal static bool IsDispatchUnavailableProblem(string problemDetails)
+    {
+        if (string.IsNullOrWhiteSpace(problemDetails))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(problemDetails);
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                && document.RootElement.TryGetProperty("type", out JsonElement type)
+                && type.ValueKind == JsonValueKind.String
+                && string.Equals(
+                    type.GetString(),
+                    "https://hexalith.dev/errors/chatbot/dispatch-unavailable",
+                    StringComparison.Ordinal);
+        }
+        catch (JsonException)
+        {
+            // A body that is not a problem document proves nothing; keep retrying inside the startup budget.
+            return false;
         }
     }
 

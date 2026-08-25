@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -58,6 +59,12 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     private readonly HttpClient _eventStoreClient;
     private readonly HttpClient _sandboxClient;
     private readonly ReadModelProjectConversationProjectionStore _readModels;
+
+    /// <summary>
+    /// Reads the governed-operation projection through the production store type, so the absence probe cannot drift
+    /// from the store name and key the projection handler actually writes.
+    /// </summary>
+    private readonly ReadModelGovernedOperationViewStore _governedOperationProjections;
     private readonly IReadModelConditionalEraser _readModelEraser;
     private readonly EventStoreDurableStateProbe _durableState;
     private readonly string _mailboxClientSecret;
@@ -102,6 +109,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         _controllerSecret = controllerSecret;
         _mailboxClientSecret = mailboxClientSecret;
         _readModels = new ReadModelProjectConversationProjectionStore(readModelStore);
+        _governedOperationProjections = new ReadModelGovernedOperationViewStore(readModelStore);
         _readModelEraser = readModelEraser;
         _durableState = durableState;
         _chatBotClient = application.CreateHttpClient("chatbot");
@@ -325,9 +333,67 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
         }
 
+        // "did not accept traffic" named the wrong side of the gap once: the listener was accepting traffic and
+        // answering 503, and the message sent an investigation after a connectivity problem that did not exist.
+        // The diagnostic knows which side is broken, so the message says it.
+        ListenerGap gap = await DescribeListenerGapAsync(cancellationToken).ConfigureAwait(false);
         throw new TimeoutException(
-            $"EventStore reported healthy but its listener did not accept traffic within {ListenerReadinessBudget.TotalSeconds:N0}s.");
+            $"EventStore did not become ready within {ListenerReadinessBudget.TotalSeconds:N0}s: {gap.Verdict} {gap.Detail}");
     }
+
+    /// <summary>
+    /// Reports which side of the "process is listening but the harness cannot reach it" gap is broken.
+    /// </summary>
+    /// <remarks>
+    /// Runs only after the readiness budget has already expired and the failure is being thrown, and only
+    /// observes: it compares the endpoint the retained client holds against the endpoint Aspire resolves now, and
+    /// probes the freshly resolved one once. It never returns success, never retries into the budget, and never
+    /// makes a run pass — a resolved endpoint that answers here is a diagnosis, not a recovery.
+    /// </remarks>
+    /// <param name="cancellationToken">Cancels the single diagnostic probe.</param>
+    /// <returns>A metadata-only description of the gap and which side of it is broken.</returns>
+    private async Task<ListenerGap> DescribeListenerGapAsync(CancellationToken cancellationToken)
+    {
+        string retained = _eventStoreClient.BaseAddress?.ToString() ?? "none";
+        string resolved;
+        try
+        {
+            resolved = _application.GetEndpoint(_eventStoreResource.Name, "http").ToString();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return new ListenerGap(
+                "the harness could not resolve the resource endpoint.",
+                $"retainedEndpoint={retained} resolvedEndpoint=<{exception.GetType().Name}>");
+        }
+
+        string verdict;
+        string freshProbe;
+        try
+        {
+            using HttpClient fresh = _application.CreateHttpClient(_eventStoreResource.Name, "http");
+            fresh.Timeout = TimeSpan.FromSeconds(10);
+            using HttpResponseMessage response = await fresh.GetAsync("/health", cancellationToken).ConfigureAwait(false);
+            freshProbe = ((int)response.StatusCode).ToString(CultureInfo.InvariantCulture);
+            verdict = response.IsSuccessStatusCode
+                ? "the application answers a fresh client but not the retained one, so the retained endpoint is stale."
+                : "the application is accepting traffic and reporting itself UNHEALTHY, so the resource is not ready.";
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            freshProbe = $"<{exception.GetType().Name}>";
+            verdict = "the application is not reachable at all, so the listener is genuinely absent.";
+        }
+
+        return new ListenerGap(
+            verdict,
+            $"retainedEndpoint={retained} resolvedEndpoint={resolved} freshClientHealth={freshProbe}");
+    }
+
+    /// <summary>Which side of the "listening versus reachable" gap is broken, plus its metadata-only evidence.</summary>
+    /// <param name="Verdict">The side of the gap the observation points at.</param>
+    /// <param name="Detail">The endpoints and status observed.</param>
+    private sealed record ListenerGap(string Verdict, string Detail);
 
     /// <inheritdoc />
     public async ValueTask<RecoveryEventStoreEndState> ReadEventStoreEndStateAsync(
@@ -388,11 +454,9 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 _faultProbeNoteRef,
                 AbsenceConfirmationWindow,
                 cancellationToken);
-            bool projectionFaultAbsent = !await WaitForGovernedOperationAsync(
+            bool projectionFaultAbsent = await RemainsGovernedOperationProjectionAbsentAsync(
+                RecoveryValidationTopology.StorageTenantRef,
                 _faultProbeNoteRef,
-                checkpoint.OperationRef,
-                expectPresent: false,
-                userAccessToken,
                 cancellationToken).ConfigureAwait(false);
             unauthorizedMutationAbsent = projectionFaultAbsent && await durableFaultAbsent.ConfigureAwait(false);
         }
@@ -473,6 +537,11 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         string controlAccessToken = await RecoveryAccessTokenProvider
             .AcquireControlAsync(_application, cancellationToken).ConfigureAwait(false);
         bool complete = true;
+
+        // Metadata-only diagnostic: `cleanup-complete: false` reaches the evidence bundle as a single boolean, so a
+        // failing hosted run cannot say which of the five sub-checks did not hold. Only stable check names are
+        // recorded — never an identifier, a tenant or a payload — and they go to stderr, not to any report.
+        List<string> incompleteChecks = [];
         foreach (string noteRef in _checkpointNoteRefs)
         {
             try
@@ -485,11 +554,13 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                     cancellationToken).ConfigureAwait(false))
                 {
                     complete = false;
+                    incompleteChecks.Add("checkpoint-note-not-present");
                 }
             }
             catch (TimeoutException)
             {
                 complete = false;
+                incompleteChecks.Add("checkpoint-note-presence-timeout");
             }
         }
 
@@ -505,11 +576,13 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                     cancellationToken).ConfigureAwait(false))
                 {
                     complete = false;
+                    incompleteChecks.Add("control-note-not-present");
                 }
             }
             catch (TimeoutException)
             {
                 complete = false;
+                incompleteChecks.Add("control-note-presence-timeout");
             }
         }
 
@@ -517,17 +590,22 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         {
             try
             {
-                bool stillPresent = await WaitForGovernedOperationAsync(
+                // Same channel change as the NFR59 assertion above, for the same reason: the read API answers
+                // 403 for a governed operation that does not exist, so verifying cleanup through it would report
+                // every successfully cleaned run as incomplete.
+                if (!await RemainsGovernedOperationProjectionAbsentAsync(
+                    RecoveryValidationTopology.StorageTenantRef,
                     _faultProbeNoteRef,
-                    _checkpointCorrelationId,
-                    expectPresent: false,
-                    userAccessToken,
-                    cancellationToken).ConfigureAwait(false);
-                complete &= !stillPresent;
+                    cancellationToken).ConfigureAwait(false))
+                {
+                    complete = false;
+                    incompleteChecks.Add("fault-probe-projection-present");
+                }
             }
-            catch (InvalidOperationException)
+            catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 complete = false;
+                incompleteChecks.Add("fault-probe-absence-faulted");
             }
         }
 
@@ -556,28 +634,29 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         try
         {
             List<Task<bool>> absenceChecks = _checkpointNoteRefs
-                .Select(noteRef => WaitForGovernedOperationAsync(
+                .Select(noteRef => RemainsGovernedOperationProjectionAbsentAsync(
+                    RecoveryValidationTopology.StorageTenantRef,
                     noteRef,
-                    _checkpointCorrelationId,
-                    expectPresent: false,
-                    userAccessToken,
                     cancellationToken))
                 .ToList();
             if (!string.IsNullOrWhiteSpace(_controlTenantNoteRef))
             {
-                absenceChecks.Add(WaitForGovernedOperationAsync(
+                absenceChecks.Add(RemainsGovernedOperationProjectionAbsentAsync(
+                    RecoveryValidationTopology.ControlTenantRef,
                     _controlTenantNoteRef,
-                    _checkpointCorrelationId,
-                    expectPresent: false,
-                    controlAccessToken,
                     cancellationToken));
             }
-            bool[] stillPresent = await Task.WhenAll(absenceChecks).ConfigureAwait(false);
-            complete &= stillPresent.All(static present => !present);
+            bool[] absent = await Task.WhenAll(absenceChecks).ConfigureAwait(false);
+            if (!absent.All(static isAbsent => isAbsent))
+            {
+                complete = false;
+                incompleteChecks.Add("erased-projection-still-present");
+            }
         }
         catch (InvalidOperationException)
         {
             complete = false;
+            incompleteChecks.Add("post-erase-absence-faulted");
         }
 
         if (complete)
@@ -587,6 +666,13 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             _checkpointNoteRefs.Clear();
             _checkpointCommittedAtUtc.Clear();
             _checkpointCorrelationId = null;
+        }
+
+        if (!complete)
+        {
+            await Console.Error
+                .WriteLineAsync($"RECOVERY_CLEANUP_INCOMPLETE checks={string.Join(',', incompleteChecks.Distinct())}")
+                .ConfigureAwait(false);
         }
 
         return complete;
@@ -1072,6 +1158,16 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             {
                 statusCode = HttpStatusCode.ServiceUnavailable;
             }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // The 30-second _chatBotClient.Timeout elapsing mid-poll is the same transient dependency state as a
+                // refused connection, and the two sibling polls above already classify it that way. Treating it as
+                // fatal here aborted whole scenarios during seeding — before any fault was injected — whenever the
+                // ChatBot's own resilience ladder (10s attempt timeout, retried) outlasted this client's budget, and
+                // the fail-safe coordinator then reduced that to an `unmeasurable` report with no retained cause.
+                // The 3-minute bound and the non-transient-status throw below are unchanged.
+                statusCode = HttpStatusCode.ServiceUnavailable;
+            }
 
             if (statusCode == HttpStatusCode.Accepted)
             {
@@ -1080,7 +1176,11 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
 
             if ((int)statusCode < 500 && statusCode is not HttpStatusCode.RequestTimeout and not HttpStatusCode.TooManyRequests)
             {
-                throw new InvalidOperationException("The governed checkpoint command failed outside a transient dependency state.");
+                // Naming the refused status is the difference between a diagnosable failure and an opaque one: the
+                // fail-safe coordinator reduces whatever is thrown here to `unmeasurable`, so a message that omits
+                // the status leaves a hosted run with no way to tell an authorization regression from a bad payload.
+                throw new InvalidOperationException(
+                    $"The governed checkpoint command failed outside a transient dependency state (status {(int)statusCode}).");
             }
 
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
@@ -1109,6 +1209,63 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         request.Headers.Add("X-Hexalith-Task-Id", operationRef);
         using HttpResponseMessage response = await _chatBotClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         return response.StatusCode;
+    }
+
+    /// <summary>
+    /// Observes, over the full absence window, that the fault-probe note never materialises in the governed-operation
+    /// projection.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The read API cannot answer this question. A governed operation that does not exist is refused
+    /// <c>403 authorization-denied</c> by the shipped safe-not-found semantics, and a <c>403</c> is not evidence that
+    /// an unauthorized mutation is absent — absence must be observed, never inferred from "not 200". The API contract
+    /// is deliberately not reopened; the probe moves to a channel that can actually observe the answer.
+    /// </para>
+    /// <para>
+    /// It reads the projection through the production <see cref="ReadModelGovernedOperationViewStore"/>, so the store
+    /// name and key are exactly the ones <c>GovernedOperationProjectionHandler</c> writes and cannot drift from them.
+    /// A missing key is a definite answer from the store that would hold the projection if it existed, not a refusal.
+    /// A read that faults propagates rather than counting as absence.
+    /// </para>
+    /// <para>
+    /// This stays independent of the durable half, which <see cref="ReadEventStoreEndStateAsync"/> computes
+    /// separately from EventStore's aggregate actor state through <see cref="EventStoreDurableStateProbe"/> — a
+    /// different service and a different store. Neither half is derived from the other, and the assertion requires
+    /// both.
+    /// </para>
+    /// </remarks>
+    /// <param name="tenantRef">The tenant partition the projection would have been written under.</param>
+    /// <param name="noteRef">The governed note that must never have landed.</param>
+    /// <param name="cancellationToken">Cancels the observation.</param>
+    /// <returns><see langword="true"/> when the projection stayed absent for the whole window.</returns>
+    private async Task<bool> RemainsGovernedOperationProjectionAbsentAsync(
+        string tenantRef,
+        string noteRef,
+        CancellationToken cancellationToken)
+    {
+        Stopwatch timer = Stopwatch.StartNew();
+        bool observedAtLeastOnce = false;
+        while (timer.Elapsed < AbsenceConfirmationWindow)
+        {
+            GovernedOperationView? view = await _governedOperationProjections
+                .GetAsync(tenantRef, noteRef, cancellationToken)
+                .ConfigureAwait(false);
+            observedAtLeastOnce = true;
+            if (view is not null)
+            {
+                return false;
+            }
+
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
+
+        // Close the final-delay race, and never report absence from a window in which nothing was read.
+        GovernedOperationView? finalView = await _governedOperationProjections
+            .GetAsync(tenantRef, noteRef, cancellationToken)
+            .ConfigureAwait(false);
+
+        return observedAtLeastOnce && finalView is null;
     }
 
     private async Task<bool> WaitForGovernedOperationAsync(
@@ -1145,8 +1302,17 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             }
             else
             {
+                // Same reason the mailbox admission probe now carries its problem document: the fail-safe
+                // coordinator reduces whatever is thrown here to `unmeasurable`, so a message without the reason
+                // code leaves a hosted failure undiagnosable. Metadata only — this is ChatBot's redacted
+                // ProblemDetails, bounded, never a tenant payload.
+                string problemDetails = await response.Content
+                    .ReadAsStringAsync(cancellationToken)
+                    .ConfigureAwait(false);
                 throw new InvalidOperationException(
-                    $"The governed-operation {(expectPresent ? "presence" : "absence")} probe returned an unexpected status {(int)response.StatusCode}.");
+                    $"The governed-operation {(expectPresent ? "presence" : "absence")} probe returned an unexpected "
+                    + $"status {(int)response.StatusCode}. Response: "
+                    + (problemDetails.Length > 512 ? problemDetails[..512] : problemDetails));
             }
 
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
@@ -1218,7 +1384,11 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         using HttpResponseMessage response = await _sandboxClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException("The closed recovery-sandbox action did not complete successfully.");
+            // Deliberately NOT retried: `process` is side-effectful, and a blind retry would manufacture the very
+            // duplicate side effects this scenario exists to rule out. Naming the action and status is what makes
+            // the resulting `unmeasurable` diagnosable instead of opaque.
+            throw new InvalidOperationException(
+                $"The closed recovery-sandbox action '{action}' did not complete successfully (status {(int)response.StatusCode}).");
         }
 
         string body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);

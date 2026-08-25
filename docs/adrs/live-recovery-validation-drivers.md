@@ -129,6 +129,53 @@ Ratification requires a complete passing scheduled-CI or release artifact plus i
 
 Even a passing sandbox run cannot close `RV-EXT-M365`, `RV-DURABLE-WORM`, `RV-PROD-CONTROL`, `RV-PROVIDER-SCALE`, `RV-MEASURABLE-CEILING`, `RV-EVIDENCE-KINDS`, or `RV-REBUILD-WORM`. Tightening or loosening still requires the PRD decision, this ADR, and `RecoveryTargets` to change together with retained evidence, rationale, and approval.
 
+## Decision: pin the ChatBot domain-service projection identity (2026-08-25)
+
+**Status: RATIFICATION OUTSTANDING — Winston has not reviewed or approved this.** It is recorded here because it
+changes shipped delivery behaviour, and it must not be read as an accepted architecture decision until Winston
+signs it off.
+
+**Decision taken in code, pending that ratification:** `src/Hexalith.ChatBot.Server/Program.cs` now pins
+`DomainProjectionIdentityOptions` to the DAPR app id `chatbot` and service version `v1`
+(`ChatBotDomainServiceIdentity`), overridable through `ChatBot:ProjectionIdentity`, and fails startup if either is
+blank.
+
+**Why this is a behaviour change, not configuration tidying.** The identity is what EventStore's named-projection
+capability negotiation matches on. Pinning it switches this service from the legacy projection-delivery path onto
+the **v2 named-projection delivery path** with its fenced completion transition. That is a real change to how
+projections are delivered and checkpointed for a shipped service, which is why it is written up as a decision.
+
+**Evidence chain, each link observed rather than inferred:**
+
+1. The domain-service SDK derives an unconfigured `AppId` from the `DAPR_APP_ID` environment variable, falling
+   back to `IHostEnvironment.ApplicationName` (`EventStoreDomainServiceExtensions.cs:447-458`). Resolved in this
+   service that fallback is `Hexalith.ChatBot.Server` — never the DAPR app id EventStore registers and invokes it
+   under. *(Measured: the identity resolved to `Hexalith.ChatBot.Server` in a host without `DAPR_APP_ID`. An
+   earlier reading of this defect as "AppId is empty" was wrong and is corrected here.)*
+2. EventStore's operational-index refresher posts `AppId` plus `ServiceVersion` to
+   `/admin/operational-index-metadata`; the SDK answers `Results.BadRequest(UnsupportedCapability)` unless both
+   match its own identity and exactly one domain is requested (`EventStoreDomainServiceExtensions.cs:296-320`).
+3. Observed: `HttpRequestException: Response status code does not indicate success: 400 (Bad Request)` thrown from
+   `AdminOperationalIndexHostedService.LoadBindingAsync`, reaching
+   `NamedProjectionDispatchCoordinator.TryDispatchAsync` — 21,034 occurrences in one run, and for the neighbouring
+   `sample` and `tenants` services too, consistent with a systematic identity derivation rather than one service's
+   configuration.
+4. With no successful dispatch there is no fenced completion. Once the store's v2 writer protocol is active — and
+   it must be, because `ProjectionDeliveryWriterProtocolHealthCheck` requires it for readiness — a scoped
+   checkpoint may advance *only* through that completion, so `SaveDeliveredSequenceAsync` refuses every legacy
+   advance by design.
+5. Observed: 42,066 checkpoint refusals in one run across `recovery-validation`, `tenant-alpha` and `tenant-beta`;
+   zero `projection-checkpoints:*` scoped rows existed.
+6. The checkpoint never advancing means the poller re-delivers the same aggregates indefinitely, so a
+   governed-operation read model erased during recovery cleanup is re-created inside the absence window and the
+   continuity drill reports `cleanup-complete: false` — the single reason the release evidence gate stop-ships.
+
+**Guard against silent regression:** `ChatBotProjectionIdentityTests` asserts the resolved identity is non-blank,
+equals the DAPR app id, is *not* the assembly name, survives a blank configured override, and honours a real one.
+
+**Explicitly not taken:** the alternative of treating "no identity configured" as capability-absent inside the SDK
+(mirroring its `404` handling) was rejected — the SDK contract is not being reopened by this story.
+
 ## Consequences
 
 - Ordinary deployments remain non-destructive and retain inert deferred live-driver defaults.

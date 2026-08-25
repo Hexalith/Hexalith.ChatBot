@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 using Hexalith.ChatBot.Server.Audit;
 
@@ -347,8 +348,20 @@ public static class LiveRecoveryValidationArchitectureTests
         // The release must depend on the independent gate, not merely on the run that produced the evidence.
         release.ShouldContain("- live-recovery-evidence-gate");
 
-        string runSettings = ReadProjectFile("live-recovery.runsettings");
-        runSettings.ShouldContain("<TreatNoTestsAsError>true</TreatNoTestsAsError>");
+        // A substring match on the raw text passed on a file the test platform rejects outright: an XML comment
+        // may not contain the double-hyphen digraph, and the header comment carried it twice, so every required
+        // live-recovery lane aborted with "Settings file provided does not conform to required format" while this
+        // guard stayed green. Parse the document first, then read the setting out of the parsed tree, so the guard
+        // fails on malformed XML as well as on a missing or false value.
+        string runSettingsPath = Path.Combine(RepositoryRoot(), "live-recovery.runsettings");
+        XDocument runSettings = Should.NotThrow(() => XDocument.Load(runSettingsPath, LoadOptions.None));
+        XElement? treatNoTestsAsError = runSettings
+            .Element("RunSettings")?
+            .Element("RunConfiguration")?
+            .Element("TreatNoTestsAsError");
+        treatNoTestsAsError.ShouldNotBeNull();
+        bool.TryParse(treatNoTestsAsError.Value.Trim(), out bool treatNoTestsAsErrorValue).ShouldBeTrue();
+        treatNoTestsAsErrorValue.ShouldBeTrue();
     }
 
     [Fact]

@@ -233,6 +233,40 @@ public sealed class LiveScopedOutageInjectionDriverTests
         operations.Cleaned.ShouldContain(ScopedOutageDependencies.AiProvider);
     }
 
+    /// <summary>
+    /// A control probe that was never answered and one that answered a non-<c>202</c> are both fail-closed, but
+    /// they are different investigations — missing containment evidence versus negative containment evidence — so
+    /// the driver must report which one happened instead of collapsing both into one message.
+    /// </summary>
+    /// <param name="unobserved">Whether the control probe timed out rather than answering a non-202.</param>
+    /// <param name="expectedCause">The cause the driver must name.</param>
+    [Theory]
+    [InlineData(true, "was never observed")]
+    [InlineData(false, "was refused")]
+    public async Task IndependentControlFailureNamesWhetherTheProbeWasAnsweredOrNegative(
+        bool unobserved,
+        string expectedCause)
+    {
+        RecordingOperations operations = new()
+        {
+            IndependentControlSucceeded = false,
+            IndependentControlUnobserved = unobserved,
+        };
+        LiveScopedOutageInjectionDriver driver = new(operations, Options());
+
+        InvalidOperationException failure = await Should.ThrowAsync<InvalidOperationException>(() =>
+            driver.InjectAndMeasureAsync(
+                ScopedOutageDependencies.Graph,
+                RecoveryValidationTopology.LogicalTenantRef,
+                "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                TestContext.Current.CancellationToken).AsTask());
+
+        // Both shapes must stay fail-closed; only the reported cause differs.
+        failure.ToString().ShouldContain(expectedCause);
+        operations.Restored.ShouldContain(ScopedOutageDependencies.Graph);
+        operations.Cleaned.ShouldContain(ScopedOutageDependencies.Graph);
+    }
+
     [Fact]
     public async Task CheckpointFailureStillCleansAndSurfacesBothFailures()
     {
@@ -375,6 +409,8 @@ public sealed class LiveScopedOutageInjectionDriverTests
 
         public bool IndependentControlSucceeded { get; init; } = true;
 
+        public bool IndependentControlUnobserved { get; init; }
+
         public CancellationTokenSource? CancelObservationToken { get; init; }
 
         public TimeSpan? ScopeRecordingSkew { get; init; }
@@ -434,7 +470,10 @@ public sealed class LiveScopedOutageInjectionDriverTests
                 recorded,
                 ObservedScopeOverride ?? IndependentlyObservedScope(dependency),
                 IndependentControlSucceeded: IndependentControlSucceeded,
-                UnauthorizedMutationDetected: false));
+                UnauthorizedMutationDetected: false)
+            {
+                IndependentControlUnobserved = IndependentControlUnobserved,
+            });
         }
 
         public string? ObservedScopeOverride { get; init; }
