@@ -124,6 +124,10 @@ public static class Program
         string policyPath = FullPath(repositoryRoot, command.Optional("policy") ?? "story-evidence-policy.json");
         JsonObject policy = EvidenceJson.LoadPolicy(policyPath);
         StoryEvidenceValidator.ValidatePinnedPolicy(policy);
+        string policyVersion = EvidenceJson.RequiredString(
+            policy,
+            "schemaVersion",
+            GateReason.ScopeDigestMismatch);
         IReadOnlyList<TransitionRecord> transitions = TransitionDetector.Detect(repositoryRoot, baseCommit, headCommit);
         Directory.CreateDirectory(reportDirectory);
         if (transitions.Count == 0)
@@ -133,7 +137,7 @@ public static class Program
                 StoryKey = "no-transition",
                 BaseCommit = baseCommit,
                 HeadCommit = headCommit,
-                PolicyVersion = "2.1",
+                PolicyVersion = policyVersion,
                 Passed = true,
                 EvaluatedAtUtc = DateTimeOffset.UtcNow,
             };
@@ -211,7 +215,13 @@ public static class Program
             GateReport report;
             if (preflightFailures.TryGetValue(transition.StoryKey, out GateValidationException? failure))
             {
-                report = FailedPreflightReport(transition, baseCommit, headCommit, failure, nowUtc);
+                report = FailedPreflightReport(
+                    transition,
+                    baseCommit,
+                    headCommit,
+                    policyVersion,
+                    failure,
+                    nowUtc);
                 JsonReportWriter.Write(reportPath, report);
             }
             else
@@ -262,10 +272,14 @@ public static class Program
 
     private static int SummarizeRecoveryAttempt(CommandArguments command, string repositoryRoot)
     {
+        JsonObject policy = EvidenceJson.LoadPolicy(
+            FullPath(repositoryRoot, command.Optional("policy") ?? "story-evidence-policy.json"));
+        StoryEvidenceValidator.ValidatePinnedPolicy(policy);
         RecoveryAttemptSummarizer.Summarize(
             FullPath(repositoryRoot, command.Required("input")),
             command.Optional("outcome") ?? "unknown",
-            FullPath(repositoryRoot, command.Required("output")));
+            FullPath(repositoryRoot, command.Required("output")),
+            policy);
         Console.Out.WriteLine("{\"passed\":true,\"operation\":\"summarize-recovery-attempt\"}");
         return 0;
     }
@@ -283,13 +297,14 @@ public static class Program
         TransitionRecord transition,
         string baseCommit,
         string headCommit,
+        string policyVersion,
         GateValidationException exception,
         DateTimeOffset evaluatedAtUtc) => new()
         {
             StoryKey = transition.StoryKey,
             BaseCommit = baseCommit,
             HeadCommit = headCommit,
-            PolicyVersion = "2.1",
+            PolicyVersion = policyVersion,
             Passed = false,
             EvaluatedAtUtc = evaluatedAtUtc,
             Issues = [GateIssue.Create(exception.ReasonCode, exception.Subject)],

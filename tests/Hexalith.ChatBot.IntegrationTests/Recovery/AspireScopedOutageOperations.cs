@@ -334,18 +334,17 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
             unauthorizedMutationDetected = root.GetProperty("unauthorizedMutationDetected").GetBoolean();
         }
 
-        _controlProbeUnobserved = false;
-        _controlProbeCause = null;
-        bool controlSucceeded = await IsChatBotControlAvailableAsync(dependency, cancellationToken).ConfigureAwait(false);
+        ControlAvailability controlAvailability = await IsChatBotControlAvailableAsync(dependency, cancellationToken)
+            .ConfigureAwait(false);
         return new ScopedOutageFaultObservation(
             observedAtUtc,
             recordedAtUtc,
             observedScope,
-            controlSucceeded,
+            controlAvailability.Succeeded,
             unauthorizedMutationDetected)
         {
-            IndependentControlUnobserved = _controlProbeUnobserved,
-            IndependentControlCause = _controlProbeCause,
+            IndependentControlUnobserved = controlAvailability.Unobserved,
+            IndependentControlCause = controlAvailability.Cause,
         };
     }
 
@@ -872,21 +871,9 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         }
     }
 
-    /// <summary>
-    /// Set when the independent-control probe could not be observed at all — a client timeout or a transport
-    /// failure — rather than answered with a non-<c>202</c>. Both remain "not available" and both still fail
-    /// closed; only this one means the observation is missing instead of negative.
-    /// </summary>
-    private bool _controlProbeUnobserved;
-
-    /// <summary>
-    /// The stable, metadata-only cause of the last unavailable control probe: <c>status-{code}</c>,
-    /// <c>transport-{error}</c> or <c>client-timeout</c>. A single "did not succeed" cannot distinguish a ChatBot
-    /// refusal from never reaching ChatBot, and those are different investigations.
-    /// </summary>
-    private string? _controlProbeCause;
-
-    private async Task<bool> IsChatBotControlAvailableAsync(string dependency, CancellationToken cancellationToken)
+    private async Task<ControlAvailability> IsChatBotControlAvailableAsync(
+        string dependency,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -916,10 +903,10 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
             if (response.StatusCode != HttpStatusCode.Accepted)
             {
                 // A real answer from ChatBot: negative containment evidence, not a missing observation.
-                _controlProbeCause = string.Create(
-                    CultureInfo.InvariantCulture,
-                    $"status-{(int)response.StatusCode}");
-                return false;
+                return new ControlAvailability(
+                    Succeeded: false,
+                    Unobserved: false,
+                    Cause: string.Create(CultureInfo.InvariantCulture, $"status-{(int)response.StatusCode}"));
             }
 
             await _durableState.WaitForGovernedNoteAsync(
@@ -931,26 +918,28 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
                 correlationId,
                 controlAccessToken,
                 cancellationToken).ConfigureAwait(false);
-            return true;
+            return new ControlAvailability(Succeeded: true, Unobserved: false, Cause: null);
         }
         catch (HttpRequestException exception)
         {
             // Never reached ChatBot. Previously reported as "did not succeed", i.e. indistinguishable from a
             // refusal — but a connection that never landed is a missing observation, not negative evidence.
-            _controlProbeUnobserved = true;
-            _controlProbeCause = $"transport-{exception.HttpRequestError}";
-            return false;
+            return new ControlAvailability(
+                Succeeded: false,
+                Unobserved: true,
+                Cause: $"transport-{exception.HttpRequestError}");
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             // Distinct from a non-202: the control operation was never answered, so this run cannot say whether the
             // unaffected path kept working. Deliberately NOT retried and NOT treated as available — widening this
             // would let a genuine degradation of the control path read as containment (the NFR58 evidence).
-            _controlProbeUnobserved = true;
-            _controlProbeCause = "client-timeout";
-            return false;
+            return new ControlAvailability(Succeeded: false, Unobserved: true, Cause: "client-timeout");
         }
     }
+
+    /// <summary>A control result plus whether its absence was observed and a metadata-only cause.</summary>
+    private sealed record ControlAvailability(bool Succeeded, bool Unobserved, string? Cause);
 
     private async Task WaitForIdentityAsync(CancellationToken cancellationToken)
     {

@@ -24,7 +24,7 @@ internal sealed class ChatBotProblemDetailsFactory(
 
         return redactionStage.Apply(new ProblemDetails
         {
-            Type = "https://hexalith.dev/errors/chatbot/authorization-denied",
+            Type = ChatBotProblemTypes.AuthorizationDenied,
             Title = entry.Headline,
             Status = status,
             Category = status == StatusCodes.Status401Unauthorized
@@ -45,7 +45,7 @@ internal sealed class ChatBotProblemDetailsFactory(
 
         return redactionStage.Apply(new ProblemDetails
         {
-            Type = "https://hexalith.dev/errors/chatbot/audit-unavailable",
+            Type = ChatBotProblemTypes.AuditUnavailable,
             Title = entry.Headline,
             Status = StatusCodes.Status503ServiceUnavailable,
             Category = ProblemDetailsCategory.Internal_error,
@@ -89,7 +89,7 @@ internal sealed class ChatBotProblemDetailsFactory(
 
         return redactionStage.Apply(new ProblemDetails
         {
-            Type = "https://hexalith.dev/errors/chatbot/idempotency-conflict",
+            Type = ChatBotProblemTypes.IdempotencyConflict,
             Title = entry.Headline,
             Status = StatusCodes.Status409Conflict,
             Category = ProblemDetailsCategory.Conflict,
@@ -108,7 +108,7 @@ internal sealed class ChatBotProblemDetailsFactory(
 
         return redactionStage.Apply(new ProblemDetails
         {
-            Type = "https://hexalith.dev/errors/chatbot/invalid-lifecycle-transition",
+            Type = ChatBotProblemTypes.InvalidLifecycleTransition,
             Title = entry.Headline,
             Status = StatusCodes.Status409Conflict,
             Category = ProblemDetailsCategory.Conflict,
@@ -127,7 +127,7 @@ internal sealed class ChatBotProblemDetailsFactory(
 
         return redactionStage.Apply(new ProblemDetails
         {
-            Type = "https://hexalith.dev/errors/chatbot/command-not-allowlisted",
+            Type = ChatBotProblemTypes.CommandNotAllowlisted,
             Title = entry.Headline,
             Status = StatusCodes.Status403Forbidden,
             Category = ProblemDetailsCategory.Authorization_denied,

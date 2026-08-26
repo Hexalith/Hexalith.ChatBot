@@ -813,7 +813,7 @@ status: open
 origin: migrated from legacy ledger ("Deferred from: 12-15 adversarial batch, stood down by the coordinator (2026-08-25)"), 2026-08-26
 location: ChatBot Tier-3 harness
 severity: low
-reason: **[LOW · api-hygiene] C10 (second half) — `RecoveryResourceLogTail.Render(string? matching)` exposes a filter no call site uses.** **Not covered:** the tail is always rendered wholly unfiltered; the parameter is dead surface that invites a future caller to assume filtering happens. *(The first half — sharing the dispatch-unavailable type URI as one constant — is done.)* **Owner:** ChatBot Tier-3 harness.
+reason: **[LOW · api-hygiene] C10 (second half) — `RecoveryResourceLogTail.Render(string? matching)` exposed a filter no call site used.** **Historical gap:** the tail was always rendered wholly unfiltered; the parameter was dead surface that invited a future caller to assume filtering happened. *(The first half — sharing the dispatch-unavailable type URI as one constant — was already done.)* **Owner:** ChatBot Tier-3 harness.
 status: done 2026-08-26
 resolution: already resolved: tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryResourceLogTail.cs:88 now exposes parameterless Render(); commit b35f3eb3 removed the unused matching filter.
 
@@ -838,7 +838,7 @@ status: open
 origin: migrated from legacy ledger ("Deferred from: 12-15 adversarial batch, stood down by the coordinator (2026-08-25)"), 2026-08-26
 location: ChatBot Tier-3 harness
 severity: low
-reason: **[LOW · dead-code] D6 — `WaitForGovernedOperationAsync`'s absence path is unreachable.** After moving absence onto the projection channel, all five call sites pass `expectPresent: true`. **Not covered:** the parameter, the `AbsenceConfirmationWindow` branch, the "absence" wording and the trailing `return false` are dead, and the retained comment documents a path that no longer exists — so a future reader can reasonably believe absence is still observed there. **Fix:** remove the parameter or keep one caller exercising it. **Owner:** ChatBot Tier-3 harness.
+reason: **[LOW · dead-code] D6 — `WaitForGovernedOperationAsync`'s absence path was unreachable.** After moving absence onto the projection channel, all three call sites passed `expectPresent: true`. **Historical gap:** the parameter, the `AbsenceConfirmationWindow` branch, the "absence" wording and the trailing `return false` were dead, and the retained comment documented a path that no longer existed — so a future reader could reasonably believe absence was still observed there. **Fix:** remove the parameter or keep one caller exercising it. **Owner:** ChatBot Tier-3 harness.
 status: done 2026-08-26
 resolution: already resolved: Commit 90c84cd7 removed the expectPresent/absence surface; tests/Hexalith.ChatBot.IntegrationTests/Recovery/AspireRecoverySandboxOperations.cs:1387 now has the presence-only IsGovernedOperationProjectionPresentAsync.
 

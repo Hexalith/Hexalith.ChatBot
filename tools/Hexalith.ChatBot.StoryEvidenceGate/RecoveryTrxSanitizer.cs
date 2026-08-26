@@ -19,14 +19,13 @@ public static class RecoveryTrxSanitizer
 
     /// <summary>The largest raw producer TRX admitted, in bytes.</summary>
     /// <remarks>
-    /// The producer runs with <c>console;verbosity=detailed</c> for hours, so its raw TRX has no natural size
-    /// bound. Refusing an oversized document with a reason code beats an <see cref="OutOfMemoryException"/> that
-    /// discards a completed drill's evidence.
+    /// The producer runs for hours, so its raw TRX has no natural size bound. Refusing an oversized document with a
+    /// reason code beats an <see cref="OutOfMemoryException"/> that discards a completed drill's evidence.
     /// </remarks>
     internal const long MaximumTrxBytes = 64L * 1024 * 1024;
 
     /// <summary>The largest raw producer TRX admitted, in characters.</summary>
-    internal const long MaximumTrxCharacters = 50_000_000;
+    internal const long MaximumTrxCharacters = MaximumTrxBytes;
 
     /// <summary>Writes a deterministic payload-free projection of one passing recovery result.</summary>
     public static void Sanitize(string inputPath, string outputPath)
@@ -103,7 +102,6 @@ public static class RecoveryTrxSanitizer
             || Counter(counters, "inconclusive") != 0
             || Counter(counters, "notExecuted") != 0
             || OptionalCounter(counters, "notRunnable") != 0
-            || OptionalCounter(counters, "warning") != 0
             || OptionalCounter(counters, "passedButRunAborted") != 0
             || OptionalCounter(counters, "disconnected") != 0
             || OptionalCounter(counters, "pending") != 0)

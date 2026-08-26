@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.Versioning;
@@ -341,6 +342,8 @@ static void ApplyWindowsRealmFileAcl(string path)
 // cannot impersonate it) lets the sweep delete only directories whose owner is genuinely gone.
 static void WriteKeycloakRealmOwnerMarker(string directory)
 {
+    string markerPath = Path.Combine(directory, "owner.marker");
+    string stagingPath = Path.Combine(directory, "owner.marker.tmp");
     try
     {
         using Process current = Process.GetCurrentProcess();
@@ -348,8 +351,6 @@ static void WriteKeycloakRealmOwnerMarker(string directory)
         // Written to a sibling temp name and MOVED into place. File.WriteAllText truncates then writes, so a
         // concurrently starting AppHost could read a zero-length or partial marker mid-write. Move is atomic within
         // a directory, so the marker is either absent or complete -- never torn.
-        string markerPath = Path.Combine(directory, "owner.marker");
-        string stagingPath = Path.Combine(directory, "owner.marker.tmp");
         File.WriteAllText(
             stagingPath,
             string.Create(
@@ -359,10 +360,13 @@ static void WriteKeycloakRealmOwnerMarker(string directory)
     }
     catch (Exception exception) when (exception is IOException
         or UnauthorizedAccessException
-        or InvalidOperationException
-        or System.ComponentModel.Win32Exception)
+        || IsProcessInspectionFailure(exception))
     {
-        // Best effort. A missing marker is read as "still live" by the sweep, which only forgoes cleanup.
+        // Best effort and metadata only. A missing marker is read as "still live" by the sweep, which only forgoes
+        // cleanup, but operators still need to know why abandoned-directory reclamation will be suppressed.
+        Console.Error.WriteLine(
+            $"Keycloak realm owner marker was not written; abandoned-directory cleanup is suppressed. "
+            + $"Marker={markerPath} Cause={exception.GetType().Name}");
     }
 }
 
@@ -450,10 +454,12 @@ static bool IsKeycloakRealmOwnerAlive(string directory)
         // No process carries that identifier: the owner is gone.
         return false;
     }
-    catch (Exception exception) when (exception is InvalidOperationException
-        or System.ComponentModel.Win32Exception)
+    catch (Exception exception) when (IsProcessInspectionFailure(exception))
     {
         // The process exists but its start time is unreadable (foreign owner, or it exited mid-inspection).
         return true;
     }
 }
+
+static bool IsProcessInspectionFailure(Exception exception)
+    => exception is InvalidOperationException or Win32Exception;

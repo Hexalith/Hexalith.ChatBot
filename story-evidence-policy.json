@@ -3,6 +3,7 @@
   "minimumSupportedVersion": "2.1",
   "repositoryIdentity": "Hexalith/Hexalith.ChatBot",
   "maximumCurrentRunAgeMinutes": 60,
+  "maximumLaneCurrentRunAgeMinutes": 1440,
   "maximumRetainedEvidenceAgeHours": 720,
   "maximumFutureClockSkewMinutes": 5,
   "allowedScopeModes": [

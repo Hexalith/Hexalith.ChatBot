@@ -371,6 +371,10 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         DistributedApplication app = await StartTestingApplicationAsync(cancellationToken).ConfigureAwait(true);
         try
         {
+            await Recovery.RecoveryWriterProtocolProvisioner.ActivateAsync(
+                app,
+                Recovery.RecoveryRepositoryCommitResolver.Resolve(),
+                cancellationToken).ConfigureAwait(true);
             foreach (string resource in new[] { EventStoreResourceName, TenantsResourceName, ChatBotResourceName })
             {
                 await app.ResourceNotifications
@@ -436,6 +440,10 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         DistributedApplication app = await StartTestingApplicationAsync(cancellationToken).ConfigureAwait(true);
         try
         {
+            await Recovery.RecoveryWriterProtocolProvisioner.ActivateAsync(
+                app,
+                Recovery.RecoveryRepositoryCommitResolver.Resolve(),
+                cancellationToken).ConfigureAwait(true);
             foreach (string resource in new[] { EventStoreResourceName, TenantsResourceName, ChatBotResourceName })
             {
                 await app.ResourceNotifications
@@ -2023,6 +2031,10 @@ public sealed class TrivialGovernedCommandAspireE2eTests
 
     private async Task WaitForAndRecordRequiredTopologyAsync(DistributedApplication app, CancellationToken cancellationToken)
     {
+        await Recovery.RecoveryWriterProtocolProvisioner.ActivateAsync(
+            app,
+            Recovery.RecoveryRepositoryCommitResolver.Resolve(),
+            cancellationToken).ConfigureAwait(true);
         Dictionary<string, int> isolatedHttpPorts = new(StringComparer.Ordinal);
         foreach (string resource in RequiredTopologyResources)
         {

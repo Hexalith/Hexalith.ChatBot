@@ -10,6 +10,7 @@ public sealed class LiveContinuityAspireE2eContractTests
     [Theory]
     [InlineData(null, 300)]
     [InlineData("265", 265)]
+    [InlineData(" 265 ", 265)]
     [InlineData("1", 1)]
     [InlineData("300", 300)]
     public void RecoveryWorkflowTimeoutHonorsTheBoundedCompletionOverride(string? configured, int expectedMinutes)

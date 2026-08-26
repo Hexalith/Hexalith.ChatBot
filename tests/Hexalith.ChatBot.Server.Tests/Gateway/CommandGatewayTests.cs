@@ -4093,6 +4093,15 @@ public sealed class CommandGatewayTests
             factory.CreateInvalidLifecycleTransition(CorrelationId, TaskId),
         ];
 
+        problems.Select(static problem => problem.Type).ShouldBe(
+        [
+            ChatBotProblemTypes.AuthorizationDenied,
+            ChatBotProblemTypes.AuthorizationDenied,
+            ChatBotProblemTypes.AuditUnavailable,
+            ChatBotProblemTypes.IdempotencyConflict,
+            ChatBotProblemTypes.InvalidLifecycleTransition,
+        ]);
+
         foreach (ProblemDetails problem in problems)
         {
             ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(problem.Code);
@@ -4110,6 +4119,9 @@ public sealed class CommandGatewayTests
         ProblemDetails dispatchUnavailable = factory.CreateDispatchUnavailable(CorrelationId, TaskId);
         dispatchUnavailable.Type.ShouldBe(ChatBotProblemTypes.DispatchUnavailable);
         dispatchUnavailable.Status.ShouldBe(503);
+
+        factory.CreateCommandNotAllowlisted(CorrelationId, TaskId)
+            .Type.ShouldBe(ChatBotProblemTypes.CommandNotAllowlisted);
     }
 
     [Fact]

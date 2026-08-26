@@ -70,8 +70,10 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t projects < <(find tests -type f -name '*.csproj' -print | sort)
-          if (( ${#projects[@]} == 0 )); then
-            printf 'No test projects were discovered under tests/.\n' >&2
+          expected_projects=15
+          if (( ${#projects[@]} != expected_projects )); then
+            printf 'Expected %s test projects under tests/, discovered %s.\n' \
+              "$expected_projects" "${#projects[@]}" >&2
             exit 1
           fi
           declare -A seen_lanes=()
@@ -85,7 +87,8 @@ jobs:
           done
           executed=0
           for project in "${projects[@]}"; do
-            if [[ "$project" == *"Hexalith.ChatBot.RecoverySandbox.csproj" ]]; then
+            if [[ "$project" == *"Hexalith.ChatBot.RecoverySandbox.csproj" \
+              || "$project" == *"Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj" ]]; then
               continue
             fi
             lane="$(basename "${project%.csproj}")"
@@ -95,8 +98,10 @@ jobs:
             sha256sum "${output}/${lane}.trx" > "${output}/${lane}.trx.sha256"
             executed=$((executed + 1))
           done
-          if (( executed == 0 )); then
-            printf 'No test lanes executed; refusing to report a green required job.\n' >&2
+          expected_lanes=13
+          if (( executed != expected_lanes )); then
+            printf 'Expected %s general test lanes, executed %s; refusing a partial green job.\n' \
+              "$expected_lanes" "$executed" >&2
             exit 1
           fi
           printf '%s\n' "$(git rev-parse HEAD)" > TestResults/producer-head.sha
@@ -113,9 +118,9 @@ jobs:
     needs: [build, topology-acceptance]
     if: always()
     runs-on: ubuntu-latest
-    # The recovery producer has a 265-minute in-process deadline. It may start only
-    # within the first 40 minutes, preserving 15 minutes to unwind and 30 minutes
-    # for cleanup, sanitization, attestation, validation, and upload.
+    # The recovery producer has a 250-minute in-process deadline and a 265-minute external interrupt. It may start
+    # only within the first 40 minutes; the remaining fixed closeout budget covers from-scratch restore/build and
+    # gate self-tests as well as fault restoration, sanitization, attestation, validation, and upload.
     timeout-minutes: 360
     permissions:
       contents: read
@@ -274,7 +279,7 @@ jobs:
             -m:1 \
             --configuration Release \
             --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" \
-            --logger "console;verbosity=detailed" \
+            --logger "console;verbosity=minimal" \
             --settings live-recovery.runsettings \
             --logger "trx;LogFileName=live-recovery-validation.trx" \
             --results-directory "${{ runner.temp }}/raw-recovery-results"
@@ -313,7 +318,7 @@ jobs:
           --configuration Release --no-build -- summarize-recovery-attempt
           --input "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.trx"
           --outcome "${{ steps.recovery.outcome }}"
-          --output "${{ runner.temp }}/recovery-attempt/recovery-attempt-summary.json"
+          --output "TestResults/completion-recovery/recovery-attempt-summary.json"
       - name: Project recovery result into metadata-only completion TRX
         if: steps.artifacts.outputs.requires_recovery == 'true'
         run: >-
@@ -321,15 +326,21 @@ jobs:
           --configuration Release --no-build -- sanitize-recovery-trx
           --input "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.trx"
           --output "${{ runner.temp }}/machine-results/recovery-primary/live-recovery-validation.trx"
+      - name: Stage metadata-only completion result under the artifact root
+        if: always() && steps.artifacts.outputs.requires_recovery == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p TestResults/completion-recovery
+          sanitized="${{ runner.temp }}/machine-results/recovery-primary/live-recovery-validation.trx"
+          if [[ -f "$sanitized" ]]; then
+            cp "$sanitized" TestResults/completion-recovery/live-recovery-validation.trx
+          fi
       - name: Upload metadata-only recovery attempt evidence
         if: always() && steps.artifacts.outputs.requires_recovery == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: completion-recovery-evidence
-          path: |
-            ${{ runner.temp }}/recovery-attempt
-            ${{ runner.temp }}/machine-results/recovery-primary
-            ${{ github.workspace }}/TestResults/live-recovery
+          path: TestResults
           retention-days: 30
           # warn, not error: this upload is always(), and on the failure path it exists for, the summarizer and
           # sanitizer outputs may not exist. Failing here would mask the recovery failure behind an artifact error.
@@ -529,7 +540,7 @@ jobs:
             -m:1 \
             --configuration Release \
             --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" \
-            --logger "console;verbosity=detailed" \
+            --logger "console;verbosity=minimal" \
             --settings live-recovery.runsettings \
             --logger "trx;LogFileName=live-recovery-validation.trx" \
             --results-directory TestResults
@@ -547,14 +558,14 @@ jobs:
             '.completedAtUtc=$completedAtUtc | .producerOutcome=$producerOutcome' \
             "$ATTEMPT_PATH" > "$temporary_path"
           mv "$temporary_path" "$ATTEMPT_PATH"
+          mkdir -p TestResults/workflow-attempt
+          cp "$ATTEMPT_PATH" TestResults/workflow-attempt/producer-attempt.json
       - name: Upload live recovery reports, manifests, and raw test evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: live-recovery-validation-evidence
-          path: |
-            TestResults
-            ${{ runner.temp }}/workflow-attempt
+          path: TestResults
           retention-days: 30
           if-no-files-found: error
       - name: Stop DAPR runtime

@@ -35,17 +35,18 @@ _ = builder.AddEventStoreDomainService(typeof(GovernedOperationAggregate).Assemb
 // does not boot. That is deliberate. A shape-valid but wrong identity is refused verbatim by EventStore and stalls
 // the projection checkpoint forever with nothing logged as an error, so a loud crash-loop is strictly easier to
 // diagnose than the outage the alternative produces.
+IConfiguration projectionIdentityConfiguration = builder.Configuration;
 _ = builder.Services
     .AddOptions<DomainProjectionIdentityOptions>()
     .PostConfigure(options =>
     {
         options.AppId = ChatBotDomainServiceIdentity.ResolveAppId(
-            builder.Configuration[$"{ChatBotDomainServiceIdentity.ConfigurationSection}:AppId"],
-            builder.Configuration["EventStore:DomainService:AppId"],
-            Environment.GetEnvironmentVariable("DAPR_APP_ID"));
+            projectionIdentityConfiguration[$"{ChatBotDomainServiceIdentity.ConfigurationSection}:AppId"],
+            projectionIdentityConfiguration["EventStore:DomainService:AppId"],
+            projectionIdentityConfiguration["DAPR_APP_ID"]);
         options.ServiceVersion = ChatBotDomainServiceIdentity.ResolveServiceVersion(
-            builder.Configuration[$"{ChatBotDomainServiceIdentity.ConfigurationSection}:ServiceVersion"],
-            builder.Configuration["EventStore:DomainService:ServiceVersion"]);
+            projectionIdentityConfiguration[$"{ChatBotDomainServiceIdentity.ConfigurationSection}:ServiceVersion"],
+            projectionIdentityConfiguration["EventStore:DomainService:ServiceVersion"]);
 
         // The gate below validates SHAPE; EventStore compares the VALUE ordinally. Nothing else recorded which
         // identity this host actually resolved, so a well-formed but WRONG value was invisible from the outside --

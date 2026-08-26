@@ -9,6 +9,9 @@ namespace Hexalith.ChatBot.StoryEvidenceGate;
 /// </summary>
 public static class StoryEvidenceValidator
 {
+    /// <summary>The policy schema this gate implementation understands.</summary>
+    internal const string SupportedPolicyVersion = "2.1";
+
     /// <summary>Validates one contract and returns a metadata-only report.</summary>
     /// <param name="options">The normalized gate options.</param>
     /// <returns>The pass or fail report.</returns>
@@ -378,11 +381,19 @@ public static class StoryEvidenceValidator
             policy,
             "minimumSupportedVersion",
             GateReason.ScopeDigestMismatch);
-        if (!policyVersion.Equals("2.1", StringComparison.Ordinal)
-            || !minimumVersion.Equals("2.1", StringComparison.Ordinal)
+        if (!Version.TryParse(policyVersion, out Version? parsedPolicyVersion)
+            || !Version.TryParse(minimumVersion, out Version? parsedMinimumVersion)
+            || parsedPolicyVersion < parsedMinimumVersion)
+        {
+            throw new GateValidationException(GateReason.ScopeDigestMismatch, "minimum-supported-version");
+        }
+
+        if (!policyVersion.Equals(SupportedPolicyVersion, StringComparison.Ordinal)
+            || !minimumVersion.Equals(SupportedPolicyVersion, StringComparison.Ordinal)
             || !EvidenceJson.RequiredString(policy, "repositoryIdentity", GateReason.ScopeDigestMismatch)
                 .Equals("Hexalith/Hexalith.ChatBot", StringComparison.Ordinal)
             || EvidenceJson.RequiredInteger(policy, "maximumCurrentRunAgeMinutes", GateReason.ScopeDigestMismatch) != 60
+            || EvidenceJson.RequiredInteger(policy, "maximumLaneCurrentRunAgeMinutes", GateReason.ScopeDigestMismatch) != 1440
             || EvidenceJson.RequiredInteger(policy, "maximumRetainedEvidenceAgeHours", GateReason.ScopeDigestMismatch) != 720
             || EvidenceJson.RequiredInteger(policy, "maximumFutureClockSkewMinutes", GateReason.ScopeDigestMismatch) != 5
             || !EvidenceJson.RequiredStrings(policy, "allowedScopeModes", GateReason.ScopeDigestMismatch)

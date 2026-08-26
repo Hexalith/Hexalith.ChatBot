@@ -144,4 +144,17 @@ public sealed class ChatBotProjectionIdentityTests
         identity.AppId.ShouldBe("chatbot-canary");
         identity.ServiceVersion.ShouldBe("v2");
     }
+
+    [Fact]
+    public void DaprIdentityCanBeSuppliedThroughHostConfigurationEndToEnd()
+    {
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => _ = builder.UseSetting("DAPR_APP_ID", "chatbot-dapr"));
+
+        DomainProjectionIdentityOptions identity = factory.Services
+            .GetRequiredService<IOptions<DomainProjectionIdentityOptions>>()
+            .Value;
+
+        identity.AppId.ShouldBe("chatbot-dapr");
+    }
 }

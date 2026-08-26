@@ -212,8 +212,7 @@ public static class LiveRecoveryValidationArchitectureTests
                     continue;
                 }
 
-                block.ShouldContain(
-                    "timeout --signal=INT --kill-after=15m",
+                block.Contains("timeout --signal=INT --kill-after=15m", StringComparison.Ordinal).ShouldBeTrue(
                     "every in-process-bounded recovery producer must carry an external interrupt of its own.");
 
                 Match literal = Regex.Match(block, "--kill-after=15m (?<seconds>[0-9]+)s");
@@ -348,13 +347,29 @@ public static class LiveRecoveryValidationArchitectureTests
         foreach (string workflow in new[] { ".github/workflows/ci.yml", ".github/workflows/release.yml" })
         {
             string source = ReadProjectFile(workflow);
+            Match producerJob = Regex.Match(
+                source,
+                "(?ms)^  live-recovery-validation:.*?(?=^  live-recovery-evidence-gate:)");
+            producerJob.Success.ShouldBeTrue($"{workflow} must contain the live recovery producer job");
+            Match uploadStep = Regex.Match(
+                producerJob.Value,
+                "(?ms)^      - name: Upload live recovery reports, manifests, and raw test evidence\\n"
+                + ".*?(?=^      - name: |\\z)");
+            uploadStep.Success.ShouldBeTrue($"{workflow} must contain the live recovery upload step");
             source.ShouldContain("live-recovery-validation:");
             source.ShouldContain("timeout-minutes: 330");
             source.ShouldContain("cancel-in-progress: false");
             source.ShouldContain("-m:1");
             source.ShouldContain("LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate");
-            source.ShouldContain("if: always()");
-            source.ShouldContain("path: TestResults");
+            uploadStep.Value.ShouldContain("if: always()");
+            uploadStep.Value.ShouldContain("path: TestResults");
+            uploadStep.Value.ShouldNotContain("path: |");
+            producerJob.Value.ShouldContain(
+                "ATTEMPT_PATH: ${{ runner.temp }}/workflow-attempt/producer-attempt.json");
+            producerJob.Value.ShouldContain(
+                "cp \"$ATTEMPT_PATH\" TestResults/workflow-attempt/producer-attempt.json");
+            producerJob.Value.ShouldContain("console;verbosity=minimal");
+            producerJob.Value.ShouldNotContain("console;verbosity=detailed");
             source.ShouldContain("Initialize metadata-only live recovery attempt envelope");
             source.ShouldContain("Finalize metadata-only live recovery attempt envelope");
             source.ShouldContain("live-recovery-producer-attempt");
@@ -462,7 +477,7 @@ public static class LiveRecoveryValidationArchitectureTests
     /// real file with a filter that matches nothing, and asserts the platform did not reject the settings.
     /// </remarks>
     [Fact]
-    public static void RunSettingsIsAcceptedByTheTestPlatform()
+    public static async Task RunSettingsIsAcceptedByTheTestPlatform()
     {
         string repositoryRoot = RepositoryRoot();
         using Process process = new()
@@ -490,24 +505,33 @@ public static class LiveRecoveryValidationArchitectureTests
             "FullyQualifiedName=Hexalith.ChatBot.Architecture.Tests.LiveRecoveryValidationArchitectureTests.RunSettingsPlatformAcceptanceProbe",
             "--settings",
             "live-recovery.runsettings",
+            "--logger",
+            "console;verbosity=detailed",
         })
         {
             process.StartInfo.ArgumentList.Add(argument);
         }
 
-        _ = process.Start();
+        process.Start().ShouldBeTrue("the run-settings acceptance probe process must start");
 
         // Drained concurrently. Reading stdout to completion and only then stderr deadlocks whenever the child
-        // fills the stderr pipe buffer, and the WaitForExit below sits after both reads so it cannot rescue it.
+        // fills the stderr pipe buffer and prevents the bounded exit wait from observing completion.
+        Task<string> standardOutput = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
         Task<string> standardError = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
-        string output = process.StandardOutput.ReadToEnd()
-            + standardError.GetAwaiter().GetResult();
-
-        if (!process.WaitForExit((int)TimeSpan.FromMinutes(5).TotalMilliseconds))
+        try
+        {
+            await process.WaitForExitAsync(TestContext.Current.CancellationToken)
+                .WaitAsync(TimeSpan.FromMinutes(5), TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
+        }
+        catch (TimeoutException)
         {
             process.Kill(entireProcessTree: true);
             throw new TimeoutException("The run-settings acceptance probe did not exit within its budget.");
         }
+
+        string output = (await standardOutput.ConfigureAwait(true))
+            + (await standardError.ConfigureAwait(true));
 
         output.ShouldNotContain(
             "does not conform to required format",

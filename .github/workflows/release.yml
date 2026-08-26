@@ -154,7 +154,7 @@ jobs:
             -m:1 \
             --configuration Release \
             --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" \
-            --logger "console;verbosity=detailed" \
+            --logger "console;verbosity=minimal" \
             --settings live-recovery.runsettings \
             --logger "trx;LogFileName=live-recovery-validation.trx" \
             --results-directory TestResults
@@ -172,14 +172,14 @@ jobs:
             '.completedAtUtc=$completedAtUtc | .producerOutcome=$producerOutcome' \
             "$ATTEMPT_PATH" > "$temporary_path"
           mv "$temporary_path" "$ATTEMPT_PATH"
+          mkdir -p TestResults/workflow-attempt
+          cp "$ATTEMPT_PATH" TestResults/workflow-attempt/producer-attempt.json
       - name: Upload live recovery reports, manifests, and raw test evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: release-live-recovery-validation-evidence
-          path: |
-            TestResults
-            ${{ runner.temp }}/workflow-attempt
+          path: TestResults
           retention-days: 30
           if-no-files-found: error
       - name: Stop DAPR runtime

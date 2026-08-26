@@ -2330,7 +2330,6 @@ public static class StoryEvidenceGateTests
     [InlineData("broken-id-crosslink")]
     [InlineData("passed-but-run-aborted")]
     [InlineData("not-runnable")]
-    [InlineData("warning")]
     [InlineData("disconnected")]
     [InlineData("pending")]
     public static void RecoveryTrxSanitizerShouldRejectAdversarialInput(string mutation)
@@ -2369,13 +2368,9 @@ public static class StoryEvidenceGateTests
                     "notExecuted=\"0\" notRunnable=\"2\"",
                     StringComparison.Ordinal),
 
-                // The remaining three fail-closed counters. Without these rows, deleting any one clause from
+                // The remaining fail-closed outcome counters. Without these rows, deleting either clause from
                 // RecoveryTrxSanitizer left the suite green while a TRX carrying that counter became completion
-                // evidence -- three of the five guards were silently removable.
-                "warning" => trx.Replace(
-                    "notExecuted=\"0\"",
-                    "notExecuted=\"0\" warning=\"1\"",
-                    StringComparison.Ordinal),
+                // evidence.
                 "disconnected" => trx.Replace(
                     "notExecuted=\"0\"",
                     "notExecuted=\"0\" disconnected=\"1\"",
@@ -2416,6 +2411,31 @@ public static class StoryEvidenceGateTests
         }
     }
 
+    /// <summary>A warning count is diagnostic metadata, not a non-passing test outcome.</summary>
+    [Fact]
+    public static void RecoveryTrxSanitizerShouldAcceptWarningsOnAnOtherwisePassingRun()
+    {
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"recovery-sanitize-warning-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            string input = Path.Combine(temporaryRoot, "raw.trx");
+            string output = Path.Combine(temporaryRoot, "sanitized.trx");
+            string trx = RecoverySanitizerTrx(DateTimeOffset.UtcNow).Replace(
+                "notExecuted=\"0\"",
+                "notExecuted=\"0\" warning=\"1\"",
+                StringComparison.Ordinal);
+            File.WriteAllText(input, trx);
+
+            RecoveryTrxSanitizer.Sanitize(input, output);
+
+            File.Exists(output).ShouldBeTrue();
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
 
     /// <summary>
     /// Proves the sanitizer's output is actually admitted by the reader that must consume it.
@@ -2478,6 +2498,8 @@ public static class StoryEvidenceGateTests
     [InlineData(false)]
     public static void RecoveryAttemptSummarizerShouldRetainMetadataForAFailedProducer(bool trxPresent)
     {
+        using GateFixture fixture = new();
+        JsonObject policy = EvidenceJson.LoadPolicy(fixture.PolicyPath);
         string temporaryRoot = Path.Combine(Path.GetTempPath(), $"recovery-summary-{Guid.NewGuid():N}");
         Directory.CreateDirectory(temporaryRoot);
         try
@@ -2493,15 +2515,24 @@ public static class StoryEvidenceGateTests
                         .Replace(
                             "<UnitTestResult testId=\"recovery-1\" outcome=\"Failed\" />",
                             "<UnitTestResult testId=\"recovery-1\" outcome=\"Failed\"><Output><StdOut>Bearer tenant-secret-payload</StdOut></Output></UnitTestResult>",
+                            StringComparison.Ordinal)
+                        .Replace(
+                            "className=\"Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests\"",
+                            "className=\"tenant-secret-payload\"",
+                            StringComparison.Ordinal)
+                        .Replace(
+                            "name=\"LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate\"",
+                            "name=\"credential=private-value\"",
                             StringComparison.Ordinal));
             }
 
-            RecoveryAttemptSummarizer.Summarize(input, "failure", output);
+            RecoveryAttemptSummarizer.Summarize(input, "failure", output, policy);
 
             string summary = File.ReadAllText(output);
             summary.ShouldContain("live-recovery-attempt-summary");
             summary.ShouldContain("\"producerOutcome\": \"failure\"");
             summary.ShouldContain(trxPresent ? "\"trxPresent\": true" : "\"trxPresent\": false");
+            summary.ShouldContain(trxPresent ? "\"trxState\": \"parsed\"" : "\"trxState\": \"absent\"");
             summary.ShouldNotContain("Bearer");
             summary.ShouldNotContain("secret");
             summary.ShouldNotContain("payload");
@@ -2517,6 +2548,7 @@ public static class StoryEvidenceGateTests
     [Fact]
     public static void RecoveryAttemptSummarizerShouldNormalizeAnUnknownOutcome()
     {
+        using GateFixture fixture = new();
         string temporaryRoot = Path.Combine(Path.GetTempPath(), $"recovery-summary-token-{Guid.NewGuid():N}");
         Directory.CreateDirectory(temporaryRoot);
         try
@@ -2525,7 +2557,8 @@ public static class StoryEvidenceGateTests
             RecoveryAttemptSummarizer.Summarize(
                 Path.Combine(temporaryRoot, "absent.trx"),
                 "$(curl evil)",
-                output);
+                output,
+                EvidenceJson.LoadPolicy(fixture.PolicyPath));
 
             string summary = File.ReadAllText(output);
             summary.ShouldContain("\"producerOutcome\": \"unknown\"");
@@ -2536,6 +2569,86 @@ public static class StoryEvidenceGateTests
             Directory.Delete(temporaryRoot, recursive: true);
         }
     }
+
+    /// <summary>Proves malformed input, zero counters, malformed counters, and truncated methods remain distinct.</summary>
+    [Fact]
+    public static void RecoveryAttemptSummarizerShouldDescribeMalformedAndTruncatedInputPrecisely()
+    {
+        using GateFixture fixture = new();
+        JsonObject policy = EvidenceJson.LoadPolicy(fixture.PolicyPath);
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"recovery-summary-state-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            string malformedInput = Path.Combine(temporaryRoot, "malformed.trx");
+            string malformedOutput = Path.Combine(temporaryRoot, "malformed.json");
+            File.WriteAllText(malformedInput, "not xml");
+            RecoveryAttemptSummarizer.Summarize(malformedInput, "failure", malformedOutput, policy);
+            string malformed = File.ReadAllText(malformedOutput);
+            malformed.ShouldContain("\"trxPresent\": true");
+            malformed.ShouldContain("\"trxState\": \"malformed\"");
+
+            string input = Path.Combine(temporaryRoot, "raw.trx");
+            string output = Path.Combine(temporaryRoot, "summary.json");
+            string extraMethods = string.Join(
+                string.Empty,
+                Enumerable.Range(0, 32).Select(index =>
+                    $"<UnitTest id=\"extra-{index}\"><TestMethod className=\"Safe.Class{index}\" name=\"SafeMethod{index}\" /></UnitTest>"));
+            File.WriteAllText(
+                input,
+                RecoverySanitizerTrx(DateTimeOffset.UtcNow)
+                    .Replace("notExecuted=\"0\"", "notExecuted=\"0\" warning=\"malformed\"", StringComparison.Ordinal)
+                    .Replace("</TestDefinitions>", $"{extraMethods}</TestDefinitions>", StringComparison.Ordinal));
+
+            RecoveryAttemptSummarizer.Summarize(input, "failure", output, policy);
+
+            string parsed = File.ReadAllText(output);
+            parsed.ShouldContain("\"trxState\": \"parsed\"");
+            parsed.ShouldContain("\"failed\": 0");
+            parsed.ShouldContain("\"warning\": null");
+            parsed.ShouldContain("\"testMethodCount\": 33");
+            parsed.ShouldContain("\"testsTruncated\": true");
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    /// <summary>Proves summary retention obeys the policy bound and never masks a producer failure on write errors.</summary>
+    [Fact]
+    public static void RecoveryAttemptSummarizerShouldUseMetadataPolicyAndRemainBestEffort()
+    {
+        using GateFixture fixture = new();
+        JsonObject policy = EvidenceJson.LoadPolicy(fixture.PolicyPath);
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"recovery-summary-policy-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            // A directory cannot be opened as the output file; the producer failure must still remain primary.
+            RecoveryAttemptSummarizer.Summarize("absent.trx", "failure", temporaryRoot, policy);
+
+            JsonObject strictPolicy = (JsonObject)policy.DeepClone();
+            EvidenceJson.RequiredObject(
+                strictPolicy,
+                "metadataOnly",
+                GateReason.EvidencePayloadForbidden)["maximumStringLength"] = 8;
+            string rejectedOutput = Path.Combine(temporaryRoot, "rejected.json");
+            RecoveryAttemptSummarizer.Summarize("absent.trx", "failure", rejectedOutput, strictPolicy);
+
+            File.Exists(rejectedOutput).ShouldBeFalse(
+                "the retained record must pass the policy's metadata-only validator before it is written");
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    /// <summary>Proves byte and character admission limits cannot disagree for an ASCII TRX.</summary>
+    [Fact]
+    public static void RecoveryTrxSanitizerSizeBoundsShouldBeConsistent()
+        => RecoveryTrxSanitizer.MaximumTrxCharacters.ShouldBe(RecoveryTrxSanitizer.MaximumTrxBytes);
 
     /// <summary>Proves a lane may raise its own current-run ceiling but never lower the global floor.</summary>
     [Fact]
@@ -2548,11 +2661,65 @@ public static class StoryEvidenceGateTests
         EvidenceJson.ResolveCurrentRunAgeMinutes(policy, "story-evidence-gate").ShouldBe(60);
     }
 
+    /// <summary>Proves both production consumers apply the lane ceiling rather than the flat global value.</summary>
+    [Fact]
+    public static void RecoveryLaneCeilingShouldFlowThroughAttestationAndValidation()
+    {
+        using GateFixture fixture = new();
+        fixture.UseClaimPrimaryPath("recovery", "recovery-primary");
+        DateTimeOffset evaluationTime = DateTimeOffset.UtcNow;
+        fixture.WriteTrx(
+            1,
+            1,
+            1,
+            0,
+            0,
+            "Completed",
+            "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.ValidAssertion",
+            evaluationTime.AddMinutes(-120));
+
+        fixture.Attest();
+        GateReport report = fixture.Validate(evaluationTime);
+
+        report.Passed.ShouldBeTrue(
+            string.Join(", ", report.Issues.Select(static issue => $"{issue.ReasonCode}:{issue.Subject}")));
+    }
+
+    /// <summary>Proves duplicate lane bindings cannot disagree by declaring and omitting an override.</summary>
+    [Fact]
+    public static void PerLaneCurrentRunCeilingShouldRejectPresentVersusAbsentOverrides()
+    {
+        using GateFixture fixture = new();
+        JsonObject policy = EvidenceJson.LoadPolicy(fixture.PolicyPath);
+        JsonArray triggers = EvidenceJson.RequiredArray(
+            policy,
+            "primaryPathTriggers",
+            GateReason.ScopeDigestMismatch);
+        JsonObject recoveryBinding = triggers
+            .SelectMany(static trigger => EvidenceJson.RequiredArray(
+                (JsonObject)trigger!,
+                "recognizedLaneBindings",
+                GateReason.ScopeDigestMismatch))
+            .OfType<JsonObject>()
+            .Single(static binding => binding["lane"]!.GetValue<string>() == "recovery-primary");
+        JsonObject missingOverride = (JsonObject)recoveryBinding.DeepClone();
+        _ = missingOverride.Remove("maximumCurrentRunAgeMinutes");
+        EvidenceJson.RequiredArray(
+            (JsonObject)triggers[0]!,
+            "recognizedLaneBindings",
+            GateReason.ScopeDigestMismatch).Add(missingOverride);
+
+        GateValidationException exception = Should.Throw<GateValidationException>(
+            () => EvidenceJson.ResolveCurrentRunAgeMinutes(policy, "recovery-primary"));
+
+        exception.Subject.ShouldBe("lane-current-run-age-presence");
+    }
+
     /// <summary>Proves a lane ceiling below the global floor, or an absurd one, fails closed.</summary>
     [Theory]
-    [InlineData(30)]
-    [InlineData(4321)]
-    public static void PerLaneCurrentRunCeilingShouldRejectOutOfRangeOverrides(int minutes)
+    [InlineData(30, "lane-current-run-age-below-global")]
+    [InlineData(4321, "lane-current-run-age-above-maximum")]
+    public static void PerLaneCurrentRunCeilingShouldRejectOutOfRangeOverrides(int minutes, string expectedSubject)
     {
         using GateFixture fixture = new();
         fixture.MutatePolicy(policy =>
@@ -2576,7 +2743,61 @@ public static class StoryEvidenceGateTests
 
         GateValidationException exception = Should.Throw<GateValidationException>(
             () => EvidenceJson.ResolveCurrentRunAgeMinutes(mutated, "recovery-primary"));
-        exception.Subject.ShouldBe("lane-current-run-age");
+        exception.Subject.ShouldBe(expectedSubject);
+    }
+
+    /// <summary>Proves two declared values for the same lane identify disagreement distinctly.</summary>
+    [Fact]
+    public static void PerLaneCurrentRunCeilingShouldIdentifyValueDisagreement()
+    {
+        using GateFixture fixture = new();
+        JsonObject policy = EvidenceJson.LoadPolicy(fixture.PolicyPath);
+        JsonArray triggers = EvidenceJson.RequiredArray(policy, "primaryPathTriggers", GateReason.ScopeDigestMismatch);
+        JsonObject recoveryBinding = triggers
+            .SelectMany(static trigger => EvidenceJson.RequiredArray(
+                (JsonObject)trigger!,
+                "recognizedLaneBindings",
+                GateReason.ScopeDigestMismatch))
+            .OfType<JsonObject>()
+            .Single(static binding => binding["lane"]!.GetValue<string>() == "recovery-primary");
+        JsonObject disagreement = (JsonObject)recoveryBinding.DeepClone();
+        disagreement["maximumCurrentRunAgeMinutes"] = 359;
+        EvidenceJson.RequiredArray(
+            (JsonObject)triggers[0]!,
+            "recognizedLaneBindings",
+            GateReason.ScopeDigestMismatch).Add(disagreement);
+
+        GateValidationException exception = Should.Throw<GateValidationException>(
+            () => EvidenceJson.ResolveCurrentRunAgeMinutes(policy, "recovery-primary"));
+
+        exception.Subject.ShouldBe("lane-current-run-age-disagreement");
+    }
+
+    /// <summary>Proves the declared compatibility floor is evaluated before exact policy pinning.</summary>
+    [Fact]
+    public static void PolicyMinimumSupportedVersionShouldRejectANewerFloor()
+    {
+        using GateFixture fixture = new();
+        JsonObject policy = EvidenceJson.LoadPolicy(fixture.PolicyPath);
+        policy["minimumSupportedVersion"] = "2.2";
+
+        GateValidationException exception = Should.Throw<GateValidationException>(
+            () => StoryEvidenceValidator.ValidatePinnedPolicy(policy));
+
+        exception.Subject.ShouldBe("minimum-supported-version");
+    }
+
+    /// <summary>Proves the checked-in policy and the gate implementation declare one supported version.</summary>
+    [Fact]
+    public static void PolicyVersionShouldMatchTheGateImplementation()
+    {
+        using GateFixture fixture = new();
+        JsonObject policy = EvidenceJson.LoadPolicy(fixture.PolicyPath);
+
+        EvidenceJson.RequiredString(policy, "schemaVersion", GateReason.ScopeDigestMismatch)
+            .ShouldBe(StoryEvidenceValidator.SupportedPolicyVersion);
+        EvidenceJson.RequiredString(policy, "minimumSupportedVersion", GateReason.ScopeDigestMismatch)
+            .ShouldBe(StoryEvidenceValidator.SupportedPolicyVersion);
     }
 
     /// <summary>Proves a transition-declared current-run topology lane requires its producer.</summary>

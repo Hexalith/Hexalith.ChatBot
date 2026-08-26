@@ -819,10 +819,28 @@ public static class ScaffoldArchitectureTests
             "tools",
             "Hexalith.ChatBot.StoryEvidenceGate",
             "ProvenanceAttestor.cs"));
+        string completionJob = WorkflowBlock(workflow, "story-evidence-integrity", "topology-acceptance");
+        string completionProducer = WorkflowStep(
+            completionJob,
+            "Produce transition-declared current recovery primary result");
+        string completionSummary = WorkflowStep(
+            completionJob,
+            "Summarize recovery attempt into metadata-only failure record");
+        string completionUpload = WorkflowStep(
+            completionJob,
+            "Upload metadata-only recovery attempt evidence");
+        string scheduledRecoveryJob = WorkflowBlock(
+            workflow,
+            "live-recovery-validation",
+            "live-recovery-evidence-gate");
+        string scheduledRecoveryProducer = WorkflowStep(
+            scheduledRecoveryJob,
+            "Run all live recovery coordinators and retain evidence");
 
         policy.ShouldContain("\"schemaVersion\": \"2.1\"");
         policy.ShouldContain("\"repositoryIdentity\": \"Hexalith/Hexalith.ChatBot\"");
         policy.ShouldContain("\"maximumCurrentRunAgeMinutes\": 60");
+        policy.ShouldContain("\"maximumLaneCurrentRunAgeMinutes\": 1440");
         policy.ShouldContain("\"maximumCurrentRunAgeMinutes\": 360");
         policy.ShouldContain("\"snapshot-plus-transition\"");
         policy.ShouldContain("\"scope_digest_mismatch\"");
@@ -886,7 +904,9 @@ public static class ScaffoldArchitectureTests
         workflow.ShouldContain("actions: read");
         workflow.ShouldContain("declare -A seen_lanes=()");
         workflow.ShouldContain("find tests -type f -name '*.csproj'");
-        workflow.ShouldContain("No test projects were discovered under tests/");
+        workflow.ShouldContain("expected_projects=15");
+        workflow.ShouldContain("expected_lanes=13");
+        workflow.ShouldContain("refusing a partial green job");
         workflow.ShouldContain("Colliding test lane");
         workflow.ShouldContain("Non-zero push base %s is unavailable; refusing a one-commit fallback.");
         workflow.ShouldContain("base_sha=\"$head_sha\"");
@@ -916,12 +936,28 @@ public static class ScaffoldArchitectureTests
         workflow.ShouldContain(
             "- name: Stop DAPR runtime for transition-declared current recovery primary\n"
             + "        if: always() && steps.artifacts.outputs.requires_recovery == 'true'");
-        workflow.ShouldContain("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: \"250\"");
         workflow.ShouldNotContain("HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT: story-evidence-integrity-reports");
-        workflow.ShouldContain("HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT: completion-recovery-evidence");
-        workflow.ShouldContain("summarize-recovery-attempt");
-        workflow.ShouldContain("No test lanes executed; refusing to report a green required job.");
-        workflow.ShouldContain("timeout-minutes: 285");
+        completionProducer.ShouldContain("timeout-minutes: 285");
+        completionProducer.ShouldContain("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: \"250\"");
+        completionProducer.ShouldContain("HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT: completion-recovery-evidence");
+        completionProducer.ShouldContain("console;verbosity=minimal");
+        completionProducer.ShouldNotContain("console;verbosity=detailed");
+        completionSummary.ShouldContain("if: always() && steps.artifacts.outputs.requires_recovery == 'true'");
+        completionSummary.ShouldContain("summarize-recovery-attempt");
+        completionUpload.ShouldContain("if: always() && steps.artifacts.outputs.requires_recovery == 'true'");
+        completionUpload.ShouldContain("name: completion-recovery-evidence");
+        completionUpload.ShouldContain("path: TestResults");
+        completionUpload.ShouldNotContain("path: |");
+        Regex.Match(
+                completionProducer,
+                "HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT: (?<name>[A-Za-z0-9_.-]+)")
+            .Groups["name"].Value.ShouldBe(
+                Regex.Match(completionUpload, "(?m)^          name: (?<name>[A-Za-z0-9_.-]+)")
+                    .Groups["name"].Value);
+        scheduledRecoveryProducer.ShouldContain("timeout-minutes: 300");
+        scheduledRecoveryProducer.ShouldContain("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: \"265\"");
+        scheduledRecoveryProducer.ShouldContain("console;verbosity=minimal");
+        scheduledRecoveryProducer.ShouldNotContain("console;verbosity=detailed");
         workflow.ShouldContain("elapsed_seconds >= 2400");
         workflow.ShouldContain("job_start_epoch + (330 * 60)");
         workflow.ShouldContain("remaining_seconds - 900");
@@ -1100,6 +1136,24 @@ public static class ScaffoldArchitectureTests
             .Where(static include => !string.IsNullOrWhiteSpace(include))
             .Select(static include => include!)
             .ToArray();
+    }
+
+    private static string WorkflowBlock(string source, string name, string nextName)
+    {
+        Match match = Regex.Match(
+            source,
+            $"(?ms)^  {Regex.Escape(name)}:.*?(?=^  {Regex.Escape(nextName)}:)");
+        match.Success.ShouldBeTrue($"workflow job '{name}' must exist before '{nextName}'");
+        return match.Value;
+    }
+
+    private static string WorkflowStep(string job, string name)
+    {
+        Match match = Regex.Match(
+            job,
+            $"(?ms)^      - name: {Regex.Escape(name)}\\n.*?(?=^      - name: |\\z)");
+        match.Success.ShouldBeTrue($"workflow step '{name}' must exist in its owning job");
+        return match.Value;
     }
 
     private static string RepositoryRoot()

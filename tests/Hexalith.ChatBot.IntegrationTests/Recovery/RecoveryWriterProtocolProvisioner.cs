@@ -60,6 +60,42 @@ internal static class RecoveryWriterProtocolProvisioner
             .AcquireGlobalAdministratorAsync(application, cancellationToken)
             .ConfigureAwait(false);
 
+        await ActivateAsync(client, adminToken, cutoverCommit, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Activates the writer protocol through an already-bound EventStore client.</summary>
+    /// <remarks>
+    /// This seam keeps the protocol state machine independently testable without composing a second Aspire
+    /// topology. The production entry point above remains responsible for resolving the real endpoint and
+    /// acquiring the global-administrator bearer.
+    /// </remarks>
+    /// <param name="client">A client bound to EventStore's HTTP endpoint.</param>
+    /// <param name="adminToken">The global-administrator bearer.</param>
+    /// <param name="cutoverCommit">The provenance recorded in the marker.</param>
+    /// <param name="cancellationToken">Cancels provisioning.</param>
+    /// <param name="activationBudget">An optional test-only activation budget.</param>
+    /// <param name="conflictResolutionBudget">An optional test-only conflict probe budget.</param>
+    /// <param name="pollInterval">An optional test-only retry interval.</param>
+    /// <returns>A task that completes once the marker is active.</returns>
+    internal static async Task ActivateAsync(
+        HttpClient client,
+        string adminToken,
+        string cutoverCommit,
+        CancellationToken cancellationToken,
+        TimeSpan? activationBudget = null,
+        TimeSpan? conflictResolutionBudget = null,
+        TimeSpan? pollInterval = null)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentException.ThrowIfNullOrWhiteSpace(adminToken);
+        ArgumentException.ThrowIfNullOrWhiteSpace(cutoverCommit);
+        TimeSpan effectiveActivationBudget = activationBudget ?? ActivationBudget;
+        TimeSpan effectiveConflictResolutionBudget = conflictResolutionBudget ?? ConflictResolutionBudget;
+        TimeSpan effectivePollInterval = pollInterval ?? PollInterval;
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(effectiveActivationBudget, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(effectiveConflictResolutionBudget, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(effectivePollInterval, TimeSpan.Zero);
+
         // Attestations are literal for a disposable sandbox store: nothing predates this topology, so there are no
         // old writers or retry workers to quiesce and no backup to reference beyond the run itself.
         string body = $$"""
@@ -67,7 +103,7 @@ internal static class RecoveryWriterProtocolProvisioner
             """;
         string lastOutcome = "no attempt completed";
         Stopwatch timer = Stopwatch.StartNew();
-        while (timer.Elapsed < ActivationBudget)
+        while (timer.Elapsed < effectiveActivationBudget)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -97,7 +133,11 @@ internal static class RecoveryWriterProtocolProvisioner
                     // oracle: it reports Healthy exactly when a current marker exists. That distinguishes the two
                     // cases with what the topology actually offers, and it attributes the failure to the marker
                     // rather than to the listener.
-                    if (await IsWriterProtocolCurrentAsync(client, cancellationToken).ConfigureAwait(false))
+                    if (await IsWriterProtocolCurrentAsync(
+                        client,
+                        effectiveConflictResolutionBudget,
+                        effectivePollInterval,
+                        cancellationToken).ConfigureAwait(false))
                     {
                         // Metadata only: never a payload. Recorded so a reviewer can tell an inherited marker from
                         // one this run activated -- the provenance the A1 claim depends on.
@@ -147,11 +187,11 @@ internal static class RecoveryWriterProtocolProvisioner
                 lastOutcome = "client-timeout";
             }
 
-            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(effectivePollInterval, cancellationToken).ConfigureAwait(false);
         }
 
         throw new InvalidOperationException(
-            $"The projection delivery writer protocol was not activated within {ActivationBudget.TotalSeconds:N0}s; "
+            $"The projection delivery writer protocol was not activated within {effectiveActivationBudget.TotalSeconds:N0}s; "
             + $"last attempt: {lastOutcome}.");
     }
 
@@ -165,10 +205,12 @@ internal static class RecoveryWriterProtocolProvisioner
     /// <returns><see langword="true"/> when a current marker exists.</returns>
     private static async Task<bool> IsWriterProtocolCurrentAsync(
         HttpClient client,
+        TimeSpan conflictResolutionBudget,
+        TimeSpan pollInterval,
         CancellationToken cancellationToken)
     {
         Stopwatch probe = Stopwatch.StartNew();
-        while (probe.Elapsed < ConflictResolutionBudget)
+        while (probe.Elapsed < conflictResolutionBudget)
         {
             try
             {
@@ -186,7 +228,7 @@ internal static class RecoveryWriterProtocolProvisioner
                 // Still starting: not evidence either way.
             }
 
-            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(pollInterval, cancellationToken).ConfigureAwait(false);
         }
 
         return false;

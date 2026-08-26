@@ -30,7 +30,8 @@ public static partial class EvidenceJson
         {
             ["root"] = Set(
                 "schemaVersion", "minimumSupportedVersion", "repositoryIdentity", "maximumCurrentRunAgeMinutes",
-                "maximumRetainedEvidenceAgeHours", "maximumFutureClockSkewMinutes", "allowedScopeModes", "acceptedResultFormats",
+                "maximumLaneCurrentRunAgeMinutes", "maximumRetainedEvidenceAgeHours", "maximumFutureClockSkewMinutes",
+                "allowedScopeModes", "acceptedResultFormats",
                 "requiredStorySections", "mandatoryCheckboxSections", "sourceDigest", "reasonCodes",
                 "storyGrammars", "eventBaseHeadResolution", "primaryPathTriggers", "metadataOnly",
                 "reportExcludedPaths", "exceptions"),
@@ -247,11 +248,11 @@ public static partial class EvidenceJson
     /// Resolves the effective current-run freshness ceiling for one lane.
     /// </summary>
     /// <remarks>
-    /// The global <c>maximumCurrentRunAgeMinutes</c> encodes "produced by this run, minutes ago", which a
-    /// structurally multi-hour lane such as the live recovery drill can never satisfy. A binding may raise its own
-    /// ceiling to the age it can legitimately reach, but never lower it below the global floor: the tight bound
-    /// stays in force for every lane that can meet it. All bindings for the lane are consulted, and disagreeing
-    /// overrides fail closed rather than letting the first one win.
+    /// The global <c>maximumCurrentRunAgeMinutes</c> is measured from the TRX finish time. A binding may raise its
+    /// own ceiling when an earlier producer must remain valid while a later multi-hour recovery drill runs, but
+    /// never lower it below the global floor or exceed <c>maximumLaneCurrentRunAgeMinutes</c>. All bindings for the
+    /// lane are consulted, and disagreeing or present-versus-absent overrides fail closed rather than letting the
+    /// first one win.
     /// </remarks>
     /// <param name="policy">The pinned policy.</param>
     /// <param name="laneName">The lane being evaluated.</param>
@@ -263,12 +264,17 @@ public static partial class EvidenceJson
             policy,
             "maximumCurrentRunAgeMinutes",
             GateReason.EvidenceStaleOrUnbound);
+        int maximumLaneCeiling = RequiredInteger(
+            policy,
+            "maximumLaneCurrentRunAgeMinutes",
+            GateReason.EvidenceStaleOrUnbound);
         if (policy["primaryPathTriggers"] is not JsonArray triggers)
         {
             return globalCeiling;
         }
 
         int? resolved = null;
+        bool? overrideDeclared = null;
         foreach (JsonNode? triggerNode in triggers)
         {
             if (triggerNode is not JsonObject trigger
@@ -290,21 +296,40 @@ public static partial class EvidenceJson
                     binding,
                     "maximumCurrentRunAgeMinutes",
                     GateReason.EvidenceStaleOrUnbound);
-                if (candidate is null)
-                {
-                    continue;
-                }
-
-                if (candidate.Value < globalCeiling
-                    || candidate.Value > 1440
-                    || (resolved is not null && resolved.Value != candidate.Value))
+                bool currentOverrideDeclared = candidate is not null;
+                if (overrideDeclared is not null && overrideDeclared.Value != currentOverrideDeclared)
                 {
                     throw new GateValidationException(
                         GateReason.EvidenceStaleOrUnbound,
-                        "lane-current-run-age");
+                        "lane-current-run-age-presence");
                 }
 
-                resolved = candidate.Value;
+                overrideDeclared = currentOverrideDeclared;
+
+                if (candidate is not null
+                    && candidate.Value < globalCeiling)
+                {
+                    throw new GateValidationException(
+                        GateReason.EvidenceStaleOrUnbound,
+                        "lane-current-run-age-below-global");
+                }
+
+                if (candidate is not null
+                    && candidate.Value > maximumLaneCeiling)
+                {
+                    throw new GateValidationException(
+                        GateReason.EvidenceStaleOrUnbound,
+                        "lane-current-run-age-above-maximum");
+                }
+
+                if (candidate is not null && resolved is not null && resolved.Value != candidate.Value)
+                {
+                    throw new GateValidationException(
+                        GateReason.EvidenceStaleOrUnbound,
+                        "lane-current-run-age-disagreement");
+                }
+
+                resolved = candidate ?? resolved;
             }
         }
 
@@ -428,25 +453,45 @@ public static partial class EvidenceJson
     }
 
     private static void RejectForbiddenEvidenceFields(JsonNode node)
+        => RejectForbiddenEvidenceFields(
+            node,
+            ["secret", "password", "credential", "payload", "prompt", "token"]);
+
+    /// <summary>Validates an artifact against the policy's metadata-only field and value bounds.</summary>
+    /// <param name="node">The artifact to inspect.</param>
+    /// <param name="policy">The policy that governs retained metadata.</param>
+    internal static void ValidateMetadataOnly(JsonNode node, JsonObject policy)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        ArgumentNullException.ThrowIfNull(policy);
+        JsonObject metadata = RequiredObject(policy, "metadataOnly", GateReason.EvidencePayloadForbidden);
+        IReadOnlyList<string> forbidden = RequiredStrings(
+            metadata,
+            "forbiddenFieldNames",
+            GateReason.EvidencePayloadForbidden);
+        int maximumStringLength = RequiredInteger(
+            metadata,
+            "maximumStringLength",
+            GateReason.EvidencePayloadForbidden);
+        RejectForbiddenEvidenceFields(node, forbidden);
+        RejectUnsafeMetadataValues(node, maximumStringLength);
+    }
+
+    private static void RejectForbiddenEvidenceFields(JsonNode node, IReadOnlyList<string> forbiddenNames)
     {
         if (node is JsonObject value)
         {
             foreach ((string name, JsonNode? child) in value)
             {
                 string normalized = name.ToLowerInvariant();
-                if (normalized.Contains("secret", StringComparison.Ordinal)
-                    || normalized.Contains("password", StringComparison.Ordinal)
-                    || normalized.Contains("credential", StringComparison.Ordinal)
-                    || normalized.Contains("payload", StringComparison.Ordinal)
-                    || normalized.Contains("prompt", StringComparison.Ordinal)
-                    || normalized.Contains("token", StringComparison.Ordinal))
+                if (forbiddenNames.Any(forbidden => normalized.Contains(forbidden, StringComparison.Ordinal)))
                 {
                     throw new GateValidationException(GateReason.EvidencePayloadForbidden, name);
                 }
 
                 if (child is not null)
                 {
-                    RejectForbiddenEvidenceFields(child);
+                    RejectForbiddenEvidenceFields(child, forbiddenNames);
                 }
             }
         }
@@ -456,13 +501,16 @@ public static partial class EvidenceJson
             {
                 if (child is not null)
                 {
-                    RejectForbiddenEvidenceFields(child);
+                    RejectForbiddenEvidenceFields(child, forbiddenNames);
                 }
             }
         }
     }
 
     private static void RejectUnsafeMetadataValues(JsonNode node)
+        => RejectUnsafeMetadataValues(node, maximumStringLength: 512);
+
+    private static void RejectUnsafeMetadataValues(JsonNode node, int maximumStringLength)
     {
         if (node is JsonObject value)
         {
@@ -470,7 +518,7 @@ public static partial class EvidenceJson
             {
                 if (child is JsonValue scalar && scalar.TryGetValue(out string? text))
                 {
-                    if (text.Length > 512
+                    if (text.Length > maximumStringLength
                         || text.Any(char.IsControl)
                         || text.Contains("Bearer ", StringComparison.OrdinalIgnoreCase)
                         || Regexes.UnsafeCredential().IsMatch(text))
@@ -480,7 +528,7 @@ public static partial class EvidenceJson
                 }
                 else if (child is not null)
                 {
-                    RejectUnsafeMetadataValues(child);
+                    RejectUnsafeMetadataValues(child, maximumStringLength);
                 }
             }
         }
@@ -490,7 +538,7 @@ public static partial class EvidenceJson
             {
                 if (child is JsonValue scalar && scalar.TryGetValue(out string? text))
                 {
-                    if (text.Length > 512
+                    if (text.Length > maximumStringLength
                         || text.Any(char.IsControl)
                         || text.Contains("Bearer ", StringComparison.OrdinalIgnoreCase)
                         || Regexes.UnsafeCredential().IsMatch(text))
@@ -500,7 +548,7 @@ public static partial class EvidenceJson
                 }
                 else if (child is not null)
                 {
-                    RejectUnsafeMetadataValues(child);
+                    RejectUnsafeMetadataValues(child, maximumStringLength);
                 }
             }
         }

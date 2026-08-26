@@ -136,7 +136,7 @@ public sealed class LiveContinuityAspireE2eTests
             // Unhealthy until the store-global writer protocol is activated, so waiting for health first would
             // deadlock. Driven through the same admin endpoint a real deployment uses.
             await RecoveryWriterProtocolProvisioner
-                .ActivateAsync(application, ResolvedRepositoryCommit(), startup.Token)
+                .ActivateAsync(application, RecoveryRepositoryCommitResolver.Resolve(), startup.Token)
                 .ConfigureAwait(true);
 
             foreach (string resource in new[] { "security", "eventstore", "chatbot", "recovery-sandbox" })
@@ -206,7 +206,7 @@ public sealed class LiveContinuityAspireE2eTests
             CapturingContinuityDrillScenarioRunner runner = new(liveRunner);
             FileRecoveryValidationEvidenceSink evidence = new(
                 options,
-                ResolvedRepositoryCommit(),
+                RecoveryRepositoryCommitResolver.Resolve(),
                 InstalledDaprRuntimeVersion(),
                 ResolvedAspireVersion(),
                 ResolvedAppHostVersion());
@@ -499,8 +499,9 @@ public sealed class LiveContinuityAspireE2eTests
             return TimeSpan.FromMinutes(DefaultMinutes);
         }
 
+        string normalized = configured.Trim();
         if (!int.TryParse(
-                configured,
+                normalized,
                 NumberStyles.None,
                 CultureInfo.InvariantCulture,
                 out int minutes)
@@ -559,53 +560,6 @@ public sealed class LiveContinuityAspireE2eTests
         {
             return false;
         }
-    }
-
-    /// <summary>
-    /// Resolves the commit the evidence is attributed to. Never falls back to a literal SHA: a hard-coded fallback
-    /// made a local run publish a manifest attributed to a commit it was not built from, which is worse than
-    /// declaring the provenance unknown.
-    /// </summary>
-    private static string ResolvedRepositoryCommit()
-    {
-        string? ambient = Environment.GetEnvironmentVariable("GITHUB_SHA");
-        if (!string.IsNullOrWhiteSpace(ambient) && AuditMetadata.IsSafeStableIdentifier(ambient))
-        {
-            return ambient;
-        }
-
-        try
-        {
-            using Process? process = Process.Start(new ProcessStartInfo("git", "rev-parse HEAD")
-            {
-                WorkingDirectory = RepositoryRoot(),
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-            });
-            if (process is not null)
-            {
-                // Drain both streams concurrently — see CommandSucceeds for why sequential ReadToEnd can deadlock.
-                Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();
-                Task<string> stderrTask = process.StandardError.ReadToEndAsync();
-                Task.WaitAll(stdoutTask, stderrTask);
-                string head = stdoutTask.Result.Trim();
-                if (process.WaitForExit(10_000) && process.ExitCode == 0 &&
-                    AuditMetadata.IsSafeStableIdentifier(head))
-                {
-                    return head;
-                }
-            }
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-            // git is unavailable on this host; fall through to the fail-closed throw below.
-        }
-
-        // Fail closed rather than inventing provenance. The previous hard-coded SHA fallback made a local run publish
-        // a manifest attributed to a commit it was not built from, which is worse than refusing to write evidence.
-        throw new InvalidOperationException(
-            "The repository commit for live-recovery evidence could not be resolved from GITHUB_SHA or git.");
     }
 
     /// <summary>Reads the AppHost assembly version so a bump cannot silently leave a hardcoded provenance token.</summary>
@@ -715,8 +669,9 @@ public sealed class LiveContinuityAspireE2eTests
         HttpStatusCode? lastStatus = null;
         // The probe used to report only the status code, so a persistent 503 could not be told apart from a slow
         // start and never named its own reason code. ChatBot answers this path with a redacted ProblemDetails whose
-        // `type`/`code` distinguishes dispatch-unavailable from audit-unavailable; retaining a bounded copy of the
-        // last one turns the failure into a diagnosis. It is test output only and never reaches an evidence artifact.
+        // `type` distinguishes dispatch-unavailable from audit-unavailable (both deliberately reuse the same safe
+        // catalog code); retaining a bounded copy of the last document turns the failure into a diagnosis. It is
+        // test output only and never reaches an evidence artifact.
         string? lastProblemDetails = null;
         while (true)
         {
@@ -833,8 +788,8 @@ public sealed class LiveContinuityAspireE2eTests
 
     /// <summary>Classifies only startup statuses that can become healthy without changing the probe request.</summary>
     /// <remarks>
-    /// Enumerated rather than a <c>&gt;= 500</c> catch-all. The catch-all made every clause below unreachable and
-    /// contradicted this summary: it also retried statuses that never become healthy on their own -- notably
+    /// Enumerated rather than a <c>&gt;= 500</c> catch-all. The catch-all subsumed every explicitly listed 5xx clause
+    /// and contradicted this summary: it also retried statuses that never become healthy on their own -- notably
     /// <c>501 NotImplemented</c> and <c>505 HttpVersionNotSupported</c> -- burning the whole startup budget on a
     /// permanent misconfiguration and discarding the status code that would have named it.
     /// <c>500 InternalServerError</c> stays transient: the command spine genuinely returns it while warming.

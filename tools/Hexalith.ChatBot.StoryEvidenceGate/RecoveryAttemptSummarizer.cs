@@ -30,9 +30,27 @@ public static class RecoveryAttemptSummarizer
     /// <param name="inputPath">The raw producer TRX path, which may not exist.</param>
     /// <param name="producerOutcome">The workflow-reported step outcome.</param>
     /// <param name="outputPath">The summary output path.</param>
-    public static void Summarize(string inputPath, string producerOutcome, string outputPath)
+    /// <param name="policy">The metadata-only policy governing the retained summary.</param>
+    public static void Summarize(
+        string inputPath,
+        string producerOutcome,
+        string outputPath,
+        JsonObject policy)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        ArgumentNullException.ThrowIfNull(policy);
+        JsonObject metadataPolicy = EvidenceJson.RequiredObject(
+            policy,
+            "metadataOnly",
+            GateReason.EvidencePayloadForbidden);
+        int maximumStringLength = EvidenceJson.RequiredInteger(
+            metadataPolicy,
+            "maximumStringLength",
+            GateReason.EvidencePayloadForbidden);
+        IReadOnlyList<string> forbiddenTokenFragments = EvidenceJson.RequiredStrings(
+            metadataPolicy,
+            "forbiddenFieldNames",
+            GateReason.EvidencePayloadForbidden);
         JsonObject summary = new()
         {
             ["schemaVersion"] = "1.0",
@@ -40,15 +58,18 @@ public static class RecoveryAttemptSummarizer
             ["producerOutcome"] = NormalizeOutcome(producerOutcome),
         };
 
+        bool inputPresent = !string.IsNullOrWhiteSpace(inputPath) && File.Exists(inputPath);
         XDocument? document = TryLoad(inputPath);
         if (document?.Root is not { } root || root.Name != TeamTestNamespace + "TestRun")
         {
-            summary["trxPresent"] = false;
-            Write(outputPath, summary);
+            summary["trxPresent"] = inputPresent;
+            summary["trxState"] = inputPresent ? "malformed" : "absent";
+            TryWrite(outputPath, summary, policy);
             return;
         }
 
         summary["trxPresent"] = true;
+        summary["trxState"] = "parsed";
         if (root.Element(TeamTestNamespace + "Times") is { } times)
         {
             summary["startedAtUtc"] = SafeTimestamp(times.Attribute("start")?.Value);
@@ -56,35 +77,44 @@ public static class RecoveryAttemptSummarizer
         }
 
         XElement? resultSummary = root.Element(TeamTestNamespace + "ResultSummary");
-        summary["runOutcome"] = SafeToken(resultSummary?.Attribute("outcome")?.Value);
+        summary["runOutcome"] = SafeToken(
+            resultSummary?.Attribute("outcome")?.Value,
+            maximumStringLength,
+            forbiddenTokenFragments);
 
         JsonObject counters = [];
         XElement? counterElement = resultSummary?.Element(TeamTestNamespace + "Counters");
         foreach (string name in CounterNames)
         {
-            if (counterElement?.Attribute(name)?.Value is { } raw
-                && int.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out int value))
-            {
-                counters[name] = value;
-            }
+            counters[name] = counterElement?.Attribute(name)?.Value is { } raw
+                && int.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out int value)
+                    ? value
+                    : null;
         }
 
         summary["counters"] = counters;
 
+        XElement[] methods = root.Descendants(TeamTestNamespace + "TestMethod").ToArray();
+        summary["testMethodCount"] = methods.Length;
+        summary["testsTruncated"] = methods.Length > 32;
         JsonArray tests = [];
-        foreach (XElement method in root
-            .Descendants(TeamTestNamespace + "TestMethod")
-            .Take(32))
+        foreach (XElement method in methods.Take(32))
         {
             tests.Add(new JsonObject
             {
-                ["className"] = SafeToken(method.Attribute("className")?.Value),
-                ["name"] = SafeToken(method.Attribute("name")?.Value),
+                ["className"] = SafeToken(
+                    method.Attribute("className")?.Value,
+                    maximumStringLength,
+                    forbiddenTokenFragments),
+                ["name"] = SafeToken(
+                    method.Attribute("name")?.Value,
+                    maximumStringLength,
+                    forbiddenTokenFragments),
             });
         }
 
         summary["tests"] = tests;
-        Write(outputPath, summary);
+        TryWrite(outputPath, summary, policy);
     }
 
     private static XDocument? TryLoad(string inputPath)
@@ -138,21 +168,38 @@ public static class RecoveryAttemptSummarizer
             ? JsonValue.Create(parsed.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture))
             : null;
 
-    private static JsonNode? SafeToken(string? value) =>
+    private static JsonNode? SafeToken(
+        string? value,
+        int maximumStringLength,
+        IReadOnlyList<string> forbiddenFragments) =>
         value is not null
-            && value.Length <= 256
+            && value.Length <= maximumStringLength
             && value.All(static character => char.IsAsciiLetterOrDigit(character)
                 || character is '.' or '_' or '-' or '+' or '`')
+            && !forbiddenFragments.Any(fragment => value.Contains(fragment, StringComparison.OrdinalIgnoreCase))
             ? JsonValue.Create(value)
             : null;
 
-    private static void Write(string outputPath, JsonObject summary)
+    private static void TryWrite(string outputPath, JsonObject summary, JsonObject policy)
     {
-        string fullPath = Path.GetFullPath(outputPath);
-        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)
-            ?? throw new InvalidOperationException("Recovery attempt summary output has no parent directory."));
-        File.WriteAllText(
-            fullPath,
-            summary.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+        try
+        {
+            EvidenceJson.ValidateMetadataOnly(summary, policy);
+            string fullPath = Path.GetFullPath(outputPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)
+                ?? throw new InvalidOperationException("Recovery attempt summary output has no parent directory."));
+            File.WriteAllText(
+                fullPath,
+                summary.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (Exception exception) when (exception is GateValidationException
+            or IOException
+            or ArgumentException
+            or UnauthorizedAccessException
+            or NotSupportedException
+            or System.Security.SecurityException)
+        {
+            // Best effort by contract: retaining no summary must never replace the producer failure being reported.
+        }
     }
 }

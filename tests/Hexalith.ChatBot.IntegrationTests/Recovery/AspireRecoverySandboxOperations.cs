@@ -340,7 +340,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         // "did not accept traffic" named the wrong side of the gap once: the listener was accepting traffic and
         // answering 503, and the message sent an investigation after a connectivity problem that did not exist.
         // The diagnostic knows which side is broken, so the message says it.
-        ListenerGap gap = await DescribeListenerGapAsync(cancellationToken).ConfigureAwait(false);
+        ListenerGap gap = await DescribeListenerGapAsync().ConfigureAwait(false);
         throw new TimeoutException(
             $"EventStore did not become ready within {ListenerReadinessBudget.TotalSeconds:N0}s: {gap.Verdict} {gap.Detail}");
     }
@@ -354,17 +354,17 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     /// probes the freshly resolved one once. It never returns success, never retries into the budget, and never
     /// makes a run pass — a resolved endpoint that answers here is a diagnosis, not a recovery.
     /// </remarks>
-    /// <param name="cancellationToken">Cancels the single diagnostic probe.</param>
     /// <returns>A metadata-only description of the gap and which side of it is broken.</returns>
-    private async Task<ListenerGap> DescribeListenerGapAsync(CancellationToken cancellationToken)
+    private async Task<ListenerGap> DescribeListenerGapAsync()
     {
+        using CancellationTokenSource diagnosticTimeout = new(TimeSpan.FromSeconds(10));
         string retained = _eventStoreClient.BaseAddress?.ToString() ?? "none";
         string resolved;
         try
         {
             resolved = _application.GetEndpoint(_eventStoreResource.Name, "http").ToString();
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception)
         {
             return new ListenerGap(
                 "the harness could not resolve the resource endpoint.",
@@ -377,13 +377,15 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         {
             using HttpClient fresh = _application.CreateHttpClient(_eventStoreResource.Name, "http");
             fresh.Timeout = TimeSpan.FromSeconds(10);
-            using HttpResponseMessage response = await fresh.GetAsync("/health", cancellationToken).ConfigureAwait(false);
+            using HttpResponseMessage response = await fresh
+                .GetAsync("/health", diagnosticTimeout.Token)
+                .ConfigureAwait(false);
             freshProbe = ((int)response.StatusCode).ToString(CultureInfo.InvariantCulture);
             verdict = response.IsSuccessStatusCode
                 ? "the application answers a fresh client but not the retained one, so the retained endpoint is stale."
                 : "the application is accepting traffic and reporting itself UNHEALTHY, so the resource is not ready.";
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception)
         {
             freshProbe = $"<{exception.GetType().Name}>";
             verdict = "the application is not reachable at all, so the listener is genuinely absent.";

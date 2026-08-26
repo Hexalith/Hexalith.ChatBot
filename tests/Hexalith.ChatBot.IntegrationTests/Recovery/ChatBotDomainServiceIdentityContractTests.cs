@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 using Hexalith.ChatBot.AppHost.Aspire;
 using Hexalith.ChatBot.Server.Projections;
 
@@ -28,12 +30,47 @@ public sealed class ChatBotDomainServiceIdentityContractTests
         => ChatBotDomainServiceIdentity.AppId.ShouldBe(ChatBotAspireModule.AppId);
 
     [Fact]
+    public void DaprSuppliedAppIdResolvesToTheTopologyIdentity()
+        => ChatBotDomainServiceIdentity.ResolveAppId(null, null, ChatBotAspireModule.AppId)
+            .ShouldBe(ChatBotAspireModule.AppId);
+
+    [Fact]
     public void ServiceVersionMatchesTheVersionEventStorePostsForAnUnversionedRegistration()
     {
-        // EventStore's operational-index refresher sends registration.Version, defaulting to "v1" when the
-        // registration declares none — which is how this topology registers the ChatBot domain service.
-        ChatBotDomainServiceIdentity.ServiceVersion.ShouldBe("v1");
+        string eventStoreSource = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "references",
+            "Hexalith.EventStore",
+            "src",
+            "Hexalith.EventStore",
+            "Indexes",
+            "AdminOperationalIndexHostedService.cs"));
+        Match defaultVersion = Regex.Match(
+            eventStoreSource,
+            "GetServiceVersion\\(DomainServiceRegistration registration\\)[\\s\\S]{0,200}?"
+            + "\\? \\\"(?<version>[A-Za-z0-9_.-]+)\\\" : registration\\.Version",
+            RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
+
+        defaultVersion.Success.ShouldBeTrue(
+            "the contract test must read EventStore's own unversioned-registration default");
+        ChatBotDomainServiceIdentity.ServiceVersion.ShouldBe(defaultVersion.Groups["version"].Value);
         ChatBotDomainServiceIdentity.IsUsableIdentityComponent(ChatBotDomainServiceIdentity.ServiceVersion)
             .ShouldBeTrue();
+    }
+
+    private static string RepositoryRoot()
+    {
+        DirectoryInfo? current = new(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "Hexalith.ChatBot.slnx")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate the repository root.");
     }
 }
