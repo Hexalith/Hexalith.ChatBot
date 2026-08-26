@@ -15,6 +15,7 @@ location: release architecture
 severity: medium
 reason: **[MEDIUM · release ordering] Per-commit live-recovery concurrency can release newer and older commits out of order.** The story deliberately accepts concurrent 5.5-hour validation jobs so GitHub cannot cancel an older pending required check, but `semantic-release` itself has no safe ordering mechanism after those jobs converge at different times. **Release-claim impact:** an older workflow may attempt publication after a newer commit has already released. **Owner:** release architecture. **Closure evidence:** a release-order design that preserves a verdict for every commit without GitHub's one-pending-run cancellation behavior.
 status: open
+decision: 2026-08-26 Guard latest head — Before publication, fetch main and publish only when the validated SHA is still the newest releasable head; treat an older included SHA as superseded.
 
 ### DW-3: [LOW · code hygiene] Duplicated read-model-key helpers (`IntakeReadModelKeys`, `AttachmentIndexKeyFor`, `AreIntakeReadModelsAbsentAsync`, `RemainsIntakeReadModelsAbsentAsync`) independently added to both `AspireRecoverySandboxOperations.cs` and `AspireScopedOutageOperations.cs`.
 
@@ -168,6 +169,7 @@ location: Story 12.15 evidence sink
 severity: medium
 reason: **[MEDIUM · evidence sink] Double-fail `RetainAsync` returns unmeasurable with no disk artifact.** Caller gets `EvidenceRetentionFailedDeviation`; gate sees `missing_evidence`. **Release-claim impact:** retention-failure reason is not reconstructable from artifacts alone. **Owner:** Story 12.15 evidence sink. **Closure evidence:** best-effort side channel, or accept and document that missing_evidence covers total sink loss.
 status: open
+decision: 2026-08-26 Write fallback marker — Emit a bounded metadata-only retention-failure sentinel through an independent workflow-owned path and teach the gate to distinguish total sink loss.
 
 ### DW-22: [LOW · options] `Enabled = false` skips environment/tenant/secret/path validation.
 
@@ -421,6 +423,7 @@ location: Story 12.15 governance chunk (ADR/PRD/addendum/Completion Notes wordin
 severity: high
 reason: **[HIGH · governance + residual] No-loss continuity RPO stays `TimeSpan.Zero` by decision (2026-08-02 option 2).** Passing-run `measuredRpo: 0s` must not be cited as A10 confirmation of RPO ≤ 15 minutes. **Release-claim impact:** A10 RPO half remains unproven by green sandbox runs until a loss-path measurement or a separately owned drill is retained. **Owner:** Story 12.15 governance chunk (ADR/PRD/addendum/Completion Notes wording) + Architecture for any future loss-injection drill. **Closure evidence:** documents stop citing green-run `0s` as A10 proof; optional retained loss-path RPO evidence against the 15-minute budget.
 status: open
+decision: 2026-08-26 Build loss-path drill — Add a controlled retained loss-injection scenario with durable commit bounds and gate evidence against the 15-minute target.
 
 ### DW-53: [HIGH · `RV-REBUILD-WORM` · WORM/governed rebuild fidelity] Projection rebuild claim-narrowing (2026-08-02 option 2) leaves WORM/governed resources off the proven equivalence path.
 
@@ -429,6 +432,7 @@ location: Story 12.15 remaining rebuild work, coordinated with `RV-DURABLE-WORM`
 severity: high
 reason: **[HIGH · `RV-REBUILD-WORM` · WORM/governed rebuild fidelity] Projection rebuild claim-narrowing (2026-08-02 option 2) leaves WORM/governed resources off the proven equivalence path.** Only `AssociationProjectionHandler` source-email rebuild is claimed; WORM still identity-writes via `ToGovernedOperationView` on both seed and rebuild. **Release-claim impact:** do not claim full immutable-source+WORM rebuild equivalence or NFR57 coverage for audit-derived projections. **Owner:** Story 12.15 remaining rebuild work, coordinated with `RV-DURABLE-WORM`. **Closure evidence:** a rebuild path for governed/WORM projections that can diverge, with retained digests and tests proving non-tautological equivalence.
 status: open
+decision: 2026-08-26 Build independent rebuild — Implement an independently derived governed and WORM rebuild path that can diverge, include its digests, and add mutation-sensitive tests.
 
 ### DW-54: [HIGH · `RV-EXT-M365` · external M365/Graph fidelity] The live subscription and Graph scenarios use the topology-composed Worker/provider simulator, not Microsoft Graph.
 
@@ -437,6 +441,7 @@ location: M365 integration / production validation owner
 severity: high
 reason: **[HIGH · `RV-EXT-M365` · external M365/Graph fidelity] The live subscription and Graph scenarios use the topology-composed Worker/provider simulator, not Microsoft Graph.** The Story 12.15 implementation exercises `GraphMailboxIntakeWorker`, expired-subscription recovery, independent DAPR read-model sentinels, and EventStore actor-state end-state assertions, but retained hosted evidence is still pending and it does not prove production Graph behavior. **Release-claim impact:** A10 remains provisional; no sandbox result may claim external-M365 disaster-recovery equivalence. **Owner:** M365 integration / production validation owner. **Closure evidence:** a retained production-shaped pre-production drill against a real Graph test tenant that exercises subscription expiry/renewal, webhook/reconciliation, throttling, permissions, and end-state assertions through the same fail-closed evidence gate.
 status: open
+decision: 2026-08-26 Build Graph drill — Create an approved test-tenant drill covering subscription expiry, renewal, webhook reconciliation, throttling, permissions, and retained end-state evidence.
 
 ### DW-55: [HIGH · `RV-DURABLE-WORM` · durable audit-storage fidelity] Projection rebuild and audit-store fault validation still use `InMemoryWormAuditStore` or a test-hosted `IAuditWriter`.
 
@@ -445,6 +450,7 @@ location: durable WORM/audit infrastructure owner, coordinated with Story 12.16 
 severity: high
 reason: **[HIGH · `RV-DURABLE-WORM` · durable audit-storage fidelity] Projection rebuild and audit-store fault validation still use `InMemoryWormAuditStore` or a test-hosted `IAuditWriter`.** The repaired rebuild executes real persisted projection writes/read-back/cleanup, but it does not prove durable WORM/KMS/storage recovery or product audit composition. **Release-claim impact:** do not claim durable audit-chain disaster recovery or storage/KMS outage coverage. **Owner:** durable WORM/audit infrastructure owner, coordinated with Story 12.16 where applicable. **Closure evidence:** retained live evidence from the production binding showing append/read failure, fail-closed mutation behavior, recovery, chain verification, rebuild equivalence, and cleanup against durable storage.
 status: open
+decision: 2026-08-26 Build durable binding — Bind an approved durable WORM and KMS store and retain failure, recovery, chain-verification, rebuild, and cleanup evidence.
 
 ### DW-56: [HIGH · `RV-PROD-CONTROL` · production orchestration and replica coordination] The destructive scheduler runs isolated GitHub/Aspire test jobs, not a production AKS/multi-replica control plane.
 
@@ -453,6 +459,7 @@ location: deployment/platform reliability owner
 severity: high
 reason: **[HIGH · `RV-PROD-CONTROL` · production orchestration and replica coordination] The destructive scheduler runs isolated GitHub/Aspire test jobs, not a production AKS/multi-replica control plane.** The scheduled lane is serialized within its own concurrency group; release validation is deliberately concurrent per commit so required checks are not cancelled. The run proves allowlisted Aspire resource commands and restoration in a single local topology. **Release-claim impact:** do not claim Kubernetes/platform recovery automation, distributed lease safety, replica coordination, or production resource-control authorization. **Owner:** deployment/platform reliability owner. **Closure evidence:** an approved pre-production platform drill with least-privilege resource authority, distributed lease/non-overlap proof, multi-replica behavior, bounded restoration, health/end-state verification, and retained gate evidence.
 status: open
+decision: 2026-08-26 Build platform drill — Add an approved pre-production multi-replica drill with least-privilege controls, distributed non-overlap, restoration, health, and retained evidence.
 
 ### DW-57: [MEDIUM · `RV-PROVIDER-SCALE` · provider, product-composition, and workload scale] Local provider/component contract implementations and the configured six-record baseline do not represent product DI composition, production volume, latency, replicas, quotas, or regional failure modes.
 
@@ -461,6 +468,7 @@ location: performance/capacity and provider-integration owners
 severity: medium
 reason: **[MEDIUM · `RV-PROVIDER-SCALE` · provider, product-composition, and workload scale] Local provider/component contract implementations and the configured six-record baseline do not represent product DI composition, production volume, latency, replicas, quotas, or regional failure modes.** Story 12.15 proves bounded contract behavior only. The baseline is **not** fully materialized: of its six categories, only `sourceRecords` and `wormAuditRecords` become real entities that are seeded, projected or compared; `governedCommands`, `approvals`, `policySnapshots` and `attachmentMetadata` are parsed into inert records that are never observed. Evidence no longer presents the configured corpus as exercised coverage: `configuredDatasetVolume` carries the six-record provenance, continuity and scoped-outage manifests publish `datasetVolume: 0`, and projection rebuild publishes the actual compared-resource count. Retained hosted validation is pending. **Update 2026-08-02:** the round-2 evidence-integrity remediation genuinely materialized `attachmentMetadata` — `attachment-processing` now runs through the real `AttachmentCaptureCoordinator` against a seeded projection candidate — though the candidate is exercise-seeded rather than sourced from the dataset file's own attachment record. `governedCommands`, `approvals`, and `policySnapshots` remain unmaterialized as described above. **Update 2026-08-03 (chunk 1b decision 2):** Contained for `ai-provider`, `command-execution`, `audit-store`, and `attachment-processing` is **sandbox-contract** evidence only — Aspire ops `fault`/`process`/`restore` the recovery-sandbox and trust that JSON (including NFR41 stamps and safety flags); ChatBot's real dependency clients are not the faulted seam. Independent control succeeding during `audit-store` is expected under this harness shape and must not be read as product audit fail-closed proof. **Update 2026-08-04:** the manifest/gate split closes the evidence-labeling defect only; it does not materialize the remaining categories or close the scale residual. **Release-claim impact:** local provider/rebuild timings cannot be advertised as production performance or capacity evidence; do not claim product DI composition, real AI-provider outage behavior, product command-execution path, or ChatBot audit-store fail-closed mutation from the Tier-3 sandbox Contained sweep for those four tokens. **Owner:** performance/capacity and provider-integration owners. **Closure evidence:** retained load-profile evidence at an approved production-shaped dataset and replica count, including product-composed provider paths (ChatBot client seams for the four tokens), quota/latency/failure modes, target measurements, isolation/end-state assertions, and the same manifest provenance.
 status: open
+decision: 2026-08-26 Build production-shaped lane — Exercise product-composed clients at an approved dataset, replica count, quota, latency, and regional failure profile with retained end-state evidence.
 
 ### DW-58: [HIGH · `RV-MEASURABLE-CEILING` · the lane cannot reach the targets it is cited for] The Tier-3 restoration budget is 180 seconds against a 4-hour RTO (A10/NFR56) and a 4-hour rebuild target (NFR57).
 
@@ -469,6 +477,7 @@ location: src/Hexalith.ChatBot.Server/Audit/LiveRecoveryValidationOptions.cs
 severity: high
 reason: **[HIGH · `RV-MEASURABLE-CEILING` · the lane cannot reach the targets it is cited for] The Tier-3 restoration budget is 180 seconds against a 4-hour RTO (A10/NFR56) and a 4-hour rebuild target (NFR57).** `LiveRecoveryValidationOptions.Validate()` places no lower bound on `RestorationTimeout` relative to `MaxRto`, so any genuine recovery between 3 minutes and 4 hours converts to `unmeasurable`, never `missed`. Round 5 removed the companion `PerScenarioTimeout >= MaxRto` rule, which claimed to "permit measurement through the recovery target" while being unsatisfiable — nine serial scenarios at 4 hours each cannot fit a sub-`RunnerBudget` workflow — and replaced it with a serial fair-share bound; it deliberately did **not** add a `RestorationTimeout` floor, because any such number is invented (see the round-2 note that removed an earlier attempt). Each manifest publishes `MeasurableRecoveryCeilingSeconds` and the gate emits a non-blocking `{job}:{key}:target_exceeds_measurable_ceiling` claim limitation, so the limit is disclosed rather than hidden — but it is not enforced at ratification. A shorter budget is a deliberate trade: a 4-hour restoration window is impractical on every scheduled run. **Release-claim impact:** a pass from this lane is evidence for recovery within 180 seconds only; it must never be cited as confirming RTO ≤ 4 hr or rebuild ≤ 4 hr, and A10 ratification from it is bounded accordingly. **Owner:** Architecture/DevOps, with performance/capacity. **Closure evidence:** either a lane whose restoration budget reaches `RecoveryTargets.MaxRto` with retained evidence of a measurable miss and pass either side of the boundary, or a separately evidenced pre-production drill that measures the full window, plus a ratification rule that rejects a candidate artifact carrying the claim-limitation token for the target being ratified. [`src/Hexalith.ChatBot.Server/Audit/LiveRecoveryValidationOptions.cs`, `LiveRecoveryValidationEvidenceGate.cs`]
 status: open
+decision: 2026-08-26 Build full-window evidence — Add a separately scheduled full-window pre-production lane and reject ratification artifacts whose measurable ceiling is below the claimed target.
 
 ### DW-59: [MEDIUM · `RV-EVIDENCE-KINDS` · the retained evidence bundle carries no logs, traces, metrics or state-store end-state] The manifest requires only `test-output` and `reports`.
 
@@ -509,6 +518,7 @@ location: CommandGatewayServiceCollectionExtensions.cs:103,113,164-168,228-229
 severity: high
 reason: **[HIGH · pre-existing production binding] The scheduled controls still read and emit only through process-local defaults.** `CommandGatewayServiceCollectionExtensions.cs:103,113,164-168,228-229` binds the outbound trace, derived store, WORM store, and operator-alert sink to in-memory implementations. The hosted proof therefore demonstrates scheduler invocation but not durable production evidence, and its empty default stores can report zero breaches without exercising production tenant data. Story 12.16 explicitly owns the live Hexalith.Memories derived-store binding; the WORM/outbound-trace/alert production bindings need an equally explicit owner before “continuous production enforcement” or production release-gate claims are accepted.
 status: open
+decision: 2026-08-26 Build durable bindings — Assign owners and implement production bindings for outbound trace, derived store, WORM audit, and operator alerts with production-data scheduler evidence.
 
 ### DW-64: [MEDIUM · pre-existing runtime scaling] Cadence ownership and status are process-local.
 
@@ -745,6 +755,7 @@ location: ScaffoldArchitectureTests.cs:273
 severity: medium
 reason: **[MEDIUM · governance] `ModelContextProtocol` 1.4.1 → 2.2.0 major bump is unratified.** Commit `f804229` accepted a major-version bump of the SDK the M1 MCP surface wraps by editing `ScaffoldArchitectureTests.cs:273` and the `architecture.md` / `epics.md` planning records — all three inside Story 12.15's File List — with no ADR entry and no decision-log record. The pins match the current `references/Hexalith.Builds` catalog, so nothing is drifting; what is missing is the decision. Disclosed as out-of-scope in Story 12.15 by the 2026-08-25 review. Release-claim impact: a major SDK bump under the MCP surface is unreviewed. Closure evidence: an ADR plus decision-log entry owned by the package-authority story.
 status: open
+decision: 2026-08-26 Ratify 2.2.0 — Review compatibility impact, add an accepted ADR and decision-log record, and execute MCP adapter conformance coverage.
 
 ### DW-93: [MEDIUM · api-contract] A permanently malformed command payload is reported as a retryable `503` and raises an operator alert on every attempt.
 
@@ -753,6 +764,7 @@ location: ChatBot gateway/API
 severity: medium
 reason: **[MEDIUM · api-contract] A permanently malformed command payload is reported as a retryable `503` and raises an operator alert on every attempt.** `AcceptedCommandDispatcher.BuildPlanAsync` throws `InvalidOperationException` for an unparseable aggregate identity, and `CommandGateway.SubmitAsync` classifies it with genuine dispatch outages: the caller is told `retryable: true`, `clientAction: retry-later`, and each attempt queues a pre-commit replay intent and an `OperatorAlertKind.AuditUnavailable` alert. During one recovery run a single malformed field produced ~1,000 such alerts. Changing it means changing a shipped API contract (`400`/`422` semantics, the message catalog, OpenAPI and conformance tests), so it is out of Story 12.15's scope. **Owner:** ChatBot gateway/API. **Closure evidence:** a decided and documented status/reason for malformed payloads, with alerting no longer triggered per attempt.
 status: open
+decision: 2026-08-26 Client-error contract — Define 400 or 422 semantics with a catalogued reason, update OpenAPI and conformance tests, and suppress outage alerts for permanent defects.
 
 ### DW-94: [MEDIUM · reliability] The ChatBot UI host can still be made unstoppable by an unreachable OTLP collector.
 
@@ -761,6 +773,7 @@ location: ChatBotUiHostDefaultsExtensions.cs:34-37
 severity: medium
 reason: **[MEDIUM · reliability] The ChatBot UI host can still be made unstoppable by an unreachable OTLP collector.** `ChatBotUiHostDefaultsExtensions.cs:34-37` registers `UseOtlpExporter()` with no bounded telemetry shutdown, and `chatbot-ui` is a composed resource in the same DCP application as the EventStore host that was fixed. Provider disposal joins the batch-exporter thread with no timeout while that thread is parked in the exporter's retry sleep, so `IHost.DisposeAsync` never returns and the resource cannot be stopped. **Constraint:** the fix that exists, `BoundedTelemetryShutdownService`, is `internal sealed` to `Hexalith.EventStore.ServiceDefaults`, so the UI host cannot adopt it without a visibility change in that repository — which is why this is recorded rather than copied. **Owner:** ChatBot UI hosting, with EventStore ServiceDefaults for the visibility decision. **Closure evidence:** the UI host stops cleanly with an unreachable OTLP endpoint, proven the same falsifiable way as the EventStore host (disable the bound, the dispose test fails).
 status: open
+decision: 2026-08-26 Expose platform API — Publish a reusable bounded-shutdown seam from EventStore ServiceDefaults, consume it in ChatBot UI, and add an unreachable-collector test.
 
 ### DW-95: [MEDIUM · evidence-integrity] The scheduled and release recovery lanes upload `TestResults` without the metadata-only TRX projection.
 
@@ -777,6 +790,7 @@ location: Hexalith.EventStore
 severity: low
 reason: **[LOW · observability] Three projection log event ids are duplicated within the EventStore projection subsystem.** `1120` and `1121` are shared by `ProjectionDiscoveryHostedService` and `ProjectionUpdateOrchestrator`, and `4660` twice within `ProjectionUpdateOrchestrator`. Anything filtering or alerting on event id conflates them. They predate this work and renumbering a shipped id changes what operators' filters match, so `ProjectionLogEventIdUniquenessTests` pins them explicitly and fails on any **new** collision instead. **Owner:** Hexalith.EventStore. **Closure evidence:** ids renumbered with an operator-facing note, and the pinned allowlist emptied.
 status: open
+decision: 2026-08-26 Renumber with migration — Assign unique ids, publish an operator-facing filter migration note, update tests, and empty the collision allowlist.
 
 ### DW-97: [MEDIUM · diagnosis] B4 — the scoped-outage control probe's catch scope is wider than the request it classifies.
 
@@ -938,6 +952,7 @@ origin: migrated from legacy ledger ("Deferred from: code review of story-13.2 (
 location: n/a
 reason: `.chatbot-conversation-shell` hand-rolled chrome still wraps the `FcPageLayout`/`FcPageHeader` composition. `chatbot.tokens.css:59-99` forces `display:grid` on `__body`, which is a `FluentStack Orientation="Horizontal"` supplying its own flex layout, so the `@media (min-width:900px)` `grid-template-columns` rule at :279-283 is fragile or inert; `Wrap` is left `false` so main and complementary cannot wrap at phone width; and the shell caps at `70rem` while content declares `FcPageLayoutMode.FullWidth`. Pre-existing — the Epic 13 application frame is Story 13.1 (`done`).
 status: open
+decision: 2026-08-26 Adopt FrontComposer layout — Remove or reduce inner chrome, use FrontComposer and Fluent responsive primitives, and update cross-surface tests.
 
 ### DW-117: Hard-coded element ids (`project-conversation-composer-input`, `-title`, `-error`, `project-conversation-stream-title`) make the conversation components single-instance-only; a second instance on one page yields duplicate ids and cross-wired focus targets.
 
@@ -981,6 +996,7 @@ location: ChatBotEvidenceChip.razor:105-113
 severity: medium
 reason: **[MEDIUM · missing-capability] The evidence drawer specified by EXPERIENCE.md does not exist on the association surface.** EXPERIENCE.md Component Patterns requires an evidence drawer that "expands source evidence without forcing users to read the full email thread" and redacts inaccessible details, and specifies that an evidence chip "click or keyboard activation opens the supporting evidence when permitted". No drawer or expansion exists anywhere on `/association-review/{id}`; `ChatBotEvidenceChip.ActivateAsync` (`ChatBotEvidenceChip.razor:105-113`) invokes an `OnActivate` callback that neither call site binds. **Deferred by decision 6 of the 2026-08-25 Story 13.3 review:** that review unnests the chips and drives `CanOpenEvidence` from `evidence.State` so the surface stops advertising an action it cannot perform; building the drawer is scoped to its own story. **Owner:** ChatBot UI. **Closure evidence:** a drawer that opens permitted evidence from a chip by pointer and keyboard, with redaction preserved for Redacted/Unauthorized/Unavailable states, verified on the live route.
 status: open
+decision: 2026-08-26 Build evidence drawer — Implement permitted evidence loading and drawer presentation with pointer and keyboard activation plus fail-closed redaction states.
 
 ### DW-123: [MEDIUM · reliability] Keycloak owner-marker liveness is pid-namespace-local and carries no host discriminator.
 
@@ -1013,6 +1029,7 @@ location: GovernedOperations.razor:254-262
 severity: high
 reason: **[HIGH · data-integrity] Two routed governance surfaces present hard-coded fixture data as live product data.** `GovernedOperations.razor:254-262` embeds six fake queue rows (`item:ambiguous-001`, `operations-admin`, …); `ChatBotApprovalQueuePriorityView.razor:127` binds the entire priority table to `ChatBotApprovalQueuePriorityContract.CreateDefault()`, a design-time fixture (`sha256:11aa`, `requester:requester-1`) whose batch action is hard-coded `DisabledWithReason` (`:88`) so no approval is ever possible there. `GovernedOperations.razor:86-90` additionally asserts `"age>0 risk:any confidence:any …"`, `"priority desc, item-ref asc"` and `"page-size:100"` as if they described the live query — the only real filter is `SelectedQueueFamily` and there is no pagination. The data layer behind it is not ready either: `OperationalDashboardService` returns `ChatBotHealthStatus.Unknown` with `depth: 0` placeholder views (`:51-54`). **Decision (2026-08-26):** split out of canonical 13.4, which makes only its own new AI Action Review route real; these surfaces are labelled in-product as sample data in the interim. **Owner:** ChatBot UI + operational query backend. **Closure evidence:** both surfaces bound to real queries, with the stated filter/sort/page metadata derived from the query actually issued.
 status: open
+decision: 2026-08-26 Keep open for backend
 
 ### DW-127: [HIGH · build] The solution does not build at `HEAD`, so `Hexalith.ChatBot.Architecture.Tests` cannot be run at all.
 
