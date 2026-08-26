@@ -53,6 +53,22 @@
             "userinfo.token.claim": "true",
             "aggregate.attrs": "true"
           }
+        },
+        {
+          "name": "chatbot-project-owners-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "chatbot_project_owners",
+            "claim.name": "chatbot:project-owner",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "aggregate.attrs": "true"
+          }
         }
       ]
     },
@@ -1242,6 +1258,9 @@
       "attributes": {
         "tenants": [
           "tenant-alpha"
+        ],
+        "chatbot_project_owners": [
+          "project-alpha"
         ]
       }
     },

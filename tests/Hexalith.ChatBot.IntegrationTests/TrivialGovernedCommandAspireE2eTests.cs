@@ -1463,10 +1463,12 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         throw streamFailure;
     }
 
-    private async Task<DistributedApplication> StartTestingApplicationAsync(CancellationToken cancellationToken)
+    internal async Task<DistributedApplication> StartTestingApplicationAsync(
+        CancellationToken cancellationToken,
+        Action<IDistributedApplicationTestingBuilder>? configureBuilder = null)
     {
         TopologyStartupAttempt attempt = await TopologyStartupOrchestrator.StartAsync(
-            CreateTopologyStartupAttemptAsync,
+            (attemptNumber, token) => CreateTopologyStartupAttemptAsync(attemptNumber, configureBuilder, token),
             StartTopologyAttemptAsync,
             ValidateTopologyAttemptAsync,
             static (currentAttempt, exception) => TopologyFailureCorrelation.IsSelectedAddressInUse(
@@ -1478,8 +1480,16 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         return attempt.Application;
     }
 
+    internal static Task<DistributedApplication> StartTestingApplicationAsync(
+        ITestOutputHelper output,
+        CancellationToken cancellationToken,
+        Action<IDistributedApplicationTestingBuilder>? configureBuilder = null)
+        => new TrivialGovernedCommandAspireE2eTests(output)
+            .StartTestingApplicationAsync(cancellationToken, configureBuilder);
+
     private static async Task<TopologyStartupAttempt> CreateTopologyStartupAttemptAsync(
         int attemptNumber,
+        Action<IDistributedApplicationTestingBuilder>? configureBuilder,
         CancellationToken cancellationToken)
     {
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
@@ -1494,6 +1504,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         {
             ConfigureReservedDaprHttpEndpoints(builder, reservations.Ports);
             ConfigureAcceptanceM2SweepCadence(builder);
+            configureBuilder?.Invoke(builder);
             IReadOnlyDictionary<string, int> selectedPorts = selected
                 .Select((endpoint, index) => new KeyValuePair<string, int>(endpoint.Resource.Name, reservations.Ports[index]))
                 .ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal);
@@ -2029,7 +2040,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             view.GetProperty("sourceVersion").ToString());
     }
 
-    private async Task WaitForAndRecordRequiredTopologyAsync(DistributedApplication app, CancellationToken cancellationToken)
+    internal async Task WaitForAndRecordRequiredTopologyAsync(DistributedApplication app, CancellationToken cancellationToken)
     {
         await Recovery.RecoveryWriterProtocolProvisioner.ActivateAsync(
             app,
@@ -2083,6 +2094,13 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             "Every selected sidecar-backed project must run on its own concrete HTTP port.");
         _output.WriteLine("ASPIRE_RESERVED_HTTP_PORT_EVIDENCE {0}", JsonSerializer.Serialize(isolatedHttpPorts));
     }
+
+    internal static Task WaitForAndRecordRequiredTopologyAsync(
+        ITestOutputHelper output,
+        DistributedApplication app,
+        CancellationToken cancellationToken)
+        => new TrivialGovernedCommandAspireE2eTests(output)
+            .WaitForAndRecordRequiredTopologyAsync(app, cancellationToken);
 
     private static async Task<HttpResponseMessage> SubmitUnauthenticatedGovernedNoteAsync(
         HttpClient client,
@@ -2154,7 +2172,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         }
     }
 
-    private static async Task WaitForChatBotListeningAsync(HttpClient client, CancellationToken cancellationToken)
+    internal static async Task WaitForChatBotListeningAsync(HttpClient client, CancellationToken cancellationToken)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
         while (stopwatch.Elapsed < StartupTimeout)
@@ -2186,7 +2204,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     // governed-operations read for a random, absent note: a 403 safe-not-found (or 200) proves the
     // chatbot -> sidecar -> chatbot-statestore round-trip works. A crashed sidecar makes this hang, so the
     // per-request timeout + retry surfaces it as a clear readiness failure rather than an opaque submit timeout.
-    private static async Task WaitForChatBotDaprSidecarAsync(HttpClient client, string accessToken, string correlationId, CancellationToken cancellationToken)
+    internal static async Task WaitForChatBotDaprSidecarAsync(HttpClient client, string accessToken, string correlationId, CancellationToken cancellationToken)
     {
         string probeNoteId = GovernedNoteId.New().ToString();
         Stopwatch stopwatch = Stopwatch.StartNew();
@@ -2220,7 +2238,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     // status code is irrelevant; even a 404/503 means it is up). EventStore/Tenants expose no app-readiness
     // signal through Aspire's Running/healthy state under IsProxied=false, and the chatbot's command dispatch
     // round-trips into EventStore's actor host, so EventStore must be listening before the first submit.
-    private static async Task WaitForListenerAsync(HttpClient client, CancellationToken cancellationToken)
+    internal static async Task WaitForListenerAsync(HttpClient client, CancellationToken cancellationToken)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
         while (stopwatch.Elapsed < StartupTimeout)
@@ -2243,6 +2261,42 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         }
 
         throw new TimeoutException($"A spine app did not start listening within {StartupTimeout}.");
+    }
+
+    internal static async Task WaitForReadyAsync(HttpClient client, string resourceName, CancellationToken cancellationToken)
+    {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        HttpStatusCode? lastStatusCode = null;
+        string? lastResponseBody = null;
+        while (stopwatch.Elapsed < StartupTimeout)
+        {
+            try
+            {
+                using HttpResponseMessage response = await client.GetAsync("/ready", cancellationToken).ConfigureAwait(false);
+                lastStatusCode = response.StatusCode;
+                if (response.IsSuccessStatusCode)
+                {
+                    return;
+                }
+
+                lastResponseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (HttpRequestException)
+            {
+                // The listener or its DAPR readiness dependencies are not available yet; keep polling.
+            }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // The per-request timeout fired while readiness checks were running; keep polling.
+            }
+
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new TimeoutException(
+            $"The {resourceName} readiness endpoint did not become successful within {StartupTimeout}; "
+            + $"last status was {(lastStatusCode is null ? "unreachable" : $"{(int)lastStatusCode} {lastStatusCode}")}; "
+            + $"last response was '{lastResponseBody ?? "unavailable"}'.");
     }
 
     private static Task<CommandSubmissionOutcome> SubmitGovernedNoteUntilAcceptedAsync(
@@ -2415,7 +2469,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     // flow: client hexalith-chatbot, user actor-alpha whose `tenants: [tenant-alpha]` attribute maps to the
     // `eventstore:tenant` claim the gateway binds the tenant from, with audience hexalith-chatbot. An out-of-band
     // HEXALITH_CHATBOT_TIER3_TOKEN override is honored first for harnesses that seed the realm differently.
-    private static async Task<string> AcquireTenantBoundAccessTokenAsync(DistributedApplication app, CancellationToken cancellationToken)
+    internal static async Task<string> AcquireTenantBoundAccessTokenAsync(DistributedApplication app, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(app);
 
@@ -2505,7 +2559,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     // The topology needs a Docker container runtime AND the DAPR CLI AND a deliberately-provisioned topology
     // (Keycloak tenant token + EventStore/Tenants sidecars). Requiring an explicit opt-in env var on top of the
     // CLIs prevents a sandbox that merely has Docker+DAPR from running the test against an unprovisioned topology.
-    private static void RequireTier3Runtime(string skipReason)
+    internal static void RequireTier3Runtime(string skipReason)
     {
         bool available = string.Equals(
             Environment.GetEnvironmentVariable("HEXALITH_CHATBOT_TIER3"),

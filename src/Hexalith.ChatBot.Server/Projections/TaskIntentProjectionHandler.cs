@@ -17,7 +17,11 @@ internal sealed class TaskIntentProjectionHandler(IProjectConversationProjection
     {
         if (published.UserMessage is not null)
         {
-            await _conversationStore.UpsertProjectConversationMessageAsync(published.UserMessage, cancellationToken).ConfigureAwait(false);
+            await _conversationStore
+                .UpsertProjectConversationMessageAsync(
+                    published.UserMessage with { SourceVersion = published.SequenceNumber },
+                    cancellationToken)
+                .ConfigureAwait(false);
             return ProjectionOutcome.Applied;
         }
 
@@ -28,22 +32,75 @@ internal sealed class TaskIntentProjectionHandler(IProjectConversationProjection
                 cancellation.TenantId,
                 cancellation.ProjectId,
                 Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.OutcomeRecorded,
-                Hexalith.ChatBot.Contracts.Enums.AiOutcomeStatus.Succeeded,
+                Hexalith.ChatBot.Contracts.Enums.AiOutcomeStatus.Executing,
                 cancellation.RequestedAtUtc,
-                cancellation.SourceVersion,
+                published.SequenceNumber,
                 cancellation.CorrelationId,
                 cancellation.ActorId,
                 "human",
                 RequestId: cancellation.ResponseId,
                 SourceConversationItemId: cancellation.ConversationId,
                 OperationId: cancellation.GenerationId,
-                SafeNextAction: cancellation.SafeNextAction,
-                AiResponseSequence: cancellation.SourceVersion,
+                SafeNextAction: "wait-for-executor",
+                AiResponseSequence: published.SequenceNumber,
+                AiResponseProgressState: "cancelling",
+                AiResponseTerminalReason: "none",
+                AiResponseVisibilityState: "metadata_only",
+                AiResponseIsTerminal: false,
+                RedactionState: cancellation.RedactionState), cancellationToken).ConfigureAwait(false);
+            return ProjectionOutcome.Applied;
+        }
+
+        if (published.AiResponseCancellationConfirmed is not null)
+        {
+            AiResponseGenerationCancellationConfirmed confirmed = published.AiResponseCancellationConfirmed;
+            await _conversationStore.UpsertAiOutcomeEventAsync(new AiOutcomeEventView(
+                confirmed.TenantId,
+                confirmed.ProjectId,
+                Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.OutcomeRecorded,
+                Hexalith.ChatBot.Contracts.Enums.AiOutcomeStatus.Succeeded,
+                confirmed.ConfirmedAtUtc,
+                published.SequenceNumber,
+                confirmed.CorrelationId,
+                "ai-action-executor",
+                "system",
+                RequestId: confirmed.ResponseId,
+                SourceConversationItemId: confirmed.ConversationId,
+                OperationId: confirmed.GenerationId,
+                SafeNextAction: confirmed.SafeNextAction,
+                AiResponseSequence: published.SequenceNumber,
                 AiResponseProgressState: "stopped",
                 AiResponseTerminalReason: "user-stopped",
                 AiResponseVisibilityState: "metadata_only",
                 AiResponseIsTerminal: true,
-                RedactionState: cancellation.RedactionState), cancellationToken).ConfigureAwait(false);
+                RedactionState: confirmed.RedactionState), cancellationToken).ConfigureAwait(false);
+            return ProjectionOutcome.Applied;
+        }
+
+        if (published.AiResponseCancellationFailed is not null)
+        {
+            AiResponseGenerationCancellationFailed failed = published.AiResponseCancellationFailed;
+            await _conversationStore.UpsertAiOutcomeEventAsync(new AiOutcomeEventView(
+                failed.TenantId,
+                failed.ProjectId,
+                Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.ExecutionFailed,
+                Hexalith.ChatBot.Contracts.Enums.AiOutcomeStatus.Failed,
+                failed.FailedAtUtc,
+                published.SequenceNumber,
+                failed.CorrelationId,
+                "ai-action-executor",
+                "system",
+                RequestId: failed.ResponseId,
+                SourceConversationItemId: failed.ConversationId,
+                OperationId: failed.GenerationId,
+                FailureCode: failed.FailureReasonCode,
+                SafeNextAction: failed.SafeNextAction,
+                AiResponseSequence: published.SequenceNumber,
+                AiResponseProgressState: "unavailable",
+                AiResponseTerminalReason: "unavailable",
+                AiResponseVisibilityState: "metadata_only",
+                AiResponseIsTerminal: true,
+                RedactionState: failed.RedactionState), cancellationToken).ConfigureAwait(false);
             return ProjectionOutcome.Applied;
         }
 

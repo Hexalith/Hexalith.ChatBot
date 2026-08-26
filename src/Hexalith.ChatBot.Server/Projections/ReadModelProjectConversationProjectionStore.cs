@@ -8,9 +8,13 @@ using Hexalith.EventStore.Client.Projections;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
-internal sealed class ReadModelProjectConversationProjectionStore(IReadModelStore store) : IProjectConversationProjectionStore
+internal sealed class ReadModelProjectConversationProjectionStore(
+    IReadModelStore store,
+    IProjectConversationChangePublisher? changePublisher = null) : IProjectConversationProjectionStore
 {
     private const string ProjectionType = nameof(ReadModelProjectConversationProjectionStore);
+    private readonly IProjectConversationChangePublisher _changePublisher =
+        changePublisher ?? NoOpProjectConversationChangePublisher.Instance;
 
     public async Task UpsertAsync(ProjectConversationItemView item, CancellationToken cancellationToken = default)
     {
@@ -334,6 +338,16 @@ internal sealed class ReadModelProjectConversationProjectionStore(IReadModelStor
     {
         ArgumentNullException.ThrowIfNull(outcome);
         await UpsertMaterializedAiOutcomeEventAsync(outcome, cancellationToken).ConfigureAwait(false);
+
+        // SignalR carries only an advisory tenant-scoped nudge. The persisted read model remains authoritative, so
+        // publish only after the progress outcome has been durably written and never put provider content on the
+        // notification path.
+        if (!string.IsNullOrWhiteSpace(outcome.AiResponseProgressState))
+        {
+            await _changePublisher
+                .PublishProjectConversationChangedAsync(outcome.TenantId, cancellationToken)
+                .ConfigureAwait(false);
+        }
     }
 
     public async Task UpsertTaskIntentAsync(TaskIntentRecord record, CancellationToken cancellationToken = default)
@@ -461,11 +475,11 @@ internal sealed class ReadModelProjectConversationProjectionStore(IReadModelStor
 
         ProjectConversationItemView? latest = ProjectConversationItemView.LatestOf(items);
         ProjectConversationItemView[] pageItems = items
-            .OrderBy(static item => item.OccurredAt)
-            .ThenBy(static item => item.ItemId, StringComparer.Ordinal)
+            .OrderByDescending(static item => item.OccurredAt)
+            .ThenByDescending(static item => item.ItemId, StringComparer.Ordinal)
             .Where(item => cursorPosition is null ||
-                item.OccurredAt > cursorPosition.OccurredAt ||
-                (item.OccurredAt == cursorPosition.OccurredAt && string.CompareOrdinal(item.ItemId, cursorPosition.ItemId) > 0))
+                item.OccurredAt < cursorPosition.OccurredAt ||
+                (item.OccurredAt == cursorPosition.OccurredAt && string.CompareOrdinal(item.ItemId, cursorPosition.ItemId) < 0))
             .Take(pageSize + 1)
             .ToArray();
         bool hasMore = pageItems.Length > pageSize;

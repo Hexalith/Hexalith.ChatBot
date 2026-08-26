@@ -444,7 +444,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
         submitted.Tenant.ShouldBe("tenant-alpha");
         submitted.Domain.ShouldBe("chatbot");
-        submitted.AggregateId.ShouldBe("graph-message-001");
+        submitted.AggregateId.ShouldBe("project-001");
         submitted.CommandType.ShouldBe(nameof(ProposeAIAction));
 
         JsonElement payload = submitted.Payload;
@@ -493,7 +493,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Fact]
-    public async Task CommandGatewayApi_ShouldExecuteAllowedLowRiskAiAssistanceAndSubmitMetadataOnlyOutcome()
+    public async Task CommandGatewayApi_ShouldAdmitAllowedLowRiskAiAssistanceWithoutStartingProvider()
     {
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAuditWriter auditWriter = new();
@@ -513,27 +513,16 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             .ConfigureAwait(true);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        provider.ExecuteCount.ShouldBe(1);
-        provider.LastRequest.ShouldNotBeNull();
-        provider.LastRequest.TenantId.ShouldBe("tenant-alpha");
-        provider.LastRequest.ProjectId.ShouldBe("project-001");
-        provider.LastRequest.PolicySnapshotId.ShouldBe("policy-snap-001");
-        provider.LastRequest.PolicyReasonCode.ShouldBe("low-risk-execute-allowed");
-        provider.LastRequest.AuthorizedContextReferences.ShouldBe(["evidence-message-001", "evidence-attachment-001"]);
-        provider.LastRequest.ExcludedContextReasons.ShouldBe(["redacted", "policy-denied"]);
+        provider.ExecuteCount.ShouldBe(0);
+        provider.LastRequest.ShouldBeNull();
 
         SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
         submitted.Tenant.ShouldBe("tenant-alpha");
         submitted.Domain.ShouldBe("chatbot");
-        submitted.AggregateId.ShouldBe("graph-message-001");
+        submitted.AggregateId.ShouldBe("project-001");
         submitted.CommandType.ShouldBe(nameof(ExecuteLowRiskAIAssistance));
         JsonElement payload = submitted.Payload;
-        JsonElement record = payload.GetProperty("ExecutionRecord");
-        record.GetProperty("Outcome").GetString().ShouldBe("success");
-        record.GetProperty("ProviderName").GetString().ShouldBe("deterministic-test");
-        record.GetProperty("PolicyReasonCode").GetString().ShouldBe("low-risk-execute-allowed");
-        record.GetProperty("ContextPackageId").GetString().ShouldBe("context-package-001");
-        record.GetProperty("SafeNextAction").GetString().ShouldBe("none");
+        payload.GetProperty("ExecutionRecord").ValueKind.ShouldBe(JsonValueKind.Null);
         payload.GetProperty("RiskClassification").GetProperty("RiskClass").GetString().ShouldBe("low-risk");
         payload.GetRawText().ShouldNotContain("prompt", Case.Insensitive);
         payload.GetRawText().ShouldNotContain("completion", Case.Insensitive);

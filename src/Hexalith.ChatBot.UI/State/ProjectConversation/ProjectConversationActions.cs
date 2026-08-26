@@ -1,10 +1,23 @@
 namespace Hexalith.ChatBot.UI.State.ProjectConversation;
 
-public sealed record LoadProjectConversationAction(string ProjectId, string? Cursor = null);
+public sealed record LoadProjectConversationAction(string ProjectId, string? Cursor = null)
+{
+    public string RequestId { get; init; } = Guid.NewGuid().ToString("N");
 
-public sealed record ProjectConversationLoadedAction(ProjectConversationModel Conversation);
+    public bool IsHistory => !string.IsNullOrWhiteSpace(Cursor);
+}
 
-public sealed record ProjectConversationFailedAction(string ErrorCode);
+public sealed record ProjectConversationLoadedAction(
+    ProjectConversationModel Conversation,
+    string? RequestId = null,
+    string? RequestedProjectId = null,
+    string? Cursor = null);
+
+public sealed record ProjectConversationFailedAction(
+    string ErrorCode,
+    string? RequestId = null,
+    string? RequestedProjectId = null,
+    string? Cursor = null);
 
 public sealed record SetProjectConversationComposerModeAction(ProjectConversationComposerMode Mode);
 

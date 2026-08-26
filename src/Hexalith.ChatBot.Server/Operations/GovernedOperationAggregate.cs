@@ -1610,6 +1610,7 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             command.TextLength > 8000 ||
             !IsSafeMetadataToken(command.Locale) ||
             command.ExpectedSourceVersion < 0 ||
+            command.ExpectedSourceVersion == long.MaxValue ||
             !IsSafeMetadataToken(command.CorrelationId) ||
             !IsMetadataOnly(command.RedactionState, command.RetentionClass) ||
             !IsSafeMetadataToken(command.SchemaVersion))
@@ -1656,6 +1657,7 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             !IsSafeMetadataToken(command.ResponseId) ||
             !IsSafeMetadataToken(command.GenerationId) ||
             command.ExpectedSourceVersion <= 0 ||
+            command.ExpectedSourceVersion == long.MaxValue ||
             !IsSafeMetadataToken(command.CorrelationId) ||
             !IsSafeMetadataToken(command.CancellationId) ||
             !IsMetadataOnly(command.RedactionState, "collaboration_input") ||
@@ -1694,7 +1696,25 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             });
         }
 
-        if (command.ExpectedSourceVersion < generation.StartedSourceVersion)
+        if ((!string.Equals(generation.TenantId, "unavailable", StringComparison.Ordinal) &&
+                !string.Equals(generation.TenantId, envelope.TenantId, StringComparison.Ordinal)) ||
+            !string.Equals(generation.ConversationId, command.ConversationId, StringComparison.Ordinal))
+        {
+            return DomainResult.Rejection(new IRejectionEvent[]
+            {
+                new TaskIntentCaptureRejected(command.CancellationId, "ai_response_cancellation_identity_mismatch"),
+            });
+        }
+
+        if (!string.Equals(generation.Status, "active", StringComparison.Ordinal))
+        {
+            return DomainResult.Rejection(new IRejectionEvent[]
+            {
+                new TaskIntentCaptureRejected(command.CancellationId, "ai_response_generation_not_active"),
+            });
+        }
+
+        if (command.ExpectedSourceVersion != generation.StartedSourceVersion)
         {
             return DomainResult.Rejection(new IRejectionEvent[]
             {
@@ -1718,8 +1738,69 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 command.RedactionState,
                 command.SchemaVersion,
                 command.ExpectedSourceVersion + 1,
-                "response-stopped"),
+                "wait-for-executor"),
         });
+    }
+
+    public static DomainResult Handle(CompleteAiResponseGenerationCancellation command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        ActiveAiResponseGeneration? generation = state?.FindActiveAiResponseGeneration(command.ResponseId, command.GenerationId);
+        if (generation is null)
+        {
+            return DomainResult.NoOp();
+        }
+
+        if (!IsSafeMetadataToken(command.ProjectId) ||
+            !IsSafeMetadataToken(command.ConversationId) ||
+            !IsSafeMetadataToken(command.ResponseId) ||
+            !IsSafeMetadataToken(command.GenerationId) ||
+            !IsSafeMetadataToken(command.CancellationId) ||
+            !IsSafeMetadataToken(command.CorrelationId) ||
+            !IsSafeMetadataToken(command.CompletionId) ||
+            !IsSafeMetadataToken(command.SchemaVersion) ||
+            !IsSafeOptionalMetadataToken(command.FailureReasonCode) ||
+            !string.Equals(generation.Status, "cancelling", StringComparison.Ordinal) ||
+            !string.Equals(generation.TenantId, envelope.TenantId, StringComparison.Ordinal) ||
+            !string.Equals(generation.ProjectId, command.ProjectId, StringComparison.Ordinal) ||
+            !string.Equals(generation.ConversationId, command.ConversationId, StringComparison.Ordinal) ||
+            !string.Equals(generation.CancellationId, command.CancellationId, StringComparison.Ordinal))
+        {
+            return DomainResult.Rejection(new IRejectionEvent[]
+            {
+                new TaskIntentCaptureRejected(command.CompletionId, "invalid_ai_response_cancellation_completion"),
+            });
+        }
+
+        IEventPayload outcome = command.Confirmed
+            ? new AiResponseGenerationCancellationConfirmed(
+                envelope.TenantId,
+                command.ProjectId,
+                command.ConversationId,
+                command.ResponseId,
+                command.GenerationId,
+                command.CancellationId,
+                command.CorrelationId,
+                DateTimeOffset.UtcNow,
+                "metadata_only",
+                command.SchemaVersion,
+                "none")
+            : new AiResponseGenerationCancellationFailed(
+                envelope.TenantId,
+                command.ProjectId,
+                command.ConversationId,
+                command.ResponseId,
+                command.GenerationId,
+                command.CancellationId,
+                command.CorrelationId,
+                DateTimeOffset.UtcNow,
+                command.FailureReasonCode ?? "cancellation_not_confirmed",
+                "metadata_only",
+                command.SchemaVersion,
+                "retry-stop");
+        return DomainResult.Success(new[] { outcome });
     }
 
     public static DomainResult Handle(CaptureTaskIntent command, GovernedOperationState? state, CommandEnvelope envelope)
@@ -1813,7 +1894,8 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             string.IsNullOrWhiteSpace(command.SchemaVersion) ||
             string.IsNullOrWhiteSpace(command.RedactionState) ||
             string.IsNullOrWhiteSpace(command.RetentionClass) ||
-            command.ExpectedSourceVersion <= 0 ||
+            command.ExpectedSourceVersion < 0 ||
+            command.ExpectedSourceVersion == long.MaxValue ||
             command.EvidenceReferences is not { Count: > 0 } ||
             !AllSafeMetadataTokens(command.EvidenceReferences) ||
             command.AffectedResourceReferences is null ||
@@ -1833,6 +1915,18 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             return string.Equals(existingTaskIntentId, command.TaskIntentId, StringComparison.Ordinal)
                 ? DomainResult.NoOp()
                 : RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, TaskIntentReasonCodes.IdempotencyConflict, command.ExpectedSourceVersion, command.CorrelationId);
+        }
+
+        // Version zero is a real observed baseline, but only for a project whose shared conversation aggregate has no
+        // prior conversation/proposal state. Once anything is present, zero is stale and must fail closed.
+        if (command.ExpectedSourceVersion == 0 &&
+            state is not null &&
+            (state.ProjectConversationMessageIds.Count > 0 ||
+                state.TaskIntentIds.Count > 0 ||
+                state.AiActionProposals.Count > 0 ||
+                state.LowRiskAiExecutionIds.Count > 0))
+        {
+            return RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, "stale_project_conversation_version", 0, command.CorrelationId);
         }
 
         List<IEventPayload> events = [];
@@ -2020,6 +2114,7 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             string.IsNullOrWhiteSpace(command.SchemaVersion) ||
             string.IsNullOrWhiteSpace(command.RedactionState) ||
             command.ExpectedProposalSourceVersion <= 0 ||
+            command.ExpectedProposalSourceVersion == long.MaxValue ||
             command.SourceEvidenceReferences is not { Count: > 0 } ||
             !AllSafeMetadataTokens(command.SourceEvidenceReferences) ||
             command.AuthorizedContextReferences is null ||
@@ -2029,7 +2124,7 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             !IsSafeOptionalMetadataToken(command.PolicySnapshotId) ||
             !IsSafeOptionalMetadataToken(command.SourceConversationItemId) ||
             !IsSafeExecutionClassification(command.RiskClassification) ||
-            !IsSafeExecutionRecord(command.ExecutionRecord, command))
+            !IsSafeLowRiskAdmissionRecord(command.ExecutionRecord, command))
         {
             return RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, TaskIntentReasonCodes.InvalidMetadata, null, command.CorrelationId);
         }
@@ -2050,8 +2145,8 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 command.CorrelationId);
         }
 
-        LowRiskAiAssistanceExecutionRecord record = command.ExecutionRecord!;
-        if (string.Equals(record.Outcome, "pending-approval", StringComparison.Ordinal))
+        LowRiskAiAssistanceExecutionRecord? record = command.ExecutionRecord;
+        if (record is not null)
         {
             AiActionApprovalRequested approval = ApprovalRequestedFromLowRiskRoute(command, envelope, record);
             return DomainResult.Success(new IEventPayload[]
@@ -2078,38 +2173,97 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             AssistanceKindToken(command.AssistanceKind),
             command.ContextPackageId,
             command.ContextPackageVersion,
-            command.PolicySnapshotId ?? record.PolicySnapshotId,
-            record.PolicyReasonCode,
+            command.PolicySnapshotId ?? "unavailable",
+            command.RiskClassification!.ReasonCode,
             command.ExpectedProposalSourceVersion,
             command.CorrelationId,
             DateTimeOffset.UtcNow,
             command.RedactionState,
             command.RetentionClass,
-            command.SchemaVersion);
+            command.SchemaVersion,
+            envelope.TenantId,
+            command.ProjectId,
+            command.ContextPackageRedactionState,
+            command.ProviderReuseSetting,
+            command.SourceEvidenceReferences,
+            command.AuthorizedContextReferences,
+            command.ExcludedContextReasons,
+            command.SourceConversationItemId,
+            $"audit:{command.ExecutionId}",
+            command with { ExecutionRecord = null });
 
-        IEventPayload completed = string.Equals(record.Outcome, "success", StringComparison.Ordinal)
-            ? new LowRiskAiAssistanceExecutionSucceeded(
-                record,
-                command.ProjectId,
-                command.RequesterId,
-                command.SourceMessageId,
-                command.SourceConversationItemId,
-                command.AuthorizedContextReferences,
-                command.ExcludedContextReasons)
-            : new LowRiskAiAssistanceExecutionFailed(
-                record,
-                command.ProjectId,
-                command.RequesterId,
-                command.SourceMessageId,
-                command.SourceConversationItemId,
-                command.AuthorizedContextReferences,
-                command.ExcludedContextReasons);
+        return DomainResult.Success(new IEventPayload[] { started });
+    }
 
-        return DomainResult.Success(new IEventPayload[]
+    public static DomainResult Handle(CompleteLowRiskAiAssistance command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+        ArgumentNullException.ThrowIfNull(command.Execution);
+        ArgumentNullException.ThrowIfNull(command.Record);
+
+        ExecuteLowRiskAIAssistance execution = command.Execution;
+        ActiveAiResponseGeneration? generation = state?.FindActiveAiResponseGeneration(execution.ProposalId, execution.ExecutionId);
+        if (generation is null)
         {
-            started,
-            completed,
-        });
+            // A retry after any terminal winner is idempotent. It must never recreate a terminal row.
+            return DomainResult.NoOp();
+        }
+
+        if (!IsSafeMetadataToken(command.ConversationId) ||
+            !IsSafeMetadataToken(command.CompletionId) ||
+            !IsSafeMetadataToken(command.SchemaVersion) ||
+            !IsSafeExecutionRecord(command.Record, execution) ||
+            !string.Equals(generation.TenantId, envelope.TenantId, StringComparison.Ordinal) ||
+            !string.Equals(generation.ProjectId, execution.ProjectId, StringComparison.Ordinal) ||
+            !string.Equals(generation.ConversationId, command.ConversationId, StringComparison.Ordinal) ||
+            execution.ExpectedProposalSourceVersion <= 0 ||
+            execution.ExpectedProposalSourceVersion == long.MaxValue ||
+            generation.StartedSourceVersion != execution.ExpectedProposalSourceVersion + 1 ||
+            !string.Equals(generation.CorrelationId, execution.CorrelationId, StringComparison.Ordinal) ||
+            !string.Equals(generation.CorrelationId, command.Record.CorrelationId, StringComparison.Ordinal))
+        {
+            return DomainResult.Rejection(new IRejectionEvent[]
+            {
+                new TaskIntentCaptureRejected(command.CompletionId, "invalid_low_risk_ai_completion"),
+            });
+        }
+
+        if (string.Equals(command.Record.Outcome, "pending-approval", StringComparison.Ordinal))
+        {
+            AiActionApprovalRequested approval = ApprovalRequestedFromLowRiskRoute(execution, envelope, command.Record);
+            return DomainResult.Success(new IEventPayload[]
+            {
+                new LowRiskAiAssistanceRoutedToApproval(
+                    command.Record,
+                    execution.ProjectId,
+                    execution.RequesterId,
+                    execution.SourceMessageId,
+                    execution.SourceConversationItemId,
+                    execution.AuthorizedContextReferences,
+                    execution.ExcludedContextReasons),
+                approval,
+            });
+        }
+
+        IEventPayload completed = string.Equals(command.Record.Outcome, "success", StringComparison.Ordinal)
+            ? new LowRiskAiAssistanceExecutionSucceeded(
+                command.Record,
+                execution.ProjectId,
+                execution.RequesterId,
+                execution.SourceMessageId,
+                execution.SourceConversationItemId,
+                execution.AuthorizedContextReferences,
+                execution.ExcludedContextReasons)
+            : new LowRiskAiAssistanceExecutionFailed(
+                command.Record,
+                execution.ProjectId,
+                execution.RequesterId,
+                execution.SourceMessageId,
+                execution.SourceConversationItemId,
+                execution.AuthorizedContextReferences,
+                execution.ExcludedContextReasons);
+        return DomainResult.Success(new[] { completed });
     }
 
     public static DomainResult Handle(DecideAiActionApproval command, GovernedOperationState? state, CommandEnvelope envelope)
@@ -4820,6 +4974,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             IsSafeMetadataToken(record.RedactionState) &&
             IsSafeMetadataToken(record.RetentionClass) &&
             IsSafeMetadataToken(record.SchemaVersion);
+
+    private static bool IsSafeLowRiskAdmissionRecord(
+        LowRiskAiAssistanceExecutionRecord? record,
+        ExecuteLowRiskAIAssistance command)
+        // A null record is the admitted execution path. The only terminal-looking record allowed on the public
+        // command is the server-generated proposal-gate result; success/failure can enter only through the internal
+        // persisted-event completion command.
+        => record is null ||
+            (string.Equals(record.Outcome, "pending-approval", StringComparison.Ordinal) &&
+                IsSafeExecutionRecord(record, command));
 
     private static bool IsValidApprovedExecutionPayload(ExecuteApprovedAIAction command)
         => IsSafeMetadataToken(command.ProjectId) &&

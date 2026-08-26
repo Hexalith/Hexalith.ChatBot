@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
 
 using OpenTelemetry;
@@ -40,7 +41,19 @@ internal static class ChatBotUiHostDefaultsExtensions
         _ = builder.Services.AddServiceDiscovery();
         _ = builder.Services.ConfigureHttpClientDefaults(static http =>
         {
-            _ = http.AddStandardResilienceHandler();
+            _ = http.AddStandardResilienceHandler(static resilience =>
+            {
+                // CommandGateway POSTs already own durable idempotency and expose an in-progress duplicate as a
+                // conflict. Transport-level retries can race the original admission and turn a successful command
+                // into a visible 409, so retry only safe HTTP methods; callers explicitly decide mutation retries.
+                resilience.Retry.DisableForUnsafeHttpMethods();
+
+                // The standard 10-second attempt timeout is shorter than a cold governed EventStore admission.
+                // Keep that wait bounded while satisfying the standard pipeline's sampling-duration coupling.
+                resilience.AttemptTimeout.Timeout = TimeSpan.FromSeconds(30);
+                resilience.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(60);
+                resilience.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
+            });
             _ = http.AddServiceDiscovery();
         });
 

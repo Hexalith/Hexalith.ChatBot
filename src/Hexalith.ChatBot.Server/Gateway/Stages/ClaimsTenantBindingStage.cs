@@ -7,6 +7,19 @@ namespace Hexalith.ChatBot.Server.Gateway.Stages;
 internal sealed class ClaimsTenantBindingStage : ITenantBindingStage
 {
     private static readonly string[] TenantClaimTypes = ["eventstore:tenant", "tenant"];
+    private static readonly HashSet<string> TenantScopedIdentifierDomains =
+        new(StringComparer.Ordinal)
+        {
+            "chatbot",
+            "conversations",
+            "folders",
+            "operation-status",
+            "parties",
+            "policy",
+            "project-conversation",
+            "projects",
+            "tenants",
+        };
 
     public ValueTask<ChatBotTenantBindingResult> BindTenantAsync(
         ChatBotCommandSubmission submission,
@@ -133,6 +146,15 @@ internal sealed class ClaimsTenantBindingStage : ITenantBindingStage
         }
 
         if (!IsTenantIdentifierSafe(parts[0]))
+        {
+            return false;
+        }
+
+        // Compound domain identifiers (for example ai-proposal:composer-ai:<id>:<transition>) also appear in
+        // ordinary *Id properties. Only interpret the first segment as a tenant when the second segment names one
+        // of this host's tenant-scoped bounded contexts; otherwise legitimate governed identifiers would be rejected
+        // as cross-tenant targets before project authorization can run.
+        if (!TenantScopedIdentifierDomains.Contains(parts[1]))
         {
             return false;
         }

@@ -61,8 +61,8 @@ public sealed class ProjectConversationProjectionTests
     [Fact]
     public async Task ReadPageShouldExposeConversationLatestItemBeyondTheRequestedPage()
     {
-        // The S1 UI loads only the first (oldest-first) page. The header conversation state must reflect the
-        // whole conversation's current item, so a newer Correcting item on a later page must not be hidden.
+        // The first page is newest-first so current truth is immediately visible. LatestItem remains an explicit
+        // header contract rather than making callers infer it from page ordering.
         InMemoryProjectConversationProjectionStore store = new();
         await store.UpsertAsync(Item("item-001", 1, DetectedAt), TestContext.Current.CancellationToken);
         await store.UpsertAsync(Item("item-002", 2, DetectedAt.AddMinutes(1)), TestContext.Current.CancellationToken);
@@ -78,7 +78,7 @@ public sealed class ProjectConversationProjectionTests
 
         firstPage.Items.Count.ShouldBe(2);
         firstPage.HasMore.ShouldBeTrue();
-        firstPage.Items.Select(static item => item.ItemId).ShouldBe(["item-001", "item-002"]);
+        firstPage.Items.Select(static item => item.ItemId).ShouldBe(["item-003", "item-002"]);
         firstPage.LatestItem.ShouldNotBeNull();
         firstPage.LatestItem!.ItemId.ShouldBe("item-003");
         firstPage.LatestItem.LifecycleState.ShouldBe(LifecycleState.Correcting);
@@ -289,12 +289,13 @@ public sealed class ProjectConversationProjectionTests
 
         outcome.ShouldBe(TaskIntentProjectionHandler.ProjectionOutcome.Applied);
         item.ItemId.ShouldBe("ui-message:001");
+        item.SourceVersion.ShouldBe(12);
         item.SurfaceOrigin.ShouldBe("ui");
         item.EvidenceReferenceSummary.ShouldBe(["text:sha256:abcdef", "length:13"], ignoreOrder: false);
     }
 
     [Fact]
-    public async Task TaskIntentHandlerShouldProjectVerifiedAiResponseCancellationTerminalState()
+    public async Task TaskIntentHandlerShouldKeepCancellationRequestNonTerminalUntilConfirmation()
     {
         InMemoryProjectConversationProjectionStore store = new();
         TaskIntentProjectionHandler handler = new(store);
@@ -323,7 +324,7 @@ public sealed class ProjectConversationProjectionTests
                     "metadata_only",
                     "chatbot.ai-response-cancel.v1",
                     13,
-                    "response-stopped")),
+                    "wait-for-executor")),
             TestContext.Current.CancellationToken);
 
         ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
@@ -334,9 +335,86 @@ public sealed class ProjectConversationProjectionTests
         outcome.ShouldBe(TaskIntentProjectionHandler.ProjectionOutcome.Applied);
         progress.ResponseId.ShouldBe("response-001");
         progress.GenerationId.ShouldBe("generation-001");
+        progress.State.ShouldBe(AiResponseProgressState.Cancelling);
+        progress.TerminalReason.ShouldBe(AiResponseTerminalReason.None);
+        progress.IsTerminal.ShouldBeFalse();
+
+        _ = await handler.HandleAsync(
+            new PublishedTaskIntentEvent(
+                Tenant,
+                "chatbot",
+                "ai-response-cancel:001",
+                typeof(Hexalith.ChatBot.Server.Governance.Conversations.AiResponseGenerationCancellationConfirmed).FullName,
+                14,
+                DetectedAt.AddSeconds(1),
+                CorrelationId,
+                null,
+                AiResponseCancellationConfirmed: new Hexalith.ChatBot.Server.Governance.Conversations.AiResponseGenerationCancellationConfirmed(
+                    Tenant,
+                    "project-001",
+                    "conversation-001",
+                    "response-001",
+                    "generation-001",
+                    "ai-response-cancel:001",
+                    CorrelationId,
+                    DetectedAt.AddSeconds(1),
+                    "metadata_only",
+                    "chatbot.ai-response-cancellation-completion.v1",
+                    "none")),
+            TestContext.Current.CancellationToken);
+
+        item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .OrderByDescending(static candidate => candidate.SourceVersion)
+            .First();
+        progress = item.BuildAiResponseProgress().ShouldNotBeNull();
         progress.State.ShouldBe(AiResponseProgressState.Stopped);
         progress.TerminalReason.ShouldBe(AiResponseTerminalReason.UserStopped);
         progress.IsTerminal.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task TaskIntentHandlerShouldProjectUnconfirmedCancellationAsRetryableUnavailableTerminalState()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        TaskIntentProjectionHandler handler = new(store);
+        TaskIntentProjectionHandler.ProjectionOutcome outcome = await handler.HandleAsync(
+            new PublishedTaskIntentEvent(
+                Tenant,
+                "chatbot",
+                "ai-response-cancel:failed:001",
+                typeof(Hexalith.ChatBot.Server.Governance.Conversations.AiResponseGenerationCancellationFailed).FullName,
+                15,
+                DetectedAt.AddSeconds(2),
+                CorrelationId,
+                null,
+                AiResponseCancellationFailed: new Hexalith.ChatBot.Server.Governance.Conversations.AiResponseGenerationCancellationFailed(
+                    Tenant,
+                    "project-001",
+                    "conversation-001",
+                    "response-001",
+                    "generation-001",
+                    "ai-response-cancel:001",
+                    CorrelationId,
+                    DetectedAt.AddSeconds(2),
+                    "provider-cancellation-unobserved",
+                    "metadata_only",
+                    "chatbot.ai-response-cancellation-completion.v1",
+                    "retry-stop")),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store
+            .ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+        AiResponseProgress progress = item.BuildAiResponseProgress().ShouldNotBeNull();
+
+        outcome.ShouldBe(TaskIntentProjectionHandler.ProjectionOutcome.Applied);
+        progress.State.ShouldBe(AiResponseProgressState.Unavailable);
+        progress.TerminalReason.ShouldBe(AiResponseTerminalReason.Unavailable);
+        progress.IsTerminal.ShouldBeTrue();
+        item.AiFailureCode.ShouldBe("provider-cancellation-unobserved");
+        item.AiSafeNextAction.ShouldBe("retry-stop");
     }
 
     [Fact]
@@ -399,6 +477,7 @@ public sealed class ProjectConversationProjectionTests
         ProjectConversationItemView proposal = items.Single(static item => item.Kind == ProjectConversationItemKind.AiOutcome);
         proposal.AiOutcomeKind.ShouldBe(AiOutcomeKind.Proposal);
         proposal.AiOutcomeStatus.ShouldBe(AiOutcomeStatus.Proposed);
+        proposal.SourceVersion.ShouldBe(12);
         proposal.AiSafeNextAction.ShouldBe("review-ai-action");
         proposal.AiExecutionStatus.ShouldBeNull();
         proposal.AiRiskClass.ShouldBeNull();
@@ -786,9 +865,9 @@ public sealed class ProjectConversationProjectionTests
 
         ProjectConversationPage page = await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken);
 
-        page.Items.Select(static item => item.ItemId).ShouldBe(["item-a", "item-b"], ignoreOrder: false);
-        page.Items.Last().SourceVersion.ShouldBe(2);
-        page.Items.Last().OccurredAt.ShouldBe(DetectedAt.AddMinutes(2));
+        page.Items.Select(static item => item.ItemId).ShouldBe(["item-b", "item-a"], ignoreOrder: false);
+        page.Items.First().SourceVersion.ShouldBe(2);
+        page.Items.First().OccurredAt.ShouldBe(DetectedAt.AddMinutes(2));
     }
 
     [Fact]
@@ -902,7 +981,8 @@ public sealed class ProjectConversationProjectionTests
         first.NextCursorPosition.ShouldNotBeNull();
 
         ProjectConversationPage second = await store.ReadPageAsync(Tenant, "project-001", first.NextCursorPosition, 1, TestContext.Current.CancellationToken);
-        second.Items.ShouldHaveSingleItem().ItemId.ShouldBe("item-b");
+        first.Items.ShouldHaveSingleItem().ItemId.ShouldBe("item-b");
+        second.Items.ShouldHaveSingleItem().ItemId.ShouldBe("item-a");
 
         ProjectConversationPage wrongProject = await store.ReadPageAsync(Tenant, "project-002", first.NextCursorPosition, 1, TestContext.Current.CancellationToken);
         wrongProject.Items.ShouldBeEmpty();
@@ -1157,11 +1237,13 @@ public sealed class ProjectConversationProjectionTests
         InMemoryProjectConversationProjectionStore store = new();
         ApprovalProjectionHandler handler = new(store);
 
+        PublishedAiActionApprovalEvent requestPublished = ApprovalRequestPublished(8);
+        PublishedAiActionApprovalEvent decisionPublished = ApprovalDecisionPublished(9);
         ApprovalProjectionHandler.ProjectionOutcome requestOutcome = await handler.HandleAsync(
-            ApprovalRequestPublished(8),
+            requestPublished with { Request = requestPublished.Request! with { SourceVersion = 2 } },
             TestContext.Current.CancellationToken);
         ApprovalProjectionHandler.ProjectionOutcome decisionOutcome = await handler.HandleAsync(
-            ApprovalDecisionPublished(9),
+            decisionPublished with { Decision = decisionPublished.Decision! with { SourceVersion = 3 } },
             TestContext.Current.CancellationToken);
 
         ProjectConversationItemView[] items = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
@@ -1173,10 +1255,12 @@ public sealed class ProjectConversationProjectionTests
         requestOutcome.ShouldBe(ApprovalProjectionHandler.ProjectionOutcome.Applied);
         decisionOutcome.ShouldBe(ApprovalProjectionHandler.ProjectionOutcome.Applied);
         request.ApprovalStatus.ShouldBe(ApprovalStatus.Pending);
+        request.SourceVersion.ShouldBe(8);
         request.ApprovalEvidenceFreshnessStates.ShouldBe([ApprovalEvidenceFreshness.Expired], ignoreOrder: false);
         request.ApprovalDisabledReason.ShouldBe("evidence-expired");
         request.SafeNextAction.ShouldBe("review-ai-action");
         decision.ApprovalStatus.ShouldBe(ApprovalStatus.Approved);
+        decision.SourceVersion.ShouldBe(9);
         decision.ApprovalDecisionKind.ShouldBe(ApprovalDecisionKind.Approve);
         decision.ApprovalProposalId.ShouldBe("proposal-001");
         decision.ApprovalCommandName.ShouldBe("SendExternalReply");
@@ -1384,8 +1468,8 @@ public sealed class ProjectConversationProjectionTests
         ProjectConversationItemView[] items = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ToArray();
 
         items.Select(static item => item.ItemId).ShouldBe([
-            ProjectConversationItemView.ApprovalItemIdFor("approval-001", ApprovalEventKind.Request, 8),
             ProjectConversationItemView.ApprovalItemIdFor("approval-001", ApprovalEventKind.Request, 9),
+            ProjectConversationItemView.ApprovalItemIdFor("approval-001", ApprovalEventKind.Request, 8),
         ], ignoreOrder: false);
         items.Single(static item => item.SourceVersion == 9).ApprovalStatus.ShouldBe(ApprovalStatus.Rejected);
         items.Single(static item => item.SourceVersion == 8).ApprovalStatus.ShouldBe(ApprovalStatus.Failed);

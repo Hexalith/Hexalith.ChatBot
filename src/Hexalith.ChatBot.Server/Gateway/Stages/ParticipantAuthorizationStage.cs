@@ -513,7 +513,9 @@ internal sealed class ParticipantAuthorizationStage(
         // append a message to -- or cancel an AI generation in -- a project they hold no chatbot:project-owner claim
         // for. Story 13.2 AC3 names authorization as a pre-mutation validation for cancellation, and the aggregate
         // performs no project authorization of its own.
-        if ((string.Equals(submission.Request.CommandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal) ||
+        if ((string.Equals(submission.Request.CommandType, nameof(ProposeAIAction), StringComparison.Ordinal) ||
+                string.Equals(submission.Request.CommandType, nameof(DecideAiActionApproval), StringComparison.Ordinal) ||
+                string.Equals(submission.Request.CommandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal) ||
                 string.Equals(submission.Request.CommandType, nameof(ExecuteApprovedAIAction), StringComparison.Ordinal) ||
                 string.Equals(submission.Request.CommandType, nameof(RequestOutboundSendApproval), StringComparison.Ordinal) ||
                 string.Equals(submission.Request.CommandType, nameof(DecideOutboundApproval), StringComparison.Ordinal) ||
@@ -2588,11 +2590,32 @@ internal sealed class ParticipantAuthorizationStage(
         JsonElement element = command is JsonElement json
             ? json
             : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        return element.ValueKind == JsonValueKind.Object &&
-            element.TryGetProperty("projectId", out JsonElement projectId) &&
-            projectId.ValueKind == JsonValueKind.String
-                ? projectId.GetString()
-                : null;
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        // The generated production client serializes the nested Contracts command through Newtonsoft's default
+        // resolver, which preserves `ProjectId`; the ASP.NET/System.Text.Json path and direct callers use `projectId`.
+        // Read either representation without broadening authority: duplicate case variants are ambiguous and fail
+        // closed instead of allowing one serializer's value to shadow another.
+        string? projectId = null;
+        foreach (JsonProperty property in element.EnumerateObject())
+        {
+            if (!string.Equals(property.Name, "projectId", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (projectId is not null || property.Value.ValueKind != JsonValueKind.String)
+            {
+                return null;
+            }
+
+            projectId = property.Value.GetString();
+        }
+
+        return projectId;
     }
 
     private sealed class PassThroughServiceClientGrantValidator : IServiceClientGrantValidator

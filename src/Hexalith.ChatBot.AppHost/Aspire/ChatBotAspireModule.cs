@@ -63,8 +63,8 @@ internal static class ChatBotAspireModule
         return $"deadletter.{tenantId}.{PubSubTopicName}";
     }
 
-    /// <summary>The IPv4 Redis endpoint provided by <c>dapr init</c>. IPv4 literal, never "localhost" (see remarks at use site).</summary>
-    private const string RedisHost = "127.0.0.1:6379";
+    /// <summary>The default IPv4 Redis endpoint provided by <c>dapr init</c>.</summary>
+    private const string DefaultRedisHost = "127.0.0.1:6379";
 
     /// <summary>
     /// Every app id this module configures a DAPR sidecar for, across <see cref="AddHexalithChatBot"/> and
@@ -107,7 +107,7 @@ internal static class ChatBotAspireModule
 
         return new DaprSidecarOptions
         {
-            AppId = appId,
+            AppId = ResolveSpineAppId(builder.Configuration, appId),
             Config = config,
             DaprInternalGrpcPort = internalGrpcPort,
 
@@ -118,6 +118,27 @@ internal static class ChatBotAspireModule
             PlacementHostAddress = string.IsNullOrWhiteSpace(placement) ? null : placement,
             SchedulerHostAddress = string.IsNullOrWhiteSpace(scheduler) ? null : scheduler,
         };
+    }
+
+    private static string ResolveSpineAppId(IConfiguration configuration, string canonicalAppId)
+    {
+        string? suffix = configuration["Dapr:SpineAppIdSuffix"];
+        if (string.IsNullOrWhiteSpace(suffix)
+            || canonicalAppId is not (AppId or EventStoreServiceName))
+        {
+            return canonicalAppId;
+        }
+
+        if (suffix.Length > 32
+            || suffix[0] is '-' or '.'
+            || suffix[^1] is '-' or '.'
+            || !suffix.All(static character => char.IsAsciiLetterOrDigit(character) || character is '-' or '.'))
+        {
+            throw new InvalidOperationException(
+                "Dapr:SpineAppIdSuffix must be at most 32 ASCII letters, digits, hyphens, or periods and cannot start or end with punctuation.");
+        }
+
+        return $"{canonicalAppId}-{suffix}";
     }
 
     /// <summary>
@@ -172,6 +193,9 @@ internal static class ChatBotAspireModule
         // sharing one internal gRPC port fail unpredictably at daprd startup, naming only whichever process lost
         // the bind race, instead of failing closed here with both conflicting app ids.
         ValidateUniqueInternalGrpcPorts(builder.Configuration);
+        string redisHost = ResolveRedisHost(builder.Configuration);
+        string eventStoreAppId = ResolveSpineAppId(builder.Configuration, EventStoreServiceName);
+        string chatBotAppId = ResolveSpineAppId(builder.Configuration, AppId);
 
         // Redis is provided by `dapr init` at 127.0.0.1:6379 (mirrors the canonical Hexalith.EventStore module).
         // Use the IPv4 literal redisHost, never "localhost": on dual-stack hosts (e.g. WSL2) "localhost" resolves
@@ -181,14 +205,14 @@ internal static class ChatBotAspireModule
         IResourceBuilder<IDaprComponentResource> actorStateStore = builder
             .AddDaprComponent(ActorStateStoreComponentName, "state.redis")
             .WithMetadata("actorStateStore", "true")
-            .WithMetadata("redisHost", RedisHost)
+            .WithMetadata("redisHost", redisHost)
             .WithMetadata("keyPrefix", "none");
 
         // The chatbot read model + coarse idempotency store is logically isolated from every other DAPR state
         // component even though the local topology shares one Redis server.
         IResourceBuilder<IDaprComponentResource> stateStore = builder
             .AddDaprComponent(StateStoreComponentName, "state.redis")
-            .WithMetadata("redisHost", RedisHost)
+            .WithMetadata("redisHost", redisHost)
             .WithMetadata("keyPrefix", "name");
 
         // Hosted Dapr Workflow uses the actor runtime internally. Keep its actor-capable state store separate from
@@ -196,14 +220,14 @@ internal static class ChatBotAspireModule
         IResourceBuilder<IDaprComponentResource> workflowStateStore = builder
             .AddDaprComponent(WorkflowStateStoreComponentName, "state.redis")
             .WithMetadata("actorStateStore", "true")
-            .WithMetadata("redisHost", RedisHost)
+            .WithMetadata("redisHost", redisHost)
             .WithMetadata("keyPrefix", "name");
 
         // A REAL Redis pub/sub (not the toolkit's in-memory default, which is per-sidecar and would never carry a
         // governed event from the EventStore publisher across to the chatbot projection subscriber).
         IResourceBuilder<IDaprComponentResource> pubSub = builder
             .AddDaprComponent(PubSubComponentName, "pubsub.redis")
-            .WithMetadata("redisHost", RedisHost);
+            .WithMetadata("redisHost", redisHost);
 
         // EventStore hosts the aggregate actors and PUBLISHES governed events on the chatbot pub/sub. It trusts the
         // chatbot as an internal DAPR caller (DaprInternal scheme authenticates the verified dapr-caller-app-id
@@ -218,7 +242,15 @@ internal static class ChatBotAspireModule
                 .WithOptions(SidecarOptions(builder, EventStoreServiceName, daprConfigPath))
                 .WithReference(actorStateStore)
                 .WithReference(pubSub))
-            .WithEnvironment("Authentication__DaprInternal__AllowedCallers__0", AppId)
+            .WithEnvironment("Authentication__DaprInternal__AllowedCallers__0", chatBotAppId)
+            // Keep EventStore's chatbot domain-service relay aligned with the effective DAPR app id. The explicit
+            // registration is equivalent to the normal `domain == app-id` convention when no suffix is configured,
+            // and prevents a validation topology from resolving a same-named app in another self-hosted DAPR run.
+            .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_chatbot_v1__AppId", chatBotAppId)
+            .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_chatbot_v1__MethodName", "process")
+            .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_chatbot_v1__TenantId", "*")
+            .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_chatbot_v1__Domain", AppId)
+            .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_chatbot_v1__Version", "v1")
             .WithEnvironment("EventStore__Publisher__PubSubName", PubSubComponentName);
 
         // Tenants is an EventStore domain service sharing the same actor state store + pub/sub (mirrors the
@@ -239,6 +271,7 @@ internal static class ChatBotAspireModule
             .WithReference(tenants)
             .WaitFor(eventStore)
             .WaitFor(tenants)
+            .WithEnvironment("ChatBot__EventStoreDaprAppId", eventStoreAppId)
             .WithDaprSidecar(sidecar => sidecar
                 .WithOptions(SidecarOptions(builder, AppId, daprConfigPath))
                 .WithReference(stateStore)
@@ -246,6 +279,21 @@ internal static class ChatBotAspireModule
                 .WithReference(pubSub));
 
         return new HexalithChatBotResources(actorStateStore, stateStore, workflowStateStore, pubSub, eventStore, tenants, chatBot);
+    }
+
+    private static string ResolveRedisHost(IConfiguration configuration)
+    {
+        string value = configuration["Dapr:RedisHost"] ?? DefaultRedisHost;
+        if (!Uri.TryCreate($"redis://{value}", UriKind.Absolute, out Uri? endpoint)
+            || string.IsNullOrWhiteSpace(endpoint.Host)
+            || endpoint.Port is <= 0 or > 65_535
+            || !string.IsNullOrEmpty(endpoint.UserInfo)
+            || endpoint.AbsolutePath is not "/")
+        {
+            throw new InvalidOperationException("Dapr:RedisHost must be a host:port endpoint without credentials or a path.");
+        }
+
+        return value;
     }
 
     /// <summary>

@@ -24,4 +24,10 @@ public sealed record ProjectConversationState(
     // Set only when a typed read confirms a server-verified stop for a cancellation THIS session requested, so the
     // "Response stopped" announcement survives a Stop-control remount and is never raised for a historically stopped
     // response or another actor's stop. Cleared by the next composer submission or cancellation request. [AC4]
-    string? VerifiedStopAnnouncementGenerationId = null);
+    string? VerifiedStopAnnouncementGenerationId = null,
+    string? RequestedProjectId = null,
+    string? CurrentLoadRequestId = null,
+    string? HistoryLoadRequestId = null,
+    bool IsHistoryLoading = false,
+    IReadOnlyList<ProjectConversationItemModel>? HistoricalItems = null,
+    IReadOnlySet<string>? CurrentPageItemIds = null);

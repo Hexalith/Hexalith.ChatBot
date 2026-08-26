@@ -18,11 +18,24 @@ public static class ProjectConversationReducers
         ArgumentNullException.ThrowIfNull(action);
         bool switchingProject = state.Conversation is { } current &&
             !string.Equals(current.ProjectId, action.ProjectId, StringComparison.Ordinal);
+        if (action.IsHistory && (state.Conversation is null || switchingProject))
+        {
+            return state with { ErrorCode = "project-conversation-history-without-current" };
+        }
+
         return state with
         {
-            IsLoading = true,
+            IsLoading = action.IsHistory ? state.IsLoading : true,
+            IsHistoryLoading = action.IsHistory,
             Conversation = switchingProject ? null : state.Conversation,
             ErrorCode = null,
+            RequestedProjectId = action.ProjectId,
+            CurrentLoadRequestId = action.IsHistory ? state.CurrentLoadRequestId : action.RequestId,
+            // A fresh current-page request invalidates every older-page request already in flight. Otherwise a late
+            // history response can resurrect an item the newer authoritative page intentionally omitted/redacted.
+            HistoryLoadRequestId = action.IsHistory ? action.RequestId : null,
+            HistoricalItems = switchingProject ? [] : state.HistoricalItems,
+            CurrentPageItemIds = switchingProject ? null : state.CurrentPageItemIds,
             ComposerValidationErrorCode = null,
             SubmissionErrorCode = null,
             IsWhyPanelLoading = switchingProject ? false : state.IsWhyPanelLoading,
@@ -43,13 +56,76 @@ public static class ProjectConversationReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        bool isHistory = !string.IsNullOrWhiteSpace(action.Cursor);
+        string requestedProjectId = action.RequestedProjectId ?? action.Conversation.ProjectId;
+        bool correlated = string.IsNullOrWhiteSpace(action.RequestId) ||
+            string.Equals(
+                action.RequestId,
+                isHistory ? state.HistoryLoadRequestId : state.CurrentLoadRequestId,
+                StringComparison.Ordinal);
+        if (!correlated)
+        {
+            return state;
+        }
+
+        if (!string.Equals(action.Conversation.ProjectId, requestedProjectId, StringComparison.Ordinal) ||
+            !string.Equals(state.RequestedProjectId ?? requestedProjectId, requestedProjectId, StringComparison.Ordinal))
+        {
+            return state with
+            {
+                IsLoading = isHistory ? state.IsLoading : false,
+                IsHistoryLoading = false,
+                ErrorCode = "project-conversation-load-identity-mismatch",
+            };
+        }
+
+        ProjectConversationModel mergedConversation;
+        IReadOnlyList<ProjectConversationItemModel> historicalItems;
+        IReadOnlySet<string> currentPageItemIds;
+        if (isHistory)
+        {
+            if (state.Conversation is not { } current ||
+                !string.Equals(current.ProjectId, requestedProjectId, StringComparison.Ordinal))
+            {
+                return state with { IsHistoryLoading = false, ErrorCode = "project-conversation-load-identity-mismatch" };
+            }
+
+            currentPageItemIds = state.CurrentPageItemIds ?? current.Items.Select(static item => item.ItemId).ToHashSet(StringComparer.Ordinal);
+            historicalItems = MergeHistoryItems(
+                state.HistoricalItems ?? [],
+                action.Conversation.Items.Where(item => !currentPageItemIds.Contains(item.ItemId)));
+            mergedConversation = current with
+            {
+                Items = MergeItems(current.Items, historicalItems),
+                NextCursor = action.Conversation.NextCursor,
+                HasMore = action.Conversation.HasMore,
+            };
+        }
+        else
+        {
+            IReadOnlySet<string> previousCurrentIds = state.CurrentPageItemIds ?? new HashSet<string>(StringComparer.Ordinal);
+            // A current-page refresh is authoritative. Anything formerly on that page but now omitted (including a
+            // newly redacted item) is purged from accumulated history instead of being resurrected by an older page.
+            historicalItems = (state.HistoricalItems ?? [])
+                .Where(item => !previousCurrentIds.Contains(item.ItemId))
+                .ToArray();
+            currentPageItemIds = action.Conversation.Items
+                .Select(static item => item.ItemId)
+                .ToHashSet(StringComparer.Ordinal);
+            historicalItems = historicalItems.Where(item => !currentPageItemIds.Contains(item.ItemId)).ToArray();
+            mergedConversation = action.Conversation with
+            {
+                Items = MergeItems(action.Conversation.Items, historicalItems),
+            };
+        }
+
         // The tracked generation reached SOME terminal state (stopped/cancelled, but also completed/failed/unavailable
         // when the stop raced natural completion). Tracking must clear on any of them: gating only on a verified stop
         // left IsCancellingAiResponse true forever after a race, and because the Stop control's Disabled binding reads
         // that flag, every LATER generation rendered a permanently disabled Stop for the life of the circuit. [AC4]
         ProjectConversationAiResponseProgressModel? trackedTerminal = state.CancellingResponseId is null
             ? null
-            : action.Conversation.Items
+            : mergedConversation.Items
                 .Select(static item => item.AiResponseProgress)
                 .OfType<ProjectConversationAiResponseProgressModel>()
                 .FirstOrDefault(progress =>
@@ -65,7 +141,10 @@ public static class ProjectConversationReducers
         return state with
         {
             IsLoading = false,
-            Conversation = action.Conversation,
+            IsHistoryLoading = false,
+            Conversation = mergedConversation,
+            HistoricalItems = historicalItems,
+            CurrentPageItemIds = currentPageItemIds,
             ErrorCode = null,
             IsCancellingAiResponse = trackingResolved ? false : state.IsCancellingAiResponse,
             CancellingResponseId = trackingResolved ? null : state.CancellingResponseId,
@@ -87,21 +166,27 @@ public static class ProjectConversationReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        bool isHistory = !string.IsNullOrWhiteSpace(action.Cursor);
+        bool correlated = string.IsNullOrWhiteSpace(action.RequestId) ||
+            string.Equals(
+                action.RequestId,
+                isHistory ? state.HistoryLoadRequestId : state.CurrentLoadRequestId,
+                StringComparison.Ordinal);
+        if (!correlated)
+        {
+            return state;
+        }
+
         return state with
         {
-            IsLoading = false,
-            Conversation = null,
+            IsLoading = isHistory ? state.IsLoading : false,
+            IsHistoryLoading = false,
+            // Keep the last safe, same-project view. A transient read failure must not erase the conversation,
+            // composer draft, or the cancellation whose terminal outcome is still being verified.
+            Conversation = state.Conversation,
             ErrorCode = action.ErrorCode,
-            IsSubmitting = false,
-            SubmissionErrorCode = action.ErrorCode,
-            IsWhyPanelLoading = false,
-            WhyPanel = null,
-            WhyPanelProjectId = null,
-            WhyPanelAssociationId = null,
-            WhyPanelErrorCode = null,
             StreamingErrorCode = action.ErrorCode,
             StreamingNotice = null,
-            IsCancellingAiResponse = false,
         };
     }
 
@@ -294,6 +379,50 @@ public static class ProjectConversationReducers
     private static bool IsCurrentPanelRequest(ProjectConversationState state, string projectId, string associationId)
         => string.Equals(state.WhyPanelProjectId, projectId, StringComparison.Ordinal) &&
             string.Equals(state.WhyPanelAssociationId, associationId, StringComparison.Ordinal);
+
+    private static IReadOnlyList<ProjectConversationItemModel> MergeItems(
+        IEnumerable<ProjectConversationItemModel> preferred,
+        IEnumerable<ProjectConversationItemModel> fallback)
+    {
+        Dictionary<string, ProjectConversationItemModel> byId = new(StringComparer.Ordinal);
+        List<string> order = [];
+        foreach (ProjectConversationItemModel item in preferred.Concat(fallback))
+        {
+            if (byId.ContainsKey(item.ItemId))
+            {
+                continue;
+            }
+
+            byId[item.ItemId] = item;
+            order.Add(item.ItemId);
+        }
+
+        return order.Select(id => byId[id]).ToArray();
+    }
+
+    private static IReadOnlyList<ProjectConversationItemModel> MergeHistoryItems(
+        IEnumerable<ProjectConversationItemModel> accumulated,
+        IEnumerable<ProjectConversationItemModel> loaded)
+    {
+        Dictionary<string, ProjectConversationItemModel> byId = new(StringComparer.Ordinal);
+        List<string> order = [];
+        foreach (ProjectConversationItemModel item in accumulated.Concat(loaded))
+        {
+            if (!byId.TryGetValue(item.ItemId, out ProjectConversationItemModel? existing))
+            {
+                byId[item.ItemId] = item;
+                order.Add(item.ItemId);
+            }
+            else if (item.SourceVersion > existing.SourceVersion)
+            {
+                // History responses may overlap and complete out of order. Keep the newest durable version while
+                // preserving the item's established visual position; the current page still wins in MergeItems.
+                byId[item.ItemId] = item;
+            }
+        }
+
+        return order.Select(id => byId[id]).ToArray();
+    }
 
     private static bool IsAcceptableNudge(ProjectConversationState state, ProjectConversationAiResponseNudgeModel nudge)
     {

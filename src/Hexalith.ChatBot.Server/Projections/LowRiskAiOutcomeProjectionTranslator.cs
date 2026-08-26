@@ -27,6 +27,7 @@ internal static class LowRiskAiOutcomeProjectionTranslator
             "ai",
             ProposalId: started.ProposalId,
             RequesterId: started.RequesterId,
+            SourceConversationItemId: started.ConversationId ?? started.ProjectId,
             SourceMessageId: started.SourceMessageId,
             OperationId: started.ExecutionId,
             RiskClass: AiActionRiskClass.LowRisk,

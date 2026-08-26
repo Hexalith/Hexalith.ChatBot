@@ -6,6 +6,7 @@ using Hexalith.ChatBot.UI.Localization;
 using Hexalith.ChatBot.UI.Registration;
 using Hexalith.ChatBot.UI.Services;
 using Hexalith.FrontComposer.Shell.Extensions;
+using Hexalith.FrontComposer.Shell.Services.Auth;
 
 using Microsoft.FluentUI.AspNetCore.Components;
 
@@ -18,15 +19,56 @@ _ = builder.Services.AddFluentUIComponents();
 _ = builder.Services.AddHexalithFrontComposerQuickstart(static options => options.ScanAssemblies(typeof(Program).Assembly));
 _ = builder.Services.AddHexalithDomain<ChatBotUiFrontComposerMarker>();
 
+bool authenticationEnabled =
+    Uri.TryCreate(builder.Configuration["Authentication:OpenIdConnect:Authority"], UriKind.Absolute, out Uri? oidcAuthority) &&
+    !string.IsNullOrWhiteSpace(builder.Configuration["Authentication:OpenIdConnect:ClientId"]);
+if (authenticationEnabled)
+{
+    string clientId = builder.Configuration["Authentication:OpenIdConnect:ClientId"]!;
+    _ = builder.Services.AddHexalithFrontComposerServerSecurity(options =>
+    {
+        options.OpenIdConnect.Enabled = true;
+        options.OpenIdConnect.ProviderName = "Keycloak";
+        options.OpenIdConnect.Authority = oidcAuthority;
+        options.OpenIdConnect.ClientId = clientId;
+        // hexalith-chatbot is deliberately a public authorization-code/PKCE client. A browser-facing UI must not
+        // manufacture or embed a client secret merely to satisfy a confidential-client recipe.
+        options.OpenIdConnect.ClientSecret = null;
+        options.OpenIdConnect.Audience = builder.Configuration["Authentication:OpenIdConnect:Audience"] ?? clientId;
+        options.OpenIdConnect.ValidIssuer = builder.Configuration["Authentication:OpenIdConnect:Issuer"]
+            ?? oidcAuthority!.ToString().TrimEnd('/');
+        options.OpenIdConnect.RoleClaimType = "roles";
+        options.OpenIdConnect.ResponseType = "code";
+        options.OpenIdConnect.SaveTokens = true;
+        options.TenantClaimTypes.Add("eventstore:tenant");
+        options.UserClaimTypes.Add("sub");
+    });
+    _ = builder.Services.AddAuthorization();
+}
+
 // The UI reaches the governed command spine ONLY through the typed Client facade (IChatBotClient over the
 // generated transport). It never references the Server, the gateway stages, or the audit/idempotency seams.
-_ = builder.Services.AddHttpClient<IClient, Client>(static (provider, http) =>
+IHttpClientBuilder chatBotHttpClient = builder.Services.AddHttpClient<IClient, Client>(static (provider, http) =>
     http.BaseAddress = ResolveChatBotBaseAddress(provider.GetRequiredService<IConfiguration>()));
+if (authenticationEnabled)
+{
+    _ = chatBotHttpClient.AddFrontComposerGatewayAuthorization();
+}
 _ = builder.Services.AddScoped<IChatBotClient, ChatBotClient>();
 // Story 10.6b transport: the ChatBot server base address the project-conversation streaming subscriber dials for its
 // SignalR hub connection (the ChatBot-owned project-conversation change hub).
-_ = builder.Services.AddSingleton(new Hexalith.ChatBot.UI.State.ProjectConversation.ChatBotHubEndpoint(
-    ResolveChatBotBaseAddress(builder.Configuration)));
+_ = builder.Services.AddSingleton(static provider =>
+{
+    IConfiguration configuration = provider.GetRequiredService<IConfiguration>();
+    bool enabled = Uri.TryCreate(configuration["Authentication:OpenIdConnect:Authority"], UriKind.Absolute, out _) &&
+        !string.IsNullOrWhiteSpace(configuration["Authentication:OpenIdConnect:ClientId"]);
+    FrontComposerAccessTokenProvider? tokenProvider = enabled
+        ? provider.GetRequiredService<FrontComposerAccessTokenProvider>()
+        : null;
+    return new Hexalith.ChatBot.UI.State.ProjectConversation.ChatBotHubEndpoint(
+        ResolveChatBotBaseAddress(configuration),
+        tokenProvider is null ? null : () => tokenProvider.GetAccessTokenAsync().AsTask());
+});
 _ = builder.Services.AddScoped<GovernedOperationService>();
 _ = builder.Services.AddScoped<OperationalDashboardService>();
 _ = builder.Services.AddScoped<AssociationReviewService>();
@@ -41,8 +83,19 @@ WebApplication app = builder.Build();
 _ = app.MapChatBotUiHealthEndpoints();
 _ = app.UseStaticFiles();
 _ = app.UseRequestLocalization(ChatBotSupportedCultures.CreateRequestLocalizationOptions());
+if (authenticationEnabled)
+{
+    _ = app.UseAuthentication();
+    _ = app.UseAuthorization();
+}
+
 _ = app.UseAntiforgery();
-_ = app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+var components = app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+if (authenticationEnabled)
+{
+    _ = components.RequireAuthorization();
+    _ = app.MapHexalithFrontComposerAuthenticationEndpoints();
+}
 
 app.Run();
 

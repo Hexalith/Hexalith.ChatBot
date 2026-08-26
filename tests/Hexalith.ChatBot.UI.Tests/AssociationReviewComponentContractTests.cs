@@ -59,6 +59,10 @@ public sealed class AssociationReviewComponentContractTests
 
         defaults.ShouldContain("AddServiceDiscovery");
         defaults.ShouldContain("AddStandardResilienceHandler");
+        defaults.ShouldContain("DisableForUnsafeHttpMethods");
+        defaults.ShouldContain("resilience.AttemptTimeout.Timeout = TimeSpan.FromSeconds(30)");
+        defaults.ShouldContain("resilience.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(60)");
+        defaults.ShouldContain("resilience.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60)");
         defaults.ShouldContain("AddOpenTelemetry");
         defaults.ShouldContain("UseOtlpExporter");
         defaults.ShouldContain("MapGet(\"/health\"");
@@ -174,6 +178,7 @@ public sealed class AssociationReviewComponentContractTests
     public void AssociationReviewActionsShouldPreserveValidationBannerAndDisabledReasonCatalog()
     {
         string actions = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor");
+        string banner = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor");
 
         actions.ShouldContain("<ChatBotStatusBanner", Case.Sensitive);
         actions.ShouldContain("StableId=\"association-review-validation\"");

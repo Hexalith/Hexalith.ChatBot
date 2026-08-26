@@ -14,4 +14,6 @@ internal sealed record PublishedTaskIntentEvent(
     TaskIntentRecord? Record,
     AiActionProposalRecord? Proposal = null,
     ProjectConversationMessageAppended? UserMessage = null,
-    AiResponseGenerationCancellationRequested? AiResponseCancellation = null);
+    AiResponseGenerationCancellationRequested? AiResponseCancellation = null,
+    AiResponseGenerationCancellationConfirmed? AiResponseCancellationConfirmed = null,
+    AiResponseGenerationCancellationFailed? AiResponseCancellationFailed = null);

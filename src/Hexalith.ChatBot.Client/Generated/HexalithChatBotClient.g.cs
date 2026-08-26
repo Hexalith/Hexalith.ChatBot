@@ -9064,6 +9064,18 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"m365-mailbox-intake")]
         M365MailboxIntake = 0,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"ui-composer")]
+        UiComposer = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"approval-event")]
+        ApprovalEvent = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failure-state")]
+        FailureState = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ai-outcome")]
+        AiOutcome = 4,
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]

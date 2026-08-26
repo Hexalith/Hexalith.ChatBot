@@ -474,6 +474,7 @@ public static class ChatBotUiTextKey
     public const string ProjectConversationBlocked = "ProjectConversation_Blocked";
     public const string ProjectConversationEmailItemAccessible = "ProjectConversation_EmailItem_Accessible";
     public const string ProjectConversationEmpty = "ProjectConversation_Empty";
+    public const string ProjectConversationLoadOlder = "ProjectConversation_LoadOlder";
     public const string ProjectConversationLoading = "ProjectConversation_Loading";
     public const string ProjectConversationMetadata = "ProjectConversation_Metadata";
     public const string ProjectConversationParticipantItemAccessible = "ProjectConversation_ParticipantItem_Accessible";
@@ -1379,6 +1380,7 @@ public static class ChatBotUiTextKey
         ProjectConversationBlocked,
         ProjectConversationEmailItemAccessible,
         ProjectConversationEmpty,
+        ProjectConversationLoadOlder,
         ProjectConversationLoading,
         ProjectConversationMetadata,
         ProjectConversationParticipantItemAccessible,

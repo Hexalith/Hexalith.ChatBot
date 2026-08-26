@@ -3145,6 +3145,37 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task ProposalAndApprovalDecisionShouldRequireExplicitProjectAuthorizationBeforeDurableMutation()
+    {
+        object[] commands = [AiProposalCommand(), ApprovalDecisionCommand()];
+        foreach (object command in commands)
+        {
+            RecordingDispatcher dispatcher = new();
+            RecordingAuditWriter auditWriter = new();
+            InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+            CommandGateway gateway = Gateway(
+                dispatcher,
+                authorizationStage: new ParticipantAuthorizationStage(),
+                auditWriter: auditWriter,
+                idempotencyStore: idempotencyStore,
+                commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+            ChatBotGatewayResult result = await gateway.SubmitAsync(
+                Submission(
+                    Principal(BoundTenant, new Claim("requester_authority_class", "project-approver")),
+                    command),
+                TestContext.Current.CancellationToken);
+
+            result.IsAccepted.ShouldBeFalse(command.GetType().Name);
+            result.Problem.ShouldNotBeNull().Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+            dispatcher.DispatchCount.ShouldBe(0);
+            auditWriter.Envelopes.ShouldBeEmpty();
+            idempotencyStore.RecordCount.ShouldBe(0);
+            Serialized(result.Problem).ShouldNotContain("project-001", Case.Insensitive);
+        }
+    }
+
+    [Fact]
     public async Task LowRiskAiExecutionReplayShouldIgnoreClientChangedExecutionIdForSameLogicalRequest()
     {
         RecordingDispatcher dispatcher = new();

@@ -59,6 +59,69 @@ public sealed class ReadModelProjectionStorePolicyTests
     }
 
     [Fact]
+    public async Task ProjectConversationReadModelStoreShouldPageNewestFirstWithStableEqualTimeCursor()
+    {
+        ConflictingReadModelStore store = new();
+        ReadModelProjectConversationProjectionStore projectionStore = new(store);
+        await projectionStore.UpsertAsync(ProjectConversationItem("item-a", 1), TestContext.Current.CancellationToken);
+        await projectionStore.UpsertAsync(ProjectConversationItem("item-b", 2), TestContext.Current.CancellationToken);
+        await projectionStore.UpsertAsync(ProjectConversationItem("item-c", 3), TestContext.Current.CancellationToken);
+
+        ProjectConversationPage first = await projectionStore
+            .ReadPageAsync("tenant-alpha", "project-alpha", null, 2, TestContext.Current.CancellationToken);
+        ProjectConversationPage second = await projectionStore
+            .ReadPageAsync("tenant-alpha", "project-alpha", first.NextCursorPosition, 2, TestContext.Current.CancellationToken);
+
+        first.Items.Select(static item => item.ItemId).ShouldBe(["item-c", "item-b"]);
+        first.HasMore.ShouldBeTrue();
+        first.LatestItem.ShouldNotBeNull().ItemId.ShouldBe("item-c");
+        second.Items.Select(static item => item.ItemId).ShouldBe(["item-a"]);
+        second.HasMore.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task ProjectConversationReadModelStoreShouldPublishOnlyPersistedAiProgressNudges()
+    {
+        ConflictingReadModelStore store = new();
+        RecordingChangePublisher publisher = new();
+        ReadModelProjectConversationProjectionStore projectionStore = new(store, publisher);
+        AiOutcomeEventView progress = new(
+            "tenant-alpha",
+            "project-alpha",
+            AiOutcomeKind.ExecutionStarted,
+            AiOutcomeStatus.Executing,
+            new DateTimeOffset(2026, 6, 12, 11, 0, 0, TimeSpan.Zero),
+            4,
+            "correlation-alpha",
+            "ai-actor-alpha",
+            "ai",
+            ProposalId: "response-alpha",
+            ExecutionStatus: "executing",
+            AiResponseSequence: 1,
+            AiResponseProgressState: "rendering",
+            AiResponseVisibilityState: "metadata_only",
+            AiResponseIsTerminal: false);
+        AiOutcomeEventView proposal = progress with
+        {
+            OutcomeKind = AiOutcomeKind.Proposal,
+            OutcomeStatus = AiOutcomeStatus.Proposed,
+            SourceVersion = 5,
+            AiResponseSequence = null,
+            AiResponseProgressState = null,
+            AiResponseVisibilityState = null,
+            AiResponseIsTerminal = null,
+        };
+
+        await projectionStore.UpsertAiOutcomeEventAsync(progress, TestContext.Current.CancellationToken);
+        await projectionStore.UpsertAiOutcomeEventAsync(proposal, TestContext.Current.CancellationToken);
+
+        publisher.Tenants.ShouldBe(["tenant-alpha"]);
+        ProjectConversationPage page = await projectionStore
+            .ReadPageAsync("tenant-alpha", "project-alpha", null, 25, TestContext.Current.CancellationToken);
+        page.Items.ShouldContain(static item => item.AiResponseProgressState == "rendering");
+    }
+
+    [Fact]
     public async Task ControlStateFreshnessRefreshShouldNotDowngradeConcurrentlyAdvancedRecord()
     {
         // The trusted snapshot is read first (active, v5). By the time the write policy re-reads under optimistic
@@ -244,6 +307,20 @@ public sealed class ReadModelProjectionStorePolicyTests
             cancellationToken.ThrowIfCancellationRequested();
             LastSaved = (GovernedControlStateView)(object)value;
             return Task.FromResult(true);
+        }
+    }
+
+    private sealed class RecordingChangePublisher : IProjectConversationChangePublisher
+    {
+        public List<string> Tenants { get; } = [];
+
+        public Task PublishProjectConversationChangedAsync(
+            string tenantId,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Tenants.Add(tenantId);
+            return Task.CompletedTask;
         }
     }
 }

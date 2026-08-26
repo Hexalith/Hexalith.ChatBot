@@ -12,6 +12,7 @@ using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
+using Hexalith.ChatBot.Server.Lifecycle.AiExecution;
 using Hexalith.ChatBot.Server.Lifecycle.Retry;
 using Hexalith.ChatBot.Server.Notifications;
 using Hexalith.ChatBot.Server.Observability;
@@ -92,7 +93,10 @@ internal static class CommandGatewayServiceCollectionExtensions
         string? daprApiToken = Environment.GetEnvironmentVariable("DAPR_API_TOKEN");
         _ = services
             .AddEventStoreGatewayClient(options => options.BaseAddress = new Uri(daprHttpEndpoint))
-            .AddHttpMessageHandler(() => new DaprAppIdHandler(EventStoreDaprAppId, daprApiToken));
+            .AddHttpMessageHandler(serviceProvider => new DaprAppIdHandler(
+                serviceProvider.GetRequiredService<IConfiguration>()["ChatBot:EventStoreDaprAppId"]
+                    ?? EventStoreDaprAppId,
+                daprApiToken));
 
         // M0 read model is projected into an in-memory, tenant-partitioned store (mirrors the Folders default;
         // the DAPR chatbot-statestore-backed store is the production swap). Projection writes stay idempotent
@@ -137,6 +141,9 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<ITenantAiPolicySnapshotProvider, UnavailableTenantAiPolicySnapshotProvider>();
         services.TryAddSingleton<IAiActionPolicyEvaluator, DefaultAiActionPolicyEvaluator>();
         services.TryAddSingleton<IAiAssistanceProvider, DisabledAiAssistanceProvider>();
+        services.TryAddSingleton<IAiExecutionWorkStore, InMemoryAiExecutionWorkStore>();
+        services.TryAddSingleton<AiExecutionCoordinator>();
+        services.TryAddSingleton<IAiExecutionCoordinator>(static provider => provider.GetRequiredService<AiExecutionCoordinator>());
         services.TryAddSingleton<IApprovedAiActionCommandAllowlist, ApprovedAiActionCommandAllowlist>();
         services.TryAddSingleton<IConversationWriter, MetadataOnlyConversationWriter>();
         services.TryAddSingleton<IAssociationProjectionStore, InMemoryAssociationProjectionStore>();
@@ -353,12 +360,22 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.RemoveAll<IAssociationProjectionStore>();
         services.RemoveAll<IProjectConversationProjectionStore>();
         services.RemoveAll<IOperationStatusStore>();
+        services.RemoveAll<IAiExecutionWorkStore>();
         return services
             .AddSingleton<IReadModelStore, DaprReadModelStore>()
             .AddSingleton<IGovernedOperationProjectionStore, ReadModelGovernedOperationViewStore>()
             .AddSingleton<IGovernedControlStateProjectionStore, ReadModelGovernedControlStateProjectionStore>()
             .AddSingleton<IAssociationProjectionStore, ReadModelAssociationProjectionStore>()
             .AddSingleton<IProjectConversationProjectionStore, ReadModelProjectConversationProjectionStore>()
+            .AddSingleton<IAiExecutionWorkStore, ReadModelAiExecutionWorkStore>()
             .AddSingleton<IOperationStatusStore, ReadModelOperationStatusStore>();
+    }
+
+    /// <summary>Enables the restart-recovering persisted AI execution loop for a production host.</summary>
+    public static IServiceCollection AddChatBotAiExecutionCoordinatorHostedService(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddSingleton<IHostedService>(static provider => provider.GetRequiredService<AiExecutionCoordinator>());
+        return services;
     }
 }

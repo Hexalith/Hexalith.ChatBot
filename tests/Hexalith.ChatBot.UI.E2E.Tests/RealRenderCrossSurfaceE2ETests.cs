@@ -44,6 +44,86 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
     private const string FrCulture = "fr";
     private const int ShellHeaderBandPx = 48;
 
+    [Fact]
+    public async Task ProjectConversation_LoadOlderMergesHistoryWithoutReplacingNewestContent()
+    {
+        Assert.SkipWhen(!_fixture.BrowserAvailable, RealRenderFixture.NoBrowserSkipReason);
+
+        await using IBrowserContext context = await _fixture.NewContextAsync();
+        IPage page = await context.NewPageAsync();
+        await OpenAsync(page, Surfaces[1], EnCulture, ColorModes[0], 1280, 900);
+
+        ILocator newest = page.Locator("[data-chatbot-conversation-item-id='item:approval-001']");
+        await newest.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+        ILocator loadOlder = page.Locator("[data-chatbot-stable-id='project-conversation-load-older']");
+        await loadOlder.ClickAsync();
+        await page.Locator("[data-chatbot-conversation-item-id='item:approval-older-001']")
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible });
+
+        (await newest.CountAsync()).ShouldBe(1, "Loading history must preserve the newest authoritative item.");
+        (await loadOlder.CountAsync()).ShouldBe(0, "The exhausted cursor must remove the Load older action.");
+    }
+
+    [Fact]
+    public async Task ProjectConversation_StatefulRouteShouldMessageAskAndAnnounceVerifiedStopOnce()
+    {
+        Assert.SkipWhen(!_fixture.BrowserAvailable, RealRenderFixture.NoBrowserSkipReason);
+
+        await using IBrowserContext context = await _fixture.NewContextAsync();
+        IPage page = await context.NewPageAsync();
+        await OpenAsync(page, Surfaces[1], EnCulture, ColorModes[0], 1280, 900);
+
+        ILocator inputHost = page.Locator("#project-conversation-composer-input");
+        ILocator input = inputHost.Locator("textarea");
+        await input.FillAsync("Stateful governed message");
+        await page.Locator("fluent-button").Filter(new() { HasText = "Submit" }).ClickAsync();
+        await page.Locator("[data-chatbot-conversation-item-id='item:message-submitted']")
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible });
+
+        ILocator askMode = page.Locator("fluent-button").Filter(new() { HasText = "Ask AI" });
+        await askMode.ClickAsync();
+        await Assertions.Expect(askMode).ToHaveAttributeAsync("aria-pressed", "true");
+        await input.FillAsync("Summarize the visible context");
+        await page.Locator("fluent-button").Filter(new() { HasText = "Submit" }).ClickAsync();
+        await page.Locator("[data-chatbot-conversation-item-id='item:proposal-submitted']")
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible });
+
+        ILocator stopHost = page.Locator("[data-chatbot-stable-id='project-conversation-ai-response-stop'] fluent-button");
+        ILocator stop = stopHost;
+        (await stopHost.GetAttributeAsync("data-chatbot-streaming-stop-active")).ShouldBe("true");
+        await page.EvaluateAsync(
+            """
+            () => {
+                window.__story132StatefulAnnouncements = 0;
+                const live = document.querySelector("[data-chatbot-stable-id='project-conversation-ai-response-stop'] [role='status']");
+                let previous = (live?.textContent || '').trim();
+                new MutationObserver(() => {
+                    const current = (live?.textContent || '').trim();
+                    if (current && current !== previous) window.__story132StatefulAnnouncements++;
+                    previous = current;
+                }).observe(live, { subtree: true, childList: true, characterData: true });
+            }
+            """);
+        await stop.ClickAsync();
+        await page.Locator("[data-chatbot-streaming-state='stopped']")
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible });
+        ILocator live = page.Locator("[data-chatbot-stable-id='project-conversation-ai-response-stop'] [role='status']");
+        (await live.InnerTextAsync()).ShouldBe("Response stopped");
+        (await inputHost.EvaluateAsync<bool>(
+            "element => document.activeElement === element && element.shadowRoot?.activeElement?.tagName === 'TEXTAREA'"))
+            .ShouldBeTrue();
+
+        await page.WaitForTimeoutAsync(500);
+        (await page.EvaluateAsync<int>("() => window.__story132StatefulAnnouncements || 0")).ShouldBe(1);
+
+        await page.EvaluateAsync("() => Blazor.navigateTo('/', false)");
+        await page.Locator("#project-workspace-title").WaitForAsync(new() { State = WaitForSelectorState.Visible });
+        await page.EvaluateAsync("() => Blazor.navigateTo('/projects/project-alpha/conversation', false)");
+        await page.Locator("#project-conversation-title").WaitForAsync(new() { State = WaitForSelectorState.Visible });
+        (await page.Locator("[data-chatbot-stable-id='project-conversation-ai-response-stop'] [role='status']")
+            .InnerTextAsync()).ShouldBeEmpty("A same-circuit remount must not repeat the verified-stop announcement.");
+    }
+
     /// <summary>
     /// Story 13.7 grouped surfaces that compose their sibling titled sections inside a real <c>FluentAccordion</c>
     /// and reliably render at least one under the deterministic <see cref="FakeChatBotClient"/> seam. Asserted

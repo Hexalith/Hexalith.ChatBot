@@ -88,6 +88,12 @@ if (security is not null)
     _ = eventStore.WithJwtBearerSecurity(security, "hexalith-eventstore");
     _ = tenants.WithJwtBearerSecurity(security, "hexalith-tenants");
     _ = chatBot.WithJwtBearerSecurity(security, "hexalith-chatbot");
+    _ = chatBotUi
+        .WithSecurityDependency(security)
+        .WithEnvironment("Authentication__OpenIdConnect__Authority", security.RealmUrl)
+        .WithEnvironment("Authentication__OpenIdConnect__Issuer", security.RealmUrl)
+        .WithEnvironment("Authentication__OpenIdConnect__ClientId", "hexalith-chatbot")
+        .WithEnvironment("Authentication__OpenIdConnect__Audience", "hexalith-chatbot");
 
     // Admin.Server validates the operator JWT the same way as the EventStore service (audience
     // hexalith-eventstore, OIDC discovery against the Keycloak realm).

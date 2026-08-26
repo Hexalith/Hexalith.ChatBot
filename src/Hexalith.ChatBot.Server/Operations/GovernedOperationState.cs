@@ -322,6 +322,27 @@ public sealed class GovernedOperationState
     {
         ArgumentNullException.ThrowIfNull(e);
         _ = _aiResponseCancellationIds.Add(e.CancellationId);
+        string key = AiResponseGenerationKey(e.ResponseId, e.GenerationId);
+        if (_activeAiResponseGenerations.TryGetValue(key, out ActiveAiResponseGeneration? generation))
+        {
+            _activeAiResponseGenerations[key] = generation with
+            {
+                Status = "cancelling",
+                CancellationId = e.CancellationId,
+            };
+        }
+    }
+
+    public void Apply(AiResponseGenerationCancellationConfirmed e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        CompleteAiResponseGeneration(e.ResponseId, e.GenerationId);
+    }
+
+    public void Apply(AiResponseGenerationCancellationFailed e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        CompleteAiResponseGeneration(e.ResponseId, e.GenerationId);
     }
 
     public void Apply(TaskIntentCaptured e)
@@ -372,8 +393,10 @@ public sealed class GovernedOperationState
             e.ProposalId,
             e.ExecutionId,
             e.ProjectId,
-            e.ExpectedProposalSourceVersion,
-            e.CorrelationId);
+            checked(e.ExpectedProposalSourceVersion + 1),
+            e.CorrelationId,
+            e.TenantId,
+            e.ConversationId ?? e.ProjectId);
     }
 
     public void Apply(LowRiskAiAssistanceRoutedToApproval e)

@@ -517,12 +517,12 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         ProjectConversationItemView[] ordered = _items
             .Where(pair => pair.Key.StartsWith(prefix, StringComparison.Ordinal))
             .Select(static pair => pair.Value)
-            .OrderBy(static item => item.OccurredAt)
-            .ThenBy(static item => item.ItemId, StringComparer.Ordinal)
+            .OrderByDescending(static item => item.OccurredAt)
+            .ThenByDescending(static item => item.ItemId, StringComparer.Ordinal)
             .ToArray();
         ProjectConversationItemView? latest = ProjectConversationItemView.LatestOf(ordered);
         ProjectConversationItemView[] pageItems = ordered
-            .Where(item => cursorPosition is null || IsAfterCursor(item, cursorPosition.OccurredAt, cursorPosition.ItemId))
+            .Where(item => cursorPosition is null || IsBeforeCursor(item, cursorPosition.OccurredAt, cursorPosition.ItemId))
             .Take(pageSize + 1)
             .ToArray();
         bool hasMore = pageItems.Length > pageSize;
@@ -601,10 +601,10 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         public DateTimeOffset UtcNow { get; } = now.ToUniversalTime();
     }
 
-    private static bool IsAfterCursor(ProjectConversationItemView item, DateTimeOffset cursorTime, string? cursorItemId)
+    private static bool IsBeforeCursor(ProjectConversationItemView item, DateTimeOffset cursorTime, string? cursorItemId)
         => cursorItemId is null ||
-            item.OccurredAt > cursorTime ||
-            (item.OccurredAt == cursorTime && string.CompareOrdinal(item.ItemId, cursorItemId) > 0);
+            item.OccurredAt < cursorTime ||
+            (item.OccurredAt == cursorTime && string.CompareOrdinal(item.ItemId, cursorItemId) < 0);
 
     private static bool ShouldAttachTaskIntent(ProjectConversationItemView item, TaskIntentRecord record)
         => string.Equals(item.TenantId, record.TenantId, StringComparison.Ordinal) &&

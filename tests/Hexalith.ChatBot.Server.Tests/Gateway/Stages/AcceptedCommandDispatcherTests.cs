@@ -356,7 +356,7 @@ public sealed class AcceptedCommandDispatcherTests
     }
 
     [Fact]
-    public async Task DispatchShouldInvokeLowRiskProviderOnceAndSubmitMetadataOnlyExecutionPayload()
+    public async Task DispatchShouldSubmitLowRiskAdmissionWithoutInvokingProvider()
     {
         RecordingEventStoreGatewayClient gateway = new();
         RecordingAiAssistanceProvider provider = new();
@@ -374,20 +374,16 @@ public sealed class AcceptedCommandDispatcherTests
 
         ChatBotDispatchResult result = await dispatcher.DispatchAsync(context, TestContext.Current.CancellationToken);
 
-        provider.ExecuteCount.ShouldBe(1);
-        provider.LastRequest.ShouldNotBeNull();
-        provider.LastRequest.TenantId.ShouldBe(Tenant);
-        provider.LastRequest.AuthorizedContextReferences.ShouldBe(["evidence-001"]);
-        provider.LastRequest.ExcludedContextReasons.ShouldBe(["redacted"]);
+        provider.ExecuteCount.ShouldBe(0);
+        provider.LastRequest.ShouldBeNull();
         SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
-        request.AggregateId.ShouldBe("graph-message-001");
+        request.AggregateId.ShouldBe("project-001");
         request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteLowRiskAIAssistance));
-        result.ResourceId.ShouldBe("graph-message-001");
+        result.ResourceId.ShouldBe("project-001");
 
         JsonElement payload = request.Payload;
         payload.TryGetProperty("ExecutionRecord", out JsonElement record).ShouldBeTrue();
-        record.GetProperty("Outcome").GetString().ShouldBe("success");
-        record.GetProperty("ProviderName").GetString().ShouldBe("deterministic-test");
+        record.ValueKind.ShouldBe(JsonValueKind.Null);
         payload.GetRawText().ShouldNotContain("prompt", Case.Insensitive);
         payload.GetRawText().ShouldNotContain("completion", Case.Insensitive);
         payload.GetRawText().ShouldNotContain("/home/administrator", Case.Insensitive);

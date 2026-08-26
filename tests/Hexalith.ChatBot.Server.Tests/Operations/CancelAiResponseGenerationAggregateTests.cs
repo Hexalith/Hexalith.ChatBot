@@ -154,6 +154,127 @@ public sealed class CancelAiResponseGenerationAggregateTests
         result.IsRejection.ShouldBeTrue();
     }
 
+    [Fact]
+    public void ProviderCompletionShouldEmitTerminalSuccessAndBecomeIdempotent()
+    {
+        GovernedOperationState state = StateWithActiveGeneration();
+        CompleteLowRiskAiAssistance command = Completion();
+
+        DomainResult first = GovernedOperationAggregate.Handle(command, state, CompletionEnvelope(command));
+        LowRiskAiAssistanceExecutionSucceeded succeeded = first.Events
+            .OfType<LowRiskAiAssistanceExecutionSucceeded>()
+            .ShouldHaveSingleItem();
+        state.Apply(succeeded);
+
+        DomainResult retry = GovernedOperationAggregate.Handle(command, state, CompletionEnvelope(command));
+
+        retry.IsNoOp.ShouldBeTrue();
+        retry.Events.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ProviderCompletionShouldRejectMismatchedConversationProjectOrExactStartedVersion()
+    {
+        GovernedOperationState state = StateWithActiveGeneration();
+        CompleteLowRiskAiAssistance valid = Completion();
+
+        CompleteLowRiskAiAssistance[] mismatches =
+        [
+            valid with { ConversationId = "conversation-other" },
+            valid with { Execution = valid.Execution with { ProjectId = "project-other" } },
+            valid with { Execution = valid.Execution with { ExpectedProposalSourceVersion = 4 } },
+        ];
+
+        foreach (CompleteLowRiskAiAssistance mismatch in mismatches)
+        {
+            DomainResult result = GovernedOperationAggregate.Handle(mismatch, state, CompletionEnvelope(mismatch));
+            result.IsRejection.ShouldBeTrue();
+            result.Events.OfType<TaskIntentCaptureRejected>()
+                .ShouldHaveSingleItem()
+                .ReasonCode.ShouldBe("invalid_low_risk_ai_completion");
+            result.Events.OfType<LowRiskAiAssistanceExecutionSucceeded>().ShouldBeEmpty();
+        }
+    }
+
+    [Fact]
+    public void NaturalProviderCompletionShouldWinARaceWithRequestedCancellation()
+    {
+        GovernedOperationState state = StateWithActiveGeneration();
+        CancelAiResponseGeneration cancellation = Command();
+        AiResponseGenerationCancellationRequested requested = GovernedOperationAggregate
+            .Handle(cancellation, state, Envelope(cancellation))
+            .Events.OfType<AiResponseGenerationCancellationRequested>()
+            .ShouldHaveSingleItem();
+        state.Apply(requested);
+
+        CompleteLowRiskAiAssistance completion = Completion();
+        LowRiskAiAssistanceExecutionSucceeded succeeded = GovernedOperationAggregate
+            .Handle(completion, state, CompletionEnvelope(completion))
+            .Events.OfType<LowRiskAiAssistanceExecutionSucceeded>()
+            .ShouldHaveSingleItem();
+        state.Apply(succeeded);
+
+        CompleteAiResponseGenerationCancellation acknowledgement = CancellationCompletion(confirmed: true);
+        DomainResult lateCancellation = GovernedOperationAggregate.Handle(
+            acknowledgement,
+            state,
+            CompletionEnvelope(acknowledgement));
+
+        lateCancellation.IsNoOp.ShouldBeTrue();
+        lateCancellation.Events.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ConfirmedCancellationShouldWinARaceWithLateProviderCompletion()
+    {
+        GovernedOperationState state = StateWithActiveGeneration();
+        CancelAiResponseGeneration cancellation = Command();
+        AiResponseGenerationCancellationRequested requested = GovernedOperationAggregate
+            .Handle(cancellation, state, Envelope(cancellation))
+            .Events.OfType<AiResponseGenerationCancellationRequested>()
+            .ShouldHaveSingleItem();
+        state.Apply(requested);
+
+        CompleteAiResponseGenerationCancellation acknowledgement = CancellationCompletion(confirmed: true);
+        AiResponseGenerationCancellationConfirmed confirmed = GovernedOperationAggregate
+            .Handle(acknowledgement, state, CompletionEnvelope(acknowledgement))
+            .Events.OfType<AiResponseGenerationCancellationConfirmed>()
+            .ShouldHaveSingleItem();
+        state.Apply(confirmed);
+
+        CompleteLowRiskAiAssistance completion = Completion();
+        DomainResult lateProvider = GovernedOperationAggregate.Handle(
+            completion,
+            state,
+            CompletionEnvelope(completion));
+
+        lateProvider.IsNoOp.ShouldBeTrue();
+        lateProvider.Events.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void UnobservedCancellationShouldEmitFailedOutcomeAndRemoveActiveGeneration()
+    {
+        GovernedOperationState state = StateWithActiveGeneration();
+        AiResponseGenerationCancellationRequested requested = GovernedOperationAggregate
+            .Handle(Command(), state, Envelope(Command()))
+            .Events.OfType<AiResponseGenerationCancellationRequested>()
+            .ShouldHaveSingleItem();
+        state.Apply(requested);
+
+        CompleteAiResponseGenerationCancellation acknowledgement = CancellationCompletion(confirmed: false);
+        AiResponseGenerationCancellationFailed failed = GovernedOperationAggregate
+            .Handle(acknowledgement, state, CompletionEnvelope(acknowledgement))
+            .Events.OfType<AiResponseGenerationCancellationFailed>()
+            .ShouldHaveSingleItem();
+        state.Apply(failed);
+
+        CompleteLowRiskAiAssistance lateCompletion = Completion();
+        GovernedOperationAggregate
+            .Handle(lateCompletion, state, CompletionEnvelope(lateCompletion))
+            .IsNoOp.ShouldBeTrue();
+    }
+
     private static GovernedOperationState StateWithActiveGeneration()
     {
         GovernedOperationState state = new();
@@ -171,7 +292,9 @@ public sealed class CancelAiResponseGenerationAggregateTests
             "low-risk-allowed",
             3,
             "01ARZ3NDEKTSV4RRFFQ69G5FAX",
-            new DateTimeOffset(2026, 6, 1, 0, 5, 0, TimeSpan.Zero)));
+            new DateTimeOffset(2026, 6, 1, 0, 5, 0, TimeSpan.Zero),
+            TenantId: "tenant-alpha",
+            ConversationId: "conversation-001"));
         return state;
     }
 
@@ -196,6 +319,44 @@ public sealed class CancelAiResponseGenerationAggregateTests
         "authorized",
         "none");
 
+    private static ExecuteLowRiskAIAssistance Execution() => new(
+        "project-001",
+        "response-001",
+        "task-intent-001",
+        "message-001",
+        "requester-001",
+        LowRiskAiAssistanceKind.SummarizeVisibleContext,
+        "context-package-001",
+        "v1",
+        "metadata_only",
+        "collaboration_input",
+        "disabled",
+        [],
+        [],
+        [],
+        3,
+        "policy-snapshot-001",
+        "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+        "generation-001",
+        "transition-001");
+
+    private static CompleteLowRiskAiAssistance Completion() => new(
+        Execution(),
+        "conversation-001",
+        ExecutionRecord(),
+        "completion-001");
+
+    private static CompleteAiResponseGenerationCancellation CancellationCompletion(bool confirmed) => new(
+        "project-001",
+        "conversation-001",
+        "response-001",
+        "generation-001",
+        "cancel-001",
+        "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+        confirmed,
+        confirmed ? null : "provider-cancellation-unobserved",
+        confirmed ? "cancel-completion-confirmed" : "cancel-completion-failed");
+
     private static CancelAiResponseGeneration Command() => new(
         "project-001",
         "conversation-001",
@@ -216,5 +377,18 @@ public sealed class CancelAiResponseGenerationAggregateTests
             CorrelationId: "correlation-001",
             CausationId: null,
             UserId: "actor-alpha",
+            Extensions: null);
+
+    private static CommandEnvelope CompletionEnvelope(object command)
+        => new(
+            MessageId: "01ARZ3NDEKTSV4RRFFQ69G5FAM",
+            TenantId: "tenant-alpha",
+            Domain: "chatbot",
+            AggregateId: "conversation-001",
+            CommandType: command.GetType().Name,
+            Payload: JsonSerializer.SerializeToUtf8Bytes(command, command.GetType()),
+            CorrelationId: "correlation-001",
+            CausationId: null,
+            UserId: "ai-execution-coordinator",
             Extensions: null);
 }

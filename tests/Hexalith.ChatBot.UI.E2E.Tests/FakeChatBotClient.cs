@@ -18,6 +18,9 @@ internal sealed class FakeChatBotClient : IChatBotClient
 {
     private static readonly DateTimeOffset At = new(2026, 5, 31, 9, 0, 0, TimeSpan.Zero);
     private const string CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
+    private bool _messageSubmitted;
+    private bool _proposalSubmitted;
+    private bool _responseStopped;
 
     public Task<CommandSubmissionResponse> SubmitAsync(
         IChatBotCommand command,
@@ -25,7 +28,21 @@ internal sealed class FakeChatBotClient : IChatBotClient
         string? taskId = null,
         ChatBotSurfaceOrigin origin = ChatBotSurfaceOrigin.Api,
         CancellationToken cancellationToken = default)
-        => Task.FromResult(new CommandSubmissionResponse
+    {
+        switch (command)
+        {
+            case Hexalith.ChatBot.Contracts.Commands.RecordProjectConversationMessage:
+                _messageSubmitted = true;
+                break;
+            case Hexalith.ChatBot.Contracts.Commands.ProposeAIAction:
+                _proposalSubmitted = true;
+                break;
+            case Hexalith.ChatBot.Contracts.Commands.CancelAiResponseGeneration:
+                _responseStopped = true;
+                break;
+        }
+
+        return Task.FromResult(new CommandSubmissionResponse
         {
             CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FCM",
             CorrelationId = correlationId ?? CorrelationId,
@@ -33,6 +50,7 @@ internal sealed class FakeChatBotClient : IChatBotClient
             LifecycleState = LifecycleState.Proposed,
             AcceptedAt = At,
         });
+    }
 
     public Task<OperationStatus> GetOperationStatusAsync(
         string operationId,
@@ -161,11 +179,11 @@ internal sealed class FakeChatBotClient : IChatBotClient
             // One pending-approval item so the live route actually mounts ChatBotApprovalConversationItem and
             // ChatBotAiActionPreviewSections. With an empty list the real-render suite asserted "no <dl> in
             // main" against a surface that was never instantiated, so every approval assertion passed vacuously.
-            Items = [PendingApprovalItem],
+            Items = cursor is null ? CurrentItems() : [OlderApprovalItem],
             Page = new ProjectConversationCursorPage
             {
-                NextCursor = null,
-                HasMore = false,
+                NextCursor = cursor is null ? "opaque-history-cursor" : null,
+                HasMore = cursor is null,
                 PageSize = pageSize,
             },
             SourceProvenance = ProjectConversationResponseSourceProvenance.M365MailboxIntake,
@@ -175,6 +193,72 @@ internal sealed class FakeChatBotClient : IChatBotClient
             CorrelationId = CorrelationId,
             SafeNextAction = "none",
         });
+
+    private ICollection<ProjectConversationItem> CurrentItems()
+    {
+        List<ProjectConversationItem> items = [PendingApprovalItem, ActiveResponseItem(_responseStopped)];
+        if (_messageSubmitted)
+        {
+            items.Insert(0, SubmittedItem("item:message-submitted", "message:submitted", 4));
+        }
+
+        if (_proposalSubmitted)
+        {
+            items.Insert(0, SubmittedItem("item:proposal-submitted", "proposal:submitted", 5));
+        }
+
+        return items;
+    }
+
+    private static ProjectConversationItem SubmittedItem(string itemId, string proposalId, long sourceVersion)
+    {
+        ProjectConversationItem item = PendingApprovalItem;
+        item.ItemId = itemId;
+        item.ApprovalId = $"approval:{proposalId}";
+        item.ApprovalProposalId = proposalId;
+        item.ApprovalSourceMessageId = $"message:{proposalId}";
+        item.SourceVersion = sourceVersion;
+        item.OccurredAt = At.AddMinutes(sourceVersion);
+        return item;
+    }
+
+    private static ProjectConversationItem ActiveResponseItem(bool stopped)
+    {
+        ProjectConversationItem item = PendingApprovalItem;
+        item.ItemId = "item:active-response";
+        item.Kind = ProjectConversationItemKind.AiOutcome;
+        item.ActorKind = ProjectConversationActorKind.AiActor;
+        item.ActorLabel = "AI actor";
+        item.AssociationId = "proposal:active-response";
+        item.SourceConversationId = "conversation:active-response";
+        item.SourceVersion = stopped ? 7 : 6;
+        item.AiOutcomeKind = AiOutcomeKind.ExecutionStarted;
+        item.AiOutcomeStatus = stopped ? AiOutcomeStatus.Failed : AiOutcomeStatus.Executing;
+        item.AiProposalId = "response:active-response";
+        item.AiRiskClass = AiActionRiskClass.LowRisk;
+        item.AiRiskActionClasses = ["read-only"];
+        item.AiPolicySnapshotId = "policy:story-13-2-stateful";
+        item.AiPolicySnapshotVisibility = "authorized";
+        item.AiAuthorizedContextReferences = ["evidence:visible-context"];
+        item.AiSafeNextAction = stopped ? "none" : "wait-for-projection";
+        item.AiResponseProgress = new AiResponseProgress
+        {
+            ProjectId = "project-alpha",
+            ConversationId = "conversation:active-response",
+            ResponseId = "response:active-response",
+            GenerationId = "generation:active-response",
+            CorrelationId = CorrelationId,
+            SourceVersion = item.SourceVersion,
+            Sequence = stopped ? 2 : 1,
+            State = stopped ? AiResponseProgressState.Stopped : AiResponseProgressState.Rendering,
+            TerminalReason = stopped ? AiResponseTerminalReason.UserStopped : AiResponseTerminalReason.None,
+            SafeNextAction = stopped ? "none" : "wait-for-projection",
+            RedactionState = AiResponseProgressRedactionState.Metadata_only,
+            VisibilityState = AiResponseProgressVisibilityState.Metadata_only,
+            IsTerminal = stopped,
+        };
+        return item;
+    }
 
     private static ProjectConversationItem PendingApprovalItem => new()
     {
@@ -207,6 +291,23 @@ internal sealed class FakeChatBotClient : IChatBotClient
         CorrelationId = CorrelationId,
         SafeNextAction = "decide-approval",
     };
+
+    private static ProjectConversationItem OlderApprovalItem
+    {
+        get
+        {
+            ProjectConversationItem item = PendingApprovalItem;
+            item.ItemId = "item:approval-older-001";
+            item.ApprovalId = "approval:older-001";
+            item.ApprovalProposalId = "proposal:older-001";
+            item.ApprovalSourceMessageId = "message:older-001";
+            item.AssociationId = "association:older-001";
+            item.SourceConversationId = "conversation:older-001";
+            item.OccurredAt = new DateTimeOffset(2026, 5, 31, 8, 0, 0, TimeSpan.Zero);
+            item.SourceVersion = 0;
+            return item;
+        }
+    }
 
     public Task<ComplianceAuditSearchView> SearchComplianceAuditRecordsAsync(
         ComplianceAuditQuery query,

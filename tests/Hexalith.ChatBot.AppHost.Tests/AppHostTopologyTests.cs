@@ -52,6 +52,14 @@ public static class AppHostTopologyTests
         module.ShouldContain("AppChannelAddress = \"127.0.0.1\"");
         module.ShouldContain("PlacementHostAddress");
         module.ShouldContain("SchedulerHostAddress");
+        module.ShouldContain("configuration[\"Dapr:RedisHost\"] ?? DefaultRedisHost");
+        module.ShouldContain("Dapr:RedisHost must be a host:port endpoint without credentials or a path.");
+        module.ShouldContain("configuration[\"Dapr:SpineAppIdSuffix\"]");
+        module.ShouldContain("ResolveSpineAppId(builder.Configuration, EventStoreServiceName)");
+        module.ShouldContain("ResolveSpineAppId(builder.Configuration, AppId)");
+        module.ShouldContain("WithEnvironment(\"ChatBot__EventStoreDaprAppId\", eventStoreAppId)");
+        module.ShouldContain("EventStore__DomainServices__Registrations__wildcard_chatbot_v1__AppId\", chatBotAppId");
+        module.ShouldContain("EventStore__DomainServices__Registrations__wildcard_chatbot_v1__Domain\", AppId");
         module.ShouldContain("endpoint.IsProxied = false");
         module.ShouldContain("EventStore__Publisher__PubSubName");
         module.ShouldContain("Authentication__DaprInternal__AllowedCallers__0");
@@ -240,6 +248,22 @@ public static class AppHostTopologyTests
         JsonElement publicClient = clientsById["hexalith-chatbot"];
         publicClient.GetProperty("publicClient").GetBoolean().ShouldBeTrue();
         publicClient.GetProperty("serviceAccountsEnabled").GetBoolean().ShouldBeFalse();
+        publicClient.TryGetProperty("secret", out _).ShouldBeFalse();
+        JsonElement projectOwnerMapper = publicClient.GetProperty("protocolMappers")
+            .EnumerateArray()
+            .Single(mapper => mapper.GetProperty("config").TryGetProperty("claim.name", out JsonElement claimName) &&
+                string.Equals(claimName.GetString(), "chatbot:project-owner", StringComparison.Ordinal));
+        JsonElement projectOwnerMapperConfig = projectOwnerMapper.GetProperty("config");
+        projectOwnerMapper.GetProperty("protocolMapper").GetString().ShouldBe("oidc-usermodel-attribute-mapper");
+        projectOwnerMapperConfig.GetProperty("user.attribute").GetString().ShouldBe("chatbot_project_owners");
+        projectOwnerMapperConfig.GetProperty("multivalued").GetString().ShouldBe("true");
+        projectOwnerMapperConfig.GetProperty("access.token.claim").GetString().ShouldBe("true");
+
+        JsonElement actorAlpha = document.RootElement.GetProperty("users")
+            .EnumerateArray()
+            .Single(user => string.Equals(user.GetProperty("username").GetString(), "actor-alpha", StringComparison.Ordinal));
+        actorAlpha.GetProperty("attributes").GetProperty("chatbot_project_owners")
+            .EnumerateArray().Select(static value => value.GetString()).ShouldBe(["project-alpha"]);
 
         string mcpMapperText = clientsById["mcp-tool-client"].GetProperty("protocolMappers").ToString();
         mcpMapperText.ShouldContain("\"claim.value\": \"mcp-tool-client\"");

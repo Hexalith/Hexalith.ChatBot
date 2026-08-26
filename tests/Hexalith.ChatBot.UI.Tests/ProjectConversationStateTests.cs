@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Hexalith.ChatBot.UI.State.ProjectConversation;
 
 using Shouldly;
@@ -7,7 +9,7 @@ namespace Hexalith.ChatBot.UI.Tests;
 public sealed class ProjectConversationStateTests
 {
     [Fact]
-    public void LoadAndFailureReducersShouldClearPriorProjectConversation()
+    public void ProjectSwitchShouldClearPriorConversationWhileFailureKeepsLastSafeView()
     {
         ProjectConversationModel priorConversation = new(
             "project-alpha",
@@ -38,7 +40,7 @@ public sealed class ProjectConversationStateTests
         switching.IsLoading.ShouldBeTrue();
         switching.Conversation.ShouldBeNull();
         failed.IsLoading.ShouldBeFalse();
-        failed.Conversation.ShouldBeNull();
+        failed.Conversation.ShouldBe(priorConversation);
         failed.ErrorCode.ShouldBe("authorization_denied");
     }
 
@@ -67,6 +69,84 @@ public sealed class ProjectConversationStateTests
     }
 
     [Fact]
+    public void CurrentAndHistoryResponsesShouldCorrelateIndependentlyAndLateHistoryMustNotResurrectOmittedItems()
+    {
+        ProjectConversationItemModel formerlyCurrent = Item("item-current-omitted", 8);
+        ProjectConversationState initial = new(false, Conversation("project-alpha", [formerlyCurrent]), null)
+        {
+            CurrentPageItemIds = new HashSet<string>([formerlyCurrent.ItemId], StringComparer.Ordinal),
+            HistoricalItems = [],
+        };
+        LoadProjectConversationAction history = new("project-alpha", "cursor-before-8") { RequestId = "history-1" };
+        LoadProjectConversationAction current = new("project-alpha") { RequestId = "current-2" };
+
+        ProjectConversationState loadingHistory = ProjectConversationReducers.ReduceLoad(initial, history);
+        ProjectConversationState loadingCurrent = ProjectConversationReducers.ReduceLoad(loadingHistory, current);
+        ProjectConversationState afterLateHistory = ProjectConversationReducers.ReduceLoaded(
+            loadingCurrent,
+            new ProjectConversationLoadedAction(
+                Conversation("project-alpha", [formerlyCurrent]),
+                history.RequestId,
+                "project-alpha",
+                history.Cursor));
+        ProjectConversationState afterCurrent = ProjectConversationReducers.ReduceLoaded(
+            afterLateHistory,
+            new ProjectConversationLoadedAction(
+                Conversation("project-alpha", [Item("item-new-current", 9)]),
+                current.RequestId,
+                "project-alpha"));
+
+        loadingCurrent.HistoryLoadRequestId.ShouldBeNull();
+        afterLateHistory.ShouldBe(loadingCurrent);
+        afterCurrent.Conversation!.Items.Select(static item => item.ItemId).ShouldBe(["item-new-current"]);
+        afterCurrent.HistoricalItems.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void HistoryPageShouldMergeOlderItemsWithoutReplacingTheNewestHeader()
+    {
+        ProjectConversationItemModel newest = Item("item-newest", 10);
+        ProjectConversationState initial = new(false, Conversation("project-alpha", [newest], "cursor-before-10", true), null)
+        {
+            CurrentPageItemIds = new HashSet<string>([newest.ItemId], StringComparer.Ordinal),
+            HistoricalItems = [],
+        };
+        LoadProjectConversationAction history = new("project-alpha", "cursor-before-10") { RequestId = "history-1" };
+
+        ProjectConversationState loading = ProjectConversationReducers.ReduceLoad(initial, history);
+        ProjectConversationState loaded = ProjectConversationReducers.ReduceLoaded(
+            loading,
+            new ProjectConversationLoadedAction(
+                Conversation("project-alpha", [Item("item-older", 4)], null, false),
+                history.RequestId,
+                "project-alpha",
+                history.Cursor));
+
+        loaded.Conversation!.ProjectDisplayName.ShouldBe("Project Alpha");
+        loaded.Conversation.Items.Select(static item => item.ItemId).ShouldBe(["item-newest", "item-older"]);
+        loaded.Conversation.HasMore.ShouldBeFalse();
+        loaded.IsHistoryLoading.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void LoadedResponseForAnotherProjectShouldFailClosedAndKeepTheLastSafeView()
+    {
+        ProjectConversationModel safe = Conversation("project-alpha", [Item("item-safe", 1)]);
+        LoadProjectConversationAction load = new("project-alpha") { RequestId = "current-1" };
+        ProjectConversationState loading = ProjectConversationReducers.ReduceLoad(new(false, safe, null), load);
+
+        ProjectConversationState result = ProjectConversationReducers.ReduceLoaded(
+            loading,
+            new ProjectConversationLoadedAction(
+                Conversation("project-beta", [Item("item-foreign", 2)]),
+                load.RequestId,
+                "project-alpha"));
+
+        result.Conversation.ShouldBe(safe);
+        result.ErrorCode.ShouldBe("project-conversation-load-identity-mismatch");
+    }
+
+    [Fact]
     public void CrossProjectNudgeShouldFailClosedWhileNoConversationIsLoaded()
     {
         // The cross-project guard used to be skipped whenever Conversation was null, so a foreign-project nudge was
@@ -92,15 +172,19 @@ public sealed class ProjectConversationStateTests
         result.StreamingErrorCode.ShouldBe("ai-response-nudge-unsafe");
     }
 
-    private static ProjectConversationModel Conversation(string projectId) => new(
+    private static ProjectConversationModel Conversation(
+        string projectId,
+        IReadOnlyList<ProjectConversationItemModel>? items = null,
+        string? nextCursor = null,
+        bool hasMore = false) => new(
         projectId,
         "Project Alpha",
         null,
         "Current",
         "Associated",
-        [],
-        null,
-        false,
+        items ?? [],
+        nextCursor,
+        hasMore,
         25,
         "m365-mailbox-intake",
         "metadata_only",
@@ -108,6 +192,12 @@ public sealed class ProjectConversationStateTests
         "chatbot.project-conversation-response.v1",
         "01ARZ3NDEKTSV4RRFFQ69G5FAX",
         "none");
+
+    private static ProjectConversationItemModel Item(string itemId, long sourceVersion)
+        => JsonSerializer.Deserialize<ProjectConversationItemModel>(
+            $$"""{"itemId":"{{itemId}}","sourceVersion":{{sourceVersion}}}""",
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            ?? throw new InvalidOperationException("The project-conversation item fixture could not be created.");
 
     [Fact]
     public void ComposerReducersShouldTrackSubmittingAcceptedAndValidationStates()
@@ -203,21 +293,4 @@ public sealed class ProjectConversationStateTests
         afterSubmit.StreamingNotice.ShouldBeNull();
     }
 
-    private static ProjectConversationModel Conversation(string projectId)
-        => new(
-            projectId,
-            "Project",
-            null,
-            "Current",
-            "Associated",
-            [],
-            null,
-            false,
-            25,
-            "m365-mailbox-intake",
-            "metadata_only",
-            "collaboration_input",
-            "chatbot.project-conversation-response.v1",
-            "correlation-001",
-            "none");
 }

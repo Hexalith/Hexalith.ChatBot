@@ -18,4 +18,8 @@ public sealed record ActiveAiResponseGeneration(
     string GenerationId,
     string ProjectId,
     long StartedSourceVersion,
-    string CorrelationId);
+    string CorrelationId,
+    string TenantId = "unavailable",
+    string? ConversationId = null,
+    string Status = "active",
+    string? CancellationId = null);

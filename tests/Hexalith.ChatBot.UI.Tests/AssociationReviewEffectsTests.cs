@@ -87,8 +87,9 @@ public sealed class AssociationReviewEffectsTests
         await effects.HandleConfirmedDecisionAsync(new ConfirmAssociationDecisionAction(), dispatcher);
 
         client.SubmitCount.ShouldBe(1);
-        AssociateEmailToProject command = client.SubmittedCommand.ShouldBeOfType<AssociateEmailToProject>();
-        command.TargetProjectId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FBB");
+        Hexalith.ChatBot.Contracts.Commands.AssociateEmailToProject command = client.SubmittedCommand
+            .ShouldBeOfType<Hexalith.ChatBot.Contracts.Commands.AssociateEmailToProject>();
+        command.ProjectId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FBB");
         command.DecisionNote.ShouldBe("Reviewed the thread.");
         dispatcher.Actions.OfType<AssociationDecisionSubmittedAction>().ShouldHaveSingleItem();
     }
@@ -283,8 +284,6 @@ public sealed class AssociationReviewEffectsTests
                 CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
                 TaskId = null,
                 LifecycleState = LifecycleState,
-                Status = CommandSubmissionResponseStatus.Accepted,
-                SchemaVersion = "chatbot.command-submission-response.v1",
             });
         }
 
@@ -308,7 +307,7 @@ public sealed class AssociationReviewEffectsTests
             string? taskId = null,
             CancellationToken cancellationToken = default)
         {
-            AssociationEvidenceReference evidence = new()
+            Hexalith.ChatBot.Client.Generated.AssociationEvidenceReference evidence = new()
             {
                 EvidenceReference = "thread-token",
                 EvidenceFingerprint = "fingerprint-1",
@@ -322,19 +321,19 @@ public sealed class AssociationReviewEffectsTests
                 SourceMailboxId = "mailbox-metadata",
                 SourceConversationId = "conversation-metadata",
                 LifecycleState = LifecycleState,
-                Outcome = AssociationScoringOutcome.CandidatesGenerated,
-                ThresholdBand = AssociationThresholdBand.Ambiguous,
+                Outcome = Hexalith.ChatBot.Client.Generated.AssociationScoringOutcome.CandidatesGenerated,
+                ThresholdBand = Hexalith.ChatBot.Client.Generated.AssociationThresholdBand.Ambiguous,
                 ConfidenceScore = 0.64,
-                ReasonCodes = [AssociationReasonCode.MultipleAuthorizedCandidates],
+                ReasonCodes = [Hexalith.ChatBot.Client.Generated.AssociationReasonCode.MultipleAuthorizedCandidates],
                 Candidates =
                 [
-                    new AssociationCandidate
+                    new Hexalith.ChatBot.Client.Generated.AssociationCandidate
                     {
                         ProjectId = "01ARZ3NDEKTSV4RRFFQ69G5FBB",
                         DisplayName = "Authorized candidate",
                         ConfidenceScore = 0.64,
                         Rank = 1,
-                        ReasonCodes = [AssociationReasonCode.ExplicitProjectIdentifierMatched],
+                        ReasonCodes = [Hexalith.ChatBot.Client.Generated.AssociationReasonCode.ExplicitProjectIdentifierMatched],
                         EvidenceRefs = [evidence],
                         ConfidenceInputs = [],
                         RequiredEvidenceComplete = true,

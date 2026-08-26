@@ -1,6 +1,7 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
 @using Microsoft.JSInterop
 @inject Microsoft.JSInterop.IJSRuntime JSRuntime
+@inject ChatBotAnnouncementDeduplicationState AnnouncementDeduplication
 @inject ChatBotUiTextLocalizer UiText
 
 <div class="chatbot-streaming-stop"
@@ -85,8 +86,6 @@
 
     private string LiveRegionMessage { get; set; } = string.Empty;
 
-    private string? _announcedGenerationId;
-
     private string StreamingValue => IsStreaming ? "true" : "false";
 
     // Unavailable when there is no active generation to stop, or while a cancellation is already in flight.
@@ -139,12 +138,13 @@
             return;
         }
 
-        if (string.Equals(_announcedGenerationId, VerifiedStopAnnouncementGenerationId, StringComparison.Ordinal))
+        if (!AnnouncementDeduplication.ShouldAnnounce(
+            $"ai-response-stop:{VerifiedStopAnnouncementGenerationId}",
+            ChatBotAnnouncementDedupRule.OncePerStableOperationKey))
         {
             return;
         }
 
-        _announcedGenerationId = VerifiedStopAnnouncementGenerationId;
         LiveRegionMessage = ResolvedStopAnnouncement;
         await InvokeAsync(StateHasChanged).ConfigureAwait(true);
 

@@ -71,6 +71,9 @@ internal sealed class AcceptedCommandDispatcher(
     public async ValueTask<ChatBotDispatchResult> DispatchAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
+        // Retained only as a source-compatible constructor seam for existing hosts/tests. Provider execution belongs
+        // exclusively to AiExecutionCoordinator after Started is persisted.
+        _ = aiAssistanceProvider;
 
         // Story 8.2: command-execution latency — duration from accepted to the dispatch result. Recorded on every
         // completion path (success or failure, AC1) via `finally` so a throwing dispatch still records latency while
@@ -584,7 +587,10 @@ internal sealed class AcceptedCommandDispatcher(
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(append);
-            return new EventStoreDispatchPlan(append.MessageId, commandType, payload);
+            // Every project-conversation mutation shares one aggregate. Routing each message by its own message id
+            // made the version check meaningless across participants and left a later Stop command unable to observe
+            // the generation it targeted.
+            return new EventStoreDispatchPlan(append.ProjectId, commandType, payload);
         }
 
         if (string.Equals(commandType, nameof(CancelAiResponseGeneration), StringComparison.Ordinal))
@@ -602,7 +608,7 @@ internal sealed class AcceptedCommandDispatcher(
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(cancel);
-            return new EventStoreDispatchPlan(cancel.CancellationId, commandType, payload);
+            return new EventStoreDispatchPlan(cancel.ProjectId, commandType, payload);
         }
 
         if (string.Equals(commandType, nameof(ProposeAIAction), StringComparison.Ordinal))
@@ -617,7 +623,7 @@ internal sealed class AcceptedCommandDispatcher(
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(proposal with { RiskClassification = context.RiskClassification.Record });
-            return new EventStoreDispatchPlan(proposal.SourceMessageId, commandType, payload);
+            return new EventStoreDispatchPlan(proposal.ProjectId, commandType, payload);
         }
 
         if (string.Equals(commandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal))
@@ -635,9 +641,12 @@ internal sealed class AcceptedCommandDispatcher(
 
             string policySnapshotId = context.ApprovalResult.PolicySnapshotId ?? execution.PolicySnapshotId ?? "unavailable";
             string assistanceKind = AiActionApprovalGate.AssistanceKindToken(execution.AssistanceKind);
-            LowRiskAiAssistanceExecutionRecord providerRecord = context.ApprovalResult.Kind is ChatBotApprovalResultKind.RoutedToApproval
+            // The command receipt is admission only. A provider call here ran before EventStore persisted Started and
+            // could therefore escape audit/recovery or be duplicated after a gateway retry. The persisted-event
+            // coordinator is the sole low-risk provider invocation path.
+            LowRiskAiAssistanceExecutionRecord? providerRecord = context.ApprovalResult.Kind is ChatBotApprovalResultKind.RoutedToApproval
                 ? RoutedToApprovalRecord(context, execution, policySnapshotId, assistanceKind)
-                : await InvokeProviderAsync(context, execution, policySnapshotId, assistanceKind, cancellationToken).ConfigureAwait(false);
+                : null;
 
             ExecuteLowRiskAIAssistance enriched = execution with
             {
@@ -646,7 +655,7 @@ internal sealed class AcceptedCommandDispatcher(
                 ExecutionRecord = providerRecord,
             };
             JsonElement payload = JsonSerializer.SerializeToElement(enriched);
-            return new EventStoreDispatchPlan(enriched.SourceMessageId, commandType, payload);
+            return new EventStoreDispatchPlan(enriched.ProjectId, commandType, payload);
         }
 
         if (string.Equals(commandType, nameof(DecideAiActionApproval), StringComparison.Ordinal))
@@ -667,7 +676,7 @@ internal sealed class AcceptedCommandDispatcher(
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(decision);
-            return new EventStoreDispatchPlan(decision.SourceMessageId, commandType, payload);
+            return new EventStoreDispatchPlan(decision.ProjectId, commandType, payload);
         }
 
         if (string.Equals(commandType, nameof(ExecuteApprovedAIAction), StringComparison.Ordinal))
@@ -991,40 +1000,6 @@ internal sealed class AcceptedCommandDispatcher(
         // Defensive fallback: the spine allowlist admits only first-party commands in production, so this branch
         // is reached only by bootstrap tests that submit a generic command through a permissive allowlist.
         return new EventStoreDispatchPlan(context.Submission.Request.CommandId, commandType, command);
-    }
-
-    private async ValueTask<LowRiskAiAssistanceExecutionRecord> InvokeProviderAsync(
-        ChatBotGatewayContext context,
-        ExecuteLowRiskAIAssistance execution,
-        string policySnapshotId,
-        string assistanceKind,
-        CancellationToken cancellationToken)
-    {
-        IAiAssistanceProvider provider = aiAssistanceProvider
-            ?? throw new InvalidOperationException("The AI assistance provider is not configured.");
-        return await provider
-            .ExecuteAsync(
-                new AiAssistanceProviderRequest(
-                    context.TenantBinding.TenantId,
-                    execution.ProjectId,
-                    execution.RequesterId,
-                    execution.ProposalId,
-                    execution.ExecutionId,
-                    assistanceKind,
-                    execution.ContextPackageId,
-                    execution.ContextPackageVersion,
-                    execution.ContextPackageRedactionState,
-                    execution.RetentionClass,
-                    execution.ProviderReuseSetting,
-                    execution.SourceEvidenceReferences,
-                    execution.AuthorizedContextReferences,
-                    execution.ExcludedContextReasons,
-                    policySnapshotId,
-                    context.ApprovalResult!.ReasonCode,
-                    context.Submission.CorrelationId,
-                    $"audit:{execution.ExecutionId}"),
-                cancellationToken)
-            .ConfigureAwait(false);
     }
 
     private LowRiskAiAssistanceExecutionRecord RoutedToApprovalRecord(

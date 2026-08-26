@@ -29,19 +29,17 @@ public static class GovernedOperationAggregateTests
     private const string IntakeId = "01ARZ3NDEKTSV4RRFFQ69G5FAZ";
 
     [Fact]
-    public static void HandleLowRiskAiExecutionShouldEmitStartedAndTerminalOutcomeEvents()
+    public static void HandleLowRiskAiExecutionShouldEmitOnlyStartedBeforeProviderCompletion()
     {
         ExecuteLowRiskAIAssistance command = LowRiskExecutionCommand("success");
 
         DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
 
         result.IsSuccess.ShouldBeTrue();
-        result.Events.Count.ShouldBe(2);
-        LowRiskAiAssistanceExecutionStarted started = result.Events[0].ShouldBeOfType<LowRiskAiAssistanceExecutionStarted>();
+        LowRiskAiAssistanceExecutionStarted started = result.Events.ShouldHaveSingleItem().ShouldBeOfType<LowRiskAiAssistanceExecutionStarted>();
         started.ExecutionId.ShouldBe(command.ExecutionId);
-        started.PolicyReasonCode.ShouldBe("low-risk-execute-allowed");
-        LowRiskAiAssistanceExecutionSucceeded succeeded = result.Events[1].ShouldBeOfType<LowRiskAiAssistanceExecutionSucceeded>();
-        succeeded.Record.SafeNextAction.ShouldBe("none");
+        started.PolicyReasonCode.ShouldBe(command.RiskClassification!.ReasonCode);
+        started.Execution.ShouldBe(command);
     }
 
     [Fact]
@@ -2196,7 +2194,7 @@ public static class GovernedOperationAggregateTests
     {
         ExecuteLowRiskAIAssistance command = LowRiskExecutionCommand("success") with
         {
-            ExecutionRecord = LowRiskExecutionCommand("success").ExecutionRecord! with
+            ExecutionRecord = LowRiskExecutionRecord("success") with
             {
                 SafeNextAction = "review-ai-action",
             },
@@ -4142,7 +4140,12 @@ public static class GovernedOperationAggregateTests
                 "declared",
                 "authorized",
                 "correlation-001")),
-            ExecutionRecord: new LowRiskAiAssistanceExecutionRecord(
+            ExecutionRecord: outcome == "pending-approval" ? LowRiskExecutionRecord(outcome, policyReasonCode) : null);
+
+    private static LowRiskAiAssistanceExecutionRecord LowRiskExecutionRecord(
+        string outcome,
+        string policyReasonCode = "low-risk-execute-allowed")
+        => new(
                 "ai-execution-001",
                 "ai-proposal-001",
                 "summarize-visible-context",
@@ -4163,7 +4166,7 @@ public static class GovernedOperationAggregateTests
                 "metadata_only",
                 outcome == "success" ? "none" : "review-ai-action",
                 FailureCode: outcome == "success" ? null : policyReasonCode,
-                Retryability: outcome == "failed" ? "retryable" : null));
+                Retryability: outcome == "failed" ? "retryable" : null);
 
     private static ExecuteApprovedAIAction ApprovedExecutionCommand()
         => new(

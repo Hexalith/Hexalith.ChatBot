@@ -121,6 +121,18 @@
                                            SafeNextAction="@conversation.SafeNextAction"
                                            OnWhyThisProjectRequested="@OpenWhyThisProject" />
 
+                @if (conversation.HasMore && !string.IsNullOrWhiteSpace(conversation.NextCursor))
+                {
+                    <FluentButton Type="ButtonType.Button"
+                                  Appearance="ButtonAppearance.Outline"
+                                  Class="chatbot-touch-target-primary"
+                                  Disabled="@State.Value.IsHistoryLoading"
+                                  OnClick="@LoadOlderHistory"
+                                  data-chatbot-stable-id="project-conversation-load-older">
+                        @UiText[ChatBotUiTextKey.ProjectConversationLoadOlder]
+                    </FluentButton>
+                }
+
                 @if (LatestAiResponseProgress is { } progress)
                 {
                     <p class="chatbot-streaming-status"
@@ -304,6 +316,14 @@
         }
     }
 
+    private void LoadOlderHistory()
+    {
+        if (Conversation is { HasMore: true, NextCursor: { } cursor } && !string.IsNullOrWhiteSpace(cursor))
+        {
+            Dispatcher.Dispatch(new LoadProjectConversationAction(ProjectId, cursor));
+        }
+    }
+
     // Story 10.6b reuse transport: the subscriber (constructed per component instance) owns the tenant-scoped
     // project-conversation projection-changed SignalR subscription and fail-open teardown.
     private ProjectConversationStreamingSubscriber? _streamingSubscriber;
@@ -411,7 +431,7 @@
             { Status: "Blocked" or "Stale" or "Degraded" } => UiText[ChatBotUiTextKey.ProjectWorkspaceStateDependencyDegraded],
             { IsEmpty: true } => UiText[ChatBotUiTextKey.ProjectWorkspaceStateEmptyProject],
             // Fail closed on an unrecognized/renamed server status instead of presenting it as a healthy conversation.
-            { Status: not "Active" } => UiText[ChatBotUiTextKey.ProjectWorkspaceStateDependencyDegraded],
+            { Status: not "Current" } => UiText[ChatBotUiTextKey.ProjectWorkspaceStateDependencyDegraded],
             not null => UiText[ChatBotUiTextKey.ProjectWorkspaceStateActiveConversation],
             _ => UiText[ChatBotUiTextKey.ProjectWorkspaceStateColdLoad],
         };
@@ -422,7 +442,7 @@
             null => ChatBotFeedbackKind.Info,
             { Status: "Blocked" or "Stale" or "Degraded" } => ChatBotFeedbackKind.Warning,
             { IsEmpty: true } => ChatBotFeedbackKind.Warning,
-            { Status: not "Active" } => ChatBotFeedbackKind.Warning,
+            { Status: not "Current" } => ChatBotFeedbackKind.Warning,
             _ => ChatBotFeedbackKind.Info,
         };
 
@@ -432,7 +452,7 @@
             { Status: "Blocked" } => ChatBotFeedbackStateFamily.BlockedAction,
             { Status: "Stale" or "Degraded" } => ChatBotFeedbackStateFamily.DependencyDegraded,
             { IsEmpty: true } => ChatBotFeedbackStateFamily.BlockedAction,
-            { Status: not "Active" } => ChatBotFeedbackStateFamily.DependencyDegraded,
+            { Status: not "Current" } => ChatBotFeedbackStateFamily.DependencyDegraded,
             _ => ChatBotFeedbackStateFamily.CurrentUserAiProposalReady,
         };
 
@@ -503,13 +523,24 @@
             ? conversation.Items.Max(static item => item.SourceVersion)
             : 0;
 
-    // Only genuine authorization codes may render a denial; everything else is retryable/degraded.
+    private static readonly IReadOnlySet<string> AuthorizationDenialCodes = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "authentication_denied",
+        "tenant_missing",
+        "tenant_mismatch",
+        "authorization_denied",
+        "unauthorized_participant",
+        "threshold_policy_unauthorized",
+        "notification_routing_unauthorized",
+        "escalation_policy_unauthorized",
+        "association_correction_target_unauthorized",
+    };
+
+    // Only exact, server-owned authorization reason codes render a denial. Substring matching misclassified transient
+    // dependencies such as "authorization-provider-unavailable" as a permanent permission failure.
     private bool IsUnauthorizedError
         => State.Value.ErrorCode is { } code &&
-            (code.Contains("authorization", StringComparison.OrdinalIgnoreCase) ||
-                code.Contains("unauthorized", StringComparison.OrdinalIgnoreCase) ||
-                code.Contains("forbidden", StringComparison.OrdinalIgnoreCase) ||
-                code.Contains("denied", StringComparison.OrdinalIgnoreCase));
+            AuthorizationDenialCodes.Contains(code);
 
     private static bool IsStopVerified(ProjectConversationAiResponseProgressModel progress)
         => progress.IsTerminal && ProjectConversationAiResponseProgressStates.IsVerifiedStop(progress.State);

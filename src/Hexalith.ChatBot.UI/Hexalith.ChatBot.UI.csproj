@@ -16,6 +16,12 @@
     <PackageReference Include="Fluxor.Blazor.Web" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
     <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" />
+    <!-- FrontComposer Shell compiles its OIDC path against the centrally pinned IdentityModel surface.
+         A consuming app otherwise receives only the older transitive suite carried by
+         Microsoft.AspNetCore.Authentication.OpenIdConnect, which compiles successfully but fails on the
+         first authenticated request when the CLR resolves the newer IdentityModel assemblies. Pinning the
+         protocol package brings its mutually versioned token/JWT dependencies with it. -->
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" />
     <PackageReference Include="OpenTelemetry" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />

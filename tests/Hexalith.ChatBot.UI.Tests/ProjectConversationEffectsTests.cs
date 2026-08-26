@@ -11,6 +11,7 @@ using Hexalith.ChatBot.UI.State.ProjectConversation;
 // command seam), so it is aliased from the contract enums namespace instead of re-importing that whole namespace,
 // which would otherwise collide with the generated read-model enums of the same name.
 using ChatBotSurfaceOrigin = Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigin;
+using ChatBotCorrelationId = Hexalith.ChatBot.Contracts.Identities.ChatBotCorrelationId;
 
 using Shouldly;
 
@@ -32,7 +33,11 @@ public sealed class ProjectConversationEffectsTests
     [Fact]
     public async Task StopEffectShouldGoPendingThenGovernedSubmitThenTypedRequeryWithoutClaimingStoppedLocally()
     {
-        StubChatBotClient client = new();
+        StubChatBotClient client = new()
+        {
+            ProgressState = AiResponseProgressState.Stopped,
+            ProgressIsTerminal = true,
+        };
         ProjectConversationEffects effects = new(new ProjectConversationService(client), EmptyState());
         RecordingDispatcher dispatcher = new();
 
@@ -40,10 +45,11 @@ public sealed class ProjectConversationEffectsTests
             new StopProjectConversationAiResponseAction(ActiveProgress()),
             dispatcher);
 
-        // Order matters: optimistic pending -> accepted receipt -> typed re-query.
+        // Order matters: optimistic pending -> accepted receipt -> bounded typed verification result.
         dispatcher.Actions[0].ShouldBeOfType<ProjectConversationAiResponseCancellationPendingAction>();
         dispatcher.Actions[1].ShouldBeOfType<ProjectConversationAiResponseCancellationAcceptedAction>();
-        dispatcher.Actions[2].ShouldBeOfType<LoadProjectConversationAction>().ProjectId.ShouldBe("project-001");
+        dispatcher.Actions[2].ShouldBeOfType<ProjectConversationLoadedAction>()
+            .Conversation.ProjectId.ShouldBe("project-001");
 
         ProjectConversationAiResponseCancellationPendingAction pending =
             dispatcher.Actions.OfType<ProjectConversationAiResponseCancellationPendingAction>().Single();
@@ -54,8 +60,8 @@ public sealed class ProjectConversationEffectsTests
         client.LastSubmitOrigin.ShouldBe(ChatBotSurfaceOrigin.Ui);
         client.LastSubmittedCommand.ShouldBeOfType<CancelAiResponseGeneration>();
 
-        // The effect never fabricates a terminal/stopped state; that is left to the typed re-query (the gate test below).
-        dispatcher.Actions.ShouldNotContain(static action => action is ProjectConversationLoadedAction);
+        // The effect never fabricates a terminal/stopped state; the dispatched model came from the typed server read.
+        dispatcher.Actions.ShouldNotContain(static action => action is LoadProjectConversationAction);
     }
 
     [Fact]
@@ -128,7 +134,10 @@ public sealed class ProjectConversationEffectsTests
         // The MEDIUM fix: the effect no longer applies its own gate; it re-queries IFF the reducer (which runs first in
         // Fluxor) accepted this exact nudge. Drive the REAL reducer, then the effect against the post-reducer state, and
         // prove they agree for a safe nudge (re-query) and a non-metadata-only nudge (reject, no re-query).
-        ProjectConversationState initial = EmptyState().Value;
+        ProjectConversationState initial = new(
+            false,
+            await ConversationWithProgressAsync(AiResponseProgressState.Rendering, isTerminal: false),
+            null);
 
         ProjectConversationAiResponseNudgeReceivedAction safeAction =
             new(Nudge(sourceVersion: 11, sequence: 5, redaction: "metadata_only"));
@@ -302,11 +311,37 @@ public sealed class ProjectConversationEffectsTests
                 askAiDispatcher);
 
         messageClient.LastSubmittedCommand.ShouldBeOfType<RecordProjectConversationMessage>();
-        askAiClient.LastSubmittedCommand.ShouldBeOfType<ProposeAIAction>();
+        askAiClient.LastSubmittedCommand.ShouldBeOfType<Hexalith.ChatBot.Contracts.Commands.ProposeAIAction>();
         messageClient.LastSubmitOrigin.ShouldBe(ChatBotSurfaceOrigin.Ui);
         askAiClient.LastSubmitOrigin.ShouldBe(ChatBotSurfaceOrigin.Ui);
         messageDispatcher.Actions.OfType<ProjectConversationSubmissionAcceptedAction>().ShouldHaveSingleItem();
         askAiDispatcher.Actions.OfType<ProjectConversationSubmissionAcceptedAction>().ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task AcceptedComposerSubmissionShouldPollReadsOnlyUntilProjectionAdvancesThenCorrelatedReload()
+    {
+        StubChatBotClient client = new()
+        {
+            ConversationReadSourceVersions = [10, 11],
+        };
+        RecordingDispatcher dispatcher = new();
+
+        await new ProjectConversationEffects(new ProjectConversationService(client), EmptyState())
+            .HandleSubmitComposerAsync(
+                new SubmitProjectConversationComposerAction(
+                    "project-001",
+                    ProjectConversationComposerMode.Message,
+                    "accepted once",
+                    "en-US",
+                    10),
+                dispatcher);
+
+        client.SubmitCount.ShouldBe(1);
+        client.ConversationReadCount.ShouldBe(2);
+        dispatcher.Actions.OfType<ProjectConversationSubmissionAcceptedAction>().ShouldHaveSingleItem();
+        dispatcher.Actions.OfType<LoadProjectConversationAction>().Count().ShouldBe(2);
+        dispatcher.Actions.ShouldNotContain(static action => action is ProjectConversationSubmissionFailedAction);
     }
 
     [Fact]
@@ -351,6 +386,8 @@ public sealed class ProjectConversationEffectsTests
 
         RecordProjectConversationMessage firstMessage = first.LastSubmittedCommand.ShouldBeOfType<RecordProjectConversationMessage>();
         RecordProjectConversationMessage secondMessage = second.LastSubmittedCommand.ShouldBeOfType<RecordProjectConversationMessage>();
+        ChatBotCorrelationId.TryParse(first.LastCorrelationId, out _).ShouldBeTrue();
+        ChatBotCorrelationId.TryParse(second.LastCorrelationId, out _).ShouldBeTrue();
         secondMessage.MessageId.ShouldNotBe(firstMessage.MessageId);
     }
 
@@ -453,9 +490,19 @@ public sealed class ProjectConversationEffectsTests
 
         public bool IncludeAiResponseProgress { get; init; } = true;
 
+        public IReadOnlyList<long>? ConversationReadSourceVersions { get; init; }
+
+        public long ConversationSourceVersion { get; init; } = 11;
+
+        public int ConversationReadCount { get; private set; }
+
+        public int SubmitCount { get; private set; }
+
         public IChatBotCommand? LastSubmittedCommand { get; private set; }
 
         public ChatBotSurfaceOrigin? LastSubmitOrigin { get; private set; }
+
+        public string? LastCorrelationId { get; private set; }
 
         public Task<CommandSubmissionResponse> SubmitAsync(
             IChatBotCommand command,
@@ -471,6 +518,8 @@ public sealed class ProjectConversationEffectsTests
 
             LastSubmittedCommand = command;
             LastSubmitOrigin = origin;
+            LastCorrelationId = correlationId;
+            SubmitCount++;
             return Task.FromResult(new CommandSubmissionResponse
             {
                 CommandId = "accepted-command-001",
@@ -488,7 +537,12 @@ public sealed class ProjectConversationEffectsTests
             string? correlationId = null,
             string? taskId = null,
             CancellationToken cancellationToken = default)
-            => Task.FromResult(new ProjectConversationResponse
+        {
+            int readIndex = ConversationReadCount++;
+            long conversationSourceVersion = ConversationReadSourceVersions is { Count: > 0 } sourceVersions
+                ? sourceVersions[Math.Min(readIndex, sourceVersions.Count - 1)]
+                : ConversationSourceVersion;
+            return Task.FromResult(new ProjectConversationResponse
             {
                 ProjectId = projectId,
                 ProjectDisplayName = "Authorized Project",
@@ -513,7 +567,7 @@ public sealed class ProjectConversationEffectsTests
                         RedactionState = ProjectConversationItemRedactionState.Metadata_only,
                         RetentionClass = ProjectConversationItemRetentionClass.Collaboration_input,
                         SchemaVersion = ProjectConversationItemSchemaVersion.Chatbot_projectConversationItem_v1,
-                        SourceVersion = 10,
+                        SourceVersion = conversationSourceVersion,
                         CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
                         ProjectId = projectId,
                         ProjectDisplayName = "Authorized Project",
@@ -548,6 +602,7 @@ public sealed class ProjectConversationEffectsTests
                 CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
                 SafeNextAction = "none",
             });
+        }
 
         public Task<OperationStatus> GetOperationStatusAsync(string operationId, string? correlationId = null, string? taskId = null, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();

@@ -25,7 +25,10 @@ internal static class TaskIntentProjectionTranslator
             return null;
         }
 
-        return record;
+        // The EventStore envelope owns stream position. Payload-local source versions describe the command's
+        // observed baseline and can lag when one command emits multiple events; exposing them as conversation cursor
+        // versions makes a later exact-version Stop target stale even though it names the visible Started row.
+        return record with { SourceVersion = published.SequenceNumber };
     }
 
     public static AiOutcomeEventView? TryCreateAiOutcome(PublishedTaskIntentEvent published)
@@ -52,7 +55,7 @@ internal static class TaskIntentProjectionTranslator
             Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.Proposal,
             Hexalith.ChatBot.Contracts.Enums.AiOutcomeStatus.Proposed,
             published.Timestamp,
-            published.Record.SourceVersion,
+            published.SequenceNumber,
             published.Record.CorrelationId,
             published.Proposal.ReviewerId,
             "human",

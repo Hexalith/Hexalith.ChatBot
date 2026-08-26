@@ -502,6 +502,12 @@ public static class ProjectConversationContractTests
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("sourceCreatedAtUtc");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("sourceTimezone");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("sourceProvenanceDisplayToken");
+        Sequence(Mapping(itemProperties, "sourceProvenance"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(
+                ["m365-mailbox-intake", "ui-composer", "approval-event", "failure-state", "ai-outcome"],
+                ignoreOrder: false);
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("participantResolutionId");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("participantAllowedReviewActions");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("participantRedactionState");

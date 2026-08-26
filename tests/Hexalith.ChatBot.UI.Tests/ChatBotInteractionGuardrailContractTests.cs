@@ -74,12 +74,15 @@ public sealed class ChatBotInteractionGuardrailContractTests
         component.ShouldContain("LiveRegionMessage = string.Empty");
         component.ShouldContain("InvokeAsync(StateHasChanged)");
 
-        // AC4: the polite "Response stopped" announcement is gated on an active/cancelling -> verified transition
-        // observed within the component lifetime, so a historically-stopped response surfaced on first navigation
-        // does not announce. Removing this gate (announcing on any first-render terminal state) is a regression.
-        component.ShouldContain("_observedActiveBeforeStop");
-        component.ShouldContain("if (!StopVerified)");
-        component.ShouldContain("_observedActiveBeforeStop && !_announcedVerifiedStop");
+        // AC4: the polite "Response stopped" announcement is gated on the store-owned generation token for a stop
+        // requested in this circuit. Circuit-scoped dedup survives remount/reconnect while suppressing both a
+        // historically stopped response and repeat renders of the same verified generation.
+        component.ShouldContain("VerifiedStopAnnouncementGenerationId");
+        component.ShouldContain("ChatBotAnnouncementDeduplicationState");
+        component.ShouldContain("ChatBotAnnouncementDedupRule.OncePerStableOperationKey");
+        component.ShouldContain("if (!StopVerified ||");
+        component.ShouldContain("ai-response-stop:{VerifiedStopAnnouncementGenerationId}");
+        component.ShouldNotContain("_observedActiveBeforeStop");
         component.ShouldNotContain("@onmouseover");
         app.ShouldContain("js/chatbot.focus.js");
         focusScript.ShouldContain("focusElementById");

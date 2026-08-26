@@ -912,6 +912,7 @@
   <data name="ProjectConversation_Composer_Title" xml:space="preserve"><value>Composeur gouverné</value></data>
   <data name="ProjectConversation_Composer_UnauthorizedReason" xml:space="preserve"><value>Le composeur est indisponible car ce contexte projet est non autorisé ou masqué.</value></data>
   <data name="ProjectConversation_Composer_ValidationRequired" xml:space="preserve"><value>Saisissez du texte avant l'envoi.</value></data>
+  <data name="ProjectConversation_LoadOlder" xml:space="preserve"><value>Charger les messages précédents</value></data>
   <data name="ProjectConversation_Streaming_Cancelling" xml:space="preserve"><value>Arrêt de la réponse ; attente de la vérification serveur.</value></data>
   <data name="ProjectConversation_Streaming_Completed" xml:space="preserve"><value>Réponse terminée.</value></data>
   <data name="ProjectConversation_Streaming_DisabledReason" xml:space="preserve"><value>L'arrêt est indisponible tant que la réponse active n'est pas vérifiée.</value></data>

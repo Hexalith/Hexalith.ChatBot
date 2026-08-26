@@ -17,6 +17,8 @@ using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Governance.Conversations;
+using Hexalith.ChatBot.Server.Lifecycle.AiExecution;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
@@ -138,11 +140,11 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
-    public async Task DomainProjectionDispatcherShouldProjectFlatAiResponseCancellationTerminalState()
+    public async Task DomainProjectionDispatcherShouldRequireFlatAiResponseCancellationConfirmationForTerminalState()
     {
         // Regression: AiResponseGenerationCancellationRequested is a flat domain event. The projection handler
         // must materialize it into PublishedTaskIntentEvent.AiResponseCancellation from its raw payload and project
-        // the server-verified "stopped" terminal state. A direct TaskIntentProjectionHandler test does not exercise
+        // the server-verified request and separate confirmation state. A direct TaskIntentProjectionHandler test does not exercise
         // this wire path, which previously left the cancellation branch as dead code.
         using WebApplicationFactory<Program> factory = new();
         using IServiceScope scope = factory.Services.CreateScope();
@@ -161,7 +163,19 @@ public sealed class ServerBootstrapApiTests
             "metadata_only",
             "chatbot.ai-response-cancel.v1",
             13,
-            "response-stopped");
+            "wait-for-executor");
+        Hexalith.ChatBot.Server.Governance.Conversations.AiResponseGenerationCancellationConfirmed confirmation = new(
+            "tenant-alpha",
+            "project-alpha",
+            "conversation-alpha",
+            "response-alpha",
+            "generation-alpha",
+            "ai-response-cancel-alpha",
+            "correlation-alpha",
+            cancellation.RequestedAtUtc.AddSeconds(1),
+            "metadata_only",
+            "chatbot.ai-response-cancellation-completion.v1",
+            "none");
 
         ProjectionRequest request = new(
             "tenant-alpha",
@@ -176,12 +190,20 @@ public sealed class ServerBootstrapApiTests
                     cancellation.RequestedAtUtc,
                     "correlation-alpha",
                     "message-cancel-alpha"),
+                new ProjectionEventDto(
+                    typeof(Hexalith.ChatBot.Server.Governance.Conversations.AiResponseGenerationCancellationConfirmed).FullName!,
+                    JsonSerializer.SerializeToUtf8Bytes(confirmation, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                    "json",
+                    14,
+                    confirmation.ConfirmedAtUtc,
+                    "correlation-alpha",
+                    "message-cancel-confirmed-alpha"),
             ]);
 
         ProjectionResponse? response = DomainProjectionDispatcher.Project(scope.ServiceProvider, request);
 
         response.ShouldNotBeNull();
-        response.State.GetProperty("appliedEventCount").GetInt32().ShouldBe(1);
+        response.State.GetProperty("appliedEventCount").GetInt32().ShouldBe(2);
         response.State.GetProperty("ignoredEventCount").GetInt32().ShouldBe(0);
 
         IProjectConversationProjectionStore conversationStore = scope.ServiceProvider.GetRequiredService<IProjectConversationProjectionStore>();
@@ -189,11 +211,146 @@ public sealed class ServerBootstrapApiTests
                 .ReadPageAsync("tenant-alpha", "project-alpha", null, 25, TestContext.Current.CancellationToken)
                 .ConfigureAwait(true))
             .Items
-            .ShouldHaveSingleItem();
+            .OrderByDescending(static candidate => candidate.SourceVersion)
+            .First();
         Hexalith.ChatBot.Contracts.Queries.AiResponseProgress progress = item.BuildAiResponseProgress().ShouldNotBeNull();
         progress.State.ShouldBe(Hexalith.ChatBot.Contracts.Enums.AiResponseProgressState.Stopped);
         progress.TerminalReason.ShouldBe(Hexalith.ChatBot.Contracts.Enums.AiResponseTerminalReason.UserStopped);
         progress.IsTerminal.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task DomainProjectionDispatcherShouldMaterializeFlatTaskIntentConversionAsAiProposal()
+    {
+        // Regression: EventStore sends the concrete conversion payload (`taskIntent` + `proposal`). The public
+        // projection adapter envelope uses `record` + `proposal`, so generic JSON deserialization silently left
+        // Record null and acknowledged the durable conversion without producing its conversation item.
+        using WebApplicationFactory<Program> factory = new();
+        using IServiceScope scope = factory.Services.CreateScope();
+        DateTimeOffset occurredAt = new(2026, 6, 19, 9, 1, 0, TimeSpan.Zero);
+        ContractTaskIntentRecord converted = ProjectConversationTaskIntentRecord() with
+        {
+            State = ContractTaskIntentState.Converted,
+            ConvertedProposalId = "proposal-domain-wire",
+            ReviewerActorId = "actor-alpha",
+            DecidedAtUtc = occurredAt,
+            AuditOperationId = "audit-domain-wire",
+            TransitionId = "transition-domain-wire",
+            ReasonCode = "task_intent_converted",
+            SafeNextAction = "review-ai-action",
+        };
+        Hexalith.ChatBot.Contracts.Queries.AiActionProposalRecord proposal = new(
+            "proposal-domain-wire",
+            converted.TaskIntentId,
+            converted.SourceMessageId,
+            converted.SourceMessageId,
+            converted.RequesterPartyId,
+            "actor-alpha",
+            ["message:offset:001"],
+            "CreateProjectTask",
+            "project-task",
+            ["project:project-alpha"],
+            [],
+            converted.PolicySnapshotId,
+            converted.SourceVersion,
+            converted.CorrelationId,
+            "metadata_only",
+            "collaboration_input",
+            "chatbot.ai-action-proposal.v1",
+            "review-ai-action");
+        TaskIntentConvertedToAiActionProposal domainEvent = new(
+            converted,
+            proposal,
+            "actor-alpha",
+            occurredAt,
+            "audit-domain-wire");
+        ProjectionRequest request = new(
+            "tenant-alpha",
+            "chatbot",
+            "project-alpha",
+            [
+                new ProjectionEventDto(
+                    typeof(TaskIntentConvertedToAiActionProposal).FullName!,
+                    JsonSerializer.SerializeToUtf8Bytes(domainEvent, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                    "json",
+                    42,
+                    occurredAt,
+                    converted.CorrelationId,
+                    "message-domain-wire"),
+            ]);
+
+        ProjectionResponse response = DomainProjectionDispatcher.Project(scope.ServiceProvider, request).ShouldNotBeNull();
+
+        response.State.GetProperty("appliedEventCount").GetInt32().ShouldBe(1);
+        response.State.GetProperty("ignoredEventCount").GetInt32().ShouldBe(0);
+        IProjectConversationProjectionStore conversationStore = scope.ServiceProvider.GetRequiredService<IProjectConversationProjectionStore>();
+        ProjectConversationItemView projectedProposal = (await conversationStore
+                .ReadPageAsync("tenant-alpha", "project-alpha", null, 25, TestContext.Current.CancellationToken)
+                .ConfigureAwait(true))
+            .Items
+            .Single(static item => item.Kind == ContractProjectConversationItemKind.AiOutcome);
+        projectedProposal.AiOutcomeKind.ShouldBe(Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.Proposal);
+        projectedProposal.AiOutcomeStatus.ShouldBe(Hexalith.ChatBot.Contracts.Enums.AiOutcomeStatus.Proposed);
+        projectedProposal.AiProposalId.ShouldBe("proposal-domain-wire");
+    }
+
+    [Fact]
+    public async Task DomainProjectionDispatcherShouldMaterializeFlatLowRiskStartAsActiveAiResponse()
+    {
+        // This is the production EventStore wire path that makes Stop reachable. The coordinator consumes the
+        // durable Started event independently; the projection must also adapt that same flat payload into an
+        // executing AI outcome instead of acknowledging it with an empty Published* nested slot.
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(
+                services => services.AddSingleton<IAiExecutionCoordinator, NoOpAiExecutionCoordinator>()));
+        using IServiceScope scope = factory.Services.CreateScope();
+        DateTimeOffset occurredAt = new(2026, 6, 19, 9, 2, 0, TimeSpan.Zero);
+        LowRiskAiAssistanceExecutionStarted domainEvent = new(
+            "execution-domain-wire",
+            "proposal-domain-wire",
+            "project-alpha",
+            "task-intent:api",
+            "graph-message-001",
+            "party-001",
+            "summarize",
+            "context-domain-wire",
+            "context-v1",
+            "policy-001",
+            "low-risk-policy",
+            42,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            occurredAt,
+            TenantId: "tenant-alpha",
+            ConversationId: "project-alpha");
+        ProjectionRequest request = new(
+            "tenant-alpha",
+            "chatbot",
+            "project-alpha",
+            [
+                new ProjectionEventDto(
+                    typeof(LowRiskAiAssistanceExecutionStarted).FullName!,
+                    JsonSerializer.SerializeToUtf8Bytes(domainEvent, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                    "json",
+                    43,
+                    occurredAt,
+                    domainEvent.CorrelationId,
+                    "message-execution-domain-wire"),
+            ]);
+
+        ProjectionResponse response = DomainProjectionDispatcher.Project(scope.ServiceProvider, request).ShouldNotBeNull();
+
+        response.State.GetProperty("appliedEventCount").GetInt32().ShouldBe(1);
+        response.State.GetProperty("ignoredEventCount").GetInt32().ShouldBe(0);
+        IProjectConversationProjectionStore conversationStore = scope.ServiceProvider.GetRequiredService<IProjectConversationProjectionStore>();
+        ProjectConversationItemView projectedStart = (await conversationStore
+                .ReadPageAsync("tenant-alpha", "project-alpha", null, 25, TestContext.Current.CancellationToken)
+                .ConfigureAwait(true))
+            .Items
+            .Single(static item => item.Kind == ContractProjectConversationItemKind.AiOutcome);
+        projectedStart.AiOutcomeKind.ShouldBe(Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.ExecutionStarted);
+        Hexalith.ChatBot.Contracts.Queries.AiResponseProgress progress = projectedStart.BuildAiResponseProgress().ShouldNotBeNull();
+        progress.State.ShouldBe(Hexalith.ChatBot.Contracts.Enums.AiResponseProgressState.Rendering);
+        progress.IsTerminal.ShouldBeFalse();
     }
 
     [Fact]
@@ -1521,10 +1678,12 @@ public sealed class ServerBootstrapApiTests
             .ReadAsStringAsync(TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         using JsonDocument first = JsonDocument.Parse(firstBody);
+        first.RootElement.GetProperty("items").EnumerateArray().Single().GetProperty("itemId").GetString()
+            .ShouldBe("conversation:item-b");
         string cursor = first.RootElement.GetProperty("page").GetProperty("nextCursor").GetString().ShouldNotBeNull();
         cursor.ShouldNotContain("tenant-alpha", Case.Sensitive);
         cursor.ShouldNotContain("project-alpha", Case.Sensitive);
-        cursor.ShouldNotContain("conversation:item-a", Case.Sensitive);
+        cursor.ShouldNotContain("conversation:item-b", Case.Sensitive);
 
         using HttpResponseMessage secondResponse = await client
             .GetAsync($"/api/v1/projects/project-alpha/conversation?pageSize=1&cursor={Uri.EscapeDataString(cursor)}", TestContext.Current.CancellationToken)
@@ -1534,7 +1693,7 @@ public sealed class ServerBootstrapApiTests
             .ReadAsStringAsync(TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         using JsonDocument second = JsonDocument.Parse(secondBody);
-        second.RootElement.GetProperty("items").EnumerateArray().Single().GetProperty("itemId").GetString().ShouldBe("conversation:item-b");
+        second.RootElement.GetProperty("items").EnumerateArray().Single().GetProperty("itemId").GetString().ShouldBe("conversation:item-a");
 
         using HttpResponseMessage tamperedResponse = await client
             .GetAsync($"/api/v1/projects/project-alpha/conversation?pageSize=1&cursor={Uri.EscapeDataString(cursor + "tampered")}", TestContext.Current.CancellationToken)
@@ -2261,7 +2420,7 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
-    public async Task CommandEndpointShouldExecuteAllowedLowRiskAiAssistanceOnceAndReplayDuplicate()
+    public async Task CommandEndpointShouldAdmitAllowedLowRiskAiAssistanceOnceAndReplayDuplicate()
     {
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAiAssistanceProvider provider = new("success");
@@ -2291,19 +2450,13 @@ public sealed class ServerBootstrapApiTests
         string replayBody = await replay.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
         replayBody.ShouldBe(firstBody);
 
-        provider.ExecuteCount.ShouldBe(1);
-        provider.LastRequest.ShouldNotBeNull();
-        provider.LastRequest.TenantId.ShouldBe("tenant-alpha");
-        provider.LastRequest.PolicySnapshotId.ShouldBe("policy-snap-001");
-        provider.LastRequest.PolicyReasonCode.ShouldBe("low-risk-execute-allowed");
-        provider.LastRequest.AuthorizedContextReferences.ShouldBe(["evidence-message-001"]);
-        provider.LastRequest.ExcludedContextReasons.ShouldBe(["redacted", "policy-denied"]);
+        provider.ExecuteCount.ShouldBe(0);
+        provider.LastRequest.ShouldBeNull();
 
         SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
         submitted.CommandType.ShouldBe("ExecuteLowRiskAIAssistance");
-        submitted.AggregateId.ShouldBe("graph-message-001");
-        submitted.Payload.GetProperty("ExecutionRecord").GetProperty("Outcome").GetString().ShouldBe("success");
-        submitted.Payload.GetProperty("ExecutionRecord").GetProperty("SafeNextAction").GetString().ShouldBe("none");
+        submitted.AggregateId.ShouldBe("project-001");
+        submitted.Payload.GetProperty("ExecutionRecord").ValueKind.ShouldBe(JsonValueKind.Null);
         string submittedPayload = submitted.Payload.GetRawText();
         submittedPayload.ShouldNotContain("raw prompt", Case.Insensitive);
         submittedPayload.ShouldNotContain("raw provider payload", Case.Insensitive);
@@ -2653,6 +2806,22 @@ public sealed class ServerBootstrapApiTests
             "policy-001",
             ConversionReadinessBlocked: false,
             SafeNextAction: "review-task-intent-action");
+
+    private sealed class NoOpAiExecutionCoordinator : IAiExecutionCoordinator
+    {
+        public ValueTask RecordStartedAsync(
+            string tenantId,
+            string conversationId,
+            long sourceVersion,
+            LowRiskAiAssistanceExecutionStarted started,
+            CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
+
+        public ValueTask RecordCancellationRequestedAsync(
+            AiResponseGenerationCancellationRequested request,
+            CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
+    }
 
     private static ProjectConversationItemView ProjectConversationAttachmentApiItem(
         ContractProjectConversationAttachmentStatus status,

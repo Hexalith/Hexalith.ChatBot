@@ -1892,6 +1892,10 @@ components:
           type: string
           enum:
             - m365-mailbox-intake
+            - ui-composer
+            - approval-event
+            - failure-state
+            - ai-outcome
         redactionState:
           type: string
           enum:
