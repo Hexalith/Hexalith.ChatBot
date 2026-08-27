@@ -34,5 +34,14 @@
     "key": "1",
     "label": "Build independent rebuild",
     "resolution": ""
+  },
+  "DW-54": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Create an approved test-tenant drill covering subscription expiry, renewal, webhook reconciliation, throttling, permissions, and retained end-state evidence.",
+    "key": "1",
+    "label": "Build Graph drill",
+    "resolution": ""
   }
 }
