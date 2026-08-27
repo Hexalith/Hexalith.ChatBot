@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
 
@@ -12,10 +13,15 @@ using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Lifecycle.AiExecution;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Contracts.Commands;
+using Hexalith.EventStore.Contracts.Results;
+
+using Microsoft.Extensions.Logging.Abstractions;
 
 using CommandSubmissionRequest = Hexalith.ChatBot.Client.Generated.CommandSubmissionRequest;
 using CommandSubmissionRequestRequestSchemaVersion = Hexalith.ChatBot.Client.Generated.CommandSubmissionRequestRequestSchemaVersion;
@@ -148,6 +154,7 @@ internal sealed class RecoveryDependencyExercise(
         // command-execution ledger (Restore for ai-provider would not clear it).
         bool previousRecording = eventStore.RecordCommandExecutionEffects;
         eventStore.RecordCommandExecutionEffects = false;
+        LowRiskAiAssistanceExecutionRecord record;
         try
         {
             AcceptedCommandDispatcher dispatcher = new(
@@ -165,18 +172,94 @@ internal sealed class RecoveryDependencyExercise(
                 await AbortAdmissionAsync(decision, cancellationToken).ConfigureAwait(false);
                 throw;
             }
+
+            SubmitCommandRequest dispatchedSubmission = eventStore.LastSubmitted
+                ?? throw new InvalidOperationException("The ai-provider recovery exercise did not observe a real dispatcher submission.");
+            ExecuteLowRiskAIAssistance dispatched = dispatchedSubmission.Payload
+                .Deserialize<ExecuteLowRiskAIAssistance>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                ?? throw new InvalidOperationException("The dispatched low-risk AI assistance command could not be read back.");
+            if (dispatched.ExecutionRecord is { } approvalRoutedRecord)
+            {
+                // The dispatcher already resolved a synchronous provider record for an approval-routed execution;
+                // no persisted-event coordinator run is involved on this branch.
+                record = approvalRoutedRecord;
+            }
+            else
+            {
+                // The standard low-risk path no longer invokes the provider inside the dispatch boundary (Story
+                // "AI execution coordination"): the real aggregate raises Started and the real persisted-event
+                // AiExecutionCoordinator owns the provider call. Reconstruct that boundary with the actual
+                // aggregate handler and the actual coordinator type rather than assuming the pre-coordinator
+                // synchronous shape this exercise was originally written against.
+                // The dispatcher's SubmitCommandRequest carries the raw logical `replay-test:` tenant label
+                // (CommandEnvelope/AggregateIdentity reject the ':' it contains); resolve the same physical
+                // storage tenant ReplayTenantPolicy.IsTestTenant guards before constructing identity-bearing types.
+                string storageTenantRef = ReplayTenantPolicy.StorageTenantFor(dispatchedSubmission.Tenant)
+                    ?? throw new InvalidOperationException("The ai-provider recovery exercise did not resolve a guarded storage tenant.");
+                CommandEnvelope envelope = new(
+                    MessageId: dispatchedSubmission.MessageId,
+                    TenantId: storageTenantRef,
+                    Domain: dispatchedSubmission.Domain,
+                    AggregateId: dispatchedSubmission.AggregateId,
+                    CommandType: dispatchedSubmission.CommandType,
+                    Payload: JsonSerializer.SerializeToUtf8Bytes(dispatched),
+                    CorrelationId: dispatchedSubmission.CorrelationId ?? correlationId,
+                    CausationId: null,
+                    UserId: "recovery-validator",
+                    Extensions: null);
+                DomainResult started = GovernedOperationAggregate.Handle(dispatched, state: null, envelope);
+                LowRiskAiAssistanceExecutionStarted startedEvent = started.Events
+                    .OfType<LowRiskAiAssistanceExecutionStarted>()
+                    .SingleOrDefault()
+                    ?? throw new InvalidOperationException("The real aggregate did not raise a low-risk AI execution start for the dispatched command.");
+
+                using AiExecutionCoordinator coordinator = new(
+                    new InMemoryAiExecutionWorkStore(),
+                    aiProvider,
+                    eventStore,
+                    new SystemClock(),
+                    NullLogger<AiExecutionCoordinator>.Instance);
+                // The coordinator's own work tracking (and, through it, the sandbox's effect ledger) is keyed by
+                // the exercise's logical `replay-test:` tenant like every other dependency in this file — only
+                // GovernedOperationAggregate.Handle's CommandEnvelope needs the guarded physical storage tenant.
+                await coordinator.RecordStartedAsync(
+                    tenantRef,
+                    dispatchedSubmission.AggregateId,
+                    sourceVersion: 1,
+                    startedEvent,
+                    cancellationToken).ConfigureAwait(false);
+                await coordinator.StartAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+                    while (eventStore.LastSubmitted is null ||
+                        !string.Equals(eventStore.LastSubmitted.CommandType, nameof(CompleteLowRiskAiAssistance), StringComparison.Ordinal))
+                    {
+                        if (DateTimeOffset.UtcNow >= deadline)
+                        {
+                            throw new InvalidOperationException("The persisted-event AI execution coordinator did not submit a terminal completion inside the exercise budget.");
+                        }
+
+                        await Task.Delay(25, cancellationToken).ConfigureAwait(false);
+                    }
+                }
+                finally
+                {
+                    await coordinator.StopAsync(CancellationToken.None).ConfigureAwait(false);
+                }
+
+                SubmitCommandRequest completionSubmission = eventStore.LastSubmitted!;
+                CompleteLowRiskAiAssistance completion = completionSubmission.Payload
+                    .Deserialize<CompleteLowRiskAiAssistance>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                    ?? throw new InvalidOperationException("The dispatched command did not carry the AI execution completion.");
+                record = completion.Record;
+            }
         }
         finally
         {
             eventStore.RecordCommandExecutionEffects = previousRecording;
         }
 
-        SubmitCommandRequest submitted = eventStore.LastSubmitted
-            ?? throw new InvalidOperationException("The ai-provider recovery exercise did not observe a real dispatcher submission.");
-        LowRiskAiAssistanceExecutionRecord record = submitted.Payload
-            .GetProperty("ExecutionRecord")
-            .Deserialize<LowRiskAiAssistanceExecutionRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
-            ?? throw new InvalidOperationException("The dispatched command did not carry the AI execution record.");
         bool faultObserved = string.Equals(record.Outcome, "failed", StringComparison.Ordinal);
         bool committed = string.Equals(record.Outcome, "succeeded", StringComparison.Ordinal);
         // Failed provider outcome must not seal the coarse key — Restore then retry needs a fresh Admit.
