@@ -170,6 +170,7 @@ location: Story 12.15 evidence sink
 severity: medium
 reason: **[MEDIUM · evidence sink] Double-fail `RetainAsync` returns unmeasurable with no disk artifact.** Caller gets `EvidenceRetentionFailedDeviation`; gate sees `missing_evidence`. **Release-claim impact:** retention-failure reason is not reconstructable from artifacts alone. **Owner:** Story 12.15 evidence sink. **Closure evidence:** best-effort side channel, or accept and document that missing_evidence covers total sink loss.
 status: open
+decision: 2026-08-27 Write fallback marker — Emit a bounded metadata-only retention-failure sentinel through an independent workflow-owned path and teach the gate to distinguish total sink loss.
 decision: 2026-08-26 Write fallback marker — Emit a bounded metadata-only retention-failure sentinel through an independent workflow-owned path and teach the gate to distinguish total sink loss.
 
 ### DW-22: [LOW · options] `Enabled = false` skips environment/tenant/secret/path validation.

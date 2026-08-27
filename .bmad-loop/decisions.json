@@ -7,5 +7,14 @@
     "key": "1",
     "label": "Guard latest head",
     "resolution": ""
+  },
+  "DW-21": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Emit a bounded metadata-only retention-failure sentinel through an independent workflow-owned path and teach the gate to distinguish total sink loss.",
+    "key": "1",
+    "label": "Write fallback marker",
+    "resolution": ""
   }
 }
