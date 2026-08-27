@@ -17,6 +17,15 @@
     "label": "Build evidence drawer",
     "resolution": ""
   },
+  "DW-126": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "keep-open",
+    "intent": "",
+    "key": "3",
+    "label": "Keep open for backend",
+    "resolution": ""
+  },
   "DW-2": {
     "answered_at": "2026-08-27",
     "bundle_name": "",
