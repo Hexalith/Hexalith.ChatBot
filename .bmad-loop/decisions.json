@@ -88,5 +88,14 @@
     "key": "1",
     "label": "Build durable bindings",
     "resolution": ""
+  },
+  "DW-92": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Review compatibility impact, add an accepted ADR and decision-log record, and execute MCP adapter conformance coverage.",
+    "key": "1",
+    "label": "Ratify 2.2.0",
+    "resolution": ""
   }
 }

@@ -765,6 +765,7 @@ location: ScaffoldArchitectureTests.cs:273
 severity: medium
 reason: **[MEDIUM · governance] `ModelContextProtocol` 1.4.1 → 2.2.0 major bump is unratified.** Commit `f804229` accepted a major-version bump of the SDK the M1 MCP surface wraps by editing `ScaffoldArchitectureTests.cs:273` and the `architecture.md` / `epics.md` planning records — all three inside Story 12.15's File List — with no ADR entry and no decision-log record. The pins match the current `references/Hexalith.Builds` catalog, so nothing is drifting; what is missing is the decision. Disclosed as out-of-scope in Story 12.15 by the 2026-08-25 review. Release-claim impact: a major SDK bump under the MCP surface is unreviewed. Closure evidence: an ADR plus decision-log entry owned by the package-authority story.
 status: open
+decision: 2026-08-27 Ratify 2.2.0 — Review compatibility impact, add an accepted ADR and decision-log record, and execute MCP adapter conformance coverage.
 decision: 2026-08-26 Ratify 2.2.0 — Review compatibility impact, add an accepted ADR and decision-log record, and execute MCP adapter conformance coverage.
 
 ### DW-93: [MEDIUM · api-contract] A permanently malformed command payload is reported as a retryable `503` and raises an operator alert on every attempt.
