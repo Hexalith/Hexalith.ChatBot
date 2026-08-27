@@ -106,5 +106,14 @@
     "key": "1",
     "label": "Client-error contract",
     "resolution": ""
+  },
+  "DW-94": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Publish a reusable bounded-shutdown seam from EventStore ServiceDefaults, consume it in ChatBot UI, and add an unreachable-collector test.",
+    "key": "1",
+    "label": "Expose platform API",
+    "resolution": ""
   }
 }
