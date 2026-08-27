@@ -16,5 +16,14 @@
     "key": "1",
     "label": "Write fallback marker",
     "resolution": ""
+  },
+  "DW-52": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Add a controlled retained loss-injection scenario with durable commit bounds and gate evidence against the 15-minute target.",
+    "key": "1",
+    "label": "Build loss-path drill",
+    "resolution": ""
   }
 }

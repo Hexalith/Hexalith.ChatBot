@@ -425,6 +425,7 @@ location: Story 12.15 governance chunk (ADR/PRD/addendum/Completion Notes wordin
 severity: high
 reason: **[HIGH · governance + residual] No-loss continuity RPO stays `TimeSpan.Zero` by decision (2026-08-02 option 2).** Passing-run `measuredRpo: 0s` must not be cited as A10 confirmation of RPO ≤ 15 minutes. **Release-claim impact:** A10 RPO half remains unproven by green sandbox runs until a loss-path measurement or a separately owned drill is retained. **Owner:** Story 12.15 governance chunk (ADR/PRD/addendum/Completion Notes wording) + Architecture for any future loss-injection drill. **Closure evidence:** documents stop citing green-run `0s` as A10 proof; optional retained loss-path RPO evidence against the 15-minute budget.
 status: open
+decision: 2026-08-27 Build loss-path drill — Add a controlled retained loss-injection scenario with durable commit bounds and gate evidence against the 15-minute target.
 decision: 2026-08-26 Build loss-path drill — Add a controlled retained loss-injection scenario with durable commit bounds and gate evidence against the 15-minute target.
 
 ### DW-53: [HIGH · `RV-REBUILD-WORM` · WORM/governed rebuild fidelity] Projection rebuild claim-narrowing (2026-08-02 option 2) leaves WORM/governed resources off the proven equivalence path.
