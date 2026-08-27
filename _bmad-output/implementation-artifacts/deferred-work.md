@@ -183,6 +183,7 @@ severity: low
 reason: **[LOW · options] `Enabled = false` skips environment/tenant/secret/path validation.** Dormant Production-shaped overlays are not rejected until enablement. **Release-claim impact:** config mistakes surface only when the lane is armed. **Owner:** Story 12.15 options hygiene. **Closure evidence:** validate sandbox shape even when disabled, or document intentional skip.
 status: open
 decision: 2026-08-27 Validate dormant shape — Validate non-secret sandbox, environment, tenant, and path shape while disabled, retain activation-only secret checks, and add disabled-overlay tests.
+decision: 2026-08-27 Validate dormant shape — Validate non-secret sandbox, environment, tenant, and path shape while disabled, retain activation-only secret checks, and add disabled-overlay tests.
 
 ### DW-23: [LOW · sanitization] `IsSafeArtifactLocator` rejects substrings `token`/`secret`/`password`.
 
@@ -191,6 +192,7 @@ location: evidence manifest sanitization
 severity: low
 reason: **[LOW · sanitization] `IsSafeArtifactLocator` rejects substrings `token`/`secret`/`password`.** Valid artifact URIs with those substrings fail closed. **Release-claim impact:** rare false stop-ship on locator naming. **Owner:** evidence manifest sanitization. **Closure evidence:** path-segment allowlist or documented substring policy.
 status: open
+decision: 2026-08-27 Use segment-aware policy — Parse the artifact URI, reject bounded sensitive path segments or keys, accept benign substring occurrences, and add positive and negative tests.
 decision: 2026-08-27 Use segment-aware policy — Parse the artifact URI, reject bounded sensitive path segments or keys, accept benign substring occurrences, and add positive and negative tests.
 
 ### DW-24: [LOW · gate fixtures] Gate fixtures publish `rpo: 0` under `met` without asserting non-citability of constant-zero RPO.
