@@ -23,9 +23,9 @@ inputDocuments:
 
 # NFR Evidence Audit — Story 12.15 recovery evidence and A10
 
-**Date:** 2026-08-24  
+**Date:** 2026-08-24 (see the 2026-08-27 addendum below for the current state)
 **Story:** 12.15  
-**Overall Status:** **FAIL — release/story-closure blocker**
+**Overall Status:** **FAIL — release/story-closure blocker, as of 2026-08-24.** *(Superseded in part — see the "Addendum (2026-08-27)" section at the end of this document. The specific hosted-authenticity blocker described below is resolved; A10/NFR56/NFR57/NFR41 numeric ratification remains open, precisely as this audit already anticipated, and is not a bare "PASS.")*
 
 This audit reviewed repository evidence, ran focused local verification, inspected current hosted workflow results, and used four independent security/performance/reliability/scalability evidence audits. It did not start a live fault-injection run.
 
@@ -33,16 +33,16 @@ This audit reviewed repository evidence, ran focused local verification, inspect
 
 The current-run `recovery-primary` completion path is materially authentic and fail-closed. The pre-Dapr planner now validates every active lane, safe path, locator, selector, skip flag, primary declaration and policy binding before it can authorize Dapr. Direct planner tests cover valid recovery, malformed secondary lanes, recovery multiplicity, result-path collisions, wrong primary bindings and retained locators; sanitizer tests reject DTDs, foreign structural namespaces, duplicate results, failed outcomes, wrong classes, counter mismatches and reversed timestamps.
 
-Hosted authenticity is a FAIL. Hosted recovery attempts have run, but none produced a complete passing recovery artifact. The latest required release run, [32705581758](https://github.com/Hexalith/Hexalith.ChatBot/actions/runs/32705581758), failed its live recovery test and independent gate. Its only retained artifact is topology evidence. Therefore A10/NFR56 and NFR41/NFR57/NFR58/NFR59 are not ratifiable, and Murat approval is withheld.
+Hosted authenticity is a FAIL, **as of this audit's 2026-08-24 date** *(resolved 2026-08-27 — see the addendum at the end of this document)*. Hosted recovery attempts have run, but none produced a complete passing recovery artifact. The latest required release run, [32705581758](https://github.com/Hexalith/Hexalith.ChatBot/actions/runs/32705581758), failed its live recovery test and independent gate. Its only retained artifact is topology evidence. Therefore A10/NFR56 and NFR41/NFR57/NFR58/NFR59 are not ratifiable, and Murat approval is withheld.
 
-| Result type | Verdict |
-| --- | --- |
-| Static completion lifecycle | PASS |
-| Final evidence acceptance | PASS |
-| Hosted recovery authenticity | FAIL |
-| A10/NFR56 ratification | FAIL |
-| NFR41/NFR57/NFR58/NFR59 ratification | FAIL |
-| Production-scale equivalence | FAIL / unproven |
+| Result type | Verdict (2026-08-24) | Verdict (2026-08-27, see addendum) |
+| --- | --- | --- |
+| Static completion lifecycle | PASS | PASS (unchanged) |
+| Final evidence acceptance | PASS | PASS (unchanged) |
+| Hosted recovery authenticity | FAIL | **PASS** — run `33066358280`, evidence `01M11EYSDMP1ZF38B7KZA1A6FA`, exact commit `17aa94d` |
+| A10/NFR56 ratification | FAIL | **PROVISIONAL** — genuine hosted evidence now exists but does not meet the exit condition (180s ceiling vs. 4h RTO target; RPO still a no-loss-path constant). Not a FAIL (evidence is real and authentic) and not a PASS (target not ratified). |
+| NFR41/NFR57/NFR58/NFR59 ratification | FAIL | **PROVISIONAL** — same reasoning; see addendum |
+| Production-scale equivalence | FAIL / unproven | FAIL / unproven (unchanged) |
 
 ## Threshold Matrix
 
@@ -245,6 +245,20 @@ nfr_assessment:
 
 ## Sign-Off
 
-**Murat Test-Architect verdict: approval withheld.** The static lifecycle concerns from this audit are resolved. Retain and independently replay a complete passing hosted bundle, then obtain the separately falsifiable timing/monitoring/production-equivalence evidence before re-running this NFR audit.
+**Murat Test-Architect verdict (2026-08-24): approval withheld.** The static lifecycle concerns from this audit are resolved. Retain and independently replay a complete passing hosted bundle, then obtain the separately falsifiable timing/monitoring/production-equivalence evidence before re-running this NFR audit. *(This specific blocking condition — retain and independently replay a complete passing hosted bundle — was met 2026-08-27. See the addendum below for the current verdict; it is not a bare approval.)*
 
 Recommended next workflow after remediation: `bmad-testarch-trace` for requirement-to-evidence coverage, followed by the required release gate.
+
+## Addendum (2026-08-27)
+
+This audit's category assessments, ADR quality checklist, and gate YAML above are **left unchanged** — they were not re-run and re-grading them is outside the scope of this addendum. This addendum updates only the two claims this audit made that are now factually stale: that no complete passing hosted recovery bundle exists, and that Murat's stated retain-and-independently-replay condition is unmet.
+
+**Hosted recovery authenticity is resolved.** Required release run [33066358280](https://github.com/Hexalith/Hexalith.ChatBot/actions/runs/33066358280) (2026-08-27T11:12–11:38 UTC), commit `17aa94d48a79b5260be919e97060290403924fe2` — the exact commit Story 12.15 was reviewed at — passed all four jobs: topology acceptance, the live recovery validation sweep, the independent out-of-process evidence gate (`Total tests: 1, Passed: 1`), and `semantic-release`. Evidence run `01M11EYSDMP1ZF38B7KZA1A6FA` retains nine manifests, nine reports, and a zero-alert attempt summary, independently downloaded and inspected (not taken on the workflow's green checkmark alone). Both continuity drills `met`, projection rebuild `equivalent`, all six scoped dependencies `contained`, zero deviations anywhere. Full detail: `.decision-log.md` (2026-08-27 entry) and Story 12.15's Completion Notes/Debug Log.
+
+**A10/NFR56/NFR57/NFR41 ratification is still not established — and this is not a defect in the new evidence.** The same two structural limits this audit already named under Disaster Recovery (the 180-second measurable-recovery ceiling against the 4-hour RTO/rebuild targets, and RPO being a constant on the no-loss path) are present in the 2026-08-27 run exactly as they were in every prior run: measured RTO 149.6s/60.5s (both comfortably inside the 180s ceiling, so a *miss* of the 4-hour target still cannot occur on this lane), measured RPO `0s` on both drills (still the no-loss-path constant). Nothing about this specific finding changed; only "did a complete passing hosted bundle exist" changed, from no to yes.
+
+**Murat's verdict is precise, not a bare PASS:** the specific 2026-08-24 blocking condition ("retain and independently replay a complete passing hosted bundle") is satisfied and Murat confirms the 2026-08-27 bundle is authentic — genuinely live-topology, correctly attributed to the reviewed commit, internally consistent. A10/NFR56/NFR57/NFR41 numeric ratification remains withheld, as a distinct and still-open governance decision, for the ceiling/RPO-constant reasons above — this is the story's own "remain provisional" outcome (Story 12.15 A10 decision semantics), a legitimate non-blocking state for story closure, not an approval failure. Winston separately ratified the previously-outstanding domain-service projection-identity decision in `docs/adrs/live-recovery-validation-drivers.md` on the strength of this same bundle.
+
+**NFR58/NFR59 note (unchanged from the body above):** the four sandbox-exercised scoped dependencies (`ai-provider`, `command-execution`, `audit-store`, `attachment-processing`) remain sandbox-contract evidence per `RV-PROVIDER-SCALE` — this run does not newly establish product-composed provider-boundary isolation proof for those four. `identity` and `graph` fault real topology boundaries as before.
+
+Overall: **hosted-authenticity blocker resolved; A10/NFR ratification remains provisional by design, not blocking story closure.** This is not "PASS" in the sense the verdict table above used it for other rows — it is a genuinely governed, evidence-linked "provisional" outcome, recorded precisely so a reader does not conflate "authentic evidence now exists" with "the numeric target is confirmed."

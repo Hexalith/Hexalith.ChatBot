@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-08-01, Story 12.15). Winston owns the architecture decision and sandbox-suitability conclusion; Murat owns authenticity review of the resulting Tier-3 evidence. Winston approved the non-circular `recovery-primary` completion-provenance slice on 2026-08-24; that approval does not authenticate a hosted run or ratify A10.
+Proposed (2026-08-01, Story 12.15). Winston owns the architecture decision and sandbox-suitability conclusion; Murat owns authenticity review of the resulting Tier-3 evidence. Winston approved the non-circular `recovery-primary` completion-provenance slice on 2026-08-24, and ratified the domain-service projection-identity decision below on 2026-08-27 against a genuine hosted bundle; neither approval authenticates a hosted run for A10 by itself or ratifies A10, which remains provisional (see "A10 governance" below).
 
 This ADR moves to **Accepted** when Story 12.15 reaches `done`. It was briefly marked Accepted on 2026-08-01 and returned to Proposed by the round-4 review: the story is still `in-progress` with open evidence-integrity and residual decisions. The matrix below reflects the post-remediation seams; residuals that remain open are named explicitly. Withdrawal from Accepted follows the same rule in reverse — a review that re-opens a matrix row or a residual returns this ADR to Proposed.
 
@@ -121,9 +121,21 @@ The absence of a hosted Workers resource is a baseline gap this story must close
 
 Story 12.15 leaves A10/NFR56 provisional at `RecoveryTargets.MaxRpo` (15 minutes) and `RecoveryTargets.MaxRto` (4 hours), with no runtime constant change.
 
-**No measured figure is published from this story.** A local pre-remediation diagnostic run did pass the evidence gate *as that gate existed at v1.1*, but its manifests predate the current manifest contract — they carry no `MeasurableRecoveryCeilingSeconds`, which the shipped gate requires — so the bundle cannot be replayed and is not citable evidence. Its run identifier and measurements have been withdrawn from the PRD, decision log, addendum and predecessor ADRs rather than restated with caveats.
+**A measured figure is now published from a genuine hosted run.** Required release run
+[33066358280](https://github.com/Hexalith/Hexalith.ChatBot/actions/runs/33066358280), commit `17aa94d`, evidence
+run `01M11EYSDMP1ZF38B7KZA1A6FA` (2026-08-27) is the first bundle produced from the exact commit on `main`; it
+retains nine manifests/reports with zero deviations and passed the independent out-of-process gate 1/1. It
+supersedes the 2026-08-26 bundle at commit `397507b`, which predated a fix required by the intervening
+`011261e` ("AI execution coordination") change. Both mandatory drills measured `met` (RPO 0s / RTO 149.6s and
+60.5s against 900s/14400s); the projection rebuild measured `equivalent`; all six scoped dependencies measured
+`contained`. See `.decision-log.md` (2026-08-27 entry) for the full bundle and the Winston/Murat review.
 
-Ratification requires a complete passing scheduled-CI or release artifact plus its hosted run/artifact locator recorded in the PRD decision log, **and** is bounded by the 180-second measurable ceiling above: a passing hosted run ratifies recovery within the ceiling, not RTO ≤ 4 hours. Ratifying the 4-hour target requires either a lane whose restoration budget reaches it or a separately evidenced pre-production drill.
+Ratification requires a complete passing scheduled-CI or release artifact plus its hosted run/artifact locator
+recorded in the PRD decision log — now satisfied — **and** is bounded by the 180-second measurable ceiling above:
+a passing hosted run ratifies recovery within the ceiling, not RTO ≤ 4 hours, and the measured RPO remains a
+constant on the no-loss path rather than a citable non-constant loss-path measurement. Neither bound is satisfied
+by this run, so **A10 remains provisional**. Ratifying the 4-hour target requires either a lane whose restoration
+budget reaches it or a separately evidenced pre-production drill.
 
 **Un-ratification.** A ratified A10 returns to provisional when the cited artifact passes the 8-day `MaximumEvidenceAge` freshness boundary without a successor, when a later required run is not passing, or when a hosted run returns `Unmeasurable` or a structural breach. The artifact remains downloadable through day 30 for investigation, but it cannot support ratification after day 8. Architecture/DevOps owns that transition and records it in the decision log.
 
@@ -131,11 +143,24 @@ Even a passing sandbox run cannot close `RV-EXT-M365`, `RV-DURABLE-WORM`, `RV-PR
 
 ## Decision: pin the ChatBot domain-service projection identity (2026-08-25)
 
-**Status: RATIFICATION OUTSTANDING — Winston has not reviewed or approved this.** It is recorded here because it
-changes shipped delivery behaviour, and it must not be read as an accepted architecture decision until Winston
-signs it off.
+*(The heading date is when the decision was taken in code, per the mechanism and evidence chain below. It is not
+the ratification date — see the Status line immediately below: Winston ratified this decision on 2026-08-27,
+against genuine hosted evidence that did not yet exist on 2026-08-25.)*
 
-**Decision taken in code, pending that ratification:** `src/Hexalith.ChatBot.Server/Program.cs` resolves
+**Status: Ratified (Winston, 2026-08-27).** The mechanism, evidence chain, and regression guard below hold on
+**two** independently produced hosted runs, not one: `397507b` (release run `32964163030`, 2026-08-26) was the
+first — its `eventstore-outage` manifest already reports `cleanup-complete: true` and verdict `met` — and the
+2026-08-27 hosted bundle (release run `33066358280`, evidence `01M11EYSDMP1ZF38B7KZA1A6FA`) is the second,
+reproducing the same result: every continuity manifest reports `cleanup-complete: true` and the projection-rebuild
+manifest reports `equivalent`, with zero checkpoint-refusal regressions in either run (21,034 dispatch failures /
+42,066 checkpoint refusals eliminated, `ChatBotProjectionIdentityTests` and `ChatBotDomainServiceIdentityContractTests`
+green). This ratifies the identity-resolution precedence chain and its fail-fast startup behaviour as an accepted
+architecture decision; it does not by itself ratify A10 (see "A10 governance" above, which remains provisional for
+unrelated reasons — the measurable-recovery-ceiling and RPO-constant-on-no-loss-path residuals), and it is
+unrelated to the separate `recovery-primary` completion-provenance decision above (still static/local-only
+evidence — see `.decision-log.md`, 2026-08-27 entry, "Architecture sign-off").
+
+**Decision taken in code and now ratified:** `src/Hexalith.ChatBot.Server/Program.cs` resolves
 `DomainProjectionIdentityOptions` through a **four-tier precedence chain** — `ChatBot:ProjectionIdentity`, then
 `EventStore:DomainService`, then the `DAPR_APP_ID` environment value, and only then the pinned constants
 `chatbot` / `v1` (`ChatBotDomainServiceIdentity`). *(Corrected 2026-08-26: this paragraph previously described a

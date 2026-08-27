@@ -4,8 +4,11 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// The single, canonical home for the ChatBot's recovery-point / recovery-time objectives (Story 9.11, NFR56 / A10).
 /// These are the <b>provisional</b> default-MVP targets for source records, attachments, approval history, command
 /// history, policy snapshots, and audit records — not yet-discharged commitments. Story 12.15 recorded RPO ≤ 15 min /
-/// RTO ≤ 4 hr as provisional against the named Aspire/DAPR sandbox, pending a retained hosted run locator; the A10
-/// assumption is not yet discharged. Future drills continue to produce recalibration evidence through
+/// RTO ≤ 4 hr as provisional against the named Aspire/DAPR sandbox. A retained hosted run now exists (release run
+/// 33066358280, commit 17aa94d, evidence 01M11EYSDMP1ZF38B7KZA1A6FA, 2026-08-27; see <c>.decision-log.md</c>), but
+/// the A10 assumption remains not discharged: the lane's measurable-recovery ceiling (180s) sits below the 4-hour
+/// RTO target, and measured RPO is a constant on the no-loss path. Future drills continue to produce recalibration
+/// evidence through
 /// <see cref="ContinuityDrillReport"/>.
 /// <para>
 /// This class is the <b>single source of truth</b> for the two targets (mirroring
