@@ -435,6 +435,7 @@ location: Story 12.15 remaining rebuild work, coordinated with `RV-DURABLE-WORM`
 severity: high
 reason: **[HIGH · `RV-REBUILD-WORM` · WORM/governed rebuild fidelity] Projection rebuild claim-narrowing (2026-08-02 option 2) leaves WORM/governed resources off the proven equivalence path.** Only `AssociationProjectionHandler` source-email rebuild is claimed; WORM still identity-writes via `ToGovernedOperationView` on both seed and rebuild. **Release-claim impact:** do not claim full immutable-source+WORM rebuild equivalence or NFR57 coverage for audit-derived projections. **Owner:** Story 12.15 remaining rebuild work, coordinated with `RV-DURABLE-WORM`. **Closure evidence:** a rebuild path for governed/WORM projections that can diverge, with retained digests and tests proving non-tautological equivalence.
 status: open
+decision: 2026-08-27 Build independent rebuild — Implement an independently derived governed and WORM rebuild path that can diverge, include its digests, and add mutation-sensitive tests.
 decision: 2026-08-26 Build independent rebuild — Implement an independently derived governed and WORM rebuild path that can diverge, include its digests, and add mutation-sensitive tests.
 
 ### DW-54: [HIGH · `RV-EXT-M365` · external M365/Graph fidelity] The live subscription and Graph scenarios use the topology-composed Worker/provider simulator, not Microsoft Graph.

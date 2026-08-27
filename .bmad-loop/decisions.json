@@ -25,5 +25,14 @@
     "key": "1",
     "label": "Build loss-path drill",
     "resolution": ""
+  },
+  "DW-53": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Implement an independently derived governed and WORM rebuild path that can diverge, include its digests, and add mutation-sensitive tests.",
+    "key": "1",
+    "label": "Build independent rebuild",
+    "resolution": ""
   }
 }
