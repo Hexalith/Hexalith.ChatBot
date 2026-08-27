@@ -295,7 +295,7 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
-    public async Task DomainProjectionDispatcherShouldMaterializeFlatLowRiskStartAsActiveAiResponse()
+    public async Task DomainProjectionDispatcherShouldCaptureAuthoritativeAppliedStartedVersion()
     {
         // This is the production EventStore wire path that makes Stop reachable. The coordinator consumes the
         // durable Started event independently; the projection must also adapt that same flat payload into an
@@ -351,6 +351,8 @@ public sealed class ServerBootstrapApiTests
         Hexalith.ChatBot.Contracts.Queries.AiResponseProgress progress = projectedStart.BuildAiResponseProgress().ShouldNotBeNull();
         progress.State.ShouldBe(Hexalith.ChatBot.Contracts.Enums.AiResponseProgressState.Rendering);
         progress.IsTerminal.ShouldBeFalse();
+        progress.SourceVersion.ShouldBe(43);
+        progress.StartedSourceVersion.ShouldBe(43);
     }
 
     [Fact]
@@ -2819,6 +2821,20 @@ public sealed class ServerBootstrapApiTests
 
         public ValueTask RecordCancellationRequestedAsync(
             AiResponseGenerationCancellationRequested request,
+            CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
+
+        public ValueTask RecordTerminalObservedAsync(
+            string tenantId,
+            string stateOwnerAggregateId,
+            string projectId,
+            string responseId,
+            string generationId,
+            CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
+
+        public ValueTask RecordCancellationFailedAsync(
+            AiResponseGenerationCancellationFailed failure,
             CancellationToken cancellationToken)
             => ValueTask.CompletedTask;
     }

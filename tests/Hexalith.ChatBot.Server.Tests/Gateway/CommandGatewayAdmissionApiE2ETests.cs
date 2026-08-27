@@ -633,7 +633,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
         submitted.Tenant.ShouldBe("tenant-alpha");
         submitted.Domain.ShouldBe("chatbot");
-        submitted.AggregateId.ShouldBe("graph-message-001");
+        submitted.AggregateId.ShouldBe("project-001");
         submitted.CommandType.ShouldBe(nameof(ExecuteApprovedAIAction));
         submitted.Extensions.ShouldNotBeNull();
         submitted.Extensions["surfaceOrigin"].ShouldBe("ui");

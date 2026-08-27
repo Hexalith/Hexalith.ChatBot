@@ -36,4 +36,7 @@ public sealed record AiActionProposalRecord(
     string? AssociationId = null,
     long? EvidenceSnapshotSourceVersion = null,
     string? ContextPackageId = null,
-    string? ContextPackageVersion = null);
+    string? ContextPackageVersion = null)
+{
+    public string? StateOwnerAggregateId { get; init; }
+}

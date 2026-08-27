@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -76,6 +77,16 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
         development.Single(static descriptor => descriptor.ServiceType == typeof(IRiskClassifier))
             .ImplementationType.ShouldBe(typeof(Story132AcceptanceRiskClassifier));
     }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    [InlineData("   ", false)]
+    [InlineData("audit_unavailable", true)]
+    public void ComposerBlockedPresentationShouldOnlyBeARejectionWithAnExplicitSubmissionError(
+        string? submissionError,
+        bool expected)
+        => IsSubmissionFailureMarker(submissionError).ShouldBe(expected);
 
     [Fact]
     public async Task AuthenticatedProductionClientShouldMessageAskAndStopAcrossRequiredChromeMatrix()
@@ -154,11 +165,63 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
             await AuthenticateActorAlphaAsync(page, uiEndpoint).ConfigureAwait(true);
             AssertNoBrowserErrors(browserErrors);
 
-            await SubmitComposerAsync(page, "Message", "Story 13.2 production route message").ConfigureAwait(true);
-            await WaitForAsync(
-                async () => await page.Locator(".chatbot-conversation-stream__entry").CountAsync().ConfigureAwait(true) >= 1,
-                "the production Message command projection",
-                cancellationToken).ConfigureAwait(true);
+            try
+            {
+                await SubmitComposerAsync(page, "Message", "Story 13.2 production route message").ConfigureAwait(true);
+            }
+            catch
+            {
+                ProjectConversationResponse diagnostic = await ReadConversationAsync(
+                    chatBot,
+                    accessToken,
+                    cancellationToken).ConfigureAwait(true);
+                output.WriteLine(
+                    $"STORY132_MESSAGE_PROJECTION_DIAGNOSTIC status={diagnostic.Status} "
+                    + $"safeNextAction={diagnostic.SafeNextAction ?? "<null>"} items={diagnostic.Items.Count}");
+                foreach (ProjectConversationItem item in diagnostic.Items)
+                {
+                    output.WriteLine(
+                        $"STORY132_MESSAGE_ITEM kind={item.Kind} lifecycle={item.LifecycleState} sourceVersion={item.SourceVersion} "
+                        + $"failureReason={item.FailureReasonCode ?? "<null>"} blockedReason={item.BlockedReason ?? "<null>"} "
+                        + $"auditStatus={item.AuditStatus ?? "<null>"} safeNextAction={item.SafeNextAction ?? "<null>"}");
+                }
+
+                throw;
+            }
+            try
+            {
+                await WaitForAsync(
+                    async () => await page.Locator(".chatbot-conversation-stream__entry").CountAsync().ConfigureAwait(true) >= 1,
+                    "the production Message command projection",
+                    cancellationToken).ConfigureAwait(true);
+            }
+            catch
+            {
+                ILocator composer = page.Locator(".chatbot-governed-composer");
+                ILocator retryableCode = page.Locator(
+                    "[data-chatbot-stable-id='project-conversation-retryable'] code");
+                ILocator conversationCode = page.Locator(
+                    "[data-chatbot-stable-id='project-conversation-status'] code");
+                string correlationId = await AttributeOrAbsentAsync(
+                    composer,
+                    "data-chatbot-pending-correlation-id").ConfigureAwait(true);
+                ProjectConversationResponse diagnostic = await ReadConversationAsync(
+                    chatBot,
+                    accessToken,
+                    cancellationToken).ConfigureAwait(true);
+                output.WriteLine(
+                    $"STORY132_MESSAGE_POLL_DIAGNOSTIC uiError={await TextOrAbsentAsync(retryableCode).ConfigureAwait(true)} "
+                    + $"uiStatus={await TextOrAbsentAsync(conversationCode).ConfigureAwait(true)} correlation={correlationId} "
+                    + $"expectedItem={UserMessageProjectionIdentity(correlationId)}");
+                foreach (ProjectConversationItem item in diagnostic.Items)
+                {
+                    output.WriteLine(
+                        $"STORY132_MESSAGE_POLL_ITEM itemId={item.ItemId} lifecycle={item.LifecycleState} "
+                        + $"sourceVersion={item.SourceVersion} auditStatus={item.AuditStatus ?? "<null>"}");
+                }
+
+                throw;
+            }
             await AssertHealthyCurrentStatusAsync(page).ConfigureAwait(true);
 
             await SubmitComposerAsync(page, "Ask AI", "Summarize the visible governed context").ConfigureAwait(true);
@@ -235,6 +298,7 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
                 (await page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches").ConfigureAwait(true))
                     .ShouldBe(row.ForcedColors);
                 await AssertHealthyCurrentStatusAsync(page).ConfigureAwait(true);
+                await AssertEveryCriticalSurfaceInMatrixRowAsync(page, stopSlot, stopControl, row).ConfigureAwait(true);
                 await AssertCriticalControlNotClippedAsync(stopControl, row).ConfigureAwait(true);
                 AssertNoBrowserErrors(browserErrors);
                 output.WriteLine("STORY132_BROWSER_MATRIX {0}", row);
@@ -274,6 +338,7 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
         catch
         {
             output.WriteLine("STORY132_COORDINATOR_MILESTONES {0}", coordinatorLogProbe.Render());
+            output.WriteLine("STORY132_CHATBOT_LOG_TAIL\n{0}", coordinatorLogProbe.RenderLogTail());
             throw;
         }
         finally
@@ -415,12 +480,18 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
             return false;
         }
 
-        ILocator code = status.Locator("code");
-        string? statusCode = await code.CountAsync().ConfigureAwait(true) > 0
-            ? await code.InnerTextAsync().ConfigureAwait(true)
-            : null;
-        return !string.Equals(statusCode, "loading", StringComparison.Ordinal);
+        // BlockedAction is also the composer's safe presentation while an accepted command's authoritative re-query
+        // is transiently loading/degraded. Only the dedicated mutation error marker is a submission rejection; the
+        // generic status code must not make the live gate fail before bounded accepted-item polling recovers.
+        ILocator composer = status.Locator("xpath=ancestor::section[1]");
+        string? submissionError = await composer
+            .GetAttributeAsync("data-chatbot-submission-error-code")
+            .ConfigureAwait(true);
+        return IsSubmissionFailureMarker(submissionError);
     }
+
+    private static bool IsSubmissionFailureMarker(string? submissionError)
+        => !string.IsNullOrWhiteSpace(submissionError);
 
     private static async Task<string> ComposerFailureDiagnosticAsync(
         string mode,
@@ -439,6 +510,7 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
 
         return $"Composer {mode} submission retained its draft. " +
             $"validation={validationText}; status={statusText}; " +
+            $"submission-error={await AttributeOrAbsentAsync(inputHost.Locator("xpath=ancestor::section[1]"), "data-chatbot-submission-error-code").ConfigureAwait(true)}; " +
             $"status-state={await AttributeOrAbsentAsync(status, "data-chatbot-feedback-state").ConfigureAwait(true)}; " +
             $"status-kind={await AttributeOrAbsentAsync(status, "data-chatbot-status").ConfigureAwait(true)}; " +
             $"host-value={await AttributeOrAbsentAsync(inputHost, "value").ConfigureAwait(true)}; " +
@@ -454,6 +526,15 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
         => await locator.CountAsync().ConfigureAwait(true) > 0
             ? await locator.GetAttributeAsync(attribute).ConfigureAwait(true) ?? "<absent>"
             : "<absent>";
+
+    private static async Task<string> TextOrAbsentAsync(ILocator locator)
+        => await locator.CountAsync().ConfigureAwait(true) > 0
+            ? await locator.InnerTextAsync().ConfigureAwait(true)
+            : "<absent>";
+
+    private static string UserMessageProjectionIdentity(string correlationId)
+        => "ui-message:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(correlationId)))
+            .ToLowerInvariant()[..24];
 
     private static async Task<ProjectConversationResponse> ReadConversationAsync(
         HttpClient client,
@@ -563,7 +644,57 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
                 return false;
             }
             """).ConfigureAwait(true);
-        clipped.ShouldBeFalse($"Stop must not be clipped at {row.Width}x{row.Height}, {row.Culture}, {row.ModeLabel}.");
+        clipped.ShouldBeFalse($"Critical control must not be clipped at {row.Width}x{row.Height}, {row.Culture}, {row.ModeLabel}.");
+    }
+
+    private static async Task AssertEveryCriticalSurfaceInMatrixRowAsync(
+        IPage page,
+        ILocator stopSlot,
+        ILocator stopControl,
+        BrowserMatrixRow row)
+    {
+        ILocator stream = page.Locator(".chatbot-conversation-stream");
+        ILocator outcome = page.Locator(".chatbot-ai-outcome-conversation-item").Last;
+        ILocator attribution = outcome.Locator(".chatbot-ai-outcome-conversation-item__header");
+        ILocator evidence = outcome.Locator("[data-chatbot-ai-content='source-evidence']");
+        ILocator generated = outcome.Locator("[data-chatbot-ai-content='ai-summary']");
+        ILocator status = page.Locator("[data-chatbot-stable-id='project-conversation-status']");
+        ILocator composer = page.Locator(".chatbot-governed-composer");
+        ILocator input = page.Locator("#project-conversation-composer-input");
+        ILocator submit = composer.Locator(".chatbot-governed-composer__actions fluent-button").First;
+        ILocator liveRegion = stopSlot.Locator("[role='status']");
+
+        foreach (ILocator surface in new[] { stream, outcome, attribution, evidence, generated, status, composer, input, submit, stopControl })
+        {
+            await surface.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 90_000 }).ConfigureAwait(true);
+        }
+
+        string attributionLabel = await outcome.GetAttributeAsync("aria-label").ConfigureAwait(true) ?? string.Empty;
+        attributionLabel.ShouldNotBeNullOrWhiteSpace();
+        (await evidence.InnerTextAsync().ConfigureAwait(true)).ShouldNotBeNullOrWhiteSpace();
+        (await generated.GetAttributeAsync("aria-label").ConfigureAwait(true)).ShouldNotBeNullOrWhiteSpace();
+        (await liveRegion.GetAttributeAsync("aria-live").ConfigureAwait(true)).ShouldBe("polite");
+        (await liveRegion.GetAttributeAsync("aria-atomic").ConfigureAwait(true)).ShouldBe("true");
+        (await input.GetAttributeAsync("aria-describedby").ConfigureAwait(true) ?? string.Empty)
+            .ShouldContain("project-conversation-composer-help");
+        await input.FocusAsync().ConfigureAwait(true);
+        // Blazor may finish an advisory SignalR re-query in the same turn as Playwright focuses the Fluent host. The
+        // control must still become the active element; wait for that exact invariant instead of sampling the one
+        // transient render boundary where the host is being reconciled.
+        await WaitForAsync(
+            async () =>
+            {
+                // Re-apply focus if an advisory re-query reconciled the Fluent host after the preceding attempt.
+                // The asserted state is unchanged; this makes every row prove the currently mounted control.
+                await input.FocusAsync().ConfigureAwait(true);
+                return await input
+                    .EvaluateAsync<bool>("element => document.activeElement === element")
+                    .ConfigureAwait(true);
+            },
+            $"the composer input focus contract at {row.Width}x{row.Height}, {row.Culture}, {row.ModeLabel}",
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
+        await AssertCriticalControlNotClippedAsync(input, row).ConfigureAwait(true);
+        await AssertCriticalControlNotClippedAsync(submit, row).ConfigureAwait(true);
     }
 
     private static void AssertNoBrowserErrors(ConcurrentQueue<string> errors)
@@ -677,6 +808,7 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
         private readonly Task _capture;
         private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ConcurrentDictionary<int, int> _counts = new();
+        private readonly ConcurrentQueue<string> _logTail = new();
 
         private Story132CoordinatorLogProbe(IAsyncEnumerable<IReadOnlyList<LogLine>> batches)
             => _capture = CaptureAsync(batches);
@@ -692,6 +824,9 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
 
         public string Render()
             => string.Join(',', EventIds.Select(id => $"{id}={_counts.GetValueOrDefault(id)}"));
+
+        public string RenderLogTail()
+            => string.Join(Environment.NewLine, _logTail);
 
         public async ValueTask DisposeAsync()
         {
@@ -721,6 +856,12 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
                     {
                         foreach (LogLine line in enumerator.Current)
                         {
+                            _logTail.Enqueue(line.Content);
+                            while (_logTail.Count > 80)
+                            {
+                                _ = _logTail.TryDequeue(out _);
+                            }
+
                             foreach (int eventId in EventIds)
                             {
                                 if (line.Content.Contains($"[{eventId}]", StringComparison.Ordinal))

@@ -124,7 +124,7 @@ public static class AssociationReviewActionPolicy
             return AssociationCorrectionStatus.Delayed;
         }
 
-        if (Matches(downstreamImpactStatus, "pending")
+        if (Matches(downstreamImpactStatus, nameof(AssociationCorrectionStatus.Pending))
             || Matches(downstreamImpactStatus, "correcting")
             || isCorrectedContextStale)
         {

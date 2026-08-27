@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Correlation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
+using Hexalith.ChatBot.Server.Lifecycle.AiExecution;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Observability;
 using Hexalith.ChatBot.Server.Operations;
@@ -98,7 +99,13 @@ if (string.Equals(builder.Configuration["ChatBot:UsePeriodicEnforcementRuntime"]
     _ = builder.Services.AddChatBotPeriodicEnforcementHostedService();
 }
 
-if (string.Equals(builder.Configuration["ChatBot:UseDaprStateStores"], "true", StringComparison.OrdinalIgnoreCase))
+bool useDaprStateStores = string.Equals(
+    builder.Configuration["ChatBot:UseDaprStateStores"],
+    "true",
+    StringComparison.OrdinalIgnoreCase);
+AiExecutionStoreConfiguration.RequireDurableStore(builder.Environment.IsProduction(), useDaprStateStores);
+
+if (useDaprStateStores)
 {
     _ = builder.Services.AddChatBotDaprStateStores();
 }
@@ -128,6 +135,7 @@ _ = app.UseCloudEvents();
 _ = app.UseEventStoreDomainService();
 _ = app.MapChatBotProjectionSubscriptionCompatibilityEndpoints();
 _ = app.MapChatBotCompatibilityEndpoints();
+_ = app.MapAiExecutionRecoveryEndpoints();
 
 if (projectionChangeNotificationsEnabled)
 {

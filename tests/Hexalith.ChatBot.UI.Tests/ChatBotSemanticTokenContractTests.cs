@@ -155,6 +155,21 @@ public sealed class ChatBotSemanticTokenContractTests
     }
 
     [Fact]
+    public void ComposerShouldKeepExplicitMutationOutcomeVisibleAcrossTransientReadDegradation()
+    {
+        string composer = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor");
+
+        int submissionFailure = composer.IndexOf("=> HasSubmissionError", StringComparison.Ordinal);
+        int acceptedReceipt = composer.IndexOf(": PendingSubmission is not null", submissionFailure, StringComparison.Ordinal);
+        int ambientDisabled = composer.IndexOf(": DisabledReasonCode switch", acceptedReceipt, StringComparison.Ordinal);
+
+        submissionFailure.ShouldBeGreaterThanOrEqualTo(0);
+        acceptedReceipt.ShouldBeGreaterThan(submissionFailure);
+        ambientDisabled.ShouldBeGreaterThan(acceptedReceipt);
+        composer.ShouldContain("data-chatbot-submission-error-code=\"@SubmissionErrorCode\"");
+    }
+
+    [Fact]
     public void GovernedOperationsShouldRenderVisibleExamplesForRequiredStatusKinds()
     {
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor");

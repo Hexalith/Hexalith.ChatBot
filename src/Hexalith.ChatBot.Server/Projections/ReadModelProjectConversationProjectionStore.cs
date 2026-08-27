@@ -487,7 +487,7 @@ internal sealed class ReadModelProjectConversationProjectionStore(
         ProjectConversationCursorPosition? nextCursorPosition = hasMore && visible.Length > 0
             ? new ProjectConversationCursorPosition(visible[^1].OccurredAt, visible[^1].ItemId)
             : null;
-        return new ProjectConversationPage(visible, nextCursorPosition, hasMore, pageSize, latest);
+        return new ProjectConversationPage(visible, nextCursorPosition, hasMore, pageSize, latest, items);
     }
 
     public async Task<IReadOnlyList<ProjectConversationItemView>> ReadAiContextPackageItemsAsync(

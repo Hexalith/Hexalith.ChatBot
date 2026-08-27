@@ -358,18 +358,21 @@
         {
             string project = ProjectId;
             string? tenant = Conversation?.TenantContext;
+            long scopeVersion = State.Value.ProjectScopeVersion;
             await subscriber.EnsureSubscribedAsync(
                 tenant,
                 () =>
                 {
-                    _ = InvokeAsync(() => Dispatcher.Dispatch(new ProjectConversationProjectionSignalReceivedAction(project, tenant!)));
+                    _ = InvokeAsync(() => Dispatcher.Dispatch(
+                        new ProjectConversationProjectionSignalReceivedAction(project, tenant!) { ScopeVersion = scopeVersion }));
                 },
                 () =>
                 {
                     // AC5: after a transparent reconnect, re-query authoritative server state (the effect dispatches
                     // LoadProjectConversationAction) so a terminal/progress change missed during the disconnect window
                     // does not leave the surface on stale in-flight state with an enabled Stop control.
-                    _ = InvokeAsync(() => Dispatcher.Dispatch(new ProjectConversationAiResponseReconnectAction(project)));
+                    _ = InvokeAsync(() => Dispatcher.Dispatch(
+                        new ProjectConversationAiResponseReconnectAction(project) { ScopeVersion = scopeVersion }));
                 });
         }
         finally
@@ -403,19 +406,30 @@
     // AC4 / review finding #4: surface the latest AI response progress for ANY state, including the terminal
     // completed/failed/unavailable states an earlier revision filtered out (so they previously rendered nothing).
     private ProjectConversationAiResponseProgressModel? LatestAiResponseProgress
-        => Conversation?.Items
-            .Select(static item => item.AiResponseProgress)
-            .OfType<ProjectConversationAiResponseProgressModel>()
-            .OrderByDescending(static progress => progress.SourceVersion)
-            .ThenByDescending(static progress => progress.Sequence)
+        => LatestProgressByGeneration()
+            .OrderByDescending(static transition => transition.OccurredAt)
+            .Select(static transition => transition.Progress)
             .FirstOrDefault();
 
     // The non-terminal, in-flight generation that the Stop/Cancel control can act on.
     private ProjectConversationAiResponseProgressModel? ActiveStreamingProgress
-        => LatestAiResponseProgress is { IsTerminal: false } active &&
-            ProjectConversationAiResponseProgressStates.IsActive(active.State)
-            ? active
-            : null;
+        => LatestProgressByGeneration()
+            .Where(static transition => !transition.Progress.IsTerminal &&
+                ProjectConversationAiResponseProgressStates.IsActive(transition.Progress.State))
+            .OrderByDescending(static transition => transition.OccurredAt)
+            .Select(static transition => transition.Progress)
+            .FirstOrDefault();
+
+    private IEnumerable<(DateTimeOffset OccurredAt, ProjectConversationAiResponseProgressModel Progress)> LatestProgressByGeneration()
+        => (Conversation?.Items ?? [])
+            .Where(static item => item.AiResponseProgress is not null)
+            .GroupBy(
+                static item => (item.AiResponseProgress!.StateOwnerAggregateId, item.AiResponseProgress.ResponseId, item.AiResponseProgress.GenerationId))
+            .Select(static group => group
+                .OrderByDescending(static item => item.AiResponseProgress!.Sequence)
+                .ThenByDescending(static item => item.SourceVersion)
+                .Select(static item => (item.OccurredAt, item.AiResponseProgress!))
+                .First());
 
     private bool LatestStopVerified
         => LatestAiResponseProgress is { } progress && IsStopVerified(progress);
@@ -462,18 +476,24 @@
             : ChatBotBlockedReason.UnsafeContext;
 
     private bool ComposerDisabled
-        => State.Value.IsLoading ||
-            State.Value.ErrorCode is not null ||
-            State.Value.IsSubmitting ||
-            Conversation is null ||
-            Conversation.IsBlockedOrStale;
+        => ShouldDisableComposer(State.Value, Conversation);
+
+    internal static bool ShouldDisableComposer(
+        ProjectConversationState state,
+        ProjectConversationModel? conversation)
+    {
+        return state.ErrorCode is not null ||
+            state.IsSubmitting ||
+            conversation is null ||
+            conversation.IsBlockedOrStale;
+    }
 
     private string? ComposerDisabledReasonCode
         => State.Value.ErrorCode is not null
             ? IsUnauthorizedError ? "unauthorized" : "degraded"
             : Conversation?.Status is "Blocked" or "Stale" or "Degraded"
                 ? "degraded"
-                : State.Value.IsLoading || Conversation is null
+                : Conversation is null
                     ? "loading"
                     : null;
 

@@ -17,10 +17,21 @@ public sealed record ProjectConversationModel(
     string CorrelationId,
     string SafeNextAction)
 {
+    public IReadOnlyList<ProjectConversationStreamCoverageModel> AuthoritativeCoverage { get; init; } = [];
+
+    public bool IsAllCoveringEmpty { get; init; }
+
     public bool IsEmpty => Items.Count == 0;
 
     public bool IsBlockedOrStale => Status is "Blocked" or "Stale" or "Degraded";
 }
+
+public sealed record ProjectConversationStreamCoverageModel(
+    string StateOwnerAggregateId,
+    long FromSourceVersion,
+    long ThroughSourceVersion,
+    bool IsContiguous,
+    bool CoversAllKnownItems);
 
 public enum ProjectConversationComposerMode
 {
@@ -319,7 +330,14 @@ public sealed record ProjectConversationAiResponseProgressModel(
     string SafeNextAction,
     string RedactionState,
     string VisibilityState,
-    bool IsTerminal);
+    bool IsTerminal)
+{
+    public string? StateOwnerAggregateId { get; init; }
+
+    public long? StartedSourceVersion { get; init; }
+
+    public DateTimeOffset? RecoveryDeadlineUtc { get; init; }
+}
 
 public sealed record ProjectConversationItemClassificationModel(
     string Kind,

@@ -388,7 +388,12 @@ internal sealed record ProjectConversationItemView(
             ResolvedSafeNextAction(),
             SafeRedactionState(),
             FirstNonBlank(AiResponseVisibilityState, AiGeneratedContentVisibility, AiContextRedactionState) ?? "metadata_only",
-            AiResponseIsTerminal ?? IsTerminalAiResponse(progressState));
+            AiResponseIsTerminal ?? IsTerminalAiResponse(progressState))
+        {
+            StateOwnerAggregateId = SourceConversationId,
+            StartedSourceVersion = (AiResponseIsTerminal ?? IsTerminalAiResponse(progressState)) ? null : SourceVersion,
+            RecoveryDeadlineUtc = OccurredAt.AddMinutes(2).AddSeconds(5),
+        };
     }
 
     public IReadOnlyList<ProjectConversationReviewHistoryEntry> BuildReviewHistory()

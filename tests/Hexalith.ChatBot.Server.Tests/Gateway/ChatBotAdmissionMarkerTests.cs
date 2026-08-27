@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts.Commands;
@@ -23,8 +24,18 @@ public sealed class ChatBotAdmissionMarkerTests
     {
         DataProtectionChatBotAdmissionMarker marker = new(new EphemeralDataProtectionProvider());
         ChatBotGatewayContext context = Context();
-        string protectedMarker = marker.Create(context, "project-alpha", nameof(RecordProjectConversationMessage));
-        CommandEnvelope envelope = Envelope(protectedMarker);
+        JsonElement payload = JsonSerializer.SerializeToElement(context.Submission.Request.Command);
+        string protectedMarker = marker.Create(
+            CommandId,
+            "tenant-alpha",
+            "project-alpha",
+            nameof(RecordProjectConversationMessage),
+            payload,
+            CorrelationId,
+            "actor-alpha",
+            "ui",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        CommandEnvelope envelope = Envelope(protectedMarker, JsonSerializer.SerializeToUtf8Bytes(payload));
 
         marker.IsValid(envelope).ShouldBeTrue();
 
@@ -32,6 +43,10 @@ public sealed class ChatBotAdmissionMarkerTests
         marker.IsValid(envelope with { CommandType = nameof(Hexalith.ChatBot.Contracts.Commands.ProposeAIAction) }).ShouldBeFalse();
         marker.IsValid(envelope with { CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAV" }).ShouldBeFalse();
         marker.IsValid(envelope with { MessageId = "01ARZ3NDEKTSV4RRFFQ69G5FAZ" }).ShouldBeFalse();
+        marker.IsValid(envelope with { Payload = "{}"u8.ToArray() }).ShouldBeFalse();
+        marker.IsValid(envelope with { Extensions = Rebind(envelope.Extensions!, "actorId", "actor-beta") }).ShouldBeFalse();
+        marker.IsValid(envelope with { Extensions = Rebind(envelope.Extensions!, "surfaceOrigin", "api") }).ShouldBeFalse();
+        marker.IsValid(envelope with { Extensions = Rebind(envelope.Extensions!, "taskId", "01ARZ3NDEKTSV4RRFFQ69G5FAV") }).ShouldBeFalse();
         marker.IsValid(envelope with { Extensions = null }).ShouldBeFalse();
     }
 
@@ -63,19 +78,34 @@ public sealed class ChatBotAdmissionMarkerTests
             new ChatBotTenantBinding("tenant-alpha"));
     }
 
-    private static CommandEnvelope Envelope(string protectedMarker)
+    private static CommandEnvelope Envelope(string protectedMarker, byte[] payload)
         => new(
             CommandId,
             "tenant-alpha",
             "chatbot",
             "project-alpha",
             nameof(RecordProjectConversationMessage),
-            "{}"u8.ToArray(),
+            payload,
             CorrelationId,
             null,
             "actor-alpha",
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 [DataProtectionChatBotAdmissionMarker.ExtensionKey] = protectedMarker,
+                ["actorId"] = "actor-alpha",
+                ["surfaceOrigin"] = "ui",
+                ["taskId"] = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
             });
+
+    private static Dictionary<string, string> Rebind(
+        IReadOnlyDictionary<string, string> extensions,
+        string key,
+        string value)
+    {
+        Dictionary<string, string> rebound = new(extensions, StringComparer.Ordinal)
+        {
+            [key] = value,
+        };
+        return rebound;
+    }
 }

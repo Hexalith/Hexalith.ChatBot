@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Queries;
@@ -6,12 +8,15 @@ using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Conversations;
+using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Contracts.Commands;
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+
+using Ulid = ByteAether.Ulid.Ulid;
 
 namespace Hexalith.ChatBot.Server.Lifecycle.AiExecution;
 
@@ -20,16 +25,28 @@ internal sealed partial class AiExecutionCoordinator(
     IAiAssistanceProvider provider,
     IEventStoreGatewayClient eventStore,
     ISystemClock clock,
-    ILogger<AiExecutionCoordinator> logger) : BackgroundService, IAiExecutionCoordinator
+    ILogger<AiExecutionCoordinator> logger,
+    IChatBotAdmissionMarker? admissionMarker = null,
+    TimeSpan? providerExecutionDeadline = null) : BackgroundService, IAiExecutionCoordinator
 {
     private const int MaximumConcurrentExecutions = 4;
+    private const int MaximumProviderExecutionAttempts = 3;
     private const int MaximumTerminalSubmissionAttempts = 3;
+    private const string CoordinatorLoopFailedLog = "AI execution coordinator loop failed.";
+    private const string ExecutionFailedLog = "AI execution work {WorkKey} attempt {AttemptCount} failed and was released for recovery.";
+    private const string ProviderCancellationObservedLog = "AI execution work {WorkKey} observed provider cancellation.";
+    private const string TerminalSubmissionStartedLog = "AI execution work {WorkKey} is submitting terminal command {CommandType}, attempt {AttemptCount}.";
+    private const string TerminalSubmissionCompletedLog = "AI execution work {WorkKey} completed terminal command {CommandType}, attempt {AttemptCount}.";
     private static readonly TimeSpan LeaseDuration = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan LeaseHeartbeatInterval = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan DefaultProviderExecutionDeadline = TimeSpan.FromSeconds(30);
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeExecutions = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string> _requestedCancellations = new(StringComparer.Ordinal);
     private readonly string _owner = $"{Environment.MachineName}:{Guid.NewGuid():N}";
+    private readonly TimeSpan _providerExecutionDeadline = providerExecutionDeadline is { } configured && configured > TimeSpan.Zero
+        ? configured
+        : DefaultProviderExecutionDeadline;
 
     public async ValueTask RecordStartedAsync(
         string tenantId,
@@ -92,29 +109,72 @@ internal sealed partial class AiExecutionCoordinator(
         _requestedCancellations[key] = request.CancellationId;
         if (_activeExecutions.TryGetValue(key, out CancellationTokenSource? active))
         {
-            // This method runs on the inbound EventStore projection callback. Cancel() may execute provider
-            // continuations inline; a continuation that submits the terminal command back to EventStore would then
-            // wait on the very projection callback it is blocking. Schedule token callbacks asynchronously so the
-            // persisted cancellation request can return before the terminal relay begins.
-            _ = active.CancelAsync();
+            // This method runs on the inbound EventStore projection callback. Even CancelAsync() is permitted to
+            // begin cancellation work before its returned ValueTask is observed. A provider continuation can submit
+            // the terminal command back to the same EventStore aggregate and wait on the projection callback that is
+            // still recording this request. Put the cancellation signal itself on the pool so this callback never
+            // owns any part of that terminal relay call stack. The durable heartbeat remains the cross-replica path.
+            ThreadPool.QueueUserWorkItem(
+                static execution => execution.Cancel(),
+                active,
+                preferLocal: false);
         }
+    }
+
+    public async ValueTask RecordTerminalObservedAsync(
+        string tenantId,
+        string stateOwnerAggregateId,
+        string projectId,
+        string responseId,
+        string generationId,
+        CancellationToken cancellationToken)
+    {
+        string key = AiExecutionWorkItem.KeyFor(tenantId, projectId, stateOwnerAggregateId, responseId, generationId);
+        await workStore.MarkTerminalObservedAsync(key, clock.UtcNow, cancellationToken).ConfigureAwait(false);
+        _ = _requestedCancellations.TryRemove(key, out _);
+    }
+
+    public async ValueTask RecordCancellationFailedAsync(
+        AiResponseGenerationCancellationFailed failure,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(failure);
+        string key = AiExecutionWorkItem.KeyFor(
+            failure.TenantId,
+            failure.ProjectId,
+            failure.ConversationId,
+            failure.ResponseId,
+            failure.GenerationId);
+        await workStore.MarkCancellationFailedAsync(key, failure.FailedAtUtc, cancellationToken).ConfigureAwait(false);
+        _ = _requestedCancellations.TryRemove(key, out _);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        Dictionary<string, Task> running = new(StringComparer.Ordinal);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
+                foreach ((string key, Task task) in running.Where(static pair => pair.Value.IsCompleted).ToArray())
+                {
+                    await task.ConfigureAwait(false);
+                    _ = running.Remove(key);
+                }
+
                 IReadOnlyList<AiExecutionWorkItem> runnable = await workStore
                     .ListRunnableAsync(clock.UtcNow, MaximumConcurrentExecutions * 4, stoppingToken)
                     .ConfigureAwait(false);
-                List<Task> batch = [];
                 foreach (AiExecutionWorkItem candidate in runnable)
                 {
-                    if (batch.Count >= MaximumConcurrentExecutions)
+                    if (running.Count >= MaximumConcurrentExecutions)
                     {
                         break;
+                    }
+
+                    if (running.ContainsKey(candidate.Key))
+                    {
+                        continue;
                     }
 
                     AiExecutionWorkItem? claimed = await workStore
@@ -122,13 +182,15 @@ internal sealed partial class AiExecutionCoordinator(
                         .ConfigureAwait(false);
                     if (claimed is not null)
                     {
-                        batch.Add(ProcessClaimedAsync(claimed, stoppingToken));
+                        running[claimed.Key] = ProcessClaimedAsync(claimed, stoppingToken);
                     }
                 }
 
-                if (batch.Count > 0)
+                if (running.Count > 0)
                 {
-                    await Task.WhenAll(batch).ConfigureAwait(false);
+                    _ = await Task.WhenAny(
+                            running.Values.Append(Task.Delay(PollInterval, stoppingToken)))
+                        .ConfigureAwait(false);
                 }
                 else
                 {
@@ -180,10 +242,29 @@ internal sealed partial class AiExecutionCoordinator(
             }
             else
             {
-                record = await provider.ExecuteAsync(ToProviderRequest(work), executionCancellation.Token).ConfigureAwait(false);
-                await workStore
+                Task<LowRiskAiAssistanceExecutionRecord> providerExecution = provider
+                    .ExecuteAsync(ToProviderRequest(work), executionCancellation.Token)
+                    .AsTask();
+                Task deadline = Task.Delay(_providerExecutionDeadline, stoppingToken);
+                if (await Task.WhenAny(providerExecution, deadline).ConfigureAwait(false) != providerExecution)
+                {
+                    await executionCancellation.CancelAsync().ConfigureAwait(false);
+                    _ = providerExecution.ContinueWith(
+                        static completed => _ = completed.Exception,
+                        CancellationToken.None,
+                        TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
+                        TaskScheduler.Default);
+                    throw new TimeoutException($"AI provider execution '{work.Key}' exceeded its per-slot deadline.");
+                }
+
+                record = await providerExecution.ConfigureAwait(false);
+                bool persisted = await workStore
                     .MarkCompletionPendingAsync(work.Key, _owner, record, clock.UtcNow, stoppingToken)
                     .ConfigureAwait(false);
+                if (!persisted)
+                {
+                    return;
+                }
             }
 
             // If the provider completed naturally while Stop raced with it, the natural terminal result wins. The
@@ -206,10 +287,32 @@ internal sealed partial class AiExecutionCoordinator(
         {
             await workStore.ReleaseAsync(work.Key, _owner, clock.UtcNow, CancellationToken.None).ConfigureAwait(false);
         }
+        catch (TerminalSubmissionExhaustedException ex)
+        {
+            ExecutionFailed(logger, ex, work.Key, work.AttemptCount);
+            _ = await workStore.MarkExhaustedAsync(
+                work.Key,
+                _owner,
+                clock.UtcNow,
+                "terminal-submission-attempts-exhausted",
+                stoppingToken).ConfigureAwait(false);
+        }
         catch (Exception ex)
         {
             ExecutionFailed(logger, ex, work.Key, work.AttemptCount);
-            await workStore.ReleaseAsync(work.Key, _owner, clock.UtcNow, stoppingToken).ConfigureAwait(false);
+            if (work.AttemptCount >= MaximumProviderExecutionAttempts)
+            {
+                _ = await workStore.MarkExhaustedAsync(
+                    work.Key,
+                    _owner,
+                    clock.UtcNow,
+                    "provider-execution-attempts-exhausted",
+                    stoppingToken).ConfigureAwait(false);
+            }
+            else
+            {
+                _ = await workStore.ReleaseAsync(work.Key, _owner, clock.UtcNow, stoppingToken).ConfigureAwait(false);
+            }
         }
         finally
         {
@@ -270,7 +373,7 @@ internal sealed partial class AiExecutionCoordinator(
             $"ai-completion:{work.GenerationId}");
         await SubmitTerminalWithRetryAsync(
             work,
-            command.CompletionId,
+            TerminalMessageId(work, nameof(CompleteLowRiskAiAssistance), command.CompletionId),
             nameof(CompleteLowRiskAiAssistance),
             command,
             cancellationToken).ConfigureAwait(false);
@@ -295,10 +398,33 @@ internal sealed partial class AiExecutionCoordinator(
             CompletionId: $"ai-cancellation-completion:{cancellationId}");
         await SubmitTerminalWithRetryAsync(
             work,
-            command.CompletionId,
+            TerminalMessageId(work, nameof(CompleteAiResponseGenerationCancellation), command.CompletionId),
             nameof(CompleteAiResponseGenerationCancellation),
             command,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    internal static string TerminalMessageId(
+        AiExecutionWorkItem work,
+        string commandType,
+        string completionId)
+    {
+        ArgumentNullException.ThrowIfNull(work);
+        ArgumentException.ThrowIfNullOrWhiteSpace(commandType);
+        ArgumentException.ThrowIfNullOrWhiteSpace(completionId);
+
+        // EventStore command message ids permit only alphanumerics and hyphens. The descriptive domain completion
+        // ids deliberately contain ':' and therefore cannot be reused as transport ids. Derive a canonical ULID
+        // from the persisted work identity and exact terminal outcome instead: it is valid at the gateway, stable
+        // across retries/restarts, distinct for a later cancellation attempt, and carries no payload metadata.
+        byte[] material = Encoding.UTF8.GetBytes(string.Join(
+            '\u001f',
+            "chatbot-ai-terminal-v1",
+            work.CanonicalKey,
+            commandType,
+            completionId));
+        byte[] digest = SHA256.HashData(material);
+        return Ulid.New(digest.AsSpan(0, 16)).ToString();
     }
 
     private async Task SubmitTerminalWithRetryAsync<TCommand>(
@@ -314,21 +440,47 @@ internal sealed partial class AiExecutionCoordinator(
             try
             {
                 TerminalSubmissionStarted(logger, work.Key, commandType, attempt);
+                JsonElement payload = JsonSerializer.SerializeToElement(command);
+                Dictionary<string, string> extensions = new(StringComparer.Ordinal)
+                {
+                    ["surfaceOrigin"] = "ai-execution-coordinator",
+                    ["actorType"] = "system",
+                    ["actorId"] = "ai-execution-coordinator",
+                };
+                if (admissionMarker is not null)
+                {
+                    extensions[DataProtectionChatBotAdmissionMarker.ExtensionKey] = admissionMarker.Create(
+                        messageId,
+                        work.TenantId,
+                        work.ConversationId,
+                        commandType,
+                        payload,
+                        work.CorrelationId,
+                        "ai-execution-coordinator",
+                        "ai-execution-coordinator",
+                        null);
+                }
+
+                AiExecutionWorkItem? renewed = await workStore
+                    .TryRenewLeaseAsync(work.Key, _owner, clock.UtcNow, LeaseDuration, cancellationToken)
+                    .ConfigureAwait(false);
+                if (renewed is null)
+                {
+                    return;
+                }
+
                 SubmitCommandRequest submit = new(
                     MessageId: messageId,
                     Tenant: work.TenantId,
                     Domain: ChatBotEventStore.DomainName,
                     AggregateId: work.ConversationId,
                     CommandType: commandType,
-                    Payload: JsonSerializer.SerializeToElement(command),
+                    Payload: payload,
                     CorrelationId: work.CorrelationId,
-                    Extensions: new Dictionary<string, string>(StringComparer.Ordinal)
-                    {
-                        ["surfaceOrigin"] = "ai-execution-coordinator",
-                        ["actorType"] = "system",
-                    });
+                    Extensions: extensions);
                 _ = await eventStore.SubmitCommandAsync(submit, cancellationToken).ConfigureAwait(false);
-                await workStore.MarkTerminalAsync(work.Key, _owner, clock.UtcNow, cancellationToken).ConfigureAwait(false);
+                // Transport acceptance is not terminal truth. The durable work remains leased/non-terminal until the
+                // persisted terminal event returns through the named projection and RecordTerminalObservedAsync fences it.
                 _ = _requestedCancellations.TryRemove(work.Key, out _);
                 TerminalSubmissionCompleted(logger, work.Key, commandType, attempt);
                 return;
@@ -340,7 +492,7 @@ internal sealed partial class AiExecutionCoordinator(
             }
         }
 
-        throw new InvalidOperationException(
+        throw new TerminalSubmissionExhaustedException(
             $"Terminal AI execution command '{messageId}' exceeded its bounded submission retry budget.",
             lastFailure);
     }
@@ -383,18 +535,21 @@ internal sealed partial class AiExecutionCoordinator(
             _ => "unsupported",
         };
 
-    [LoggerMessage(EventId = 130201, Level = LogLevel.Error, Message = "AI execution coordinator loop failed.")]
+    private sealed class TerminalSubmissionExhaustedException(string message, Exception? innerException)
+        : InvalidOperationException(message, innerException);
+
+    [LoggerMessage(EventId = 130201, Level = LogLevel.Error, Message = CoordinatorLoopFailedLog)]
     private static partial void CoordinatorLoopFailed(ILogger logger, Exception exception);
 
-    [LoggerMessage(EventId = 130202, Level = LogLevel.Warning, Message = "AI execution work {WorkKey} attempt {AttemptCount} failed and was released for recovery.")]
+    [LoggerMessage(EventId = 130202, Level = LogLevel.Warning, Message = ExecutionFailedLog)]
     private static partial void ExecutionFailed(ILogger logger, Exception exception, string workKey, int attemptCount);
 
-    [LoggerMessage(EventId = 130203, Level = LogLevel.Information, Message = "AI execution work {WorkKey} observed provider cancellation.")]
+    [LoggerMessage(EventId = 130203, Level = LogLevel.Information, Message = ProviderCancellationObservedLog)]
     private static partial void ProviderCancellationObserved(ILogger logger, string workKey);
 
-    [LoggerMessage(EventId = 130204, Level = LogLevel.Information, Message = "AI execution work {WorkKey} is submitting terminal command {CommandType}, attempt {AttemptCount}.")]
+    [LoggerMessage(EventId = 130204, Level = LogLevel.Information, Message = TerminalSubmissionStartedLog)]
     private static partial void TerminalSubmissionStarted(ILogger logger, string workKey, string commandType, int attemptCount);
 
-    [LoggerMessage(EventId = 130205, Level = LogLevel.Information, Message = "AI execution work {WorkKey} completed terminal command {CommandType}, attempt {AttemptCount}.")]
+    [LoggerMessage(EventId = 130205, Level = LogLevel.Information, Message = TerminalSubmissionCompletedLog)]
     private static partial void TerminalSubmissionCompleted(ILogger logger, string workKey, string commandType, int attemptCount);
 }

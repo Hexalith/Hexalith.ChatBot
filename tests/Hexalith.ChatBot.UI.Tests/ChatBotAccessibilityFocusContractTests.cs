@@ -83,9 +83,8 @@ public sealed class ChatBotAccessibilityFocusContractTests
             "src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor",
             [
                 "data-chatbot-operational-queue=\"true\"",
-                "role=\"table\"",
-                "role=\"row\"",
-                "tabindex=\"0\"",
+                "role=\"list\"",
+                "role=\"listitem\"",
                 "GovernedOperationsQueueOpenDetailAccessible",
                 "GovernedOperationsQueueDetailUnavailable",
             ]),
@@ -130,9 +129,9 @@ public sealed class ChatBotAccessibilityFocusContractTests
     [
         new("Story 12.2 governed composer", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor", ["<FluentButton", "<FluentLabel", "<FluentTextArea", "aria-describedby=\"project-conversation-composer-help project-conversation-composer-status\"", "aria-invalid=", "@onkeydown:stopPropagation=\"true\"", "FocusAsync"]),
         new("Story 12.3 conversation stream", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor", ["<FluentCard", "<FluentStack", "<FluentText", "data-chatbot-conversation-stream=\"metadata-only\"", "aria-labelledby=\"@TitleId\"", "<ol"]),
-        new("Story 12.4 association review actions", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor", ["<FluentLabel", "<FluentTextArea", "aria-label=\"@UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]\"", "aria-describedby=\"association-review-validation\"", "aria-invalid=\"@DecisionNoteInvalidText\"", "ChatBotGovernedAction"]),
+        new("Story 12.4 association review actions", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor", ["<FluentLabel", "<FluentTextArea", "aria-label=\"@UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]\"", "aria-describedby=\"@DecisionNoteDescribedBy\"", "aria-invalid=\"@DecisionNoteInvalidText\"", "ChatBotGovernedAction"]),
         new("Story 12.4 association candidate row", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationCandidateRow.razor", ["<FluentButton", "role=\"radio\"", "aria-checked=\"@IsSelectedText\"", "aria-label=\"@AccessibleLabel\"", "data-chatbot-association-candidate=\"@Candidate.ProjectId\""]),
-        new("Story 12.5 approval decision actions", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor", ["<FluentButton", "aria-describedby=\"@ApproveReasonId\"", "DecisionLiveRegion", "BlockApproveAsync", "data-chatbot-approval-evidence-freshness"]),
+        new("Story 12.5 approval decision actions", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor", ["<FluentButton", "aria-describedby=\"@(!CanApprove ? ApproveReasonId : null)\"", "DecisionLiveRegion", "BlockApproveAsync", "data-chatbot-approval-evidence-freshness"]),
         new("Story 12.5 why-this-project panel", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotWhyProjectPanel.razor", ["<FluentButton", "role=\"complementary\"", "data-chatbot-why-project-panel=\"metadata-only\"", "data-chatbot-correction-link", "data-chatbot-evidence-visibility"]),
         new("Story 12.5 task intent review", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotTaskIntentReviewPanel.razor", ["<FluentButton", "<FluentLabel", "<FluentTextInput", "role=\"toolbar\"", "aria-describedby=\"@DisabledReasonReferenceId(transition)\"", "role=\"status\""]),
         new("Story 12.6 escalation editor", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEscalationPolicyEditor.razor", ["<FluentNumberInput", "<FluentSelect", "<FluentOption", "<FluentTextInput", "<FluentLabel", "aria-label=", "role=\"complementary\""]),
@@ -145,7 +144,7 @@ public sealed class ChatBotAccessibilityFocusContractTests
         // FluentAccordion (one item per section, expanded by default). The queue/data markers and the
         // operation-outcome-title focus-landing target (asserted by the busy-region contract below) are
         // preserved on the regrouped sections, so the marker set is strengthened, not loosened.
-        new("Story 12.7 governed operations", "src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor", ["<FluentButton", "<ChatBotGovernedAction", "data-chatbot-operational-queue=\"true\"", "role=\"table\"", "role=\"row\"", "data-chatbot-queue-family", "<FluentAccordion", "ExpandMode=\"AccordionExpandMode.Multi\"", "Expanded=\"true\"", "id=\"operation-outcome-title\""]),
+        new("Story 12.7 governed operations", "src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor", ["<FluentButton", "<ChatBotGovernedAction", "data-chatbot-operational-queue=\"true\"", "role=\"list\"", "role=\"listitem\"", "data-chatbot-queue-family", "<FluentAccordion", "ExpandMode=\"AccordionExpandMode.Multi\"", "Expanded=\"true\"", "id=\"operation-outcome-title\""]),
         // Story 13.5 retarget: the operational-dashboards data-viz moved from hand-rolled role="table"/role="row"
         // markup to a FluentDataGrid + non-color FluentBadge status cues; the data-chatbot-* machine tokens are
         // preserved on the sibling per-row markers, so the marker set is retargeted (grid shape), not loosened.
@@ -351,7 +350,7 @@ public sealed class ChatBotAccessibilityFocusContractTests
             (
                 "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationEvidenceComparison.razor",
                 ["<FluentCard", "<FluentStack", "<FluentText"],
-                ["data-chatbot-association-comparison=\"true\"", "<article", "<dl", "ChatBotEvidenceChip"]),
+                ["data-chatbot-association-comparison=\"true\"", "<article", "CodeRow(", "ChatBotEvidenceChip"]),
             (
                 "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationShell.razor",
                 ["<FluentStack"],

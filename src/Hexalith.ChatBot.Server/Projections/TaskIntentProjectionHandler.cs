@@ -119,7 +119,10 @@ internal sealed class TaskIntentProjectionHandler(IProjectConversationProjection
 
         if (published.Proposal is not null)
         {
-            await _conversationStore.UpsertAiActionProposalAsync(record.TenantId, published.Proposal, cancellationToken).ConfigureAwait(false);
+            await _conversationStore.UpsertAiActionProposalAsync(
+                record.TenantId,
+                published.Proposal with { StateOwnerAggregateId = published.AggregateId },
+                cancellationToken).ConfigureAwait(false);
         }
 
         return ProjectionOutcome.Applied;

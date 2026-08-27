@@ -72,7 +72,7 @@
 
     private string EvidenceText(AssociationEvidenceModel evidence)
         => evidence.State is ChatBotEvidenceState.Available
-            ? $"{evidence.Kind} {evidence.Reference}"
+            ? string.Concat(evidence.Kind, " ", evidence.Reference)
             : UiText[ChatBotUiTextKey.AssociationReviewEvidenceRestricted];
 
     /// <summary>

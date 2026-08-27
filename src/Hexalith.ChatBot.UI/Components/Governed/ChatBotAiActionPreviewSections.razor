@@ -15,10 +15,14 @@
             <section class="chatbot-ai-action-preview__section"
                      data-chatbot-ai-action-preview-section="@section.Kind"
                      aria-label="@section.Title"
+                     aria-disabled="@section.AriaDisabled"
                      data-chatbot-ai-action-preview-blocked="@section.AriaDisabled">
                 <h4 class="chatbot-ai-action-preview__section-title">@section.Title</h4>
                 <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
-                    @MetadataRow(ChatBotUiTextKey.AiActionPreviewStateLabel, section.State)
+                    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+                        <FluentText Weight="TextWeight.Semibold">@UiText[ChatBotUiTextKey.AiActionPreviewStateLabel]</FluentText>
+                        <code class="chatbot-code">@section.State</code>
+                    </FluentStack>
                     @MetadataRow(ChatBotUiTextKey.AiActionPreviewReasonCodeLabel, section.ReasonCode)
                     @MetadataRow(ChatBotUiTextKey.AiActionPreviewRedactionStateLabel, section.RedactionState)
                     @MetadataRow(ChatBotUiTextKey.AiActionPreviewEvidenceFreshnessLabel, section.EvidenceFreshness)
@@ -155,9 +159,10 @@
     // A blank reason means "nothing is blocking"; anything else is treated as blocking until it is known safe.
     private static bool IsUnavailableReason(string? reason)
         => !string.IsNullOrWhiteSpace(reason) &&
-            !reason.Equals("available", StringComparison.OrdinalIgnoreCase) &&
-            !reason.Equals("allowed", StringComparison.OrdinalIgnoreCase) &&
-            !reason.Equals("none", StringComparison.OrdinalIgnoreCase);
+            (reason.Equals("not-yet-produced", StringComparison.OrdinalIgnoreCase) ||
+             (!reason.Equals("available", StringComparison.OrdinalIgnoreCase) &&
+              !reason.Equals("allowed", StringComparison.OrdinalIgnoreCase) &&
+              !reason.Equals("none", StringComparison.OrdinalIgnoreCase)));
 
     private static string NormalizeReason(string? reason)
         => string.IsNullOrWhiteSpace(reason) ? "unavailable" : reason;

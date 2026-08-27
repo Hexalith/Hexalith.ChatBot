@@ -193,7 +193,7 @@ public sealed class ChatBotInteractionGuardrailContractTests
         page.ShouldContain("GovernedOperationsQueueDetailUnavailable");
         page.ShouldContain("DisabledWithReason");
         page.ShouldContain("data-chatbot-source-version");
-        page.ShouldContain("page-size:100");
+        page.ShouldContain("sample-data:not-a-live-query");
     }
 
     private static string ReadProjectFile(string relativePath)

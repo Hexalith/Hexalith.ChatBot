@@ -160,11 +160,10 @@ public sealed class ProjectConversationEffectsTests
     }
 
     [Fact]
-    public async Task ProjectionSignalEffectShouldSynthesizeForwardNudgeForLoadedConversationAndFailClosedOnMismatch()
+    public async Task ProjectionSignalEffectShouldRequeryWithoutInventingWatermarkAndFailClosedOnMismatch()
     {
-        // Signal-only transport: a project-conversation change for the loaded conversation becomes a metadata-only,
-        // forward-looking nudge (one past the last-rendered progress) that drives a typed re-query. A signal for a
-        // different project is ignored (fail closed).
+        // Signal-only transport carries no stream/version evidence. It can request an authoritative reload, but must
+        // never manufacture a future watermark. A signal for a different project is ignored (fail closed).
         ProjectConversationModel conversation = await ConversationWithProgressAsync(AiResponseProgressState.Rendering, isTerminal: false);
         FakeState loaded = new(new ProjectConversationState(false, conversation, null));
 
@@ -172,13 +171,8 @@ public sealed class ProjectConversationEffectsTests
         await new ProjectConversationEffects(new ProjectConversationService(new StubChatBotClient()), loaded)
             .HandleProjectionSignalAsync(new ProjectConversationProjectionSignalReceivedAction("project-001", "tenant-001"), matched);
 
-        ProjectConversationAiResponseNudgeModel nudge =
-            matched.Actions.OfType<ProjectConversationAiResponseNudgeReceivedAction>().Single().Nudge;
-        nudge.ProjectId.ShouldBe("project-001");
-        nudge.RedactionState.ShouldBe("metadata_only");
-        nudge.VisibilityState.ShouldBe("metadata_only");
-        nudge.SourceVersion.ShouldBe(11); // last-rendered 10 + 1
-        nudge.Sequence.ShouldBe(5);        // last-rendered 4 + 1
+        matched.Actions.OfType<LoadProjectConversationAction>().Single().ProjectId.ShouldBe("project-001");
+        matched.Actions.OfType<ProjectConversationAiResponseNudgeReceivedAction>().ShouldBeEmpty();
 
         RecordingDispatcher mismatched = new();
         await new ProjectConversationEffects(new ProjectConversationService(new StubChatBotClient()), loaded)
@@ -187,7 +181,7 @@ public sealed class ProjectConversationEffectsTests
     }
 
     [Fact]
-    public async Task ProjectionSignalEffectShouldSilentlyDedupBenignDuplicateSignalWithoutSurfacingAStaleError()
+    public async Task DuplicateProjectionSignalsShouldRemainAdvisoryReloadsWithoutInventedState()
     {
         // The tenant-wide, at-least-once change broadcast routinely delivers duplicate / no-advance signals (a duplicate
         // delivery, or a change to ANOTHER conversation in the tenant). When the loaded conversation's last-rendered
@@ -196,23 +190,23 @@ public sealed class ProjectConversationEffectsTests
         // spurious "stale" streaming error. [AC: nudge handlers must be duplicate-safe]
         ProjectConversationModel conversation = await ConversationWithProgressAsync(AiResponseProgressState.Rendering, isTerminal: false);
 
-        // First signal: a genuine advance -> the effect synthesizes and dispatches the forward nudge.
+        // Each advisory signal may cause an idempotent typed reload; neither becomes accepted version state itself.
         FakeState loaded = new(new ProjectConversationState(false, conversation, null));
         RecordingDispatcher first = new();
         await new ProjectConversationEffects(new ProjectConversationService(new StubChatBotClient()), loaded)
             .HandleProjectionSignalAsync(new ProjectConversationProjectionSignalReceivedAction("project-001", "tenant-001"), first);
-        ProjectConversationAiResponseNudgeModel accepted =
-            first.Actions.OfType<ProjectConversationAiResponseNudgeReceivedAction>().Single().Nudge;
+        first.Actions.OfType<LoadProjectConversationAction>().ShouldHaveSingleItem();
+        first.Actions.OfType<ProjectConversationAiResponseNudgeReceivedAction>().ShouldBeEmpty();
 
         // Second identical signal with no intervening server advance (LastAcceptedAiResponseNudge == what we would
         // synthesize again): silently deduped -> NOTHING dispatched -> no nudge, hence no "ai-response-nudge-unsafe" banner.
-        FakeState afterAccept = new(new ProjectConversationState(false, conversation, null) { LastAcceptedAiResponseNudge = accepted });
+        FakeState afterAccept = new(new ProjectConversationState(false, conversation, null));
         RecordingDispatcher duplicate = new();
         await new ProjectConversationEffects(new ProjectConversationService(new StubChatBotClient()), afterAccept)
             .HandleProjectionSignalAsync(new ProjectConversationProjectionSignalReceivedAction("project-001", "tenant-001"), duplicate);
 
         duplicate.Actions.OfType<ProjectConversationAiResponseNudgeReceivedAction>().ShouldBeEmpty();
-        duplicate.Actions.ShouldBeEmpty();
+        duplicate.Actions.OfType<LoadProjectConversationAction>().ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -319,7 +313,7 @@ public sealed class ProjectConversationEffectsTests
     }
 
     [Fact]
-    public async Task AcceptedComposerSubmissionShouldPollReadsOnlyUntilProjectionAdvancesThenCorrelatedReload()
+    public async Task AcceptedCommandShouldPollExactProjectedItemIdentityAndIgnoreHigherVersionDistractor()
     {
         StubChatBotClient client = new()
         {
@@ -340,7 +334,15 @@ public sealed class ProjectConversationEffectsTests
         client.SubmitCount.ShouldBe(1);
         client.ConversationReadCount.ShouldBe(2);
         dispatcher.Actions.OfType<ProjectConversationSubmissionAcceptedAction>().ShouldHaveSingleItem();
-        dispatcher.Actions.OfType<LoadProjectConversationAction>().Count().ShouldBe(2);
+        dispatcher.Actions.OfType<LoadProjectConversationAction>().ShouldHaveSingleItem();
+        ProjectConversationLoadedAction verified = dispatcher.Actions
+            .OfType<ProjectConversationLoadedAction>()
+            .ShouldHaveSingleItem();
+        verified.Conversation.Items.ShouldContain(item =>
+            string.Equals(
+                item.ItemId,
+                ((RecordProjectConversationMessage)client.LastSubmittedCommand!).MessageId,
+                StringComparison.Ordinal));
         dispatcher.Actions.ShouldNotContain(static action => action is ProjectConversationSubmissionFailedAction);
     }
 
@@ -552,7 +554,7 @@ public sealed class ProjectConversationEffectsTests
                 [
                     new ProjectConversationItem
                     {
-                        ItemId = "ai:proposal-001:proposal:10",
+                        ItemId = ProjectedItemId(conversationSourceVersion),
                         Kind = ProjectConversationItemKind.AiOutcome,
                         ActorKind = ProjectConversationActorKind.AiActor,
                         ActorLabel = "AI actor",
@@ -602,6 +604,24 @@ public sealed class ProjectConversationEffectsTests
                 CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
                 SafeNextAction = "none",
             });
+        }
+
+        private string ProjectedItemId(long sourceVersion)
+        {
+            bool visible = ConversationReadSourceVersions is null ||
+                ConversationReadSourceVersions.Count == 0 ||
+                sourceVersion > ConversationReadSourceVersions[0];
+            if (!visible)
+            {
+                return "prior-item";
+            }
+
+            return LastSubmittedCommand switch
+            {
+                RecordProjectConversationMessage message => message.MessageId,
+                Hexalith.ChatBot.Contracts.Commands.ProposeAIAction proposal => proposal.TaskIntentId,
+                _ => "ai:proposal-001:proposal:10",
+            };
         }
 
         public Task<OperationStatus> GetOperationStatusAsync(string operationId, string? correlationId = null, string? taskId = null, CancellationToken cancellationToken = default)

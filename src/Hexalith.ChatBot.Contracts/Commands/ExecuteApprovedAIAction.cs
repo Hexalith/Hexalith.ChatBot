@@ -27,4 +27,7 @@ public sealed record ExecuteApprovedAIAction(
     ApprovedAiActionExecutionRecord? ExecutionRecord = null,
     string RedactionState = ChatBotDetailVisibility.MetadataOnly,
     string RetentionClass = "collaboration_input",
-    string SchemaVersion = "chatbot.approved-ai-action-execution.v1") : IChatBotCommand;
+    string SchemaVersion = "chatbot.approved-ai-action-execution.v1") : IChatBotCommand
+{
+    public string? StateOwnerAggregateId { get; init; }
+}

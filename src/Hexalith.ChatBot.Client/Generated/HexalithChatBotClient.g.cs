@@ -2908,6 +2908,33 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("pageSize", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public int PageSize { get; set; } = default!;
 
+        [Newtonsoft.Json.JsonProperty("authoritativeCoverage", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<ProjectConversationStreamCoverage>? AuthoritativeCoverage { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("isAllCoveringEmpty", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? IsAllCoveringEmpty { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ProjectConversationStreamCoverage
+    {
+
+        [Newtonsoft.Json.JsonProperty("stateOwnerAggregateId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string StateOwnerAggregateId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("firstSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long FirstSourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("lastSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long LastSourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("isContiguous", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool IsContiguous { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("coversAllKnownEvents", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool CoversAllKnownEvents { get; set; } = default!;
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -3715,6 +3742,15 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [Newtonsoft.Json.JsonProperty("isTerminal", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public bool IsTerminal { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("stateOwnerAggregateId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? StateOwnerAggregateId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("startedSourceVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long? StartedSourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("recoveryDeadlineUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? RecoveryDeadlineUtc { get; set; } = default!;
 
     }
 
@@ -8910,6 +8946,18 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"m365-mailbox-intake")]
         M365MailboxIntake = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ui-composer")]
+        UiComposer = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"approval-event")]
+        ApprovalEvent = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failure-state")]
+        FailureState = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ai-outcome")]
+        AiOutcome = 4,
 
     }
 

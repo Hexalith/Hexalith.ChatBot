@@ -8,7 +8,6 @@ namespace Hexalith.ChatBot.UI.State.ProjectConversation;
 
 public sealed class ProjectConversationEffects(ProjectConversationService service, IState<ProjectConversationState> state)
 {
-    private const int CancellationVerificationAttempts = 5;
     private const int SubmissionProjectionVerificationAttempts = 20;
     private static readonly TimeSpan SubmissionProjectionVerificationDelay = TimeSpan.FromMilliseconds(250);
     public const string GenericFailureCode = "project-conversation-unavailable";
@@ -64,7 +63,17 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
 
         if (string.IsNullOrWhiteSpace(action.Text))
         {
-            dispatcher.Dispatch(new ProjectConversationComposerValidationFailedAction(EmptyComposerCode));
+            dispatcher.Dispatch(new ProjectConversationComposerValidationFailedAction(EmptyComposerCode)
+            {
+                RequestId = action.RequestId,
+                ScopeVersion = _state.Value.ProjectScopeVersion,
+            });
+            return;
+        }
+
+        long scopeVersion = _state.Value.ProjectScopeVersion;
+        if (!IsCurrentSubmission(action.ProjectId, action.RequestId, scopeVersion))
+        {
             return;
         }
 
@@ -72,6 +81,9 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
         // Keep it inside the public client contract as a canonical ULID: a descriptive `ui-composer:*` token is rejected
         // by ChatBotClient before transport and otherwise degrades into the generic unavailable UI state.
         string correlationId = ChatBotCorrelationId.New().Value;
+        string expectedProjectionIdentity = action.Mode is ProjectConversationComposerMode.AskAi
+            ? ProjectConversationService.AskAiProjectionIdentity(correlationId)
+            : ProjectConversationService.UserMessageProjectionIdentity(correlationId);
         try
         {
             CommandSubmissionResponse response = action.Mode is ProjectConversationComposerMode.AskAi
@@ -82,6 +94,11 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
                     .SubmitUserMessageAsync(action.ProjectId, action.Text, action.Locale, action.ExpectedSourceVersion, correlationId)
                     .ConfigureAwait(false);
 
+            if (!IsCurrentSubmission(action.ProjectId, action.RequestId, scopeVersion))
+            {
+                return;
+            }
+
             dispatcher.Dispatch(new ProjectConversationSubmissionAcceptedAction(new ProjectConversationSubmissionReceiptModel(
                 action.Mode,
                 response.CommandId,
@@ -89,19 +106,36 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
                 response.TaskId,
                 response.LifecycleState.ToString(),
                 response.AcceptedAt,
-                "wait-for-projection")));
+                "wait-for-projection"))
+            {
+                ProjectId = action.ProjectId,
+                RequestId = action.RequestId,
+                ScopeVersion = scopeVersion,
+            });
 
             // Admission and projection are deliberately separate durable steps. Re-query immediately for the common
             // case, then verify the accepted source-version advance with bounded GET-only polling. An ordinary message
             // or proposal does not carry AI progress, so it emits no streaming nudge; without this bounded follow-up,
             // the first read can race the EventStore projection and leave the accepted item invisible indefinitely.
             // Never resubmit the POST here. The accepted receipt has already cleared the matching draft, and every
-            // retry below is an authoritative typed read. The final Load action keeps the established request-id
-            // correlation/reducer gate rather than dispatching an uncorrelated read result directly.
-            dispatcher.Dispatch(new LoadProjectConversationAction(action.ProjectId));
-            if (await WaitForAcceptedProjectionAsync(action).ConfigureAwait(false))
+            // retry below is an authoritative typed read. Apply the exact typed response that proved the accepted
+            // identity exists: throwing it away and issuing one more GET let that final request fail transiently after
+            // a successful poll, stranding the UI in a degraded state even though the item was already authoritative.
+            if (!IsCurrentScope(action.ProjectId, scopeVersion))
             {
-                dispatcher.Dispatch(new LoadProjectConversationAction(action.ProjectId));
+                return;
+            }
+
+            dispatcher.Dispatch(new LoadProjectConversationAction(action.ProjectId));
+            ProjectConversationModel? acceptedProjection = await WaitForAcceptedProjectionAsync(
+                action,
+                expectedProjectionIdentity,
+                scopeVersion).ConfigureAwait(false);
+            if (acceptedProjection is not null && IsCurrentScope(action.ProjectId, scopeVersion))
+            {
+                dispatcher.Dispatch(new ProjectConversationLoadedAction(
+                    acceptedProjection,
+                    RequestedProjectId: action.ProjectId));
             }
         }
         catch (OperationCanceledException)
@@ -111,27 +145,45 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
         catch (HexalithChatBotApiException<ProblemDetails> problem)
         {
             dispatcher.Dispatch(new ProjectConversationSubmissionFailedAction(
-                string.IsNullOrWhiteSpace(problem.Result?.Code) ? GenericFailureCode : problem.Result.Code));
+                string.IsNullOrWhiteSpace(problem.Result?.Code) ? GenericFailureCode : problem.Result.Code)
+            {
+                ProjectId = action.ProjectId,
+                RequestId = action.RequestId,
+                ScopeVersion = scopeVersion,
+            });
         }
         catch (Exception)
         {
-            dispatcher.Dispatch(new ProjectConversationSubmissionFailedAction(GenericFailureCode));
+            dispatcher.Dispatch(new ProjectConversationSubmissionFailedAction(GenericFailureCode)
+            {
+                ProjectId = action.ProjectId,
+                RequestId = action.RequestId,
+                ScopeVersion = scopeVersion,
+            });
         }
     }
 
-    private async Task<bool> WaitForAcceptedProjectionAsync(SubmitProjectConversationComposerAction action)
+    private async Task<ProjectConversationModel?> WaitForAcceptedProjectionAsync(
+        SubmitProjectConversationComposerAction action,
+        string expectedProjectionIdentity,
+        long scopeVersion)
     {
         for (int attempt = 1; attempt <= SubmissionProjectionVerificationAttempts; attempt++)
         {
+            if (!IsCurrentScope(action.ProjectId, scopeVersion))
+            {
+                return null;
+            }
+
             try
             {
                 ProjectConversationModel conversation = await _service
                     .GetProjectConversationAsync(action.ProjectId)
                     .ConfigureAwait(false);
                 if (string.Equals(conversation.ProjectId, action.ProjectId, StringComparison.Ordinal) &&
-                    conversation.Items.Any(item => item.SourceVersion > action.ExpectedSourceVersion))
+                    conversation.Items.Any(item => IsAcceptedProjectionItem(item, expectedProjectionIdentity)))
                 {
-                    return true;
+                    return conversation;
                 }
             }
             catch (OperationCanceledException)
@@ -151,13 +203,11 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
             }
         }
 
-        return false;
+        return null;
     }
 
-    // Translates a signal-only projection-changed notification into the rich-nudge re-query path. The signal carries
-    // no version/sequence, so a forward-looking metadata-only nudge is synthesized for the CURRENTLY-LOADED conversation
-    // (one past the last-rendered progress); IsAcceptableNudge then accepts a genuine advance and dedups a redundant
-    // re-signal of the same state. Fails closed when the signal does not match the loaded conversation's project.
+    // SignalR is advisory only: never invent a version watermark. A matching signal triggers an authoritative read,
+    // and the reducer advances state only after that read returns for the still-current project scope.
     [EffectMethod]
     public Task HandleProjectionSignalAsync(ProjectConversationProjectionSignalReceivedAction action, IDispatcher dispatcher)
     {
@@ -181,31 +231,12 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
             return Task.CompletedTask;
         }
 
-        ProjectConversationAiResponseProgressModel? latest = LatestAiResponseProgress(conversation);
-        if (latest is null)
-        {
-            // No AI-response progress row to advance past. Synthesizing a nudge here produced a CONSTANT record
-            // (ResponseId/GenerationId empty, SourceVersion/Sequence pinned to 1), so after the first signal every
-            // later one deduped against itself and ordinary conversation changes -- a new message, a completed
-            // attachment scan -- refreshed exactly once per page load. The signal is the only change evidence that
-            // exists in that case, so re-query authoritative server state directly.
-            dispatcher.Dispatch(new LoadProjectConversationAction(conversation.ProjectId));
-            return Task.CompletedTask;
-        }
-
-        ProjectConversationAiResponseNudgeModel nudge = BuildReQueryNudge(conversation, latest);
-
-        // Benign duplicate / no-advance re-signal: the tenant-wide, at-least-once change broadcast routinely delivers
-        // signals (duplicate deliveries, or changes to OTHER conversations in the same tenant) that do not advance THIS
-        // conversation's last-rendered progress, so the synthesized forward nudge is identical to the one already
-        // accepted. That is already-rendered state, so silently dedup (the AC "duplicate-safe" requirement) instead of
-        // dispatching a nudge the reducer would reject and surface to the user as a spurious "stale" streaming error.
-        if (nudge == _state.Value.LastAcceptedAiResponseNudge)
+        if (action.ScopeVersion != 0 && action.ScopeVersion != _state.Value.ProjectScopeVersion)
         {
             return Task.CompletedTask;
         }
 
-        dispatcher.Dispatch(new ProjectConversationAiResponseNudgeReceivedAction(nudge));
+        dispatcher.Dispatch(new LoadProjectConversationAction(conversation.ProjectId));
         return Task.CompletedTask;
     }
 
@@ -231,35 +262,16 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
         return Task.CompletedTask;
     }
 
-    private static ProjectConversationAiResponseProgressModel? LatestAiResponseProgress(ProjectConversationModel conversation)
-        => conversation.Items
-            .Select(static item => item.AiResponseProgress)
-            .OfType<ProjectConversationAiResponseProgressModel>()
-            .OrderByDescending(static progress => progress.SourceVersion)
-            .ThenByDescending(static progress => progress.Sequence)
-            .FirstOrDefault();
-
-    private static ProjectConversationAiResponseNudgeModel BuildReQueryNudge(
-        ProjectConversationModel conversation,
-        ProjectConversationAiResponseProgressModel latest)
-        => new(
-            conversation.ProjectId,
-            latest.ConversationId,
-            latest.ResponseId,
-            latest.GenerationId,
-            latest.CorrelationId,
-            latest.SourceVersion + 1,
-            latest.Sequence + 1,
-            latest.State,
-            "metadata_only",
-            "metadata_only");
-
     [EffectMethod]
     public Task HandleAiResponseReconnectAsync(ProjectConversationAiResponseReconnectAction action, IDispatcher dispatcher)
     {
         ArgumentNullException.ThrowIfNull(action);
         ArgumentNullException.ThrowIfNull(dispatcher);
-        dispatcher.Dispatch(new LoadProjectConversationAction(action.ProjectId));
+        if ((action.ScopeVersion == 0 || action.ScopeVersion == _state.Value.ProjectScopeVersion) &&
+            IsCurrentScope(action.ProjectId, _state.Value.ProjectScopeVersion))
+        {
+            dispatcher.Dispatch(new LoadProjectConversationAction(action.ProjectId));
+        }
         return Task.CompletedTask;
     }
 
@@ -271,12 +283,28 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
 
         try
         {
+            long scopeVersion = _state.Value.ProjectScopeVersion;
+            if (!IsCurrentScope(action.Progress.ProjectId, scopeVersion))
+            {
+                return;
+            }
+
             dispatcher.Dispatch(new ProjectConversationAiResponseCancellationPendingAction(
                 action.Progress.ResponseId,
-                action.Progress.GenerationId));
+                action.Progress.GenerationId)
+            {
+                ProjectId = action.Progress.ProjectId,
+                RequestId = action.RequestId,
+                ScopeVersion = scopeVersion,
+            });
             CommandSubmissionResponse response = await _service
                 .SubmitStopAiResponseAsync(action.Progress)
                 .ConfigureAwait(false);
+            if (!IsCurrentCancellation(action.Progress.ProjectId, action.RequestId, scopeVersion))
+            {
+                return;
+            }
+
             dispatcher.Dispatch(new ProjectConversationAiResponseCancellationAcceptedAction(new ProjectConversationSubmissionReceiptModel(
                 ProjectConversationComposerMode.AskAi,
                 response.CommandId,
@@ -284,8 +312,13 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
                 response.TaskId,
                 response.LifecycleState.ToString(),
                 response.AcceptedAt,
-                "wait-for-projection")));
-            await VerifyCancellationTerminalAsync(action.Progress, dispatcher).ConfigureAwait(false);
+                "wait-for-projection"))
+            {
+                ProjectId = action.Progress.ProjectId,
+                RequestId = action.RequestId,
+                ScopeVersion = scopeVersion,
+            });
+            await VerifyCancellationTerminalAsync(action.Progress, action.RequestId, scopeVersion, dispatcher).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -294,25 +327,43 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
         catch (HexalithChatBotApiException<ProblemDetails> problem)
         {
             dispatcher.Dispatch(new ProjectConversationAiResponseCancellationFailedAction(
-                string.IsNullOrWhiteSpace(problem.Result?.Code) ? GenericFailureCode : problem.Result.Code));
+                string.IsNullOrWhiteSpace(problem.Result?.Code) ? GenericFailureCode : problem.Result.Code)
+            {
+                ProjectId = action.Progress.ProjectId,
+                RequestId = action.RequestId,
+                ScopeVersion = _state.Value.ProjectScopeVersion,
+            });
         }
         catch (Exception)
         {
-            dispatcher.Dispatch(new ProjectConversationAiResponseCancellationFailedAction(GenericFailureCode));
+            dispatcher.Dispatch(new ProjectConversationAiResponseCancellationFailedAction(GenericFailureCode)
+            {
+                ProjectId = action.Progress.ProjectId,
+                RequestId = action.RequestId,
+                ScopeVersion = _state.Value.ProjectScopeVersion,
+            });
         }
     }
 
     private async Task VerifyCancellationTerminalAsync(
         ProjectConversationAiResponseProgressModel requested,
+        string requestId,
+        long scopeVersion,
         IDispatcher dispatcher)
     {
-        for (int attempt = 1; attempt <= CancellationVerificationAttempts; attempt++)
+        DateTimeOffset deadline = requested.RecoveryDeadlineUtc ?? DateTimeOffset.UtcNow.AddSeconds(2);
+        while (DateTimeOffset.UtcNow <= deadline && IsCurrentCancellation(requested.ProjectId, requestId, scopeVersion))
         {
             try
             {
                 ProjectConversationModel conversation = await _service
                     .GetProjectConversationAsync(requested.ProjectId)
                     .ConfigureAwait(false);
+                if (!IsCurrentCancellation(requested.ProjectId, requestId, scopeVersion))
+                {
+                    return;
+                }
+
                 dispatcher.Dispatch(new ProjectConversationLoadedAction(conversation));
                 ProjectConversationAiResponseProgressModel? terminal = conversation.Items
                     .Select(static item => item.AiResponseProgress)
@@ -332,20 +383,49 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
             {
                 throw;
             }
-            catch (Exception) when (attempt < CancellationVerificationAttempts)
+            catch (Exception)
             {
                 // A transient read failure consumes one bounded verification attempt and keeps the last safe view.
             }
 
-            if (attempt < CancellationVerificationAttempts)
-            {
-                await Task.Delay(TimeSpan.FromMilliseconds(100 * attempt)).ConfigureAwait(false);
-            }
+            await Task.Delay(SubmissionProjectionVerificationDelay).ConfigureAwait(false);
         }
 
-        dispatcher.Dispatch(new ProjectConversationAiResponseCancellationFailedAction(
-            "ai-response-cancellation-unverified"));
+        if (IsCurrentCancellation(requested.ProjectId, requestId, scopeVersion))
+        {
+            dispatcher.Dispatch(new ProjectConversationAiResponseCancellationFailedAction(
+                "ai-response-cancellation-unverified")
+            {
+                ProjectId = requested.ProjectId,
+                RequestId = requestId,
+                ScopeVersion = scopeVersion,
+            });
+        }
     }
+
+    private static bool IsAcceptedProjectionItem(ProjectConversationItemModel item, string expectedIdentity)
+        => string.Equals(item.ItemId, expectedIdentity, StringComparison.Ordinal) ||
+            string.Equals(item.TaskId, expectedIdentity, StringComparison.Ordinal) ||
+            string.Equals(item.AiProposalId, expectedIdentity, StringComparison.Ordinal) ||
+            string.Equals(item.AiRequestId, expectedIdentity, StringComparison.Ordinal) ||
+            string.Equals(item.AiSourceMessageId, expectedIdentity, StringComparison.Ordinal);
+
+    private bool IsCurrentScope(string projectId, long scopeVersion)
+    {
+        string? scopedProjectId = _state.Value.RequestedProjectId ?? _state.Value.Conversation?.ProjectId;
+        return scopeVersion == _state.Value.ProjectScopeVersion &&
+            (scopedProjectId is null || string.Equals(scopedProjectId, projectId, StringComparison.Ordinal));
+    }
+
+    private bool IsCurrentSubmission(string projectId, string requestId, long scopeVersion)
+        => IsCurrentScope(projectId, scopeVersion) &&
+            (_state.Value.SubmissionRequestId is null ||
+             string.Equals(_state.Value.SubmissionRequestId, requestId, StringComparison.Ordinal));
+
+    private bool IsCurrentCancellation(string projectId, string requestId, long scopeVersion)
+        => IsCurrentScope(projectId, scopeVersion) &&
+            (_state.Value.CancellationRequestId is null ||
+             string.Equals(_state.Value.CancellationRequestId, requestId, StringComparison.Ordinal));
 
     [EffectMethod]
     public async Task HandleOpenWhyPanelAsync(OpenProjectAssociationWhyPanelAction action, IDispatcher dispatcher)

@@ -191,13 +191,15 @@ public static class AiResponseStreamingTransportAdrTests
         subscriber.ShouldContain("Reconnected");
         subscriber.ShouldContain("_onReconnected");
 
-        // The effect fails closed against the loaded conversation and re-queries authoritative state via the rich-nudge
-        // path; the nudge effect re-queries only when the reducer accepted the nudge (effect/reducer agree).
+        // The transport signal has no stream/version evidence, so the effect must never synthesize a rich nudge or an
+        // invented watermark. It fails closed on project, tenant and scope, then requests the typed authoritative read.
         effects.ShouldContain("HandleProjectionSignalAsync");
-        effects.ShouldContain("BuildReQueryNudge(conversation)");
-        effects.ShouldContain("ProjectConversationAiResponseNudgeReceivedAction(nudge)");
-        // A benign duplicate / no-advance re-signal is silently deduped (not surfaced to the user as a stale error).
-        effects.ShouldContain("nudge == _state.Value.LastAcceptedAiResponseNudge");
+        effects.ShouldContain("conversation.TenantContext");
+        effects.ShouldContain("action.ScopeVersion != _state.Value.ProjectScopeVersion");
+        effects.ShouldContain("new LoadProjectConversationAction(conversation.ProjectId)");
+        effects.ShouldNotContain("BuildReQueryNudge(conversation)");
+        // Rich nudges remain an independently validated path and re-query only when their reducer accepted the exact
+        // nudge instance (effect/reducer agree).
         effects.ShouldContain("ReferenceEquals(_state.Value.LastAcceptedAiResponseNudge, action.Nudge)");
     }
 

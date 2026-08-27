@@ -16,8 +16,9 @@ public static class ProjectConversationReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
-        bool switchingProject = state.Conversation is { } current &&
-            !string.Equals(current.ProjectId, action.ProjectId, StringComparison.Ordinal);
+        string? scopedProjectId = state.RequestedProjectId ?? state.Conversation?.ProjectId;
+        bool switchingProject = !string.IsNullOrWhiteSpace(scopedProjectId) &&
+            !string.Equals(scopedProjectId, action.ProjectId, StringComparison.Ordinal);
         if (action.IsHistory && (state.Conversation is null || switchingProject))
         {
             return state with { ErrorCode = "project-conversation-history-without-current" };
@@ -30,6 +31,7 @@ public static class ProjectConversationReducers
             Conversation = switchingProject ? null : state.Conversation,
             ErrorCode = null,
             RequestedProjectId = action.ProjectId,
+            ProjectScopeVersion = switchingProject ? checked(state.ProjectScopeVersion + 1) : state.ProjectScopeVersion,
             CurrentLoadRequestId = action.IsHistory ? state.CurrentLoadRequestId : action.RequestId,
             // A fresh current-page request invalidates every older-page request already in flight. Otherwise a late
             // history response can resurrect an item the newer authoritative page intentionally omitted/redacted.
@@ -38,6 +40,9 @@ public static class ProjectConversationReducers
             CurrentPageItemIds = switchingProject ? null : state.CurrentPageItemIds,
             ComposerValidationErrorCode = null,
             SubmissionErrorCode = null,
+            IsSubmitting = switchingProject ? false : state.IsSubmitting,
+            PendingSubmission = switchingProject ? null : state.PendingSubmission,
+            SubmissionRequestId = switchingProject ? null : state.SubmissionRequestId,
             IsWhyPanelLoading = switchingProject ? false : state.IsWhyPanelLoading,
             WhyPanel = switchingProject ? null : state.WhyPanel,
             WhyPanelProjectId = switchingProject ? null : state.WhyPanelProjectId,
@@ -48,6 +53,9 @@ public static class ProjectConversationReducers
             IsCancellingAiResponse = switchingProject ? false : state.IsCancellingAiResponse,
             CancellingResponseId = switchingProject ? null : state.CancellingResponseId,
             CancellingGenerationId = switchingProject ? null : state.CancellingGenerationId,
+            CancellationRequestId = switchingProject ? null : state.CancellationRequestId,
+            VerifiedStopAnnouncementGenerationId = switchingProject ? null : state.VerifiedStopAnnouncementGenerationId,
+            StreamingNotice = switchingProject ? null : state.StreamingNotice,
         };
     }
 
@@ -106,9 +114,12 @@ public static class ProjectConversationReducers
             IReadOnlySet<string> previousCurrentIds = state.CurrentPageItemIds ?? new HashSet<string>(StringComparer.Ordinal);
             // A current-page refresh is authoritative. Anything formerly on that page but now omitted (including a
             // newly redacted item) is purged from accumulated history instead of being resurrected by an older page.
-            historicalItems = (state.HistoricalItems ?? [])
-                .Where(item => !previousCurrentIds.Contains(item.ItemId))
-                .ToArray();
+            historicalItems = action.Conversation.IsAllCoveringEmpty
+                ? []
+                : (state.HistoricalItems ?? [])
+                    .Where(item => !previousCurrentIds.Contains(item.ItemId))
+                    .Where(item => !IsCoveredByAuthoritativeStream(item, action.Conversation.AuthoritativeCoverage))
+                    .ToArray();
             currentPageItemIds = action.Conversation.Items
                 .Select(static item => item.ItemId)
                 .ToHashSet(StringComparer.Ordinal);
@@ -161,6 +172,24 @@ public static class ProjectConversationReducers
         };
     }
 
+    private static bool IsCoveredByAuthoritativeStream(
+        ProjectConversationItemModel item,
+        IReadOnlyList<ProjectConversationStreamCoverageModel> coverage)
+    {
+        ProjectConversationAiResponseProgressModel? progress = item.AiResponseProgress;
+        if (progress is null || string.IsNullOrWhiteSpace(progress.StateOwnerAggregateId))
+        {
+            return false;
+        }
+
+        return coverage.Any(interval =>
+            interval.IsContiguous &&
+            interval.CoversAllKnownItems &&
+            string.Equals(interval.StateOwnerAggregateId, progress.StateOwnerAggregateId, StringComparison.Ordinal) &&
+            progress.SourceVersion >= interval.FromSourceVersion &&
+            progress.SourceVersion <= interval.ThroughSourceVersion);
+    }
+
     [ReducerMethod]
     public static ProjectConversationState ReduceFailed(ProjectConversationState state, ProjectConversationFailedAction action)
     {
@@ -208,6 +237,12 @@ public static class ProjectConversationReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        string? scopedProjectId = state.RequestedProjectId ?? state.Conversation?.ProjectId;
+        if (scopedProjectId is not null && !string.Equals(scopedProjectId, action.ProjectId, StringComparison.Ordinal))
+        {
+            return state;
+        }
+
         return state with
         {
             ComposerMode = action.Mode,
@@ -216,6 +251,9 @@ public static class ProjectConversationReducers
             SubmissionErrorCode = null,
             StreamingNotice = null,
             VerifiedStopAnnouncementGenerationId = null,
+            PendingSubmission = null,
+            SubmissionRequestId = action.RequestId,
+            RequestedProjectId = scopedProjectId ?? action.ProjectId,
         };
     }
 
@@ -224,6 +262,11 @@ public static class ProjectConversationReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        if (!MatchesSubmission(state, action.RequestId, action.ScopeVersion, null))
+        {
+            return state;
+        }
+
         return state with
         {
             IsSubmitting = false,
@@ -237,12 +280,18 @@ public static class ProjectConversationReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        if (!MatchesSubmission(state, action.RequestId, action.ScopeVersion, action.ProjectId))
+        {
+            return state;
+        }
+
         return state with
         {
             IsSubmitting = false,
             PendingSubmission = action.Receipt,
             ComposerValidationErrorCode = null,
             SubmissionErrorCode = null,
+            SubmissionRequestId = null,
         };
     }
 
@@ -251,10 +300,16 @@ public static class ProjectConversationReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        if (!MatchesSubmission(state, action.RequestId, action.ScopeVersion, action.ProjectId))
+        {
+            return state;
+        }
+
         return state with
         {
             IsSubmitting = false,
             SubmissionErrorCode = action.ErrorCode,
+            SubmissionRequestId = null,
         };
     }
 
@@ -278,10 +333,19 @@ public static class ProjectConversationReducers
 
     // Reconnect is advisory (AC5): surface a transient localized "reconnected" notice and let the re-query effect
     // refresh authoritative state. The notice clears on the next accepted nudge or user submission.
-    [ReducerMethod(typeof(ProjectConversationAiResponseReconnectAction))]
-    public static ProjectConversationState ReduceAiResponseReconnect(ProjectConversationState state)
+    [ReducerMethod]
+    public static ProjectConversationState ReduceAiResponseReconnect(
+        ProjectConversationState state,
+        ProjectConversationAiResponseReconnectAction action)
     {
         ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(action);
+        if ((action.ScopeVersion != 0 && action.ScopeVersion != state.ProjectScopeVersion) ||
+            !string.Equals(state.RequestedProjectId ?? state.Conversation?.ProjectId, action.ProjectId, StringComparison.Ordinal))
+        {
+            return state;
+        }
+
         return state with { StreamingNotice = "reconnected", StreamingErrorCode = null };
     }
 
@@ -290,6 +354,13 @@ public static class ProjectConversationReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        if (action.ProjectId is not null &&
+            (!string.Equals(state.RequestedProjectId ?? state.Conversation?.ProjectId, action.ProjectId, StringComparison.Ordinal) ||
+             action.ScopeVersion != state.ProjectScopeVersion))
+        {
+            return state;
+        }
+
         return state with
         {
             IsCancellingAiResponse = true,
@@ -298,6 +369,7 @@ public static class ProjectConversationReducers
             StreamingErrorCode = null,
             StreamingNotice = null,
             VerifiedStopAnnouncementGenerationId = null,
+            CancellationRequestId = action.RequestId,
         };
     }
 
@@ -306,6 +378,11 @@ public static class ProjectConversationReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        if (!MatchesCancellation(state, action.RequestId, action.ScopeVersion, action.ProjectId))
+        {
+            return state;
+        }
+
         return state with
         {
             PendingSubmission = action.Receipt,
@@ -318,12 +395,18 @@ public static class ProjectConversationReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        if (!MatchesCancellation(state, action.RequestId, action.ScopeVersion, action.ProjectId))
+        {
+            return state;
+        }
+
         return state with
         {
             IsCancellingAiResponse = false,
             CancellingResponseId = null,
             CancellingGenerationId = null,
             StreamingErrorCode = action.ErrorCode,
+            CancellationRequestId = null,
         };
     }
 
@@ -379,6 +462,24 @@ public static class ProjectConversationReducers
     private static bool IsCurrentPanelRequest(ProjectConversationState state, string projectId, string associationId)
         => string.Equals(state.WhyPanelProjectId, projectId, StringComparison.Ordinal) &&
             string.Equals(state.WhyPanelAssociationId, associationId, StringComparison.Ordinal);
+
+    private static bool MatchesSubmission(
+        ProjectConversationState state,
+        string? requestId,
+        long scopeVersion,
+        string? projectId)
+        => (requestId is null || string.Equals(requestId, state.SubmissionRequestId, StringComparison.Ordinal)) &&
+            (requestId is null || scopeVersion == state.ProjectScopeVersion) &&
+            (projectId is null || string.Equals(projectId, state.RequestedProjectId ?? state.Conversation?.ProjectId, StringComparison.Ordinal));
+
+    private static bool MatchesCancellation(
+        ProjectConversationState state,
+        string? requestId,
+        long scopeVersion,
+        string? projectId)
+        => (requestId is null || string.Equals(requestId, state.CancellationRequestId, StringComparison.Ordinal)) &&
+            (requestId is null || scopeVersion == state.ProjectScopeVersion) &&
+            (projectId is null || string.Equals(projectId, state.RequestedProjectId ?? state.Conversation?.ProjectId, StringComparison.Ordinal));
 
     private static IReadOnlyList<ProjectConversationItemModel> MergeItems(
         IEnumerable<ProjectConversationItemModel> preferred,

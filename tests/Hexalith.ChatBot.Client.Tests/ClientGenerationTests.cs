@@ -56,6 +56,17 @@ public static class ClientGenerationTests
     }
 
     [Fact]
+    public static void GeneratedConversationItemShouldDeserializeEveryGovernedProjectionProvenance()
+    {
+        foreach (string token in new[] { "m365-mailbox-intake", "ui-composer", "approval-event", "failure-state", "ai-outcome" })
+        {
+            ProjectConversationItemSourceProvenance provenance = Newtonsoft.Json.JsonConvert
+                .DeserializeObject<ProjectConversationItemSourceProvenance>($"\"{token}\"");
+            GetWireValue(provenance).ShouldBe(token);
+        }
+    }
+
+    [Fact]
     public static void GeneratedOutputHashShouldMatchCheckedInFreshnessFixture()
     {
         string expected = File.ReadAllText(Path.Combine(RepositoryRoot, "tests", "fixtures", "hexalith-chatbot-generated-client.sha256")).Trim();

@@ -28,6 +28,12 @@ public sealed class ProjectConversationService(IChatBotClient client)
 
     private readonly IChatBotClient _client = client ?? throw new ArgumentNullException(nameof(client));
 
+    public static string UserMessageProjectionIdentity(string correlationId)
+        => $"ui-message:{SubmissionToken(correlationId)}";
+
+    public static string AskAiProjectionIdentity(string correlationId)
+        => $"composer-ai:{SubmissionToken(correlationId)}";
+
     public async Task<ProjectConversationModel> GetProjectConversationAsync(
         string projectId,
         string? cursor = null,
@@ -52,7 +58,18 @@ public sealed class ProjectConversationService(IChatBotClient client)
             response.RetentionClass.ToString(),
             response.SchemaVersion.ToString(),
             response.CorrelationId,
-            string.IsNullOrWhiteSpace(response.SafeNextAction) ? "none" : response.SafeNextAction);
+            string.IsNullOrWhiteSpace(response.SafeNextAction) ? "none" : response.SafeNextAction)
+        {
+            AuthoritativeCoverage = (response.Page.AuthoritativeCoverage ?? [])
+                .Select(static coverage => new ProjectConversationStreamCoverageModel(
+                    coverage.StateOwnerAggregateId,
+                    coverage.FirstSourceVersion,
+                    coverage.LastSourceVersion,
+                    coverage.IsContiguous,
+                    coverage.CoversAllKnownEvents))
+                .ToArray(),
+            IsAllCoveringEmpty = response.Page.IsAllCoveringEmpty ?? false,
+        };
     }
 
     public async Task<ProjectAssociationWhyPanelModel> GetAssociationWhyPanelAsync(
@@ -167,7 +184,10 @@ public sealed class ProjectConversationService(IChatBotClient client)
             item.SourceVersion,
             item.CorrelationId,
             decisionId,
-            rationaleRedactionState);
+            rationaleRedactionState)
+        {
+            StateOwnerAggregateId = item.AiResponseProgress?.StateOwnerAggregateId ?? item.SourceConversationId,
+        };
         return _client.SubmitAsync(command, item.CorrelationId, origin: ContractSurfaceOrigin.Ui, cancellationToken: cancellationToken);
     }
 
@@ -187,7 +207,7 @@ public sealed class ProjectConversationService(IChatBotClient client)
         string fingerprint = TextFingerprint(text);
         RecordProjectConversationMessageCommand command = new(
             projectId,
-            $"ui-message:{SubmissionToken(correlationId)}",
+            UserMessageProjectionIdentity(correlationId),
             fingerprint,
             text.Trim().Length,
             SafeLocale(locale),
@@ -211,7 +231,7 @@ public sealed class ProjectConversationService(IChatBotClient client)
 
         string fingerprint = TextFingerprint(text);
         string submissionToken = SubmissionToken(correlationId);
-        string taskIntentId = $"composer-ai:{submissionToken}";
+        string taskIntentId = AskAiProjectionIdentity(correlationId);
         ProposeAIActionCommand command = new(
             projectId,
             taskIntentId,
@@ -268,7 +288,10 @@ public sealed class ProjectConversationService(IChatBotClient client)
                 "collaboration_input",
                 "chatbot.ai-action-risk-classification.v1",
                 correlationId,
-                DateTimeOffset.UtcNow));
+                DateTimeOffset.UtcNow))
+        {
+            StateOwnerAggregateId = projectId,
+        };
         return _client.SubmitAsync(command, correlationId, origin: ContractSurfaceOrigin.Ui, cancellationToken: cancellationToken);
     }
 
@@ -282,7 +305,7 @@ public sealed class ProjectConversationService(IChatBotClient client)
             string.IsNullOrWhiteSpace(progress.ConversationId) ||
             string.IsNullOrWhiteSpace(progress.ResponseId) ||
             string.IsNullOrWhiteSpace(progress.GenerationId) ||
-            progress.SourceVersion <= 0 ||
+            (progress.StartedSourceVersion ?? progress.SourceVersion) <= 0 ||
             string.IsNullOrWhiteSpace(progress.CorrelationId))
         {
             throw new InvalidOperationException("AI response cancellation metadata is incomplete.");
@@ -295,10 +318,10 @@ public sealed class ProjectConversationService(IChatBotClient client)
             $"ai-response-cancel:{SubmissionToken($"{progress.CorrelationId}:{progress.ResponseId}:{progress.GenerationId}")}:{progress.Sequence}";
         CancelAiResponseGenerationCommand command = new(
             progress.ProjectId,
-            progress.ConversationId,
+            progress.StateOwnerAggregateId ?? progress.ConversationId,
             progress.ResponseId,
             progress.GenerationId,
-            progress.SourceVersion,
+            progress.StartedSourceVersion ?? progress.SourceVersion,
             progress.CorrelationId,
             cancellationId);
         return _client.SubmitAsync(command, progress.CorrelationId, origin: ContractSurfaceOrigin.Ui, cancellationToken: cancellationToken);
@@ -546,7 +569,12 @@ public sealed class ProjectConversationService(IChatBotClient client)
                 string.IsNullOrWhiteSpace(progress.SafeNextAction) ? "none" : progress.SafeNextAction,
                 WireToken(progress.RedactionState),
                 WireToken(progress.VisibilityState),
-                progress.IsTerminal);
+                progress.IsTerminal)
+            {
+                StateOwnerAggregateId = progress.StateOwnerAggregateId,
+                StartedSourceVersion = progress.StartedSourceVersion,
+                RecoveryDeadlineUtc = progress.RecoveryDeadlineUtc,
+            };
 
     private static ProjectConversationItemClassificationModel? MapClassification(ProjectConversationItemClassification? classification)
         => classification is null

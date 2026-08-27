@@ -12,7 +12,7 @@
        position whether or not a response is streaming so keyboard focus never jumps as generation starts or stops.
        It is never natively `disabled`: the accessibility floor ("Unavailable governed actions remain focusable,
        expose aria-disabled, link to a reachable reason, and fail closed when activated") requires the reason to be
-       reachable by keyboard, and a native disabled button is removed from the tab order entirely. So the button stays
+       reachable by keyboard, and a natively disabled FluentButton is removed from the tab order entirely. The control stays
        focusable, advertises aria-disabled, points at its reason via aria-describedby, and fails closed in StopAsync. *@
     <FluentButton Appearance="ButtonAppearance.Outline"
                   Class="chatbot-touch-target-primary"
@@ -114,7 +114,7 @@
 
     private async Task StopAsync()
     {
-        // Fail closed on activation: the button stays in the tab order, so an activation while unavailable must be
+        // Fail closed on activation: the FluentButton stays in the tab order, so an activation while unavailable must be
         // rejected here rather than prevented by a native disabled attribute.
         if (StopUnavailable)
         {

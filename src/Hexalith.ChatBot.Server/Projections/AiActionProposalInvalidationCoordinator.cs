@@ -45,13 +45,16 @@ internal sealed class AiActionProposalInvalidationCoordinator(
                 correctedAssociation.SourceVersion,
                 correctedAssociation.CorrelationId,
                 proposal.RedactionState,
-                proposal.RetentionClass);
+                proposal.RetentionClass)
+            {
+                StateOwnerAggregateId = proposal.StateOwnerAggregateId ?? projectId,
+            };
 
             SubmitCommandRequest request = new(
                 MessageId: $"{correctedAssociation.CorrectionId}:{proposal.ProposalId}:invalidated-by-correction",
                 Tenant: correctedAssociation.TenantId,
                 Domain: ChatBotEventStore.DomainName,
-                AggregateId: proposal.SourceMessageId,
+                AggregateId: command.StateOwnerAggregateId,
                 CommandType: nameof(MarkAiActionProposalInvalidatedByCorrection),
                 Payload: JsonSerializer.SerializeToElement(command),
                 CorrelationId: correctedAssociation.CorrelationId,

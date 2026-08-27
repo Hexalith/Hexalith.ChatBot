@@ -5,4 +5,5 @@ internal sealed record ProjectConversationPage(
     ProjectConversationCursorPosition? NextCursorPosition,
     bool HasMore,
     int PageSize,
-    ProjectConversationItemView? LatestItem = null);
+    ProjectConversationItemView? LatestItem = null,
+    IReadOnlyList<ProjectConversationItemView>? AuthoritativeItems = null);

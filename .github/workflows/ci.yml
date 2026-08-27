@@ -419,6 +419,7 @@ jobs:
     env:
       HEXALITH_CHATBOT_TIER3: "1"
       HEXALITH_CHATBOT_TIER3_REQUIRED: "1"
+      CHROME_EXECUTABLE_PATH: /usr/bin/google-chrome
       ChatBotServiceGrants__LifetimeDays: "90"
     steps:
       - name: Checkout
@@ -453,6 +454,19 @@ jobs:
           --logger "console;verbosity=detailed"
           --logger "trx;LogFileName=topology-acceptance.trx"
           --results-directory TestResults
+      - name: Run exact Story 13.2 authenticated production-client matrix
+        run: >-
+          dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
+          -m:1
+          --configuration Release
+          --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests.AuthenticatedProductionClientShouldMessageAskAndStopAcrossRequiredChromeMatrix"
+          --settings live-recovery.runsettings
+          --logger "console;verbosity=detailed"
+          --logger "trx;LogFileName=story132-topology-acceptance.trx"
+          --results-directory TestResults
+      - name: Require one executed Story 13.2 test and zero skips
+        run: >-
+          python3 -c "import xml.etree.ElementTree as E; r=E.parse('TestResults/story132-topology-acceptance.trx').getroot(); c=next(x for x in r.iter() if x.tag.endswith('Counters')).attrib; assert c.get('executed') == '1' and c.get('passed') == '1' and c.get('notExecuted') == '0', c"
       - name: Record topology producer head
         run: printf '%s\n' "$(git rev-parse HEAD)" > TestResults/producer-head.sha
       - name: Upload topology acceptance evidence

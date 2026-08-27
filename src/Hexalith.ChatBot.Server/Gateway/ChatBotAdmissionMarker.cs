@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Enums;
@@ -12,7 +13,16 @@ namespace Hexalith.ChatBot.Server.Gateway;
 
 internal interface IChatBotAdmissionMarker
 {
-    string Create(ChatBotGatewayContext context, string aggregateId, string commandType);
+    string Create(
+        string messageId,
+        string tenantId,
+        string aggregateId,
+        string commandType,
+        JsonElement payload,
+        string correlationId,
+        string actorId,
+        string surfaceOrigin,
+        string? taskId);
 
     bool IsValid(CommandEnvelope command);
 }
@@ -21,29 +31,47 @@ internal sealed class DataProtectionChatBotAdmissionMarker(IDataProtectionProvid
 {
     internal const string ExtensionKey = "chatbot.admission.v1";
 
+    private static readonly TimeSpan MaximumMarkerAge = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan MaximumClockSkew = TimeSpan.FromSeconds(30);
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IDataProtector _protector = dataProtectionProvider
         .CreateProtector("Hexalith.ChatBot.Server.Gateway.AdmissionMarker.v1");
 
-    public string Create(ChatBotGatewayContext context, string aggregateId, string commandType)
+    public string Create(
+        string messageId,
+        string tenantId,
+        string aggregateId,
+        string commandType,
+        JsonElement payload,
+        string correlationId,
+        string actorId,
+        string surfaceOrigin,
+        string? taskId)
     {
-        ArgumentNullException.ThrowIfNull(context);
+        ArgumentException.ThrowIfNullOrWhiteSpace(messageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
         ArgumentException.ThrowIfNullOrWhiteSpace(aggregateId);
         ArgumentException.ThrowIfNullOrWhiteSpace(commandType);
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actorId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(surfaceOrigin);
 
-        ChatBotAdmissionMarkerPayload payload = new(
-            context.Submission.Request.CommandId,
-            context.TenantBinding.TenantId,
+        ChatBotAdmissionMarkerPayload marker = new(
+            messageId,
+            tenantId,
             ChatBotEventStore.DomainName,
             aggregateId,
             commandType,
-            context.Submission.CorrelationId,
-            context.Actor.ActorId,
-            ChatBotSurfaceOrigins.ToWireValue(context.Submission.Origin),
-            context.Submission.TaskId);
+            correlationId,
+            actorId,
+            surfaceOrigin,
+            taskId,
+            PayloadDigest(payload),
+            DateTimeOffset.UtcNow);
 
-        return _protector.Protect(JsonSerializer.Serialize(payload, JsonOptions));
+        return _protector.Protect(JsonSerializer.Serialize(marker, JsonOptions));
     }
 
     public bool IsValid(CommandEnvelope command)
@@ -73,14 +101,43 @@ internal sealed class DataProtectionChatBotAdmissionMarker(IDataProtectionProvid
             return false;
         }
 
-        return string.Equals(payload.CommandId, command.MessageId, StringComparison.Ordinal) &&
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        string? actorId = Extension(command, "actorId");
+        string? surfaceOrigin = Extension(command, "surfaceOrigin");
+        string? taskId = Extension(command, "taskId");
+        return payload.IssuedAtUtc >= now.Subtract(MaximumMarkerAge) &&
+            payload.IssuedAtUtc <= now.Add(MaximumClockSkew) &&
+            string.Equals(payload.CommandId, command.MessageId, StringComparison.Ordinal) &&
             string.Equals(payload.TenantId, command.TenantId, StringComparison.Ordinal) &&
             string.Equals(payload.Domain, command.Domain, StringComparison.Ordinal) &&
             string.Equals(payload.AggregateId, command.AggregateId, StringComparison.Ordinal) &&
             string.Equals(payload.CommandType, command.CommandType, StringComparison.Ordinal) &&
             string.Equals(payload.CorrelationId, command.CorrelationId, StringComparison.Ordinal) &&
-            AuditMetadata.SafeOptionalToken(payload.SurfaceOrigin) is not null &&
-            (payload.TaskId is null || AuditMetadata.SafeOptionalToken(payload.TaskId) is not null);
+            string.Equals(payload.ActorId, actorId, StringComparison.Ordinal) &&
+            string.Equals(payload.SurfaceOrigin, surfaceOrigin, StringComparison.Ordinal) &&
+            string.Equals(payload.TaskId, taskId, StringComparison.Ordinal) &&
+            string.Equals(payload.PayloadDigest, PayloadDigest(command.Payload), StringComparison.Ordinal);
+    }
+
+    private static string? Extension(CommandEnvelope command, string key)
+        => command.Extensions is not null && command.Extensions.TryGetValue(key, out string? value)
+            ? AuditMetadata.SafeOptionalToken(value)
+            : null;
+
+    private static string PayloadDigest(JsonElement payload)
+        => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(payload)));
+
+    private static string PayloadDigest(byte[] payload)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(payload);
+            return PayloadDigest(document.RootElement);
+        }
+        catch (JsonException)
+        {
+            return Convert.ToHexString(SHA256.HashData(payload));
+        }
     }
 
     private sealed record ChatBotAdmissionMarkerPayload(
@@ -92,5 +149,7 @@ internal sealed class DataProtectionChatBotAdmissionMarker(IDataProtectionProvid
         string CorrelationId,
         string ActorId,
         string SurfaceOrigin,
-        string? TaskId);
+        string? TaskId,
+        string PayloadDigest,
+        DateTimeOffset IssuedAtUtc);
 }

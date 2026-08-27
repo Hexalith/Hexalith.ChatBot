@@ -60,8 +60,11 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        QuarantineInvalidRows();
         IReadOnlyList<AiExecutionWorkItem> result = _items.Values
             .Where(item => IsRunnable(item, now))
+            .GroupBy(static item => item.CanonicalKey, StringComparer.Ordinal)
+            .Select(static group => group.OrderByDescending(static item => item.Key.StartsWith("ai-execution-v2.", StringComparison.Ordinal)).First())
             .OrderBy(static item => item.UpdatedAtUtc)
             .ThenBy(static item => item.Key, StringComparer.Ordinal)
             .Take(maximumCount)
@@ -78,7 +81,8 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!_items.TryGetValue(key, out AiExecutionWorkItem? current) ||
-            current.Status is AiExecutionWorkStatus.Terminal ||
+            current.Status is AiExecutionWorkStatus.Terminal or AiExecutionWorkStatus.Exhausted or AiExecutionWorkStatus.Quarantined ||
+            current.AttemptCount == int.MaxValue ||
             (current.LeaseExpiresAtUtc > now && !string.Equals(current.LeaseOwner, owner, StringComparison.Ordinal)))
         {
             return ValueTask.FromResult<AiExecutionWorkItem?>(null);
@@ -109,8 +113,10 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
         cancellationToken.ThrowIfCancellationRequested();
         while (_items.TryGetValue(key, out AiExecutionWorkItem? current))
         {
-            if (current.Status is AiExecutionWorkStatus.Terminal ||
-                !string.Equals(current.LeaseOwner, owner, StringComparison.Ordinal))
+            if (current.Status is AiExecutionWorkStatus.Terminal or AiExecutionWorkStatus.Exhausted or AiExecutionWorkStatus.Quarantined ||
+                !string.Equals(current.LeaseOwner, owner, StringComparison.Ordinal) ||
+                current.LeaseExpiresAtUtc is null ||
+                current.LeaseExpiresAtUtc <= now)
             {
                 return ValueTask.FromResult<AiExecutionWorkItem?>(null);
             }
@@ -129,7 +135,7 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
         return ValueTask.FromResult<AiExecutionWorkItem?>(null);
     }
 
-    public ValueTask MarkCompletionPendingAsync(
+    public ValueTask<bool> MarkCompletionPendingAsync(
         string key,
         string owner,
         LowRiskAiAssistanceExecutionRecord record,
@@ -138,6 +144,7 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
         => UpdateOwnedAsync(
             key,
             owner,
+            now,
             current => current with
             {
                 Status = AiExecutionWorkStatus.CompletionPending,
@@ -146,7 +153,7 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
             },
             cancellationToken);
 
-    public ValueTask MarkTerminalAsync(
+    public ValueTask<bool> MarkTerminalAsync(
         string key,
         string owner,
         DateTimeOffset now,
@@ -154,6 +161,7 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
         => UpdateOwnedAsync(
             key,
             owner,
+            now,
             current => current with
             {
                 Status = AiExecutionWorkStatus.Terminal,
@@ -163,7 +171,7 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
             },
             cancellationToken);
 
-    public ValueTask ReleaseAsync(
+    public ValueTask<bool> ReleaseAsync(
         string key,
         string owner,
         DateTimeOffset now,
@@ -171,6 +179,7 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
         => UpdateOwnedAsync(
             key,
             owner,
+            now,
             current => current with
             {
                 Status = current.CompletionRecord is not null
@@ -185,30 +194,162 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
             },
             cancellationToken);
 
-    private static bool IsRunnable(AiExecutionWorkItem item, DateTimeOffset now)
-        => item.Status is not AiExecutionWorkStatus.Terminal &&
-            (item.LeaseExpiresAtUtc is null || item.LeaseExpiresAtUtc <= now);
+    public ValueTask MarkTerminalObservedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        while (_items.TryGetValue(key, out AiExecutionWorkItem? current))
+        {
+            if (_items.TryUpdate(key, current with
+            {
+                Status = AiExecutionWorkStatus.Terminal,
+                LeaseOwner = null,
+                LeaseExpiresAtUtc = null,
+                UpdatedAtUtc = now,
+            }, current))
+            {
+                break;
+            }
+        }
 
-    private ValueTask UpdateOwnedAsync(
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask MarkCancellationFailedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        while (_items.TryGetValue(key, out AiExecutionWorkItem? current))
+        {
+            AiExecutionWorkItem updated = current.Status is AiExecutionWorkStatus.Terminal
+                ? current
+                : current with
+                {
+                    Status = current.CompletionRecord is null ? AiExecutionWorkStatus.Pending : AiExecutionWorkStatus.CompletionPending,
+                    CancellationId = null,
+                    LeaseOwner = null,
+                    LeaseExpiresAtUtc = null,
+                    TerminalSubmissionAttemptCount = 0,
+                    UpdatedAtUtc = now,
+                };
+            if (_items.TryUpdate(key, updated, current))
+            {
+                break;
+            }
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask<bool> MarkExhaustedAsync(
         string key,
         string owner,
+        DateTimeOffset now,
+        string reason,
+        CancellationToken cancellationToken)
+        => UpdateOwnedAsync(
+            key,
+            owner,
+            now,
+            current => current with
+            {
+                Status = AiExecutionWorkStatus.Exhausted,
+                LeaseOwner = null,
+                LeaseExpiresAtUtc = null,
+                UpdatedAtUtc = now,
+                FailureReason = reason,
+            },
+            cancellationToken);
+
+    public ValueTask<IReadOnlyList<AiExecutionWorkItem>> ListExhaustedAsync(
+        string? afterKey,
+        int maximumCount,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        IReadOnlyList<AiExecutionWorkItem> items = _items.Values
+            .Where(static item => item.Status is AiExecutionWorkStatus.Exhausted)
+            .Where(item => afterKey is null || string.CompareOrdinal(item.Key, afterKey) > 0)
+            .OrderBy(static item => item.Key, StringComparer.Ordinal)
+            .Take(maximumCount)
+            .ToArray();
+        return ValueTask.FromResult(items);
+    }
+
+    public ValueTask<bool> RecoverExhaustedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        while (_items.TryGetValue(key, out AiExecutionWorkItem? current))
+        {
+            if (current.Status is not AiExecutionWorkStatus.Exhausted)
+            {
+                return ValueTask.FromResult(false);
+            }
+
+            AiExecutionWorkItem recovered = current with
+            {
+                Status = current.CompletionRecord is null ? AiExecutionWorkStatus.Pending : AiExecutionWorkStatus.CompletionPending,
+                LeaseOwner = null,
+                LeaseExpiresAtUtc = null,
+                AttemptCount = 0,
+                TerminalSubmissionAttemptCount = 0,
+                UpdatedAtUtc = now,
+                FailureReason = null,
+            };
+            if (_items.TryUpdate(key, recovered, current))
+            {
+                return ValueTask.FromResult(true);
+            }
+        }
+
+        return ValueTask.FromResult(false);
+    }
+
+    private void QuarantineInvalidRows()
+    {
+        foreach ((string key, AiExecutionWorkItem item) in _items)
+        {
+            if (item.Status is AiExecutionWorkStatus.Terminal or AiExecutionWorkStatus.Quarantined ||
+                (item.HasValidPersistedIdentity() && item.AttemptCount < int.MaxValue))
+            {
+                continue;
+            }
+
+            _ = _items.TryUpdate(key, item with
+            {
+                Status = AiExecutionWorkStatus.Quarantined,
+                LeaseOwner = null,
+                LeaseExpiresAtUtc = null,
+                FailureReason = item.AttemptCount == int.MaxValue ? "attempt-count-overflow" : "persisted-identity-corrupt",
+            }, item);
+        }
+    }
+
+    private static bool IsRunnable(AiExecutionWorkItem item, DateTimeOffset now)
+        => item.Status is not (AiExecutionWorkStatus.Terminal or AiExecutionWorkStatus.Exhausted or AiExecutionWorkStatus.Quarantined) &&
+            (item.LeaseExpiresAtUtc is null || item.LeaseExpiresAtUtc <= now);
+
+    private ValueTask<bool> UpdateOwnedAsync(
+        string key,
+        string owner,
+        DateTimeOffset now,
         Func<AiExecutionWorkItem, AiExecutionWorkItem> update,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         while (_items.TryGetValue(key, out AiExecutionWorkItem? current))
         {
-            if (!string.Equals(current.LeaseOwner, owner, StringComparison.Ordinal))
+            if (!string.Equals(current.LeaseOwner, owner, StringComparison.Ordinal) ||
+                current.LeaseExpiresAtUtc is null ||
+                current.LeaseExpiresAtUtc <= now)
             {
-                return ValueTask.CompletedTask;
+                return ValueTask.FromResult(false);
             }
 
             if (_items.TryUpdate(key, update(current), current))
             {
-                return ValueTask.CompletedTask;
+                return ValueTask.FromResult(true);
             }
         }
 
-        return ValueTask.CompletedTask;
+        return ValueTask.FromResult(false);
     }
 }

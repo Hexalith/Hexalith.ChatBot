@@ -66,7 +66,11 @@ internal static class ChatBotReadQueryResultMapper
             status,
             state,
             page.Items.Select(ToContractItem).ToArray(),
-            new ProjectConversationCursorPage(nextCursor, page.HasMore, page.PageSize),
+            new ProjectConversationCursorPage(nextCursor, page.HasMore, page.PageSize)
+            {
+                AuthoritativeCoverage = BuildConversationCoverage(page),
+                IsAllCoveringEmpty = (page.AuthoritativeItems ?? page.Items).Count == 0 && !page.HasMore,
+            },
             AssociationCandidateView.MailboxSourceProvenance,
             "metadata_only",
             "collaboration_input",
@@ -75,6 +79,26 @@ internal static class ChatBotReadQueryResultMapper
             safeNextAction,
             aiContextPackage);
     }
+
+    private static IReadOnlyList<ProjectConversationStreamCoverage> BuildConversationCoverage(ProjectConversationPage page)
+        => (page.AuthoritativeItems ?? page.Items)
+            .Select(static item => item.BuildAiResponseProgress())
+            .OfType<AiResponseProgress>()
+            .Where(static progress => !string.IsNullOrWhiteSpace(progress.StateOwnerAggregateId))
+            .GroupBy(static progress => progress.StateOwnerAggregateId!, StringComparer.Ordinal)
+            .Select(static group =>
+            {
+                long[] versions = group.Select(static progress => progress.SourceVersion).Distinct().Order().ToArray();
+                bool contiguous = versions.Length == 0 || versions[^1] - versions[0] + 1 == versions.Length;
+                return new ProjectConversationStreamCoverage(
+                    group.Key,
+                    versions.Length == 0 ? 0 : versions[0],
+                    versions.Length == 0 ? 0 : versions[^1],
+                    contiguous,
+                    contiguous);
+            })
+            .OrderBy(static coverage => coverage.StateOwnerAggregateId, StringComparer.Ordinal)
+            .ToArray();
 
     public static TaskIntentReview TaskIntentReviewUnavailable(string projectId, string taskIntentId, string reasonCode, string requestCorrelationId)
         => new(

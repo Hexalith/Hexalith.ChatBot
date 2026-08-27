@@ -80,6 +80,25 @@ internal sealed class ChatBotDomainProjectionHandler(
                 .ConfigureAwait(false);
         }
 
+        LowRiskAiAssistanceExecutionRecord? terminalExecution =
+            DeserializeWhen<LowRiskAiAssistanceExecutionSucceeded>(projectionEvent)?.Record ??
+            DeserializeWhen<LowRiskAiAssistanceExecutionFailed>(projectionEvent)?.Record ??
+            DeserializeWhen<LowRiskAiAssistanceRoutedToApproval>(projectionEvent)?.Record;
+        if (terminalExecution is not null)
+        {
+            string terminalProjectId = DeserializeWhen<LowRiskAiAssistanceExecutionSucceeded>(projectionEvent)?.ProjectId ??
+                DeserializeWhen<LowRiskAiAssistanceExecutionFailed>(projectionEvent)?.ProjectId ??
+                DeserializeWhen<LowRiskAiAssistanceRoutedToApproval>(projectionEvent)?.ProjectId ??
+                request.AggregateId;
+            await aiExecutionCoordinator.RecordTerminalObservedAsync(
+                request.TenantId,
+                request.AggregateId,
+                terminalProjectId,
+                terminalExecution.ProposalId,
+                terminalExecution.ExecutionId,
+                cancellationToken).ConfigureAwait(false);
+        }
+
         GovernedNoteRecordedNotification? governedNotification = GovernedOperationProjectionTranslator.TryCreateNotification(governedEvent);
         if (governedNotification is not null)
         {
@@ -105,6 +124,24 @@ internal sealed class ChatBotDomainProjectionHandler(
             {
                 await aiExecutionCoordinator
                     .RecordCancellationRequestedAsync(cancellation, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            if (flatConversationEvent.AiResponseCancellationConfirmed is { } confirmation)
+            {
+                await aiExecutionCoordinator.RecordTerminalObservedAsync(
+                    confirmation.TenantId,
+                    request.AggregateId,
+                    confirmation.ProjectId,
+                    confirmation.ResponseId,
+                    confirmation.GenerationId,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            if (flatConversationEvent.AiResponseCancellationFailed is { } cancellationFailure)
+            {
+                await aiExecutionCoordinator
+                    .RecordCancellationFailedAsync(cancellationFailure, cancellationToken)
                     .ConfigureAwait(false);
             }
 

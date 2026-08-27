@@ -30,4 +30,7 @@ public sealed record ProjectConversationState(
     string? HistoryLoadRequestId = null,
     bool IsHistoryLoading = false,
     IReadOnlyList<ProjectConversationItemModel>? HistoricalItems = null,
-    IReadOnlySet<string>? CurrentPageItemIds = null);
+    IReadOnlySet<string>? CurrentPageItemIds = null,
+    long ProjectScopeVersion = 0,
+    string? SubmissionRequestId = null,
+    string? CancellationRequestId = null);

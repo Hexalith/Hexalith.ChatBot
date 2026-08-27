@@ -608,7 +608,9 @@ internal sealed class AcceptedCommandDispatcher(
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(cancel);
-            return new EventStoreDispatchPlan(cancel.ProjectId, commandType, payload);
+            // Stop must enter the exact aggregate stream that persisted Started. ConversationId carries that
+            // lifecycle-owner identity from the authoritative progress row; ProjectId is only display/query scope.
+            return new EventStoreDispatchPlan(cancel.ConversationId, commandType, payload);
         }
 
         if (string.Equals(commandType, nameof(ProposeAIAction), StringComparison.Ordinal))
@@ -623,7 +625,7 @@ internal sealed class AcceptedCommandDispatcher(
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(proposal with { RiskClassification = context.RiskClassification.Record });
-            return new EventStoreDispatchPlan(proposal.ProjectId, commandType, payload);
+            return new EventStoreDispatchPlan(proposal.StateOwnerAggregateId ?? proposal.ProjectId, commandType, payload);
         }
 
         if (string.Equals(commandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal))
@@ -655,7 +657,7 @@ internal sealed class AcceptedCommandDispatcher(
                 ExecutionRecord = providerRecord,
             };
             JsonElement payload = JsonSerializer.SerializeToElement(enriched);
-            return new EventStoreDispatchPlan(enriched.ProjectId, commandType, payload);
+            return new EventStoreDispatchPlan(enriched.StateOwnerAggregateId ?? enriched.ProjectId, commandType, payload);
         }
 
         if (string.Equals(commandType, nameof(DecideAiActionApproval), StringComparison.Ordinal))
@@ -676,7 +678,7 @@ internal sealed class AcceptedCommandDispatcher(
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(decision);
-            return new EventStoreDispatchPlan(decision.ProjectId, commandType, payload);
+            return new EventStoreDispatchPlan(decision.StateOwnerAggregateId ?? decision.ProjectId, commandType, payload);
         }
 
         if (string.Equals(commandType, nameof(ExecuteApprovedAIAction), StringComparison.Ordinal))
@@ -741,7 +743,7 @@ internal sealed class AcceptedCommandDispatcher(
                 PolicySnapshotId = policySnapshotId,
                 ExecutionRecord = record,
             });
-            return new EventStoreDispatchPlan(execution.SourceMessageId, commandType, payload);
+            return new EventStoreDispatchPlan(execution.StateOwnerAggregateId ?? execution.ProjectId, commandType, payload);
         }
 
         if (string.Equals(commandType, nameof(MarkAiActionProposalInvalidatedByCorrection), StringComparison.Ordinal))
@@ -757,7 +759,7 @@ internal sealed class AcceptedCommandDispatcher(
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(invalidation);
-            return new EventStoreDispatchPlan(invalidation.SourceMessageId, commandType, payload);
+            return new EventStoreDispatchPlan(invalidation.StateOwnerAggregateId ?? invalidation.ProjectId, commandType, payload);
         }
 
         if (string.Equals(commandType, nameof(CreateOutboundDraft), StringComparison.Ordinal))
@@ -1104,6 +1106,7 @@ internal sealed class AcceptedCommandDispatcher(
         Dictionary<string, string> extensions = new(StringComparer.Ordinal)
         {
             ["surfaceOrigin"] = ChatBotSurfaceOrigins.ToWireValue(context.Submission.Origin),
+            ["actorId"] = context.Actor.ActorId,
             ["decidedAt"] = clock.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
         };
 
@@ -1123,9 +1126,15 @@ internal sealed class AcceptedCommandDispatcher(
         if (admissionMarker is not null)
         {
             extensions[DataProtectionChatBotAdmissionMarker.ExtensionKey] = admissionMarker.Create(
-                context,
+                context.Submission.Request.CommandId,
+                context.TenantBinding.TenantId,
                 plan.AggregateId,
-                plan.CommandType);
+                plan.CommandType,
+                plan.Payload,
+                context.Submission.CorrelationId,
+                context.Actor.ActorId,
+                ChatBotSurfaceOrigins.ToWireValue(context.Submission.Origin),
+                context.Submission.TaskId);
         }
 
         return extensions;

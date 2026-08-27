@@ -181,8 +181,9 @@ public sealed class ChatBotResponsiveTouchContractTests
         [
             ("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedAction.razor", ["<FluentButton", "Class=\"chatbot-touch-target-primary\"", "data-chatbot-touch-target=\"primary\""]),
             ("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStreamingStopControl.razor", ["<FluentButton", "Class=\"chatbot-touch-target-primary\"", "data-chatbot-touch-target=\"primary\""]),
+            ("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor", ["<FluentButton", "Class=\"chatbot-touch-target-primary\"", "data-chatbot-touch-target=\"primary\""]),
             ("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotActorBadge.razor", ["<FluentButton", "Class=\"chatbot-touch-target-dense-secondary\""]),
-            ("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor", ["<FluentButton", "data-chatbot-operational-queue=\"true\"", "role=\"row\""]),
+            ("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor", ["<FluentButton", "data-chatbot-operational-queue=\"true\"", "role=\"listitem\""]),
             ("src/Hexalith.ChatBot.UI/Components/Pages/ComplianceAuditInvestigation.razor", ["<FluentButton", "data-chatbot-stable-id=\"compliance-request-access\"", "compliance-phone-fallback"]),
         ];
 

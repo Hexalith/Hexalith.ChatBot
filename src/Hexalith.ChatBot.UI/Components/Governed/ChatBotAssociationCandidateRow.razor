@@ -27,7 +27,7 @@
     </span>
 </FluentButton>
 @* The chips sit outside the radio. Nested interactive controls are invalid HTML, and while they were inside
-   the button every chip activation also selected the candidate. *@
+   the FluentButton every chip activation also selected the candidate. *@
 <span class="chatbot-association-candidate__evidence">
     @foreach (AssociationEvidenceModel evidence in Candidate.Evidence)
     {
@@ -72,7 +72,7 @@
 
     private string EvidenceText(AssociationEvidenceModel evidence)
         => evidence.State is ChatBotEvidenceState.Available
-            ? $"{evidence.Kind} {evidence.Reference}"
+            ? string.Concat(evidence.Kind, " ", evidence.Reference)
             : UiText[ChatBotUiTextKey.AssociationReviewEvidenceRestricted];
 
     /// <summary>

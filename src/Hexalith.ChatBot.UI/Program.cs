@@ -19,24 +19,20 @@ _ = builder.Services.AddFluentUIComponents();
 _ = builder.Services.AddHexalithFrontComposerQuickstart(static options => options.ScanAssemblies(typeof(Program).Assembly));
 _ = builder.Services.AddHexalithDomain<ChatBotUiFrontComposerMarker>();
 
-bool authenticationEnabled =
-    Uri.TryCreate(builder.Configuration["Authentication:OpenIdConnect:Authority"], UriKind.Absolute, out Uri? oidcAuthority) &&
-    !string.IsNullOrWhiteSpace(builder.Configuration["Authentication:OpenIdConnect:ClientId"]);
-if (authenticationEnabled)
+ChatBotOidcConfiguration oidc = ChatBotOidcConfiguration.Resolve(builder.Configuration, builder.Environment);
+if (oidc.Enabled)
 {
-    string clientId = builder.Configuration["Authentication:OpenIdConnect:ClientId"]!;
     _ = builder.Services.AddHexalithFrontComposerServerSecurity(options =>
     {
         options.OpenIdConnect.Enabled = true;
         options.OpenIdConnect.ProviderName = "Keycloak";
-        options.OpenIdConnect.Authority = oidcAuthority;
-        options.OpenIdConnect.ClientId = clientId;
+        options.OpenIdConnect.Authority = oidc.Authority;
+        options.OpenIdConnect.ClientId = oidc.ClientId;
         // hexalith-chatbot is deliberately a public authorization-code/PKCE client. A browser-facing UI must not
         // manufacture or embed a client secret merely to satisfy a confidential-client recipe.
         options.OpenIdConnect.ClientSecret = null;
-        options.OpenIdConnect.Audience = builder.Configuration["Authentication:OpenIdConnect:Audience"] ?? clientId;
-        options.OpenIdConnect.ValidIssuer = builder.Configuration["Authentication:OpenIdConnect:Issuer"]
-            ?? oidcAuthority!.ToString().TrimEnd('/');
+        options.OpenIdConnect.Audience = oidc.Audience;
+        options.OpenIdConnect.ValidIssuer = oidc.Issuer;
         options.OpenIdConnect.RoleClaimType = "roles";
         options.OpenIdConnect.ResponseType = "code";
         options.OpenIdConnect.SaveTokens = true;
@@ -50,19 +46,17 @@ if (authenticationEnabled)
 // generated transport). It never references the Server, the gateway stages, or the audit/idempotency seams.
 IHttpClientBuilder chatBotHttpClient = builder.Services.AddHttpClient<IClient, Client>(static (provider, http) =>
     http.BaseAddress = ResolveChatBotBaseAddress(provider.GetRequiredService<IConfiguration>()));
-if (authenticationEnabled)
+if (oidc.Enabled)
 {
     _ = chatBotHttpClient.AddFrontComposerGatewayAuthorization();
 }
 _ = builder.Services.AddScoped<IChatBotClient, ChatBotClient>();
 // Story 10.6b transport: the ChatBot server base address the project-conversation streaming subscriber dials for its
 // SignalR hub connection (the ChatBot-owned project-conversation change hub).
-_ = builder.Services.AddSingleton(static provider =>
+_ = builder.Services.AddSingleton(provider =>
 {
     IConfiguration configuration = provider.GetRequiredService<IConfiguration>();
-    bool enabled = Uri.TryCreate(configuration["Authentication:OpenIdConnect:Authority"], UriKind.Absolute, out _) &&
-        !string.IsNullOrWhiteSpace(configuration["Authentication:OpenIdConnect:ClientId"]);
-    FrontComposerAccessTokenProvider? tokenProvider = enabled
+    FrontComposerAccessTokenProvider? tokenProvider = oidc.Enabled
         ? provider.GetRequiredService<FrontComposerAccessTokenProvider>()
         : null;
     return new Hexalith.ChatBot.UI.State.ProjectConversation.ChatBotHubEndpoint(
@@ -83,7 +77,7 @@ WebApplication app = builder.Build();
 _ = app.MapChatBotUiHealthEndpoints();
 _ = app.UseStaticFiles();
 _ = app.UseRequestLocalization(ChatBotSupportedCultures.CreateRequestLocalizationOptions());
-if (authenticationEnabled)
+if (oidc.Enabled)
 {
     _ = app.UseAuthentication();
     _ = app.UseAuthorization();
@@ -91,7 +85,7 @@ if (authenticationEnabled)
 
 _ = app.UseAntiforgery();
 var components = app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
-if (authenticationEnabled)
+if (oidc.Enabled)
 {
     _ = components.RequireAuthorization();
     _ = app.MapHexalithFrontComposerAuthenticationEndpoints();

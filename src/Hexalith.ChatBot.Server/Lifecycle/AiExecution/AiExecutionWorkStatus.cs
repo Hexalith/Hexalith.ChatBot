@@ -7,4 +7,6 @@ internal enum AiExecutionWorkStatus
     CancellationRequested,
     CompletionPending,
     Terminal,
+    Exhausted,
+    Quarantined,
 }

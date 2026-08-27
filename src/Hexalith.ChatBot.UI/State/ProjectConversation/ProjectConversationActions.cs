@@ -26,13 +26,35 @@ public sealed record SubmitProjectConversationComposerAction(
     ProjectConversationComposerMode Mode,
     string Text,
     string Locale,
-    long ExpectedSourceVersion);
+    long ExpectedSourceVersion)
+{
+    public string RequestId { get; init; } = Guid.NewGuid().ToString("N");
+}
 
-public sealed record ProjectConversationComposerValidationFailedAction(string ErrorCode);
+public sealed record ProjectConversationComposerValidationFailedAction(string ErrorCode)
+{
+    public string? RequestId { get; init; }
 
-public sealed record ProjectConversationSubmissionAcceptedAction(ProjectConversationSubmissionReceiptModel Receipt);
+    public long ScopeVersion { get; init; }
+}
 
-public sealed record ProjectConversationSubmissionFailedAction(string ErrorCode);
+public sealed record ProjectConversationSubmissionAcceptedAction(ProjectConversationSubmissionReceiptModel Receipt)
+{
+    public string? ProjectId { get; init; }
+
+    public string? RequestId { get; init; }
+
+    public long ScopeVersion { get; init; }
+}
+
+public sealed record ProjectConversationSubmissionFailedAction(string ErrorCode)
+{
+    public string? ProjectId { get; init; }
+
+    public string? RequestId { get; init; }
+
+    public long ScopeVersion { get; init; }
+}
 
 public sealed record ProjectConversationAiResponseNudgeModel(
     string ProjectId,
@@ -50,21 +72,51 @@ public sealed record ProjectConversationAiResponseNudgeModel(
 // project-conversation projection changed for the current tenant. Carries no version/sequence (signal-only); the
 // effect synthesizes a forward-looking metadata-only nudge for the current conversation and re-queries authoritative
 // server state. ProjectId/TenantId let the effect fail closed on a signal that does not match the loaded conversation.
-public sealed record ProjectConversationProjectionSignalReceivedAction(string ProjectId, string TenantId);
+public sealed record ProjectConversationProjectionSignalReceivedAction(string ProjectId, string TenantId)
+{
+    public long ScopeVersion { get; init; }
+}
 
 public sealed record ProjectConversationAiResponseNudgeReceivedAction(ProjectConversationAiResponseNudgeModel Nudge);
 
 public sealed record ProjectConversationAiResponseNudgeRejectedAction(string ErrorCode);
 
-public sealed record ProjectConversationAiResponseReconnectAction(string ProjectId);
+public sealed record ProjectConversationAiResponseReconnectAction(string ProjectId)
+{
+    public long ScopeVersion { get; init; }
+}
 
-public sealed record StopProjectConversationAiResponseAction(ProjectConversationAiResponseProgressModel Progress);
+public sealed record StopProjectConversationAiResponseAction(ProjectConversationAiResponseProgressModel Progress)
+{
+    public string RequestId { get; init; } = Guid.NewGuid().ToString("N");
+}
 
-public sealed record ProjectConversationAiResponseCancellationPendingAction(string ResponseId, string GenerationId);
+public sealed record ProjectConversationAiResponseCancellationPendingAction(string ResponseId, string GenerationId)
+{
+    public string? ProjectId { get; init; }
 
-public sealed record ProjectConversationAiResponseCancellationAcceptedAction(ProjectConversationSubmissionReceiptModel Receipt);
+    public string? RequestId { get; init; }
 
-public sealed record ProjectConversationAiResponseCancellationFailedAction(string ErrorCode);
+    public long ScopeVersion { get; init; }
+}
+
+public sealed record ProjectConversationAiResponseCancellationAcceptedAction(ProjectConversationSubmissionReceiptModel Receipt)
+{
+    public string? ProjectId { get; init; }
+
+    public string? RequestId { get; init; }
+
+    public long ScopeVersion { get; init; }
+}
+
+public sealed record ProjectConversationAiResponseCancellationFailedAction(string ErrorCode)
+{
+    public string? ProjectId { get; init; }
+
+    public string? RequestId { get; init; }
+
+    public long ScopeVersion { get; init; }
+}
 
 public sealed record OpenProjectAssociationWhyPanelAction(string ProjectId, string AssociationId);
 

@@ -199,7 +199,7 @@
                                                  AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectionPendingAccessible]"
                                                  StableId="projection-pending"
                                                  StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
-                                                 AnnouncementKey="@($"{outcome.OperationId}-{outcome.CompletionStatus}")">
+                                                 AnnouncementKey="@outcome.OperationId">
                                 @UiText[ChatBotUiTextKey.ProjectionPending] (<code class="chatbot-code">@outcome.CompletionStatus</code>).
                             </ChatBotStatusBanner>
                         }
@@ -212,7 +212,7 @@
                                                  AccessibleLabel="@UiText[ChatBotUiTextKey.SubmissionFailedAccessible]"
                                                  StableId="projection-failed"
                                                  StateFamily="@ChatBotFeedbackStateFamily.RetryableFailure"
-                                                 AnnouncementKey="@($"{outcome.OperationId}-{outcome.CompletionStatus}")">
+                                                 AnnouncementKey="@outcome.OperationId">
                                 @UiText[ChatBotUiTextKey.SubmissionFailed] (<code class="chatbot-code">@outcome.CompletionStatus</code>).
                             </ChatBotStatusBanner>
                         }
@@ -223,7 +223,7 @@
                                                  AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectionCompleteAccessible]"
                                                  StableId="projection-complete"
                                                  StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
-                                                 AnnouncementKey="@($"{outcome.OperationId}-{outcome.CompletionStatus}")">
+                                                 AnnouncementKey="@outcome.OperationId">
                                 @UiText[ChatBotUiTextKey.ProjectionComplete] (<code class="chatbot-code">@outcome.CompletionStatus</code>).
                             </ChatBotStatusBanner>
                         }

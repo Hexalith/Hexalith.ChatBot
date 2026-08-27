@@ -179,6 +179,7 @@ public sealed class AssociationReviewComponentContractTests
     {
         string actions = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor");
         string banner = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor");
+        string policy = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewActionPolicy.cs");
 
         actions.ShouldContain("<ChatBotStatusBanner", Case.Sensitive);
         actions.ShouldContain("StableId=\"association-review-validation\"");
@@ -233,9 +234,9 @@ public sealed class AssociationReviewComponentContractTests
             actions.ShouldContain(disabledReasonCode, Case.Sensitive);
         }
 
-        actions.ShouldContain("SpecificDisabledReasonPriority", Case.Sensitive);
-        actions.ShouldContain("ResolveDisabledReasonCode", Case.Sensitive);
-        actions.ShouldContain("ResolveCorrectionDisabledReasonCode", Case.Sensitive);
+        policy.ShouldContain("DisabledReasonPriority", Case.Sensitive);
+        policy.ShouldContain("ResolveDecisionDisabledReasonCode", Case.Sensitive);
+        policy.ShouldContain("ResolveCorrectionDisabledReasonCode", Case.Sensitive);
         actions.ShouldContain("DisabledReasonText", Case.Sensitive);
     }
 
@@ -351,7 +352,7 @@ public sealed class AssociationReviewComponentContractTests
         approval.ShouldContain("OnClick=\"RequestRevisionAsync\"", Case.Sensitive);
         approval.ShouldContain("OnClick=\"CancelAsync\"", Case.Sensitive);
         approval.ShouldContain("aria-disabled=\"@ApproveAriaDisabled\"");
-        approval.ShouldContain("aria-describedby=\"@ApproveReasonId\"");
+        approval.ShouldContain("aria-describedby=\"@(!CanApprove ? ApproveReasonId : null)\"");
         approval.ShouldContain("BlockApproveAsync");
         approval.ShouldContain("DecisionLiveRegion = \"assertive\"");
         approval.ShouldNotContain("<button", Case.Sensitive);

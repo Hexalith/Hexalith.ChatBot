@@ -253,7 +253,7 @@ public sealed class CancelAiResponseGenerationAggregateTests
     }
 
     [Fact]
-    public void UnobservedCancellationShouldEmitFailedOutcomeAndRemoveActiveGeneration()
+    public void UnobservedCancellationShouldEmitFailedOutcomeAndRestoreActiveGeneration()
     {
         GovernedOperationState state = StateWithActiveGeneration();
         AiResponseGenerationCancellationRequested requested = GovernedOperationAggregate
@@ -270,9 +270,11 @@ public sealed class CancelAiResponseGenerationAggregateTests
         state.Apply(failed);
 
         CompleteLowRiskAiAssistance lateCompletion = Completion();
-        GovernedOperationAggregate
-            .Handle(lateCompletion, state, CompletionEnvelope(lateCompletion))
-            .IsNoOp.ShouldBeTrue();
+        DomainResult naturalCompletion = GovernedOperationAggregate
+            .Handle(lateCompletion, state, CompletionEnvelope(lateCompletion));
+
+        naturalCompletion.IsNoOp.ShouldBeFalse();
+        naturalCompletion.Events.OfType<LowRiskAiAssistanceExecutionSucceeded>().ShouldHaveSingleItem();
     }
 
     private static GovernedOperationState StateWithActiveGeneration()

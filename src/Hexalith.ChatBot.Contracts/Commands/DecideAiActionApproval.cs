@@ -12,4 +12,7 @@ public sealed record DecideAiActionApproval(
     string CorrelationId,
     string DecisionId,
     string RationaleRedactionState = "metadata_only",
-    string SchemaVersion = "chatbot.ai-action-approval-decision.v1") : IChatBotCommand;
+    string SchemaVersion = "chatbot.ai-action-approval-decision.v1") : IChatBotCommand
+{
+    public string? StateOwnerAggregateId { get; init; }
+}

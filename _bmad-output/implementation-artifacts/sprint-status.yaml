@@ -179,7 +179,7 @@ development_status:
   # Legacy Epics 10/12/13 are consolidated here; each surface returns to review under corrected live-route acceptance.
   epic-13: in-progress
   13-1-establish-one-working-fluent-frontcomposer-application-frame: done
-  13-2-work-converse-and-interrupt-ai-safely-in-project-context: in-progress
+  13-2-work-converse-and-interrupt-ai-safely-in-project-context: review
   13-3-resolve-ambiguous-association-from-a-safe-live-review-surface: review
   13-4-review-risky-ai-actions-without-losing-evidence-or-authority: review
   13-5-administer-tenant-policy-and-review-operations-within-bounded-authority: review

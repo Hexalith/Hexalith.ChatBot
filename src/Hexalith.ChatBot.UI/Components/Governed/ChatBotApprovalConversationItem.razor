@@ -30,7 +30,7 @@
                     @if (chip.IsExpired)
                     {
                         @* Expired evidence cannot be opened. Render it as text rather than an aria-disabled
-                           button: a focusable control that swallows every activation is a dead tab stop. *@
+                           FluentButton: a focusable control that swallows every activation is a dead tab stop. *@
                         <FluentStack Orientation="Orientation.Horizontal"
                                      HorizontalGap="0.25rem"
                                      Class="chatbot-chip chatbot-chip--evidence"
@@ -139,7 +139,7 @@
                           Appearance="ButtonAppearance.Primary"
                           Class="chatbot-touch-target-primary"
                           aria-disabled="@ApproveAriaDisabled"
-                          aria-describedby="@ApproveDescribedBy"
+                          aria-describedby="@(!CanApprove ? ApproveReasonId : null)"
                           OnClick="ApproveAsync">
                 @UiText.ApprovalDecisionKindLabel("approve")
             </FluentButton>
@@ -223,10 +223,6 @@
     private string ApproveAriaDisabled => CanApprove ? "false" : "true";
 
     private string ApproveReasonId => $"chatbot-approval-{Item.ItemId}-approve-reason";
-
-    // Only reference the reason element when it is actually rendered; a constant aria-describedby dangles
-    // whenever approval is permitted.
-    private string? ApproveDescribedBy => CanApprove ? null : ApproveReasonId;
 
     // Mirrors GovernedOperationAggregate.ApprovalDisabledReason: the domain treats a freshness list that does
     // not line up with the evidence list as expired for approval, so the surface must too — otherwise Approve

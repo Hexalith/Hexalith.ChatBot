@@ -15,4 +15,16 @@ internal interface IAiExecutionCoordinator
     ValueTask RecordCancellationRequestedAsync(
         AiResponseGenerationCancellationRequested request,
         CancellationToken cancellationToken);
+
+    ValueTask RecordTerminalObservedAsync(
+        string tenantId,
+        string stateOwnerAggregateId,
+        string projectId,
+        string responseId,
+        string generationId,
+        CancellationToken cancellationToken);
+
+    ValueTask RecordCancellationFailedAsync(
+        AiResponseGenerationCancellationFailed failure,
+        CancellationToken cancellationToken);
 }

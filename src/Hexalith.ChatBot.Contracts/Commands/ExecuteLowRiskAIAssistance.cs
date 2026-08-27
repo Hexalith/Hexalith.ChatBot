@@ -27,4 +27,7 @@ public sealed record ExecuteLowRiskAIAssistance(
     AiActionRiskClassificationRecord? RiskClassification = null,
     LowRiskAiAssistanceExecutionRecord? ExecutionRecord = null,
     string RedactionState = "metadata_only",
-    string SchemaVersion = "chatbot.low-risk-ai-assistance-execution.v1") : IChatBotCommand;
+    string SchemaVersion = "chatbot.low-risk-ai-assistance-execution.v1") : IChatBotCommand
+{
+    public string? StateOwnerAggregateId { get; init; }
+}

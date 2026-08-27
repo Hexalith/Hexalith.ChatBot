@@ -291,6 +291,37 @@ public sealed class ProjectConversationServiceTests
     }
 
     [Fact]
+    public async Task StopShouldPreferAuthoritativeStateOwnerAndStartedVersionWhileKeepingLegacyFallback()
+    {
+        FakeChatBotClient client = new();
+        ProjectConversationService service = new(client);
+        ProjectConversationAiResponseProgressModel progress = new(
+            "project-001",
+            "display-conversation",
+            "response-001",
+            "generation-001",
+            "correlation-001",
+            99,
+            4,
+            "rendering",
+            "none",
+            "wait-for-projection",
+            "metadata_only",
+            "metadata_only",
+            false)
+        {
+            StateOwnerAggregateId = "lifecycle-owner",
+            StartedSourceVersion = 37,
+        };
+
+        _ = await service.SubmitStopAiResponseAsync(progress, TestContext.Current.CancellationToken);
+
+        CancelAiResponseGeneration command = client.LastSubmittedCommand.ShouldBeOfType<CancelAiResponseGeneration>();
+        command.ConversationId.ShouldBe("lifecycle-owner");
+        command.ExpectedSourceVersion.ShouldBe(37);
+    }
+
+    [Fact]
     public async Task ServiceShouldReadWhyPanelThroughRoutingStatusAndMapSafeEvidence()
     {
         FakeChatBotClient client = new();

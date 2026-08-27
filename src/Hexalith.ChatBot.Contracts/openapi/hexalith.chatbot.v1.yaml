@@ -1595,6 +1595,10 @@ components:
           type: string
           enum:
             - m365-mailbox-intake
+            - ui-composer
+            - approval-event
+            - failure-state
+            - ai-outcome
         redactionState:
           type: string
           enum:
@@ -1797,6 +1801,38 @@ components:
           format: int32
           minimum: 1
           maximum: 100
+        authoritativeCoverage:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectConversationStreamCoverage"
+        isAllCoveringEmpty:
+          type: boolean
+    ProjectConversationStreamCoverage:
+      type: object
+      additionalProperties: false
+      required:
+        - stateOwnerAggregateId
+        - firstSourceVersion
+        - lastSourceVersion
+        - isContiguous
+        - coversAllKnownEvents
+      properties:
+        stateOwnerAggregateId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        firstSourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        lastSourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        isContiguous:
+          type: boolean
+        coversAllKnownEvents:
+          type: boolean
     ProjectConversationItem:
       type: object
       additionalProperties: false
@@ -2722,6 +2758,17 @@ components:
             - unavailable
         isTerminal:
           type: boolean
+        stateOwnerAggregateId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        startedSourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        recoveryDeadlineUtc:
+          type: string
+          format: date-time
     AiResponseProgressNudge:
       type: object
       additionalProperties: false

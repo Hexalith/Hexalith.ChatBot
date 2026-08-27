@@ -441,9 +441,9 @@ public sealed class AcceptedCommandDispatcherTests
         conversationWriter.LastRequest.CommandName.ShouldBe("Project.AppendConversationMessage");
 
         SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
-        request.AggregateId.ShouldBe("graph-message-001");
+        request.AggregateId.ShouldBe("project-001");
         request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedAIAction));
-        result.ResourceId.ShouldBe("graph-message-001");
+        result.ResourceId.ShouldBe("project-001");
 
         JsonElement payload = request.Payload;
         payload.TryGetProperty("ExecutionRecord", out JsonElement record).ShouldBeTrue();
@@ -479,7 +479,7 @@ public sealed class AcceptedCommandDispatcherTests
     }
 
     [Fact]
-    public async Task DispatchShouldRouteAiProposalInvalidationToSourceMessageAggregate()
+    public async Task DispatchShouldRouteAiProposalInvalidationToSharedConversationAggregate()
     {
         RecordingEventStoreGatewayClient gateway = new();
         AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
@@ -491,12 +491,46 @@ public sealed class AcceptedCommandDispatcherTests
             TestContext.Current.CancellationToken);
 
         SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
-        request.AggregateId.ShouldBe("graph-message-001");
+        request.AggregateId.ShouldBe("project-001");
         request.CommandType.ShouldBe(nameof(MarkAiActionProposalInvalidatedByCorrection));
-        result.ResourceId.ShouldBe("graph-message-001");
+        result.ResourceId.ShouldBe("project-001");
         request.Payload.TryGetProperty("ProposalId", out JsonElement proposalId).ShouldBeTrue();
         proposalId.GetString().ShouldBe("ai-proposal-001");
         request.Payload.TryGetProperty("proposalId", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task MixedLegacyAndCurrentStreamsWithIdenticalEventTypesShouldRouteByExplicitLifecycleOwnerOnly()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock());
+        JsonSerializerOptions wireOptions = new(JsonSerializerDefaults.Web);
+        MarkAiActionProposalInvalidatedByCorrection template = WireProposalInvalidationCommand()
+            .Deserialize<MarkAiActionProposalInvalidatedByCorrection>(wireOptions)
+            .ShouldNotBeNull();
+        MarkAiActionProposalInvalidatedByCorrection legacy = template with
+        {
+            StateOwnerAggregateId = "legacy-message-state-owner",
+        };
+        MarkAiActionProposalInvalidatedByCorrection current = template with
+        {
+            StateOwnerAggregateId = "project-001",
+            CorrectionId = "01ARZ3NDEKTSV4RRFFQ69G5FAV:correction:12",
+        };
+
+        await dispatcher.DispatchAsync(
+            Context(JsonSerializer.SerializeToElement(legacy, wireOptions), commandType: nameof(MarkAiActionProposalInvalidatedByCorrection)),
+            TestContext.Current.CancellationToken);
+        await dispatcher.DispatchAsync(
+            Context(JsonSerializer.SerializeToElement(current, wireOptions), commandType: nameof(MarkAiActionProposalInvalidatedByCorrection)),
+            TestContext.Current.CancellationToken);
+
+        gateway.Submitted.Select(static request => request.AggregateId)
+            .ShouldBe(["legacy-message-state-owner", "project-001"]);
     }
 
     [Fact]

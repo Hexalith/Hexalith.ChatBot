@@ -1,6 +1,11 @@
 using System.Text.Json;
 
+using Hexalith.ChatBot.UI.Components.Governed;
+using Hexalith.ChatBot.UI.Registration;
 using Hexalith.ChatBot.UI.State.ProjectConversation;
+using Hexalith.FrontComposer.Shell.Extensions;
+
+using Microsoft.Extensions.DependencyInjection;
 
 using Shouldly;
 
@@ -8,6 +13,17 @@ namespace Hexalith.ChatBot.UI.Tests;
 
 public sealed class ProjectConversationStateTests
 {
+    [Fact]
+    public void FrontComposerRegistrationShouldLoadEveryChatBotReducer()
+    {
+        // Fluxor treats an explicit ActionType as the metadata for a one-parameter reducer. A typed, two-parameter
+        // reducer must use the parameter-inferred attribute; otherwise the real UI fails during startup even though
+        // direct reducer unit tests pass.
+        ServiceCollection services = new();
+        services.AddHexalithFrontComposerQuickstart(
+            static options => options.ScanAssemblies(typeof(ChatBotUiFrontComposerMarker).Assembly));
+    }
+
     [Fact]
     public void ProjectSwitchShouldClearPriorConversationWhileFailureKeepsLastSafeView()
     {
@@ -69,6 +85,23 @@ public sealed class ProjectConversationStateTests
     }
 
     [Fact]
+    public void SameProjectBackgroundReloadShouldKeepComposerEnabledAndPreserveFocus()
+    {
+        ProjectConversationModel conversation = Conversation("project-alpha");
+        ProjectConversationState backgroundReload = ProjectConversationReducers.ReduceLoad(
+            new ProjectConversationState(false, conversation, null),
+            new LoadProjectConversationAction("project-alpha"));
+
+        ChatBotProjectConversationWorkspace.ShouldDisableComposer(backgroundReload, conversation).ShouldBeFalse();
+        ChatBotProjectConversationWorkspace.ShouldDisableComposer(
+            new ProjectConversationState(true, null, null),
+            conversation: null).ShouldBeTrue();
+        ChatBotProjectConversationWorkspace.ShouldDisableComposer(
+            backgroundReload with { IsSubmitting = true },
+            conversation).ShouldBeTrue();
+    }
+
+    [Fact]
     public void CurrentAndHistoryResponsesShouldCorrelateIndependentlyAndLateHistoryMustNotResurrectOmittedItems()
     {
         ProjectConversationItemModel formerlyCurrent = Item("item-current-omitted", 8);
@@ -126,6 +159,34 @@ public sealed class ProjectConversationStateTests
         loaded.Conversation.Items.Select(static item => item.ItemId).ShouldBe(["item-newest", "item-older"]);
         loaded.Conversation.HasMore.ShouldBeFalse();
         loaded.IsHistoryLoading.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void MixedStreamCoverageShouldPurgeOnlyCoveredOwnerAndAllCoveringEmptyShouldPurgeEverything()
+    {
+        ProjectConversationItemModel ownerA = AiItem("owner-a-old", "owner-a", 7);
+        ProjectConversationItemModel ownerB = AiItem("owner-b-same-version", "owner-b", 7);
+        ProjectConversationState initial = new(false, Conversation("project-alpha", [ownerA, ownerB]), null)
+        {
+            HistoricalItems = [ownerA, ownerB],
+            CurrentPageItemIds = new HashSet<string>(StringComparer.Ordinal),
+            RequestedProjectId = "project-alpha",
+        };
+        ProjectConversationModel coveringA = Conversation("project-alpha") with
+        {
+            AuthoritativeCoverage = [new ProjectConversationStreamCoverageModel("owner-a", 1, 10, true, true)],
+        };
+
+        ProjectConversationState afterMixedCoverage = ProjectConversationReducers.ReduceLoaded(
+            initial,
+            new ProjectConversationLoadedAction(coveringA));
+        ProjectConversationState afterAllCoveringEmpty = ProjectConversationReducers.ReduceLoaded(
+            afterMixedCoverage,
+            new ProjectConversationLoadedAction(Conversation("project-alpha") with { IsAllCoveringEmpty = true }));
+
+        afterMixedCoverage.Conversation!.Items.Select(static item => item.ItemId).ShouldBe([ownerB.ItemId]);
+        afterAllCoveringEmpty.Conversation!.Items.ShouldBeEmpty();
+        afterAllCoveringEmpty.HistoricalItems.ShouldBeEmpty();
     }
 
     [Fact]
@@ -199,6 +260,33 @@ public sealed class ProjectConversationStateTests
             new JsonSerializerOptions(JsonSerializerDefaults.Web))
             ?? throw new InvalidOperationException("The project-conversation item fixture could not be created.");
 
+    private static ProjectConversationItemModel AiItem(string itemId, string owner, long sourceVersion)
+        => JsonSerializer.Deserialize<ProjectConversationItemModel>(
+            $$"""
+            {
+              "itemId": "{{itemId}}",
+              "sourceVersion": {{sourceVersion}},
+              "aiResponseProgress": {
+                "projectId": "project-alpha",
+                "conversationId": "{{owner}}",
+                "responseId": "response-001",
+                "generationId": "generation-001",
+                "correlationId": "correlation-001",
+                "sourceVersion": {{sourceVersion}},
+                "sequence": 1,
+                "state": "rendering",
+                "terminalReason": "none",
+                "safeNextAction": "wait",
+                "redactionState": "metadata_only",
+                "visibilityState": "metadata_only",
+                "isTerminal": false,
+                "stateOwnerAggregateId": "{{owner}}"
+              }
+            }
+            """,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            ?? throw new InvalidOperationException("The AI project-conversation item fixture could not be created.");
+
     [Fact]
     public void ComposerReducersShouldTrackSubmittingAcceptedAndValidationStates()
     {
@@ -228,6 +316,58 @@ public sealed class ProjectConversationStateTests
         accepted.IsSubmitting.ShouldBeFalse();
         accepted.PendingSubmission.ShouldBe(receipt);
         invalid.ComposerValidationErrorCode.ShouldBe("composer_input_required");
+    }
+
+    [Fact]
+    public void ProjectSwitchShouldInvalidateEveryOldSubmissionCancellationAndLoadIdentity()
+    {
+        ProjectConversationState oldScope = new(false, Conversation("project-old"), null)
+        {
+            RequestedProjectId = "project-old",
+            ProjectScopeVersion = 7,
+            IsSubmitting = true,
+            SubmissionRequestId = "submit-old",
+            PendingSubmission = new ProjectConversationSubmissionReceiptModel(
+                ProjectConversationComposerMode.Message,
+                "command-old",
+                "correlation-old",
+                null,
+                "Proposed",
+                DateTimeOffset.UtcNow,
+                "wait-for-projection"),
+            IsCancellingAiResponse = true,
+            CancellationRequestId = "cancel-old",
+            CancellingResponseId = "response-old",
+            CancellingGenerationId = "generation-old",
+            CurrentLoadRequestId = "load-old",
+            HistoryLoadRequestId = "history-old",
+            VerifiedStopAnnouncementGenerationId = "generation-old",
+        };
+
+        ProjectConversationState switched = ProjectConversationReducers.ReduceLoad(
+            oldScope,
+            new LoadProjectConversationAction("project-new") { RequestId = "load-new" });
+        ProjectConversationState afterLateAcceptance = ProjectConversationReducers.ReduceSubmissionAccepted(
+            switched,
+            new ProjectConversationSubmissionAcceptedAction(oldScope.PendingSubmission!)
+            {
+                ProjectId = "project-old",
+                RequestId = "submit-old",
+                ScopeVersion = 7,
+            });
+
+        switched.ProjectScopeVersion.ShouldBe(8);
+        switched.RequestedProjectId.ShouldBe("project-new");
+        switched.IsSubmitting.ShouldBeFalse();
+        switched.PendingSubmission.ShouldBeNull();
+        switched.SubmissionRequestId.ShouldBeNull();
+        switched.IsCancellingAiResponse.ShouldBeFalse();
+        switched.CancellationRequestId.ShouldBeNull();
+        switched.CancellingResponseId.ShouldBeNull();
+        switched.CurrentLoadRequestId.ShouldBe("load-new");
+        switched.HistoryLoadRequestId.ShouldBeNull();
+        switched.VerifiedStopAnnouncementGenerationId.ShouldBeNull();
+        afterLateAcceptance.ShouldBe(switched);
     }
 
     [Fact]
@@ -283,7 +423,9 @@ public sealed class ProjectConversationStateTests
     {
         ProjectConversationState state = new(false, Conversation("project-001"), null);
 
-        ProjectConversationState reconnected = ProjectConversationReducers.ReduceAiResponseReconnect(state);
+        ProjectConversationState reconnected = ProjectConversationReducers.ReduceAiResponseReconnect(
+            state,
+            new ProjectConversationAiResponseReconnectAction("project-001"));
         ProjectConversationState afterSubmit = ProjectConversationReducers.ReduceSubmitComposer(
             reconnected,
             new SubmitProjectConversationComposerAction("project-001", ProjectConversationComposerMode.AskAi, "hi", "en-US", 1));
@@ -291,6 +433,22 @@ public sealed class ProjectConversationStateTests
         reconnected.StreamingNotice.ShouldBe("reconnected");
         reconnected.StreamingErrorCode.ShouldBeNull();
         afterSubmit.StreamingNotice.ShouldBeNull();
+    }
+
+    [Fact]
+    public void StaleReconnectAfterProjectSwitchShouldNotReviveOldScopeOrNotice()
+    {
+        ProjectConversationState switched = new(false, Conversation("project-new"), null)
+        {
+            RequestedProjectId = "project-new",
+            ProjectScopeVersion = 8,
+        };
+        ProjectConversationAiResponseReconnectAction stale = new("project-old") { ScopeVersion = 7 };
+
+        ProjectConversationState result = ProjectConversationReducers.ReduceAiResponseReconnect(switched, stale);
+
+        result.ShouldBe(switched);
+        result.StreamingNotice.ShouldBeNull();
     }
 
 }

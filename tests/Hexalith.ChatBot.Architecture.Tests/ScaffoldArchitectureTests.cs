@@ -977,11 +977,23 @@ public static class ScaffoldArchitectureTests
         workflow.ShouldContain(
             "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests."
             + "TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology");
+        workflow.ShouldContain(
+            "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests."
+            + "AuthenticatedProductionClientShouldMessageAskAndStopAcrossRequiredChromeMatrix");
         workflow.ShouldContain("trx;LogFileName=topology-acceptance.trx");
+        workflow.ShouldContain("trx;LogFileName=story132-topology-acceptance.trx");
+        workflow.ShouldContain("Require one executed Story 13.2 test and zero skips");
+        workflow.ShouldContain("c.get('notExecuted') == '0'");
         releaseWorkflow.ShouldContain(
             "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests."
             + "TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology");
+        releaseWorkflow.ShouldContain(
+            "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests."
+            + "AuthenticatedProductionClientShouldMessageAskAndStopAcrossRequiredChromeMatrix");
         releaseWorkflow.ShouldContain("trx;LogFileName=topology-acceptance.trx");
+        releaseWorkflow.ShouldContain("trx;LogFileName=story132-topology-acceptance.trx");
+        releaseWorkflow.ShouldContain("Require one executed Story 13.2 test and zero skips");
+        releaseWorkflow.ShouldContain("c.get('notExecuted') == '0'");
         releaseWorkflow.ShouldContain(
             "semantic-release:\n"
             + "    needs:\n"

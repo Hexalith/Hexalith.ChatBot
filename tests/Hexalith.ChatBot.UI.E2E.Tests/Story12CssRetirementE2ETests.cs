@@ -89,7 +89,7 @@ public sealed class Story12CssRetirementE2ETests
         approval.ShouldContain("<FluentButton", Case.Sensitive);
         approval.ShouldContain("Appearance=\"ButtonAppearance.Primary\"", Case.Sensitive);
         approval.ShouldContain("aria-disabled=\"@ApproveAriaDisabled\"", Case.Sensitive);
-        approval.ShouldContain("aria-describedby=\"@ApproveReasonId\"", Case.Sensitive);
+        approval.ShouldContain("aria-describedby=\"@(!CanApprove ? ApproveReasonId : null)\"", Case.Sensitive);
         approval.ShouldContain("OnClick=\"ApproveAsync\"", Case.Sensitive);
         approval.ShouldNotContain("chatbot-action-button", Case.Sensitive);
 

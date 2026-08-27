@@ -1,7 +1,10 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
 @inject ChatBotUiTextLocalizer UiText
 
-<section class="chatbot-governed-composer composer-action-entry" aria-labelledby="project-conversation-composer-title">
+<section class="chatbot-governed-composer composer-action-entry"
+         aria-labelledby="project-conversation-composer-title"
+         data-chatbot-submission-error-code="@SubmissionErrorCode"
+         data-chatbot-pending-correlation-id="@PendingSubmission?.CorrelationId">
     <h2 id="project-conversation-composer-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ProjectConversationComposerTitle]</h2>
 
     @if (!string.IsNullOrWhiteSpace(StatusMessage))
@@ -56,7 +59,8 @@
                     ValueChanged="OnTextChanged"
                     Immediate="true"
                     Placeholder="@UiText[ChatBotUiTextKey.ProjectConversationComposerPlaceholder]"
-                    aria-describedby="@DescribedBy"
+                    aria-describedby="project-conversation-composer-help project-conversation-composer-status"
+                    aria-errormessage="@(string.IsNullOrWhiteSpace(ValidationMessage) ? null : "project-conversation-composer-error")"
                     aria-invalid="@(!string.IsNullOrWhiteSpace(ValidationMessage))"
                     Disabled="@Disabled"
                     @onkeydown:stopPropagation="true" />
@@ -65,6 +69,8 @@
     <div class="chatbot-governed-composer__actions">
         <FluentButton Type="ButtonType.Button"
                       Appearance="ButtonAppearance.Primary"
+                      Class="chatbot-touch-target-primary"
+                      data-chatbot-touch-target="primary"
                       Disabled="@Disabled"
                       OnClick="SubmitAsync">
             @(IsSubmitting ? UiText[ChatBotUiTextKey.ProjectConversationComposerSubmitting] : UiText[ChatBotUiTextKey.ProjectConversationComposerSubmit])
@@ -119,36 +125,37 @@
     private bool HasSubmissionError => !string.IsNullOrWhiteSpace(SubmissionErrorCode);
 
     private string? StatusMessage
-        => DisabledReasonCode switch
+        => HasSubmissionError
+            ? UiText[ChatBotUiTextKey.ProjectConversationComposerRejected]
+            : IsSubmitting
+                ? UiText[ChatBotUiTextKey.ProjectConversationComposerSubmitting]
+                // Acceptance is a durable mutation outcome, not optimistic projection state. Keep that receipt
+                // visible while an immediate authoritative reload is temporarily loading/degraded; the workspace
+                // independently surfaces the read failure and retry control. A later gateway rejection still wins.
+                : PendingSubmission is not null
+                    ? UiText[ChatBotUiTextKey.ProjectConversationComposerAccepted]
+                    : DisabledReasonCode switch
         {
             "unauthorized" => UiText[ChatBotUiTextKey.ProjectConversationComposerUnauthorizedReason],
             "degraded" => UiText[ChatBotUiTextKey.ProjectConversationComposerDegradedReason],
             not null => UiText[ChatBotUiTextKey.ProjectConversationComposerDisabledReason],
-            _ when IsSubmitting => UiText[ChatBotUiTextKey.ProjectConversationComposerSubmitting],
-            // A rejection outranks a stale accepted receipt: reporting "accepted" for a command the gateway refused
-            // is exactly the optimistic success AC2 forbids.
-            _ when HasSubmissionError => UiText[ChatBotUiTextKey.ProjectConversationComposerRejected],
-            _ when PendingSubmission is not null => UiText[ChatBotUiTextKey.ProjectConversationComposerAccepted],
             _ => null,
         };
 
     private string? StatusCode
-        => DisabledReasonCode ?? (HasSubmissionError ? SubmissionErrorCode : PendingSubmission?.CommandId);
+        => HasSubmissionError
+            ? SubmissionErrorCode
+            : PendingSubmission?.CommandId ?? DisabledReasonCode;
 
     private ChatBotFeedbackKind StatusKind
-        => DisabledReasonCode is not null || HasSubmissionError
+        => HasSubmissionError || (PendingSubmission is null && DisabledReasonCode is not null)
             ? ChatBotFeedbackKind.Warning
             : ChatBotFeedbackKind.Info;
 
     private ChatBotFeedbackStateFamily StatusFamily
-        => DisabledReasonCode is not null || HasSubmissionError
+        => HasSubmissionError || (PendingSubmission is null && DisabledReasonCode is not null)
             ? ChatBotFeedbackStateFamily.BlockedAction
             : ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending;
-
-    private string DescribedBy
-        => string.IsNullOrWhiteSpace(ValidationMessage)
-            ? "project-conversation-composer-help project-conversation-composer-status"
-            : "project-conversation-composer-help project-conversation-composer-error project-conversation-composer-status";
 
     // UX-DR34: move focus only when the relevant state first appears, never on every re-render. Re-focusing on
     // each render would yank focus back to the composer while a proposal review panel is being read (a store

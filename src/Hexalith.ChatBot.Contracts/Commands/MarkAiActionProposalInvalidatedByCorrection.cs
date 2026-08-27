@@ -15,4 +15,7 @@ public sealed record MarkAiActionProposalInvalidatedByCorrection(
     string CorrelationId,
     string RedactionState = "metadata_only",
     string RetentionClass = "collaboration_input",
-    string SchemaVersion = "chatbot.ai-action-proposal-invalidation.v1") : IChatBotCommand;
+    string SchemaVersion = "chatbot.ai-action-proposal-invalidation.v1") : IChatBotCommand
+{
+    public string? StateOwnerAggregateId { get; init; }
+}

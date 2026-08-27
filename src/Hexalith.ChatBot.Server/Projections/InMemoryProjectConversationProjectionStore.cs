@@ -530,7 +530,7 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         ProjectConversationCursorPosition? nextCursorPosition = hasMore && visible.Length > 0
             ? new ProjectConversationCursorPosition(visible[^1].OccurredAt, visible[^1].ItemId)
             : null;
-        return Task.FromResult(new ProjectConversationPage(visible, nextCursorPosition, hasMore, pageSize, latest));
+        return Task.FromResult(new ProjectConversationPage(visible, nextCursorPosition, hasMore, pageSize, latest, ordered));
     }
 
     public Task<IReadOnlyList<ProjectConversationItemView>> ReadAiContextPackageItemsAsync(

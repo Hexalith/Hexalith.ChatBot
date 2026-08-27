@@ -342,7 +342,16 @@ public sealed class GovernedOperationState
     public void Apply(AiResponseGenerationCancellationFailed e)
     {
         ArgumentNullException.ThrowIfNull(e);
-        CompleteAiResponseGeneration(e.ResponseId, e.GenerationId);
+        string key = AiResponseGenerationKey(e.ResponseId, e.GenerationId);
+        if (_activeAiResponseGenerations.TryGetValue(key, out ActiveAiResponseGeneration? generation) &&
+            string.Equals(generation.CancellationId, e.CancellationId, StringComparison.Ordinal))
+        {
+            _activeAiResponseGenerations[key] = generation with
+            {
+                Status = "active",
+                CancellationId = null,
+            };
+        }
     }
 
     public void Apply(TaskIntentCaptured e)
