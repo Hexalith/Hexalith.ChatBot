@@ -527,6 +527,7 @@ location: CommandGatewayServiceCollectionExtensions.cs:103,113,164-168,228-229
 severity: high
 reason: **[HIGH · pre-existing production binding] The scheduled controls still read and emit only through process-local defaults.** `CommandGatewayServiceCollectionExtensions.cs:103,113,164-168,228-229` binds the outbound trace, derived store, WORM store, and operator-alert sink to in-memory implementations. The hosted proof therefore demonstrates scheduler invocation but not durable production evidence, and its empty default stores can report zero breaches without exercising production tenant data. Story 12.16 explicitly owns the live Hexalith.Memories derived-store binding; the WORM/outbound-trace/alert production bindings need an equally explicit owner before “continuous production enforcement” or production release-gate claims are accepted.
 status: open
+decision: 2026-08-27 Build durable bindings — Assign owners and implement production bindings for outbound trace, derived store, WORM audit, and operator alerts with production-data scheduler evidence.
 decision: 2026-08-26 Build durable bindings — Assign owners and implement production bindings for outbound trace, derived store, WORM audit, and operator alerts with production-data scheduler evidence.
 
 ### DW-64: [MEDIUM · pre-existing runtime scaling] Cadence ownership and status are process-local.

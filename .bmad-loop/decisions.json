@@ -79,5 +79,14 @@
     "key": "1",
     "label": "Build full-window evidence",
     "resolution": ""
+  },
+  "DW-63": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Assign owners and implement production bindings for outbound trace, derived store, WORM audit, and operator alerts with production-data scheduler evidence.",
+    "key": "1",
+    "label": "Build durable bindings",
+    "resolution": ""
   }
 }
