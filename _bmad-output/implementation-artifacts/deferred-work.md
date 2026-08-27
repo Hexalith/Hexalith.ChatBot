@@ -966,6 +966,7 @@ origin: migrated from legacy ledger ("Deferred from: code review of story-13.2 (
 location: n/a
 reason: `.chatbot-conversation-shell` hand-rolled chrome still wraps the `FcPageLayout`/`FcPageHeader` composition. `chatbot.tokens.css:59-99` forces `display:grid` on `__body`, which is a `FluentStack Orientation="Horizontal"` supplying its own flex layout, so the `@media (min-width:900px)` `grid-template-columns` rule at :279-283 is fragile or inert; `Wrap` is left `false` so main and complementary cannot wrap at phone width; and the shell caps at `70rem` while content declares `FcPageLayoutMode.FullWidth`. Pre-existing — the Epic 13 application frame is Story 13.1 (`done`).
 status: open
+decision: 2026-08-27 Adopt FrontComposer layout — Remove or reduce inner chrome, use FrontComposer and Fluent responsive primitives, and update cross-surface tests.
 decision: 2026-08-26 Adopt FrontComposer layout — Remove or reduce inner chrome, use FrontComposer and Fluent responsive primitives, and update cross-surface tests.
 
 ### DW-117: Hard-coded element ids (`project-conversation-composer-input`, `-title`, `-error`, `project-conversation-stream-title`) make the conversation components single-instance-only; a second instance on one page yields duplicate ids and cross-wired focus targets.

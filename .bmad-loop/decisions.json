@@ -1,4 +1,13 @@
 {
+  "DW-116": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Remove or reduce inner chrome, use FrontComposer and Fluent responsive primitives, and update cross-surface tests.",
+    "key": "1",
+    "label": "Adopt FrontComposer layout",
+    "resolution": ""
+  },
   "DW-2": {
     "answered_at": "2026-08-27",
     "bundle_name": "",
