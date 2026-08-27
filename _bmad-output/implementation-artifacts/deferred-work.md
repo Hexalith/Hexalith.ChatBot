@@ -775,6 +775,7 @@ location: ChatBot gateway/API
 severity: medium
 reason: **[MEDIUM · api-contract] A permanently malformed command payload is reported as a retryable `503` and raises an operator alert on every attempt.** `AcceptedCommandDispatcher.BuildPlanAsync` throws `InvalidOperationException` for an unparseable aggregate identity, and `CommandGateway.SubmitAsync` classifies it with genuine dispatch outages: the caller is told `retryable: true`, `clientAction: retry-later`, and each attempt queues a pre-commit replay intent and an `OperatorAlertKind.AuditUnavailable` alert. During one recovery run a single malformed field produced ~1,000 such alerts. Changing it means changing a shipped API contract (`400`/`422` semantics, the message catalog, OpenAPI and conformance tests), so it is out of Story 12.15's scope. **Owner:** ChatBot gateway/API. **Closure evidence:** a decided and documented status/reason for malformed payloads, with alerting no longer triggered per attempt.
 status: open
+decision: 2026-08-27 Client-error contract — Define 400 or 422 semantics with a catalogued reason, update OpenAPI and conformance tests, and suppress outage alerts for permanent defects.
 decision: 2026-08-26 Client-error contract — Define 400 or 422 semantics with a catalogued reason, update OpenAPI and conformance tests, and suppress outage alerts for permanent defects.
 
 ### DW-94: [MEDIUM · reliability] The ChatBot UI host can still be made unstoppable by an unreachable OTLP collector.

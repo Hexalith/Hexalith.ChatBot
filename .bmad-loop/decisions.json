@@ -97,5 +97,14 @@
     "key": "1",
     "label": "Ratify 2.2.0",
     "resolution": ""
+  },
+  "DW-93": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Define 400 or 422 semantics with a catalogued reason, update OpenAPI and conformance tests, and suppress outage alerts for permanent defects.",
+    "key": "1",
+    "label": "Client-error contract",
+    "resolution": ""
   }
 }
