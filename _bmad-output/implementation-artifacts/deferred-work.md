@@ -15,6 +15,7 @@ location: release architecture
 severity: medium
 reason: **[MEDIUM · release ordering] Per-commit live-recovery concurrency can release newer and older commits out of order.** The story deliberately accepts concurrent 5.5-hour validation jobs so GitHub cannot cancel an older pending required check, but `semantic-release` itself has no safe ordering mechanism after those jobs converge at different times. **Release-claim impact:** an older workflow may attempt publication after a newer commit has already released. **Owner:** release architecture. **Closure evidence:** a release-order design that preserves a verdict for every commit without GitHub's one-pending-run cancellation behavior.
 status: open
+decision: 2026-08-27 Guard latest head — Before publication, fetch main and publish only when the validated SHA is still the newest releasable head; treat an older included SHA as superseded.
 decision: 2026-08-26 Guard latest head — Before publication, fetch main and publish only when the validated SHA is still the newest releasable head; treat an older included SHA as superseded.
 
 ### DW-3: [LOW · code hygiene] Duplicated read-model-key helpers (`IntakeReadModelKeys`, `AttachmentIndexKeyFor`, `AreIntakeReadModelsAbsentAsync`, `RemainsIntakeReadModelsAbsentAsync`) independently added to both `AspireRecoverySandboxOperations.cs` and `AspireScopedOutageOperations.cs`.

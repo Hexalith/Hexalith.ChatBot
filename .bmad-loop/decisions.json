@@ -1,0 +1,11 @@
+{
+  "DW-2": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Before publication, fetch main and publish only when the validated SHA is still the newest releasable head; treat an older included SHA as superseded.",
+    "key": "1",
+    "label": "Guard latest head",
+    "resolution": ""
+  }
+}
