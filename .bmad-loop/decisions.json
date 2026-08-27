@@ -52,5 +52,14 @@
     "key": "1",
     "label": "Build durable binding",
     "resolution": ""
+  },
+  "DW-56": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Add an approved pre-production multi-replica drill with least-privilege controls, distributed non-overlap, restoration, health, and retained evidence.",
+    "key": "1",
+    "label": "Build platform drill",
+    "resolution": ""
   }
 }
