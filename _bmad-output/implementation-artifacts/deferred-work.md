@@ -455,6 +455,7 @@ location: durable WORM/audit infrastructure owner, coordinated with Story 12.16 
 severity: high
 reason: **[HIGH · `RV-DURABLE-WORM` · durable audit-storage fidelity] Projection rebuild and audit-store fault validation still use `InMemoryWormAuditStore` or a test-hosted `IAuditWriter`.** The repaired rebuild executes real persisted projection writes/read-back/cleanup, but it does not prove durable WORM/KMS/storage recovery or product audit composition. **Release-claim impact:** do not claim durable audit-chain disaster recovery or storage/KMS outage coverage. **Owner:** durable WORM/audit infrastructure owner, coordinated with Story 12.16 where applicable. **Closure evidence:** retained live evidence from the production binding showing append/read failure, fail-closed mutation behavior, recovery, chain verification, rebuild equivalence, and cleanup against durable storage.
 status: open
+decision: 2026-08-27 Build durable binding — Bind an approved durable WORM and KMS store and retain failure, recovery, chain-verification, rebuild, and cleanup evidence.
 decision: 2026-08-26 Build durable binding — Bind an approved durable WORM and KMS store and retain failure, recovery, chain-verification, rebuild, and cleanup evidence.
 
 ### DW-56: [HIGH · `RV-PROD-CONTROL` · production orchestration and replica coordination] The destructive scheduler runs isolated GitHub/Aspire test jobs, not a production AKS/multi-replica control plane.

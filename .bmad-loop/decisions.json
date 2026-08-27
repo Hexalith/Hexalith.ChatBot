@@ -43,5 +43,14 @@
     "key": "1",
     "label": "Build Graph drill",
     "resolution": ""
+  },
+  "DW-55": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Bind an approved durable WORM and KMS store and retain failure, recovery, chain-verification, rebuild, and cleanup evidence.",
+    "key": "1",
+    "label": "Build durable binding",
+    "resolution": ""
   }
 }
