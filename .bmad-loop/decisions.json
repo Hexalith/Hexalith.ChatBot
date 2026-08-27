@@ -8,6 +8,15 @@
     "label": "Adopt FrontComposer layout",
     "resolution": ""
   },
+  "DW-122": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Implement permitted evidence loading and drawer presentation with pointer and keyboard activation plus fail-closed redaction states.",
+    "key": "1",
+    "label": "Build evidence drawer",
+    "resolution": ""
+  },
   "DW-2": {
     "answered_at": "2026-08-27",
     "bundle_name": "",
