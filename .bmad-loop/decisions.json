@@ -44,6 +44,15 @@
     "label": "Write fallback marker",
     "resolution": ""
   },
+  "DW-22": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Validate non-secret sandbox, environment, tenant, and path shape while disabled, retain activation-only secret checks, and add disabled-overlay tests.",
+    "key": "1",
+    "label": "Validate dormant shape",
+    "resolution": ""
+  },
   "DW-52": {
     "answered_at": "2026-08-27",
     "bundle_name": "",
