@@ -70,5 +70,14 @@
     "key": "1",
     "label": "Build production-shaped lane",
     "resolution": ""
+  },
+  "DW-58": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Add a separately scheduled full-window pre-production lane and reject ratification artifacts whose measurable ceiling is below the claimed target.",
+    "key": "1",
+    "label": "Build full-window evidence",
+    "resolution": ""
   }
 }
