@@ -191,6 +191,7 @@ location: evidence manifest sanitization
 severity: low
 reason: **[LOW · sanitization] `IsSafeArtifactLocator` rejects substrings `token`/`secret`/`password`.** Valid artifact URIs with those substrings fail closed. **Release-claim impact:** rare false stop-ship on locator naming. **Owner:** evidence manifest sanitization. **Closure evidence:** path-segment allowlist or documented substring policy.
 status: open
+decision: 2026-08-27 Use segment-aware policy — Parse the artifact URI, reject bounded sensitive path segments or keys, accept benign substring occurrences, and add positive and negative tests.
 
 ### DW-24: [LOW · gate fixtures] Gate fixtures publish `rpo: 0` under `met` without asserting non-citability of constant-zero RPO.
 

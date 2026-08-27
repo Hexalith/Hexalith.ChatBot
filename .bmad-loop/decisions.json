@@ -53,6 +53,15 @@
     "label": "Validate dormant shape",
     "resolution": ""
   },
+  "DW-23": {
+    "answered_at": "2026-08-27",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Parse the artifact URI, reject bounded sensitive path segments or keys, accept benign substring occurrences, and add positive and negative tests.",
+    "key": "1",
+    "label": "Use segment-aware policy",
+    "resolution": ""
+  },
   "DW-52": {
     "answered_at": "2026-08-27",
     "bundle_name": "",
