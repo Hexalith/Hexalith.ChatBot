@@ -56,7 +56,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: Story 12.15 verification strategy
 severity: medium
 reason: **[MEDIUM · verification strategy]** Most of this diff's Aspire ops-harness rewrite (fault/observe/recover/cleanup logic in both `Aspire*Operations` classes) is reachable only through `LiveContinuityAspireE2eTests`, gated behind `HEXALITH_CHATBOT_TIER3=1` and not rerun in this pass — unlike the pieces extracted into static/internal helpers (e.g. `StopReachedDependencyBoundary`), which got real always-run unit tests. **Release-claim impact:** today's remediation claims ("N patches applied and verified") rest on build/non-live-suite success, not on the live-path behavior actually changing. **Owner:** Story 12.15 verification strategy. **Closure evidence:** extract more branch-level decision logic into testable static helpers, or rerun the live Tier-3 lane before claiming these fixes proven.
-status: open
+status: done 2026-08-27
+resolution: already resolved: Commit ffb62664cd0282d9ac70fad519f190c49e0d7cb9 records the genuine hosted release run 33066358280/evidence 01M11EYSDMP1ZF38B7KZA1A6FA; docs/adrs/continuity-drill-and-rpo-rto-validation.md:39 cites that retained run.
 
 ### DW-8: [MEDIUM · NFR41] Identity/Graph scope stamps still minted via post-hoc `/scope-observation`. Reconfirmed on ops-harness chunk.
 
@@ -128,7 +129,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: Story 12.15 evidence-integrity
 severity: medium
 reason: **[MEDIUM · NFR41]** Scoped-outage missing/degenerate monitoring → driver unmeasurable conversion still open.** Ops reject bad stamps; driver path to audited unmeasurable remains. **Release-claim impact:** NFR41 figures remain provisional. **Owner:** Story 12.15 evidence-integrity. **Closure evidence:** per existing ledger entry.
-status: open
+status: done 2026-08-27
+resolution: already resolved: tests/Hexalith.ChatBot.IntegrationTests/Recovery/AspireScopedOutageOperations.cs:260-263,300-303 rejects degenerate stamps, and src/Hexalith.ChatBot.Server/Audit/ScopedOutageDegradationValidationCoordinator.cs:169-205 converts non-cancellation driver failures into retained audited unmeasurable reports.
 
 ### DW-17: [MEDIUM · RPO semantics] Green-path RPO hard-coded `TimeSpan.Zero` when no loss detected.
 
@@ -286,7 +288,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: Story 12.15 workflows hygiene if parity is required
 severity: low
 reason: **[LOW · live-recovery checkout] Scheduled live-recovery jobs omit exact-head / producer-head sidecars.** Gate still pins `REQUIRED_COMMIT` to `github.sha`. **Release-claim impact:** weaker provenance ceremony than story-evidence lane. **Owner:** Story 12.15 workflows hygiene if parity is required. **Closure evidence:** same head-binding sidecars as build/topology or documented intentional difference.
-status: open
+status: done 2026-08-27
+resolution: already resolved: tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryRepositoryCommitResolver.cs:15-24 binds evidence to GITHUB_SHA or exact HEAD, and src/Hexalith.ChatBot.Server/Audit/LiveRecoveryValidationEvidenceGate.cs:161-165 rejects a manifest that differs from the workflow-pinned commit.
 
 ### DW-36: [MEDIUM · gate producer summary] Gate still trusts producer-written `LatestAttemptCompletedSuccessfully` and `AlertsDeliveredByJob`.
 
@@ -708,7 +711,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of story-10.6b 
 location: _bmad-output/implementation-artifacts/spec-run-all-tests-and-fix-issues.md
 source_spec: _bmad-output/implementation-artifacts/spec-run-all-tests-and-fix-issues.md
 reason: Streaming release-readiness evidence remains source-token and synthetic-fixture based rather than production progressive-render execution. Evidence: The pre-existing readiness pattern searches whole source files for markers, while the cited browser case uses hand-authored `SetContentAsync` HTML; production component wiring, successive response chunks, or Stop behavior can regress without those markers disappearing.
-status: open
+status: done 2026-08-27
+resolution: already resolved: Commit 011261ef302aba9d3045f03d456562c089c6886d added tests/Hexalith.ChatBot.IntegrationTests/Story132ProductionBrowserAspireE2ETests.cs:92-335, which exercises the authenticated production UI, command/projection/SignalR path, active generation, Stop, terminal render, focus return, and live announcement.
 
 ### DW-86: [LOW · durable activity CT] Workflow activities pass `CancellationToken.None` into EventStore/audit/alert side effects.
 
@@ -1002,7 +1006,8 @@ status: open
 origin: migrated from legacy ledger ("Deferred from: code review of story-13.2 (2026-08-25)"), 2026-08-26
 location: n/a
 reason: `ProjectConversationReducers.ReduceFailed` writes `SubmissionErrorCode` from a *load* error (conflating two different failures) and sets `StreamingErrorCode` in the same reducer that nulls `Conversation`, making that value unreachable because the streaming line only renders inside `@if (Conversation is { } ...)`.
-status: open
+status: done 2026-08-27
+resolution: already resolved: Commit 011261ef302aba9d3045f03d456562c089c6886d; src/Hexalith.ChatBot.UI/State/ProjectConversation/ProjectConversationReducers.cs:209-218 preserves Conversation on load failure, with tests/Hexalith.ChatBot.UI.Tests/ProjectConversationStateTests.cs:27-61 proving the prior view survives.
 
 ### DW-122: [MEDIUM · missing-capability] The evidence drawer specified by EXPERIENCE.md does not exist on the association surface.
 
