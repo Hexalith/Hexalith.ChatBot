@@ -803,6 +803,7 @@ location: Hexalith.EventStore
 severity: low
 reason: **[LOW · observability] Three projection log event ids are duplicated within the EventStore projection subsystem.** `1120` and `1121` are shared by `ProjectionDiscoveryHostedService` and `ProjectionUpdateOrchestrator`, and `4660` twice within `ProjectionUpdateOrchestrator`. Anything filtering or alerting on event id conflates them. They predate this work and renumbering a shipped id changes what operators' filters match, so `ProjectionLogEventIdUniquenessTests` pins them explicitly and fails on any **new** collision instead. **Owner:** Hexalith.EventStore. **Closure evidence:** ids renumbered with an operator-facing note, and the pinned allowlist emptied.
 status: open
+decision: 2026-08-27 Renumber with migration — Assign unique ids, publish an operator-facing filter migration note, update tests, and empty the collision allowlist.
 decision: 2026-08-26 Renumber with migration — Assign unique ids, publish an operator-facing filter migration note, update tests, and empty the collision allowlist.
 
 ### DW-97: [MEDIUM · diagnosis] B4 — the scoped-outage control probe's catch scope is wider than the request it classifies.
