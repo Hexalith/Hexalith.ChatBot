@@ -560,6 +560,7 @@ location: PeriodicEnforcementRuntime.cs:181-193,321-323,690-718
 severity: medium
 reason: **[MEDIUM · pre-existing runtime scaling] Cadence ownership and status are process-local.** `PeriodicEnforcementRuntime.cs:181-193,321-323,690-718` keeps last-run state, cadence partitions, and non-overlap guards in memory. Restarts reset the evidence window and horizontally scaled replicas can execute the same global sweep and duplicate writes/alerts. The current story explicitly modeled the in-memory once-per-day guard, so distributed leasing/durable status belongs to the deployment/scale owner before the server runs with multiple replicas.
 status: open
+decision: 2026-08-28 Build distributed cadence — Introduce a durable fenced lease and cadence-status store and verify restart and multi-replica non-overlap.
 
 ### DW-65: [HIGH · owned by Story 12.16] The periodic correction-propagation SLO-deadline sweep (AC1 item 5) was never built.
 
