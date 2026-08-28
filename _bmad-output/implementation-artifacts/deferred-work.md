@@ -1159,4 +1159,6 @@ location: n/a
 source_spec: `spec-dw-52-loss-path-rpo-evidence.md`
 severity: low
 reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260827-211223-44d7; this entry preserves the lingering recommendation for a deliberate later review.
-status: open
+status: done 2026-08-28
+resolution: closed by human decision: The completed follow-up and separately triaged concrete residuals make the generic reminder redundant.
+decision: 2026-08-28 Close review reminder — The completed follow-up and separately triaged concrete residuals make the generic reminder redundant.
