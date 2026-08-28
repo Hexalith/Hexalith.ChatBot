@@ -265,6 +265,7 @@ severity: low
 reason: **[LOW · reason taxonomy] Broad reuse of `scope_digest_mismatch`/`status_mismatch` for I/O and CLI errors via subjects.** **Release-claim impact:** dashboards keyed only on reason codes blur failure classes. **Owner:** TE-2/policy if reason set expands. **Closure evidence:** new stable reasons or documented subject convention.
 status: open
 decision: 2026-08-28 Document subject convention — Keep the nine stable reason codes, define bounded subject tokens for CLI syntax, process launch, file I/O, and scope evaluation, and add focused tests and runbook mappings.
+decision: 2026-08-28 Document subject convention — Keep the nine stable reason codes, define bounded subject tokens for CLI syntax, process launch, file I/O, and scope evaluation, and add focused tests and runbook mappings.
 
 ### DW-31: [LOW · test harness] `GateFixture.FindPolicy` parent-walk discovery.
 
@@ -735,6 +736,7 @@ source_spec: _bmad-output/implementation-artifacts/spec-run-all-tests-and-fix-is
 reason: Externally committed Story 13.9 visual artifacts do not reliably prove dark-mode or settled forced-colors rendering. Evidence: Eighteen baseline-to-HEAD PNGs changed outside this workflow; inspected dark captures render Light/Clair, the French project-conversation dark/light files are byte-identical, and an English forced-colors dashboard capture records a loading state while the generator overwrites tracked PNGs without baseline comparison.
 status: open
 decision: 2026-08-28 Regenerate and review — Wait for settled dark and forced-colors state, compare against a baseline, regenerate affected PNGs, and present them for explicit acceptance.
+decision: 2026-08-28 Regenerate and review — Wait for settled dark and forced-colors state, compare against a baseline, regenerate affected PNGs, and present them for explicit acceptance.
 
 ### DW-85: Streaming release-readiness evidence remains source-token and synthetic-fixture based rather than production progressive-render execution.
 
@@ -752,6 +754,7 @@ location: Story 2.9 / correction-propagation runtime
 severity: low
 reason: **[LOW · durable activity CT]** Workflow activities pass `CancellationToken.None` into EventStore/audit/alert side effects. **Release-claim impact:** host cancellation cannot abort in-flight activity I/O; acceptable under typical Dapr durable-activity semantics if activities remain idempotent. **Owner:** Story 2.9 / correction-propagation runtime. **Closure evidence:** documented durable-activity cancellation policy, or activity-context token plumbing with idempotent compensation tests.
 status: open
+decision: 2026-08-28 Document durable completion — Ratify CancellationToken.None for durable side effects, document replay and idempotency policy, and add shutdown and replay tests proving eventual completion is safe.
 decision: 2026-08-28 Document durable completion — Ratify CancellationToken.None for durable side effects, document replay and idempotency policy, and add shutdown and replay tests proving eventual completion is safe.
 
 ### DW-87: [MEDIUM · terminal failure ownership] Distinct correction-propagation workflow `Failed` status deferred; Story 2.9 keeps `Correction-delayed` for store/soft failures.
@@ -1136,6 +1139,7 @@ source_spec: `spec-retention-failure-marker.md`
 severity: medium
 reason: All three coordinators guard the retention fallback with `catch (Exception) when (cancellationToken is { IsCancellationRequested: false })`. The filter predates this story and is deliberately documented, and the marker is specified to be emitted only after both `RecordAsync` attempts fail -- so the current behaviour is spec-conformant. It nonetheless leaves the workflow-timeout path (the 265m SIGINT ladder in ci.yml / release.yml, i.e. the failure most likely to lose evidence) with no artifact-level reason at all: the gate reports plain `<job>:missing_evidence`, which is the exact reconstruction gap this story closed for the non-cancelled path.
 status: open
+decision: 2026-08-28 Mark cancellation loss — Define a bounded cancellation-safe retention path, attempt the required canonical fallback semantics, emit an independent marker when evidence cannot be retained, and update all coordinators, gates, workflows, and tests consistently.
 decision: 2026-08-28 Mark cancellation loss — Define a bounded cancellation-safe retention path, attempt the required canonical fallback semantics, emit an independent marker when evidence cannot be retained, and update all coordinators, gates, workflows, and tests consistently.
 
 ### DW-133: Follow-up review still recommended for dw-retention-failure-marker after the damping cap was spent
