@@ -241,7 +241,7 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
     }
 
     [Fact]
-    public async Task WorkflowShapedArtifactReplaysAllThreeRetentionFailuresWithoutManifests()
+    public async Task WorkflowShapedArtifactReplaysAllFourRetentionFailuresWithoutManifests()
     {
         string root = Path.Combine(Path.GetTempPath(), $"recovery-workflow-artifact-{Guid.NewGuid():N}");
         string canonicalEvidenceRoot = Path.Combine(root, "canonical-evidence");
@@ -261,6 +261,11 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
                 runId,
                 LiveRecoveryValidationJobs.Continuity,
                 ContinuityDrillScenarios.EventStoreOutage,
+                failedAtUtc),
+            RecoveryValidationEvidenceRetentionFailureMarker.Create(
+                runId,
+                LiveRecoveryValidationJobs.ControlledLossPath,
+                ControlledLossPathReport.SubscriptionNotificationRejectionScenario,
                 failedAtUtc),
             RecoveryValidationEvidenceRetentionFailureMarker.Create(
                 runId,
@@ -287,6 +292,7 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
             AlertsDeliveredByJob = new Dictionary<string, int>(StringComparer.Ordinal)
             {
                 [LiveRecoveryValidationJobs.Continuity] = 0,
+                [LiveRecoveryValidationJobs.ControlledLossPath] = 0,
                 [LiveRecoveryValidationJobs.ProjectionRebuild] = 0,
                 [LiveRecoveryValidationJobs.ScopedOutage] = 0,
             },
@@ -342,11 +348,80 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
         foreach (string jobId in LiveRecoveryValidationJobs.All)
         {
             decision.StopShipReasons.ShouldContain($"{jobId}:evidence_retention_failed");
-            decision.StopShipReasons.ShouldContain($"{jobId}:unalerted_breach");
             decision.StopShipReasons.ShouldNotContain($"{jobId}:missing_evidence");
+            if (string.Equals(jobId, LiveRecoveryValidationJobs.ControlledLossPath, StringComparison.Ordinal))
+            {
+                decision.StopShipReasons.ShouldNotContain($"{jobId}:unalerted_breach");
+            }
+            else
+            {
+                decision.StopShipReasons.ShouldContain($"{jobId}:unalerted_breach");
+            }
         }
 
         Directory.GetFiles(artifactRoot, "*.manifest.json", SearchOption.AllDirectories).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReplayRejectsControlledLossEvidenceFromAnotherCommit()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-08-28T12:00:00Z", CultureInfo.InvariantCulture);
+        LiveRecoveryValidationEvidenceGateDecision decision = ReplayDecision(
+            [ReplayControlledLossManifest(now)],
+            now,
+            requiredCommit: "2493ff8f2f7e031bc386a2d379d95649744fe7ee");
+
+        decision.StopShipReasons.ShouldContain(
+            $"{LiveRecoveryValidationJobs.ControlledLossPath}:repository_commit_unexpected");
+    }
+
+    [Fact]
+    public void ReplayRejectsStaleControlledLossEvidence()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-08-28T12:00:00Z", CultureInfo.InvariantCulture);
+        RecoveryValidationEvidenceManifest stale = ReplayControlledLossManifest(now) with
+        {
+            StartedAtUtc = now - TimeSpan.FromDays(3),
+            EndedAtUtc = now - TimeSpan.FromDays(2),
+            PreFaultCommittedAtUtc = now - TimeSpan.FromDays(3) + TimeSpan.FromSeconds(10),
+            RejectedAtUtc = now - TimeSpan.FromDays(3) + TimeSpan.FromSeconds(20),
+            PostRecoveryCommittedAtUtc = now - TimeSpan.FromDays(3) + TimeSpan.FromSeconds(30),
+        };
+
+        LiveRecoveryValidationEvidenceGateDecision decision = ReplayDecision([stale], now);
+
+        decision.StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.ControlledLossPath}:manifest_stale");
+    }
+
+    [Fact]
+    public void ReplayRejectsDuplicateControlledLossEvidence()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-08-28T12:00:00Z", CultureInfo.InvariantCulture);
+        RecoveryValidationEvidenceManifest manifest = ReplayControlledLossManifest(now);
+
+        LiveRecoveryValidationEvidenceGateDecision decision = ReplayDecision(
+            [manifest, manifest with { ScenarioId = "01ARZ3NDEKTSV4RRFFQ69G5FAF" }],
+            now);
+
+        decision.StopShipReasons.ShouldContain(
+            $"{LiveRecoveryValidationJobs.ControlledLossPath}:incomplete_scenario_set");
+    }
+
+    [Fact]
+    public void ReplayRejectsCorruptRetentionEvidence()
+    {
+        DateTimeOffset now = DateTimeOffset.Parse("2026-08-28T12:00:00Z", CultureInfo.InvariantCulture);
+        LiveRecoveryValidationEvidenceAttempt attempt = ReplayAttempt([ReplayControlledLossManifest(now)], now) with
+        {
+            RetentionFailureMarkers = [null],
+        };
+
+        LiveRecoveryValidationEvidenceGateDecision decision = LiveRecoveryValidationEvidenceGate.Evaluate(
+            attempt,
+            ReplayPolicy(),
+            now);
+
+        decision.StopShipReasons.ShouldContain("retention_failure_marker_invalid");
     }
 
     internal static ValueTask<IReadOnlyList<RecoveryValidationEvidenceRetentionFailureMarker?>>
@@ -525,4 +600,94 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
             ? value
             : throw new InvalidOperationException($"{variable} is set to '{configured}', which is not a positive number.");
     }
+
+    private static LiveRecoveryValidationEvidenceGateDecision ReplayDecision(
+        IReadOnlyList<RecoveryValidationEvidenceManifest> manifests,
+        DateTimeOffset now,
+        string? requiredCommit = null)
+        => LiveRecoveryValidationEvidenceGate.Evaluate(
+            ReplayAttempt(manifests, now),
+            ReplayPolicy(requiredCommit),
+            now);
+
+    private static LiveRecoveryValidationEvidenceAttempt ReplayAttempt(
+        IReadOnlyList<RecoveryValidationEvidenceManifest> manifests,
+        DateTimeOffset now)
+        => new(
+            Enabled: true,
+            RunId: "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            StartedAtUtc: now - TimeSpan.FromMinutes(3),
+            CompletedAtUtc: now - TimeSpan.FromMinutes(1),
+            LatestAttemptCompletedSuccessfully: true,
+            Evidence: manifests,
+            RetentionFailureMarkers: [],
+            AlertsDeliveredByJob: new Dictionary<string, int>(StringComparer.Ordinal));
+
+    private static LiveRecoveryValidationGatePolicy ReplayPolicy(string? requiredCommit = null)
+        => new(
+            ConfiguredProjectionDatasets: ["recovery-baseline"],
+            TargetDeviationsBlockRelease: true,
+            RequiredDriverMode: RecoveryValidationEvidenceManifest.LiveDriverMode,
+            MaximumEvidenceAge: TimeSpan.FromDays(1),
+            ExpectedDatasetVersion: "v1",
+            MinimumDatasetVolume: 6,
+            RequiredRepositoryCommit: requiredCommit,
+            MaximumMeasurableRecoveryCeilingSeconds: 180);
+
+    private static RecoveryValidationEvidenceManifest ReplayControlledLossManifest(DateTimeOffset now)
+        => new()
+        {
+            RunId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            ScenarioId = "01ARZ3NDEKTSV4RRFFQ69G5FAE",
+            StartedAtUtc = now - TimeSpan.FromMinutes(2),
+            EndedAtUtc = now - TimeSpan.FromMinutes(1),
+            RepositoryCommit = "1493ff8f2f7e031bc386a2d379d95649744fe7ee",
+            AppHostVersion = "chatbot-apphost-v1",
+            AspireVersion = "13.4.6",
+            DaprVersion = "1.18.4",
+            TopologyVersion = "aspire-single-replica-recovery-v1",
+            ConfigurationVersion = "live-recovery-v1",
+            TenantRef = "replay-test:recovery-validation",
+            DatasetRef = "recovery-baseline",
+            DatasetVersion = "v1",
+            ConfiguredDatasetVolume = 6,
+            DatasetVolume = 0,
+            DriverMode = RecoveryValidationEvidenceManifest.LiveDriverMode,
+            JobId = LiveRecoveryValidationJobs.ControlledLossPath,
+            Scenario = ControlledLossPathReport.SubscriptionNotificationRejectionScenario,
+            // Exactly what FileRecoveryValidationEvidenceSink writes for this job. A replay fixture that invents its
+            // own action vocabulary replays a shape the producer never emits.
+            InjectedFaultAction = "reject:subscription-notification",
+            RestoreAction = "restore:graph-subscription",
+            CleanupAction = "cleanup:subscription-notification-rejection",
+            ExpectedScope = "tenant",
+            ObservedScope = "tenant",
+            ReportKind = LiveRecoveryValidationJobs.ControlledLossPath,
+            Verdict = ControlledLossPathVerdicts.Met,
+            ReasonCode = ControlledLossPathReport.CompletedReasonCode,
+            MeasurementsSeconds = new Dictionary<string, double> { ["rpo"] = 20 },
+            AllowedTargetsSeconds = new Dictionary<string, double> { ["rpo"] = 900 },
+            Assertions = LiveRecoveryValidationEvidenceGate.RequiredAssertionsFor(
+                    LiveRecoveryValidationJobs.ControlledLossPath)
+                .ToDictionary(static assertion => assertion, static _ => true, StringComparer.Ordinal),
+            Coverage = new Dictionary<string, int> { ["scenario"] = 1 },
+            Deviations = [],
+            ResidualIds = ["RV-PROD-CONTROL"],
+            ArtifactLocators = new Dictionary<string, string>
+            {
+                ["test-output"] = "artifact:live-recovery-validation-evidence/results.trx",
+                ["reports"] = "artifact:live-recovery-validation-evidence/reports",
+            },
+            MeasurableRecoveryCeilingSeconds = 180,
+            PreFaultRetainedRef = "01ARZ3NDEKTSV4RRFFQ69G5FAA",
+            PreFaultEventRef = "01ARZ3NDEKTSV4RRFFQ69G5FAB",
+            PreFaultSequence = 1,
+            PreFaultCommittedAtUtc = now - TimeSpan.FromSeconds(100),
+            RejectedCandidateRef = "01ARZ3NDEKTSV4RRFFQ69G5FAC",
+            RejectedAtUtc = now - TimeSpan.FromSeconds(90),
+            PostRecoveryRetainedRef = "01ARZ3NDEKTSV4RRFFQ69G5FAD",
+            PostRecoveryEventRef = "01ARZ3NDEKTSV4RRFFQ69G5FAF",
+            PostRecoverySequence = 1,
+            PostRecoveryCommittedAtUtc = now - TimeSpan.FromSeconds(80),
+        };
 }

@@ -11,6 +11,7 @@ using Aspire.Hosting.Testing;
 
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.RecoverySandbox;
+using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Client.Projections;
 
@@ -88,6 +89,10 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     private string? _subscriptionCheckpointIntakeRef;
     private string? _reconciledIntakeRef;
     private string? _duplicateProbeIntakeRef;
+    private string? _controlledPreFaultIntakeRef;
+    private string? _controlledRejectedCandidateRef;
+    private string? _controlledPostRecoveryIntakeRef;
+    private bool _controlledFaultLeftStateUnchanged;
     private bool _subscriptionFaultLeftStateUnchanged;
 
     public AspireRecoverySandboxOperations(
@@ -759,6 +764,213 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         return new RecoveryOperationCheckpoint(1, committedAtUtc, intakeId);
     }
 
+    /// <summary>Produces and reads one authoritative durable bound for the controlled-loss lane.</summary>
+    internal async ValueTask<DurableCommitObservation> WitnessControlledLossCommitAsync(
+        string tenantRef,
+        bool preFault,
+        CancellationToken cancellationToken)
+    {
+        string phase = preFault
+            ? RecoveryNotificationIdentity.PreFaultPhase
+            : RecoveryNotificationIdentity.PostRecoveryPhase;
+        using JsonDocument process = await SendSandboxControlAsync(
+            tenantRef,
+            "process",
+            includeBearer: true,
+            cancellationToken,
+            notificationPhase: phase,
+            scenarioLane: RecoveryNotificationIdentity.ControlledLossLane).ConfigureAwait(false);
+        JsonElement root = process.RootElement;
+        if (!root.GetProperty("submitted").GetBoolean() ||
+            root.GetProperty("intakeId").GetString() is not { Length: > 0 } intakeRef ||
+            root.GetProperty("candidateRef").GetString() is not { Length: > 0 } candidateRef ||
+            !string.Equals(intakeRef, candidateRef, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The controlled-loss retained bound did not reach the real Worker submission path.");
+        }
+
+        DurableCommitObservation observation = await _durableState.WaitForMailboxIntakeCommitAsync(
+            RecoveryValidationTopology.StorageTenantRef,
+            intakeRef,
+            cancellationToken).ConfigureAwait(false);
+        if (preFault)
+        {
+            _controlledPreFaultIntakeRef = intakeRef;
+        }
+        else
+        {
+            _controlledPostRecoveryIntakeRef = intakeRef;
+        }
+
+        return observation;
+    }
+
+    /// <summary>Obtains the candidate identity captured before the controlled 503 dependency rejection.</summary>
+    internal async ValueTask<ControlledLossCandidateObservation> RejectControlledLossCandidateAsync(
+        string tenantRef,
+        CancellationToken cancellationToken)
+    {
+        using JsonDocument response = await SendSandboxControlAsync(
+            tenantRef,
+            "process",
+            includeBearer: true,
+            cancellationToken,
+            notificationPhase: RecoveryNotificationIdentity.LossPhase,
+            scenarioLane: RecoveryNotificationIdentity.ControlledLossLane).ConfigureAwait(false);
+        JsonElement root = response.RootElement;
+        string? candidateRef = root.GetProperty("candidateRef").GetString();
+
+        // Read the observation instant defensively. When the sandbox never reached the submission boundary the
+        // capture is null, and an eager GetDateTimeOffset() replaced this method's own diagnostic with a raw
+        // "element is not a string" JSON error in the hosted log.
+        DateTimeOffset? observedAtUtc =
+            root.TryGetProperty("candidateObservedAtUtc", out JsonElement observed) &&
+            observed.ValueKind == JsonValueKind.String &&
+            observed.TryGetDateTimeOffset(out DateTimeOffset parsedObservedAtUtc)
+                ? parsedObservedAtUtc
+                : null;
+        bool rejected = !root.GetProperty("submitted").GetBoolean() &&
+            string.Equals(root.GetProperty("reasonCode").GetString(), "chatbot_submission_recoverable", StringComparison.Ordinal);
+        if (!rejected || !RecoveryValidationEvidenceManifest.IsCanonicalUlid(candidateRef) ||
+            observedAtUtc is not { Offset.Ticks: 0 })
+        {
+            throw new InvalidOperationException("The controlled fault-window candidate was not safely identified before rejection.");
+        }
+
+        ProjectConversationSourceEmailView? affectedAfterFault = await _readModels
+            .GetSourceEmailAsync(_affectedTenantSentinel!.TenantId, _affectedTenantSentinel.IntakeId, cancellationToken)
+            .ConfigureAwait(false);
+        ProjectConversationSourceEmailView? controlAfterFault = await _readModels
+            .GetSourceEmailAsync(_controlTenantSentinel!.TenantId, _controlTenantSentinel.IntakeId, cancellationToken)
+            .ConfigureAwait(false);
+        _controlledFaultLeftStateUnchanged = Equals(affectedAfterFault, _affectedTenantSentinel) &&
+            Equals(controlAfterFault, _controlTenantSentinel);
+        _controlledRejectedCandidateRef = candidateRef!;
+        return new ControlledLossCandidateObservation(candidateRef!, observedAtUtc.Value, rejected);
+    }
+
+    /// <summary>Reads all retained, absent, and tenant-isolation invariants after controlled-loss restoration.</summary>
+    internal async ValueTask<ControlledLossPathSafetyObservation> ReadControlledLossSafetyAsync(
+        string tenantRef,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantRef);
+        if (_controlledPreFaultIntakeRef is null || _controlledRejectedCandidateRef is null ||
+            _controlledPostRecoveryIntakeRef is null || _affectedTenantSentinel is null ||
+            _controlTenantSentinel is null)
+        {
+            throw new InvalidOperationException("The controlled-loss safety observation is incomplete.");
+        }
+
+        Task<bool> candidateAggregateAbsent = _durableState.RemainsAbsentAsync(
+            RecoveryValidationTopology.StorageTenantRef,
+            _controlledRejectedCandidateRef,
+            AbsenceConfirmationWindow,
+            cancellationToken);
+        Task<bool> candidateReadModelsAbsent = RemainsIntakeReadModelsAbsentAsync(
+            RecoveryValidationTopology.StorageTenantRef,
+            _controlledRejectedCandidateRef,
+            AbsenceConfirmationWindow,
+            cancellationToken);
+        Task<bool> controlPreAggregateAbsent = _durableState.RemainsAbsentAsync(
+            RecoveryValidationTopology.ControlTenantRef,
+            _controlledPreFaultIntakeRef,
+            AbsenceConfirmationWindow,
+            cancellationToken);
+        Task<bool> controlPreReadModelsAbsent = RemainsIntakeReadModelsAbsentAsync(
+            RecoveryValidationTopology.ControlTenantRef,
+            _controlledPreFaultIntakeRef,
+            AbsenceConfirmationWindow,
+            cancellationToken);
+        Task<bool> controlCandidateAggregateAbsent = _durableState.RemainsAbsentAsync(
+            RecoveryValidationTopology.ControlTenantRef,
+            _controlledRejectedCandidateRef,
+            AbsenceConfirmationWindow,
+            cancellationToken);
+        Task<bool> controlCandidateReadModelsAbsent = RemainsIntakeReadModelsAbsentAsync(
+            RecoveryValidationTopology.ControlTenantRef,
+            _controlledRejectedCandidateRef,
+            AbsenceConfirmationWindow,
+            cancellationToken);
+        Task<bool> controlPostAggregateAbsent = _durableState.RemainsAbsentAsync(
+            RecoveryValidationTopology.ControlTenantRef,
+            _controlledPostRecoveryIntakeRef,
+            AbsenceConfirmationWindow,
+            cancellationToken);
+        Task<bool> controlPostReadModelsAbsent = RemainsIntakeReadModelsAbsentAsync(
+            RecoveryValidationTopology.ControlTenantRef,
+            _controlledPostRecoveryIntakeRef,
+            AbsenceConfirmationWindow,
+            cancellationToken);
+        await Task.WhenAll(
+            candidateAggregateAbsent,
+            candidateReadModelsAbsent,
+            controlPreAggregateAbsent,
+            controlPreReadModelsAbsent,
+            controlCandidateAggregateAbsent,
+            controlCandidateReadModelsAbsent,
+            controlPostAggregateAbsent,
+            controlPostReadModelsAbsent).ConfigureAwait(false);
+        bool preRetained = await _durableState.IsMailboxIntakeCommittedAsync(
+            RecoveryValidationTopology.StorageTenantRef,
+            _controlledPreFaultIntakeRef,
+            cancellationToken).ConfigureAwait(false);
+        bool postRetained = await _durableState.IsMailboxIntakeCommittedAsync(
+            RecoveryValidationTopology.StorageTenantRef,
+            _controlledPostRecoveryIntakeRef,
+            cancellationToken).ConfigureAwait(false);
+        ProjectConversationSourceEmailView? affectedSentinel = await _readModels.GetSourceEmailAsync(
+            _affectedTenantSentinel.TenantId,
+            _affectedTenantSentinel.IntakeId,
+            cancellationToken).ConfigureAwait(false);
+        ProjectConversationSourceEmailView? controlSentinel = await _readModels.GetSourceEmailAsync(
+            _controlTenantSentinel.TenantId,
+            _controlTenantSentinel.IntakeId,
+            cancellationToken).ConfigureAwait(false);
+        bool sentinelsUnchanged = Equals(affectedSentinel, _affectedTenantSentinel) &&
+            Equals(controlSentinel, _controlTenantSentinel);
+        return EvaluateControlledLossSafety(
+            preRetained,
+            candidateAggregateAbsent.Result,
+            candidateReadModelsAbsent.Result,
+            postRetained,
+            controlPreAggregateAbsent.Result,
+            controlPreReadModelsAbsent.Result,
+            controlCandidateAggregateAbsent.Result,
+            controlCandidateReadModelsAbsent.Result,
+            controlPostAggregateAbsent.Result,
+            controlPostReadModelsAbsent.Result,
+            sentinelsUnchanged,
+            _controlledFaultLeftStateUnchanged);
+    }
+
+    /// <summary>Combines independently observed controlled-loss durability, isolation, and sentinel facts.</summary>
+    internal static ControlledLossPathSafetyObservation EvaluateControlledLossSafety(
+        bool preFaultRetained,
+        bool candidateAggregateAbsent,
+        bool candidateReadModelsAbsent,
+        bool postRecoveryRetained,
+        bool controlPreAggregateAbsent,
+        bool controlPreReadModelsAbsent,
+        bool controlCandidateAggregateAbsent,
+        bool controlCandidateReadModelsAbsent,
+        bool controlPostAggregateAbsent,
+        bool controlPostReadModelsAbsent,
+        bool sentinelsUnchangedAfterRecovery,
+        bool sentinelsUnchangedDuringFault)
+        => new(
+            preFaultRetained,
+            candidateAggregateAbsent && candidateReadModelsAbsent,
+            postRecoveryRetained,
+            controlPreAggregateAbsent &&
+                controlPreReadModelsAbsent &&
+                controlCandidateAggregateAbsent &&
+                controlCandidateReadModelsAbsent &&
+                controlPostAggregateAbsent &&
+                controlPostReadModelsAbsent &&
+                sentinelsUnchangedAfterRecovery,
+            sentinelsUnchangedDuringFault && sentinelsUnchangedAfterRecovery);
+
     /// <inheritdoc />
     public async ValueTask ExpireSubscriptionAsync(string tenantRef, CancellationToken cancellationToken)
     {
@@ -961,6 +1173,12 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             (RecoveryValidationTopology.StorageTenantRef, _subscriptionCheckpointIntakeRef),
             (RecoveryValidationTopology.StorageTenantRef, _reconciledIntakeRef),
             (RecoveryValidationTopology.StorageTenantRef, _duplicateProbeIntakeRef),
+            (RecoveryValidationTopology.StorageTenantRef, _controlledPreFaultIntakeRef),
+            (RecoveryValidationTopology.StorageTenantRef, _controlledRejectedCandidateRef),
+            (RecoveryValidationTopology.StorageTenantRef, _controlledPostRecoveryIntakeRef),
+            (RecoveryValidationTopology.ControlTenantRef, _controlledPreFaultIntakeRef),
+            (RecoveryValidationTopology.ControlTenantRef, _controlledRejectedCandidateRef),
+            (RecoveryValidationTopology.ControlTenantRef, _controlledPostRecoveryIntakeRef),
         ];
         // Erase FIRST, then restore in finally. Running restore ahead of erase stranded rows when restore failed;
         // running erase without finally left the simulator faulted when erase threw.
@@ -1011,6 +1229,31 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 AbsenceConfirmationWindow,
                 cancellationToken).ConfigureAwait(false);
         }
+        foreach (string? controlledIdentity in new[]
+        {
+            _controlledPreFaultIntakeRef,
+            _controlledRejectedCandidateRef,
+            _controlledPostRecoveryIntakeRef,
+        })
+        {
+            if (!string.IsNullOrWhiteSpace(controlledIdentity))
+            {
+                complete &= await _durableState.RemainsAbsentAsync(
+                    RecoveryValidationTopology.ControlTenantRef,
+                    controlledIdentity,
+                    AbsenceConfirmationWindow,
+                    cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(_controlledRejectedCandidateRef))
+        {
+            complete &= await _durableState.RemainsAbsentAsync(
+                RecoveryValidationTopology.StorageTenantRef,
+                _controlledRejectedCandidateRef,
+                AbsenceConfirmationWindow,
+                cancellationToken).ConfigureAwait(false);
+        }
 
         if (complete)
         {
@@ -1019,6 +1262,13 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             _subscriptionCheckpointIntakeRef = null;
             _reconciledIntakeRef = null;
             _duplicateProbeIntakeRef = null;
+            _controlledPreFaultIntakeRef = null;
+            _controlledRejectedCandidateRef = null;
+            _controlledPostRecoveryIntakeRef = null;
+
+            // Reset the isolation observation with the refs it was derived from. Left set, a later controlled-loss
+            // run on this instance would publish the previous run's tenant-isolation fact as its own.
+            _controlledFaultLeftStateUnchanged = false;
         }
 
         return complete;
@@ -1458,9 +1708,15 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         bool includeBearer,
         CancellationToken cancellationToken,
         HttpMethod? method = null,
-        string? notificationPhase = null)
+        string? notificationPhase = null,
+        string scenarioLane = RecoveryNotificationIdentity.ContinuityLane)
     {
-        using HttpRequestMessage request = SandboxRequest(tenantRef, action, includeBearer, method ?? HttpMethod.Post);
+        using HttpRequestMessage request = SandboxRequest(
+            tenantRef,
+            action,
+            includeBearer,
+            method ?? HttpMethod.Post,
+            scenarioLane);
         if (includeBearer)
         {
             string mailboxAccessToken = await RecoveryAccessTokenProvider
@@ -1491,12 +1747,17 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         return JsonDocument.Parse(body);
     }
 
-    private HttpRequestMessage SandboxRequest(string tenantRef, string action, bool includeBearer, HttpMethod method)
+    private HttpRequestMessage SandboxRequest(
+        string tenantRef,
+        string action,
+        bool includeBearer,
+        HttpMethod method,
+        string scenarioLane = RecoveryNotificationIdentity.ContinuityLane)
     {
         string tenant = Uri.EscapeDataString(tenantRef);
         HttpRequestMessage request = new(method, $"/recovery/{tenant}/m365-subscription-failure/{action}");
         request.Headers.Add("X-Recovery-Controller-Secret", _controllerSecret);
-        request.Headers.Add("X-Recovery-Scenario-Lane", "continuity");
+        request.Headers.Add("X-Recovery-Scenario-Lane", scenarioLane);
 
         return request;
     }

@@ -56,11 +56,11 @@ public sealed class EventStoreDurableStateProbeTests
             // artifact of the two actor-state keys committing via separate writes.
             1 => SequenceHttpMessageHandler.Json("{\"currentSequence\":1}"),
             2 => SequenceHttpMessageHandler.Json(
-                "{\"tenantId\":\"tenant-other\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}"),
+                EventEnvelope("tenant-other")),
             // Second attempt: fully consistent.
             3 => SequenceHttpMessageHandler.Json("{\"currentSequence\":1}"),
             _ => SequenceHttpMessageHandler.Json(
-                "{\"tenantId\":\"recovery-validation\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}"),
+                EventEnvelope("recovery-validation")),
         });
         using EventStoreDurableStateProbe probe = new(
             Endpoint,
@@ -85,7 +85,7 @@ public sealed class EventStoreDurableStateProbeTests
             1 => new HttpResponseMessage(HttpStatusCode.NotFound),
             2 => SequenceHttpMessageHandler.Json("{\"currentSequence\":1}"),
             _ => SequenceHttpMessageHandler.Json(
-                "{\"tenantId\":\"recovery-validation\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}"),
+                EventEnvelope("recovery-validation")),
         });
         using EventStoreDurableStateProbe probe = new(
             Endpoint,
@@ -112,7 +112,7 @@ public sealed class EventStoreDurableStateProbeTests
             1 => new HttpResponseMessage(HttpStatusCode.NotFound),
             2 => SequenceHttpMessageHandler.Json("{\"currentSequence\":1}"),
             _ => SequenceHttpMessageHandler.Json(
-                "{\"tenantId\":\"tenant-other\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}"),
+                EventEnvelope("tenant-other")),
         });
         using EventStoreDurableStateProbe probe = new(
             Endpoint,
@@ -136,7 +136,7 @@ public sealed class EventStoreDurableStateProbeTests
             1 => new HttpResponseMessage(HttpStatusCode.NotFound),
             2 => SequenceHttpMessageHandler.Json("{\"currentSequence\":1}"),
             _ => SequenceHttpMessageHandler.Json(
-                "{\"tenantId\":\"recovery-validation\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}"),
+                EventEnvelope("recovery-validation")),
         });
         using EventStoreDurableStateProbe probe = new(
             Endpoint,
@@ -153,4 +153,76 @@ public sealed class EventStoreDurableStateProbeTests
         absent.ShouldBeFalse();
         handler.Requests.ShouldBe(3);
     }
+
+    [Fact]
+    public async Task ReadReturnsAuthoritativePersistedSequenceTimestampAndIdentity()
+    {
+        using SequenceHttpMessageHandler handler = new((requestNumber, _) => requestNumber == 1
+            ? SequenceHttpMessageHandler.Json("{\"currentSequence\":1}")
+            : SequenceHttpMessageHandler.Json(EventEnvelope("recovery-validation")));
+        using EventStoreDurableStateProbe probe = new(
+            Endpoint,
+            handler,
+            TimeSpan.FromMilliseconds(50),
+            TimeSpan.FromMilliseconds(5));
+
+        DurableCommitObservation? observation = await probe.ReadMailboxIntakeCommitAsync(
+            "recovery-validation",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken);
+
+        observation.ShouldNotBeNull();
+        observation.SequenceNumber.ShouldBe(1);
+        observation.EventRef.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        observation.CommittedAtUtc.ShouldBe(DateTimeOffset.Parse("2026-08-28T00:01:00Z"));
+    }
+
+    [Fact]
+    public async Task FirstEventBoundRemainsAuthoritativeWhenAggregateMetadataHasAdvanced()
+    {
+        using SequenceHttpMessageHandler handler = new((requestNumber, _) => requestNumber == 1
+            ? SequenceHttpMessageHandler.Json("{\"currentSequence\":2}")
+            : SequenceHttpMessageHandler.Json(EventEnvelope("recovery-validation")));
+        using EventStoreDurableStateProbe probe = new(
+            Endpoint,
+            handler,
+            TimeSpan.FromMilliseconds(50),
+            TimeSpan.FromMilliseconds(5));
+
+        DurableCommitObservation? observation = await probe.ReadMailboxIntakeCommitAsync(
+            "recovery-validation",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken);
+
+        observation.ShouldNotBeNull();
+        observation.SequenceNumber.ShouldBe(1);
+        observation.CommittedAtUtc.ShouldBe(DateTimeOffset.Parse("2026-08-28T00:01:00Z"));
+    }
+
+    [Theory]
+    [InlineData("{\"tenantId\":\"recovery-validation\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"sequenceNumber\":1,\"messageId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAX\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}")]
+    [InlineData("{\"tenantId\":\"recovery-validation\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"sequenceNumber\":2,\"messageId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAX\",\"timestamp\":\"2026-08-28T00:01:00Z\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}")]
+    [InlineData("{\"tenantId\":\"recovery-validation\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"sequenceNumber\":1,\"messageId\":\"not-a-ulid\",\"timestamp\":\"2026-08-28T00:01:00Z\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}")]
+    [InlineData("{\"tenantId\":\"recovery-validation\",\"domain\":\"chatbot\",\"aggregateId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\",\"sequenceNumber\":1,\"messageId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAX\",\"timestamp\":\"2026-08-28T02:01:00+02:00\",\"eventTypeName\":\"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured\"}")]
+    public async Task MissingMalformedOrMismatchedDurableBoundsFailClosed(string eventBody)
+    {
+        using SequenceHttpMessageHandler handler = new((requestNumber, _) => requestNumber == 1
+            ? SequenceHttpMessageHandler.Json("{\"currentSequence\":1}")
+            : SequenceHttpMessageHandler.Json(eventBody));
+        using EventStoreDurableStateProbe probe = new(
+            Endpoint,
+            handler,
+            TimeSpan.FromMilliseconds(50),
+            TimeSpan.FromMilliseconds(5));
+
+        _ = await Should.ThrowAsync<InvalidOperationException>(() => probe.ReadMailboxIntakeCommitAsync(
+            "recovery-validation",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken));
+    }
+
+    private static string EventEnvelope(string tenantRef)
+        => $$"""
+            {"tenantId":"{{tenantRef}}","domain":"chatbot","aggregateId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","sequenceNumber":1,"messageId":"01ARZ3NDEKTSV4RRFFQ69G5FAX","timestamp":"2026-08-28T00:01:00Z","eventTypeName":"Hexalith.ChatBot.Server.Association.Intake.MailboxMessageIntakeCaptured"}
+            """;
 }

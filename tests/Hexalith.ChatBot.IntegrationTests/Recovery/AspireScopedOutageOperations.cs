@@ -1029,7 +1029,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         string tenant = Uri.EscapeDataString(tenantRef);
         using HttpRequestMessage request = new(method ?? HttpMethod.Post, $"/recovery/{tenant}/m365-subscription-failure/{action}");
         request.Headers.Add("X-Recovery-Controller-Secret", _controllerSecret);
-        request.Headers.Add("X-Recovery-Scenario-Lane", "graph");
+        request.Headers.Add("X-Recovery-Scenario-Lane", RecoveryNotificationIdentity.GraphLane);
         if (string.Equals(action, "process", StringComparison.Ordinal))
         {
             request.Headers.Add(

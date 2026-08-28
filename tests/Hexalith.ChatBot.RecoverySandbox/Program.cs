@@ -113,7 +113,10 @@ app.MapPost(
         }
 
         string scenarioLane = request.Headers["X-Recovery-Scenario-Lane"].ToString();
-        if (scenarioLane is not ("continuity" or "graph"))
+        if (scenarioLane is not (
+            RecoveryNotificationIdentity.ContinuityLane or
+            RecoveryNotificationIdentity.GraphLane or
+            RecoveryNotificationIdentity.ControlledLossLane))
         {
             return Results.NotFound();
         }
@@ -135,7 +138,13 @@ app.MapPost(
         HttpClient http = httpClientFactory.CreateClient("chatbot-forward");
         using (RecoveryBearerForwardingHandler.Use(bearer.Parameter))
         {
-            ChatBotClient client = new(new Client(http));
+            ChatBotClient forwardingClient = new(new Client(http));
+            CapturingRecoveryChatBotClient client = new(
+                forwardingClient,
+                rejectSubmission: string.Equals(
+                    notificationPhase,
+                    RecoveryNotificationIdentity.LossPhase,
+                    StringComparison.Ordinal));
             GraphMailboxIntakeWorker worker = new(
                 storageTenantRef,
                 mailboxConfiguration,
@@ -155,6 +164,8 @@ app.MapPost(
                 result.ReasonCode,
                 result.IntakeId,
                 submitted,
+                candidateRef = client.CandidateRef,
+                candidateObservedAtUtc = client.ObservedAtUtc,
                 observedAtUtc = DateTimeOffset.UtcNow,
             });
         }

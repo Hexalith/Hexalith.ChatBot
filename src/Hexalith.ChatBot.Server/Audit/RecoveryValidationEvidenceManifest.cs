@@ -61,6 +61,36 @@ internal sealed record RecoveryValidationEvidenceManifest
     public required IReadOnlyList<string> ResidualIds { get; init; }
     public required IReadOnlyDictionary<string, string> ArtifactLocators { get; init; }
 
+    /// <summary>Gets the retained aggregate identity immediately before the controlled rejection.</summary>
+    public string? PreFaultRetainedRef { get; init; }
+
+    /// <summary>Gets the persisted EventStore event identity immediately before the controlled rejection.</summary>
+    public string? PreFaultEventRef { get; init; }
+
+    /// <summary>Gets the persisted EventStore sequence immediately before the controlled rejection.</summary>
+    public long? PreFaultSequence { get; init; }
+
+    /// <summary>Gets the authoritative persisted EventStore timestamp immediately before the controlled rejection.</summary>
+    public DateTimeOffset? PreFaultCommittedAtUtc { get; init; }
+
+    /// <summary>Gets the deliberately rejected aggregate candidate identity.</summary>
+    public string? RejectedCandidateRef { get; init; }
+
+    /// <summary>Gets when the sandbox exposed the safe candidate identity before rejecting the dependency call.</summary>
+    public DateTimeOffset? RejectedAtUtc { get; init; }
+
+    /// <summary>Gets the retained aggregate identity committed after restoration.</summary>
+    public string? PostRecoveryRetainedRef { get; init; }
+
+    /// <summary>Gets the persisted EventStore event identity committed after restoration.</summary>
+    public string? PostRecoveryEventRef { get; init; }
+
+    /// <summary>Gets the persisted EventStore sequence committed after restoration.</summary>
+    public long? PostRecoverySequence { get; init; }
+
+    /// <summary>Gets the authoritative persisted EventStore timestamp after restoration.</summary>
+    public DateTimeOffset? PostRecoveryCommittedAtUtc { get; init; }
+
     /// <summary>
     /// Gets the longest recovery this lane could have measured, in seconds — the harness restoration budget.
     /// <para>
@@ -158,6 +188,23 @@ internal sealed record RecoveryValidationEvidenceManifest
             errors.Add("Measurements and allowed targets must use safe keys and finite non-negative seconds.");
         }
 
+        if (string.Equals(JobId, LiveRecoveryValidationJobs.ControlledLossPath, StringComparison.Ordinal))
+        {
+            if (!HasValidControlledLossBounds())
+            {
+                errors.Add("Controlled-loss durable commit bounds are incomplete or invalid.");
+            }
+
+            if (!HasConsistentControlledLossReason())
+            {
+                errors.Add("Controlled-loss verdict and reason code are inconsistent.");
+            }
+        }
+        else if (HasAnyControlledLossBound())
+        {
+            errors.Add("Controlled-loss durable commit bounds are not allowed on another report kind.");
+        }
+
         if (Assertions.Count == 0 || Assertions.Keys.Any(static token => !AuditMetadata.IsSafeStableIdentifier(token)))
         {
             errors.Add("Assertions must be non-empty metadata-only tokens.");
@@ -218,4 +265,40 @@ internal sealed record RecoveryValidationEvidenceManifest
             AuditMetadata.IsSafeStableIdentifier(entry.Key) &&
             double.IsFinite(entry.Value) &&
             entry.Value >= 0);
+
+    private bool HasAnyControlledLossBound()
+        => PreFaultRetainedRef is not null || PreFaultEventRef is not null || PreFaultSequence is not null ||
+            PreFaultCommittedAtUtc is not null || RejectedCandidateRef is not null || RejectedAtUtc is not null ||
+            PostRecoveryRetainedRef is not null || PostRecoveryEventRef is not null || PostRecoverySequence is not null ||
+            PostRecoveryCommittedAtUtc is not null;
+
+    private bool HasValidControlledLossBounds()
+    {
+        string[] identities =
+        [
+            PreFaultRetainedRef ?? string.Empty,
+            PreFaultEventRef ?? string.Empty,
+            RejectedCandidateRef ?? string.Empty,
+            PostRecoveryRetainedRef ?? string.Empty,
+            PostRecoveryEventRef ?? string.Empty,
+        ];
+        return identities.All(IsCanonicalUlid) &&
+            identities.Distinct(StringComparer.Ordinal).Count() == identities.Length &&
+            PreFaultSequence > 0 &&
+            PostRecoverySequence > 0 &&
+            PreFaultCommittedAtUtc is { Offset: var preOffset } pre && preOffset == TimeSpan.Zero &&
+            RejectedAtUtc is { Offset: var rejectedOffset } && rejectedOffset == TimeSpan.Zero &&
+            PostRecoveryCommittedAtUtc is { Offset: var postOffset } post && postOffset == TimeSpan.Zero &&
+            StartedAtUtc <= EndedAtUtc &&
+            pre <= post;
+    }
+
+    private bool HasConsistentControlledLossReason()
+        => (Verdict, ReasonCode) switch
+        {
+            (ControlledLossPathVerdicts.Met, ControlledLossPathReport.CompletedReasonCode) => true,
+            (ControlledLossPathVerdicts.Missed, ControlledLossPathReport.TargetMissedReasonCode) => true,
+            (ControlledLossPathVerdicts.Unmeasurable, ControlledLossPathReport.UnmeasurableReasonCode) => true,
+            _ => false,
+        };
 }

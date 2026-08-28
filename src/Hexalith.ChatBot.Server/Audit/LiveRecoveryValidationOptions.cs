@@ -71,11 +71,11 @@ internal sealed class LiveRecoveryValidationOptions
     public TimeSpan RunnerBudget { get; set; } = TimeSpan.FromMinutes(330);
 
     /// <summary>
-    /// Gets the smallest number of scenarios a complete sweep runs: both continuity drills, every canonical scoped
-    /// outage, and at least one projection-rebuild dataset.
+    /// Gets the smallest number of scenarios a complete sweep runs: both continuity drills, the separate controlled
+    /// loss path, every canonical scoped outage, and at least one projection-rebuild dataset.
     /// </summary>
     public static int MinimumSweepScenarioCount
-        => ContinuityDrillScenarios.All.Count + ScopedOutageDependencies.All.Count + 1;
+        => ContinuityDrillScenarios.All.Count + ScopedOutageDependencies.All.Count + 2;
 
     /// <summary>Topology startup and cleanup margin reserved inside <see cref="WorkflowTimeout"/>.</summary>
     private static readonly TimeSpan TopologyMargin = TimeSpan.FromMinutes(30);

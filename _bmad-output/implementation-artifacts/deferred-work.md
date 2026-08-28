@@ -437,7 +437,9 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: Story 12.15 governance chunk (ADR/PRD/addendum/Completion Notes wording) + Architecture for any future loss-injection drill
 severity: high
 reason: **[HIGH · governance + residual] No-loss continuity RPO stays `TimeSpan.Zero` by decision (2026-08-02 option 2).** Passing-run `measuredRpo: 0s` must not be cited as A10 confirmation of RPO ≤ 15 minutes. **Release-claim impact:** A10 RPO half remains unproven by green sandbox runs until a loss-path measurement or a separately owned drill is retained. **Owner:** Story 12.15 governance chunk (ADR/PRD/addendum/Completion Notes wording) + Architecture for any future loss-injection drill. **Closure evidence:** documents stop citing green-run `0s` as A10 proof; optional retained loss-path RPO evidence against the 15-minute budget.
-status: open
+status: done 2026-08-28
+resolution: resolved by sweep bundle dw-loss-path-rpo-evidence
+resolution-undo: 4be3e8d5ebe7beed69bd12b04996eb96a1f527879240e2ec3555232d1c620697 2026-08-28 7374617475733a206f70656e
 decision: 2026-08-27 Build loss-path drill — Add a controlled retained loss-injection scenario with durable commit bounds and gate evidence against the 15-minute target.
 decision: 2026-08-26 Build loss-path drill — Add a controlled retained loss-injection scenario with durable commit bounds and gate evidence against the 15-minute target.
 
@@ -1116,6 +1118,30 @@ status: open
 origin: review-budget-followup
 location: n/a
 source_spec: `spec-retention-failure-marker.md`
+severity: low
+reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260827-211223-44d7; this entry preserves the lingering recommendation for a deliberate later review.
+status: open
+
+### DW-134: RecoveryValidationTopologyContractTests.PrepareKeycloakRealmImportWritesTheRenderedRealmWithOwnerOnlyPermissionsAtAnUnpredictablePath fails in a full IntegrationTests run while passing in isolation.
+origin: spec-deferred c71f5c5b5a39
+location: tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryValidationTopologyContractTests.cs:377
+source_spec: `spec-dw-52-loss-path-rpo-evidence.md`
+severity: medium
+reason: The test asserts that exactly one new `{temp}/hexalith-chatbot-keycloak-*` subdirectory appears, but a sibling test in the same class creates four such directories, so the delta assertion sees 2 in a whole-assembly run. Reproduced at baseline dc194c7 with every DW-52 change stashed (280 tests, same single failure), so it is pre-existing and untouched by this story; both files are absent from this diff.
+status: open
+
+### DW-135: Only the controlled-loss stage writes a failed attempt summary, so the gate's `latest_attempt_incomplete` branch stays unreachable when the projection-rebuild or scoped-outage stages throw.
+origin: spec-deferred 2a66d370a301
+location: tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs:274
+source_spec: `spec-dw-52-loss-path-rpo-evidence.md`
+severity: low
+reason: LiveContinuityAspireE2eTests wraps RunControlledLossAndRetainAsync in a catch that writes `LatestAttemptCompletedSuccessfully: false`; the stages that run after it still propagate without one, so a hosted failure there leaves no attempt summary for the gate to read. Pre-existing shape — no stage had such a summary before this story added one for the new stage.
+status: open
+
+### DW-136: Follow-up review still recommended for dw-loss-path-rpo-evidence after the damping cap was spent
+origin: review-budget-followup
+location: n/a
+source_spec: `spec-dw-52-loss-path-rpo-evidence.md`
 severity: low
 reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260827-211223-44d7; this entry preserves the lingering recommendation for a deliberate later review.
 status: open

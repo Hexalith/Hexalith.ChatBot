@@ -12,7 +12,7 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
     private static readonly DateTimeOffset Now = new(2026, 8, 1, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void CompleteFreshPositivelyCoveredThreeJobAttemptPasses()
+    public void CompleteFreshPositivelyCoveredFourJobAttemptPasses()
     {
         LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(CompleteAttempt());
 
@@ -20,6 +20,7 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
         decision.StopShipReasons.ShouldBeEmpty();
         decision.TargetDeviationReasons.ShouldBeEmpty();
         decision.EvidenceCounts[LiveRecoveryValidationJobs.Continuity].ShouldBe(2);
+        decision.EvidenceCounts[LiveRecoveryValidationJobs.ControlledLossPath].ShouldBe(1);
         decision.EvidenceCounts[LiveRecoveryValidationJobs.ProjectionRebuild].ShouldBe(1);
         decision.EvidenceCounts[LiveRecoveryValidationJobs.ScopedOutage].ShouldBe(6);
     }
@@ -61,7 +62,7 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
     }
 
     [Fact]
-    public void ValidMarkersClassifyAndRequireAlertsForAllThreeJobsWithoutEvidence()
+    public void ValidMarkersClassifyAllJobsButControlledLossRemainsGateOnly()
     {
         LiveRecoveryValidationEvidenceAttempt attempt = CompleteAttempt() with
         {
@@ -69,6 +70,9 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
             RetentionFailureMarkers =
             [
                 Marker(LiveRecoveryValidationJobs.Continuity, ContinuityDrillScenarios.EventStoreOutage),
+                Marker(
+                    LiveRecoveryValidationJobs.ControlledLossPath,
+                    ControlledLossPathReport.SubscriptionNotificationRejectionScenario),
                 Marker(
                     LiveRecoveryValidationJobs.ProjectionRebuild,
                     RecoveryValidationEvidenceRetentionFailureMarker.ProjectionRebuildScenario),
@@ -81,8 +85,15 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
         foreach (string jobId in LiveRecoveryValidationJobs.All)
         {
             decision.StopShipReasons.ShouldContain($"{jobId}:evidence_retention_failed");
-            decision.StopShipReasons.ShouldContain($"{jobId}:unalerted_breach");
             decision.StopShipReasons.ShouldNotContain($"{jobId}:missing_evidence");
+            if (string.Equals(jobId, LiveRecoveryValidationJobs.ControlledLossPath, StringComparison.Ordinal))
+            {
+                decision.StopShipReasons.ShouldNotContain($"{jobId}:unalerted_breach");
+            }
+            else
+            {
+                decision.StopShipReasons.ShouldContain($"{jobId}:unalerted_breach");
+            }
         }
     }
 
@@ -689,10 +700,147 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
             .ShouldBe(RecoveryTargets.MaxRpo.TotalSeconds);
         LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(LiveRecoveryValidationJobs.Continuity)["rto"]
             .ShouldBe(RecoveryTargets.MaxRto.TotalSeconds);
+        LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(LiveRecoveryValidationJobs.ControlledLossPath)["rpo"]
+            .ShouldBe(RecoveryTargets.MaxRpo.TotalSeconds);
         LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(LiveRecoveryValidationJobs.ProjectionRebuild)["rebuild-duration"]
             .ShouldBe(RecoveryTargets.MaxRto.TotalSeconds);
         LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(LiveRecoveryValidationJobs.ScopedOutage)["scope-recording-latency"]
             .ShouldBe(RecoveryTargets.MaxScopeRecordingLatency.TotalSeconds);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(900)]
+    public void PositiveControlledLossRpoAtOrBelowCanonicalTargetPassesItsChannel(int seconds)
+    {
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(ControlledAttempt(seconds));
+
+        decision.StopShipReasons.ShouldNotContain(
+            reason => reason.StartsWith($"{LiveRecoveryValidationJobs.ControlledLossPath}:", StringComparison.Ordinal));
+        decision.TargetDeviationReasons.ShouldNotContain($"{LiveRecoveryValidationJobs.ControlledLossPath}:target_deviation");
+    }
+
+    [Fact]
+    public void ControlledLossRpoAboveCanonicalTargetIsAReleaseBlockingDeviation()
+    {
+        LiveRecoveryValidationEvidenceAttempt attempt = ControlledAttempt(901) with
+        {
+            AlertsDeliveredByJob = new Dictionary<string, int>(StringComparer.Ordinal)
+            {
+                [LiveRecoveryValidationJobs.ControlledLossPath] = 1,
+            },
+        };
+
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(attempt);
+
+        decision.TargetDeviationReasons.ShouldContain($"{LiveRecoveryValidationJobs.ControlledLossPath}:target_deviation");
+        decision.StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.ControlledLossPath}:target_deviation");
+    }
+
+    [Fact]
+    public void GateOnlyControlledLossDeviationBlocksWithoutInventingAnAlert()
+    {
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(ControlledAttempt(901));
+
+        decision.StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.ControlledLossPath}:target_deviation");
+        decision.StopShipReasons.ShouldNotContain($"{LiveRecoveryValidationJobs.ControlledLossPath}:unalerted_breach");
+    }
+
+    [Fact]
+    public void GateOnlyControlledLossStructuralFailureBlocksWithoutInventingAnAlert()
+    {
+        LiveRecoveryValidationEvidenceAttempt attempt = MutateJob(
+            LiveRecoveryValidationJobs.ControlledLossPath,
+            manifest => manifest with
+            {
+                Verdict = ControlledLossPathVerdicts.Unmeasurable,
+                ReasonCode = ControlledLossPathReport.UnmeasurableReasonCode,
+                Assertions = new Dictionary<string, bool>(manifest.Assertions, StringComparer.Ordinal)
+                {
+                    ["candidate-absent"] = false,
+                },
+            });
+
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(attempt);
+
+        decision.StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.ControlledLossPath}:structural_breach");
+        decision.StopShipReasons.ShouldNotContain($"{LiveRecoveryValidationJobs.ControlledLossPath}:unalerted_breach");
+    }
+
+    [Fact]
+    public void ControlledLossMissCannotClaimTheCompletedReason()
+    {
+        LiveRecoveryValidationEvidenceAttempt attempt = ControlledAttempt(901);
+        List<RecoveryValidationEvidenceManifest> evidence = attempt.Evidence
+            .Select(manifest => manifest.JobId == LiveRecoveryValidationJobs.ControlledLossPath
+                ? manifest with { ReasonCode = ControlledLossPathReport.CompletedReasonCode }
+                : manifest)
+            .ToList();
+
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(attempt with { Evidence = evidence });
+
+        decision.StopShipReasons.ShouldContain(
+            $"{LiveRecoveryValidationJobs.ControlledLossPath}:verdict_reason_mismatch");
+    }
+
+    /// <summary>
+    /// The gate re-derives RPO from the manifest's own persisted commit bounds instead of trusting the published
+    /// measurement, and that recompute is the only thing tying the graded number to EventStore. Without a case that
+    /// disagrees, the comparison could be deleted or widened and every suite would stay green.
+    /// </summary>
+    [Fact]
+    public void APublishedRpoThatContradictsItsDurableBoundsIsStopShipped()
+    {
+        LiveRecoveryValidationEvidenceAttempt forged = MutateJob(
+            LiveRecoveryValidationJobs.ControlledLossPath,
+            manifest => manifest with
+            {
+                // The fixture's persisted bounds are 20 seconds apart. 700 stays under the 900-second target, so
+                // only the bounds/measurement disagreement can produce a stop-ship here.
+                MeasurementsSeconds = new Dictionary<string, double>(StringComparer.Ordinal) { ["rpo"] = 700 },
+            });
+
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(forged);
+
+        decision.StopShipReasons.ShouldContain(
+            $"{LiveRecoveryValidationJobs.ControlledLossPath}:rpo_measurement_mismatch");
+        decision.IsStopShip.ShouldBeTrue();
+    }
+
+    /// <summary>
+    /// Adding the controlled-loss channel to <see cref="LiveRecoveryValidationJobs.All"/> is a deliberate
+    /// compatibility break: an artifact retained before that channel existed carries three jobs and can no longer
+    /// replay clean. Pin the exact reason so the break is stated in code rather than discovered by a release lane
+    /// replaying an older bundle.
+    /// </summary>
+    [Fact]
+    public void AnEvidenceBundleRetainedBeforeTheControlledLossChannelNoLongerPasses()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        LiveRecoveryValidationEvidenceAttempt legacy = complete with
+        {
+            Evidence = complete.Evidence
+                .Where(manifest => manifest.JobId != LiveRecoveryValidationJobs.ControlledLossPath)
+                .ToList(),
+        };
+
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(legacy);
+
+        decision.StopShipReasons.ShouldContain(
+            $"{LiveRecoveryValidationJobs.ControlledLossPath}:missing_evidence");
+        decision.IsStopShip.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ZeroOrMissingControlledLossBoundsFailClosedWithStableBoundReasons()
+    {
+        LiveRecoveryValidationEvidenceAttempt zero = ControlledAttempt(0);
+        Evaluate(zero).StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.ControlledLossPath}:rpo_not_positive");
+
+        LiveRecoveryValidationEvidenceAttempt missing = MutateJob(
+            LiveRecoveryValidationJobs.ControlledLossPath,
+            manifest => manifest with { PreFaultCommittedAtUtc = null });
+        Evaluate(missing).StopShipReasons.ShouldContain($"{LiveRecoveryValidationJobs.ControlledLossPath}:durable_bounds_invalid");
     }
 
     private static LiveRecoveryValidationEvidenceAttempt AttemptWithAssertion(string jobId, string assertion, bool? value)
@@ -714,6 +862,39 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
     private static LiveRecoveryValidationEvidenceAttempt MutateContinuity(
         Func<RecoveryValidationEvidenceManifest, RecoveryValidationEvidenceManifest> mutate)
         => MutateJob(LiveRecoveryValidationJobs.Continuity, mutate);
+
+    private static LiveRecoveryValidationEvidenceAttempt ControlledAttempt(int rpoSeconds)
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        DateTimeOffset pre = Now - TimeSpan.FromSeconds(rpoSeconds + 90);
+        DateTimeOffset post = pre.AddSeconds(rpoSeconds);
+        List<RecoveryValidationEvidenceManifest> evidence = complete.Evidence
+            .Select(manifest => manifest.JobId == LiveRecoveryValidationJobs.ControlledLossPath
+                ? manifest with
+                {
+                    StartedAtUtc = pre - TimeSpan.FromSeconds(1),
+                    EndedAtUtc = post + TimeSpan.FromSeconds(1),
+                    PreFaultCommittedAtUtc = pre,
+                    RejectedAtUtc = pre + TimeSpan.FromTicks((post - pre).Ticks / 2),
+                    PostRecoveryCommittedAtUtc = post,
+                    MeasurementsSeconds = new Dictionary<string, double> { ["rpo"] = rpoSeconds },
+                    Verdict = rpoSeconds > 900 ? ControlledLossPathVerdicts.Missed : ControlledLossPathVerdicts.Met,
+                    ReasonCode = rpoSeconds > 900
+                        ? ControlledLossPathReport.TargetMissedReasonCode
+                        : ControlledLossPathReport.CompletedReasonCode,
+                    Assertions = new Dictionary<string, bool>(manifest.Assertions, StringComparer.Ordinal)
+                    {
+                        ["rpo-positive"] = rpoSeconds > 0,
+                    },
+                }
+                : manifest)
+            .ToList();
+        return complete with
+        {
+            StartedAtUtc = pre - TimeSpan.FromSeconds(2),
+            Evidence = evidence,
+        };
+    }
 
     private static LiveRecoveryValidationEvidenceAttempt MutateJob(
         string jobId,
@@ -756,6 +937,9 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
         [
             Manifest(LiveRecoveryValidationJobs.Continuity, ContinuityDrillScenarios.EventStoreOutage),
             Manifest(LiveRecoveryValidationJobs.Continuity, ContinuityDrillScenarios.M365SubscriptionFailure),
+            Manifest(
+                LiveRecoveryValidationJobs.ControlledLossPath,
+                ControlledLossPathReport.SubscriptionNotificationRejectionScenario),
             Manifest(LiveRecoveryValidationJobs.ProjectionRebuild, "recovery-baseline"),
         ];
         evidence.AddRange(ScopedOutageDependencies.All.Select(dependency =>
@@ -793,6 +977,11 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
             measurements["rpo"] = 0;
             measurements["rto"] = 28;
         }
+        else if (jobId == LiveRecoveryValidationJobs.ControlledLossPath)
+        {
+            verdict = ControlledLossPathVerdicts.Met;
+            measurements["rpo"] = 20;
+        }
         else if (jobId == LiveRecoveryValidationJobs.ProjectionRebuild)
         {
             verdict = ProjectionRebuildVerdicts.Equivalent;
@@ -811,6 +1000,7 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
         Dictionary<string, double> targets = jobId switch
         {
             LiveRecoveryValidationJobs.Continuity => new(StringComparer.Ordinal) { ["rpo"] = 900, ["rto"] = 14_400 },
+            LiveRecoveryValidationJobs.ControlledLossPath => new(StringComparer.Ordinal) { ["rpo"] = 900 },
             LiveRecoveryValidationJobs.ProjectionRebuild => new(StringComparer.Ordinal) { ["rebuild-duration"] = 14_400 },
             _ => new(StringComparer.Ordinal) { ["scope-recording-latency"] = 300 },
         };
@@ -842,7 +1032,9 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
             ObservedScope = "tenant",
             ReportKind = jobId,
             Verdict = verdict,
-            ReasonCode = "validation_completed",
+            ReasonCode = jobId == LiveRecoveryValidationJobs.ControlledLossPath
+                ? ControlledLossPathReport.CompletedReasonCode
+                : "validation_completed",
             MeasurementsSeconds = measurements,
             AllowedTargetsSeconds = targets,
             Assertions = assertions,
@@ -855,6 +1047,32 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
                 ["test-output"] = "artifact:live-recovery-validation-evidence/results.trx",
                 ["reports"] = "artifact:live-recovery-validation-evidence/reports",
             },
+            PreFaultRetainedRef = jobId == LiveRecoveryValidationJobs.ControlledLossPath
+                ? "01ARZ3NDEKTSV4RRFFQ69G5FAA"
+                : null,
+            PreFaultEventRef = jobId == LiveRecoveryValidationJobs.ControlledLossPath
+                ? "01ARZ3NDEKTSV4RRFFQ69G5FAB"
+                : null,
+            PreFaultSequence = jobId == LiveRecoveryValidationJobs.ControlledLossPath ? 1 : null,
+            PreFaultCommittedAtUtc = jobId == LiveRecoveryValidationJobs.ControlledLossPath
+                ? Now - TimeSpan.FromSeconds(100)
+                : null,
+            RejectedCandidateRef = jobId == LiveRecoveryValidationJobs.ControlledLossPath
+                ? "01ARZ3NDEKTSV4RRFFQ69G5FAC"
+                : null,
+            RejectedAtUtc = jobId == LiveRecoveryValidationJobs.ControlledLossPath
+                ? Now - TimeSpan.FromSeconds(90)
+                : null,
+            PostRecoveryRetainedRef = jobId == LiveRecoveryValidationJobs.ControlledLossPath
+                ? "01ARZ3NDEKTSV4RRFFQ69G5FAD"
+                : null,
+            PostRecoveryEventRef = jobId == LiveRecoveryValidationJobs.ControlledLossPath
+                ? "01ARZ3NDEKTSV4RRFFQ69G5FAE"
+                : null,
+            PostRecoverySequence = jobId == LiveRecoveryValidationJobs.ControlledLossPath ? 1 : null,
+            PostRecoveryCommittedAtUtc = jobId == LiveRecoveryValidationJobs.ControlledLossPath
+                ? Now - TimeSpan.FromSeconds(80)
+                : null,
         };
     }
 }

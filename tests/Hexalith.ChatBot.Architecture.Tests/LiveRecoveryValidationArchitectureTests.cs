@@ -35,7 +35,15 @@ public static class LiveRecoveryValidationArchitectureTests
         ContinuityDrillScenarios.All.SetEquals(expectedContinuityScenarios).ShouldBeTrue();
         ScopedOutageDependencies.Contains("unknown-dependency").ShouldBeFalse();
         ContinuityDrillScenarios.Contains("unknown-scenario").ShouldBeFalse();
-        LiveRecoveryValidationOptions.MinimumSweepScenarioCount.ShouldBe(9);
+        ContinuityDrillScenarios.All.ShouldNotContain(ControlledLossPathReport.SubscriptionNotificationRejectionScenario);
+        LiveRecoveryValidationJobs.All.SetEquals(
+        [
+            LiveRecoveryValidationJobs.Continuity,
+            LiveRecoveryValidationJobs.ControlledLossPath,
+            LiveRecoveryValidationJobs.ProjectionRebuild,
+            LiveRecoveryValidationJobs.ScopedOutage,
+        ]).ShouldBeTrue();
+        LiveRecoveryValidationOptions.MinimumSweepScenarioCount.ShouldBe(10);
     }
 
     [Fact]
@@ -43,6 +51,8 @@ public static class LiveRecoveryValidationArchitectureTests
     {
         LiveRecoveryValidationEvidenceGate.RequiredAssertionsFor(LiveRecoveryValidationJobs.Continuity)
             .ShouldContain("state-reconstructable");
+        LiveRecoveryValidationEvidenceGate.RequiredAssertionsFor(LiveRecoveryValidationJobs.ControlledLossPath)
+            .ShouldContain("durable-bounds-valid");
         LiveRecoveryValidationEvidenceGate.RequiredAssertionsFor(LiveRecoveryValidationJobs.ProjectionRebuild)
             .ShouldContain("structurally-equivalent");
         LiveRecoveryValidationEvidenceGate.RequiredAssertionsFor(LiveRecoveryValidationJobs.ScopedOutage)
@@ -50,6 +60,8 @@ public static class LiveRecoveryValidationArchitectureTests
 
         LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(LiveRecoveryValidationJobs.Continuity)["rto"]
             .ShouldBe(RecoveryTargets.MaxRto.TotalSeconds);
+        LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(LiveRecoveryValidationJobs.ControlledLossPath)["rpo"]
+            .ShouldBe(RecoveryTargets.MaxRpo.TotalSeconds);
         LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(LiveRecoveryValidationJobs.ProjectionRebuild)["rebuild-duration"]
             .ShouldBe(RecoveryTargets.MaxRto.TotalSeconds);
         LiveRecoveryValidationEvidenceGate.CanonicalTargetsFor(LiveRecoveryValidationJobs.ScopedOutage)["scope-recording-latency"]
@@ -116,6 +128,10 @@ public static class LiveRecoveryValidationArchitectureTests
         string appHostProject = ReadProjectFile("src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj");
         string composer = ReadProjectFile("tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoverySandboxTopologyComposer.cs");
         string sandbox = ReadProjectFile("tests/Hexalith.ChatBot.RecoverySandbox/Program.cs");
+        string notificationIdentity = ReadProjectFile(
+            "tests/Hexalith.ChatBot.RecoverySandbox/RecoveryNotificationIdentity.cs");
+        string graphSource = ReadProjectFile(
+            "tests/Hexalith.ChatBot.RecoverySandbox/ControlledGraphMailboxMessageSource.cs");
 
         appHost.ShouldNotContain("recovery-sandbox");
         appHostProject.ShouldNotContain("Hexalith.ChatBot.RecoverySandbox");
@@ -143,6 +159,12 @@ public static class LiveRecoveryValidationArchitectureTests
         sandbox.ShouldContain("RecoveryScopedOutageState.Contains(dependency)");
         sandbox.ShouldContain("RecoverySandboxAuthorization.Authorized(");
         sandbox.ShouldContain("X-Recovery-Controller-Secret");
+        sandbox.ShouldContain("RecoveryNotificationIdentity.LossPhase");
+        notificationIdentity.ShouldContain("ControlledLossLane = \"controlled-loss\"");
+        notificationIdentity.ShouldContain("(ControlledLossLane, PreFaultPhase or LossPhase or PostRecoveryPhase)");
+        graphSource.ShouldContain("controlledLossCandidate && !state.IsFaulted()");
+        graphSource.ShouldContain("controlled_loss_fault_not_active");
+        sandbox.ShouldContain("CapturingRecoveryChatBotClient");
         sandbox.ShouldNotContain("{resource}");
     }
 
@@ -535,8 +557,8 @@ public static class LiveRecoveryValidationArchitectureTests
 
         string liveE2e = ReadProjectFile(
             "tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs");
-        liveE2e.ShouldContain(
-            "Path.Combine(retentionFailureDirectory, LiveRecoveryValidationAttemptSummary.FileName)");
+        liveE2e.ShouldContain("WriteAttemptSummaryAsync(");
+        liveE2e.ShouldContain("Path.Combine(directory, LiveRecoveryValidationAttemptSummary.FileName)");
         liveE2e.ShouldNotContain(
             "Path.Combine(evidenceDirectory, LiveRecoveryValidationAttemptSummary.FileName)");
         string replay = ReadProjectFile(

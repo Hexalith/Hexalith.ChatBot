@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
 
+using Hexalith.ChatBot.Server.Audit;
+
 namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 
 /// <summary>
@@ -49,6 +51,17 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
             intakeRef,
             ".MailboxMessageIntakeCaptured",
             cancellationToken).ConfigureAwait(false);
+
+    /// <summary>Waits for and returns the authoritative persisted envelope for a mailbox-intake aggregate.</summary>
+    public async Task<DurableCommitObservation> WaitForMailboxIntakeCommitAsync(
+        string tenantRef,
+        string intakeRef,
+        CancellationToken cancellationToken)
+    {
+        await WaitForMailboxIntakeAsync(tenantRef, intakeRef, cancellationToken).ConfigureAwait(false);
+        return await ReadMailboxIntakeCommitAsync(tenantRef, intakeRef, cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidOperationException("The witnessed mailbox-intake commit disappeared from EventStore actor state.");
+    }
 
     public async Task WaitForGovernedNoteAsync(
         string tenantRef,
@@ -209,6 +222,17 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
             ".MailboxMessageIntakeCaptured",
             cancellationToken).ConfigureAwait(false);
 
+    /// <summary>Reads a validated mailbox-intake durable envelope, or null only when no aggregate metadata exists.</summary>
+    public async Task<DurableCommitObservation?> ReadMailboxIntakeCommitAsync(
+        string tenantRef,
+        string intakeRef,
+        CancellationToken cancellationToken)
+        => await ReadAggregateCommitAsync(
+            tenantRef,
+            intakeRef,
+            ".MailboxMessageIntakeCaptured",
+            cancellationToken).ConfigureAwait(false);
+
     public async Task<bool> IsGovernedNoteCommittedAsync(
         string tenantRef,
         string noteRef,
@@ -220,6 +244,17 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
             cancellationToken).ConfigureAwait(false);
 
     private async Task<bool> IsAggregateCommittedAsync(
+        string tenantRef,
+        string aggregateRef,
+        string expectedEventTypeSuffix,
+        CancellationToken cancellationToken)
+        => await ReadAggregateCommitAsync(
+            tenantRef,
+            aggregateRef,
+            expectedEventTypeSuffix,
+            cancellationToken).ConfigureAwait(false) is not null;
+
+    private async Task<DurableCommitObservation?> ReadAggregateCommitAsync(
         string tenantRef,
         string aggregateRef,
         string expectedEventTypeSuffix,
@@ -236,7 +271,7 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
             cancellationToken).ConfigureAwait(false);
         if (metadata is null)
         {
-            return false;
+            return null;
         }
 
         if (!TryGetInt64(metadata.Value, "CurrentSequence", out long currentSequence) || currentSequence < 1)
@@ -252,6 +287,12 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
             !string.Equals(GetString(persistedEvent.Value, "TenantId"), tenantRef, StringComparison.Ordinal) ||
             !string.Equals(GetString(persistedEvent.Value, "Domain"), "chatbot", StringComparison.Ordinal) ||
             !string.Equals(GetString(persistedEvent.Value, "AggregateId"), aggregateRef, StringComparison.Ordinal) ||
+            !TryGetInt64(persistedEvent.Value, "SequenceNumber", out long sequenceNumber) ||
+            sequenceNumber != 1 || currentSequence < sequenceNumber ||
+            GetString(persistedEvent.Value, "MessageId") is not { } eventRef ||
+            !RecoveryValidationEvidenceManifest.IsCanonicalUlid(eventRef) ||
+            !TryGetDateTimeOffset(persistedEvent.Value, "Timestamp", out DateTimeOffset committedAtUtc) ||
+            committedAtUtc.Offset != TimeSpan.Zero ||
             GetString(persistedEvent.Value, "EventTypeName")?.EndsWith(
                 expectedEventTypeSuffix,
                 StringComparison.Ordinal) != true)
@@ -259,7 +300,7 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
             throw new InvalidOperationException($"EventStore event state for aggregate '{actorId}' is incomplete or inconsistent.");
         }
 
-        return true;
+        return new DurableCommitObservation(tenantRef, aggregateRef, eventRef, sequenceNumber, committedAtUtc);
     }
 
     public void Dispose() => _client.Dispose();
@@ -328,6 +369,14 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
     {
         value = default;
         return TryGetProperty(element, propertyName, out JsonElement property) && property.TryGetInt64(out value);
+    }
+
+    private static bool TryGetDateTimeOffset(JsonElement element, string propertyName, out DateTimeOffset value)
+    {
+        value = default;
+        return TryGetProperty(element, propertyName, out JsonElement property) &&
+            property.ValueKind == JsonValueKind.String &&
+            property.TryGetDateTimeOffset(out value);
     }
 
     private static bool TryGetProperty(JsonElement element, string propertyName, out JsonElement value)

@@ -12,7 +12,15 @@ internal sealed class ControlledGraphMailboxMessageSource(RecoverySubscriptionSi
     {
         ArgumentNullException.ThrowIfNull(notification);
         cancellationToken.ThrowIfCancellationRequested();
-        if (state.IsFaulted())
+        bool controlledLossCandidate = RecoveryNotificationIdentity.IsControlledLossCandidate(
+            notification.ProviderMessageId);
+        if (controlledLossCandidate && !state.IsFaulted())
+        {
+            return ValueTask.FromResult(
+                GraphMailboxFetchResult.RetryableFailure("controlled_loss_fault_not_active"));
+        }
+
+        if (state.IsFaulted() && !controlledLossCandidate)
         {
             return ValueTask.FromResult(GraphMailboxFetchResult.RetryableFailure("graph_subscription_expired"));
         }

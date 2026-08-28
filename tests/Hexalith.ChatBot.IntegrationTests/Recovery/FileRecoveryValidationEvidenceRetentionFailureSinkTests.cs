@@ -240,6 +240,9 @@ public sealed class FileRecoveryValidationEvidenceRetentionFailureSinkTests
 
     private sealed class TotallyUnavailableEvidenceSink : IRecoveryValidationEvidenceSink
     {
+        public ValueTask RecordAsync(ControlledLossPathReport report, CancellationToken cancellationToken)
+            => throw new IOException("evidence directory unavailable");
+
         public ValueTask RecordAsync(ContinuityDrillReport report, CancellationToken cancellationToken)
             => throw new IOException("evidence directory unavailable");
 

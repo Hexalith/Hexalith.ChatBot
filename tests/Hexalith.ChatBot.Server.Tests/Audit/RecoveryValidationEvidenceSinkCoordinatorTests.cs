@@ -314,9 +314,17 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
     private sealed class CapturingSink : IRecoveryValidationEvidenceSink
     {
         public List<string> Events { get; } = [];
+        public List<ControlledLossPathReport> ControlledLossReports { get; } = [];
         public List<ContinuityDrillReport> ContinuityReports { get; } = [];
         public List<ProjectionRebuildReport> RebuildReports { get; } = [];
         public List<ScopedOutageDegradationReport> ScopedOutageReports { get; } = [];
+
+        public ValueTask RecordAsync(ControlledLossPathReport report, CancellationToken cancellationToken)
+        {
+            ControlledLossReports.Add(report);
+            Events.Add($"controlled-loss:{report.Scenario}");
+            return ValueTask.CompletedTask;
+        }
 
         public ValueTask RecordAsync(ContinuityDrillReport report, CancellationToken cancellationToken)
         {
@@ -342,6 +350,9 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
 
     private sealed class ThrowingSink : IRecoveryValidationEvidenceSink
     {
+        public ValueTask RecordAsync(ControlledLossPathReport report, CancellationToken cancellationToken)
+            => throw new IOException("evidence unavailable");
+
         public ValueTask RecordAsync(ContinuityDrillReport report, CancellationToken cancellationToken)
             => throw new IOException("evidence unavailable");
 
@@ -357,6 +368,9 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
         public int Attempts { get; private set; }
 
         public List<ContinuityDrillReport> Retained { get; } = [];
+
+        public ValueTask RecordAsync(ControlledLossPathReport report, CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
 
         public ValueTask RecordAsync(ContinuityDrillReport report, CancellationToken cancellationToken)
         {
@@ -509,6 +523,12 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
 
     private sealed class OrderTrackingSink(List<string> callOrder, IRecoveryValidationEvidenceSink inner) : IRecoveryValidationEvidenceSink
     {
+        public ValueTask RecordAsync(ControlledLossPathReport report, CancellationToken cancellationToken)
+        {
+            callOrder.Add("retain");
+            return inner.RecordAsync(report, cancellationToken);
+        }
+
         public ValueTask RecordAsync(ContinuityDrillReport report, CancellationToken cancellationToken)
         {
             callOrder.Add("retain");

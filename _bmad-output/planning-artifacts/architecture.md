@@ -90,7 +90,7 @@ architectural implications:
 - **Audit/compliance (NFR49–NFR55, NFR49a/50a):** tamper-evident append-only WORM hash-chained audit;
   ≥99.5% audit-completeness production observable (reconstructability, not just field presence); GDPR
   retention classes; consent/lawful-basis metadata.
-- **Recovery (NFR56–NFR59):** RPO ≤ 15 min / RTO ≤ 4 hr (provisional per A10, pending a retained hosted live-recovery run locator — Story 12.15); projection rebuild
+- **Recovery (NFR56–NFR59):** RPO ≤ 15 min / RTO ≤ 4 hr remain provisional per A10. Story 12.15 supplied an authentic hosted safety bundle; DW-52 supplies a distinct locally verified controlled-loss RPO mechanism, but no hosted artifact from that channel is yet cited, and the lane's 180-second ceiling leaves the 4-hour RTO residual open. Projection rebuild
   from source ≤ 4 hr; scoped outage degradation.
 - **Accessibility (NFR60–NFR64):** WCAG 2.2 AA scoped per-increment to enumerated surfaces; non-color
   status; keyboard/screen-reader for core flows; English + French.
@@ -474,7 +474,7 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
   `ReindexVectors(tenantId, correctionId, sourceVersion)` remains an M2 activity and must be idempotent +
   version-guarded.
 - **Deploy / recovery:** SDK-container images; Aspire 13.4 K8s/AKS + Helm (M2); RPO ≤ 15 min / RTO ≤ 4 hr
-  provisional per A10 pending a retained hosted run locator (Story 12.15); replay/simulation against an isolated test tenant (FR95a, M2).
+  provisional per A10. The Story 12.15 hosted bundle authenticates the live safety lane; DW-52's separate controlled-loss channel is mechanism-ready and locally verified but has no cited hosted artifact, while the 180-second ceiling still prevents 4-hour RTO ratification. Replay/simulation runs against an isolated test tenant (FR95a, M2).
 - **Observability:** OpenTelemetry; structured emission always-on (dashboards trim-able, emission is not);
   published SLOs (M2).
 
@@ -905,7 +905,7 @@ fail-closed seam, two-phase audit, idempotency, AI-outage tolerance (tag+heurist
 dependency). Audit (NFR49–55, 49a/50a) — WORM hash chain + reconstructability assertion. Performance
 (NFR23–30) — architecturally supported (per-tenant rate limits/circuit breakers, projection reads, noisy-
 neighbor isolation); **specific SLO budgets calibrate at M2 per A11** (framed, not yet numeric). Recovery
-(NFR56–59) — **RPO/RTO targets provisional per A10, pending a retained hosted live-recovery run locator (Story 12.15)**. Accessibility (NFR60–64) — WCAG 2.2
+(NFR56–59) — **RPO/RTO targets remain provisional per A10**: Story 12.15 has authentic hosted safety evidence, DW-52's distinct controlled-loss RPO mechanism is locally verified without a cited hosted artifact, and the measurable-recovery-ceiling RTO residual remains open. Accessibility (NFR60–64) — WCAG 2.2
 AA per-increment to enumerated surfaces.
 
 ### Architecture Readiness Validation ✅ — Planning Revalidation Pending

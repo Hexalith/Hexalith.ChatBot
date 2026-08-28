@@ -5,11 +5,13 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// These are the <b>provisional</b> default-MVP targets for source records, attachments, approval history, command
 /// history, policy snapshots, and audit records — not yet-discharged commitments. Story 12.15 recorded RPO ≤ 15 min /
 /// RTO ≤ 4 hr as provisional against the named Aspire/DAPR sandbox. A retained hosted run now exists (release run
-/// 33066358280, commit 17aa94d, evidence 01M11EYSDMP1ZF38B7KZA1A6FA, 2026-08-27; see <c>.decision-log.md</c>), but
+/// 33066358280, commit 17aa94d, evidence 01M11EYSDMP1ZF38B7KZA1A6FA, 2026-08-27; that bundle predates the fourth
+/// controlled-loss job and no longer replays clean, see <c>.decision-log.md</c>), but
 /// the A10 assumption remains not discharged: the lane's measurable-recovery ceiling (180s) sits below the 4-hour
-/// RTO target, and measured RPO is a constant on the no-loss path. Future drills continue to produce recalibration
-/// evidence through
-/// <see cref="ContinuityDrillReport"/>.
+/// RTO target. Ordinary continuity correctly keeps RPO at zero on the no-loss path; the separate
+/// <see cref="ControlledLossPathReport"/> channel now supports a positive durable-bound measurement, but no hosted
+/// controlled-loss artifact has yet been cited. Future drills continue to produce recalibration evidence through
+/// <see cref="ContinuityDrillReport"/> and the distinct controlled-loss report.
 /// <para>
 /// This class is the <b>single source of truth</b> for the two targets (mirroring
 /// <see cref="AuditCompletenessMeasurement.CompletenessTargetFraction"/> / <c>RollingWindow</c>): the pure
@@ -22,7 +24,8 @@ internal static class RecoveryTargets
 {
     /// <summary>
     /// The provisional default-MVP recovery-point objective: the maximum tolerable data loss is 15 minutes (NFR56/A10).
-    /// The drill compares the measured RPO against this value. Provisional pending a retained hosted run locator.
+    /// The controlled-loss gate compares its positive durable-bound RPO against this value. It remains provisional
+    /// pending a retained hosted controlled-loss artifact; ordinary no-loss continuity reports cannot qualify it.
     /// </summary>
     public static readonly TimeSpan MaxRpo = TimeSpan.FromMinutes(15);
 

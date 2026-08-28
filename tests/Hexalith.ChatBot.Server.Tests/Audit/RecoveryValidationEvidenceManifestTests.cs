@@ -66,6 +66,52 @@ public sealed class RecoveryValidationEvidenceManifestTests
         }
     }
 
+    [Fact]
+    public void ControlledLossManifestRequiresCompleteOrderedUtcDistinctDurableBounds()
+    {
+        ControlledManifest().Validate().ShouldBeEmpty();
+        (ControlledManifest() with { PreFaultCommittedAtUtc = null }).Validate().ShouldNotBeEmpty();
+        (ControlledManifest() with { PostRecoverySequence = 0 }).Validate().ShouldNotBeEmpty();
+        (ControlledManifest() with { RejectedCandidateRef = "not-a-ulid" }).Validate().ShouldNotBeEmpty();
+        (ControlledManifest() with
+        {
+            PostRecoveryCommittedAtUtc = Started + TimeSpan.FromSeconds(9),
+            RejectedAtUtc = Started + TimeSpan.FromSeconds(20),
+        }).Validate().ShouldNotBeEmpty();
+        (ControlledManifest() with
+        {
+            PostRecoveryEventRef = "01ARZ3NDEKTSV4RRFFQ69G5FAA",
+        }).Validate().ShouldNotBeEmpty();
+        (ControlledManifest() with
+        {
+            RejectedAtUtc = Started - TimeSpan.FromDays(1),
+        }).Validate().ShouldBeEmpty("Sandbox and EventStore timestamps use independent authoritative clocks.");
+    }
+
+    [Fact]
+    public void ControlledLossManifestRequiresVerdictReasonConsistency()
+    {
+        (ControlledManifest() with
+        {
+            Verdict = ControlledLossPathVerdicts.Missed,
+            ReasonCode = ControlledLossPathReport.CompletedReasonCode,
+        }).Validate().ShouldContain(error => error.Contains("reason code", StringComparison.Ordinal));
+
+        (ControlledManifest() with
+        {
+            Verdict = ControlledLossPathVerdicts.Missed,
+            ReasonCode = ControlledLossPathReport.TargetMissedReasonCode,
+        }).Validate().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void OrdinaryManifestCannotSmuggleControlledLossBounds()
+    {
+        (ValidManifest() with { RejectedCandidateRef = "01ARZ3NDEKTSV4RRFFQ69G5FAA" })
+            .Validate()
+            .ShouldContain(error => error.Contains("not allowed", StringComparison.Ordinal));
+    }
+
     private static RecoveryValidationEvidenceManifest ValidManifest()
         => new()
         {
@@ -107,5 +153,27 @@ public sealed class RecoveryValidationEvidenceManifestTests
                 ["test-output"] = "artifact:live-recovery-validation-evidence/results.trx",
                 ["reports"] = "artifact:live-recovery-validation-evidence/reports",
             },
+        };
+
+    private static RecoveryValidationEvidenceManifest ControlledManifest()
+        => ValidManifest() with
+        {
+            JobId = LiveRecoveryValidationJobs.ControlledLossPath,
+            ReportKind = LiveRecoveryValidationJobs.ControlledLossPath,
+            Scenario = ControlledLossPathReport.SubscriptionNotificationRejectionScenario,
+            Verdict = ControlledLossPathVerdicts.Met,
+            ReasonCode = ControlledLossPathReport.CompletedReasonCode,
+            MeasurementsSeconds = new Dictionary<string, double> { ["rpo"] = 20 },
+            AllowedTargetsSeconds = new Dictionary<string, double> { ["rpo"] = 900 },
+            PreFaultRetainedRef = "01ARZ3NDEKTSV4RRFFQ69G5FAA",
+            PreFaultEventRef = "01ARZ3NDEKTSV4RRFFQ69G5FAB",
+            PreFaultSequence = 1,
+            PreFaultCommittedAtUtc = Started + TimeSpan.FromSeconds(10),
+            RejectedCandidateRef = "01ARZ3NDEKTSV4RRFFQ69G5FAC",
+            RejectedAtUtc = Started + TimeSpan.FromSeconds(20),
+            PostRecoveryRetainedRef = "01ARZ3NDEKTSV4RRFFQ69G5FAD",
+            PostRecoveryEventRef = "01ARZ3NDEKTSV4RRFFQ69G5FAE",
+            PostRecoverySequence = 1,
+            PostRecoveryCommittedAtUtc = Started + TimeSpan.FromSeconds(30),
         };
 }

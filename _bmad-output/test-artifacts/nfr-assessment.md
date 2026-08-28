@@ -262,3 +262,18 @@ This audit's category assessments, ADR quality checklist, and gate YAML above ar
 **NFR58/NFR59 note (unchanged from the body above):** the four sandbox-exercised scoped dependencies (`ai-provider`, `command-execution`, `audit-store`, `attachment-processing`) remain sandbox-contract evidence per `RV-PROVIDER-SCALE` — this run does not newly establish product-composed provider-boundary isolation proof for those four. `identity` and `graph` fault real topology boundaries as before.
 
 Overall: **hosted-authenticity blocker resolved; A10/NFR ratification remains provisional by design, not blocking story closure.** This is not "PASS" in the sense the verdict table above used it for other rows — it is a genuinely governed, evidence-linked "provisional" outcome, recorded precisely so a reader does not conflate "authentic evidence now exists" with "the numeric target is confirmed."
+
+## Addendum (2026-08-28 — DW-52)
+
+DW-52 closes the implementation gap behind the prior "RPO constant on the no-loss path" finding without
+rewriting the historical assessment. A separate `controlled-loss-path` job now rejects one known sandbox
+notification, proves it absent, witnesses retained EventStore commits on both sides, and derives a positive RPO
+only from their persisted UTC timestamps. The independent gate recomputes the value, anchors the allowed target
+to `RecoveryTargets.MaxRpo`, and rejects zero, missing/reversed bounds, target misses, residual candidate state,
+isolation/cleanup failure, stale evidence, commit mismatch, duplicates, and corrupt retention markers.
+
+This is mechanism evidence only: local focused verification passed, but no hosted DW-52 artifact was produced or
+cited. The authentic 2026-08-27 bundle contains nine manifests and predates the new fourth channel, so its two
+ordinary 0s RPO values remain safety results and cannot ratify the 15-minute target. A10/NFR56 remains
+provisional pending a fresh exact-commit hosted controlled-loss artifact, and the 180-second ceiling leaves the
+4-hour RTO conclusion unchanged.

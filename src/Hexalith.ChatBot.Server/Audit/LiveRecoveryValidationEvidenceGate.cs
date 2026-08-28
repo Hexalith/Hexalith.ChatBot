@@ -18,7 +18,7 @@ internal static class LiveRecoveryValidationEvidenceGate
         new HashSet<string>(StringComparer.Ordinal) { "rto", "rebuild-duration" };
 
 
-    /// <summary>Returns a stop-ship decision for anything short of a valid latest three-job evidence attempt.</summary>
+    /// <summary>Returns a stop-ship decision for anything short of a valid latest four-job evidence attempt.</summary>
     public static LiveRecoveryValidationEvidenceGateDecision Evaluate(
         LiveRecoveryValidationEvidenceAttempt attempt,
         LiveRecoveryValidationGatePolicy policy,
@@ -142,6 +142,11 @@ internal static class LiveRecoveryValidationEvidenceGate
         HashSet<RecoveryValidationEvidenceManifest> invalidManifests = new(ReferenceEqualityComparer.Instance);
         foreach (RecoveryValidationEvidenceManifest manifest in evidence)
         {
+            if (string.Equals(manifest.JobId, LiveRecoveryValidationJobs.ControlledLossPath, StringComparison.Ordinal))
+            {
+                ValidateControlledLossMeasurement(manifest, stopShip);
+            }
+
             if (manifest.Validate().Count > 0)
             {
                 stopShip.Add($"{SafeJob(manifest.JobId)}:invalid_evidence");
@@ -251,6 +256,20 @@ internal static class LiveRecoveryValidationEvidenceGate
             evidence,
             invalidManifests,
             validRetentionFailureMarkers,
+            LiveRecoveryValidationJobs.ControlledLossPath,
+            new HashSet<string>(StringComparer.Ordinal)
+            {
+                ControlledLossPathReport.SubscriptionNotificationRejectionScenario,
+            },
+            stopShip,
+            targetDeviations,
+            claimLimitations,
+            counts);
+        EvaluateJob(
+            attempt,
+            evidence,
+            invalidManifests,
+            validRetentionFailureMarkers,
             LiveRecoveryValidationJobs.ProjectionRebuild,
             configuredDatasets.ToHashSet(StringComparer.Ordinal),
             stopShip,
@@ -301,6 +320,10 @@ internal static class LiveRecoveryValidationEvidenceGate
                 ["rpo"] = RecoveryTargets.MaxRpo.TotalSeconds,
                 ["rto"] = RecoveryTargets.MaxRto.TotalSeconds,
             },
+            LiveRecoveryValidationJobs.ControlledLossPath => new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["rpo"] = RecoveryTargets.MaxRpo.TotalSeconds,
+            },
             LiveRecoveryValidationJobs.ProjectionRebuild => new Dictionary<string, double>(StringComparer.Ordinal)
             {
                 ["rebuild-duration"] = RecoveryTargets.MaxRto.TotalSeconds,
@@ -323,6 +346,12 @@ internal static class LiveRecoveryValidationEvidenceGate
             [
                 "cleanup-complete", "data-loss-absent", "fault-observed", "recovery-observed",
                 "state-reconstructable", "tenant-isolation-preserved", "unauthorized-mutation-absent", "measurable",
+            ],
+            LiveRecoveryValidationJobs.ControlledLossPath =>
+            [
+                "cleanup-complete", "pre-fault-retained", "candidate-rejected", "candidate-absent",
+                "post-recovery-retained", "tenant-isolation-preserved", "unauthorized-mutation-absent",
+                "durable-bounds-valid", "rpo-positive",
             ],
             LiveRecoveryValidationJobs.ProjectionRebuild =>
             [
@@ -356,6 +385,11 @@ internal static class LiveRecoveryValidationEvidenceGate
             [
                 "fault-observed", "recovery-observed", "state-reconstructable",
                 "tenant-isolation-preserved", "unauthorized-mutation-absent", "measurable",
+            ],
+            LiveRecoveryValidationJobs.ControlledLossPath =>
+            [
+                "pre-fault-retained", "candidate-rejected", "candidate-absent", "post-recovery-retained",
+                "tenant-isolation-preserved", "unauthorized-mutation-absent", "durable-bounds-valid", "rpo-positive",
             ],
             // "mailbox-reingestion-absent" is deliberately excluded: no live driver observes mailbox reingestion, so
             // the assertion is always published false (see RecoveryValidationExecutionAssertions.MailboxReingestionAbsent)
@@ -418,9 +452,13 @@ internal static class LiveRecoveryValidationEvidenceGate
         }
 
         IReadOnlyDictionary<string, double> canonicalTargets = CanonicalTargetsFor(jobId);
-        // Every marker represents one unmeasurable report whose producer follows audit-then-alert. Count it even when
-        // no manifest survived, so the marker path cannot bypass the existing delivery-accounting stop-ship.
-        int alertsRequired = jobMarkers.Length;
+        // Controlled loss is intentionally a gate-only drill: it has no audit/alert coordinator, so its truthful
+        // delivered-alert count is zero. Its marker, structural breach, unmeasurable verdict, and target deviation
+        // still stop-ship through their own reasons; they must not also invent an impossible unalerted breach.
+        bool gateOnlyDrill = string.Equals(jobId, LiveRecoveryValidationJobs.ControlledLossPath, StringComparison.Ordinal);
+        // Every other marker represents one unmeasurable report whose producer follows audit-then-alert. Count it even
+        // when no manifest survived, so the marker path cannot bypass the existing delivery-accounting stop-ship.
+        int alertsRequired = gateOnlyDrill ? 0 : jobMarkers.Length;
         foreach (RecoveryValidationEvidenceManifest manifest in evidence)
         {
             // Already stop-shipped as `{job}:invalid_evidence` by the caller (which computed Validate() once for
@@ -558,7 +596,7 @@ internal static class LiveRecoveryValidationEvidenceGate
             // `SafetyAssertionsFor` remain gate-only stop-ships: they still block release, but they do not drive
             // `unalerted_breach`. Expanding this counter without also expanding producer alert emission would invent
             // systematic unalerted-breach failures on paths that never emit an operator alert today.
-            if (unmeasurable || structuralBreach || targetDeviation)
+            if (!gateOnlyDrill && (unmeasurable || structuralBreach || targetDeviation))
             {
                 alertsRequired++;
             }
@@ -585,6 +623,7 @@ internal static class LiveRecoveryValidationEvidenceGate
         => jobId switch
         {
             LiveRecoveryValidationJobs.Continuity => string.Equals(verdict, ContinuityDrillVerdicts.Unmeasurable, StringComparison.Ordinal),
+            LiveRecoveryValidationJobs.ControlledLossPath => string.Equals(verdict, ControlledLossPathVerdicts.Unmeasurable, StringComparison.Ordinal),
             LiveRecoveryValidationJobs.ProjectionRebuild => string.Equals(verdict, ProjectionRebuildVerdicts.Unmeasurable, StringComparison.Ordinal),
             LiveRecoveryValidationJobs.ScopedOutage => string.Equals(verdict, ScopedOutageDegradationVerdicts.Unmeasurable, StringComparison.Ordinal),
             _ => true,
@@ -595,6 +634,7 @@ internal static class LiveRecoveryValidationEvidenceGate
         {
             LiveRecoveryValidationJobs.Continuity => verdict is
                 ContinuityDrillVerdicts.Met or ContinuityDrillVerdicts.Missed or ContinuityDrillVerdicts.Unmeasurable,
+            LiveRecoveryValidationJobs.ControlledLossPath => ControlledLossPathVerdicts.Contains(verdict),
             LiveRecoveryValidationJobs.ProjectionRebuild => verdict is
                 ProjectionRebuildVerdicts.Equivalent or ProjectionRebuildVerdicts.Divergent or ProjectionRebuildVerdicts.Unmeasurable,
             LiveRecoveryValidationJobs.ScopedOutage => verdict is
@@ -606,6 +646,15 @@ internal static class LiveRecoveryValidationEvidenceGate
         => jobId switch
         {
             LiveRecoveryValidationJobs.Continuity => !Assertion(manifest, "data-loss-absent"),
+            LiveRecoveryValidationJobs.ControlledLossPath =>
+                !Assertion(manifest, "pre-fault-retained") ||
+                !Assertion(manifest, "candidate-rejected") ||
+                !Assertion(manifest, "candidate-absent") ||
+                !Assertion(manifest, "post-recovery-retained") ||
+                !Assertion(manifest, "tenant-isolation-preserved") ||
+                !Assertion(manifest, "unauthorized-mutation-absent") ||
+                !Assertion(manifest, "durable-bounds-valid") ||
+                !Assertion(manifest, "rpo-positive"),
             LiveRecoveryValidationJobs.ProjectionRebuild =>
                 string.Equals(manifest.Verdict, ProjectionRebuildVerdicts.Divergent, StringComparison.Ordinal) ||
                 !Assertion(manifest, "structurally-equivalent"),
@@ -621,6 +670,10 @@ internal static class LiveRecoveryValidationEvidenceGate
             LiveRecoveryValidationJobs.Continuity =>
                 string.Equals(manifest.Verdict, ContinuityDrillVerdicts.Missed, StringComparison.Ordinal) &&
                 Assertion(manifest, "data-loss-absent"),
+            LiveRecoveryValidationJobs.ControlledLossPath =>
+                string.Equals(manifest.Verdict, ControlledLossPathVerdicts.Missed, StringComparison.Ordinal) &&
+                Assertion(manifest, "durable-bounds-valid") &&
+                Assertion(manifest, "rpo-positive"),
             LiveRecoveryValidationJobs.ProjectionRebuild => !Assertion(manifest, "duration-within-target"),
             LiveRecoveryValidationJobs.ScopedOutage => !Assertion(manifest, "scope-recorded-within-target"),
             _ => false,
@@ -644,6 +697,46 @@ internal static class LiveRecoveryValidationEvidenceGate
 
     private static bool Assertion(RecoveryValidationEvidenceManifest manifest, string name)
         => manifest.Assertions.TryGetValue(name, out bool passed) && passed;
+
+    private static void ValidateControlledLossMeasurement(
+        RecoveryValidationEvidenceManifest manifest,
+        List<string> stopShip)
+    {
+        bool reasonConsistent = (manifest.Verdict, manifest.ReasonCode) switch
+        {
+            (ControlledLossPathVerdicts.Met, ControlledLossPathReport.CompletedReasonCode) => true,
+            (ControlledLossPathVerdicts.Missed, ControlledLossPathReport.TargetMissedReasonCode) => true,
+            (ControlledLossPathVerdicts.Unmeasurable, ControlledLossPathReport.UnmeasurableReasonCode) => true,
+            _ => false,
+        };
+        if (!reasonConsistent)
+        {
+            stopShip.Add($"{LiveRecoveryValidationJobs.ControlledLossPath}:verdict_reason_mismatch");
+        }
+
+        if (manifest.PreFaultCommittedAtUtc is not { } pre ||
+            manifest.PostRecoveryCommittedAtUtc is not { } post ||
+            manifest.PreFaultSequence is not > 0 ||
+            manifest.PostRecoverySequence is not > 0)
+        {
+            stopShip.Add($"{LiveRecoveryValidationJobs.ControlledLossPath}:durable_bounds_invalid");
+            return;
+        }
+
+        double authoritativeRpo = (post - pre).TotalSeconds;
+        if (!double.IsFinite(authoritativeRpo) || authoritativeRpo <= 0)
+        {
+            stopShip.Add($"{LiveRecoveryValidationJobs.ControlledLossPath}:rpo_not_positive");
+            return;
+        }
+
+        if (manifest.MeasurementsSeconds is null ||
+            !manifest.MeasurementsSeconds.TryGetValue("rpo", out double reportedRpo) ||
+            Math.Abs(authoritativeRpo - reportedRpo) > 0.000_001)
+        {
+            stopShip.Add($"{LiveRecoveryValidationJobs.ControlledLossPath}:rpo_measurement_mismatch");
+        }
+    }
 
     private static string SafeJob(string jobId)
         => LiveRecoveryValidationJobs.All.Contains(jobId) ? jobId : "unknown_live_job";

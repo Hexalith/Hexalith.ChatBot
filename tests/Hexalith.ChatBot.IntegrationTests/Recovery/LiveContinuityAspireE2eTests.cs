@@ -198,11 +198,15 @@ public sealed class LiveContinuityAspireE2eTests
                 ValidationPartitionRef = "recovery-partition-v1",
                 ControllerCapability = LiveRecoveryValidationOptions.AspireControllerCapability,
                 ControllerSecret = controllerSecret,
-                // A reachable per-scenario budget rather than the 4-hour recovery target: nine serial scenarios plus
+                // A reachable per-scenario budget rather than the 4-hour recovery target: ten serial scenarios plus
                 // topology margin have to fit inside WorkflowTimeout, so a 4-hour per-scenario budget was nominal and
                 // silently truncated by the outer deadline. RestorationTimeout remains the lane's measurable recovery
-                // ceiling and is published in every manifest.
-                PerScenarioTimeout = TimeSpan.FromMinutes(25),
+                // ceiling and is published in every manifest. Twenty rather than the previous twenty-five minutes
+                // because the tenth scenario has to fit the smallest configured workflow window (20 x 10 + 30 min
+                // topology margin = 230 <= 250); both values already exceed MaxRpo, so the controlled-loss channel
+                // can still retain a measured 901-second miss instead of canceling at 900. See
+                // LiveContinuityAspireE2eContractTests.HostedControlledLossBudgetCanMeasurePastRpoTargetWithinSmallestWorkflowWindow.
+                PerScenarioTimeout = TimeSpan.FromMinutes(20),
                 RestorationTimeout = TimeSpan.FromMinutes(3),
                 WorkflowTimeout = RecoveryWorkflowTimeout(
                     Environment.GetEnvironmentVariable("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES")),
@@ -256,6 +260,20 @@ public sealed class LiveContinuityAspireE2eTests
             {
                 throw new AggregateException("Live continuity validation produced unmeasurable scenario failures.", runner.Failures);
             }
+
+            AspireControlledLossPathOperations controlledLossOperations = new(operations);
+            LiveControlledLossPathRunner controlledLossRunner = new(controlledLossOperations, options);
+            ControlledLossPathReport controlledLossReport = await RunControlledLossStageAsync(
+                token => controlledLossRunner.RunAsync(tenantRef, runId, token),
+                evidence.RecordAsync,
+                retentionFailures,
+                retentionFailureDirectory,
+                options.Enabled,
+                runId,
+                attemptStartedAtUtc,
+                outcome.Alerted,
+                options.RestorationTimeout,
+                workflowToken).ConfigureAwait(true);
 
             RecoveryValidationDataset validationDataset = RecoveryValidationDataset.Load(
                 Path.Combine(
@@ -352,7 +370,7 @@ public sealed class LiveContinuityAspireE2eTests
                     scopedDriver.Failures.Values);
             }
 
-            int expectedEvidence = ContinuityDrillScenarios.All.Count + 1 + ScopedOutageDependencies.All.Count;
+            int expectedEvidence = ContinuityDrillScenarios.All.Count + 2 + ScopedOutageDependencies.All.Count;
 
             // The sinks' failure path writes a SECOND report+manifest pair for a substituted Unmeasurable report, so an
             // exact count turned a genuine sink/manifest error into an opaque count mismatch. Require at least one pair
@@ -374,6 +392,8 @@ public sealed class LiveContinuityAspireE2eTests
                 outcome.Unmeasurable == 0 &&
                 outcome.Missed == 0 &&
                 outcome.Met == ContinuityDrillScenarios.All.Count &&
+                string.Equals(controlledLossReport.Verdict, ControlledLossPathVerdicts.Met, StringComparison.Ordinal) &&
+                controlledLossReport.MeasuredRpo > TimeSpan.Zero &&
                 rebuildOutcome.Unmeasurable == 0 &&
                 rebuildOutcome.Equivalent == 1 &&
                 rebuildOutcome.Divergent == 0 &&
@@ -388,6 +408,7 @@ public sealed class LiveContinuityAspireE2eTests
             Dictionary<string, int> alertsDeliveredByJob = new(StringComparer.Ordinal)
             {
                 [LiveRecoveryValidationJobs.Continuity] = outcome.Alerted,
+                [LiveRecoveryValidationJobs.ControlledLossPath] = 0,
                 [LiveRecoveryValidationJobs.ProjectionRebuild] = rebuildOutcome.Alerted,
                 [LiveRecoveryValidationJobs.ScopedOutage] = scopedOutcome.Alerted,
             };
@@ -401,21 +422,15 @@ public sealed class LiveContinuityAspireE2eTests
             // outcome assertions below: hand-setting it to true, then only reaching the write on a fully passing run,
             // made the gate's `live_validation_disabled` and `latest_attempt_incomplete` branches unreachable from any
             // real artifact. A breached/missed/divergent sweep must still retain a summary saying so.
-            LiveRecoveryValidationAttemptSummary summary = new()
-            {
-                Enabled = options.Enabled,
-                RunId = runId,
-                StartedAtUtc = attemptStartedAtUtc,
-                CompletedAtUtc = attemptCompletedAtUtc,
-                LatestAttemptCompletedSuccessfully = attemptSucceeded,
-                AlertsDeliveredByJob = alertsDeliveredByJob,
-            };
-            Directory.CreateDirectory(retentionFailureDirectory);
-            await File.WriteAllTextAsync(
-                    Path.Combine(retentionFailureDirectory, LiveRecoveryValidationAttemptSummary.FileName),
-                    JsonSerializer.Serialize(summary, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }),
-                    cancellationToken)
-                .ConfigureAwait(true);
+            await WriteAttemptSummaryAsync(
+                retentionFailureDirectory,
+                options.Enabled,
+                runId,
+                attemptStartedAtUtc,
+                attemptCompletedAtUtc,
+                attemptSucceeded,
+                alertsDeliveredByJob,
+                cancellationToken).ConfigureAwait(true);
 
             // Parse normal evidence only after the independent summary is durable. A truncated, unreadable, or
             // concurrently removed canonical file must not erase the attempt-level observations needed by replay.
@@ -451,6 +466,13 @@ public sealed class LiveContinuityAspireE2eTests
             outcome.Missed.ShouldBe(0);
             outcome.Met.ShouldBe(ContinuityDrillScenarios.All.Count);
             outcome.Alerted.ShouldBe(0);
+            controlledLossReport.Verdict.ShouldBe(ControlledLossPathVerdicts.Met);
+            controlledLossReport.MeasuredRpo.ShouldBeGreaterThan(TimeSpan.Zero);
+            controlledLossReport.MeasuredRpo.ShouldBeLessThanOrEqualTo(RecoveryTargets.MaxRpo);
+            controlledLossReport.PreFaultRetained.ShouldBeTrue();
+            controlledLossReport.CandidateRejected.ShouldBeTrue();
+            controlledLossReport.CandidateAbsent.ShouldBeTrue();
+            controlledLossReport.PostRecoveryRetained.ShouldBeTrue();
             rebuildOutcome.TenantsValidated.ShouldBe(1);
             rebuildOutcome.Equivalent.ShouldBe(1);
             rebuildOutcome.Divergent.ShouldBe(0);
@@ -525,6 +547,152 @@ public sealed class LiveContinuityAspireE2eTests
 
             await application.DisposeAsync().ConfigureAwait(true);
         }
+    }
+
+    /// <summary>
+    /// Runs the controlled-loss stage and, when it fails, retains the incomplete attempt summary the out-of-process
+    /// gate reads for <c>latest_attempt_incomplete</c> before rethrowing. Extracted from the Tier-3 fact so the
+    /// summary's destination directory and its false completion flag are pinned by an executing test rather than by
+    /// a source-text assertion: writing it to the canonical evidence directory, or with the flag left true, would
+    /// otherwise be invisible outside a hosted run.
+    /// </summary>
+    internal static async ValueTask<ControlledLossPathReport> RunControlledLossStageAsync(
+        Func<CancellationToken, ValueTask<ControlledLossPathReport>> run,
+        Func<ControlledLossPathReport, CancellationToken, ValueTask> retain,
+        IRecoveryValidationEvidenceRetentionFailureSink retentionFailures,
+        string retentionFailureDirectory,
+        bool enabled,
+        string runId,
+        DateTimeOffset attemptStartedAtUtc,
+        int continuityAlertsDelivered,
+        TimeSpan markerTimeout,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await RunControlledLossAndRetainAsync(
+                run,
+                retain,
+                retentionFailures,
+                runId,
+                markerTimeout,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception controlledFailure)
+        {
+            // Stages after this one never constructed their coordinators, so no alert was delivered for them. The
+            // incomplete flag below is what stops the release; these counts only keep the delivery accounting honest.
+            Dictionary<string, int> failedAlertCounts = new(StringComparer.Ordinal)
+            {
+                [LiveRecoveryValidationJobs.Continuity] = continuityAlertsDelivered,
+                [LiveRecoveryValidationJobs.ControlledLossPath] = 0,
+                [LiveRecoveryValidationJobs.ProjectionRebuild] = 0,
+                [LiveRecoveryValidationJobs.ScopedOutage] = 0,
+            };
+            Exception? summaryFailure = null;
+            try
+            {
+                using CancellationTokenSource summaryDeadline = new(markerTimeout);
+                await WriteAttemptSummaryAsync(
+                    retentionFailureDirectory,
+                    enabled,
+                    runId,
+                    attemptStartedAtUtc,
+                    DateTimeOffset.UtcNow,
+                    latestAttemptCompletedSuccessfully: false,
+                    failedAlertCounts,
+                    summaryDeadline.Token).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                summaryFailure = exception;
+            }
+
+            if (summaryFailure is not null)
+            {
+                throw new AggregateException(
+                    "The controlled-loss run failed and its attempt summary could not be retained.",
+                    controlledFailure,
+                    summaryFailure);
+            }
+
+            throw;
+        }
+    }
+
+    /// <summary>Runs and retains controlled-loss evidence, writing the fourth-job marker before any failure escapes.</summary>
+    internal static async ValueTask<ControlledLossPathReport> RunControlledLossAndRetainAsync(
+        Func<CancellationToken, ValueTask<ControlledLossPathReport>> run,
+        Func<ControlledLossPathReport, CancellationToken, ValueTask> retain,
+        IRecoveryValidationEvidenceRetentionFailureSink retentionFailures,
+        string runId,
+        TimeSpan markerTimeout,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        ArgumentNullException.ThrowIfNull(retain);
+        ArgumentNullException.ThrowIfNull(retentionFailures);
+        try
+        {
+            ControlledLossPathReport report = await run(cancellationToken).ConfigureAwait(false);
+            await retain(report, cancellationToken).ConfigureAwait(false);
+            return report;
+        }
+        catch (Exception primaryFailure)
+        {
+            Exception? markerFailure = null;
+            try
+            {
+                using CancellationTokenSource markerDeadline = new(markerTimeout);
+                await retentionFailures.RecordAsync(
+                    RecoveryValidationEvidenceRetentionFailureMarker.Create(
+                        runId,
+                        LiveRecoveryValidationJobs.ControlledLossPath,
+                        ControlledLossPathReport.SubscriptionNotificationRejectionScenario,
+                        DateTimeOffset.UtcNow),
+                    markerDeadline.Token).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                markerFailure = exception;
+            }
+
+            if (markerFailure is not null)
+            {
+                throw new AggregateException(
+                    "Controlled-loss evidence failed and its retention-failure marker could not be written.",
+                    primaryFailure,
+                    markerFailure);
+            }
+
+            throw;
+        }
+    }
+
+    private static async ValueTask WriteAttemptSummaryAsync(
+        string directory,
+        bool enabled,
+        string runId,
+        DateTimeOffset startedAtUtc,
+        DateTimeOffset completedAtUtc,
+        bool latestAttemptCompletedSuccessfully,
+        IReadOnlyDictionary<string, int> alertsDeliveredByJob,
+        CancellationToken cancellationToken)
+    {
+        LiveRecoveryValidationAttemptSummary summary = new()
+        {
+            Enabled = enabled,
+            RunId = runId,
+            StartedAtUtc = startedAtUtc,
+            CompletedAtUtc = completedAtUtc,
+            LatestAttemptCompletedSuccessfully = latestAttemptCompletedSuccessfully,
+            AlertsDeliveredByJob = alertsDeliveredByJob,
+        };
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(
+            Path.Combine(directory, LiveRecoveryValidationAttemptSummary.FileName),
+            JsonSerializer.Serialize(summary, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

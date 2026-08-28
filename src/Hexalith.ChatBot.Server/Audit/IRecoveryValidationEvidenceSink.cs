@@ -6,6 +6,9 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// </summary>
 internal interface IRecoveryValidationEvidenceSink
 {
+    /// <summary>Retains one distinct controlled-loss RPO report.</summary>
+    ValueTask RecordAsync(ControlledLossPathReport report, CancellationToken cancellationToken);
+
     /// <summary>Retains one continuity-drill report.</summary>
     ValueTask RecordAsync(ContinuityDrillReport report, CancellationToken cancellationToken);
 

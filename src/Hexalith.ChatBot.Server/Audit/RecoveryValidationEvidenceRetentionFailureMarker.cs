@@ -65,6 +65,10 @@ internal sealed record RecoveryValidationEvidenceRetentionFailureMarker(
         => jobId switch
         {
             LiveRecoveryValidationJobs.Continuity => ContinuityDrillScenarios.Contains(scenario),
+            LiveRecoveryValidationJobs.ControlledLossPath => string.Equals(
+                scenario,
+                ControlledLossPathReport.SubscriptionNotificationRejectionScenario,
+                StringComparison.Ordinal),
             LiveRecoveryValidationJobs.ProjectionRebuild =>
                 string.Equals(scenario, ProjectionRebuildScenario, StringComparison.Ordinal),
             LiveRecoveryValidationJobs.ScopedOutage => ScopedOutageDependencies.Contains(scenario),

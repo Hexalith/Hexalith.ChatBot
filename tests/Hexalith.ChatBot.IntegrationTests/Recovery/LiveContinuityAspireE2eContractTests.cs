@@ -1,4 +1,8 @@
 using System.Net;
+using System.Text.Json;
+
+using Hexalith.ChatBot.RecoverySandbox;
+using Hexalith.ChatBot.Server.Audit;
 
 using Shouldly;
 
@@ -7,6 +11,42 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 /// <summary>Always-run contracts for the live Tier-3 startup boundary.</summary>
 public sealed class LiveContinuityAspireE2eContractTests
 {
+    [Theory]
+    [InlineData(RecoveryNotificationIdentity.PreFaultPhase)]
+    [InlineData(RecoveryNotificationIdentity.LossPhase)]
+    [InlineData(RecoveryNotificationIdentity.PostRecoveryPhase)]
+    public void ControlledLossRouteUsesOnlyClosedNotificationPhases(string phase)
+    {
+        string identity = RecoveryNotificationIdentity.Compose(
+            "provider-message",
+            RecoveryNotificationIdentity.ControlledLossLane,
+            phase);
+
+        identity.ShouldBe($"provider-message-controlled-loss-{phase}");
+    }
+
+    [Fact]
+    public void ControlledLossRouteRejectsOpenEndedNotificationPhase()
+        => Should.Throw<InvalidOperationException>(() => RecoveryNotificationIdentity.Compose(
+            "provider-message",
+            RecoveryNotificationIdentity.ControlledLossLane,
+            "caller-supplied"));
+
+    [Theory]
+    [InlineData(RecoveryNotificationIdentity.ContinuityLane, RecoveryNotificationIdentity.PreFaultPhase)]
+    [InlineData(RecoveryNotificationIdentity.ContinuityLane, RecoveryNotificationIdentity.LossPhase)]
+    [InlineData(RecoveryNotificationIdentity.ContinuityLane, RecoveryNotificationIdentity.PostRecoveryPhase)]
+    [InlineData(RecoveryNotificationIdentity.GraphLane, RecoveryNotificationIdentity.PreFaultPhase)]
+    [InlineData(RecoveryNotificationIdentity.GraphLane, RecoveryNotificationIdentity.LossPhase)]
+    [InlineData(RecoveryNotificationIdentity.GraphLane, RecoveryNotificationIdentity.PostRecoveryPhase)]
+    [InlineData(RecoveryNotificationIdentity.ControlledLossLane, RecoveryNotificationIdentity.CheckpointPhase)]
+    [InlineData(RecoveryNotificationIdentity.ControlledLossLane, RecoveryNotificationIdentity.RecoveryPhase)]
+    public void NotificationPhasesCannotCrossClosedLaneOwnership(string lane, string phase)
+        => Should.Throw<InvalidOperationException>(() => RecoveryNotificationIdentity.Compose(
+            "provider-message",
+            lane,
+            phase));
+
     [Theory]
     [InlineData(null, 300)]
     [InlineData("265", 265)]
@@ -27,6 +67,57 @@ public sealed class LiveContinuityAspireE2eContractTests
     {
         Should.Throw<InvalidOperationException>(() =>
             LiveContinuityAspireE2eTests.RecoveryWorkflowTimeout(configured));
+    }
+
+    [Fact]
+    public void HostedControlledLossBudgetCanMeasurePastRpoTargetWithinSmallestWorkflowWindow()
+    {
+        LiveRecoveryValidationOptions options = new()
+        {
+            Enabled = true,
+            EnvironmentName = "Testing",
+            TestTenantRef = "replay-test:recovery-validation",
+            DatasetRef = "recovery-baseline",
+            DatasetVersion = "v1",
+            DatasetVolume = 6,
+            ProjectionSchemaVersion = "schema-v1",
+            ValidationPartitionRef = "recovery-partition-v1",
+            ControllerCapability = LiveRecoveryValidationOptions.AspireControllerCapability,
+            ControllerSecret = "test-secret",
+            PerScenarioTimeout = TimeSpan.FromMinutes(20),
+            RestorationTimeout = TimeSpan.FromMinutes(3),
+            WorkflowTimeout = TimeSpan.FromMinutes(250),
+            EvidenceDirectory = Path.GetTempPath(),
+            EvidenceLocator = "artifact://live-recovery/test",
+        };
+
+        options.PerScenarioTimeout.ShouldBeGreaterThan(RecoveryTargets.MaxRpo);
+        options.Validate().ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ControlledRunnerOrSinkFailureWritesFourthJobMarkerBeforeRethrow(bool sinkFails)
+    {
+        InvalidOperationException primary = new(sinkFails ? "sink failed" : "runner failed");
+        CapturingRetentionFailureSink markerSink = new();
+
+        InvalidOperationException observed = await Should.ThrowAsync<InvalidOperationException>(() =>
+            LiveContinuityAspireE2eTests.RunControlledLossAndRetainAsync(
+                sinkFails
+                    ? _ => ValueTask.FromResult<ControlledLossPathReport>(null!)
+                    : _ => ValueTask.FromException<ControlledLossPathReport>(primary),
+                (_, _) => sinkFails ? ValueTask.FromException(primary) : ValueTask.CompletedTask,
+                markerSink,
+                "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                TimeSpan.FromSeconds(1),
+                TestContext.Current.CancellationToken).AsTask());
+
+        observed.ShouldBeSameAs(primary);
+        RecoveryValidationEvidenceRetentionFailureMarker marker = markerSink.Markers.ShouldHaveSingleItem();
+        marker.JobId.ShouldBe(LiveRecoveryValidationJobs.ControlledLossPath);
+        marker.Scenario.ShouldBe(ControlledLossPathReport.SubscriptionNotificationRejectionScenario);
     }
 
     [Theory]
@@ -100,5 +191,125 @@ public sealed class LiveContinuityAspireE2eContractTests
         LiveContinuityAspireE2eTests
             .ProvesMailboxAdmission(statusCode, body)
             .ShouldBe(expectedAdmissionProof);
+    }
+
+    /// <summary>
+    /// The stage's failure path is what tells the out-of-process gate the hosted attempt was incomplete. Its
+    /// destination directory and its false completion flag were previously asserted only by source-text matches, so
+    /// writing the summary into the canonical evidence directory, or leaving the flag true, would have surfaced
+    /// nowhere but a hosted run.
+    /// </summary>
+    [Fact]
+    public async Task ControlledLossStageFailureRetainsAnIncompleteAttemptSummaryBesideTheMarker()
+    {
+        InvalidOperationException primary = new("runner failed");
+        CapturingRetentionFailureSink markerSink = new();
+        string retentionFailureDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"hexalith-chatbot-controlled-loss-summary-{Guid.NewGuid():N}");
+        string evidenceDirectory = Path.Combine(retentionFailureDirectory, "evidence");
+        Directory.CreateDirectory(evidenceDirectory);
+        DateTimeOffset startedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-5);
+        try
+        {
+            InvalidOperationException observed = await Should.ThrowAsync<InvalidOperationException>(() =>
+                LiveContinuityAspireE2eTests.RunControlledLossStageAsync(
+                    _ => ValueTask.FromException<ControlledLossPathReport>(primary),
+                    (_, _) => ValueTask.CompletedTask,
+                    markerSink,
+                    retentionFailureDirectory,
+                    enabled: true,
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                    startedAtUtc,
+                    continuityAlertsDelivered: 2,
+                    TimeSpan.FromSeconds(5),
+                    TestContext.Current.CancellationToken).AsTask());
+
+            observed.ShouldBeSameAs(primary);
+            markerSink.Markers.ShouldHaveSingleItem();
+
+            // The summary must land in the retention-failure root the replay loader reads, never in the evidence
+            // directory the manifests occupy.
+            string summaryPath = Path.Combine(
+                retentionFailureDirectory,
+                LiveRecoveryValidationAttemptSummary.FileName);
+            File.Exists(summaryPath).ShouldBeTrue();
+            File.Exists(Path.Combine(evidenceDirectory, LiveRecoveryValidationAttemptSummary.FileName))
+                .ShouldBeFalse();
+
+            LiveRecoveryValidationAttemptSummary summary = JsonSerializer.Deserialize<LiveRecoveryValidationAttemptSummary>(
+                await File.ReadAllTextAsync(summaryPath, TestContext.Current.CancellationToken),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+            summary.LatestAttemptCompletedSuccessfully.ShouldBeFalse();
+            summary.Enabled.ShouldBeTrue();
+            summary.RunId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+            summary.StartedAtUtc.ShouldBe(startedAtUtc, TimeSpan.FromSeconds(1));
+            summary.CompletedAtUtc.ShouldNotBeNull();
+            summary.AlertsDeliveredByJob[LiveRecoveryValidationJobs.Continuity].ShouldBe(2);
+            foreach (string jobId in LiveRecoveryValidationJobs.All)
+            {
+                summary.AlertsDeliveredByJob.ShouldContainKey(jobId);
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(retentionFailureDirectory))
+            {
+                Directory.Delete(retentionFailureDirectory, recursive: true);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A successful stage must not leave an incomplete-attempt summary behind: the success path writes its own
+    /// summary later, and a stray failed one would stop-ship an otherwise complete hosted attempt.
+    /// </summary>
+    [Fact]
+    public async Task ControlledLossStageSuccessWritesNoIncompleteAttemptSummary()
+    {
+        CapturingRetentionFailureSink markerSink = new();
+        string retentionFailureDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"hexalith-chatbot-controlled-loss-summary-{Guid.NewGuid():N}");
+        try
+        {
+            ControlledLossPathReport returned = await LiveContinuityAspireE2eTests.RunControlledLossStageAsync(
+                _ => ValueTask.FromResult<ControlledLossPathReport>(null!),
+                (_, _) => ValueTask.CompletedTask,
+                markerSink,
+                retentionFailureDirectory,
+                enabled: true,
+                "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                DateTimeOffset.UtcNow,
+                continuityAlertsDelivered: 0,
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+
+            returned.ShouldBeNull();
+            markerSink.Markers.ShouldBeEmpty();
+            File.Exists(Path.Combine(retentionFailureDirectory, LiveRecoveryValidationAttemptSummary.FileName))
+                .ShouldBeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(retentionFailureDirectory))
+            {
+                Directory.Delete(retentionFailureDirectory, recursive: true);
+            }
+        }
+    }
+
+    private sealed class CapturingRetentionFailureSink : IRecoveryValidationEvidenceRetentionFailureSink
+    {
+        public List<RecoveryValidationEvidenceRetentionFailureMarker> Markers { get; } = [];
+
+        public ValueTask RecordAsync(
+            RecoveryValidationEvidenceRetentionFailureMarker marker,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Markers.Add(marker);
+            return ValueTask.CompletedTask;
+        }
     }
 }

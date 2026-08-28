@@ -39,7 +39,8 @@ The harness rejects a missing controller capability, missing/blank secret, produ
 6. It runs the existing coordinator/evaluator/audit path and inspects state-store end-state after recovery.
 7. Fault restoration runs in `finally`; restoration is bounded by its own timeout, followed by declared resource health and cleanup/end-state assertions.
 8. Every measured report is written to the evidence sink before `RunAll*` reduces it to aggregate counts.
-9. The release evidence gate validates freshness, provenance, coverage, cleanup, verdict dimensions, and alert reconciliation.
+9. A separate `controlled-loss-path` runner deliberately rejects one sandbox notification, witnesses retained EventStore commits before and after it, and proves the rejected candidate absent without adding a third continuity scenario.
+10. The release evidence gate independently derives the controlled-loss RPO from those persisted commit timestamps, then validates freshness, provenance, coverage, cleanup, verdict dimensions, and alert reconciliation for all retained jobs.
 
 The controller secret is minted per run by the Tier-3 harness from a CSPRNG (`RandomNumberGenerator`) and passed to the AppHost as sandbox-only configuration; no workflow secret is involved and none is required. It is never committed to the realm, manifest, logs, traces, filenames, or report. The sandbox endpoint compares it without reflecting either the configured or presented value. Controller calls and fault transitions produce metadata-only audit entries containing only run/scenario ULIDs, safe tenant/dataset locators, scenario/dependency token, action, UTC timestamp, and stable reason code.
 
@@ -49,6 +50,7 @@ The controller secret is minted per run by the Tier-3 harness from a CSPRNG (`Ra
 | --- | --- | --- | --- | --- |
 | `eventstore-outage` | Aspire `eventstore` project resource, stopped and started by Tier-3 `ResourceCommandService`. | A previously healthy governed command through ChatBot/DAPR reaches the EventStore dependency failure and no unauthorized mutation is committed. | EventStore and ChatBot return healthy; the committed-before-outage set is reconstructed from state/audit evidence; a post-restore idempotent command succeeds; RPO/RTO and data-loss are derived from observed timestamps and sets. | Local single-process Aspire/DAPR and Redis are not AKS, durable production storage, or a multi-replica control plane. |
 | `m365-subscription-failure` | Test-only topology composes a closed Graph/subscription simulator behind `GraphMailboxIntakeWorker`; the shipped AppHost has no sandbox reference. | The subscription is expired through the authenticated controller; the Worker returns its stable recoverable result and affected/control DAPR read-model sentinels remain unchanged. | Renewal drives the Worker through the generated ChatBot client; the EventStore owner-sidecar actor-state API proves the committed mailbox-intake aggregate, a lane-stable second notification proves coarse-idempotent no-duplicate behavior, both tenant sentinels remain unchanged, and all directly seeded test keys are erased. | The simulator proves the ChatBot/Worker contract and recovery path, not external Microsoft Graph behavior, throttling, permissions, webhook delivery, or tenant-scale fidelity. |
+| `controlled-loss-path` | The subscription simulator admits one closed `loss` notification while the sandbox-only generated-client decorator deliberately returns a recoverable rejection. This is an evidence job, not a `ContinuityDrillScenarios` member. | EventStore proves a retained pre-fault envelope; the decorator records only the candidate ULID and observation time; the rejected candidate never becomes a durable EventStore commit. | A distinct post-recovery envelope is durable, the candidate remains absent throughout the isolation sweep, restoration and cleanup complete, and RPO is derived exclusively from the two persisted EventStore envelope timestamps. Only `0 < rpo <= RecoveryTargets.MaxRpo` qualifies. | The mechanism is implemented and locally verified, but no hosted controlled-loss artifact has yet been retained and cited. Ordinary continuity's RPO 0s remains safety evidence only. |
 | `projection-rebuild` | Fresh DAPR validation partition selected by a file-loaded versioned dataset; the driver reads immutable `ProjectConversationSourceEmailView` metadata plus `IWormAuditStore.EnumerateChain` only. | A separately seeded persisted baseline is read back before rebuild; zero source or audit coverage and any of the six missing dataset categories are rejected. | Production projection stores write and read a distinct partition; source-email rebuild reconstructs captured events and replays them through the real `AssociationProjectionHandler`; duration/resources are recorded; ETag cleanup erases the rebuilt partition and the drivers stamp `cleanup-complete` from that outcome. **Source-email equivalence is no longer an identity tautology.** Governed/WORM projections remain identity-written (`RV-REBUILD-WORM`); full NFR57 coverage for audit-derived projections is still residual. | Only source-email and WORM records are projection inputs. The other four parsed categories establish configured-corpus provenance but are never materialized, seeded or compared. The manifest reports `configuredDatasetVolume: 6` and the actual compared-resource count in `datasetVolume`. WORM remains process-local and scale is non-production. |
 | `graph` | The same hosted Worker-to-provider simulator boundary, including expired-subscription behavior. | The affected mailbox returns a recoverable Graph/subscription failure while the control tenant/mailbox operation stays available. | Restored intake reconciles once with no duplicate side effect and records mailbox scope. | No external Graph service or production webhook infrastructure. |
 | `identity` | Allowlisted Aspire Keycloak `security` resource stop/start, with the token-acquisition/authentication boundary as the probe. | New authentication fails closed and cannot mutate the test tenant; a separately established control operation is checked according to the active token/JWKS-cache policy. | Keycloak health and token acquisition recover; a newly authenticated governed operation succeeds without broad fallback access. | Local Keycloak, development certificates, and single replica do not prove the production identity control plane or cache distribution. |
@@ -157,18 +159,28 @@ Story 12.15 leaves A10/NFR56 provisional at `RecoveryTargets.MaxRpo` (15 minutes
 **A measured figure is now published from a genuine hosted run.** Required release run
 [33066358280](https://github.com/Hexalith/Hexalith.ChatBot/actions/runs/33066358280), commit `17aa94d`, evidence
 run `01M11EYSDMP1ZF38B7KZA1A6FA` (2026-08-27) is the first bundle produced from the exact commit on `main`; it
-retains nine manifests/reports with zero deviations and passed the independent out-of-process gate 1/1. It
+retains nine manifests/reports with zero deviations and passed the independent out-of-process gate 1/1 **as that
+gate stood at commit `17aa94d`**. DW-52 adds `controlled-loss-path` to `LiveRecoveryValidationJobs.All`, so the
+shipped gate now requires a fourth job: replaying this three-job bundle through the current gate returns
+`controlled-loss-path:missing_evidence` and stop-ships. Its measured figures remain readable as historical
+evidence, but it can no longer be replayed clean, and only a hosted run produced at or after this commit can
+carry the authenticity condition forward (pinned by
+`LiveRecoveryValidationEvidenceGateTests.AnEvidenceBundleRetainedBeforeTheControlledLossChannelNoLongerPasses`).
+It
 supersedes the 2026-08-26 bundle at commit `397507b`, which predated a fix required by the intervening
 `011261e` ("AI execution coordination") change. Both mandatory drills measured `met` (RPO 0s / RTO 149.6s and
 60.5s against 900s/14400s); the projection rebuild measured `equivalent`; all six scoped dependencies measured
 `contained`. See `.decision-log.md` (2026-08-27 entry) for the full bundle and the Winston/Murat review.
 
 Ratification requires a complete passing scheduled-CI or release artifact plus its hosted run/artifact locator
-recorded in the PRD decision log — now satisfied — **and** is bounded by the 180-second measurable ceiling above:
-a passing hosted run ratifies recovery within the ceiling, not RTO ≤ 4 hours, and the measured RPO remains a
-constant on the no-loss path rather than a citable non-constant loss-path measurement. Neither bound is satisfied
-by this run, so **A10 remains provisional**. Ratifying the 4-hour target requires either a lane whose restoration
-budget reaches it or a separately evidenced pre-production drill.
+recorded in the PRD decision log. The cited 2026-08-27 bundle satisfies that authenticity condition for its nine
+jobs, but it predates the fourth, separate `controlled-loss-path` evidence channel. DW-52 now provides the local
+mechanism for a citable non-vacuous RPO measurement: persisted EventStore bounds around one deliberately rejected
+candidate, independently recomputed by the gate, with only `0 < rpo <= RecoveryTargets.MaxRpo` accepted. No hosted
+artifact from that channel is cited, so the 15-minute RPO remains provisional; ordinary continuity's 0s values
+cannot substitute. The 180-second measurable ceiling independently means a passing hosted run ratifies recovery
+within the ceiling, not RTO ≤ 4 hours. Therefore **A10 remains provisional**. Ratifying the 4-hour target requires
+either a lane whose restoration budget reaches it or a separately evidenced pre-production drill.
 
 **Un-ratification.** A ratified A10 returns to provisional when the cited artifact passes the 8-day `MaximumEvidenceAge` freshness boundary without a successor, when a later required run is not passing, or when a hosted run returns `Unmeasurable` or a structural breach. The artifact remains downloadable through day 30 for investigation, but it cannot support ratification after day 8. Architecture/DevOps owns that transition and records it in the decision log.
 

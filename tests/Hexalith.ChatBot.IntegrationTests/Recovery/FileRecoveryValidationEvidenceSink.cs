@@ -17,6 +17,57 @@ internal sealed class FileRecoveryValidationEvidenceSink(
 
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
+    public ValueTask RecordAsync(ControlledLossPathReport report, CancellationToken cancellationToken)
+    {
+        ControlledLossPathMeasurement measurement = new(
+            report.TenantRef,
+            report.StartedAtUtc,
+            report.EndedAtUtc,
+            report.PreFaultRetainedRef,
+            report.PreFaultEventRef,
+            report.PreFaultSequence,
+            report.PreFaultCommittedAtUtc,
+            report.RejectedCandidateRef,
+            report.RejectedAtUtc,
+            report.PostRecoveryRetainedRef,
+            report.PostRecoveryEventRef,
+            report.PostRecoverySequence,
+            report.PostRecoveryCommittedAtUtc,
+            report.PreFaultRetained,
+            report.CandidateRejected,
+            report.CandidateAbsent,
+            report.PostRecoveryRetained,
+            report.TenantIsolationPreserved,
+            report.UnauthorizedMutationAbsent,
+            report.CleanupComplete);
+        return WriteAsync(
+            report,
+            report.Scenario,
+            LiveRecoveryValidationJobs.ControlledLossPath,
+            report.Verdict,
+            report.ReasonCode,
+            report.StartedAtUtc,
+            report.EndedAtUtc,
+            new Dictionary<string, double> { ["rpo"] = report.MeasuredRpo.TotalSeconds },
+            new Dictionary<string, double> { ["rpo"] = RecoveryTargets.MaxRpo.TotalSeconds },
+            new Dictionary<string, bool>
+            {
+                ["cleanup-complete"] = report.CleanupComplete,
+                ["pre-fault-retained"] = report.PreFaultRetained,
+                ["candidate-rejected"] = report.CandidateRejected,
+                ["candidate-absent"] = report.CandidateAbsent,
+                ["post-recovery-retained"] = report.PostRecoveryRetained,
+                ["tenant-isolation-preserved"] = report.TenantIsolationPreserved,
+                ["unauthorized-mutation-absent"] = report.UnauthorizedMutationAbsent,
+                ["durable-bounds-valid"] = ControlledLossPathEvaluator.BoundsAreValid(measurement),
+                ["rpo-positive"] = report.MeasuredRpo > TimeSpan.Zero,
+            },
+            report.Deviations,
+            cancellationToken,
+            datasetVolume: 0,
+            coverage: 1);
+    }
+
     public ValueTask RecordAsync(ContinuityDrillReport report, CancellationToken cancellationToken)
     {
         bool measurable = !string.Equals(report.Verdict, ContinuityDrillVerdicts.Unmeasurable, StringComparison.Ordinal);
@@ -218,6 +269,16 @@ internal sealed class FileRecoveryValidationEvidenceSink(
                 ["test-output"] = $"{options.EvidenceLocator}/results.trx",
                 ["reports"] = $"{options.EvidenceLocator}/reports",
             },
+            PreFaultRetainedRef = (report as ControlledLossPathReport)?.PreFaultRetainedRef,
+            PreFaultEventRef = (report as ControlledLossPathReport)?.PreFaultEventRef,
+            PreFaultSequence = (report as ControlledLossPathReport)?.PreFaultSequence,
+            PreFaultCommittedAtUtc = (report as ControlledLossPathReport)?.PreFaultCommittedAtUtc,
+            RejectedCandidateRef = (report as ControlledLossPathReport)?.RejectedCandidateRef,
+            RejectedAtUtc = (report as ControlledLossPathReport)?.RejectedAtUtc,
+            PostRecoveryRetainedRef = (report as ControlledLossPathReport)?.PostRecoveryRetainedRef,
+            PostRecoveryEventRef = (report as ControlledLossPathReport)?.PostRecoveryEventRef,
+            PostRecoverySequence = (report as ControlledLossPathReport)?.PostRecoverySequence,
+            PostRecoveryCommittedAtUtc = (report as ControlledLossPathReport)?.PostRecoveryCommittedAtUtc,
         };
         IReadOnlyList<string> errors = manifest.Validate();
         if (errors.Count > 0)
@@ -298,6 +359,7 @@ internal sealed class FileRecoveryValidationEvidenceSink(
         => report switch
         {
             ContinuityDrillReport continuity => continuity.CorrelationId,
+            ControlledLossPathReport controlledLoss => controlledLoss.CorrelationId,
             ProjectionRebuildReport rebuild => rebuild.CorrelationId,
             ScopedOutageDegradationReport outage => outage.CorrelationId,
             _ => throw new InvalidOperationException("Unknown canonical recovery report type."),
@@ -314,6 +376,7 @@ internal sealed class FileRecoveryValidationEvidenceSink(
         {
             ("continuity", ContinuityDrillScenarios.EventStoreOutage) => "stop:eventstore",
             ("continuity", ContinuityDrillScenarios.M365SubscriptionFailure) => "fault:graph-subscription",
+            ("controlled-loss-path", _) => "reject:subscription-notification",
             ("projection-rebuild", _) => "rebuild:fresh-partition",
             ("scoped-outage", ScopedOutageDependencies.Identity) => "stop:security",
             ("scoped-outage", ScopedOutageDependencies.Graph) => "fault:graph-subscription",
@@ -325,6 +388,7 @@ internal sealed class FileRecoveryValidationEvidenceSink(
         {
             ("continuity", ContinuityDrillScenarios.EventStoreOutage) => "start:eventstore",
             ("continuity", ContinuityDrillScenarios.M365SubscriptionFailure) => "restore:graph-subscription",
+            ("controlled-loss-path", _) => "restore:graph-subscription",
             ("projection-rebuild", _) => "verify:fresh-partition",
             ("scoped-outage", ScopedOutageDependencies.Identity) => "start:security",
             ("scoped-outage", ScopedOutageDependencies.Graph) => "restore:graph-subscription",
@@ -334,7 +398,11 @@ internal sealed class FileRecoveryValidationEvidenceSink(
     private static IReadOnlyList<string> ResidualIds(string reportKind, string scenario)
         => (reportKind, scenario) switch
         {
+            // The controlled-loss drill faults and restores the same composed Graph/subscription boundary as the
+            // M365 continuity scenario, so it inherits RV-EXT-M365: no live Graph resource is exercised. Omitting
+            // it here would let the one manifest that carries the RPO claim under-declare its own boundary limit.
             ("continuity", ContinuityDrillScenarios.M365SubscriptionFailure) or
+            ("controlled-loss-path", _) or
             ("scoped-outage", ScopedOutageDependencies.Graph) =>
                 ["RV-EXT-M365", "RV-PROD-CONTROL", "RV-PROVIDER-SCALE", "RV-EVIDENCE-KINDS"],
             ("projection-rebuild", _) or ("scoped-outage", ScopedOutageDependencies.AuditStore) =>

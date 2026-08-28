@@ -29,6 +29,9 @@ public sealed class FileRecoveryValidationEvidenceSinkTests
             MetReport(ChatBotCorrelationId.New().Value, ContinuityDrillScenarios.EventStoreOutage, started),
             TestContext.Current.CancellationToken).ConfigureAwait(true);
         await sink.RecordAsync(
+            ControlledLossReport(ChatBotCorrelationId.New().Value, started.AddSeconds(30)),
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
+        await sink.RecordAsync(
             EquivalentProjectionReport(ChatBotCorrelationId.New().Value, started.AddMinutes(1), resourcesCompared: 2),
             TestContext.Current.CancellationToken).ConfigureAwait(true);
         await sink.RecordAsync(
@@ -40,9 +43,11 @@ public sealed class FileRecoveryValidationEvidenceSinkTests
             .Select(DeserializeManifest)
             .ToArray();
 
-        manifests.Length.ShouldBe(3);
+        manifests.Length.ShouldBe(4);
         manifests.ShouldAllBe(static manifest => manifest.ConfiguredDatasetVolume == 6);
         manifests.Single(static manifest => manifest.JobId == LiveRecoveryValidationJobs.Continuity)
+            .DatasetVolume.ShouldBe(0);
+        manifests.Single(static manifest => manifest.JobId == LiveRecoveryValidationJobs.ControlledLossPath)
             .DatasetVolume.ShouldBe(0);
         manifests.Single(static manifest => manifest.JobId == LiveRecoveryValidationJobs.ProjectionRebuild)
             .DatasetVolume.ShouldBe(2);
@@ -89,6 +94,70 @@ public sealed class FileRecoveryValidationEvidenceSinkTests
             Path.GetFileName(manifestPath).ShouldNotContain(":");
             Path.GetFileName(manifestPath).ShouldNotContain("/");
         }
+    }
+
+    [Fact]
+    public async Task RecordAsyncRetainsControlledLossDurableBoundsAsMetadataOnlyEvidence()
+    {
+        string evidenceDirectory = CreateEvidenceDirectory();
+        FileRecoveryValidationEvidenceSink sink = new(
+            Options(evidenceDirectory),
+            repositoryCommit: "0123456789abcdef0123456789abcdef01234567",
+            daprRuntimeVersion: "1.18.4",
+            aspireVersion: "13.4.6",
+            appHostVersion: "1.0.0");
+        DateTimeOffset started = DateTimeOffset.Parse("2026-08-01T00:00:00Z");
+
+        await sink.RecordAsync(
+            ControlledLossReport(ChatBotCorrelationId.New().Value, started),
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
+
+        RecoveryValidationEvidenceManifest manifest = DeserializeManifest(
+            Directory.GetFiles(evidenceDirectory, "*.manifest.json").Single());
+        manifest.Validate().ShouldBeEmpty();
+        manifest.JobId.ShouldBe(LiveRecoveryValidationJobs.ControlledLossPath);
+        manifest.MeasurementsSeconds["rpo"].ShouldBe(20);
+        manifest.AllowedTargetsSeconds["rpo"].ShouldBe(RecoveryTargets.MaxRpo.TotalSeconds);
+        manifest.PreFaultEventRef.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAB");
+        manifest.RejectedCandidateRef.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAC");
+        manifest.PostRecoveryEventRef.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAE");
+        manifest.Assertions["candidate-absent"].ShouldBeTrue();
+        manifest.Assertions["rpo-positive"].ShouldBeTrue();
+    }
+
+    /// <summary>
+    /// Ties the producer's hand-listed assertion dictionary and residual set to what the gate actually demands. Every
+    /// other controlled-loss gate test builds its manifest from <c>RequiredAssertionsFor</c> or by hand, so a renamed
+    /// or dropped key in the sink would have surfaced first on a hosted run.
+    /// </summary>
+    [Fact]
+    public async Task RecordedControlledLossManifestSatisfiesTheGateItWillBeReplayedThrough()
+    {
+        string evidenceDirectory = CreateEvidenceDirectory();
+        FileRecoveryValidationEvidenceSink sink = new(
+            Options(evidenceDirectory),
+            repositoryCommit: "0123456789abcdef0123456789abcdef01234567",
+            daprRuntimeVersion: "1.18.4",
+            aspireVersion: "13.4.6",
+            appHostVersion: "1.0.0");
+
+        await sink.RecordAsync(
+            ControlledLossReport(ChatBotCorrelationId.New().Value, DateTimeOffset.Parse("2026-08-01T00:00:00Z")),
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
+
+        RecoveryValidationEvidenceManifest manifest = DeserializeManifest(
+            Directory.GetFiles(evidenceDirectory, "*.manifest.json").Single());
+
+        foreach (string assertion in LiveRecoveryValidationEvidenceGate.RequiredAssertionsFor(
+            LiveRecoveryValidationJobs.ControlledLossPath))
+        {
+            manifest.Assertions.ShouldContainKey(assertion);
+            manifest.Assertions[assertion].ShouldBeTrue();
+        }
+
+        // The drill faults and restores the composed Graph/subscription boundary, so the manifest that carries the
+        // RPO claim must declare the same external-M365 limitation the other subscription manifests declare.
+        manifest.ResidualIds.ShouldContain("RV-EXT-M365");
     }
 
     [Fact]
@@ -206,6 +275,35 @@ public sealed class FileRecoveryValidationEvidenceSinkTests
             RecalibrationFlag = true,
             Deviations = ["rto_target_missed"],
         };
+
+    private static ControlledLossPathReport ControlledLossReport(string correlationId, DateTimeOffset started)
+        => new(
+            RecoveryValidationTopology.LogicalTenantRef,
+            ControlledLossPathReport.SubscriptionNotificationRejectionScenario,
+            started,
+            started.AddSeconds(40),
+            TimeSpan.FromSeconds(20),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAA",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAB",
+            1,
+            started.AddSeconds(10),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAC",
+            started.AddSeconds(20),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAD",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAE",
+            1,
+            started.AddSeconds(30),
+            PreFaultRetained: true,
+            CandidateRejected: true,
+            CandidateAbsent: true,
+            PostRecoveryRetained: true,
+            TenantIsolationPreserved: true,
+            UnauthorizedMutationAbsent: true,
+            CleanupComplete: true,
+            ControlledLossPathVerdicts.Met,
+            Deviations: [],
+            correlationId,
+            ControlledLossPathReport.CompletedReasonCode);
 
     private static ProjectionRebuildReport EquivalentProjectionReport(
         string correlationId,

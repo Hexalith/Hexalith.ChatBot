@@ -14,6 +14,10 @@ internal sealed class DiscardingRecoveryValidationEvidenceSink : IRecoveryValida
     }
 
     /// <inheritdoc />
+    public ValueTask RecordAsync(ControlledLossPathReport report, CancellationToken cancellationToken)
+        => ValueTask.CompletedTask;
+
+    /// <inheritdoc />
     public ValueTask RecordAsync(ContinuityDrillReport report, CancellationToken cancellationToken)
         => ValueTask.CompletedTask;
 
