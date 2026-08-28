@@ -26,6 +26,15 @@
     "label": "Keep open for backend",
     "resolution": ""
   },
+  "DW-132": {
+    "answered_at": "2026-08-28",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Define a bounded cancellation-safe retention path, attempt the required canonical fallback semantics, emit an independent marker when evidence cannot be retained, and update all coordinators, gates, workflows, and tests consistently.",
+    "key": "1",
+    "label": "Mark cancellation loss",
+    "resolution": ""
+  },
   "DW-2": {
     "answered_at": "2026-08-27",
     "bundle_name": "",
