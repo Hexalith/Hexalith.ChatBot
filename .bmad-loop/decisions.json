@@ -161,6 +161,15 @@
     "label": "Lease and fence cleanup",
     "resolution": ""
   },
+  "DW-84": {
+    "answered_at": "2026-08-28",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Wait for settled dark and forced-colors state, compare against a baseline, regenerate affected PNGs, and present them for explicit acceptance.",
+    "key": "1",
+    "label": "Regenerate and review",
+    "resolution": ""
+  },
   "DW-92": {
     "answered_at": "2026-08-27",
     "bundle_name": "",

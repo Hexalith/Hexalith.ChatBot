@@ -734,6 +734,7 @@ location: _bmad-output/implementation-artifacts/spec-run-all-tests-and-fix-issue
 source_spec: _bmad-output/implementation-artifacts/spec-run-all-tests-and-fix-issues.md
 reason: Externally committed Story 13.9 visual artifacts do not reliably prove dark-mode or settled forced-colors rendering. Evidence: Eighteen baseline-to-HEAD PNGs changed outside this workflow; inspected dark captures render Light/Clair, the French project-conversation dark/light files are byte-identical, and an English forced-colors dashboard capture records a loading state while the generator overwrites tracked PNGs without baseline comparison.
 status: open
+decision: 2026-08-28 Regenerate and review — Wait for settled dark and forced-colors state, compare against a baseline, regenerate affected PNGs, and present them for explicit acceptance.
 
 ### DW-85: Streaming release-readiness evidence remains source-token and synthetic-fixture based rather than production progressive-render execution.
 
