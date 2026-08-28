@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.ExceptionServices;
@@ -7,6 +8,7 @@ using System.Text;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Client.Projections;
@@ -20,6 +22,7 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 internal sealed class LiveProjectionRebuildDriver(
     IReadOnlyList<ProjectConversationSourceEmailView> immutableSourceRecords,
     IWormAuditStore wormAuditStore,
+    ProjectionRebuildBaselineEvidence baselineEvidence,
     IReadModelStore readModelStore,
     IReadModelConditionalEraser readModelEraser,
     RecoveryValidationDatasetDescriptor dataset,
@@ -74,30 +77,46 @@ internal sealed class LiveProjectionRebuildDriver(
             throw new InvalidOperationException("The immutable rebuild source population or tenant boundary does not match the dataset.");
         }
 
+        if (sources.Select(static source => source.IntakeId).Distinct(StringComparer.Ordinal).Count() != sources.Length ||
+            sources.Any(static source => !AuditMetadata.IsSafeStableIdentifier(source.IntakeId)))
+        {
+            throw new InvalidOperationException("The immutable rebuild source contains an unsafe or duplicate logical resource id.");
+        }
+
         IReadOnlyList<WormAuditChainRecord> auditRecords = wormAuditStore.EnumerateChain(testTenantRef);
         if (auditRecords.Count != dataset.WormAuditRecordCount)
         {
             throw new InvalidOperationException("The selected tenant WORM population does not match the dataset.");
         }
 
+        IReadOnlyList<WormOperationGroup> rebuildOperations = GroupOperations(auditRecords);
+        if (baselineEvidence.WormRecordCount != dataset.WormAuditRecordCount ||
+            baselineEvidence.SourceIntakeIds.Count != dataset.SourceRecordCount ||
+            baselineEvidence.WormOperationCount <= 0 ||
+            rebuildOperations.Count != baselineEvidence.WormOperationCount)
+        {
+            throw new InvalidOperationException("The independent seed and rebuild WORM cardinalities do not match the pinned dataset.");
+        }
+
         string baselinePartitionTenant = BaselinePartitionTenant(testTenantRef, dataset.ValidationPartitionRef);
-        IReadOnlyList<ProjectionResourceDigest> baselineFull = await ReadSnapshotAsync(
+        IReadOnlyList<ProjectionResourceDigest> baseline = await ReadBaselineSnapshotAsync(
             readModelStore,
             baselinePartitionTenant,
-            sources,
-            auditRecords,
+            baselineEvidence,
             scenarioToken).ConfigureAwait(false);
-        // Claim narrowing (decision 2.2): structural proof is source-email digests only. WORM/governed identity-writes
-        // remain as RV-REBUILD-WORM residual and are excluded from equivalence.
-        IReadOnlyList<ProjectionResourceDigest> baseline = SourceDigestsOnly(baselineFull);
-        string preRebuildSchemaVersion = await ReadObservedSourceSchemaAsync(
-            readModelStore,
-            baselinePartitionTenant,
-            sources,
-            scenarioToken).ConfigureAwait(false);
+        string preRebuildSchemaVersion = baselineEvidence.ProjectionSchemaVersion;
         string freshPartitionTenant = FreshPartitionTenant(testTenantRef, dataset.ValidationPartitionRef, correlationId);
         IReadOnlyList<string> freshKeys = ProjectionKeys(freshPartitionTenant, sources, auditRecords);
-        IReadOnlyList<string> baselineKeys = ProjectionKeys(baselinePartitionTenant, sources, auditRecords);
+        int expectedFreshKeyCount = sources.Length + rebuildOperations
+            .Select(static operation => operation.ResourceId)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        if (freshKeys.Count != expectedFreshKeyCount || freshKeys.Distinct(StringComparer.Ordinal).Count() != freshKeys.Count)
+        {
+            throw new InvalidOperationException("The constrained rebuild write set is incomplete or contains a logical key collision.");
+        }
+
+        IReadOnlyList<string> baselineKeys = BaselineProjectionKeys(baselinePartitionTenant, baselineEvidence);
         await AssertPartitionAbsentAsync(readModelEraser, freshKeys, scenarioToken).ConfigureAwait(false);
         IReadOnlyDictionary<string, string> baselineEtagsBefore = await ReadEtagsAsync(
             readModelEraser,
@@ -115,20 +134,17 @@ internal sealed class LiveProjectionRebuildDriver(
                 clock,
                 freshPartitionTenant,
                 sources,
-                auditRecords,
+                rebuildOperations,
                 scenarioToken).ConfigureAwait(false);
-            IReadOnlyList<ProjectionResourceDigest> rebuiltFull = await ReadSnapshotAsync(
+            IReadOnlyList<ProjectionResourceDigest> rebuilt = await ReadRebuiltSnapshotAsync(
                 readModelStore,
                 freshPartitionTenant,
                 sources,
-                auditRecords,
+                rebuildOperations,
                 scenarioToken).ConfigureAwait(false);
-            IReadOnlyList<ProjectionResourceDigest> rebuilt = SourceDigestsOnly(rebuiltFull);
-            string rebuiltSchemaVersion = await ReadObservedSourceSchemaAsync(
-                readModelStore,
-                freshPartitionTenant,
-                sources,
-                scenarioToken).ConfigureAwait(false);
+            string rebuiltSchemaVersion = SnapshotSchemaVersion(
+                ProjectConversationSourceEmailView.CurrentSchemaVersion,
+                GovernedOperationView.CurrentSchemaVersion);
             IReadOnlyDictionary<string, string> baselineEtagsAfter = await ReadEtagsAsync(
                 readModelEraser,
                 baselineKeys,
@@ -152,9 +168,13 @@ internal sealed class LiveProjectionRebuildDriver(
                     TenantIsolationPreserved: baselinePartitionUntouched,
                     UnauthorizedMutationAbsent: false, // not observed — do not fabricate
                     StateReconstructable: sourcesEquivalent,
-                    // Honest for the source path: rebuild uses only immutableSourceRecords + AssociationProjectionHandler.
+                    // The rebuild consumes only its independently loaded immutable source dataset and WORM store.
                     ImmutableSourceOnly: true,
-                    MailboxReingestionAbsent: false)); // not observed — do not fabricate mailbox absence
+                    MailboxReingestionAbsent: true),
+                SourceResourceCount: sources.Length,
+                GovernedResourceCount: rebuildOperations.Select(static operation => operation.ResourceId).Distinct(StringComparer.Ordinal).Count(),
+                WormRecordCount: auditRecords.Count,
+                WormOperationCount: rebuildOperations.Count);
         }
         catch (Exception exception)
         {
@@ -197,7 +217,7 @@ internal sealed class LiveProjectionRebuildDriver(
     /// live rebuild. The seed is deliberately outside <see cref="RebuildAsync"/> so the rebuild cannot manufacture both
     /// sides of its own equivalence comparison.
     /// </summary>
-    internal static async Task SeedBaselineAsync(
+    internal static async Task<ProjectionRebuildBaselineEvidence> SeedBaselineAsync(
         IReadModelStore store,
         string testTenantRef,
         RecoveryValidationDatasetDescriptor descriptor,
@@ -217,21 +237,14 @@ internal sealed class LiveProjectionRebuildDriver(
             throw new InvalidOperationException("Projection baseline seeding is restricted to one replay-test tenant.");
         }
 
-        await ProjectPartitionAsync(
-            store,
-            BaselinePartitionTenant(testTenantRef, descriptor.ValidationPartitionRef),
-            sources,
-            auditRecords,
-            cancellationToken).ConfigureAwait(false);
-    }
+        if (sources.Select(static source => source.IntakeId).Distinct(StringComparer.Ordinal).Count() != sources.Count ||
+            sources.Any(static source => !AuditMetadata.IsSafeStableIdentifier(source.IntakeId)))
+        {
+            throw new InvalidOperationException("Projection baseline sources contain an unsafe or duplicate logical resource id.");
+        }
 
-    private static async Task ProjectPartitionAsync(
-        IReadModelStore store,
-        string partitionTenant,
-        IReadOnlyList<ProjectConversationSourceEmailView> sources,
-        IReadOnlyList<WormAuditChainRecord> auditRecords,
-        CancellationToken cancellationToken)
-    {
+        IReadOnlyList<WormOperationGroup> operations = GroupOperations(auditRecords);
+        string partitionTenant = BaselinePartitionTenant(testTenantRef, descriptor.ValidationPartitionRef);
         var sourceStore = new ReadModelProjectConversationProjectionStore(store);
         var governedStore = new ReadModelGovernedOperationViewStore(store);
         foreach (ProjectConversationSourceEmailView source in sources)
@@ -242,13 +255,45 @@ internal sealed class LiveProjectionRebuildDriver(
                 .ConfigureAwait(false);
         }
 
-        foreach (WormAuditChainRecord auditRecord in auditRecords)
+        Dictionary<string, string> governedHistoryTokens = new(StringComparer.Ordinal);
+        foreach (WormOperationGroup operation in operations)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            AuditEnvelope representative = BaselineResultBearingEnvelope(operation.Records);
+            long sourceVersion = checked(operation.Records.Max(static record => record.Sequence) + 1);
             await governedStore
-                .SaveAsync(ToGovernedOperationView(partitionTenant, auditRecord), cancellationToken)
+                .SaveAsync(
+                    new GovernedOperationView(
+                        partitionTenant,
+                        operation.ResourceId,
+                        GovernedOperationView.CurrentSchemaVersion,
+                        GovernedOperationView.GovernedCommandProvenance,
+                        GovernedOperationView.CurrentDerivationKernelVersion,
+                        BaselineProjectionRedactionState(representative),
+                        GovernedOperationView.GovernedOperationalRetentionClass,
+                        sourceVersion,
+                        representative.Timestamp,
+                        representative.Timestamp),
+                    cancellationToken)
                 .ConfigureAwait(false);
+
+            string historyToken = BaselineOperationHistoryToken(operation, representative);
+            if (governedHistoryTokens.TryGetValue(operation.ResourceId, out string? existing))
+            {
+                governedHistoryTokens[operation.ResourceId] = Digest(existing, historyToken);
+            }
+            else
+            {
+                governedHistoryTokens[operation.ResourceId] = historyToken;
+            }
         }
+
+        return new ProjectionRebuildBaselineEvidence(
+            [.. sources.Select(static source => source.IntakeId).Order(StringComparer.Ordinal)],
+            governedHistoryTokens,
+            SnapshotSchemaVersion(ProjectConversationSourceEmailView.CurrentSchemaVersion, GovernedOperationView.CurrentSchemaVersion),
+            auditRecords.Count,
+            operations.Count);
     }
 
     /// <summary>
@@ -263,7 +308,7 @@ internal sealed class LiveProjectionRebuildDriver(
         ISystemClock clock,
         string partitionTenant,
         IReadOnlyList<ProjectConversationSourceEmailView> sources,
-        IReadOnlyList<WormAuditChainRecord> auditRecords,
+        IReadOnlyList<WormOperationGroup> operations,
         CancellationToken cancellationToken)
     {
         AssociationProjectionHandler handler = new(
@@ -288,23 +333,44 @@ internal sealed class LiveProjectionRebuildDriver(
             }
         }
 
-        // WORM/governed projections remain identity-written (RV-REBUILD-WORM). They are persisted for partition
-        // completeness but excluded from structural equivalence claims above.
         var governedStore = new ReadModelGovernedOperationViewStore(store);
-        foreach (WormAuditChainRecord auditRecord in auditRecords)
+        GovernedOperationProjectionHandler governedHandler = new(governedStore, clock);
+        foreach (WormOperationGroup operation in operations)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await governedStore
-                .SaveAsync(ToGovernedOperationView(partitionTenant, auditRecord), cancellationToken)
+            AuditOperationReconstructionResult reconstruction = AuditOperationReconstructor.Reconstruct(
+                [.. operation.Records.Select(static record => record.Envelope)]);
+            if (!reconstruction.IsReconstructable || reconstruction.State is not { } state ||
+                !string.Equals(state.ResourceId, operation.ResourceId, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("A grouped WORM operation could not be reconstructed through the production audit path.");
+            }
+
+            WormAuditChainRecord resultRecord = ResultBearingRecord(operation.Records);
+            long sourceVersion = checked(operation.Records.Max(static record => record.Sequence) + 1);
+            GovernedOperationProjectionHandler.ProjectionOutcome outcome = await governedHandler
+                .HandleAsync(
+                    new GovernedNoteRecordedNotification(
+                        partitionTenant,
+                        state.ResourceId,
+                        operation.CorrelationId,
+                        sourceVersion,
+                        resultRecord.Envelope.Timestamp,
+                        operation.CorrelationId),
+                    cancellationToken)
                 .ConfigureAwait(false);
+            if (outcome != GovernedOperationProjectionHandler.ProjectionOutcome.Applied)
+            {
+                throw new InvalidOperationException("The production governed projection handler ignored a grouped WORM operation.");
+            }
         }
     }
 
     /// <summary>
     /// Reverses the metadata-only projection back into the captured-event shape the real handler expects. Sender,
     /// recipients, and attachment content are never retained by the redacted immutable view, so reconstruction uses
-    /// safe placeholders for those fields — the fields the story's structural digest and equivalence checks actually
-    /// compare (schema version, source version, provenance, redaction state, retention class) all round-trip exactly.
+    /// safe placeholders for those fields. Every safely retainable persisted structural field included by the snapshot
+    /// digest round-trips exactly; participant identities remain deliberately outside the metadata-only evidence.
     /// </summary>
     private static MailboxMessageIntakeCaptured ReconstructCapturedEvent(ProjectConversationSourceEmailView source)
         => new(
@@ -331,11 +397,41 @@ internal sealed class LiveProjectionRebuildDriver(
             source.DelegatedSender,
             source.ExternalSender);
 
-    private static async Task<IReadOnlyList<ProjectionResourceDigest>> ReadSnapshotAsync(
+    private static async Task<IReadOnlyList<ProjectionResourceDigest>> ReadBaselineSnapshotAsync(
+        IReadModelStore store,
+        string partitionTenant,
+        ProjectionRebuildBaselineEvidence evidence,
+        CancellationToken cancellationToken)
+    {
+        var sourceStore = new ReadModelProjectConversationProjectionStore(store);
+        var governedStore = new ReadModelGovernedOperationViewStore(store);
+        List<ProjectionResourceDigest> snapshot = [];
+        foreach (string intakeId in evidence.SourceIntakeIds.Order(StringComparer.Ordinal))
+        {
+            ProjectConversationSourceEmailView source = await sourceStore
+                .GetSourceEmailAsync(partitionTenant, intakeId, cancellationToken)
+                .ConfigureAwait(false)
+                ?? throw new InvalidOperationException("The persisted source-email projection was missing from the validation partition.");
+            snapshot.Add(SourceDigest(source));
+        }
+
+        foreach ((string resourceId, string historyToken) in evidence.GovernedHistoryTokens.OrderBy(static item => item.Key, StringComparer.Ordinal))
+        {
+            GovernedOperationView view = await governedStore
+                .GetAsync(partitionTenant, resourceId, cancellationToken)
+                .ConfigureAwait(false)
+                ?? throw new InvalidOperationException("The persisted audit-derived projection was missing from the validation partition.");
+            snapshot.Add(GovernedDigest(view, historyToken));
+        }
+
+        return [.. snapshot.OrderBy(static digest => digest.ResourceId, StringComparer.Ordinal)];
+    }
+
+    private static async Task<IReadOnlyList<ProjectionResourceDigest>> ReadRebuiltSnapshotAsync(
         IReadModelStore store,
         string partitionTenant,
         IReadOnlyList<ProjectConversationSourceEmailView> sources,
-        IReadOnlyList<WormAuditChainRecord> auditRecords,
+        IReadOnlyList<WormOperationGroup> operations,
         CancellationToken cancellationToken)
     {
         var sourceStore = new ReadModelProjectConversationProjectionStore(store);
@@ -347,54 +443,276 @@ internal sealed class LiveProjectionRebuildDriver(
                 .GetSourceEmailAsync(partitionTenant, expected.IntakeId, cancellationToken)
                 .ConfigureAwait(false)
                 ?? throw new InvalidOperationException("The persisted source-email projection was missing from the validation partition.");
-            snapshot.Add(ProjectionResourceDigest.Create(
-                $"source-{source.IntakeId}",
-                Digest(
-                    source.SchemaVersion,
-                    source.SourceVersion.ToString(CultureInfo.InvariantCulture),
-                    source.SourceProvenance,
-                    source.RedactionState,
-                    source.RetentionClass)));
+            snapshot.Add(SourceDigest(source));
         }
 
-        foreach (WormAuditChainRecord expected in auditRecords.OrderBy(static record => record.Sequence))
+        foreach (IGrouping<string, WormOperationGroup> resourceHistory in operations
+            .GroupBy(static operation => operation.ResourceId, StringComparer.Ordinal)
+            .OrderBy(static group => group.Key, StringComparer.Ordinal))
         {
             GovernedOperationView view = await governedStore
-                .GetAsync(partitionTenant, expected.Envelope.ResourceId, cancellationToken)
+                .GetAsync(partitionTenant, resourceHistory.Key, cancellationToken)
                 .ConfigureAwait(false)
                 ?? throw new InvalidOperationException("The persisted audit-derived projection was missing from the validation partition.");
-            snapshot.Add(ProjectionResourceDigest.Create(
-                $"worm-{expected.Sequence.ToString(CultureInfo.InvariantCulture)}",
-                Digest(
-                    view.SchemaVersion,
-                    view.SourceVersion.ToString(CultureInfo.InvariantCulture),
-                    view.SourceProvenance,
-                    view.DerivationKernelVersion,
-                    view.RedactionState,
-                    view.RetentionClass)));
+            string historyToken = string.Empty;
+            foreach (WormOperationGroup operation in resourceHistory.OrderBy(static item => item.Records[0].Sequence))
+            {
+                AuditOperationReconstructionResult reconstruction = AuditOperationReconstructor.Reconstruct(
+                    [.. operation.Records.Select(static record => record.Envelope)]);
+                if (!reconstruction.IsReconstructable || reconstruction.State is not { } state)
+                {
+                    throw new InvalidOperationException("A grouped WORM operation could not be reconstructed for snapshot evidence.");
+                }
+
+                string operationToken = RebuiltOperationHistoryToken(operation, state);
+                historyToken = historyToken.Length == 0 ? operationToken : Digest(historyToken, operationToken);
+            }
+
+            snapshot.Add(GovernedDigest(view, historyToken));
         }
 
-        return snapshot;
+        return [.. snapshot.OrderBy(static digest => digest.ResourceId, StringComparer.Ordinal)];
     }
 
-    private static IReadOnlyList<ProjectionResourceDigest> SourceDigestsOnly(IReadOnlyList<ProjectionResourceDigest> snapshot)
-        => snapshot
-            .Where(digest => digest.ResourceId.StartsWith("source-", StringComparison.Ordinal))
-            .ToArray();
-
-    private static async Task<string> ReadObservedSourceSchemaAsync(
-        IReadModelStore store,
-        string partitionTenant,
-        IReadOnlyList<ProjectConversationSourceEmailView> sources,
-        CancellationToken cancellationToken)
+    private static ProjectionResourceDigest SourceDigest(ProjectConversationSourceEmailView source)
     {
-        var sourceStore = new ReadModelProjectConversationProjectionStore(store);
-        ProjectConversationSourceEmailView first = await sourceStore
-            .GetSourceEmailAsync(partitionTenant, sources[0].IntakeId, cancellationToken)
-            .ConfigureAwait(false)
-            ?? throw new InvalidOperationException("The persisted source-email projection was missing from the validation partition.");
-        return first.SchemaVersion;
+        List<string> values =
+        [
+            source.SchemaVersion,
+            source.SourceVersion.ToString(CultureInfo.InvariantCulture),
+            source.SourceMailboxId,
+            source.SourceProviderMessageId,
+            source.InternetMessageId ?? "absent",
+            source.SourceConversationId,
+            source.SourceThreadId ?? "absent",
+            source.SourceReceivedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+            source.SourceSentAtUtc?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "absent",
+            source.SourceCreatedAtUtc?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "absent",
+            source.SourceTimezone ?? "absent",
+            source.SourceProvenanceDisplayToken,
+            source.SourceProvenance,
+            source.RedactionState,
+            source.RetentionClass,
+            source.CorrelationId,
+        ];
+        AppendAuthenticityFacts(values, source.Authenticity);
+        AppendDelegatedSenderFacts(values, source.DelegatedSender);
+        AppendExternalSenderFacts(values, source.ExternalSender);
+        return ProjectionResourceDigest.Create($"source-{source.IntakeId}", Digest([.. values]));
     }
+
+    private static ProjectionResourceDigest GovernedDigest(GovernedOperationView view, string historyToken)
+    {
+        return ProjectionResourceDigest.Create(
+            $"governed-{view.NoteId}",
+            Digest(
+                view.SchemaVersion,
+                view.SourceVersion.ToString(CultureInfo.InvariantCulture),
+                view.SourceProvenance,
+                view.DerivationKernelVersion,
+                view.RedactionState,
+                view.RetentionClass,
+                historyToken));
+    }
+
+    private static void AppendAuthenticityFacts(List<string> values, MailboxAuthenticityMetadata? authenticity)
+    {
+        if (authenticity is null)
+        {
+            values.Add("authenticity-absent");
+            return;
+        }
+
+        MailboxAuthenticationResultSnapshot results = authenticity.AuthenticationResults;
+        values.AddRange(
+        [
+            "authenticity-present",
+            results.Spf.ToString(),
+            results.Dkim.ToString(),
+            results.Dmarc.ToString(),
+            results.CompositeAuthentication.ToString(),
+            results.CompositeAuthenticationReason ?? "absent",
+        ]);
+        AppendHeaders(values, results.AuthenticationResultsHeaders);
+        MailboxHeaderInspectionSnapshot inspection = authenticity.HeaderInspection;
+        AppendHeaders(values, inspection.ReceivedHeaders);
+        AppendHeaders(values, inspection.AuthenticationResultsHeaders);
+        values.AddRange(
+        [
+            inspection.From.ToString(),
+            inspection.ReplyTo.ToString(),
+            inspection.Sender.ToString(),
+            inspection.XOriginalSender.ToString(),
+            .. inspection.Discrepancies.Select(static item => item.ToString()),
+        ]);
+        if (authenticity.StrictnessPolicy is { } policy)
+        {
+            values.AddRange(["strictness-present", policy.Strictness.ToString(), policy.PolicyVersion, policy.ReasonCode]);
+        }
+        else
+        {
+            values.Add("strictness-absent");
+        }
+    }
+
+    private static void AppendHeaders(List<string> values, IReadOnlyList<MailboxSelectedHeaderSnapshot> headers)
+    {
+        values.Add(headers.Count.ToString(CultureInfo.InvariantCulture));
+        foreach (MailboxSelectedHeaderSnapshot header in headers.OrderBy(static item => item.Ordinal))
+        {
+            values.AddRange([header.Name, header.Ordinal.ToString(CultureInfo.InvariantCulture), header.ValueState.ToString()]);
+        }
+    }
+
+    private static void AppendDelegatedSenderFacts(List<string> values, MailboxDelegatedSenderSnapshot? delegated)
+    {
+        if (delegated is null)
+        {
+            values.Add("delegated-sender-absent");
+            return;
+        }
+
+        // Participant identities may contain addresses/display names and are intentionally not retained, even hashed.
+        values.AddRange(
+        [
+            "delegated-sender-present",
+            delegated.State.ToString(),
+            delegated.Delegate is null ? "delegate-absent" : "delegate-present",
+            delegated.PrincipalFor is null ? "principal-absent" : "principal-present",
+            .. delegated.EvidenceRefs,
+            .. delegated.Discrepancies.Select(static item => item.ToString()),
+        ]);
+    }
+
+    private static void AppendExternalSenderFacts(List<string> values, MailboxExternalSenderPosture? external)
+    {
+        if (external is null)
+        {
+            values.Add("external-sender-absent");
+            return;
+        }
+
+        values.AddRange(
+        [
+            "external-sender-present",
+            external.ExternalSender.ToString(CultureInfo.InvariantCulture),
+            external.PartyResolutionState.ToString(),
+            external.ResolvedPartyRef ?? "absent",
+            .. external.EvidenceRefs,
+        ]);
+    }
+
+    private static IReadOnlyList<WormOperationGroup> GroupOperations(IReadOnlyList<WormAuditChainRecord> records)
+    {
+        if (records.Count == 0 || records.Any(static record => record is null) ||
+            records.Select(static record => record.Sequence).Distinct().Count() != records.Count)
+        {
+            throw new InvalidOperationException("The selected WORM chain is empty, malformed, or has duplicate sequences.");
+        }
+
+        foreach (WormAuditChainRecord record in records)
+        {
+            if (!AuditMetadata.IsSafeStableIdentifier(record.Envelope.ResourceId) ||
+                !AuditMetadata.IsSafeStableIdentifier(record.Envelope.CorrelationId))
+            {
+                throw new InvalidOperationException("The selected WORM chain contains an unsafe logical resource or operation id.");
+            }
+        }
+
+        return
+        [
+            .. records
+                .GroupBy(static record => (record.Envelope.ResourceId, record.Envelope.CorrelationId))
+                .Select(static group => new WormOperationGroup(
+                    group.Key.ResourceId,
+                    group.Key.CorrelationId,
+                    [.. group.OrderBy(static record => record.Sequence)]))
+                .OrderBy(static operation => operation.Records[0].Sequence)
+                .ThenBy(static operation => operation.ResourceId, StringComparer.Ordinal)
+                .ThenBy(static operation => operation.CorrelationId, StringComparer.Ordinal),
+        ];
+    }
+
+    private static string BaselineOperationHistoryToken(WormOperationGroup operation, AuditEnvelope representative)
+    {
+        ChatBotStateWritingPath path = ChatBotAuditPathMap.Resolve(representative)
+            ?? throw new InvalidOperationException("The independent baseline WORM operation maps to no governed state-writing path.");
+        string projectionRedactionState = BaselineProjectionRedactionState(representative);
+        return Digest(
+        [
+            .. ChainFacts(operation.Records),
+            representative.ResourceId,
+            representative.Decision,
+            representative.ReasonCode,
+            representative.PolicySnapshotId,
+            representative.StateTransition,
+            representative.Outcome,
+            projectionRedactionState,
+            $"{path.Code}:{representative.StateTransition}:{representative.Outcome}",
+        ]);
+    }
+
+    private static string RebuiltOperationHistoryToken(WormOperationGroup operation, ReconstructedOperationState state)
+        => Digest(
+        [
+            .. ChainFacts(operation.Records),
+            state.ResourceId,
+            state.Decision,
+            state.ReasonCode,
+            state.PolicySnapshotId,
+            state.StateTransition,
+            state.Outcome,
+            state.ProjectionRedactionState,
+            state.ResultingStateToken,
+        ]);
+
+    private static IEnumerable<string> ChainFacts(IReadOnlyList<WormAuditChainRecord> records)
+    {
+        foreach (WormAuditChainRecord record in records.OrderBy(static item => item.Sequence))
+        {
+            AuditEnvelope envelope = record.Envelope;
+            yield return record.Sequence.ToString(CultureInfo.InvariantCulture);
+            yield return record.PredecessorHash;
+            yield return record.RecordHash;
+            yield return record.CanonicalSerializationVersion;
+            yield return envelope.EnvelopeSchemaVersion;
+            yield return envelope.Phase.ToString();
+            yield return envelope.Timestamp.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+            yield return envelope.ActorId;
+            yield return envelope.ActorType;
+            yield return envelope.CommandName;
+            yield return envelope.ResourceId;
+            yield return envelope.CorrelationId;
+            yield return envelope.Decision;
+            yield return envelope.ReasonCode;
+            yield return envelope.PolicySnapshotId;
+            yield return envelope.IdempotencyKey ?? "absent";
+            yield return envelope.StateTransition;
+            yield return envelope.RedactionDecision;
+            yield return envelope.Outcome;
+            yield return envelope.SurfaceOrigin;
+            yield return envelope.ReplayRunId ?? "absent";
+            yield return envelope.SourceEvidenceRefs.Count.ToString(CultureInfo.InvariantCulture);
+            foreach (string evidenceRef in envelope.SourceEvidenceRefs)
+            {
+                yield return evidenceRef;
+            }
+        }
+    }
+
+    private static AuditEnvelope BaselineResultBearingEnvelope(IReadOnlyList<WormAuditChainRecord> records)
+        => ResultBearingRecord(records).Envelope;
+
+    private static WormAuditChainRecord ResultBearingRecord(IReadOnlyList<WormAuditChainRecord> records)
+        => records.LastOrDefault(static record => record.Envelope.Phase == AuditCommitPhase.PostCommit) ?? records[^1];
+
+    private static string BaselineProjectionRedactionState(AuditEnvelope envelope)
+        => string.Equals(envelope.RedactionDecision, CoarseUserFacingRedactionStage.MetadataOnlyDecision, StringComparison.Ordinal)
+            ? GovernedOperationView.MetadataOnlyRedactionState
+            : envelope.RedactionDecision;
+
+    private static string SnapshotSchemaVersion(string sourceSchemaVersion, string governedSchemaVersion)
+        => $"{sourceSchemaVersion}|{governedSchemaVersion}";
 
     private static async Task<IReadOnlyDictionary<string, string>> ReadEtagsAsync(
         IReadModelConditionalEraser eraser,
@@ -436,27 +754,6 @@ internal sealed class LiveProjectionRebuildDriver(
         return true;
     }
 
-    private static GovernedOperationView ToGovernedOperationView(string partitionTenant, WormAuditChainRecord record)
-    {
-        AuditOperationReconstructionResult reconstruction = AuditOperationReconstructor.Reconstruct([record.Envelope]);
-        if (!reconstruction.IsReconstructable || reconstruction.State is not { } state)
-        {
-            throw new InvalidOperationException("The selected WORM record could not be rebuilt into a projection state.");
-        }
-
-        return new GovernedOperationView(
-            partitionTenant,
-            state.ResourceId,
-            GovernedOperationView.CurrentSchemaVersion,
-            GovernedOperationView.GovernedCommandProvenance,
-            GovernedOperationView.CurrentDerivationKernelVersion,
-            state.ProjectionRedactionState,
-            GovernedOperationView.GovernedOperationalRetentionClass,
-            record.Sequence,
-            record.Envelope.Timestamp,
-            record.Envelope.Timestamp);
-    }
-
     /// <summary>Builds the persisted keys for a rebuild or baseline partition (shared with the Aspire E2E cleanup).</summary>
     internal static IReadOnlyList<string> ProjectionKeys(
         string partitionTenant,
@@ -465,7 +762,19 @@ internal sealed class LiveProjectionRebuildDriver(
         =>
         [
             .. sources.Select(source => ProjectConversationSourceEmailView.KeyFor(partitionTenant, source.IntakeId)),
-            .. auditRecords.Select(record => GovernedOperationView.KeyFor(partitionTenant, record.Envelope.ResourceId)),
+            .. auditRecords
+                .Select(static record => record.Envelope.ResourceId)
+                .Distinct(StringComparer.Ordinal)
+                .Select(resourceId => GovernedOperationView.KeyFor(partitionTenant, resourceId)),
+        ];
+
+    private static IReadOnlyList<string> BaselineProjectionKeys(
+        string partitionTenant,
+        ProjectionRebuildBaselineEvidence evidence)
+        =>
+        [
+            .. evidence.SourceIntakeIds.Select(intakeId => ProjectConversationSourceEmailView.KeyFor(partitionTenant, intakeId)),
+            .. evidence.GovernedHistoryTokens.Keys.Select(resourceId => GovernedOperationView.KeyFor(partitionTenant, resourceId)),
         ];
 
     /// <summary>Fresh-partition tenant label used by the live rebuild driver and post-capture E2E erase.</summary>
@@ -528,5 +837,17 @@ internal sealed class LiveProjectionRebuildDriver(
         => $"{testTenantRef}:baseline:{validationPartitionRef}";
 
     private static string Digest(params string[] values)
-        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('|', values)))).ToLowerInvariant();
+    {
+        using IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        byte[] length = new byte[sizeof(int)];
+        foreach (string value in values)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(value);
+            BinaryPrimitives.WriteInt32BigEndian(length, bytes.Length);
+            hash.AppendData(length);
+            hash.AppendData(bytes);
+        }
+
+        return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+    }
 }

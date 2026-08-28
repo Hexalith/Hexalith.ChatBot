@@ -25,6 +25,18 @@ public sealed class ProjectionRebuildLeakageScanTests
     {
         DateTimeOffset started = new(2026, 6, 3, 4, 0, 0, TimeSpan.Zero);
         DateTimeOffset ended = started + RecoveryTargets.MaxRto + TimeSpan.FromMinutes(30);
+        IReadOnlyList<ProjectionResourceDigest> baseline =
+        [
+            new("governed-resource-a", new string('a', 64)),
+            new("source-resource-a", new string('b', 64)),
+            new("source-resource-b", new string('c', 64)),
+        ];
+        IReadOnlyList<ProjectionResourceDigest> rebuilt =
+        [
+            baseline[0] with { StructuralStateToken = new string('d', 64) },
+            baseline[1],
+            baseline[2],
+        ];
 
         // A divergent + over-target report exercises every populated field: deviations, a first-diverging locator, the flags.
         ProjectionRebuildReport report = new(
@@ -44,7 +56,18 @@ public sealed class ProjectionRebuildLeakageScanTests
             FirstDivergingResourceLocator: "resource:resource-b",
             ProjectionSchemaVersion: "chatbot.governed-operation-view.v1",
             Correlation,
-            ProjectionRebuildReport.ValidationCompletedReasonCode);
+            ProjectionRebuildReport.ValidationCompletedReasonCode,
+            PreRebuildDigests: baseline,
+            RebuiltDigests: rebuilt,
+            PreRebuildSchemaVersion: "source-v1|governed-v1",
+            RebuiltSchemaVersion: "source-v1|governed-v1",
+            SourceResourcesCompared: 2,
+            GovernedResourcesCompared: 1,
+            WormRecordsReplayed: 1,
+            WormOperationsReplayed: 1,
+            FingerprintAlgorithmVersion: ProjectionSnapshotFingerprint.AlgorithmVersion,
+            PreRebuildFingerprint: ProjectionSnapshotFingerprint.Compute(baseline),
+            RebuiltFingerprint: ProjectionSnapshotFingerprint.Compute(rebuilt));
 
         ProjectionResourceDigest digest = ProjectionResourceDigest.Create("resource-b", "token-b");
         ProjectionRebuildOutcome outcome = new(TenantsValidated: 3, Equivalent: 1, Divergent: 1, DurationExceeded: 1, Unmeasurable: 1, Alerted: 2);

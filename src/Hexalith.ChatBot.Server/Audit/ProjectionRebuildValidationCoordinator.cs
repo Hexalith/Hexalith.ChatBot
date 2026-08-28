@@ -212,6 +212,8 @@ internal sealed class ProjectionRebuildValidationCoordinator(
             string? firstDiverging = string.Equals(verdict, ProjectionRebuildVerdicts.Divergent, StringComparison.Ordinal)
                 ? ProjectionRebuildEquivalenceEvaluator.FirstDivergingResourceLocator(measurement.PreRebuildSnapshot, measurement.RebuiltSnapshot)
                 : null;
+            string preRebuildFingerprint = ProjectionSnapshotFingerprint.Compute(measurement.PreRebuildSnapshot);
+            string rebuiltFingerprint = ProjectionSnapshotFingerprint.Compute(measurement.RebuiltSnapshot);
 
             report = new ProjectionRebuildReport(
                 testTenantRef,
@@ -227,7 +229,18 @@ internal sealed class ProjectionRebuildValidationCoordinator(
                 ProjectionSchemaVersion: measurement.RebuiltSchemaVersion,
                 correlationId,
                 ProjectionRebuildReport.ValidationCompletedReasonCode,
-                measurement.ExecutionAssertions);
+                measurement.ExecutionAssertions,
+                PreRebuildDigests: [.. measurement.PreRebuildSnapshot],
+                RebuiltDigests: [.. measurement.RebuiltSnapshot],
+                measurement.PreRebuildSchemaVersion,
+                measurement.RebuiltSchemaVersion,
+                measurement.SourceResourceCount,
+                measurement.GovernedResourceCount,
+                measurement.WormRecordCount,
+                measurement.WormOperationCount,
+                ProjectionSnapshotFingerprint.AlgorithmVersion,
+                preRebuildFingerprint,
+                rebuiltFingerprint);
         }
         catch (Exception) when (cancellationToken is { IsCancellationRequested: false })
         {

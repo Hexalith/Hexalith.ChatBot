@@ -61,6 +61,39 @@ internal sealed record RecoveryValidationEvidenceManifest
     public required IReadOnlyList<string> ResidualIds { get; init; }
     public required IReadOnlyDictionary<string, string> ArtifactLocators { get; init; }
 
+    /// <summary>Gets the independently read baseline projection schema stamp for projection evidence.</summary>
+    public string? ProjectionPreRebuildSchemaVersion { get; init; }
+
+    /// <summary>Gets the rebuilt projection schema stamp for projection evidence.</summary>
+    public string? ProjectionRebuiltSchemaVersion { get; init; }
+
+    /// <summary>Gets the retained metadata-only baseline resource digests.</summary>
+    public IReadOnlyList<ProjectionResourceDigest>? ProjectionPreRebuildDigests { get; init; }
+
+    /// <summary>Gets the retained metadata-only rebuilt resource digests.</summary>
+    public IReadOnlyList<ProjectionResourceDigest>? ProjectionRebuiltDigests { get; init; }
+
+    /// <summary>Gets the number of source-email resources compared.</summary>
+    public int ProjectionSourceResourceCount { get; init; }
+
+    /// <summary>Gets the number of unique governed resources compared.</summary>
+    public int ProjectionGovernedResourceCount { get; init; }
+
+    /// <summary>Gets the number of WORM records replayed.</summary>
+    public int ProjectionWormRecordCount { get; init; }
+
+    /// <summary>Gets the number of grouped WORM operations replayed.</summary>
+    public int ProjectionWormOperationCount { get; init; }
+
+    /// <summary>Gets the canonical snapshot-fingerprint algorithm/version token.</summary>
+    public string? ProjectionFingerprintAlgorithmVersion { get; init; }
+
+    /// <summary>Gets the canonical baseline snapshot fingerprint.</summary>
+    public string? ProjectionPreRebuildFingerprint { get; init; }
+
+    /// <summary>Gets the canonical rebuilt snapshot fingerprint.</summary>
+    public string? ProjectionRebuiltFingerprint { get; init; }
+
     /// <summary>Gets the retained aggregate identity immediately before the controlled rejection.</summary>
     public string? PreFaultRetainedRef { get; init; }
 
@@ -205,6 +238,12 @@ internal sealed record RecoveryValidationEvidenceManifest
             errors.Add("Controlled-loss durable commit bounds are not allowed on another report kind.");
         }
 
+        IReadOnlyList<string> projectionErrors = ValidateProjectionEvidence();
+        if (projectionErrors.Count > 0)
+        {
+            errors.Add("Projection snapshot evidence is invalid: " + string.Join(", ", projectionErrors));
+        }
+
         if (Assertions.Count == 0 || Assertions.Keys.Any(static token => !AuditMetadata.IsSafeStableIdentifier(token)))
         {
             errors.Add("Assertions must be non-empty metadata-only tokens.");
@@ -231,6 +270,113 @@ internal sealed record RecoveryValidationEvidenceManifest
         }
 
         return errors;
+    }
+
+    /// <summary>Returns stable projection-specific fail-closed evidence reason codes without throwing.</summary>
+    internal IReadOnlyList<string> ValidateProjectionEvidence()
+    {
+        bool projectionJob = string.Equals(JobId, LiveRecoveryValidationJobs.ProjectionRebuild, StringComparison.Ordinal);
+        if (!projectionJob)
+        {
+            return HasAnyProjectionEvidence() ? ["projection_evidence_not_applicable"] : [];
+        }
+
+        List<string> reasons = [];
+        bool unmeasurable = string.Equals(Verdict, ProjectionRebuildVerdicts.Unmeasurable, StringComparison.Ordinal);
+        IReadOnlyList<ProjectionResourceDigest?> pre = ProjectionPreRebuildDigests ?? [];
+        IReadOnlyList<ProjectionResourceDigest?> rebuilt = ProjectionRebuiltDigests ?? [];
+        if (unmeasurable)
+        {
+            if (ProjectionPreRebuildSchemaVersion is not null || ProjectionRebuiltSchemaVersion is not null ||
+                pre.Count != 0 || rebuilt.Count != 0 || ProjectionSourceResourceCount != 0 ||
+                ProjectionGovernedResourceCount != 0 || ProjectionWormRecordCount != 0 ||
+                ProjectionWormOperationCount != 0 || ProjectionPreRebuildFingerprint is not null ||
+                ProjectionRebuiltFingerprint is not null || ProjectionFingerprintAlgorithmVersion is not null)
+            {
+                reasons.Add("projection_unmeasurable_evidence_not_empty");
+            }
+
+            if (!string.Equals(ReasonCode, ProjectionRebuildReport.ValidationUnmeasurableReasonCode, StringComparison.Ordinal))
+            {
+                reasons.Add("projection_verdict_reason_mismatch");
+            }
+
+            return reasons;
+        }
+
+        if (pre.Count > ProjectionSnapshotFingerprint.MaximumResources || rebuilt.Count > ProjectionSnapshotFingerprint.MaximumResources)
+        {
+            reasons.Add("projection_snapshot_oversized");
+        }
+
+        if (ProjectionPreRebuildDigests is null || ProjectionRebuiltDigests is null || pre.Count == 0 || rebuilt.Count == 0 ||
+            pre.Any(static digest => digest is null) || rebuilt.Any(static digest => digest is null) ||
+            !IsCanonicalSnapshot(pre) || !IsCanonicalSnapshot(rebuilt))
+        {
+            reasons.Add("projection_snapshot_malformed");
+            return reasons;
+        }
+
+        if (!string.Equals(ProjectionFingerprintAlgorithmVersion, ProjectionSnapshotFingerprint.AlgorithmVersion, StringComparison.Ordinal) ||
+            !ProjectionSnapshotFingerprint.IsCanonicalSha256(ProjectionPreRebuildFingerprint) ||
+            !ProjectionSnapshotFingerprint.IsCanonicalSha256(ProjectionRebuiltFingerprint))
+        {
+            reasons.Add("projection_fingerprint_algorithm_invalid");
+        }
+        else
+        {
+            try
+            {
+                if (!string.Equals(
+                        ProjectionSnapshotFingerprint.Compute([.. pre.OfType<ProjectionResourceDigest>()]),
+                        ProjectionPreRebuildFingerprint,
+                        StringComparison.Ordinal) ||
+                    !string.Equals(
+                        ProjectionSnapshotFingerprint.Compute([.. rebuilt.OfType<ProjectionResourceDigest>()]),
+                        ProjectionRebuiltFingerprint,
+                        StringComparison.Ordinal))
+                {
+                    reasons.Add("projection_fingerprint_mismatch");
+                }
+            }
+            catch (Exception)
+            {
+                reasons.Add("projection_snapshot_malformed");
+            }
+        }
+
+        int expectedResources = ProjectionSourceResourceCount + ProjectionGovernedResourceCount;
+        if (ProjectionSourceResourceCount <= 0 || ProjectionGovernedResourceCount <= 0 ||
+            ProjectionWormRecordCount <= 0 || ProjectionWormOperationCount <= 0 ||
+            ProjectionWormOperationCount > ProjectionWormRecordCount || expectedResources != pre.Count ||
+            expectedResources != rebuilt.Count || DatasetVolume != expectedResources ||
+            Coverage is null || !Coverage.TryGetValue("scenario", out int coverage) || coverage != expectedResources)
+        {
+            reasons.Add("projection_resource_count_mismatch");
+        }
+
+        bool fingerprintsEqual = string.Equals(
+            ProjectionPreRebuildFingerprint,
+            ProjectionRebuiltFingerprint,
+            StringComparison.Ordinal);
+        bool schemasEqual = string.Equals(
+            ProjectionPreRebuildSchemaVersion,
+            ProjectionRebuiltSchemaVersion,
+            StringComparison.Ordinal);
+        bool evidenceEquivalent = fingerprintsEqual && schemasEqual;
+        bool verdictConsistent = (Verdict, ReasonCode) switch
+        {
+            (ProjectionRebuildVerdicts.Equivalent, ProjectionRebuildReport.ValidationCompletedReasonCode) => evidenceEquivalent,
+            (ProjectionRebuildVerdicts.Divergent, ProjectionRebuildReport.ValidationCompletedReasonCode) => !evidenceEquivalent,
+            _ => false,
+        };
+        if (!AuditMetadata.IsSafeStableIdentifier(ProjectionPreRebuildSchemaVersion) ||
+            !AuditMetadata.IsSafeStableIdentifier(ProjectionRebuiltSchemaVersion) || !verdictConsistent)
+        {
+            reasons.Add("projection_verdict_reason_mismatch");
+        }
+
+        return [.. reasons.Distinct(StringComparer.Ordinal)];
     }
 
     /// <summary>Returns whether a locator is a query-free CI artifact URI containing no sensitive marker.</summary>
@@ -271,6 +417,30 @@ internal sealed record RecoveryValidationEvidenceManifest
             PreFaultCommittedAtUtc is not null || RejectedCandidateRef is not null || RejectedAtUtc is not null ||
             PostRecoveryRetainedRef is not null || PostRecoveryEventRef is not null || PostRecoverySequence is not null ||
             PostRecoveryCommittedAtUtc is not null;
+
+    private bool HasAnyProjectionEvidence()
+        => ProjectionPreRebuildSchemaVersion is not null || ProjectionRebuiltSchemaVersion is not null ||
+            ProjectionPreRebuildDigests is not null || ProjectionRebuiltDigests is not null ||
+            ProjectionSourceResourceCount != 0 || ProjectionGovernedResourceCount != 0 ||
+            ProjectionWormRecordCount != 0 || ProjectionWormOperationCount != 0 ||
+            ProjectionFingerprintAlgorithmVersion is not null || ProjectionPreRebuildFingerprint is not null ||
+            ProjectionRebuiltFingerprint is not null;
+
+    private static bool IsCanonicalSnapshot(IReadOnlyList<ProjectionResourceDigest?> snapshot)
+    {
+        HashSet<string> resourceIds = new(StringComparer.Ordinal);
+        foreach (ProjectionResourceDigest? digest in snapshot)
+        {
+            if (digest is null || !AuditMetadata.IsSafeStableIdentifier(digest.ResourceId) ||
+                !ProjectionSnapshotFingerprint.IsCanonicalSha256(digest.StructuralStateToken) ||
+                !resourceIds.Add(digest.ResourceId))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private bool HasValidControlledLossBounds()
     {

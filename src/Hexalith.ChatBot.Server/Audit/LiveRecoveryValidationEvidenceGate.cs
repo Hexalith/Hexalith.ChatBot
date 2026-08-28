@@ -147,6 +147,14 @@ internal static class LiveRecoveryValidationEvidenceGate
                 ValidateControlledLossMeasurement(manifest, stopShip);
             }
 
+            if (string.Equals(manifest.JobId, LiveRecoveryValidationJobs.ProjectionRebuild, StringComparison.Ordinal))
+            {
+                foreach (string reason in manifest.ValidateProjectionEvidence())
+                {
+                    stopShip.Add($"{LiveRecoveryValidationJobs.ProjectionRebuild}:{reason}");
+                }
+            }
+
             if (manifest.Validate().Count > 0)
             {
                 stopShip.Add($"{SafeJob(manifest.JobId)}:invalid_evidence");
@@ -374,9 +382,9 @@ internal static class LiveRecoveryValidationEvidenceGate
     /// measurable target misses and stay in the deviation channel per Task 6; <c>cleanup-complete</c>, which keeps its
     /// own <c>{job}:cleanup_incomplete</c> code; <c>data-loss-absent</c>/<c>structurally-equivalent</c>/
     /// <c>scope-contained</c>, which are already routed through <see cref="IsStructuralBreach"/>; and
-    /// <c>mailbox-reingestion-absent</c>, which no live driver observes and which is always published <see
-    /// langword="false"/> — including it here would make <see cref="LiveRecoveryValidationJobs.ProjectionRebuild"/>
-    /// stop-ship on every run. <c>RequiredAssertionsFor</c> still requires the key be present.
+    /// <c>mailbox-reingestion-absent</c> is structural for projection rebuild: the live driver's constructor exposes
+    /// only independently loaded immutable source records and a tenant-scoped WORM store, so a false value is a
+    /// stop-ship boundary regression rather than an unobservable operational measurement.
     /// </summary>
     internal static IReadOnlyList<string> SafetyAssertionsFor(string jobId)
         => jobId switch
@@ -391,13 +399,9 @@ internal static class LiveRecoveryValidationEvidenceGate
                 "pre-fault-retained", "candidate-rejected", "candidate-absent", "post-recovery-retained",
                 "tenant-isolation-preserved", "unauthorized-mutation-absent", "durable-bounds-valid", "rpo-positive",
             ],
-            // "mailbox-reingestion-absent" is deliberately excluded: no live driver observes mailbox reingestion, so
-            // the assertion is always published false (see RecoveryValidationExecutionAssertions.MailboxReingestionAbsent)
-            // and including it here would make the ProjectionRebuild job stop-ship on every run, healthy or not. The gap
-            // is tracked as the RV-REBUILD-WORM residual/claim-limitation instead of a stop-ship safety assertion.
             LiveRecoveryValidationJobs.ProjectionRebuild =>
             [
-                "immutable-source-only", "tenant-isolation-preserved",
+                "immutable-source-only", "mailbox-reingestion-absent", "tenant-isolation-preserved",
             ],
             LiveRecoveryValidationJobs.ScopedOutage =>
             [

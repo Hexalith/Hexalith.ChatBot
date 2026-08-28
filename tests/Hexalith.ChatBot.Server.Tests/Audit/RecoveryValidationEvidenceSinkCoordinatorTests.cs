@@ -448,8 +448,9 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
     /// <summary>
     /// A representative "everything observed cleanly" fixture, so the sink-failure tests can assert this measurement's
     /// <see cref="RecoveryValidationExecutionAssertions"/> survives into the retention-failure fallback report rather
-    /// than being silently dropped to <see langword="null"/>. Mailbox re-ingestion remains deliberately unproven under
-    /// the <c>RV-REBUILD-WORM</c> residual, so that one assertion is false rather than fabricated as clean.
+    /// than being silently dropped to <see langword="null"/>. This generic retention fixture does not observe mailbox
+    /// re-ingestion, so that one assertion remains false rather than being fabricated as clean; the independent live
+    /// projection driver supplies its own positive immutable-input boundary assertion.
     /// </summary>
     private static readonly RecoveryValidationExecutionAssertions SampleExecutionAssertions = new(
         CleanupComplete: true,

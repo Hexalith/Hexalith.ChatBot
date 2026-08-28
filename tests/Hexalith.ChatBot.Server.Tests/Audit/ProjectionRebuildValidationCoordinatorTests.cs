@@ -47,6 +47,16 @@ public sealed class ProjectionRebuildValidationCoordinatorTests
         report.Deviations.ShouldBeEmpty();
         report.FirstDivergingResourceLocator.ShouldBeNull();
         report.ReasonCode.ShouldBe(ProjectionRebuildReport.ValidationCompletedReasonCode);
+        report.PreRebuildDigests.ShouldBe(Snapshot);
+        report.RebuiltDigests.ShouldBe(Snapshot);
+        report.PreRebuildSchemaVersion.ShouldBe(SchemaV1);
+        report.RebuiltSchemaVersion.ShouldBe(SchemaV1);
+        report.SourceResourcesCompared.ShouldBe(1);
+        report.GovernedResourcesCompared.ShouldBe(1);
+        report.WormRecordsReplayed.ShouldBe(1);
+        report.WormOperationsReplayed.ShouldBe(1);
+        report.FingerprintAlgorithmVersion.ShouldBe(ProjectionSnapshotFingerprint.AlgorithmVersion);
+        report.PreRebuildFingerprint.ShouldBe(report.RebuiltFingerprint);
         auditWriter.Envelopes.ShouldBeEmpty();
         alertSink.Alerts.ShouldBeEmpty();
     }
@@ -216,7 +226,18 @@ public sealed class ProjectionRebuildValidationCoordinatorTests
         string preSchema,
         string rebuiltSchema,
         TimeSpan duration)
-        => new(Now, Now + duration, duration, preRebuild, rebuilt, preSchema, rebuiltSchema);
+        => new(
+            Now,
+            Now + duration,
+            duration,
+            preRebuild,
+            rebuilt,
+            preSchema,
+            rebuiltSchema,
+            SourceResourceCount: 1,
+            GovernedResourceCount: 1,
+            WormRecordCount: 1,
+            WormOperationCount: 1);
 
     /// <summary>A scripted driver returning a fixed measurement, recording the (tenant, dataset) it was invoked with.</summary>
     private sealed class ScriptedDriver(ProjectionRebuildMeasurement measurement) : IProjectionRebuildDriver

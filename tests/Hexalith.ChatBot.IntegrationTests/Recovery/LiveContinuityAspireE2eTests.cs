@@ -275,34 +275,42 @@ public sealed class LiveContinuityAspireE2eTests
                 options.RestorationTimeout,
                 workflowToken).ConfigureAwait(true);
 
-            RecoveryValidationDataset validationDataset = RecoveryValidationDataset.Load(
-                Path.Combine(
-                    RepositoryRoot(),
-                    "tests",
-                    "Hexalith.ChatBot.IntegrationTests",
-                    "Recovery",
-                    "Datasets",
-                    "recovery-baseline-v1.json"),
-                tenantRef);
-            RecoveryValidationDatasetDescriptor dataset = validationDataset.Descriptor;
+            string recoveryDatasetPath = Path.Combine(
+                RepositoryRoot(),
+                "tests",
+                "Hexalith.ChatBot.IntegrationTests",
+                "Recovery",
+                "Datasets",
+                "recovery-baseline-v1.json");
+            RecoveryValidationDataset seedDataset = RecoveryValidationDataset.Load(recoveryDatasetPath, tenantRef);
+            RecoveryValidationDataset rebuildDataset = RecoveryValidationDataset.Load(recoveryDatasetPath, tenantRef);
+            RecoveryValidationDatasetDescriptor dataset = rebuildDataset.Descriptor;
             dataset.Validate(
                 options.DatasetRef,
                 options.DatasetVersion,
                 options.DatasetVolume,
                 options.ProjectionSchemaVersion,
                 options.ValidationPartitionRef).ShouldBeNull();
-            InMemoryWormAuditStore worm = new();
-            foreach (AuditEnvelope envelope in validationDataset.AuditEnvelopes)
+            seedDataset.ShouldNotBeSameAs(rebuildDataset);
+            seedDataset.SourceRecords.ShouldNotBeSameAs(rebuildDataset.SourceRecords);
+            InMemoryWormAuditStore seedWorm = new();
+            foreach (AuditEnvelope envelope in seedDataset.AuditEnvelopes)
             {
-                _ = await worm.AppendAsync(envelope, workflowToken).ConfigureAwait(true);
+                _ = await seedWorm.AppendAsync(envelope, workflowToken).ConfigureAwait(true);
             }
 
-            await LiveProjectionRebuildDriver.SeedBaselineAsync(
+            InMemoryWormAuditStore rebuildWorm = new();
+            foreach (AuditEnvelope envelope in rebuildDataset.AuditEnvelopes)
+            {
+                _ = await rebuildWorm.AppendAsync(envelope, workflowToken).ConfigureAwait(true);
+            }
+
+            ProjectionRebuildBaselineEvidence baselineEvidence = await LiveProjectionRebuildDriver.SeedBaselineAsync(
                 recoveryReadModels,
                 tenantRef,
-                dataset,
-                validationDataset.SourceRecords,
-                worm.EnumerateChain(tenantRef),
+                seedDataset.Descriptor,
+                seedDataset.SourceRecords,
+                seedWorm.EnumerateChain(tenantRef),
                 workflowToken).ConfigureAwait(true);
             freshPartitionTenant = LiveProjectionRebuildDriver.FreshPartitionTenant(
                 tenantRef,
@@ -310,11 +318,12 @@ public sealed class LiveContinuityAspireE2eTests
                 runId);
             rebuildFreshKeys = LiveProjectionRebuildDriver.ProjectionKeys(
                 freshPartitionTenant,
-                validationDataset.SourceRecords,
-                worm.EnumerateChain(tenantRef).ToArray());
+                rebuildDataset.SourceRecords,
+                rebuildWorm.EnumerateChain(tenantRef).ToArray());
             LiveProjectionRebuildDriver rebuildDriver = new(
-                validationDataset.SourceRecords,
-                worm,
+                rebuildDataset.SourceRecords,
+                rebuildWorm,
+                baselineEvidence,
                 recoveryReadModels,
                 recoveryReadModels,
                 dataset,

@@ -10,6 +10,29 @@ public sealed class RecoveryValidationEvidenceManifestTests
     private static readonly DateTimeOffset Started = new(2026, 8, 1, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void UnmeasurableProjectionRejectsRetainedSchemaEvidence()
+    {
+        RecoveryValidationEvidenceManifest manifest = ProjectionManifest() with
+        {
+            Verdict = ProjectionRebuildVerdicts.Unmeasurable,
+            ReasonCode = ProjectionRebuildReport.ValidationUnmeasurableReasonCode,
+            DatasetVolume = 0,
+            Coverage = new Dictionary<string, int> { ["scenario"] = 0 },
+            ProjectionPreRebuildDigests = [],
+            ProjectionRebuiltDigests = [],
+            ProjectionSourceResourceCount = 0,
+            ProjectionGovernedResourceCount = 0,
+            ProjectionWormRecordCount = 0,
+            ProjectionWormOperationCount = 0,
+            ProjectionFingerprintAlgorithmVersion = null,
+            ProjectionPreRebuildFingerprint = null,
+            ProjectionRebuiltFingerprint = null,
+        };
+
+        manifest.ValidateProjectionEvidence().ShouldContain("projection_unmeasurable_evidence_not_empty");
+    }
+
+    [Fact]
     public void CompleteMetadataOnlyManifestIsValid()
     {
         RecoveryValidationEvidenceManifest manifest = ValidManifest();
@@ -112,6 +135,51 @@ public sealed class RecoveryValidationEvidenceManifestTests
             .ShouldContain(error => error.Contains("not allowed", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void ProjectionManifestBindsSnapshotsCountsSchemasFingerprintsAndVerdict()
+    {
+        ProjectionManifest().Validate().ShouldBeEmpty();
+        (ProjectionManifest() with { ProjectionRebuiltFingerprint = new string('0', 64) })
+            .ValidateProjectionEvidence().ShouldContain("projection_fingerprint_mismatch");
+        (ProjectionManifest() with { ProjectionGovernedResourceCount = 2 })
+            .ValidateProjectionEvidence().ShouldContain("projection_resource_count_mismatch");
+        (ProjectionManifest() with { ProjectionRebuiltSchemaVersion = "governed-v2" })
+            .ValidateProjectionEvidence().ShouldContain("projection_verdict_reason_mismatch");
+        (ProjectionManifest() with { ProjectionFingerprintAlgorithmVersion = "sha256-v0" })
+            .ValidateProjectionEvidence().ShouldContain("projection_fingerprint_algorithm_invalid");
+    }
+
+    [Fact]
+    public void ProjectionManifestRejectsNullUnsafeDuplicateAndOversizedDigestEvidenceWithoutThrowing()
+    {
+        (ProjectionManifest() with { ProjectionRebuiltDigests = [null!] })
+            .ValidateProjectionEvidence().ShouldContain("projection_snapshot_malformed");
+        (ProjectionManifest() with
+        {
+            ProjectionRebuiltDigests =
+            [
+                new ProjectionResourceDigest("unsafe/resource", new string('a', 64)),
+                new ProjectionResourceDigest("source-resource-1", new string('b', 64)),
+            ],
+        }).ValidateProjectionEvidence().ShouldContain("projection_snapshot_malformed");
+        (ProjectionManifest() with
+        {
+            ProjectionRebuiltDigests =
+            [
+                new ProjectionResourceDigest("resource-1", new string('a', 64)),
+                new ProjectionResourceDigest("resource-1", new string('b', 64)),
+            ],
+        }).ValidateProjectionEvidence().ShouldContain("projection_snapshot_malformed");
+
+        IReadOnlyList<ProjectionResourceDigest> oversized =
+        [
+            .. Enumerable.Range(0, ProjectionSnapshotFingerprint.MaximumResources + 1)
+                .Select(index => new ProjectionResourceDigest($"resource-{index}", new string('a', 64))),
+        ];
+        (ProjectionManifest() with { ProjectionRebuiltDigests = oversized })
+            .ValidateProjectionEvidence().ShouldContain("projection_snapshot_oversized");
+    }
+
     private static RecoveryValidationEvidenceManifest ValidManifest()
         => new()
         {
@@ -176,4 +244,35 @@ public sealed class RecoveryValidationEvidenceManifestTests
             PostRecoverySequence = 1,
             PostRecoveryCommittedAtUtc = Started + TimeSpan.FromSeconds(30),
         };
+
+    private static RecoveryValidationEvidenceManifest ProjectionManifest()
+    {
+        IReadOnlyList<ProjectionResourceDigest> digests =
+        [
+            new("governed-resource-1", new string('a', 64)),
+            new("source-resource-1", new string('b', 64)),
+        ];
+        string fingerprint = ProjectionSnapshotFingerprint.Compute(digests);
+        return ValidManifest() with
+        {
+            JobId = LiveRecoveryValidationJobs.ProjectionRebuild,
+            ReportKind = LiveRecoveryValidationJobs.ProjectionRebuild,
+            Scenario = "recovery-baseline",
+            Verdict = ProjectionRebuildVerdicts.Equivalent,
+            ReasonCode = ProjectionRebuildReport.ValidationCompletedReasonCode,
+            DatasetVolume = 2,
+            Coverage = new Dictionary<string, int> { ["scenario"] = 2 },
+            ProjectionPreRebuildSchemaVersion = "source-v1|governed-v1",
+            ProjectionRebuiltSchemaVersion = "source-v1|governed-v1",
+            ProjectionPreRebuildDigests = digests,
+            ProjectionRebuiltDigests = digests,
+            ProjectionSourceResourceCount = 1,
+            ProjectionGovernedResourceCount = 1,
+            ProjectionWormRecordCount = 1,
+            ProjectionWormOperationCount = 1,
+            ProjectionFingerprintAlgorithmVersion = ProjectionSnapshotFingerprint.AlgorithmVersion,
+            ProjectionPreRebuildFingerprint = fingerprint,
+            ProjectionRebuiltFingerprint = fingerprint,
+        };
+    }
 }

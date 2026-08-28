@@ -33,7 +33,18 @@ internal sealed record ProjectionRebuildReport(
     string ProjectionSchemaVersion,
     string CorrelationId,
     string ReasonCode,
-    RecoveryValidationExecutionAssertions? ExecutionAssertions = null)
+    RecoveryValidationExecutionAssertions? ExecutionAssertions = null,
+    IReadOnlyList<ProjectionResourceDigest>? PreRebuildDigests = null,
+    IReadOnlyList<ProjectionResourceDigest>? RebuiltDigests = null,
+    string? PreRebuildSchemaVersion = null,
+    string? RebuiltSchemaVersion = null,
+    int SourceResourcesCompared = 0,
+    int GovernedResourcesCompared = 0,
+    int WormRecordsReplayed = 0,
+    int WormOperationsReplayed = 0,
+    string? FingerprintAlgorithmVersion = null,
+    string? PreRebuildFingerprint = null,
+    string? RebuiltFingerprint = null)
 {
     /// <summary>Reason code for a validation that completed and produced a measured verdict (equivalent or divergent).</summary>
     public const string ValidationCompletedReasonCode = "projection_rebuild_completed";
@@ -82,7 +93,9 @@ internal sealed record ProjectionRebuildReport(
             FirstDivergingResourceLocator: null,
             projectionSchemaVersion,
             correlationId,
-            ValidationUnmeasurableReasonCode);
+            ValidationUnmeasurableReasonCode,
+            PreRebuildDigests: [],
+            RebuiltDigests: []);
 }
 
 /// <summary>
@@ -99,7 +112,11 @@ internal sealed record ProjectionRebuildMeasurement(
     IReadOnlyList<ProjectionResourceDigest> RebuiltSnapshot,
     string PreRebuildSchemaVersion,
     string RebuiltSchemaVersion,
-    RecoveryValidationExecutionAssertions? ExecutionAssertions = null);
+    RecoveryValidationExecutionAssertions? ExecutionAssertions = null,
+    int SourceResourceCount = 0,
+    int GovernedResourceCount = 0,
+    int WormRecordCount = 0,
+    int WormOperationCount = 0);
 
 /// <summary>
 /// The structured result of a projection-rebuild validation sweep across every baseline dataset (Story 9.12, AC4). A

@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Hexalith.ChatBot.Server.Audit;
 
 using Shouldly;
@@ -38,6 +40,10 @@ public sealed class ProjectionRebuildReportTests
         report.FirstDivergingResourceLocator.ShouldBeNull();
         report.ProjectionSchemaVersion.ShouldBe(SchemaVersion);
         report.ReasonCode.ShouldBe(ProjectionRebuildReport.ValidationUnmeasurableReasonCode);
+        report.PreRebuildDigests.ShouldBeEmpty();
+        report.RebuiltDigests.ShouldBeEmpty();
+        report.PreRebuildFingerprint.ShouldBeNull();
+        report.RebuiltFingerprint.ShouldBeNull();
 
         // Unmeasurable is the fail-safe breach, NOT a determinism failure.
         report.IsBreach.ShouldBeTrue();
@@ -87,5 +93,32 @@ public sealed class ProjectionRebuildReportTests
 
         report.IsBreach.ShouldBeTrue(); // a recovery-time miss is still a breach to surface
         report.IsDivergent.ShouldBeFalse(); // ...but it is NOT a determinism failure
+    }
+
+    [Fact]
+    public void LegacyReportJsonWithoutSnapshotEvidenceRemainsReadable()
+    {
+        string legacyJson = JsonSerializer.Serialize(new
+        {
+            TenantRef = Tenant,
+            DatasetRef = Dataset,
+            StartedAtUtc = Started,
+            EndedAtUtc = Started.AddSeconds(1),
+            MeasuredRebuildDuration = TimeSpan.FromSeconds(1),
+            DurationWithinTarget = true,
+            Verdict = ProjectionRebuildVerdicts.Equivalent,
+            ResourcesCompared = 1,
+            Deviations = Array.Empty<string>(),
+            FirstDivergingResourceLocator = (string?)null,
+            ProjectionSchemaVersion = SchemaVersion,
+            CorrelationId = Correlation,
+            ReasonCode = ProjectionRebuildReport.ValidationCompletedReasonCode,
+        });
+
+        ProjectionRebuildReport report = JsonSerializer.Deserialize<ProjectionRebuildReport>(legacyJson).ShouldNotBeNull();
+
+        report.PreRebuildDigests.ShouldBeNull();
+        report.RebuiltDigests.ShouldBeNull();
+        report.FingerprintAlgorithmVersion.ShouldBeNull();
     }
 }

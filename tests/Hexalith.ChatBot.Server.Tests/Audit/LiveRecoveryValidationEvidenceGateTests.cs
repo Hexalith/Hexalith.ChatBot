@@ -655,7 +655,70 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
             static manifest => manifest.JobId == LiveRecoveryValidationJobs.ProjectionRebuild);
         understatedRebuild[rebuildIndex] = understatedRebuild[rebuildIndex] with { DatasetVolume = 0 };
         Evaluate(complete with { Evidence = understatedRebuild }).StopShipReasons
-            .ShouldContain($"{LiveRecoveryValidationJobs.ProjectionRebuild}:dataset_volume_mismatch");
+            .ShouldContain($"{LiveRecoveryValidationJobs.ProjectionRebuild}:projection_resource_count_mismatch");
+    }
+
+    [Fact]
+    public void ProjectionSnapshotTamperingFailsClosedWithStableProjectionReasons()
+    {
+        Evaluate(MutateJob(
+            LiveRecoveryValidationJobs.ProjectionRebuild,
+            manifest => manifest with { ProjectionRebuiltFingerprint = new string('0', 64) }))
+            .StopShipReasons.ShouldContain("projection-rebuild:projection_fingerprint_mismatch");
+
+        Evaluate(MutateJob(
+            LiveRecoveryValidationJobs.ProjectionRebuild,
+            manifest => manifest with { ProjectionRebuiltDigests = [null!] }))
+            .StopShipReasons.ShouldContain("projection-rebuild:projection_snapshot_malformed");
+
+        Evaluate(MutateJob(
+            LiveRecoveryValidationJobs.ProjectionRebuild,
+            manifest => manifest with { ProjectionRebuiltSchemaVersion = "source-v2|governed-v1" }))
+            .StopShipReasons.ShouldContain("projection-rebuild:projection_verdict_reason_mismatch");
+
+        Evaluate(MutateJob(
+            LiveRecoveryValidationJobs.ProjectionRebuild,
+            manifest => manifest with { ProjectionWormOperationCount = 2 }))
+            .StopShipReasons.ShouldContain("projection-rebuild:projection_resource_count_mismatch");
+    }
+
+    [Fact]
+    public void TruthfulUnequalProjectionFingerprintsStopShipAsStructuralDivergence()
+    {
+        LiveRecoveryValidationEvidenceAttempt divergent = MutateJob(
+            LiveRecoveryValidationJobs.ProjectionRebuild,
+            manifest =>
+            {
+                IReadOnlyList<ProjectionResourceDigest> rebuilt =
+                [
+                    manifest.ProjectionRebuiltDigests![0] with { StructuralStateToken = new string('c', 64) },
+                    manifest.ProjectionRebuiltDigests[1],
+                ];
+                Dictionary<string, bool> assertions = new(manifest.Assertions, StringComparer.Ordinal)
+                {
+                    ["structurally-equivalent"] = false,
+                };
+                return manifest with
+                {
+                    Verdict = ProjectionRebuildVerdicts.Divergent,
+                    ProjectionRebuiltDigests = rebuilt,
+                    ProjectionRebuiltFingerprint = ProjectionSnapshotFingerprint.Compute(rebuilt),
+                    Assertions = assertions,
+                    Deviations = [ProjectionRebuildEquivalenceEvaluator.DivergedDeviation],
+                };
+            });
+        divergent = divergent with
+        {
+            AlertsDeliveredByJob = new Dictionary<string, int>(StringComparer.Ordinal)
+            {
+                [LiveRecoveryValidationJobs.ProjectionRebuild] = 1,
+            },
+        };
+
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(divergent);
+
+        decision.StopShipReasons.ShouldContain("projection-rebuild:structural_breach");
+        decision.StopShipReasons.ShouldNotContain("projection-rebuild:invalid_evidence");
     }
 
     [Fact]
@@ -1004,6 +1067,16 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
             LiveRecoveryValidationJobs.ProjectionRebuild => new(StringComparer.Ordinal) { ["rebuild-duration"] = 14_400 },
             _ => new(StringComparer.Ordinal) { ["scope-recording-latency"] = 300 },
         };
+        IReadOnlyList<ProjectionResourceDigest>? projectionDigests = jobId == LiveRecoveryValidationJobs.ProjectionRebuild
+            ?
+            [
+                new ProjectionResourceDigest("governed-resource-1", new string('a', 64)),
+                new ProjectionResourceDigest("source-resource-1", new string('b', 64)),
+            ]
+            : null;
+        string? projectionFingerprint = projectionDigests is null
+            ? null
+            : ProjectionSnapshotFingerprint.Compute(projectionDigests);
 
         return new RecoveryValidationEvidenceManifest
         {
@@ -1021,7 +1094,7 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
             DatasetRef = "recovery-baseline",
             DatasetVersion = "v1",
             ConfiguredDatasetVolume = 6,
-            DatasetVolume = jobId == LiveRecoveryValidationJobs.ProjectionRebuild ? 1 : 0,
+            DatasetVolume = jobId == LiveRecoveryValidationJobs.ProjectionRebuild ? 2 : 0,
             DriverMode = RecoveryValidationEvidenceManifest.LiveDriverMode,
             JobId = jobId,
             Scenario = scenario,
@@ -1032,13 +1105,19 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
             ObservedScope = "tenant",
             ReportKind = jobId,
             Verdict = verdict,
-            ReasonCode = jobId == LiveRecoveryValidationJobs.ControlledLossPath
-                ? ControlledLossPathReport.CompletedReasonCode
-                : "validation_completed",
+            ReasonCode = jobId switch
+            {
+                LiveRecoveryValidationJobs.ControlledLossPath => ControlledLossPathReport.CompletedReasonCode,
+                LiveRecoveryValidationJobs.ProjectionRebuild => ProjectionRebuildReport.ValidationCompletedReasonCode,
+                _ => "validation_completed",
+            },
             MeasurementsSeconds = measurements,
             AllowedTargetsSeconds = targets,
             Assertions = assertions,
-            Coverage = new Dictionary<string, int> { ["scenario"] = 1 },
+            Coverage = new Dictionary<string, int>
+            {
+                ["scenario"] = jobId == LiveRecoveryValidationJobs.ProjectionRebuild ? 2 : 1,
+            },
             Deviations = [],
             ResidualIds = ["RV-PROD-CONTROL"],
             MeasurableRecoveryCeilingSeconds = 180,
@@ -1047,6 +1126,19 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
                 ["test-output"] = "artifact:live-recovery-validation-evidence/results.trx",
                 ["reports"] = "artifact:live-recovery-validation-evidence/reports",
             },
+            ProjectionPreRebuildSchemaVersion = projectionDigests is null ? null : "source-v1|governed-v1",
+            ProjectionRebuiltSchemaVersion = projectionDigests is null ? null : "source-v1|governed-v1",
+            ProjectionPreRebuildDigests = projectionDigests,
+            ProjectionRebuiltDigests = projectionDigests,
+            ProjectionSourceResourceCount = projectionDigests is null ? 0 : 1,
+            ProjectionGovernedResourceCount = projectionDigests is null ? 0 : 1,
+            ProjectionWormRecordCount = projectionDigests is null ? 0 : 1,
+            ProjectionWormOperationCount = projectionDigests is null ? 0 : 1,
+            ProjectionFingerprintAlgorithmVersion = projectionDigests is null
+                ? null
+                : ProjectionSnapshotFingerprint.AlgorithmVersion,
+            ProjectionPreRebuildFingerprint = projectionFingerprint,
+            ProjectionRebuiltFingerprint = projectionFingerprint,
             PreFaultRetainedRef = jobId == LiveRecoveryValidationJobs.ControlledLossPath
                 ? "01ARZ3NDEKTSV4RRFFQ69G5FAA"
                 : null,

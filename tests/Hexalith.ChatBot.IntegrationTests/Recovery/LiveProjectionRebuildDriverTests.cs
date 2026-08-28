@@ -18,7 +18,7 @@ public sealed class LiveProjectionRebuildDriverTests
         _ = await worm.AppendAsync(Envelope(tenantRef, "resource-001"), TestContext.Current.CancellationToken);
         _ = await worm.AppendAsync(Envelope("replay-test:neighbor", "foreign-001"), TestContext.Current.CancellationToken);
         InMemoryRecoveryReadModelStore readModels = new();
-        await LiveProjectionRebuildDriver.SeedBaselineAsync(
+        ProjectionRebuildBaselineEvidence baselineEvidence = await LiveProjectionRebuildDriver.SeedBaselineAsync(
             readModels,
             tenantRef,
             Descriptor(),
@@ -28,6 +28,7 @@ public sealed class LiveProjectionRebuildDriverTests
         LiveProjectionRebuildDriver driver = new(
             [Source(tenantRef)],
             worm,
+            baselineEvidence,
             readModels,
             readModels,
             Descriptor(),
@@ -40,16 +41,22 @@ public sealed class LiveProjectionRebuildDriverTests
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             TestContext.Current.CancellationToken);
 
-        measurement.PreRebuildSnapshot.Count.ShouldBe(1);
-        measurement.PreRebuildSnapshot.ShouldAllBe(digest => digest.ResourceId.StartsWith("source-", StringComparison.Ordinal));
+        measurement.PreRebuildSnapshot.Count.ShouldBe(2);
+        measurement.PreRebuildSnapshot.ShouldContain(digest => digest.ResourceId.StartsWith("source-", StringComparison.Ordinal));
+        measurement.PreRebuildSnapshot.ShouldContain(digest => digest.ResourceId.StartsWith("governed-", StringComparison.Ordinal));
         measurement.RebuiltSnapshot.ShouldBe(measurement.PreRebuildSnapshot);
-        measurement.PreRebuildSchemaVersion.ShouldBe(ProjectConversationSourceEmailView.CurrentSchemaVersion);
-        measurement.RebuiltSchemaVersion.ShouldBe(ProjectConversationSourceEmailView.CurrentSchemaVersion);
+        measurement.PreRebuildSchemaVersion.ShouldContain(ProjectConversationSourceEmailView.CurrentSchemaVersion);
+        measurement.PreRebuildSchemaVersion.ShouldContain(GovernedOperationView.CurrentSchemaVersion);
+        measurement.RebuiltSchemaVersion.ShouldBe(measurement.PreRebuildSchemaVersion);
+        measurement.SourceResourceCount.ShouldBe(1);
+        measurement.GovernedResourceCount.ShouldBe(1);
+        measurement.WormRecordCount.ShouldBe(1);
+        measurement.WormOperationCount.ShouldBe(1);
         measurement.MeasuredDuration.ShouldBeGreaterThanOrEqualTo(TimeSpan.Zero);
         measurement.ExecutionAssertions!.CleanupComplete.ShouldBeTrue();
         measurement.ExecutionAssertions.TenantIsolationPreserved.ShouldBeTrue();
         measurement.ExecutionAssertions.UnauthorizedMutationAbsent.ShouldBeFalse();
-        measurement.ExecutionAssertions.MailboxReingestionAbsent.ShouldBeFalse();
+        measurement.ExecutionAssertions.MailboxReingestionAbsent.ShouldBeTrue();
         measurement.ExecutionAssertions.IndependentControlSucceeded.ShouldBeFalse();
         measurement.ExecutionAssertions.StateReconstructable.ShouldBeTrue();
         measurement.PreRebuildSnapshot.ShouldNotContain(digest => digest.ResourceId.Contains("foreign", StringComparison.Ordinal));
@@ -64,7 +71,7 @@ public sealed class LiveProjectionRebuildDriverTests
         InMemoryWormAuditStore worm = new();
         _ = await worm.AppendAsync(Envelope(tenantRef, "resource-001"), TestContext.Current.CancellationToken);
         InMemoryRecoveryReadModelStore readModels = new();
-        await LiveProjectionRebuildDriver.SeedBaselineAsync(
+        ProjectionRebuildBaselineEvidence baselineEvidence = await LiveProjectionRebuildDriver.SeedBaselineAsync(
             readModels,
             tenantRef,
             Descriptor(),
@@ -81,6 +88,7 @@ public sealed class LiveProjectionRebuildDriverTests
         LiveProjectionRebuildDriver driver = new(
             [Source(tenantRef)],
             worm,
+            baselineEvidence,
             readModels,
             readModels,
             Descriptor(),
@@ -125,7 +133,7 @@ public sealed class LiveProjectionRebuildDriverTests
         _ = await worm.AppendAsync(Envelope(tenantRef, "resource-001"), TestContext.Current.CancellationToken);
         InMemoryRecoveryReadModelStore readModels = new();
         ProjectConversationSourceEmailView baselineSource = Source(tenantRef);
-        await LiveProjectionRebuildDriver.SeedBaselineAsync(
+        ProjectionRebuildBaselineEvidence baselineEvidence = await LiveProjectionRebuildDriver.SeedBaselineAsync(
             readModels,
             tenantRef,
             Descriptor(),
@@ -136,6 +144,7 @@ public sealed class LiveProjectionRebuildDriverTests
         LiveProjectionRebuildDriver driver = new(
             [changedSource],
             worm,
+            baselineEvidence,
             readModels,
             readModels,
             Descriptor(),
@@ -164,7 +173,7 @@ public sealed class LiveProjectionRebuildDriverTests
         InMemoryWormAuditStore worm = new();
         _ = await worm.AppendAsync(Envelope(tenantRef, "resource-001"), TestContext.Current.CancellationToken);
         InMemoryRecoveryReadModelStore readModels = new();
-        await LiveProjectionRebuildDriver.SeedBaselineAsync(
+        ProjectionRebuildBaselineEvidence baselineEvidence = await LiveProjectionRebuildDriver.SeedBaselineAsync(
             readModels,
             tenantRef,
             Descriptor(),
@@ -174,6 +183,7 @@ public sealed class LiveProjectionRebuildDriverTests
         LiveProjectionRebuildDriver driver = new(
             [Source(tenantRef)],
             worm,
+            baselineEvidence,
             readModels,
             readModels,
             Descriptor(),
@@ -200,6 +210,146 @@ public sealed class LiveProjectionRebuildDriverTests
     }
 
     [Fact]
+    public async Task SameResourceWormStructuralMutationChangesTheGovernedDigest()
+    {
+        string tenantRef = RecoveryValidationTopology.LogicalTenantRef;
+        InMemoryWormAuditStore seedWorm = new();
+        InMemoryWormAuditStore rebuildWorm = new();
+        _ = await seedWorm.AppendAsync(Envelope(tenantRef, "resource-001"), TestContext.Current.CancellationToken);
+        _ = await rebuildWorm.AppendAsync(
+            Envelope(tenantRef, "resource-001") with { Outcome = "rejected", ReasonCode = "policy-rejected" },
+            TestContext.Current.CancellationToken);
+        InMemoryRecoveryReadModelStore readModels = new();
+        ProjectionRebuildBaselineEvidence baselineEvidence = await LiveProjectionRebuildDriver.SeedBaselineAsync(
+            readModels,
+            tenantRef,
+            Descriptor(),
+            [Source(tenantRef)],
+            seedWorm.EnumerateChain(tenantRef),
+            TestContext.Current.CancellationToken);
+        LiveProjectionRebuildDriver driver = new(
+            [Source(tenantRef)], rebuildWorm, baselineEvidence, readModels, readModels, Descriptor(), Options(), new SystemClock());
+
+        ProjectionRebuildValidationCoordinator coordinator = new(
+            driver,
+            new InMemoryAuditWriter(),
+            new InMemoryOperatorAlertSink(),
+            new SystemClock());
+        ProjectionRebuildReport report = await coordinator.RunValidationAndRecordAsync(
+            tenantRef,
+            "recovery-baseline",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken);
+
+        report.Verdict.ShouldBe(ProjectionRebuildVerdicts.Divergent);
+        report.FirstDivergingResourceLocator.ShouldBe("resource:governed-resource-001");
+        report.PreRebuildDigests!.Single(static digest => digest.ResourceId == "governed-resource-001")
+            .ShouldNotBe(report.RebuiltDigests!.Single(static digest => digest.ResourceId == "governed-resource-001"));
+        report.PreRebuildFingerprint.ShouldNotBe(report.RebuiltFingerprint);
+    }
+
+    [Fact]
+    public async Task MultiEnvelopeOperationIsGroupedAndReplayedOnce()
+    {
+        string tenantRef = RecoveryValidationTopology.LogicalTenantRef;
+        InMemoryWormAuditStore seedWorm = new();
+        InMemoryWormAuditStore rebuildWorm = new();
+        AuditEnvelope preCommit = Envelope(tenantRef, "resource-001") with
+        {
+            Phase = AuditCommitPhase.PreCommit,
+            Outcome = "proposed",
+        };
+        AuditEnvelope postCommit = Envelope(tenantRef, "resource-001");
+        foreach (InMemoryWormAuditStore worm in new[] { seedWorm, rebuildWorm })
+        {
+            _ = await worm.AppendAsync(preCommit, TestContext.Current.CancellationToken);
+            _ = await worm.AppendAsync(postCommit, TestContext.Current.CancellationToken);
+        }
+
+        RecoveryValidationDatasetDescriptor descriptor = Descriptor(wormAuditRecordCount: 2);
+        InMemoryRecoveryReadModelStore readModels = new();
+        ProjectionRebuildBaselineEvidence baselineEvidence = await LiveProjectionRebuildDriver.SeedBaselineAsync(
+            readModels,
+            tenantRef,
+            descriptor,
+            [Source(tenantRef)],
+            seedWorm.EnumerateChain(tenantRef),
+            TestContext.Current.CancellationToken);
+        LiveProjectionRebuildDriver driver = new(
+            [Source(tenantRef)], rebuildWorm, baselineEvidence, readModels, readModels, descriptor, Options(datasetVolume: 7), new SystemClock());
+
+        ProjectionRebuildMeasurement measurement = await driver.RebuildAsync(
+            tenantRef,
+            "recovery-baseline",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken);
+
+        measurement.PreRebuildSnapshot.ShouldBe(measurement.RebuiltSnapshot);
+        measurement.WormRecordCount.ShouldBe(2);
+        measurement.WormOperationCount.ShouldBe(1);
+        measurement.GovernedResourceCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task SeveralOperationsMayTargetOneGovernedResource()
+    {
+        string tenantRef = RecoveryValidationTopology.LogicalTenantRef;
+        InMemoryWormAuditStore seedWorm = new();
+        InMemoryWormAuditStore rebuildWorm = new();
+        AuditEnvelope first = Envelope(tenantRef, "resource-001", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        AuditEnvelope second = Envelope(tenantRef, "resource-001", "01ARZ3NDEKTSV4RRFFQ69G5FAX") with
+        {
+            StateTransition = "Proposed-Recorded",
+        };
+        foreach (InMemoryWormAuditStore worm in new[] { seedWorm, rebuildWorm })
+        {
+            _ = await worm.AppendAsync(first, TestContext.Current.CancellationToken);
+            _ = await worm.AppendAsync(second, TestContext.Current.CancellationToken);
+        }
+
+        RecoveryValidationDatasetDescriptor descriptor = Descriptor(wormAuditRecordCount: 2);
+        InMemoryRecoveryReadModelStore readModels = new();
+        ProjectionRebuildBaselineEvidence baselineEvidence = await LiveProjectionRebuildDriver.SeedBaselineAsync(
+            readModels,
+            tenantRef,
+            descriptor,
+            [Source(tenantRef)],
+            seedWorm.EnumerateChain(tenantRef),
+            TestContext.Current.CancellationToken);
+        LiveProjectionRebuildDriver driver = new(
+            [Source(tenantRef)], rebuildWorm, baselineEvidence, readModels, readModels, descriptor, Options(datasetVolume: 7), new SystemClock());
+
+        ProjectionRebuildMeasurement measurement = await driver.RebuildAsync(
+            tenantRef,
+            "recovery-baseline",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken);
+
+        measurement.PreRebuildSnapshot.ShouldBe(measurement.RebuiltSnapshot);
+        measurement.WormRecordCount.ShouldBe(2);
+        measurement.WormOperationCount.ShouldBe(2);
+        measurement.GovernedResourceCount.ShouldBe(1);
+        measurement.PreRebuildSnapshot.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task UnsafeWormResourceIdIsRejectedInsteadOfCollapsed()
+    {
+        string tenantRef = RecoveryValidationTopology.LogicalTenantRef;
+        InMemoryWormAuditStore worm = new();
+        _ = await worm.AppendAsync(Envelope(tenantRef, "unsafe/resource"), TestContext.Current.CancellationToken);
+        InMemoryRecoveryReadModelStore readModels = new();
+
+        _ = await Should.ThrowAsync<InvalidOperationException>(() => LiveProjectionRebuildDriver.SeedBaselineAsync(
+            readModels,
+            tenantRef,
+            Descriptor(),
+            [Source(tenantRef)],
+            worm.EnumerateChain(tenantRef),
+            TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task DisabledLiveModeIsRejectedBeforeTheRebuildReadsItsPopulation()
     {
         LiveRecoveryValidationOptions options = Options();
@@ -208,6 +358,7 @@ public sealed class LiveProjectionRebuildDriverTests
         LiveProjectionRebuildDriver driver = new(
             [],
             new InMemoryWormAuditStore(),
+            new ProjectionRebuildBaselineEvidence([], new Dictionary<string, string>(), "schema", 0, 0),
             readModels,
             readModels,
             Descriptor(),
@@ -224,7 +375,7 @@ public sealed class LiveProjectionRebuildDriverTests
         readModels.Erases.ShouldBe(0);
     }
 
-    private static LiveRecoveryValidationOptions Options()
+    private static LiveRecoveryValidationOptions Options(int datasetVolume = 6)
         => new()
         {
             Enabled = true,
@@ -232,7 +383,7 @@ public sealed class LiveProjectionRebuildDriverTests
             TestTenantRef = RecoveryValidationTopology.LogicalTenantRef,
             DatasetRef = "recovery-baseline",
             DatasetVersion = "v1",
-            DatasetVolume = 6,
+            DatasetVolume = datasetVolume,
             ProjectionSchemaVersion = "chatbot.project-conversation-source-email.v1",
             ValidationPartitionRef = "recovery-partition-v1",
             ControllerCapability = LiveRecoveryValidationOptions.AspireControllerCapability,
@@ -244,14 +395,14 @@ public sealed class LiveProjectionRebuildDriverTests
             EvidenceLocator = "artifact:live-recovery-validation-evidence",
         };
 
-    private static RecoveryValidationDatasetDescriptor Descriptor()
+    private static RecoveryValidationDatasetDescriptor Descriptor(int wormAuditRecordCount = 1)
         => new(
             "recovery-baseline",
             "v1",
             "chatbot.project-conversation-source-email.v1",
             "recovery-partition-v1",
             SourceRecordCount: 1,
-            WormAuditRecordCount: 1,
+            WormAuditRecordCount: wormAuditRecordCount,
             GovernedCommandCount: 1,
             ApprovalCount: 1,
             PolicySnapshotCount: 1,
@@ -271,15 +422,18 @@ public sealed class LiveProjectionRebuildDriverTests
             SourceSentAtUtc: null,
             SourceCreatedAtUtc: null,
             "UTC",
-            "Microsoft-365-mailbox",
-            "m365-mailbox",
-            "metadata-only",
+            "Microsoft 365 mailbox",
+            AssociationCandidateView.MailboxSourceProvenance,
+            GovernedOperationView.MetadataOnlyRedactionState,
             "standard",
             ProjectConversationSourceEmailView.CurrentSchemaVersion,
             SourceVersion: 1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
-    private static AuditEnvelope Envelope(string tenantRef, string resourceRef)
+    private static AuditEnvelope Envelope(
+        string tenantRef,
+        string resourceRef,
+        string correlationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW")
         => new(
             tenantRef,
             "recovery-validator",
@@ -288,13 +442,13 @@ public sealed class LiveProjectionRebuildDriverTests
             resourceRef,
             "allow",
             "accepted",
-            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            correlationId,
             DateTimeOffset.Parse("2026-08-01T00:00:01Z", System.Globalization.CultureInfo.InvariantCulture),
             "policy-v1",
             ["dataset:recovery-baseline"],
             IdempotencyKey: null,
             "Received-Proposed",
-            "metadata-only",
+            GovernedOperationView.MetadataOnlyRedactionState,
             "accepted",
             AuditCommitPhase.PostCommit,
             "audit-envelope-v1",

@@ -69,6 +69,32 @@ public static class LiveRecoveryValidationArchitectureTests
     }
 
     [Fact]
+    public static void ProjectionRebuildTopology_ShouldKeepIndependentSeedAndProductionReplayPaths()
+    {
+        string root = RepositoryRoot();
+        string e2e = File.ReadAllText(Path.Combine(
+            root,
+            "tests",
+            "Hexalith.ChatBot.IntegrationTests",
+            "Recovery",
+            "LiveContinuityAspireE2eTests.cs"));
+        string driver = File.ReadAllText(Path.Combine(
+            root,
+            "tests",
+            "Hexalith.ChatBot.IntegrationTests",
+            "Recovery",
+            "LiveProjectionRebuildDriver.cs"));
+
+        e2e.ShouldContain("RecoveryValidationDataset seedDataset");
+        e2e.ShouldContain("RecoveryValidationDataset rebuildDataset");
+        e2e.ShouldContain("InMemoryWormAuditStore seedWorm");
+        e2e.ShouldContain("InMemoryWormAuditStore rebuildWorm");
+        driver.ShouldContain("AuditOperationReconstructor.Reconstruct");
+        driver.ShouldContain("GovernedOperationProjectionHandler governedHandler");
+        driver.ShouldNotContain("ToGovernedOperationView");
+    }
+
+    [Fact]
     public static void LiveRecoveryReleasePolicy_ShouldRejectUnpinnedDatasetEvidence()
     {
         _ = Should.Throw<ArgumentException>(() => LiveRecoveryValidationGatePolicy.ForRelease(

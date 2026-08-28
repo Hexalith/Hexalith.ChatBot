@@ -224,12 +224,23 @@ public sealed class FileRecoveryValidationEvidenceSinkTests
             MeasuredRebuildDuration: TimeSpan.FromSeconds(1),
             DurationWithinTarget: true,
             ProjectionRebuildVerdicts.Equivalent,
-            ResourcesCompared: 1,
+            ResourcesCompared: 2,
             Deviations: [],
             FirstDivergingResourceLocator: null,
             ProjectConversationSourceEmailView.CurrentSchemaVersion,
             ChatBotCorrelationId.New().Value,
-            ProjectionRebuildReport.ValidationCompletedReasonCode);
+            ProjectionRebuildReport.ValidationCompletedReasonCode,
+            PreRebuildDigests: SnapshotDigests(2),
+            RebuiltDigests: SnapshotDigests(2),
+            PreRebuildSchemaVersion: "source-v1|governed-v1",
+            RebuiltSchemaVersion: "source-v1|governed-v1",
+            SourceResourcesCompared: 1,
+            GovernedResourcesCompared: 1,
+            WormRecordsReplayed: 1,
+            WormOperationsReplayed: 1,
+            FingerprintAlgorithmVersion: ProjectionSnapshotFingerprint.AlgorithmVersion,
+            PreRebuildFingerprint: ProjectionSnapshotFingerprint.Compute(SnapshotDigests(2)),
+            RebuiltFingerprint: ProjectionSnapshotFingerprint.Compute(SnapshotDigests(2)));
 
         await sink.RecordAsync(report, TestContext.Current.CancellationToken).ConfigureAwait(true);
 
@@ -309,7 +320,9 @@ public sealed class FileRecoveryValidationEvidenceSinkTests
         string correlationId,
         DateTimeOffset started,
         int resourcesCompared)
-        => new(
+    {
+        IReadOnlyList<ProjectionResourceDigest> digests = SnapshotDigests(resourcesCompared);
+        return new(
             RecoveryValidationTopology.LogicalTenantRef,
             DatasetRef: "recovery-baseline",
             started,
@@ -322,7 +335,27 @@ public sealed class FileRecoveryValidationEvidenceSinkTests
             FirstDivergingResourceLocator: null,
             ProjectConversationSourceEmailView.CurrentSchemaVersion,
             correlationId,
-            ProjectionRebuildReport.ValidationCompletedReasonCode);
+            ProjectionRebuildReport.ValidationCompletedReasonCode,
+            PreRebuildDigests: digests,
+            RebuiltDigests: digests,
+            PreRebuildSchemaVersion: "source-v1|governed-v1",
+            RebuiltSchemaVersion: "source-v1|governed-v1",
+            SourceResourcesCompared: 1,
+            GovernedResourcesCompared: resourcesCompared - 1,
+            WormRecordsReplayed: resourcesCompared - 1,
+            WormOperationsReplayed: resourcesCompared - 1,
+            FingerprintAlgorithmVersion: ProjectionSnapshotFingerprint.AlgorithmVersion,
+            PreRebuildFingerprint: ProjectionSnapshotFingerprint.Compute(digests),
+            RebuiltFingerprint: ProjectionSnapshotFingerprint.Compute(digests));
+    }
+
+    private static IReadOnlyList<ProjectionResourceDigest> SnapshotDigests(int count)
+        =>
+        [
+            .. Enumerable.Range(0, count).Select(index => new ProjectionResourceDigest(
+                $"resource-{index}",
+                new string((char)('a' + index), 64))),
+        ];
 
     private static ScopedOutageDegradationReport ContainedScopedOutageReport(
         string correlationId,
