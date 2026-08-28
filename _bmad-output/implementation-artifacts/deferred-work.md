@@ -561,6 +561,7 @@ severity: medium
 reason: **[MEDIUM · pre-existing runtime scaling] Cadence ownership and status are process-local.** `PeriodicEnforcementRuntime.cs:181-193,321-323,690-718` keeps last-run state, cadence partitions, and non-overlap guards in memory. Restarts reset the evidence window and horizontally scaled replicas can execute the same global sweep and duplicate writes/alerts. The current story explicitly modeled the in-memory once-per-day guard, so distributed leasing/durable status belongs to the deployment/scale owner before the server runs with multiple replicas.
 status: open
 decision: 2026-08-28 Build distributed cadence — Introduce a durable fenced lease and cadence-status store and verify restart and multi-replica non-overlap.
+decision: 2026-08-28 Build distributed cadence — Introduce a durable fenced lease and cadence-status store and verify restart and multi-replica non-overlap.
 
 ### DW-65: [HIGH · owned by Story 12.16] The periodic correction-propagation SLO-deadline sweep (AC1 item 5) was never built.
 
@@ -610,6 +611,7 @@ location: DerivedStoreIsolationProbeCoordinator.cs:243-244
 severity: medium
 reason: **[MEDIUM · coupled to the distributed cadence-lease item above] The now-deterministic derived-store sentinel id makes the isolation probe fail-open under concurrent sweeps.** `DerivedStoreIsolationProbeCoordinator.cs:243-244` — the round-1 patch removed the run correlation id from `SentinelResourceId` to make the probe idempotent (correctly: nightly activation of the old per-run id would have grown live derived state without bound). The consequence is that `iso-probe:{segment}:{ownerTenant}` is now a *shared mutable key* across runs. If two sweeps overlap on the same `(class, ownerTenant)` — two replicas, or a manual release-gate invocation racing the nightly sweep — run B's `finally` `InvalidateAsync` (`:126-128`) can delete run A's sentinel in the window between A's `PutAsync` (`:98-100`) and A's cross-tenant `GetAsync` (`:105-107`). A then observes `null`, `DerivedStoreIsolationVerifier.Verify` returns Isolated, and a genuinely leaky store reports **zero breaches** to the M2 stop-ship signal. `SweepAllTenantPairsAsync` is sequential, so a single process is safe today; the exposure begins exactly where the recorded "horizontally scaled replicas can execute the same global sweep" deferral does — but note that deferral describes duplicate *writes/alerts*, not a **masked breach**, which is strictly worse. Resolve together with distributed cadence leasing; do not close that item without covering this. Owner: the deployment/scale owner.
 status: open
+decision: 2026-08-28 Lease and fence cleanup — Serialize matching probes through the distributed cadence lease, fence cleanup to its generation, and add concurrent-sweep tests.
 decision: 2026-08-28 Lease and fence cleanup — Serialize matching probes through the distributed cadence lease, fence cleanup to its generation, and add concurrent-sweep tests.
 
 ### DW-71: [LOW · pre-existing, outside the solution] `Hexalith.ChatBot.Aspire.Tests` fails on a stale hardcoded source path and nothing runs it.
@@ -1115,6 +1117,7 @@ source_spec: `spec-release-workflow-safety.md`
 severity: low
 reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260827-211223-44d7; this entry preserves the lingering recommendation for a deliberate later review.
 status: done 2026-08-28
+decision: 2026-08-28 Close review reminder — The completed follow-up and separately tracked concrete residuals make the generic reminder redundant.
 resolution: closed by human decision: The completed follow-up and separately tracked concrete residuals make the generic reminder redundant.
 decision: 2026-08-28 Close review reminder — The completed follow-up and separately tracked concrete residuals make the generic reminder redundant.
 
@@ -1133,6 +1136,7 @@ source_spec: `spec-retention-failure-marker.md`
 severity: low
 reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260827-211223-44d7; this entry preserves the lingering recommendation for a deliberate later review.
 status: done 2026-08-28
+decision: 2026-08-28 Close review reminder — The completed follow-up and separately tracked concrete residual make the generic reminder redundant.
 resolution: closed by human decision: The completed follow-up and separately tracked concrete residual make the generic reminder redundant.
 decision: 2026-08-28 Close review reminder — The completed follow-up and separately tracked concrete residual make the generic reminder redundant.
 
@@ -1160,5 +1164,6 @@ source_spec: `spec-dw-52-loss-path-rpo-evidence.md`
 severity: low
 reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260827-211223-44d7; this entry preserves the lingering recommendation for a deliberate later review.
 status: done 2026-08-28
+decision: 2026-08-28 Close review reminder — The completed follow-up and separately triaged concrete residuals make the generic reminder redundant.
 resolution: closed by human decision: The completed follow-up and separately triaged concrete residuals make the generic reminder redundant.
 decision: 2026-08-28 Close review reminder — The completed follow-up and separately triaged concrete residuals make the generic reminder redundant.
