@@ -264,6 +264,7 @@ location: TE-2/policy if reason set expands
 severity: low
 reason: **[LOW · reason taxonomy] Broad reuse of `scope_digest_mismatch`/`status_mismatch` for I/O and CLI errors via subjects.** **Release-claim impact:** dashboards keyed only on reason codes blur failure classes. **Owner:** TE-2/policy if reason set expands. **Closure evidence:** new stable reasons or documented subject convention.
 status: open
+decision: 2026-08-28 Document subject convention — Keep the nine stable reason codes, define bounded subject tokens for CLI syntax, process launch, file I/O, and scope evaluation, and add focused tests and runbook mappings.
 
 ### DW-31: [LOW · test harness] `GateFixture.FindPolicy` parent-walk discovery.
 

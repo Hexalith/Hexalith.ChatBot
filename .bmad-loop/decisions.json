@@ -62,6 +62,15 @@
     "label": "Use segment-aware policy",
     "resolution": ""
   },
+  "DW-30": {
+    "answered_at": "2026-08-28",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Keep the nine stable reason codes, define bounded subject tokens for CLI syntax, process launch, file I/O, and scope evaluation, and add focused tests and runbook mappings.",
+    "key": "1",
+    "label": "Document subject convention",
+    "resolution": ""
+  },
   "DW-52": {
     "answered_at": "2026-08-27",
     "bundle_name": "",
