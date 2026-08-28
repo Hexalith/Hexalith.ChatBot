@@ -752,6 +752,7 @@ location: Story 2.9 / correction-propagation runtime
 severity: low
 reason: **[LOW · durable activity CT]** Workflow activities pass `CancellationToken.None` into EventStore/audit/alert side effects. **Release-claim impact:** host cancellation cannot abort in-flight activity I/O; acceptable under typical Dapr durable-activity semantics if activities remain idempotent. **Owner:** Story 2.9 / correction-propagation runtime. **Closure evidence:** documented durable-activity cancellation policy, or activity-context token plumbing with idempotent compensation tests.
 status: open
+decision: 2026-08-28 Document durable completion — Ratify CancellationToken.None for durable side effects, document replay and idempotency policy, and add shutdown and replay tests proving eventual completion is safe.
 
 ### DW-87: [MEDIUM · terminal failure ownership] Distinct correction-propagation workflow `Failed` status deferred; Story 2.9 keeps `Correction-delayed` for store/soft failures.
 

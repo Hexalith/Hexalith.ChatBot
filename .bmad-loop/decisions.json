@@ -170,6 +170,15 @@
     "label": "Regenerate and review",
     "resolution": ""
   },
+  "DW-86": {
+    "answered_at": "2026-08-28",
+    "bundle_name": "",
+    "effect": "build",
+    "intent": "Ratify CancellationToken.None for durable side effects, document replay and idempotency policy, and add shutdown and replay tests proving eventual completion is safe.",
+    "key": "1",
+    "label": "Document durable completion",
+    "resolution": ""
+  },
   "DW-92": {
     "answered_at": "2026-08-27",
     "bundle_name": "",
