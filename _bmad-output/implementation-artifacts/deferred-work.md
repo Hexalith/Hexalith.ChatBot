@@ -145,7 +145,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: governance / A10
 severity: medium
 reason: **[MEDIUM · RPO semantics] Green-path RPO hard-coded `TimeSpan.Zero` when no loss detected.** Intentional documented classic-RPO empty loss window. **Release-claim impact:** do not cite green-path Zero as A10 budget exercise. **Owner:** governance / A10. **Closure evidence:** loss-path measurement + hosted locator, or documented non-citability.
-status: open
+status: done 2026-08-28
+resolution: already resolved: Commit 23030e3; docs/adrs/live-recovery-validation-drivers.md:53,178-186 makes ordinary zero-RPO non-citable, while tests/Hexalith.ChatBot.Server.Tests/Audit/LiveRecoveryValidationEvidenceGateTests.cs:898-906 rejects zero or missing controlled-loss proof.
 
 ### DW-18: [MEDIUM · dataset] ~~`DatasetVolume: 6` vs actual compared resources.~~ Closed 2026-08-04.
 
@@ -211,7 +212,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: Story 12.15 governance / RPO residual
 severity: low
 reason: **[LOW · gate fixtures] Gate fixtures publish `rpo: 0` under `met` without asserting non-citability of constant-zero RPO.** **Release-claim impact:** unit fixtures mirror the no-loss shape; they do not launder A10. **Owner:** Story 12.15 governance / RPO residual. **Closure evidence:** existing no-loss RPO residual closure, or fixtures that mark Zero-RPO as non-citable.
-status: open
+status: done 2026-08-28
+resolution: already resolved: Commit 23030e3; tests/Hexalith.ChatBot.Server.Tests/Audit/LiveRecoveryValidationEvidenceGateTests.cs:777-783,898-906 separates positive controlled-loss RPO proof from the ordinary zero-RPO fixture and rejects zero or missing proof.
 
 ### DW-25: [LOW · architecture methodology] `AppHostTopologyTests` StrictEnum/sidecar assertions are source-substring greps.
 
@@ -1178,4 +1180,5 @@ location: ChatBot mailbox/source-association-to-Memories ingestion boundary (abs
 source_spec: `spec-12-16-bind-the-live-hexalith-memories-derived-store-backing.md`
 severity: high
 reason: ChatBot never calls `MemoriesClient.IngestAsync`; the metadata-only mailbox projection and folder attachment capture paths contain no authoritative prior Memories case id or ordered canonical message/attachment `MemoryUnitId` results. It therefore cannot prove all individual ingests succeeded or construct the exact finalization manifest. Inferring case/unit identities from ChatBot project or attachment ids is prohibited by the spec's Block If rule. The correction adapter remains intentionally fail-closed on a missing binding. Closure requires an owned message/attachment-to-Memories ingestion workflow that returns the prior case plus every ordered canonical unit, calls `FinalizeDerivedStoreBindingAsync` only after complete success, and proves the live persisted end-state.
-status: open
+status: done 2026-08-28
+resolution: already resolved: Commit b9d49cb; src/Hexalith.ChatBot.Server/Adapters/Memories/IngestionBindingStartSourceActivity.cs:35 starts Memories ingestion, IngestionBindingWorkflowRunner.cs:29-38 collects canonical MemoryUnitId results before finalization, and IngestionBindingFinalizeActivity.cs:19-30 calls FinalizeDerivedStoreBindingAsync.
