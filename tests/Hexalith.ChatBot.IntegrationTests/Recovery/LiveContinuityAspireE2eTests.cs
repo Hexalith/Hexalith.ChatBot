@@ -36,6 +36,9 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 [Collection(LiveRecoveryValidationCollection.Name)]
 public sealed class LiveContinuityAspireE2eTests
 {
+    private const string RetentionFailureDirectoryVariable =
+        "HEXALITH_CHATBOT_RECOVERY_RETENTION_FAILURE_DIR";
+
     private static readonly string[] DaprInternalGrpcAppIds =
     [
         "eventstore",
@@ -60,6 +63,26 @@ public sealed class LiveContinuityAspireE2eTests
         // Keycloak confidential-client secret that mints CaptureMailboxMessageIntake service-client tokens.
         string mailboxClientSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         string runId = ChatBotCorrelationId.New().Value;
+
+        // Resolved and reset BEFORE the topology starts, for two reasons.
+        //
+        // 1. Fail fast. Resolving the variable only after startup burned the whole 15-minute provisioning budget
+        //    before reporting a lane that simply forgot to set it.
+        // 2. Run isolation. The marker root is workflow-owned and its filenames are deterministic per job+scenario,
+        //    not per run, while the canonical evidence directory is run-scoped. A root that survives between runs
+        //    (a local Tier-3 re-run, or any runner whose temp is not wiped per job) therefore carries a previous
+        //    run's marker into this attempt, where it fails `marker.RunId == attempt.RunId` and turns a healthy run
+        //    into `retention_failure_marker_invalid` both in process and after upload. The producer owns this root,
+        //    so it starts it empty rather than filtering foreign markers at load -- the gate must keep treating a
+        //    run-mismatched marker as fail-closed proof of tampering.
+        string canonicalEvidenceDirectory = Path.Combine(RepositoryRoot(), "TestResults", "live-recovery", runId);
+        string markerRoot = RetentionFailureDirectory(canonicalEvidenceDirectory);
+        if (Directory.Exists(markerRoot))
+        {
+            Directory.Delete(markerRoot, recursive: true);
+        }
+
+        Directory.CreateDirectory(markerRoot);
         using PortReservationSet internalGrpcReservations = PortReservationSet.Reserve(DaprInternalGrpcAppIds.Length);
         List<string> arguments =
         [
@@ -161,7 +184,8 @@ public sealed class LiveContinuityAspireE2eTests
             rebuildEraser = recoveryReadModels;
             using EventStoreDurableStateProbe durableState = new(
                 application.GetEndpoint("eventstore-dapr-cli", "http"));
-            string evidenceDirectory = Path.Combine(RepositoryRoot(), "TestResults", "live-recovery", runId);
+            string evidenceDirectory = canonicalEvidenceDirectory;
+            string retentionFailureDirectory = markerRoot;
             LiveRecoveryValidationOptions options = new()
             {
                 Enabled = true,
@@ -210,10 +234,19 @@ public sealed class LiveContinuityAspireE2eTests
                 InstalledDaprRuntimeVersion(),
                 ResolvedAspireVersion(),
                 ResolvedAppHostVersion());
+            FileRecoveryValidationEvidenceRetentionFailureSink retentionFailures = new(
+                retentionFailureDirectory,
+                evidenceDirectory);
             DateTimeOffset attemptStartedAtUtc = DateTimeOffset.UtcNow;
             InMemoryAuditWriter audit = new();
             InMemoryOperatorAlertSink alerts = new();
-            ContinuityDrillCoordinator coordinator = new(runner, audit, alerts, new SystemClock(), evidence);
+            ContinuityDrillCoordinator coordinator = new(
+                runner,
+                audit,
+                alerts,
+                new SystemClock(),
+                evidence,
+                retentionFailures);
 
             ContinuityDrillOutcome outcome = await coordinator
                 .RunAllScenariosAsync(tenantRef, runId, workflowToken)
@@ -275,7 +308,8 @@ public sealed class LiveContinuityAspireE2eTests
                 audit,
                 alerts,
                 new SystemClock(),
-                evidence);
+                evidence,
+                retentionFailures);
 
             ProjectionRebuildOutcome rebuildOutcome = await rebuildCoordinator
                 .RunAllAsync(tenantRef, [options.DatasetRef], runId, workflowToken)
@@ -304,7 +338,8 @@ public sealed class LiveContinuityAspireE2eTests
                 audit,
                 alerts,
                 new SystemClock(),
-                evidence);
+                evidence,
+                retentionFailures);
 
             ScopedOutageDegradationOutcome scopedOutcome = await scopedCoordinator
                 .RunAllScenariosAsync(tenantRef, runId, workflowToken)
@@ -322,26 +357,10 @@ public sealed class LiveContinuityAspireE2eTests
             // The sinks' failure path writes a SECOND report+manifest pair for a substituted Unmeasurable report, so an
             // exact count turned a genuine sink/manifest error into an opaque count mismatch. Require at least one pair
             // per scenario and let the manifest contents (asserted below and by the gate) carry the real verdict.
-            Directory.Exists(evidenceDirectory)
-                .ShouldBeTrue($"No live-recovery evidence was written to '{evidenceDirectory}'.");
-            string[] reportFiles = Directory.GetFiles(evidenceDirectory, "*.report.json");
-            string[] manifestFiles = Directory.GetFiles(evidenceDirectory, "*.manifest.json");
-            reportFiles.Length.ShouldBeGreaterThanOrEqualTo(expectedEvidence);
-            manifestFiles.Length.ShouldBe(
-                reportFiles.Length,
-                "Every retained report must have a matching evidence manifest.");
-            List<RecoveryValidationEvidenceManifest> manifests = [];
-            foreach (string manifestFile in manifestFiles)
-            {
-                await using FileStream stream = File.OpenRead(manifestFile);
-                RecoveryValidationEvidenceManifest? manifest = await JsonSerializer
-                    .DeserializeAsync<RecoveryValidationEvidenceManifest>(
-                        stream,
-                        new JsonSerializerOptions(JsonSerializerDefaults.Web),
-                        cancellationToken)
-                    .ConfigureAwait(true);
-                manifests.Add(manifest.ShouldNotBeNull());
-            }
+            // Directory enumeration itself can be the canonical failure. Treat an unreadable/disappearing root as
+            // zero evidence so the independent attempt summary below is still retained with a failed outcome.
+            string[] reportFiles = CanonicalEvidenceFiles(evidenceDirectory, "*.report.json");
+            string[] manifestFiles = CanonicalEvidenceFiles(evidenceDirectory, "*.manifest.json");
 
             DateTimeOffset attemptCompletedAtUtc = DateTimeOffset.UtcNow;
 
@@ -373,9 +392,11 @@ public sealed class LiveContinuityAspireE2eTests
                 [LiveRecoveryValidationJobs.ScopedOutage] = scopedOutcome.Alerted,
             };
 
-            // Retain the run's own observations beside its manifests so the release gate can be re-evaluated in a
-            // separate job from a fresh process. Alert counts and sweep completion are facts only this run can see;
-            // every threshold they are judged by comes from the release path's policy, not from here.
+            // Retain the run's own observations in the independent workflow-owned side-channel root so the release
+            // gate can still reconstruct total canonical-directory loss from a fresh process. Alert counts and sweep
+            // completion are facts only this run can see; every threshold they are judged by comes from the release
+            // path's policy, not from here. The workflow stages this root once under `retention-failures`, yielding
+            // exactly one uploaded summary without depending on the canonical evidence directory.
             // Enabled mirrors the configured option rather than a literal, and the summary is written BEFORE the
             // outcome assertions below: hand-setting it to true, then only reaching the write on a fully passing run,
             // made the gate's `live_validation_disabled` and `latest_attempt_incomplete` branches unreachable from any
@@ -389,11 +410,39 @@ public sealed class LiveContinuityAspireE2eTests
                 LatestAttemptCompletedSuccessfully = attemptSucceeded,
                 AlertsDeliveredByJob = alertsDeliveredByJob,
             };
+            Directory.CreateDirectory(retentionFailureDirectory);
             await File.WriteAllTextAsync(
-                    Path.Combine(evidenceDirectory, LiveRecoveryValidationAttemptSummary.FileName),
+                    Path.Combine(retentionFailureDirectory, LiveRecoveryValidationAttemptSummary.FileName),
                     JsonSerializer.Serialize(summary, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }),
                     cancellationToken)
                 .ConfigureAwait(true);
+
+            // Parse normal evidence only after the independent summary is durable. A truncated, unreadable, or
+            // concurrently removed canonical file must not erase the attempt-level observations needed by replay.
+            List<RecoveryValidationEvidenceManifest> manifests = [];
+            foreach (string manifestFile in manifestFiles)
+            {
+                await using FileStream stream = File.OpenRead(manifestFile);
+                RecoveryValidationEvidenceManifest? manifest = await JsonSerializer
+                    .DeserializeAsync<RecoveryValidationEvidenceManifest>(
+                        stream,
+                        new JsonSerializerOptions(JsonSerializerDefaults.Web),
+                        cancellationToken)
+                    .ConfigureAwait(true);
+                manifests.Add(manifest.ShouldNotBeNull());
+            }
+
+            // Load through the SAME bounded loader the out-of-process gate uses. A separate ad-hoc deserialize loop
+            // here applied neither the size bound nor the closed-schema rejection, so identical retained bytes could be
+            // accepted in-process and rejected after upload — and a corrupt marker threw instead of becoming an invalid
+            // candidate the gate can classify.
+            IReadOnlyList<RecoveryValidationEvidenceRetentionFailureMarker?> retentionFailureMarkers =
+                await LiveRecoveryEvidenceGateReplayTests
+                    .LoadRetentionFailureMarkersFromDirectoryAsync(
+                        retentionFailureDirectory,
+                        new JsonSerializerOptions(JsonSerializerDefaults.Web),
+                        cancellationToken)
+                    .ConfigureAwait(true);
 
             // Asserted only after the summary is durable, so a breached/missed/divergent sweep still leaves retained
             // evidence for the independent gate to reject rather than failing here with nothing written.
@@ -422,6 +471,7 @@ public sealed class LiveContinuityAspireE2eTests
                 CompletedAtUtc: attemptCompletedAtUtc,
                 LatestAttemptCompletedSuccessfully: attemptSucceeded,
                 Evidence: manifests,
+                RetentionFailureMarkers: retentionFailureMarkers,
                 AlertsDeliveredByJob: alertsDeliveredByJob);
 
             // Evaluate at a real wall-clock instant rather than reusing attemptCompletedAtUtc. Passing the completion
@@ -444,6 +494,11 @@ public sealed class LiveContinuityAspireE2eTests
                 DateTimeOffset.UtcNow);
             gate.IsStopShip.ShouldBeFalse(string.Join(',', gate.StopShipReasons));
             gate.TargetDeviationReasons.ShouldBeEmpty();
+
+            reportFiles.Length.ShouldBeGreaterThanOrEqualTo(expectedEvidence);
+            manifestFiles.Length.ShouldBe(
+                reportFiles.Length,
+                "Every retained report must have a matching evidence manifest.");
         }
         finally
         {
@@ -489,6 +544,47 @@ public sealed class LiveContinuityAspireE2eTests
         }
 
         return locator;
+    }
+
+    private static string RetentionFailureDirectory(string evidenceDirectory)
+    {
+        string? configured = Environment.GetEnvironmentVariable(RetentionFailureDirectoryVariable);
+        if (string.IsNullOrWhiteSpace(configured) || !Path.IsPathFullyQualified(configured))
+        {
+            throw new InvalidOperationException(
+                $"{RetentionFailureDirectoryVariable} must name an absolute workflow-owned runner-temp directory.");
+        }
+
+        string markerRoot = Path.GetFullPath(configured);
+        string evidenceRoot = Path.GetFullPath(evidenceDirectory);
+        if (markerRoot.StartsWith(
+            evidenceRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar,
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"{RetentionFailureDirectoryVariable} must be outside the canonical evidence directory.");
+        }
+
+        return markerRoot;
+    }
+
+    private static string[] CanonicalEvidenceFiles(string evidenceDirectory, string pattern)
+    {
+        try
+        {
+            return Directory.Exists(evidenceDirectory)
+                ? Directory.GetFiles(evidenceDirectory, pattern)
+                : [];
+        }
+        catch (IOException)
+        {
+            return [];
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return [];
+        }
     }
 
     internal static TimeSpan RecoveryWorkflowTimeout(string? configured)

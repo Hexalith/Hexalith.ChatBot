@@ -443,12 +443,106 @@ public static class LiveRecoveryValidationArchitectureTests
             source.ShouldContain("HEXALITH_CHATBOT_RECOVERY_MAX_EVIDENCE_AGE_HOURS: \"192\"");
             source.ShouldContain("retention-days: 30");
 
+            int liveInvocations = CountOccurrences(
+                source,
+                "LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate");
+            // Every assertion below compares a count against `liveInvocations`, so a workflow that stopped invoking
+            // the live test at all would satisfy all of them with zero -- the guard would disappear at exactly the
+            // moment the env var and the staging step were dropped wholesale.
+            liveInvocations.ShouldBeGreaterThan(
+                0,
+                $"{workflow} must invoke the live recovery test, or every marker-retention assertion below is vacuous.");
+            CountOccurrences(
+                source,
+                "HEXALITH_CHATBOT_RECOVERY_RETENTION_FAILURE_DIR: ${{ runner.temp }}/live-recovery-retention-failures")
+                .ShouldBe(
+                    liveInvocations,
+                    $"{workflow} must give every live recovery invocation an independent runner-temp marker root.");
+            CountOccurrences(
+                source,
+                "cp -R \"$RETENTION_FAILURE_ROOT\"/. TestResults/retention-failures/")
+                .ShouldBe(
+                    liveInvocations,
+                    $"{workflow} must always stage every invocation's marker root under its uploaded TestResults artifact.");
+
+            string[] finalizationBlocks = source
+                .Split("\n      - name: ", StringSplitOptions.None)
+                .Where(static block => block.Contains(
+                    "cp -R \"$RETENTION_FAILURE_ROOT\"/. TestResults/retention-failures/",
+                    StringComparison.Ordinal))
+                .ToArray();
+            finalizationBlocks.Length.ShouldBe(liveInvocations);
+            foreach (string block in finalizationBlocks)
+            {
+                int markerStage = block.IndexOf(
+                    "cp -R \"$RETENTION_FAILURE_ROOT\"/. TestResults/retention-failures/",
+                    StringComparison.Ordinal);
+                foreach (string failureProneCommand in new[]
+                {
+                    "jq \\",
+                    "mv \"$temporary_path\"",
+                    "cp \"$ATTEMPT_PATH\"",
+                    "cp \"$sanitized\"",
+                })
+                {
+                    int commandIndex = block.IndexOf(failureProneCommand, StringComparison.Ordinal);
+                    if (commandIndex >= 0)
+                    {
+                        markerStage.ShouldBeLessThan(
+                            commandIndex,
+                            $"{workflow} must stage retention failures before '{failureProneCommand}' can abort finalization.");
+                    }
+                }
+
+                // "Always stage" is a claim about the step's WHOLE condition, not only about the presence of its
+                // copy command or of the `always()` token. Counting the command alone stayed green with `always() &&`
+                // removed; asserting `Contains("if: always()")` alone stayed green with
+                // `if: always() && steps.recovery.outcome == 'success'`, which skips staging on exactly the failed
+                // producer run whose marker the gate needs. Read the condition line and reject any conjunct that
+                // reintroduces success-dependence.
+                string condition = block
+                    .Split('\n')
+                    .Select(static line => line.Trim())
+                    .FirstOrDefault(static line => line.StartsWith("if:", StringComparison.Ordinal))
+                    ?? string.Empty;
+                condition.StartsWith("if: always()", StringComparison.Ordinal)
+                    .ShouldBeTrue($"{workflow} must stage retention failures even when the recovery producer step fails.");
+                foreach (string successDependence in new[] { ".outcome", "success()", "failure()", ".result" })
+                {
+                    condition.Contains(successDependence, StringComparison.Ordinal)
+                        .ShouldBeFalse(
+                            $"{workflow} must not make retention staging depend on '{successDependence}': "
+                            + $"the condition was '{condition}'.");
+                }
+
+                // The producer writes markers to HEXALITH_CHATBOT_RECOVERY_RETENTION_FAILURE_DIR and the staging step
+                // reads RETENTION_FAILURE_ROOT. Two independent literals with a `[[ -d ]]` guard meant a drifted value
+                // staged nothing at all, silently, and the job fell back to ordinary missing_evidence.
+                block.Contains("RETENTION_FAILURE_ROOT: ${{ runner.temp }}/live-recovery-retention-failures", StringComparison.Ordinal)
+                    .ShouldBeTrue($"{workflow} must stage the same runner-temp root the producer was given.");
+
+                // The copy must not be able to abort the always-run finalization commands staged after it.
+                block.Contains("cp -R \"$RETENTION_FAILURE_ROOT\"/. TestResults/retention-failures/ || true", StringComparison.Ordinal)
+                    .ShouldBeTrue($"{workflow} must keep marker staging non-blocking under `set -e`.");
+            }
+
             // Least privilege on the destructive lane and its gate.
             source.ShouldContain("permissions:\n      contents: read");
         }
 
         // The release must depend on the independent gate, not merely on the run that produced the evidence.
         release.ShouldContain("- live-recovery-evidence-gate");
+
+        string liveE2e = ReadProjectFile(
+            "tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs");
+        liveE2e.ShouldContain(
+            "Path.Combine(retentionFailureDirectory, LiveRecoveryValidationAttemptSummary.FileName)");
+        liveE2e.ShouldNotContain(
+            "Path.Combine(evidenceDirectory, LiveRecoveryValidationAttemptSummary.FileName)");
+        string replay = ReadProjectFile(
+            "tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveRecoveryEvidenceGateReplayTests.cs");
+        replay.ShouldContain("Path.Combine(artifactRoot, RetentionFailuresDirectoryName)");
+        replay.ShouldContain("SearchOption.TopDirectoryOnly");
 
         // Three layers, because each is strictly weaker than the lane's real requirement:
         //   1. the document parses (catches the double-hyphen digraph that broke every lane), and

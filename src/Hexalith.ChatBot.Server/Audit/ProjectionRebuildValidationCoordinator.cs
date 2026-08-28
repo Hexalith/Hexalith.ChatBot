@@ -42,7 +42,8 @@ internal sealed class ProjectionRebuildValidationCoordinator(
     IAuditWriter auditWriter,
     IOperatorAlertSink operatorAlertSink,
     ISystemClock clock,
-    IRecoveryValidationEvidenceSink evidenceSink)
+    IRecoveryValidationEvidenceSink evidenceSink,
+    IRecoveryValidationEvidenceRetentionFailureSink retentionFailureSink)
 {
     /// <summary>Creates a coordinator with the inert product evidence sink for existing non-live callers.</summary>
     internal ProjectionRebuildValidationCoordinator(
@@ -50,7 +51,30 @@ internal sealed class ProjectionRebuildValidationCoordinator(
         IAuditWriter auditWriter,
         IOperatorAlertSink operatorAlertSink,
         ISystemClock clock)
-        : this(rebuildDriver, auditWriter, operatorAlertSink, clock, DiscardingRecoveryValidationEvidenceSink.Instance)
+        : this(
+            rebuildDriver,
+            auditWriter,
+            operatorAlertSink,
+            clock,
+            DiscardingRecoveryValidationEvidenceSink.Instance,
+            DiscardingRecoveryValidationEvidenceRetentionFailureSink.Instance)
+    {
+    }
+
+    /// <summary>Creates a coordinator with an inert retention-failure side channel.</summary>
+    internal ProjectionRebuildValidationCoordinator(
+        IProjectionRebuildDriver rebuildDriver,
+        IAuditWriter auditWriter,
+        IOperatorAlertSink operatorAlertSink,
+        ISystemClock clock,
+        IRecoveryValidationEvidenceSink evidenceSink)
+        : this(
+            rebuildDriver,
+            auditWriter,
+            operatorAlertSink,
+            clock,
+            evidenceSink,
+            DiscardingRecoveryValidationEvidenceRetentionFailureSink.Instance)
     {
     }
 
@@ -272,10 +296,23 @@ internal sealed class ProjectionRebuildValidationCoordinator(
                 // this fallback write must still degrade to the unmeasurable report even if the token is cancelled
                 // mid-fallback. The caller still receives an unmeasurable stop-ship report when the retaining sink is
                 // unavailable.
+                await TryRecordRetentionFailureAsync(unmeasurable).ConfigureAwait(false);
             }
 
             return unmeasurable;
         }
+    }
+
+    private async ValueTask TryRecordRetentionFailureAsync(ProjectionRebuildReport report)
+    {
+        await RecoveryValidationEvidenceRetentionFailureRecorder.TryRecordAsync(
+                retentionFailureSink,
+                clock,
+                report.StartedAtUtc,
+                report.CorrelationId,
+                LiveRecoveryValidationJobs.ProjectionRebuild,
+                RecoveryValidationEvidenceRetentionFailureMarker.ProjectionRebuildScenario)
+            .ConfigureAwait(false);
     }
 
     private async ValueTask<bool> AuditThenAlertAsync(

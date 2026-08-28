@@ -25,6 +25,198 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
     }
 
     [Fact]
+    public void ValidSameRunMarkerClassifiesMissingJobAsEvidenceRetentionFailure()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        RecoveryValidationEvidenceManifest[] withoutRebuild = complete.Evidence
+            .Where(manifest => manifest.JobId != LiveRecoveryValidationJobs.ProjectionRebuild)
+            .ToArray();
+        RecoveryValidationEvidenceRetentionFailureMarker marker = Marker(
+            LiveRecoveryValidationJobs.ProjectionRebuild,
+            RecoveryValidationEvidenceRetentionFailureMarker.ProjectionRebuildScenario);
+
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(complete with
+        {
+            Evidence = withoutRebuild,
+            RetentionFailureMarkers = [marker],
+        });
+
+        decision.StopShipReasons.ShouldContain("projection-rebuild:evidence_retention_failed");
+        decision.StopShipReasons.ShouldNotContain("projection-rebuild:missing_evidence");
+    }
+
+    [Fact]
+    public void MissingJobWithoutValidMarkerRetainsOrdinaryMissingEvidence()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        RecoveryValidationEvidenceManifest[] withoutRebuild = complete.Evidence
+            .Where(manifest => manifest.JobId != LiveRecoveryValidationJobs.ProjectionRebuild)
+            .ToArray();
+
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(complete with { Evidence = withoutRebuild });
+
+        decision.StopShipReasons.ShouldContain("projection-rebuild:missing_evidence");
+        decision.StopShipReasons.ShouldNotContain("projection-rebuild:evidence_retention_failed");
+        decision.StopShipReasons.ShouldNotContain("projection-rebuild:unalerted_breach");
+    }
+
+    [Fact]
+    public void ValidMarkersClassifyAndRequireAlertsForAllThreeJobsWithoutEvidence()
+    {
+        LiveRecoveryValidationEvidenceAttempt attempt = CompleteAttempt() with
+        {
+            Evidence = [],
+            RetentionFailureMarkers =
+            [
+                Marker(LiveRecoveryValidationJobs.Continuity, ContinuityDrillScenarios.EventStoreOutage),
+                Marker(
+                    LiveRecoveryValidationJobs.ProjectionRebuild,
+                    RecoveryValidationEvidenceRetentionFailureMarker.ProjectionRebuildScenario),
+                Marker(LiveRecoveryValidationJobs.ScopedOutage, ScopedOutageDependencies.Graph),
+            ],
+        };
+
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(attempt);
+
+        foreach (string jobId in LiveRecoveryValidationJobs.All)
+        {
+            decision.StopShipReasons.ShouldContain($"{jobId}:evidence_retention_failed");
+            decision.StopShipReasons.ShouldContain($"{jobId}:unalerted_breach");
+            decision.StopShipReasons.ShouldNotContain($"{jobId}:missing_evidence");
+        }
+    }
+
+    [Fact]
+    public void JobMarkerClassifiesPartialEvidenceEvenWhenItsScenarioAlreadyHasEvidence()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        RecoveryValidationEvidenceManifest[] partial = complete.Evidence
+            .Where(manifest => manifest.Scenario != ContinuityDrillScenarios.M365SubscriptionFailure)
+            .ToArray();
+
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(complete with
+        {
+            Evidence = partial,
+            RetentionFailureMarkers =
+            [Marker(LiveRecoveryValidationJobs.Continuity, ContinuityDrillScenarios.EventStoreOutage)],
+        });
+
+        decision.StopShipReasons.ShouldContain("continuity:evidence_retention_failed");
+        decision.StopShipReasons.ShouldContain("continuity:incomplete_scenario_set");
+        decision.StopShipReasons.ShouldContain("continuity:unalerted_breach");
+    }
+
+    [Fact]
+    public void JobMarkerRemainsStopShipBesideCompleteEvidenceAndDeliveredAlertIsAccounted()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        RecoveryValidationEvidenceRetentionFailureMarker marker = Marker(
+            LiveRecoveryValidationJobs.ProjectionRebuild,
+            RecoveryValidationEvidenceRetentionFailureMarker.ProjectionRebuildScenario);
+        Dictionary<string, int> alerts = new(complete.AlertsDeliveredByJob, StringComparer.Ordinal)
+        {
+            [LiveRecoveryValidationJobs.ProjectionRebuild] = 1,
+        };
+
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(complete with
+        {
+            RetentionFailureMarkers = [marker],
+            AlertsDeliveredByJob = alerts,
+        });
+
+        decision.StopShipReasons.ShouldContain("projection-rebuild:evidence_retention_failed");
+        decision.StopShipReasons.ShouldNotContain("projection-rebuild:incomplete_scenario_set");
+        decision.StopShipReasons.ShouldNotContain("projection-rebuild:unalerted_breach");
+    }
+
+    [Fact]
+    public void MalformedFutureNonUtcUnknownJobAndRunMismatchedMarkersFailClosed()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        RecoveryValidationEvidenceManifest[] withoutRebuild = complete.Evidence
+            .Where(manifest => manifest.JobId != LiveRecoveryValidationJobs.ProjectionRebuild)
+            .ToArray();
+        RecoveryValidationEvidenceRetentionFailureMarker valid = Marker(
+            LiveRecoveryValidationJobs.ProjectionRebuild,
+            RecoveryValidationEvidenceRetentionFailureMarker.ProjectionRebuildScenario);
+        (string Case, RecoveryValidationEvidenceRetentionFailureMarker Marker)[] invalidMarkers =
+        [
+            ("unknown schema", valid with { SchemaVersion = "unknown-schema" }),
+            ("unknown kind", valid with { Kind = "recovery-evidence" }),
+            ("unknown reason code", valid with { ReasonCode = "evidence_missing" }),
+            ("future failure instant", valid with { FailedAtUtc = Now + TimeSpan.FromMinutes(1) }),
+            (
+                "non-UTC offset",
+                valid with { FailedAtUtc = new DateTimeOffset(2026, 8, 1, 11, 58, 30, TimeSpan.FromHours(1)) }),
+            ("unknown job", valid with { JobId = "unknown-job" }),
+            ("run mismatch", valid with { RunId = "01ARZ3NDEKTSV4RRFFQ69G5FAX" }),
+
+            // The closed per-job scenario vocabulary is the whole reason a marker cannot carry caller-controlled free
+            // text. Both a foreign-job token and arbitrary text must be rejected on the SCENARIO clause alone: the job
+            // id here is legitimate, so no earlier clause can absorb the case.
+            ("cross-job scenario", valid with { Scenario = ContinuityDrillScenarios.EventStoreOutage }),
+            ("free-text scenario", valid with { Scenario = "dataset-recovery-baseline" }),
+            // Both instants sit inside the policy freshness window, so each isolates one attempt-window clause: a
+            // failure claimed before the run began, and one claimed after the run had already completed.
+            ("failure before the attempt started", valid with { FailedAtUtc = Now - TimeSpan.FromMinutes(3) }),
+            ("failure after the attempt completed", valid with { FailedAtUtc = Now - TimeSpan.FromSeconds(30) }),
+        ];
+
+        foreach ((string caseName, RecoveryValidationEvidenceRetentionFailureMarker invalid) in invalidMarkers)
+        {
+            LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(complete with
+            {
+                Evidence = withoutRebuild,
+                RetentionFailureMarkers = [invalid],
+            });
+
+            decision.StopShipReasons.ShouldContain("retention_failure_marker_invalid", $"case: {caseName}");
+            decision.StopShipReasons.ShouldContain("projection-rebuild:missing_evidence", $"case: {caseName}");
+            decision.StopShipReasons.ShouldNotContain(
+                "projection-rebuild:evidence_retention_failed",
+                $"case: {caseName}");
+        }
+    }
+
+    [Fact]
+    public void UnreadableAndAbsentMarkerCollectionsFailClosed()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+
+        // The artifact loader materializes `null` for every marker file it retained but could not read as a marker
+        // (oversized, unmapped members, malformed, raced). A silently skipped null would let a tampered or truncated
+        // proof-of-sink-loss artifact evaluate as if it had never been retained.
+        LiveRecoveryValidationEvidenceGateDecision withNullEntry = Evaluate(complete with
+        {
+            RetentionFailureMarkers = [null],
+        });
+        withNullEntry.StopShipReasons.ShouldContain("retention_failure_marker_invalid");
+
+        LiveRecoveryValidationEvidenceGateDecision withNullList = Evaluate(complete with
+        {
+            RetentionFailureMarkers = null!,
+        });
+        withNullList.StopShipReasons.ShouldContain("retention_failure_marker_invalid");
+    }
+
+    [Fact]
+    public void DuplicateMarkersForOneScenarioFailClosedWhileTheFirstStillClassifies()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        RecoveryValidationEvidenceRetentionFailureMarker marker = Marker(
+            LiveRecoveryValidationJobs.ProjectionRebuild,
+            RecoveryValidationEvidenceRetentionFailureMarker.ProjectionRebuildScenario);
+
+        LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(complete with
+        {
+            RetentionFailureMarkers = [marker, marker],
+        });
+
+        decision.StopShipReasons.ShouldContain("projection-rebuild:evidence_retention_failed");
+        decision.StopShipReasons.ShouldContain("retention_failure_marker_invalid");
+    }
+
+    [Fact]
     public void DisabledIncompleteFutureStaleAndMissingCoverageStatesFailClosed()
     {
         LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
@@ -575,8 +767,16 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
             CompletedAtUtc: Now - TimeSpan.FromMinutes(1),
             LatestAttemptCompletedSuccessfully: true,
             Evidence: evidence,
+            RetentionFailureMarkers: [],
             AlertsDeliveredByJob: new Dictionary<string, int>(StringComparer.Ordinal));
     }
+
+    private static RecoveryValidationEvidenceRetentionFailureMarker Marker(string jobId, string scenario)
+        => RecoveryValidationEvidenceRetentionFailureMarker.Create(
+            RunId,
+            jobId,
+            scenario,
+            Now - TimeSpan.FromSeconds(90));
 
     private static RecoveryValidationEvidenceManifest Manifest(string jobId, string scenario)
     {

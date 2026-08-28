@@ -109,7 +109,10 @@ public sealed class LiveRecoveryValidationOptionsDependencyInjectionTests
         using ServiceProvider provider = services.BuildServiceProvider();
 
         LiveRecoveryValidationOptions options = provider.GetRequiredService<IOptions<LiveRecoveryValidationOptions>>().Value;
+        IRecoveryValidationEvidenceRetentionFailureSink retentionFailureSink =
+            provider.GetRequiredService<IRecoveryValidationEvidenceRetentionFailureSink>();
 
         options.Enabled.ShouldBeFalse();
+        retentionFailureSink.ShouldBeSameAs(DiscardingRecoveryValidationEvidenceRetentionFailureSink.Instance);
     }
 }

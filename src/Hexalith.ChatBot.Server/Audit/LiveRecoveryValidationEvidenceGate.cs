@@ -72,6 +72,33 @@ internal static class LiveRecoveryValidationEvidenceGate
             stopShip.Add("attempt_alert_counts_unreadable");
         }
 
+        IReadOnlyList<RecoveryValidationEvidenceRetentionFailureMarker?> markerCandidates =
+            attempt.RetentionFailureMarkers ?? [];
+        if (attempt.RetentionFailureMarkers is null || markerCandidates.Any(static marker => marker is null))
+        {
+            stopShip.Add("retention_failure_marker_invalid");
+        }
+
+        List<RecoveryValidationEvidenceRetentionFailureMarker> validRetentionFailureMarkers = [];
+        HashSet<(string JobId, string Scenario)> markerKeys = [];
+        foreach (RecoveryValidationEvidenceRetentionFailureMarker marker in markerCandidates.OfType<RecoveryValidationEvidenceRetentionFailureMarker>())
+        {
+            bool valid = marker.IsValid() &&
+                string.Equals(marker.RunId, attempt.RunId, StringComparison.Ordinal) &&
+                marker.FailedAtUtc >= attempt.StartedAtUtc &&
+                marker.FailedAtUtc <= evaluatedAtUtc &&
+                evaluatedAtUtc - marker.FailedAtUtc <= policy.MaximumEvidenceAge &&
+                (attempt.CompletedAtUtc is null || marker.FailedAtUtc <= attempt.CompletedAtUtc.Value) &&
+                markerKeys.Add((marker.JobId, marker.Scenario));
+            if (!valid)
+            {
+                stopShip.Add("retention_failure_marker_invalid");
+                continue;
+            }
+
+            validRetentionFailureMarkers.Add(marker);
+        }
+
         if (!attempt.Enabled)
         {
             stopShip.Add("live_validation_disabled");
@@ -212,6 +239,7 @@ internal static class LiveRecoveryValidationEvidenceGate
             attempt,
             evidence,
             invalidManifests,
+            validRetentionFailureMarkers,
             LiveRecoveryValidationJobs.Continuity,
             ContinuityDrillScenarios.All,
             stopShip,
@@ -222,6 +250,7 @@ internal static class LiveRecoveryValidationEvidenceGate
             attempt,
             evidence,
             invalidManifests,
+            validRetentionFailureMarkers,
             LiveRecoveryValidationJobs.ProjectionRebuild,
             configuredDatasets.ToHashSet(StringComparer.Ordinal),
             stopShip,
@@ -232,6 +261,7 @@ internal static class LiveRecoveryValidationEvidenceGate
             attempt,
             evidence,
             invalidManifests,
+            validRetentionFailureMarkers,
             LiveRecoveryValidationJobs.ScopedOutage,
             ScopedOutageDependencies.All,
             stopShip,
@@ -348,6 +378,7 @@ internal static class LiveRecoveryValidationEvidenceGate
         LiveRecoveryValidationEvidenceAttempt attempt,
         IReadOnlyList<RecoveryValidationEvidenceManifest> allEvidence,
         IReadOnlySet<RecoveryValidationEvidenceManifest> invalidManifests,
+        IReadOnlyList<RecoveryValidationEvidenceRetentionFailureMarker> retentionFailureMarkers,
         string jobId,
         IReadOnlySet<string> expectedScenarios,
         List<string> stopShip,
@@ -358,21 +389,38 @@ internal static class LiveRecoveryValidationEvidenceGate
         RecoveryValidationEvidenceManifest[] evidence = allEvidence
             .Where(manifest => string.Equals(manifest.JobId, jobId, StringComparison.Ordinal))
             .ToArray();
+        RecoveryValidationEvidenceRetentionFailureMarker[] jobMarkers = retentionFailureMarkers
+            .Where(marker => string.Equals(marker.JobId, jobId, StringComparison.Ordinal))
+            .ToArray();
         counts[jobId] = evidence.Length;
-        if (evidence.Length == 0)
+        if (jobMarkers.Length > 0)
         {
-            stopShip.Add($"{jobId}:missing_evidence");
-            return;
+            // A valid marker is job-level proof that an unmeasurable report could not be retained. It remains
+            // stop-ship even if another scenario produced partial evidence or canonical evidence contradictorily
+            // appears complete; neither state can erase the proven sink-loss event.
+            stopShip.Add($"{jobId}:{RecoveryValidationEvidenceRetentionFailureMarker.EvidenceRetentionFailedReasonCode}");
         }
 
-        HashSet<string> actualScenarios = evidence.Select(static manifest => manifest.Scenario).ToHashSet(StringComparer.Ordinal);
-        if (evidence.Length != expectedScenarios.Count || !actualScenarios.SetEquals(expectedScenarios))
+        if (evidence.Length == 0)
         {
-            stopShip.Add($"{jobId}:incomplete_scenario_set");
+            if (jobMarkers.Length == 0)
+            {
+                stopShip.Add($"{jobId}:missing_evidence");
+            }
+        }
+        else
+        {
+            HashSet<string> actualScenarios = evidence.Select(static manifest => manifest.Scenario).ToHashSet(StringComparer.Ordinal);
+            if (evidence.Length != expectedScenarios.Count || !actualScenarios.SetEquals(expectedScenarios))
+            {
+                stopShip.Add($"{jobId}:incomplete_scenario_set");
+            }
         }
 
         IReadOnlyDictionary<string, double> canonicalTargets = CanonicalTargetsFor(jobId);
-        int alertsRequired = 0;
+        // Every marker represents one unmeasurable report whose producer follows audit-then-alert. Count it even when
+        // no manifest survived, so the marker path cannot bypass the existing delivery-accounting stop-ship.
+        int alertsRequired = jobMarkers.Length;
         foreach (RecoveryValidationEvidenceManifest manifest in evidence)
         {
             // Already stop-shipped as `{job}:invalid_evidence` by the caller (which computed Validate() once for

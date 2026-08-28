@@ -175,7 +175,9 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: Story 12.15 evidence sink
 severity: medium
 reason: **[MEDIUM · evidence sink] Double-fail `RetainAsync` returns unmeasurable with no disk artifact.** Caller gets `EvidenceRetentionFailedDeviation`; gate sees `missing_evidence`. **Release-claim impact:** retention-failure reason is not reconstructable from artifacts alone. **Owner:** Story 12.15 evidence sink. **Closure evidence:** best-effort side channel, or accept and document that missing_evidence covers total sink loss.
-status: open
+status: done 2026-08-28
+resolution: resolved by sweep bundle dw-retention-failure-marker
+resolution-undo: b71f090ec811d8068dd7424e412d83c32baf6450975c0a62f208b21297d18f7d 2026-08-28 7374617475733a206f70656e
 decision: 2026-08-27 Write fallback marker — Emit a bounded metadata-only retention-failure sentinel through an independent workflow-owned path and teach the gate to distinguish total sink loss.
 decision: 2026-08-26 Write fallback marker — Emit a bounded metadata-only retention-failure sentinel through an independent workflow-owned path and teach the gate to distinguish total sink loss.
 
@@ -1098,6 +1100,22 @@ status: open
 origin: review-budget-followup
 location: n/a
 source_spec: `spec-release-workflow-safety.md`
+severity: low
+reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260827-211223-44d7; this entry preserves the lingering recommendation for a deliberate later review.
+status: open
+
+### DW-132: A cancelled workflow token makes the coordinators' filtered catch rethrow the canonical evidence-write failure, so a deadline-killed live recovery run produces neither an unmeasurable report nor a ret
+origin: spec-deferred cb692f129574
+location: src/Hexalith.ChatBot.Server/Audit/ContinuityDrillCoordinator.cs:231
+source_spec: `spec-retention-failure-marker.md`
+severity: medium
+reason: All three coordinators guard the retention fallback with `catch (Exception) when (cancellationToken is { IsCancellationRequested: false })`. The filter predates this story and is deliberately documented, and the marker is specified to be emitted only after both `RecordAsync` attempts fail -- so the current behaviour is spec-conformant. It nonetheless leaves the workflow-timeout path (the 265m SIGINT ladder in ci.yml / release.yml, i.e. the failure most likely to lose evidence) with no artifact-level reason at all: the gate reports plain `<job>:missing_evidence`, which is the exact reconstruction gap this story closed for the non-cancelled path.
+status: open
+
+### DW-133: Follow-up review still recommended for dw-retention-failure-marker after the damping cap was spent
+origin: review-budget-followup
+location: n/a
+source_spec: `spec-retention-failure-marker.md`
 severity: low
 reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260827-211223-44d7; this entry preserves the lingering recommendation for a deliberate later review.
 status: open

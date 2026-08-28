@@ -55,12 +55,14 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
         List<string> callOrder = [];
         OrderTrackingAuditWriter auditWriter = new(callOrder);
         OrderTrackingAlertSink alertSink = new(callOrder);
+        CapturingMarkerSink markers = new(callOrder);
         ContinuityDrillCoordinator coordinator = new(
             new ContinuityRunner(),
             auditWriter,
             alertSink,
             new WormAuditTestData.FixedClock(Now),
-            new OrderTrackingSink(callOrder, new ThrowingSink()));
+            new OrderTrackingSink(callOrder, new ThrowingSink()),
+            markers);
 
         ContinuityDrillReport report = await coordinator.RunScenarioAndRecordAsync(
             ContinuityDrillScenarios.EventStoreOutage,
@@ -76,6 +78,11 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
         // retention-failure report, not the pre-retention met measurement.
         auditWriter.Envelopes.ShouldHaveSingleItem();
         alertSink.Alerts.ShouldHaveSingleItem().Kind.ShouldBe(OperatorAlertKind.ContinuityDrillTargetMissed);
+        RecoveryValidationEvidenceRetentionFailureMarker marker = markers.Markers.ShouldHaveSingleItem();
+        marker.RunId.ShouldBe(Correlation);
+        marker.JobId.ShouldBe(LiveRecoveryValidationJobs.Continuity);
+        marker.Scenario.ShouldBe(ContinuityDrillScenarios.EventStoreOutage);
+        markers.ReceivedCancelableToken.ShouldBeFalse();
         AssertRetentionRanBeforeAuditThenAlert(callOrder);
     }
 
@@ -85,12 +92,14 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
         List<string> callOrder = [];
         OrderTrackingAuditWriter auditWriter = new(callOrder);
         OrderTrackingAlertSink alertSink = new(callOrder);
+        CapturingMarkerSink markers = new(callOrder);
         ProjectionRebuildValidationCoordinator coordinator = new(
             new RebuildDriver(),
             auditWriter,
             alertSink,
             new WormAuditTestData.FixedClock(Now),
-            new OrderTrackingSink(callOrder, new ThrowingSink()));
+            new OrderTrackingSink(callOrder, new ThrowingSink()),
+            markers);
 
         ProjectionRebuildReport report = await coordinator.RunValidationAndRecordAsync(
             TestTenant,
@@ -104,6 +113,9 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
         report.ExecutionAssertions.ShouldNotBeNull();
         auditWriter.Envelopes.ShouldHaveSingleItem();
         alertSink.Alerts.ShouldHaveSingleItem().Kind.ShouldBe(OperatorAlertKind.ProjectionRebuildValidationFailed);
+        RecoveryValidationEvidenceRetentionFailureMarker marker = markers.Markers.ShouldHaveSingleItem();
+        marker.JobId.ShouldBe(LiveRecoveryValidationJobs.ProjectionRebuild);
+        marker.Scenario.ShouldBe(RecoveryValidationEvidenceRetentionFailureMarker.ProjectionRebuildScenario);
         AssertRetentionRanBeforeAuditThenAlert(callOrder);
     }
 
@@ -113,12 +125,14 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
         List<string> callOrder = [];
         OrderTrackingAuditWriter auditWriter = new(callOrder);
         OrderTrackingAlertSink alertSink = new(callOrder);
+        CapturingMarkerSink markers = new(callOrder);
         ScopedOutageDegradationValidationCoordinator coordinator = new(
             new OutageDriver(),
             auditWriter,
             alertSink,
             new WormAuditTestData.FixedClock(Now),
-            new OrderTrackingSink(callOrder, new ThrowingSink()));
+            new OrderTrackingSink(callOrder, new ThrowingSink()),
+            markers);
 
         ScopedOutageDegradationReport report = await coordinator.RunScenarioAndRecordAsync(
             ScopedOutageDependencies.CommandExecution,
@@ -132,7 +146,61 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
         report.ExecutionAssertions.ShouldNotBeNull();
         auditWriter.Envelopes.ShouldHaveSingleItem();
         alertSink.Alerts.ShouldHaveSingleItem().Kind.ShouldBe(OperatorAlertKind.ScopedOutageDegradationBreach);
+        RecoveryValidationEvidenceRetentionFailureMarker marker = markers.Markers.ShouldHaveSingleItem();
+        marker.JobId.ShouldBe(LiveRecoveryValidationJobs.ScopedOutage);
+        marker.Scenario.ShouldBe(ScopedOutageDependencies.CommandExecution);
         AssertRetentionRanBeforeAuditThenAlert(callOrder);
+    }
+
+    [Fact]
+    public async Task SuccessfulFallbackEvidenceWriteDoesNotEmitMarker()
+    {
+        FallbackSucceedsSink evidence = new();
+        CapturingMarkerSink markers = new();
+        ContinuityDrillCoordinator coordinator = new(
+            new ContinuityRunner(),
+            new InMemoryAuditWriter(),
+            new InMemoryOperatorAlertSink(),
+            new WormAuditTestData.FixedClock(Now),
+            evidence,
+            markers);
+
+        ContinuityDrillReport report = await coordinator.RunScenarioAndRecordAsync(
+            ContinuityDrillScenarios.EventStoreOutage,
+            TestTenant,
+            Correlation,
+            TestContext.Current.CancellationToken);
+
+        report.Verdict.ShouldBe(ContinuityDrillVerdicts.Unmeasurable);
+        evidence.Attempts.ShouldBe(2);
+        evidence.Retained.ShouldHaveSingleItem().Deviations
+            .ShouldContain(ContinuityDrillReport.EvidenceRetentionFailedDeviation);
+        markers.Markers.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task MarkerSinkFailureDoesNotMaskUnmeasurableReportOrAuditAlert()
+    {
+        InMemoryAuditWriter audit = new();
+        InMemoryOperatorAlertSink alerts = new();
+        ContinuityDrillCoordinator coordinator = new(
+            new ContinuityRunner(),
+            audit,
+            alerts,
+            new WormAuditTestData.FixedClock(Now),
+            new ThrowingSink(),
+            new ThrowingMarkerSink());
+
+        ContinuityDrillReport report = await coordinator.RunScenarioAndRecordAsync(
+            ContinuityDrillScenarios.EventStoreOutage,
+            TestTenant,
+            Correlation,
+            TestContext.Current.CancellationToken);
+
+        report.Verdict.ShouldBe(ContinuityDrillVerdicts.Unmeasurable);
+        report.Deviations.ShouldContain(ContinuityDrillReport.EvidenceRetentionFailedDeviation);
+        audit.Envelopes.ShouldHaveSingleItem();
+        alerts.Alerts.ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -142,12 +210,14 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
         // fixed-clock fixtures above cannot exercise (there, clock.UtcNow always equals the measurement's
         // StartedAtUtc, so `endedAtUtc < report.StartedAtUtc` is never true, merely equal).
         DateTimeOffset futureStartedAtUtc = Now + TimeSpan.FromMinutes(5);
+        CapturingMarkerSink markers = new();
         ContinuityDrillCoordinator coordinator = new(
             new FutureStartedContinuityRunner(futureStartedAtUtc),
             new InMemoryAuditWriter(),
             new InMemoryOperatorAlertSink(),
             new WormAuditTestData.FixedClock(Now),
-            new ThrowingSink());
+            new ThrowingSink(),
+            markers);
 
         ContinuityDrillReport report = await coordinator.RunScenarioAndRecordAsync(
             ContinuityDrillScenarios.EventStoreOutage,
@@ -159,6 +229,65 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
         report.StartedAtUtc.ShouldBe(futureStartedAtUtc);
         report.EndedAtUtc.ShouldBe(futureStartedAtUtc);
         (report.EndedAtUtc >= report.StartedAtUtc).ShouldBeTrue("EndedAtUtc must never precede StartedAtUtc, even under clock skew.");
+        markers.Markers.ShouldHaveSingleItem().FailedAtUtc.ShouldBe(futureStartedAtUtc);
+    }
+
+    [Fact]
+    public async Task MarkerClockFailureDoesNotMaskUnmeasurableReportOrAuditAlert()
+    {
+        InMemoryAuditWriter audit = new();
+        InMemoryOperatorAlertSink alerts = new();
+        CapturingMarkerSink markers = new();
+        ContinuityDrillCoordinator coordinator = new(
+            new ContinuityRunner(),
+            audit,
+            alerts,
+            new ClockThrowingOnlyDuringMarkerCreation(),
+            new ThrowingSink(),
+            markers);
+
+        ContinuityDrillReport report = await coordinator.RunScenarioAndRecordAsync(
+            ContinuityDrillScenarios.EventStoreOutage,
+            TestTenant,
+            Correlation,
+            TestContext.Current.CancellationToken);
+
+        report.Verdict.ShouldBe(ContinuityDrillVerdicts.Unmeasurable);
+        markers.Markers.ShouldBeEmpty();
+        audit.Envelopes.ShouldHaveSingleItem();
+        alerts.Alerts.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task NeverCompletingMarkerSinkIsBoundedBeforeAuditAndAlert()
+    {
+        List<string> callOrder = [];
+        OrderTrackingAuditWriter audit = new(callOrder);
+        OrderTrackingAlertSink alerts = new(callOrder);
+        NeverCompletingMarkerSink markers = new(callOrder);
+        ContinuityDrillCoordinator coordinator = new(
+            new ContinuityRunner(),
+            audit,
+            alerts,
+            new WormAuditTestData.FixedClock(Now),
+            new OrderTrackingSink(callOrder, new ThrowingSink()),
+            markers);
+
+        Task<ContinuityDrillReport> run = coordinator.RunScenarioAndRecordAsync(
+            ContinuityDrillScenarios.EventStoreOutage,
+            TestTenant,
+            Correlation,
+            TestContext.Current.CancellationToken).AsTask();
+        Task winner = await Task.WhenAny(
+            run,
+            Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+
+        winner.ShouldBe(run, "the best-effort marker sink must not delay audit and alert indefinitely.");
+        (await run.ConfigureAwait(true)).Verdict.ShouldBe(ContinuityDrillVerdicts.Unmeasurable);
+        markers.Attempts.ShouldBe(1);
+        audit.Envelopes.ShouldHaveSingleItem();
+        alerts.Alerts.ShouldHaveSingleItem();
+        AssertRetentionRanBeforeAuditThenAlert(callOrder);
     }
 
     /// <summary>
@@ -173,8 +302,11 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
         callOrder.ShouldContain("audit");
         callOrder.ShouldContain("alert");
         int lastRetain = callOrder.LastIndexOf("retain");
+        int marker = callOrder.IndexOf("retention-marker");
         int audit = callOrder.IndexOf("audit");
         int alert = callOrder.IndexOf("alert");
+        (marker > lastRetain).ShouldBeTrue("the marker must run only after both evidence writes fail.");
+        (audit > marker).ShouldBeTrue("audit must run after the best-effort retention marker attempt.");
         (audit > lastRetain).ShouldBeTrue("audit must run after every retention attempt, not before.");
         (alert > audit).ShouldBeTrue("alert must run after audit, not before or interleaved ahead of it.");
     }
@@ -218,6 +350,85 @@ public sealed class RecoveryValidationEvidenceSinkCoordinatorTests
 
         public ValueTask RecordAsync(ScopedOutageDegradationReport report, CancellationToken cancellationToken)
             => throw new IOException("evidence unavailable");
+    }
+
+    private sealed class FallbackSucceedsSink : IRecoveryValidationEvidenceSink
+    {
+        public int Attempts { get; private set; }
+
+        public List<ContinuityDrillReport> Retained { get; } = [];
+
+        public ValueTask RecordAsync(ContinuityDrillReport report, CancellationToken cancellationToken)
+        {
+            Attempts++;
+            if (Attempts == 1)
+            {
+                throw new IOException("canonical evidence unavailable");
+            }
+
+            Retained.Add(report);
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask RecordAsync(ProjectionRebuildReport report, CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
+
+        public ValueTask RecordAsync(ScopedOutageDegradationReport report, CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
+    }
+
+    private sealed class CapturingMarkerSink(List<string>? callOrder = null) :
+        IRecoveryValidationEvidenceRetentionFailureSink
+    {
+        public List<RecoveryValidationEvidenceRetentionFailureMarker> Markers { get; } = [];
+
+        public bool ReceivedCancelableToken { get; private set; }
+
+        public ValueTask RecordAsync(
+            RecoveryValidationEvidenceRetentionFailureMarker marker,
+            CancellationToken cancellationToken)
+        {
+            callOrder?.Add("retention-marker");
+            ReceivedCancelableToken = cancellationToken.CanBeCanceled;
+            Markers.Add(marker);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class ThrowingMarkerSink : IRecoveryValidationEvidenceRetentionFailureSink
+    {
+        public ValueTask RecordAsync(
+            RecoveryValidationEvidenceRetentionFailureMarker marker,
+            CancellationToken cancellationToken)
+            => throw new IOException("retention marker unavailable");
+    }
+
+    private sealed class NeverCompletingMarkerSink(List<string> callOrder) :
+        IRecoveryValidationEvidenceRetentionFailureSink
+    {
+        private readonly TaskCompletionSource _never = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int Attempts { get; private set; }
+
+        public ValueTask RecordAsync(
+            RecoveryValidationEvidenceRetentionFailureMarker marker,
+            CancellationToken cancellationToken)
+        {
+            callOrder.Add("retention-marker");
+            Attempts++;
+            cancellationToken.CanBeCanceled.ShouldBeFalse();
+            return new ValueTask(_never.Task);
+        }
+    }
+
+    private sealed class ClockThrowingOnlyDuringMarkerCreation : ISystemClock
+    {
+        private int _reads;
+
+        public DateTimeOffset UtcNow
+            => Interlocked.Increment(ref _reads) == 3
+                ? throw new InvalidOperationException("marker timestamp unavailable")
+                : Now;
     }
 
     /// <summary>

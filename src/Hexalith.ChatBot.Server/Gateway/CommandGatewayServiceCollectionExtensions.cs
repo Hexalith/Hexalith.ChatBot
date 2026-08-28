@@ -79,6 +79,8 @@ internal static class CommandGatewayServiceCollectionExtensions
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<LiveRecoveryValidationOptions>, LiveRecoveryValidationOptionsValidator>();
         services.TryAddSingleton<IRecoveryValidationEvidenceSink>(DiscardingRecoveryValidationEvidenceSink.Instance);
+        services.TryAddSingleton<IRecoveryValidationEvidenceRetentionFailureSink>(
+            DiscardingRecoveryValidationEvidenceRetentionFailureSink.Instance);
 
         // The real dispatcher routes admitted commands into EventStore through the public gateway client. The
         // submission must authenticate WITHOUT a forged user JWT, so it goes through the chatbot's OWN DAPR

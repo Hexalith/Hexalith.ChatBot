@@ -161,6 +161,7 @@ jobs:
         timeout-minutes: 300
         env:
           HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: "265"
+          HEXALITH_CHATBOT_RECOVERY_RETENTION_FAILURE_DIR: ${{ runner.temp }}/live-recovery-retention-failures
         run: |
           set -euo pipefail
           timeout --signal=INT --kill-after=15m 16800s \
@@ -176,9 +177,17 @@ jobs:
         if: always()
         env:
           ATTEMPT_PATH: ${{ runner.temp }}/workflow-attempt/producer-attempt.json
+          RETENTION_FAILURE_ROOT: ${{ runner.temp }}/live-recovery-retention-failures
           PRODUCER_OUTCOME: ${{ steps.recovery.outcome }}
         run: |
           set -euo pipefail
+          # Stage the independent marker/summary root before jq/mv/cp finalization can fail.
+          mkdir -p TestResults/retention-failures
+          if [[ -d "$RETENTION_FAILURE_ROOT" ]]; then
+            # Non-blocking under `set -e`: staging runs FIRST, so a copy failure here must not abort the
+            # always-run finalization commands below that previously always executed.
+            cp -R "$RETENTION_FAILURE_ROOT"/. TestResults/retention-failures/ || true
+          fi
           temporary_path="${ATTEMPT_PATH}.tmp"
           jq \
             --arg completedAtUtc "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \

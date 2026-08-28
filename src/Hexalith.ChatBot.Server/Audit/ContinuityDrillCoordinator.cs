@@ -38,7 +38,8 @@ internal sealed class ContinuityDrillCoordinator(
     IAuditWriter auditWriter,
     IOperatorAlertSink operatorAlertSink,
     ISystemClock clock,
-    IRecoveryValidationEvidenceSink evidenceSink)
+    IRecoveryValidationEvidenceSink evidenceSink,
+    IRecoveryValidationEvidenceRetentionFailureSink retentionFailureSink)
 {
     /// <summary>Creates a coordinator with the inert product evidence sink for existing non-live callers.</summary>
     internal ContinuityDrillCoordinator(
@@ -46,7 +47,30 @@ internal sealed class ContinuityDrillCoordinator(
         IAuditWriter auditWriter,
         IOperatorAlertSink operatorAlertSink,
         ISystemClock clock)
-        : this(scenarioRunner, auditWriter, operatorAlertSink, clock, DiscardingRecoveryValidationEvidenceSink.Instance)
+        : this(
+            scenarioRunner,
+            auditWriter,
+            operatorAlertSink,
+            clock,
+            DiscardingRecoveryValidationEvidenceSink.Instance,
+            DiscardingRecoveryValidationEvidenceRetentionFailureSink.Instance)
+    {
+    }
+
+    /// <summary>Creates a coordinator with an inert retention-failure side channel.</summary>
+    internal ContinuityDrillCoordinator(
+        IContinuityDrillScenarioRunner scenarioRunner,
+        IAuditWriter auditWriter,
+        IOperatorAlertSink operatorAlertSink,
+        ISystemClock clock,
+        IRecoveryValidationEvidenceSink evidenceSink)
+        : this(
+            scenarioRunner,
+            auditWriter,
+            operatorAlertSink,
+            clock,
+            evidenceSink,
+            DiscardingRecoveryValidationEvidenceRetentionFailureSink.Instance)
     {
     }
 
@@ -238,10 +262,23 @@ internal sealed class ContinuityDrillCoordinator(
                 // this fallback write must still degrade to the unmeasurable report even if the token is cancelled
                 // mid-fallback. The caller still receives an unmeasurable stop-ship report when the retaining sink is
                 // unavailable.
+                await TryRecordRetentionFailureAsync(unmeasurable).ConfigureAwait(false);
             }
 
             return unmeasurable;
         }
+    }
+
+    private async ValueTask TryRecordRetentionFailureAsync(ContinuityDrillReport report)
+    {
+        await RecoveryValidationEvidenceRetentionFailureRecorder.TryRecordAsync(
+                retentionFailureSink,
+                clock,
+                report.StartedAtUtc,
+                report.CorrelationId,
+                LiveRecoveryValidationJobs.Continuity,
+                report.Scenario)
+            .ConfigureAwait(false);
     }
 
     private async ValueTask<bool> AuditThenAlertAsync(

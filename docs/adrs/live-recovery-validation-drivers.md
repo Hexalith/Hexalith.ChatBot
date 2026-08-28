@@ -83,6 +83,31 @@ The rebuild driver receives narrow source/evidence interfaces rather than a gene
 
 The canonical reports remain the verdict authority. A metadata-only manifest adds run/scenario ULIDs, UTC bounds, repository/topology/configuration versions, safe tenant and dataset locators, configured corpus volume, per-scenario exercised dataset volume, driver mode, fault/restore/cleanup actions, expected/observed scope, measurements and targets, verdict dimensions, assertions, coverage, deviations, durable residual identifiers, and raw-artifact locators.
 
+When both the canonical report write and its unmeasurable fallback write fail, the coordinator makes exactly one
+best-effort write through an independent retention-failure sink before auditing and alerting. Its sentinel is diagnostic
+proof of evidence-sink loss, never recovery evidence. The closed `chatbot.recovery-retention-failure.v1` schema carries
+only kind `evidence-retention-failure`, the canonical run ULID, a closed job/scenario pair, a UTC failure instant, and
+reason `evidence_retention_failed`; it contains no tenant, path, payload, claim, exception, stack trace, credential, or
+secret. Marker failure cannot mask or alter the returned `unmeasurable` report.
+
+The live sink writes deterministic `{job}-{scenario}.retention-failure.json` files through sibling temporary files and
+atomic replacement into a workflow-owned runner-temp root that is path-disjoint from the canonical evidence directory.
+Same-scenario retries overwrite in place without exposing a truncated prior marker, serialized size and path containment
+are bounded, and every live producer stages that independent root before other failure-prone finalization commands under
+the uploaded `TestResults/retention-failures` artifact directory. The attempt summary is written once into that same
+independent root rather than the canonical evidence directory, so total canonical-directory loss remains replayable.
+Every live producer invocation receives that root through the required
+`HEXALITH_CHATBOT_RECOVERY_RETENTION_FAILURE_DIR` environment variable, which must name an absolute directory outside
+the canonical evidence directory; the live E2E fails fast rather than silently writing markers nowhere, so a local
+Tier-3 run must set it too. A marker write is bounded at one second and is abandoned rather than allowed to delay audit
+and alert. The replay loader reads markers only from the designated uploaded directory, rejects oversized or unmapped JSON, and
+maps bounded file races/read failures to invalid candidates. The external gate accepts a marker only when its schema
+vocabulary is exact, its run matches the attempt, its job/scenario is closed, and its UTC timestamp is neither future,
+stale, nor outside the attempt window. Any valid same-run job marker yields `{job}:evidence_retention_failed` even beside
+partial or contradictorily complete evidence, and it participates in the existing alert-delivery accounting. Absent or
+rejected markers preserve ordinary `{job}:missing_evidence`, while malformed markers also yield the stable
+`retention_failure_marker_invalid` stop-ship reason. Neither outcome relaxes stop-ship behavior.
+
 Release validation remains per commit and non-cancelling: every pushed SHA retains its own recovery producer and
 independent evidence-gate verdict even when runs finish out of order. Publication eligibility is a separate final
 decision. Immediately before semantic-release on `main`, the workflow fetches remote `main`; only an exact match

@@ -15,4 +15,5 @@ internal sealed record LiveRecoveryValidationEvidenceAttempt(
     DateTimeOffset? CompletedAtUtc,
     bool LatestAttemptCompletedSuccessfully,
     IReadOnlyList<RecoveryValidationEvidenceManifest> Evidence,
+    IReadOnlyList<RecoveryValidationEvidenceRetentionFailureMarker?> RetentionFailureMarkers,
     IReadOnlyDictionary<string, int> AlertsDeliveredByJob);
