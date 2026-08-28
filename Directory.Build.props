@@ -6,9 +6,15 @@
     <HexalithTenantsRoot Condition="'$(HexalithTenantsRoot)' == '' and Exists('$(MSBuildThisFileDirectory)references\Hexalith.Tenants\src\Hexalith.Tenants.Contracts')">$(MSBuildThisFileDirectory)references\Hexalith.Tenants</HexalithTenantsRoot>
     <HexalithFrontComposerRoot Condition="'$(HexalithFrontComposerRoot)' == '' and Exists('$(MSBuildThisFileDirectory)references\Hexalith.FrontComposer\src\Hexalith.FrontComposer.Contracts')">$(MSBuildThisFileDirectory)references\Hexalith.FrontComposer</HexalithFrontComposerRoot>
     <HexalithProjectsRoot Condition="'$(HexalithProjectsRoot)' == '' and Exists('$(MSBuildThisFileDirectory)references\Hexalith.Projects\src\Hexalith.Projects.Contracts')">$(MSBuildThisFileDirectory)references\Hexalith.Projects</HexalithProjectsRoot>
+    <HexalithMemoriesRoot Condition="'$(HexalithMemoriesRoot)' == '' and Exists('$(MSBuildThisFileDirectory)references\Hexalith.Memories\src\Hexalith.Memories.Contracts')">$(MSBuildThisFileDirectory)references\Hexalith.Memories</HexalithMemoriesRoot>
     <HexalithPartiesRoot Condition="'$(HexalithPartiesRoot)' == '' and Exists('$(MSBuildThisFileDirectory)references\Hexalith.Parties\src\Hexalith.Parties.Contracts')">$(MSBuildThisFileDirectory)references\Hexalith.Parties</HexalithPartiesRoot>
     <HexalithFoldersRoot Condition="'$(HexalithFoldersRoot)' == '' and Exists('$(MSBuildThisFileDirectory)references\Hexalith.Folders\src\Hexalith.Folders.Contracts')">$(MSBuildThisFileDirectory)references\Hexalith.Folders</HexalithFoldersRoot>
     <HexalithConversationsRoot Condition="'$(HexalithConversationsRoot)' == '' and Exists('$(MSBuildThisFileDirectory)references\Hexalith.Conversations\src\Hexalith.Conversations.Contracts')">$(MSBuildThisFileDirectory)references\Hexalith.Conversations</HexalithConversationsRoot>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <UseHexalithProjectReferences Condition="'$(UseHexalithProjectReferences)' == '' and '$(Configuration)' == 'Debug'">true</UseHexalithProjectReferences>
+    <UseHexalithProjectReferences Condition="'$(UseHexalithProjectReferences)' == ''">false</UseHexalithProjectReferences>
   </PropertyGroup>
 
   <PropertyGroup>

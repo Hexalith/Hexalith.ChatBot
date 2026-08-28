@@ -24,6 +24,13 @@ internal interface IProjectConversationProjectionStore
         ProjectConversationAttachmentSetView attachments,
         CancellationToken cancellationToken = default);
 
+    Task<ProjectConversationIngestionSource?> GetIngestionSourceAsync(
+        string tenantId,
+        string projectId,
+        string associationId,
+        string intakeId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<ProjectConversationAttachmentStorageCandidate>> GetAttachmentStorageCandidatesAsync(
         string tenantId,
         string intakeId,

@@ -126,6 +126,34 @@ public static class AppHostTopologyTests
     }
 
     [Fact]
+    public static void AppHostShouldComposeMemoriesOwnedInfrastructureAndPassOnlyServiceEndpointsToChatBot()
+    {
+        string source = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
+        string project = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "src",
+            "Hexalith.ChatBot.AppHost",
+            "Hexalith.ChatBot.AppHost.csproj"));
+
+        project.ShouldContain("Hexalith.Memories.Aspire.csproj");
+        project.ShouldContain("Hexalith.Memories.Server.csproj");
+        source.ShouldContain("AddHexalithMemoriesSearchIndexServer");
+        source.ShouldContain("AddDaprComponent(\"pubsub\", \"pubsub.redis\")");
+        source.ShouldContain("ChatBotAspireModule.ResolveRedisHost");
+        source.ShouldContain("secretstore.memories.yaml");
+        source.ShouldContain("llm.memories.yaml");
+        source.ShouldContain("WithReference(memories.Server)");
+        source.ShouldContain("WaitFor(memories.Server)");
+        source.ShouldContain("ChatBot__Memories__UseLiveBacking");
+        source.ShouldContain("ChatBot__Memories__Endpoint");
+        source.ShouldContain("ChatBot__Projects__Endpoint");
+        source.ShouldContain("ChatBot__Projects__ApiToken");
+        source.ShouldContain("secret: true");
+        source.ShouldNotContain("ConnectionStrings__redis");
+        source.ShouldNotContain("ConnectionStrings__falkordb");
+    }
+
+    [Fact]
     public static void AppHostShouldWireTheUiSurfaceWithoutADaprSidecarOrAclChange()
     {
         string appHost = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));

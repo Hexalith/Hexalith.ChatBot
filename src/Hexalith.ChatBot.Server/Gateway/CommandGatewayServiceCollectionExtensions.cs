@@ -3,6 +3,7 @@ using Hexalith.ChatBot.Server.Adapters.Conversations;
 using Hexalith.ChatBot.Server.Adapters.Folders;
 using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Adapters.Mailbox;
+using Hexalith.ChatBot.Server.Adapters.Memories;
 using Hexalith.ChatBot.Server.Adapters.Parties;
 using Hexalith.ChatBot.Server.Adapters.Projects;
 using Hexalith.ChatBot.Server.Association.Scoring;
@@ -155,6 +156,9 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<TaskIntentProjectionHandler>();
         services.TryAddSingleton<ApprovalProjectionHandler>();
         services.TryAddSingleton<IMailboxMessageContentSource, UnavailableMailboxMessageContentSource>();
+        services.TryAddSingleton<IMemoriesCaseResolver, UnavailableMemoriesCaseResolver>();
+        services.TryAddSingleton<IIngestionBindingWorkflowRuntime, UnavailableIngestionBindingWorkflowRuntime>();
+        services.TryAddSingleton<IIngestionBindingCoordinator, DaprIngestionBindingCoordinator>();
         services.AddChatBotCorrectionPropagation();
         services.AddChatBotPeriodicEnforcement();
 
@@ -332,15 +336,23 @@ internal static class CommandGatewayServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.RemoveAll<ICorrectionPropagationWorkflowRuntime>();
+        services.RemoveAll<IIngestionBindingWorkflowRuntime>();
         services.AddSingleton<ICorrectionPropagationWorkflowRuntime, DaprCorrectionPropagationWorkflowRuntime>();
+        services.AddSingleton<IIngestionBindingWorkflowRuntime, DaprIngestionBindingWorkflowRuntime>();
         services.AddDaprWorkflow(static options =>
         {
             options.RegisterWorkflow<CorrectionPropagationWorkflow>();
+            options.RegisterWorkflow<IngestionBindingWorkflow>();
             options.RegisterActivity<CorrectionPropagationScopeActivity>();
+            options.RegisterActivity<CorrectionPropagationResolveCaseActivity>();
             options.RegisterActivity<CorrectionPropagationStartActivity>();
             options.RegisterActivity<CorrectionPropagationRunStoreActivity>();
             options.RegisterActivity<CorrectionPropagationCompleteActivity>();
             options.RegisterActivity<CorrectionPropagationDelayActivity>();
+            options.RegisterActivity<IngestionBindingResolveActivity>();
+            options.RegisterActivity<IngestionBindingStartSourceActivity>();
+            options.RegisterActivity<IngestionBindingGetStatusActivity>();
+            options.RegisterActivity<IngestionBindingFinalizeActivity>();
         });
 
         return services;

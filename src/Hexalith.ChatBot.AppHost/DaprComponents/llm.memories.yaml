@@ -1,0 +1,11 @@
+# DAPR Conversation Component -- Memories Server (Local Development)
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: llm
+spec:
+  type: conversation.echo
+  version: v1
+  metadata:
+    - name: responseCacheTTL
+      value: "0s"

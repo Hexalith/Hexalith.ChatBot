@@ -4,7 +4,10 @@ internal sealed record CorrectionPropagationActivityResult(
     string StoreKey,
     string Outcome,
     string? FailureReasonCode,
-    DateTimeOffset CompletedAtUtc)
+    DateTimeOffset CompletedAtUtc,
+    string? RemoteOperationId = null)
 {
     public bool IsSuccessful => string.Equals(Outcome, "success", StringComparison.Ordinal);
+
+    public bool IsPending => string.Equals(Outcome, "awaiting-completion", StringComparison.Ordinal);
 }

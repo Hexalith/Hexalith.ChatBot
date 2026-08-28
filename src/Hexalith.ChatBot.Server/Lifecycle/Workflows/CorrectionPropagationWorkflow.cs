@@ -29,6 +29,12 @@ internal sealed class CorrectionPropagationWorkflow
                 request,
                 _retryOptions);
 
+        public Task<string> CallResolveCorrectedCaseAsync(CorrectionPropagationRequest request)
+            => context.CallActivityAsync<string>(
+                nameof(CorrectionPropagationResolveCaseActivity),
+                request,
+                _retryOptions);
+
         public Task CallStartAsync(CorrectionPropagationStartInput input)
             => context.CallActivityAsync<bool>(
                 nameof(CorrectionPropagationStartActivity),
@@ -40,6 +46,9 @@ internal sealed class CorrectionPropagationWorkflow
                 nameof(CorrectionPropagationRunStoreActivity),
                 input,
                 _retryOptions);
+
+        public Task CreateTimerAsync(TimeSpan delay)
+            => context.CreateTimer(delay);
 
         public Task CallCompleteAsync(CorrectionPropagationRequest request)
             => context.CallActivityAsync<bool>(

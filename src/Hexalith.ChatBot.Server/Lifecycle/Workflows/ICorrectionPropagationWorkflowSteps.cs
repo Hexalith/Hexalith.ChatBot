@@ -10,9 +10,13 @@ internal interface ICorrectionPropagationWorkflowSteps
 
     Task<IReadOnlyList<string>> CallScopeAsync(CorrectionPropagationRequest request);
 
+    Task<string> CallResolveCorrectedCaseAsync(CorrectionPropagationRequest request);
+
     Task CallStartAsync(CorrectionPropagationStartInput input);
 
     Task<CorrectionPropagationActivityResult> CallStoreAsync(CorrectionPropagationStoreActivityInput input);
+
+    Task CreateTimerAsync(TimeSpan delay);
 
     Task CallCompleteAsync(CorrectionPropagationRequest request);
 

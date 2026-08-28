@@ -6,8 +6,10 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using CommunityToolkit.Aspire.Hosting.Dapr;
 using Hexalith.ChatBot.AppHost.Aspire;
 using Hexalith.EventStore.Aspire;
+using Hexalith.Memories.Aspire;
 using Microsoft.Extensions.Configuration;
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
@@ -33,6 +35,33 @@ IResourceBuilder<ProjectResource> chatBot = builder.AddProject<Projects.Hexalith
 
 HexalithChatBotResources resources = builder.AddHexalithChatBot(eventStore, tenants, chatBot, accessControlConfigPath);
 
+// Memories owns its vector/graph infrastructure. The ChatBot topology supplies only the local component files and
+// receives the server endpoint; no Redis/FalkorDB connection string crosses the service boundary.
+// Memories' EventStore subscriber is compiled against the canonical Dapr component name "pubsub". Give its sidecar
+// an alias over the same validated local Redis broker; ChatBot keeps its own "chatbot-pubsub" name and topic scope.
+IResourceBuilder<IDaprComponentResource> memoriesPubSub = builder
+    .AddDaprComponent("pubsub", "pubsub.redis")
+    .WithMetadata("redisHost", ChatBotAspireModule.ResolveRedisHost(builder.Configuration));
+HexalithMemoriesSearchIndexServerResources memories = builder.AddHexalithMemoriesSearchIndexServer(
+    resources.EventStore,
+    memoriesPubSub,
+    ResolveDaprConfigPath(builder.AppHostDirectory, "secretstore.memories.yaml"),
+    ResolveDaprConfigPath(builder.AppHostDirectory, "llm.memories.yaml"));
+EndpointReference memoriesHttp = memories.Server.GetEndpoint("http");
+ReferenceExpression memoriesEndpoint = ReferenceExpression.Create($"{memoriesHttp}");
+
+string projectsEndpoint = builder.Configuration["ChatBot:Projects:Endpoint"]
+    ?? throw new InvalidOperationException(
+        "ChatBot:Projects:Endpoint must identify the authorization-filtered Projects server when the live Memories topology is enabled.");
+string projectsApiToken = builder.Configuration["ChatBot:Projects:ApiToken"]
+    ?? throw new InvalidOperationException(
+        "ChatBot:Projects:ApiToken must supply the service bearer token for authorization-filtered Project Context reads.");
+IResourceBuilder<ParameterResource> projectsApiTokenParameter = builder.AddParameter(
+    "projects-api-token",
+    () => projectsApiToken,
+    publishValueAsDefault: false,
+    secret: true);
+
 // Live durable read path: project the governed-operation read model into the DAPR chatbot-statestore, and
 // subscribe to the tenant-prefixed topic the EventStore publishes governed events on
 // ({tenantId}.chatbot.events). The primary M0 projection remains tenant-alpha. The local realm also carries an
@@ -40,6 +69,12 @@ HexalithChatBotResources resources = builder.AddHexalithChatBot(eventStore, tena
 // second projection subscription remains an M1 concern.
 _ = chatBot
     .WithExternalHttpEndpoints()
+    .WithReference(memories.Server)
+    .WaitFor(memories.Server)
+    .WithEnvironment("ChatBot__Memories__UseLiveBacking", "true")
+    .WithEnvironment("ChatBot__Memories__Endpoint", memoriesEndpoint)
+    .WithEnvironment("ChatBot__Projects__Endpoint", projectsEndpoint)
+    .WithEnvironment("ChatBot__Projects__ApiToken", projectsApiTokenParameter)
     .WithEnvironment("ChatBot__UseDaprStateStores", "true")
     .WithEnvironment("ChatBot__UseDaprWorkflowRuntime", "true")
     .WithEnvironment("ChatBot__UsePeriodicEnforcementRuntime", "true")

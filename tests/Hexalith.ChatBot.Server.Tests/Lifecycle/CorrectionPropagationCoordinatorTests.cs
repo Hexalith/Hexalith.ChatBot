@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Server.Association;
+using Hexalith.ChatBot.Server.Adapters.Projects;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
@@ -113,6 +114,61 @@ public sealed class CorrectionPropagationCoordinatorTests
         writer.CommandTypes.Count(static type => type == nameof(AcknowledgeMailboxAssociationCorrectionStoreInvalidated)).ShouldBe(5);
         writer.CommandTypes.Last().ShouldBe(nameof(CompleteMailboxAssociationCorrectionPropagation));
         alerts.Alerts.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task M2PendingVectorStatusIsPolledWithoutPrematureStoreAcknowledgement()
+    {
+        RecordingWriter writer = new();
+        RecordingAlertSink alerts = new();
+        PendingThenSuccessActivity vector = new(CorrectionPropagationStoreKeys.VectorReindex, StartedAt.AddSeconds(5));
+        ICorrectionPropagationStoreActivity[] activities =
+        [
+            .. CorrectionPropagationStoreKeys.RequiredM0.Select(static key => new SucceedingActivity(key, StartedAt.AddSeconds(5))),
+            vector,
+        ];
+
+        await ExecuteWorkflowActivitiesAsync(
+            Request(),
+            new CorrectionPropagationActivityCatalog(activities),
+            writer,
+            alerts,
+            new RecordingAuditWriter());
+
+        vector.CallCount.ShouldBe(2);
+        vector.SawRemoteOperationOnSecondCall.ShouldBeTrue();
+        writer.CommandTypes.Count(static type => type == nameof(AcknowledgeMailboxAssociationCorrectionStoreInvalidated)).ShouldBe(5);
+        writer.CommandTypes.Last().ShouldBe(nameof(CompleteMailboxAssociationCorrectionPropagation));
+        alerts.Alerts.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task CorrectedCaseResolutionShouldDurablyRetryBeforeStartingPropagation()
+    {
+        RecordingWriter writer = new();
+        var statuses = new List<CorrectionPropagationWorkflowProgress>();
+        ActivityBackedSteps steps = new(
+            new CorrectionPropagationActivityCatalog(
+                CorrectionPropagationStoreKeys.RequiredM0.Select(static key => new SucceedingActivity(key, StartedAt.AddSeconds(5)))),
+            writer,
+            new RecordingAlertSink(),
+            new RecordingAuditWriter(),
+            statuses)
+        {
+            ResolveFailuresRemaining = 1,
+        };
+
+        CorrectionPropagationWorkflowResult result = await CorrectionPropagationWorkflowRunner
+            .RunAsync(Request(), steps)
+            .ConfigureAwait(true);
+
+        result.Status.ShouldBe(CorrectionPropagationWorkflowStatuses.Completed);
+        steps.ResolveCalls.ShouldBe(2);
+        steps.TimerDelays.ShouldContain(TimeSpan.FromSeconds(30));
+        statuses.ShouldContain(static status =>
+            status.Status == CorrectionPropagationWorkflowStatuses.Retrying
+            && status.LastFailureCode == CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable);
+        writer.CommandTypes.First().ShouldBe(nameof(StartMailboxAssociationCorrectionPropagation));
     }
 
     [Fact]
@@ -267,6 +323,12 @@ public sealed class CorrectionPropagationCoordinatorTests
         RecordingAuditWriter audit,
         List<CorrectionPropagationWorkflowProgress> statuses) : ICorrectionPropagationWorkflowSteps
     {
+        public int ResolveCalls { get; private set; }
+
+        public int ResolveFailuresRemaining { get; set; }
+
+        public List<TimeSpan> TimerDelays { get; } = [];
+
         public DateTimeOffset CurrentUtc => StartedAt.AddSeconds(1);
 
         public void SetStatus(CorrectionPropagationWorkflowProgress progress) => statuses.Add(progress);
@@ -274,11 +336,29 @@ public sealed class CorrectionPropagationCoordinatorTests
         public async Task<IReadOnlyList<string>> CallScopeAsync(CorrectionPropagationRequest request)
             => await new CorrectionPropagationScopeActivity(catalog).RunAsync(null!, request).ConfigureAwait(false);
 
+        public Task<string> CallResolveCorrectedCaseAsync(CorrectionPropagationRequest request)
+        {
+            ResolveCalls++;
+            if (ResolveFailuresRemaining > 0)
+            {
+                ResolveFailuresRemaining--;
+                throw new InvalidOperationException(ProjectsMemoriesCaseResolver.ContextUnavailableReasonCode);
+            }
+
+            return Task.FromResult("case-corrected-001");
+        }
+
         public async Task CallStartAsync(CorrectionPropagationStartInput input)
             => _ = await new CorrectionPropagationStartActivity(writer).RunAsync(null!, input).ConfigureAwait(false);
 
         public async Task<CorrectionPropagationActivityResult> CallStoreAsync(CorrectionPropagationStoreActivityInput input)
             => await new CorrectionPropagationRunStoreActivity(catalog, writer).RunAsync(null!, input).ConfigureAwait(false);
+
+        public Task CreateTimerAsync(TimeSpan delay)
+        {
+            TimerDelays.Add(delay);
+            return Task.CompletedTask;
+        }
 
         public async Task CallCompleteAsync(CorrectionPropagationRequest request)
             => _ = await new CorrectionPropagationCompleteActivity(writer, new FixedClock()).RunAsync(null!, request).ConfigureAwait(false);
@@ -347,6 +427,33 @@ public sealed class CorrectionPropagationCoordinatorTests
             CorrectionPropagationActivityRequest request,
             CancellationToken cancellationToken)
             => ValueTask.FromResult(new CorrectionPropagationActivityResult(StoreKey, "failed", "store_unavailable", completedAt));
+    }
+
+    private sealed class PendingThenSuccessActivity(string storeKey, DateTimeOffset completedAt) : ICorrectionPropagationStoreActivity
+    {
+        public string StoreKey { get; } = storeKey;
+
+        public int CallCount { get; private set; }
+
+        public bool SawRemoteOperationOnSecondCall { get; private set; }
+
+        public ValueTask<CorrectionPropagationActivityResult> InvalidateAndRebuildAsync(
+            CorrectionPropagationActivityRequest request,
+            CancellationToken cancellationToken)
+        {
+            CallCount++;
+            if (CallCount == 2)
+            {
+                SawRemoteOperationOnSecondCall = string.Equals(
+                    request.RemoteOperationId,
+                    "operation-1",
+                    StringComparison.Ordinal);
+            }
+
+            return ValueTask.FromResult(CallCount == 1
+                ? new CorrectionPropagationActivityResult(StoreKey, "awaiting-completion", null, completedAt, "operation-1")
+                : new CorrectionPropagationActivityResult(StoreKey, "success", null, completedAt));
+        }
     }
 
     private sealed class FixedResultActivity(string storeKey, string outcome, string? reasonCode, DateTimeOffset completedAt)

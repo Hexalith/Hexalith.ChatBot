@@ -11,6 +11,7 @@ using Hexalith.ChatBot.Server.Observability;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
 using Hexalith.ChatBot.Server.Projections;
+using Hexalith.ChatBot.Server.Projections.DerivedStores;
 using Hexalith.EventStore.Client.Registration;
 using Hexalith.EventStore.DomainService;
 
@@ -64,6 +65,7 @@ _ = builder.Services
         + "EventStore compares them verbatim and refuses the whole named-projection capability on any mismatch.")
     .ValidateOnStart();
 _ = builder.Services.AddChatBotCommandGateway();
+_ = builder.Services.AddChatBotMemoriesDerivedStores(builder.Configuration, builder.Environment);
 _ = builder.Services.AddStory132AcceptanceFixture(builder.Configuration, builder.Environment);
 _ = builder.Services.AddChatBotAiExecutionCoordinatorHostedService();
 _ = builder.AddEventStoreDomainTelemetry("chatbot");

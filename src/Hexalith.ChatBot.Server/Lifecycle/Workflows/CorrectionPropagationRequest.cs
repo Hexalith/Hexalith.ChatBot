@@ -13,4 +13,5 @@ internal sealed record CorrectionPropagationRequest(
     string CorrelationId,
     DateTimeOffset StartedAtUtc,
     DateTimeOffset EstimatedCompletionAtUtc,
+    string CorrectedCaseId = "",
     string OperationId = "");

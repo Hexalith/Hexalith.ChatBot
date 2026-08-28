@@ -210,6 +210,76 @@ internal sealed class ReadModelProjectConversationProjectionStore(
         return candidates;
     }
 
+    public async Task<ProjectConversationIngestionSource?> GetIngestionSourceAsync(
+        string tenantId,
+        string projectId,
+        string associationId,
+        string intakeId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(associationId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(intakeId);
+
+        ProjectConversationSourceEmailView? source = await GetSourceEmailAsync(tenantId, intakeId, cancellationToken).ConfigureAwait(false);
+        ProjectConversationAttachmentSetView? attachmentSet = await GetAsync<ProjectConversationAttachmentSetView>(
+            ProjectConversationAttachmentSetView.KeyFor(tenantId, intakeId),
+            cancellationToken).ConfigureAwait(false);
+        if (source is null || attachmentSet is null)
+        {
+            return null;
+        }
+
+        ProjectConversationIntakeIndex intakeIndex = await GetIntakeIndexAsync(tenantId, intakeId, cancellationToken).ConfigureAwait(false);
+        ProjectConversationItemView? association = null;
+        foreach (ProjectConversationItemRef itemRef in intakeIndex.Items)
+        {
+            if (!string.Equals(itemRef.ProjectId, projectId, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            ProjectConversationItemView? candidate = await GetAsync<ProjectConversationItemView>(
+                ProjectConversationItemView.KeyFor(tenantId, itemRef.ProjectId, itemRef.ItemId),
+                cancellationToken).ConfigureAwait(false);
+            if (candidate is not null
+                && ProjectConversationItemView.IsAssociationContextKind(candidate.Kind)
+                && string.Equals(candidate.AssociationId, associationId, StringComparison.Ordinal))
+            {
+                if (association is not null)
+                {
+                    return null;
+                }
+
+                association = candidate;
+            }
+        }
+
+        if (association is null)
+        {
+            return null;
+        }
+
+        ProjectConversationIngestionAttachment[] attachments =
+        [.. attachmentSet.Attachments
+            .OrderBy(static attachment => attachment.Ordinal)
+            .Select(static attachment => new ProjectConversationIngestionAttachment(
+                attachment.ProviderAttachmentId,
+                attachment.Ordinal + 1,
+                attachment.ContentType))];
+        return new ProjectConversationIngestionSource(
+            tenantId,
+            projectId,
+            associationId,
+            intakeId,
+            source.SourceMailboxId,
+            source.SourceProviderMessageId,
+            attachments,
+            Math.Max(association.SourceVersion, source.SourceVersion),
+            association.CorrelationId);
+    }
+
     public async Task UpsertAttachmentStorageOutcomeAsync(
         ProjectConversationAttachmentStorageOutcomeView outcome,
         CancellationToken cancellationToken = default)

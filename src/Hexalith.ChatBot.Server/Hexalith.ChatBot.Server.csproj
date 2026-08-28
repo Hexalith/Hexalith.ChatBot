@@ -35,4 +35,19 @@
     <ProjectReference Include="$(HexalithProjectsRoot)\src\Hexalith.Projects.Client\Hexalith.Projects.Client.csproj" />
     <ProjectReference Include="$(HexalithTenantsRoot)\src\Hexalith.Tenants.Contracts\Hexalith.Tenants.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup Condition="'$(UseHexalithProjectReferences)' == 'true'">
+    <!-- ChatBot source mode consumes the two owned Memories surfaces directly, but Memories must still obey its
+         Release rule that external Hexalith dependencies are packages. Remove the outer graph-mode globals before
+         setting the child build explicitly; otherwise a Release source build is rejected by Memories' policy. -->
+    <ProjectReference Include="$(HexalithMemoriesRoot)\src\Hexalith.Memories.Client.Rest\Hexalith.Memories.Client.Rest.csproj"
+                      AdditionalProperties="UseHexalithProjectReferences=false;UseNuGetDeps=true"
+                      GlobalPropertiesToRemove="UseHexalithProjectReferences;UseNuGetDeps" />
+    <ProjectReference Include="$(HexalithMemoriesRoot)\src\Hexalith.Memories.Contracts\Hexalith.Memories.Contracts.csproj"
+                      AdditionalProperties="UseHexalithProjectReferences=false;UseNuGetDeps=true"
+                      GlobalPropertiesToRemove="UseHexalithProjectReferences;UseNuGetDeps" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
+    <PackageReference Include="Hexalith.Memories.Client.Rest" />
+    <PackageReference Include="Hexalith.Memories.Contracts" />
+  </ItemGroup>
 </Project>

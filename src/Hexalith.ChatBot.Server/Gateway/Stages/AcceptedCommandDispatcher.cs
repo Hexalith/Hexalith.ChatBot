@@ -34,6 +34,7 @@ internal sealed class AcceptedCommandDispatcher(
     ISystemClock clock,
     IAiAssistanceProvider? aiAssistanceProvider = null,
     ICorrectionPropagationCoordinator? correctionPropagation = null,
+    IIngestionBindingCoordinator? ingestionBinding = null,
     IApprovedAiActionCommandAllowlist? approvedAiActionAllowlist = null,
     IConversationWriter? conversationWriter = null,
     IOutboundMailboxSender? outboundMailboxSender = null,
@@ -97,10 +98,17 @@ internal sealed class AcceptedCommandDispatcher(
 
             _ = await eventStore.SubmitCommandAsync(request, cancellationToken).ConfigureAwait(false);
 
-            if (plan.CorrectionPropagation is not null && correctionPropagation is not null)
+            if (plan.CorrectionPropagation is not null && correctionPropagation?.IsReady is true)
             {
                 await correctionPropagation
                     .StartAsync(plan.CorrectionPropagation, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            if (plan.IngestionBinding is not null && ingestionBinding?.IsReady is true)
+            {
+                await ingestionBinding
+                    .StartAsync(plan.IngestionBinding, cancellationToken)
                     .ConfigureAwait(false);
             }
 
@@ -947,7 +955,7 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (IsAssociationDecisionCommand(commandType))
         {
-            EventStoreDispatchPlan? decisionPlan = BuildAssociationDecisionPlan(commandType, command);
+            EventStoreDispatchPlan? decisionPlan = BuildAssociationDecisionPlan(commandType, command, context);
             if (decisionPlan is not null)
             {
                 return decisionPlan;
@@ -990,7 +998,10 @@ internal sealed class AcceptedCommandDispatcher(
                 context.Submission.CorrelationId,
                 clock.UtcNow,
                 clock.UtcNow.Add(DaprCorrectionPropagationCoordinator.M0M1P95Target),
-                operationId);
+                // Projects remains the case authority, but resolution is a retryable activity inside the durable
+                // correction workflow. Admission persists the accepted command before that external read occurs.
+                CorrectedCaseId: string.Empty,
+                OperationId: operationId);
 
             return new EventStoreDispatchPlan(
                 payload.AssociationId,
@@ -1044,7 +1055,10 @@ internal sealed class AcceptedCommandDispatcher(
             or nameof(DeferEmailProjectAssociation)
             or nameof(MarkEmailAssociationNeedsReview);
 
-    private static EventStoreDispatchPlan? BuildAssociationDecisionPlan(string commandType, JsonElement command)
+    private static EventStoreDispatchPlan? BuildAssociationDecisionPlan(
+        string commandType,
+        JsonElement command,
+        ChatBotGatewayContext context)
     {
         if (string.Equals(commandType, nameof(AssociateEmailToProject), StringComparison.Ordinal))
         {
@@ -1056,7 +1070,23 @@ internal sealed class AcceptedCommandDispatcher(
                 throw new InvalidOperationException("The association-decision command is missing its selected project identity.");
             }
 
-            return new EventStoreDispatchPlan(payload.AssociationId, commandType, JsonSerializer.SerializeToElement(payload));
+            IngestionBindingRequest binding = new(
+                context.TenantBinding.TenantId,
+                payload.AssociationId,
+                payload.IntakeId,
+                payload.ProjectId,
+                payload.SourceVersion,
+                context.Submission.CorrelationId,
+                DaprIngestionBindingCoordinator.WorkflowInstanceIdFor(
+                    context.TenantBinding.TenantId,
+                    payload.AssociationId,
+                    payload.IntakeId,
+                    payload.SourceVersion));
+            return new EventStoreDispatchPlan(
+                payload.AssociationId,
+                commandType,
+                JsonSerializer.SerializeToElement(payload),
+                IngestionBinding: binding);
         }
 
         if (string.Equals(commandType, nameof(RejectEmailProjectAssociation), StringComparison.Ordinal))
@@ -1144,5 +1174,6 @@ internal sealed class AcceptedCommandDispatcher(
         string AggregateId,
         string CommandType,
         JsonElement Payload,
-        CorrectionPropagationRequest? CorrectionPropagation = null);
+        CorrectionPropagationRequest? CorrectionPropagation = null,
+        IngestionBindingRequest? IngestionBinding = null);
 }

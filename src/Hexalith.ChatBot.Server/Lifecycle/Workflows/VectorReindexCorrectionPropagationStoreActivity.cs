@@ -10,13 +10,8 @@ namespace Hexalith.ChatBot.Server.Lifecycle.Workflows;
 /// parallel coordinator). Its <see cref="StoreKey"/> is <see cref="CorrectionPropagationStoreKeys.VectorReindex"/>, so a
 /// deployment that registers it runs the M2 scope (<see cref="CorrectionPropagationStoreKeys.RequiredM2"/>); the four
 /// metadata-only M0 activities are unchanged.
-/// <para>
-/// <b>Affected-resource-id derivation (scoped tight).</b> <see cref="CorrectionPropagationActivityRequest"/> carries no
-/// explicit resource-id list, so the affected resource id is derived deterministically from the correction identity —
-/// the association id + the prior project id, consistent with how the prior association keyed its derived entries. The
-/// richer "every entry that referenced the prior association" enumeration is left to the live M2 binding if it needs a
-/// store-side index (it would require a cross-aggregate query this story deliberately does not invent).
-/// </para>
+/// The live canonical adapter receives the governed association/intake and Projects-resolved corrected case as distinct
+/// identities. The legacy affected-resource list remains only for the deterministic in-memory development adapter.
 /// </summary>
 internal sealed class VectorReindexCorrectionPropagationStoreActivity(IVectorReindexer reindexer)
     : ICorrectionPropagationStoreActivity
@@ -33,17 +28,28 @@ internal sealed class VectorReindexCorrectionPropagationStoreActivity(IVectorRei
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
-        IReadOnlyList<string> affectedResourceIds = [AffectedResourceId(request)];
-
-        VectorReindexOutcome outcome = await reindexer
-            .ReindexVectorsAsync(
-                request.TenantId,
-                request.CorrectionId,
-                request.SourceVersion,
-                affectedResourceIds,
-                request.StartedAtUtc,
-                cancellationToken)
-            .ConfigureAwait(false);
+        VectorReindexOutcome outcome = reindexer is ICanonicalVectorReindexer canonical
+            ? await canonical
+                .ReindexCanonicalVectorsAsync(
+                    request.TenantId,
+                    request.AssociationId,
+                    request.IntakeId,
+                    request.CorrectionId,
+                    request.SourceVersion,
+                    request.CorrectedCaseId,
+                    request.RemoteOperationId,
+                    request.StartedAtUtc,
+                    cancellationToken)
+                .ConfigureAwait(false)
+            : await reindexer
+                .ReindexVectorsAsync(
+                    request.TenantId,
+                    request.CorrectionId,
+                    request.SourceVersion,
+                    [request.AssociationId],
+                    request.StartedAtUtc,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
         // A hard failure wins; otherwise a completed-but-late reindex surfaces the SLO-exceeded reason so the
         // coordinator marks correction-delayed. A clean reindex (and an idempotent version-guard skip within SLO) is a
@@ -53,11 +59,9 @@ internal sealed class VectorReindexCorrectionPropagationStoreActivity(IVectorRei
 
         return new CorrectionPropagationActivityResult(
             StoreKey,
-            reasonCode is null ? "success" : "failed",
+            !outcome.IsTerminal ? "awaiting-completion" : reasonCode is null ? "success" : "failed",
             reasonCode,
-            outcome.CompletedAtUtc);
+            outcome.CompletedAtUtc,
+            outcome.RemoteOperationId);
     }
-
-    private static string AffectedResourceId(CorrectionPropagationActivityRequest request)
-        => $"{request.AssociationId}:{request.PriorProjectId}";
 }

@@ -292,12 +292,15 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         payload.TryGetProperty("associationId", out _).ShouldBeFalse();
         payload.TryGetProperty("actorId", out _).ShouldBeFalse();
         payload.TryGetProperty("tenantId", out _).ShouldBeFalse();
-        workflowRuntime.Scheduled.ShouldHaveSingleItem().WorkflowInstanceId.ShouldBe(
+        CorrectionPropagationRequest scheduled = workflowRuntime.Scheduled.ShouldHaveSingleItem();
+        scheduled.WorkflowInstanceId.ShouldBe(
             DaprCorrectionPropagationCoordinator.WorkflowInstanceIdFor(
                 "tenant-alpha",
                 "01ARZ3NDEKTSV4RRFFQ69G5FAV",
                 DaprCorrectionPropagationCoordinator.CorrectionIdFor("01ARZ3NDEKTSV4RRFFQ69G5FAV", 10),
                 10));
+        scheduled.CorrectedProjectId.ShouldBe("project-beta");
+        scheduled.CorrectedCaseId.ShouldBeEmpty();
         foreach (string submittedPayload in eventStore.Submitted.Select(static request => request.Payload.GetRawText()))
         {
             submittedPayload.ShouldNotContain("sender@example.test", Case.Insensitive);

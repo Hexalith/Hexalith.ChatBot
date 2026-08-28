@@ -246,6 +246,55 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         return Task.FromResult<IReadOnlyList<ProjectConversationAttachmentStorageCandidate>>(candidates);
     }
 
+    public Task<ProjectConversationIngestionSource?> GetIngestionSourceAsync(
+        string tenantId,
+        string projectId,
+        string associationId,
+        string intakeId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(associationId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(intakeId);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string intakeKey = IntakeIndexKeyFor(tenantId, intakeId);
+        ProjectConversationItemView? association = _itemsByIntake.TryGetValue(intakeKey, out ConcurrentDictionary<string, byte>? itemKeys)
+            ? itemKeys.Keys
+                .Select(key => _items.TryGetValue(key, out ProjectConversationItemView? item) ? item : null)
+                .OfType<ProjectConversationItemView>()
+                .SingleOrDefault(item =>
+                    ProjectConversationItemView.IsAssociationContextKind(item.Kind)
+                    && string.Equals(item.ProjectId, projectId, StringComparison.Ordinal)
+                    && string.Equals(item.AssociationId, associationId, StringComparison.Ordinal))
+            : null;
+        if (association is null
+            || !_sourceEmails.TryGetValue(ProjectConversationSourceEmailView.KeyFor(tenantId, intakeId), out ProjectConversationSourceEmailView? source)
+            || !_attachments.TryGetValue(ProjectConversationAttachmentSetView.KeyFor(tenantId, intakeId), out ProjectConversationAttachmentSetView? attachmentSet))
+        {
+            return Task.FromResult<ProjectConversationIngestionSource?>(null);
+        }
+
+        ProjectConversationIngestionAttachment[] attachments =
+        [.. attachmentSet.Attachments
+            .OrderBy(static attachment => attachment.Ordinal)
+            .Select(static attachment => new ProjectConversationIngestionAttachment(
+                attachment.ProviderAttachmentId,
+                attachment.Ordinal + 1,
+                attachment.ContentType))];
+        return Task.FromResult<ProjectConversationIngestionSource?>(new(
+            tenantId,
+            projectId,
+            associationId,
+            intakeId,
+            source.SourceMailboxId,
+            source.SourceProviderMessageId,
+            attachments,
+            Math.Max(association.SourceVersion, source.SourceVersion),
+            association.CorrelationId));
+    }
+
     public Task UpsertAttachmentStorageOutcomeAsync(
         ProjectConversationAttachmentStorageOutcomeView outcome,
         CancellationToken cancellationToken = default)

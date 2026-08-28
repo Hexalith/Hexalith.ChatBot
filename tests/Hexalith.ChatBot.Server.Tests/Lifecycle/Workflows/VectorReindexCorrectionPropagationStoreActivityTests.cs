@@ -83,12 +83,14 @@ public sealed class VectorReindexCorrectionPropagationStoreActivityTests
         => new(
             "tenant-alpha",
             "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY",
             "01ARZ3NDEKTSV4RRFFQ69G5FAV:correction:5",
             "wf-001",
             CorrectionPropagationStoreKeys.VectorReindex,
             5,
             "project-001",
             "project-002",
+            "case-corrected-001",
             StartedAt,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 

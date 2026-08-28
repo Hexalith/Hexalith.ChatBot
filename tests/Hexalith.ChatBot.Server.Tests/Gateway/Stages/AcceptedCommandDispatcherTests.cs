@@ -7,10 +7,12 @@ using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Adapters.Conversations;
+using Hexalith.ChatBot.Server.Adapters.Projects;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Observability;
+using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Tests.Observability;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Contracts.Commands;
@@ -326,6 +328,30 @@ public sealed class AcceptedCommandDispatcherTests
         payload.TryGetProperty("associationId", out _).ShouldBeFalse();
         payload.GetRawText().ShouldNotContain("sender@example.test", Case.Insensitive);
         payload.GetRawText().ShouldNotContain("raw-body", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task DispatchShouldDeferCorrectedCaseResolutionToDurableWorkflow()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        RecordingCorrectionPropagationCoordinator coordinator = new();
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            correctionPropagation: coordinator);
+
+        _ = await dispatcher.DispatchAsync(
+            Context(
+                WireAssociationCorrectionCommand(),
+                commandType: nameof(Hexalith.ChatBot.Contracts.Commands.CorrectEmailProjectAssociation)),
+            TestContext.Current.CancellationToken);
+
+        gateway.Submitted.ShouldHaveSingleItem();
+        CorrectionPropagationRequest propagation = coordinator.Requests.ShouldHaveSingleItem();
+        propagation.CorrectedProjectId.ShouldBe("project-002");
+        propagation.CorrectedCaseId.ShouldBeEmpty();
     }
 
     [Fact]
@@ -2370,6 +2396,19 @@ public sealed class AcceptedCommandDispatcherTests
 
         public Task<StreamReadPage> ReadStreamAsync(StreamReadRequest request, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+    }
+
+    private sealed class RecordingCorrectionPropagationCoordinator : ICorrectionPropagationCoordinator
+    {
+        public bool IsReady => true;
+
+        public List<CorrectionPropagationRequest> Requests { get; } = [];
+
+        public ValueTask StartAsync(CorrectionPropagationRequest request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+            return ValueTask.CompletedTask;
+        }
     }
 
     // Simulates a failing dispatch so the latency-on-failure path (AC1/AC5) can be asserted.

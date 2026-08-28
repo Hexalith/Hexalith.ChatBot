@@ -12,9 +12,7 @@ internal sealed class DaprCorrectionPropagationWorkflowRuntime(
 {
     private const string ReadinessProbeInstanceId = "chatbot:correction-propagation:readiness-probe";
     private readonly IChatBotMetrics _metrics = metrics ?? NullChatBotMetrics.Instance;
-    private volatile bool _lastProbeAvailable;
-
-    public bool IsAvailable => _lastProbeAvailable;
+    public bool IsAvailable => true;
 
     public async ValueTask ScheduleAsync(CorrectionPropagationRequest request, CancellationToken cancellationToken)
     {
@@ -31,13 +29,11 @@ internal sealed class DaprCorrectionPropagationWorkflowRuntime(
                     startTime: null,
                     cancellation: cancellationToken)
                 .ConfigureAwait(false);
-            _lastProbeAvailable = true;
         }
         catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException and not OperationCanceledException)
         {
             if (DaprWorkflowDuplicateInstanceDetector.IsDuplicateInstance(ex))
             {
-                _lastProbeAvailable = true;
                 _metrics.RecordWorkflowLifecycle(
                     request.TenantId,
                     "duplicate-schedule-replay",
@@ -45,7 +41,6 @@ internal sealed class DaprCorrectionPropagationWorkflowRuntime(
                 return;
             }
 
-            _lastProbeAvailable = false;
             throw;
         }
     }
@@ -58,7 +53,6 @@ internal sealed class DaprCorrectionPropagationWorkflowRuntime(
             _ = await workflowClient
                 .GetWorkflowStateAsync(ReadinessProbeInstanceId, getInputsAndOutputs: false, cancellation: cancellationToken)
                 .ConfigureAwait(false);
-            _lastProbeAvailable = true;
             return new CorrectionPropagationWorkflowRuntimeStatus(
                 true,
                 "available",
@@ -67,7 +61,6 @@ internal sealed class DaprCorrectionPropagationWorkflowRuntime(
         }
         catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException and not OperationCanceledException)
         {
-            _lastProbeAvailable = false;
             return new CorrectionPropagationWorkflowRuntimeStatus(
                 false,
                 CorrectionPropagationWorkflowStatuses.RuntimeUnavailable,

@@ -35,44 +35,50 @@ internal sealed class CorrectionPropagationRunStoreActivity(
             CorrectionPropagationActivityRequest activityRequest = new(
                 request.TenantId,
                 request.AssociationId,
+                request.IntakeId,
                 request.CorrectionId,
                 request.WorkflowInstanceId,
                 input.StoreKey,
                 request.SourceVersion,
                 request.PriorProjectId,
                 request.CorrectedProjectId,
+                request.CorrectedCaseId,
                 input.StartedAtUtc,
-                request.CorrelationId);
+                request.CorrelationId,
+                input.RemoteOperationId);
             result = await storeActivity
                 .InvalidateAndRebuildAsync(activityRequest, CancellationToken.None)
                 .ConfigureAwait(false);
         }
 
-        await writer.SubmitAsync(
-            request,
-            nameof(AcknowledgeMailboxAssociationCorrectionStoreInvalidated),
-            new AcknowledgeMailboxAssociationCorrectionStoreInvalidated(
-                request.AssociationId,
-                request.CorrectionId,
-                request.WorkflowInstanceId,
-                input.StoreKey,
-                request.SourceVersion,
-                request.PriorProjectId,
-                request.CorrectedProjectId,
-                input.StartedAtUtc,
-                result.CompletedAtUtc,
-                result.Outcome,
-                result.FailureReasonCode,
-                "metadata_only",
-                "collaboration_input",
-                DaprCorrectionPropagationCoordinator.SchemaVersion),
-            CancellationToken.None)
-            .ConfigureAwait(false);
+        if (!result.IsPending)
+        {
+            await writer.SubmitAsync(
+                request,
+                nameof(AcknowledgeMailboxAssociationCorrectionStoreInvalidated),
+                new AcknowledgeMailboxAssociationCorrectionStoreInvalidated(
+                    request.AssociationId,
+                    request.CorrectionId,
+                    request.WorkflowInstanceId,
+                    input.StoreKey,
+                    request.SourceVersion,
+                    request.PriorProjectId,
+                    request.CorrectedProjectId,
+                    input.StartedAtUtc,
+                    result.CompletedAtUtc,
+                    result.Outcome,
+                    result.FailureReasonCode,
+                    "metadata_only",
+                    "collaboration_input",
+                    DaprCorrectionPropagationCoordinator.SchemaVersion),
+                CancellationToken.None)
+                .ConfigureAwait(false);
 
-        _metrics.RecordWorkflowLifecycle(
-            request.TenantId,
-            result.IsSuccessful ? "store-completed" : CorrectionPropagationWorkflowStatuses.Failed,
-            result.FailureReasonCode ?? CorrectionPropagationWorkflowFailureCodes.None);
+            _metrics.RecordWorkflowLifecycle(
+                request.TenantId,
+                result.IsSuccessful ? "store-completed" : CorrectionPropagationWorkflowStatuses.Failed,
+                result.FailureReasonCode ?? CorrectionPropagationWorkflowFailureCodes.None);
+        }
 
         return result;
     }

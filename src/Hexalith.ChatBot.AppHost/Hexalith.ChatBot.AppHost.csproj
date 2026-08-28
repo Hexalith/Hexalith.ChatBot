@@ -28,6 +28,12 @@
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Admin.Server.Host\Hexalith.EventStore.Admin.Server.Host.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Admin.UI\Hexalith.EventStore.Admin.UI.csproj" />
     <ProjectReference Include="$(HexalithTenantsRoot)\src\Hexalith.Tenants\Hexalith.Tenants.csproj" />
+    <!-- The reusable Memories Aspire helper owns Redis Stack, FalkorDB, Dapr component, and server wiring.
+         The server reference forces the Debug binary that the cross-repository project metadata launches. -->
+    <ProjectReference Include="$(HexalithMemoriesRoot)\src\Hexalith.Memories.Aspire\Hexalith.Memories.Aspire.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="$(HexalithMemoriesRoot)\src\Hexalith.Memories.Server\Hexalith.Memories.Server.csproj"
+                      IsAspireProjectResource="false"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
   <!-- Project resources can transitively consume Conversations. Pass the root-declared Commons location as a
        global MSBuild property so no sibling falls back to its forbidden nested submodule. -->

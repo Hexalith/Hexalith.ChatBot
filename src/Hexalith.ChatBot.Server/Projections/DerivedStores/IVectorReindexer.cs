@@ -12,6 +12,7 @@ namespace Hexalith.ChatBot.Server.Projections.DerivedStores;
 /// <param name="DeadlineUtc">The effective M2 completion deadline (started-at + 60 min), from <c>CorrectionPropagationSlo</c>.</param>
 /// <param name="CompletedAtUtc">When the reindex finished.</param>
 /// <param name="FailureReasonCode">A safe reason code when the reindex failed (e.g. <c>vector_reindex_failed</c>), or null on success.</param>
+/// <param name="RemoteOperationId">The opaque Memories operation identifier retained by the durable polling workflow.</param>
 internal sealed record VectorReindexOutcome(
     int EntriesInvalidated,
     int EntriesRebuilt,
@@ -19,7 +20,9 @@ internal sealed record VectorReindexOutcome(
     bool SloBreached,
     DateTimeOffset DeadlineUtc,
     DateTimeOffset CompletedAtUtc,
-    string? FailureReasonCode);
+    string? FailureReasonCode,
+    bool IsTerminal = true,
+    string? RemoteOperationId = null);
 
 /// <summary>
 /// The named <c>ReindexVectors(tenantId, correctionId, sourceVersion)</c> M2 correction-propagation operation

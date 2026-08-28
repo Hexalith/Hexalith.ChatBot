@@ -281,7 +281,7 @@ internal static class ChatBotAspireModule
         return new HexalithChatBotResources(actorStateStore, stateStore, workflowStateStore, pubSub, eventStore, tenants, chatBot);
     }
 
-    private static string ResolveRedisHost(IConfiguration configuration)
+    internal static string ResolveRedisHost(IConfiguration configuration)
     {
         string value = configuration["Dapr:RedisHost"] ?? DefaultRedisHost;
         if (!Uri.TryCreate($"redis://{value}", UriKind.Absolute, out Uri? endpoint)
