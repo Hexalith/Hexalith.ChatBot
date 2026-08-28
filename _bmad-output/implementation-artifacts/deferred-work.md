@@ -36,7 +36,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: ops-harness design guard
 severity: low
 reason: **[LOW · design invariant]** Graph scoped-outage lane hardcodes `RecoveryPhase` notification identity at every call site with no `CheckpointPhase` concept. **Release-claim impact:** none today — Graph never issues a pre-fault commit notification — but nothing enforces that invariant against a future change. **Owner:** ops-harness design guard. **Closure evidence:** an assertion or comment tying the omission to the absence of a Graph pre-fault checkpoint.
-status: open
+status: done 2026-08-28
+resolution: already resolved: Commit 23030e35; tests/Hexalith.ChatBot.RecoverySandbox/RecoveryNotificationIdentity.cs:26-33 permits GraphLane only with RecoveryPhase, while RecoverySandboxContractTests.cs:190-197 rejects unknown lane/phase combinations.
 
 ### DW-5: [MEDIUM · cleanup integrity] Cleanup methods only null tracked note/intake refs when `complete=true`, leaving stale refs after a partial cleanup failure; no test exercises "cleanup fails, then the next scenario runs".
 
@@ -109,7 +110,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: existing `RV-REBUILD-WORM`
 severity: high
 reason: **[HIGH · `RV-REBUILD-WORM`] Projection rebuild still identity-writes WORM/governed views and excludes them via `SourceDigestsOnly`.** Reconfirmed on live-drivers chunk. **Release-claim impact:** do not claim full immutable-source+WORM rebuild equivalence. **Owner:** existing `RV-REBUILD-WORM`. **Closure evidence:** per existing residual.
-status: open
+status: done 2026-08-28
+resolution: already resolved: Commit b57f02e1; tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveProjectionRebuildDriver.cs:336-365 reconstructs WORM operations through GovernedOperationProjectionHandler, and docs/adrs/projection-rebuild-validation.md:62 retires RV-REBUILD-WORM for the bounded sandbox path.
 
 ### DW-14: [HIGH · `RV-REBUILD-WORM`] Governed/WORM rebuild cannot diverge.
 
@@ -117,7 +119,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: existing `RV-REBUILD-WORM`
 severity: high
 reason: **[HIGH · `RV-REBUILD-WORM`] Governed/WORM rebuild cannot diverge.** Source-email reconstruction now runs through the real `AssociationProjectionHandler`, so that part can diverge; governed/WORM views still identity-write from the same records on both sides. **Release-claim impact:** full immutable-source-plus-WORM divergence remains unreachable on the live lane. **Owner:** existing `RV-REBUILD-WORM`. **Closure evidence:** per existing residual.
-status: open
+status: done 2026-08-28
+resolution: already resolved: Commit b57f02e1; tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveProjectionRebuildDriver.cs:430-474 independently rebuilds governed snapshots from grouped WORM history, and LiveProjectionRebuildDriverTests.cs:213-244 proves structural mutation changes the digest.
 
 ### DW-15: [HIGH · `RV-MEASURABLE-CEILING`] E2E `RestorationTimeout = 3 minutes` vs A10/NFR56 `MaxRto` 4 hours.
 
@@ -159,7 +162,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: `RV-REBUILD-WORM` / rebuild residual
 severity: low
 reason: **[LOW · rebuild] `ReconstructCapturedEvent` placeholders outside structural digest tuple.** Claim-narrowed. **Release-claim impact:** handler regressions outside digest fields stay invisible. **Owner:** `RV-REBUILD-WORM` / rebuild residual. **Closure evidence:** richer round-trip or explicit non-claim.
-status: open
+status: done 2026-08-28
+resolution: already resolved: Commit b57f02e1; tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveProjectionRebuildDriver.cs:369-398 limits placeholders to data never retained by the metadata-only view, while :477-515 digests all safely retained source and governed structure.
 
 ### DW-20: [MEDIUM · gate producer] In-process gate evaluation remains smoke while gate trusts producer summary fields.
 
@@ -356,7 +360,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: continuity Aspire ops / end-state assertions
 severity: low
 reason: **[LOW · continuity end-state] Actor-state probe only checks `events:1` + `MailboxMessageIntakeCaptured` suffix.** Higher sequences / alternate event type names remain unproven by this helper. **Release-claim impact:** committed state without event `1` can look absent. **Owner:** continuity Aspire ops / end-state assertions. **Closure evidence:** sequence-aware probe or consumer assertions covering the witnessed event stream.
-status: open
+status: done 2026-08-28
+resolution: already resolved: Commit 23030e35; tests/Hexalith.ChatBot.IntegrationTests/Recovery/EventStoreDurableStateProbeTests.cs:181-200 proves the authoritative first event remains valid when metadata advances to sequence 2, while EventStoreDurableStateProbe.cs:277-303 validates metadata/event coherence.
 
 ### DW-43: [MEDIUM · `RV-PROVIDER-SCALE`] NFR59 unauthorized-mutation / cross-tenant flags remain structurally unreachable for the four sandbox deps.
 
@@ -412,7 +417,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: Story 12.15 rebuild residual / `RV-REBUILD-WORM`
 severity: high
 reason: **[HIGH · `RV-REBUILD-WORM`] Live E2E still passes the same `SourceRecords` instance to seed and rebuild driver.** Claim-narrowed in chunk 1a; divergence remains unreachable on the live lane. **Release-claim impact:** do not claim non-tautological WORM/full rebuild equivalence from this wiring. **Owner:** Story 12.15 rebuild residual / `RV-REBUILD-WORM`. **Closure evidence:** per existing residual.
-status: open
+status: done 2026-08-28
+resolution: already resolved: Commit b57f02e1; tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs:294-326 independently loads distinct seed and rebuild datasets, WORM stores, and SourceRecords collections.
 
 ### DW-50: [MEDIUM · workflows chunk / group 3] Independent `live-recovery-evidence-gate` job is skipped when validation fails.
 
@@ -429,7 +435,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: Story 12.15 remaining evidence-integrity work (driver + 1c)
 severity: medium
 reason: **[MEDIUM · chunk 1b/1c] Missing/degenerate scope-monitoring evidence cannot be fail-closed from the live scoped-outage driver alone.** `LiveScopedOutageInjectionDriver` always computes latency from the two stamps on `ScopedOutageFaultObservation`; Task 5 requires missing monitoring to be `unmeasurable`, not zero-ms. **Update 2026-08-03 (chunk 1b):** Aspire ops now reject missing/default/`Tenant`-fallback and degenerate (`recordedAtUtc <= observedAtUtc`) stamps with `InvalidOperationException`, so fabricated zero-ms latency can no longer leave ObserveFault. Remaining gap: the driver/coordinator path that converts that throw into an audited `unmeasurable` (vs a hard scenario failure), plus RecoverySandbox monitor edge cases (chunk 1c). **Release-claim impact:** NFR41 figures remain provisional until driver unmeasurable conversion and monitor honesty are closed. **Owner:** Story 12.15 remaining evidence-integrity work (driver + 1c). **Closure evidence:** ops/monitor path that can omit or invalidate stamps, plus a driver/coordinator path that converts that into `unmeasurable` with a unit/live fixture.
-status: open
+status: done 2026-08-28
+resolution: already resolved: tests/Hexalith.ChatBot.IntegrationTests/Recovery/AspireScopedOutageOperations.cs:827-854 rejects missing or degenerate monitoring stamps, and src/Hexalith.ChatBot.Server/Audit/ScopedOutageDegradationValidationCoordinator.cs:193-228 retains non-cancellation failures as audited unmeasurable reports.
 
 ### DW-52: [HIGH · governance + residual] No-loss continuity RPO stays `TimeSpan.Zero` by decision (2026-08-02 option 2).
 
@@ -449,7 +456,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: Story 12.15 remaining rebuild work, coordinated with `RV-DURABLE-WORM`
 severity: high
 reason: **[HIGH · `RV-REBUILD-WORM` · WORM/governed rebuild fidelity] Projection rebuild claim-narrowing (2026-08-02 option 2) leaves WORM/governed resources off the proven equivalence path.** Only `AssociationProjectionHandler` source-email rebuild is claimed; WORM still identity-writes via `ToGovernedOperationView` on both seed and rebuild. **Release-claim impact:** do not claim full immutable-source+WORM rebuild equivalence or NFR57 coverage for audit-derived projections. **Owner:** Story 12.15 remaining rebuild work, coordinated with `RV-DURABLE-WORM`. **Closure evidence:** a rebuild path for governed/WORM projections that can diverge, with retained digests and tests proving non-tautological equivalence.
-status: open
+status: done 2026-08-28
+resolution: already resolved: Commit b57f02e1; tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveProjectionRebuildDriver.cs:337-366 reconstructs WORM operations through GovernedOperationProjectionHandler, while LiveProjectionRebuildDriverTests.cs:213-248 proves a structural mutation produces a divergent governed digest.
 decision: 2026-08-27 Build independent rebuild — Implement an independently derived governed and WORM rebuild path that can diverge, include its digests, and add mutation-sensitive tests.
 decision: 2026-08-26 Build independent rebuild — Implement an independently derived governed and WORM rebuild path that can diverge, include its digests, and add mutation-sensitive tests.
 
@@ -1128,7 +1136,8 @@ location: tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryValidationTop
 source_spec: `spec-dw-52-loss-path-rpo-evidence.md`
 severity: medium
 reason: The test asserts that exactly one new `{temp}/hexalith-chatbot-keycloak-*` subdirectory appears, but a sibling test in the same class creates four such directories, so the delta assertion sees 2 in a whole-assembly run. Reproduced at baseline dc194c7 with every DW-52 change stashed (280 tests, same single failure), so it is pre-existing and untouched by this story; both files are absent from this diff.
-status: open
+status: done 2026-08-28
+resolution: already resolved: tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryValidationTopologyContractTests.cs:367-379 identifies the generated directory by this process's owner marker, excluding sibling-test directories before asserting a single candidate.
 
 ### DW-135: Only the controlled-loss stage writes a failed attempt summary, so the gate's `latest_attempt_incomplete` branch stays unreachable when the projection-rebuild or scoped-outage stages throw.
 origin: spec-deferred 2a66d370a301
