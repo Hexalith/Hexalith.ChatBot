@@ -467,6 +467,58 @@ public static class LiveRecoveryValidationArchitectureTests
         treatNoTestsAsErrorValue.ShouldBeTrue();
     }
 
+    [Fact]
+    public static void ReleasePublication_ShouldRequireFreshMainHeadImmediatelyBeforeSemanticRelease()
+    {
+        string release = ReadProjectFile(".github/workflows/release.yml");
+        // Bounded by the next top-level job key: an open-ended match would let a job added after semantic-release
+        // satisfy the job-level assertions below.
+        Match semanticReleaseJob = Regex.Match(release, "(?ms)^  semantic-release:.*?(?=^  \\S|\\z)");
+        semanticReleaseJob.Success.ShouldBeTrue("release workflow must contain the semantic-release job");
+        string job = semanticReleaseJob.Value;
+        Match publicationGuard = Regex.Match(
+            job,
+            "(?ms)^      - name: Guard main publication against a stale validated commit\\n"
+            + ".*?(?=^      - |\\z)");
+        publicationGuard.Success.ShouldBeTrue("release workflow must contain the publication guard step");
+        string afterPublicationGuard = job[(publicationGuard.Index + publicationGuard.Length)..];
+        afterPublicationGuard.StartsWith("      - name: Release\n", StringComparison.Ordinal).ShouldBeTrue(
+            "no named or unnamed workflow step may intervene between the publication guard and semantic-release");
+
+        job.ShouldContain("fetch-depth: 0");
+        job.ShouldContain("timeout-minutes: 30");
+        publicationGuard.Value.ShouldContain("id: publication_guard");
+        publicationGuard.Value.ShouldContain("RELEASE_BRANCH: ${{ github.ref_name }}");
+        publicationGuard.Value.ShouldContain("VALIDATED_SHA: ${{ github.sha }}");
+        publicationGuard.Value.ShouldContain("bash .github/scripts/guard-main-publication.sh");
+        job.ShouldContain(
+            "- name: Release\n"
+            + "        if: steps.publication_guard.outputs.should_publish == 'true'");
+
+        // Recovery validation remains independently authoritative for every SHA. Publication eligibility is not
+        // allowed to replace it with branch-keyed serialization or cancellation.
+        release.ShouldContain(
+            "group: live-recovery-validation-release-${{ github.repository }}-${{ github.sha }}");
+        release.ShouldContain(
+            "group: live-recovery-evidence-gate-release-${{ github.repository }}-${{ github.sha }}");
+        release.ShouldNotContain(
+            "group: live-recovery-validation-release-${{ github.repository }}-${{ github.ref }}");
+        release.ShouldNotContain(
+            "group: live-recovery-evidence-gate-release-${{ github.repository }}-${{ github.ref }}");
+
+        // Bound to each group in turn: an unscoped `cancel-in-progress: false` search is satisfied by either
+        // concurrency block, so one lane could flip to cancellation while the assertion stayed green.
+        release.ShouldContain(
+            "group: live-recovery-validation-release-${{ github.repository }}-${{ github.sha }}\n"
+            + "      cancel-in-progress: false");
+        release.ShouldContain(
+            "group: live-recovery-evidence-gate-release-${{ github.repository }}-${{ github.sha }}\n"
+            + "      cancel-in-progress: false");
+        Regex.Matches(release, "^      cancel-in-progress: ", RegexOptions.Multiline).Count.ShouldBe(
+            2,
+            "the release workflow must declare exactly the two per-commit recovery concurrency blocks");
+    }
+
     /// <summary>
     /// Proves the test platform itself accepts the run settings, not merely that it is well-formed XML.
     /// </summary>

@@ -6,7 +6,9 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: CI architecture
 severity: medium
 reason: **[MEDIUM · PR integration] Exact-head story evidence does not test the GitHub pull-request merge result.** The evidence producers intentionally check out `github.event.pull_request.head.sha` so provenance binds the proposed source tree, but this replaced the former default merge-ref checkout. **Release-claim impact:** a PR may pass exact-head evidence while failing when merged with the current base. **Owner:** CI architecture. **Closure evidence:** a separate merge-ref integration job (or an equivalent isolated merge validation) that does not contaminate exact-head provenance.
-status: open
+status: done 2026-08-27
+resolution: resolved by sweep bundle dw-release-workflow-safety
+resolution-undo: 62b87e5b2b0f5cd98de7e31b41ffb34f03070488e12da505081d09776a9959b0 2026-08-27 7374617475733a206f70656e
 
 ### DW-2: [MEDIUM · release ordering] Per-commit live-recovery concurrency can release newer and older commits out of order.
 
@@ -14,7 +16,9 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: release architecture
 severity: medium
 reason: **[MEDIUM · release ordering] Per-commit live-recovery concurrency can release newer and older commits out of order.** The story deliberately accepts concurrent 5.5-hour validation jobs so GitHub cannot cancel an older pending required check, but `semantic-release` itself has no safe ordering mechanism after those jobs converge at different times. **Release-claim impact:** an older workflow may attempt publication after a newer commit has already released. **Owner:** release architecture. **Closure evidence:** a release-order design that preserves a verdict for every commit without GitHub's one-pending-run cancellation behavior.
-status: open
+status: done 2026-08-27
+resolution: resolved by sweep bundle dw-release-workflow-safety
+resolution-undo: 62b87e5b2b0f5cd98de7e31b41ffb34f03070488e12da505081d09776a9959b0 2026-08-27 7374617475733a206f70656e
 decision: 2026-08-27 Guard latest head — Before publication, fetch main and publish only when the validated SHA is still the newest releasable head; treat an older included SHA as superseded.
 decision: 2026-08-26 Guard latest head — Before publication, fetch main and publish only when the validated SHA is still the newest releasable head; treat an older included SHA as superseded.
 
@@ -1072,4 +1076,28 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15 patch 
 location: ChatBot AppHost composition
 severity: medium
 reason: **[MEDIUM · test-design] `AddEventStoreAdmin`'s port-guard call site is pinned by a method-body source scan, not by execution.** `AddEventStoreAdminBodyInvokesThePortGuard` slices the `AddEventStoreAdmin` method text and asserts the guard call appears inside it, which is strictly stronger than the previous whole-file substring and strictly weaker than composing the method. **Not covered:** invoking `AddEventStoreAdmin` for real needs a `HexalithChatBotResources` plus two `IResourceBuilder<ProjectResource>` instances — a full topology — so a refactor that keeps the call text but stops reaching it would still pass. **Owner:** ChatBot AppHost composition. **Closure evidence:** a test that composes `AddEventStoreAdmin` on a builder with colliding `Dapr:InternalGrpcPorts` and no preceding `AddHexalithChatBot`, asserting it throws.
+status: open
+
+### DW-129: No repository workflow lints the GitHub Actions files or the checked-in shell scripts, so workflow and script regressions are caught only when a run fails.
+origin: spec-deferred 38290798d6e7
+location: .github/workflows
+source_spec: `spec-release-workflow-safety.md`
+severity: low
+reason: `.github/workflows/` contains no actionlint or shellcheck step; the spec's Verification section runs actionlint locally only, and shellcheck is unavailable in this environment. The publication guard and merge-ref boundaries are now safety-critical Bash with no static gate, and the existing `.github/scripts/install-dapr-cli.sh` is equally unguarded, so this predates the current change.
+status: open
+
+### DW-130: The required `build` job's ordinary test lanes have no zero-test guard, so a lane that discovers no tests exits 0 and still emits a checksummed TRX that reads as real evidence.
+origin: spec-deferred 5bdedb5737f4
+location: .github/workflows/ci.yml:130
+source_spec: `spec-release-workflow-safety.md`
+severity: medium
+reason: `.github/workflows/ci.yml`'s `Test` step runs each of the 13 ordinary lanes as `dotnet test "$project" --no-build --configuration Release --logger trx ...` with no `RunConfiguration.TreatNoTestsAsError=true`. Reproduced in this repository: the same command form with a filter matching nothing prints "No test matches the given testcase filter" and exits 0, still writes the TRX, so `sha256sum` succeeds and `executed` still reaches 13. The `build` loop is unchanged by this story -- the gap predates it and was surfaced only because the new merge lane adopted the override. The merge lane is `pull_request`-only, so pushes to `main` and the whole release path remain unguarded.
+status: open
+
+### DW-131: Follow-up review still recommended for dw-release-workflow-safety after the damping cap was spent
+origin: review-budget-followup
+location: n/a
+source_spec: `spec-release-workflow-safety.md`
+severity: low
+reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260827-211223-44d7; this entry preserves the lingering recommendation for a deliberate later review.
 status: open

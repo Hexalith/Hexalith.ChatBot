@@ -760,6 +760,44 @@ public static class ScaffoldArchitectureTests
     }
 
     [Fact]
+    public static void PullRequestMergeRefValidationShouldRemainIsolatedFromExactHeadEvidence()
+    {
+        string workflow = File.ReadAllText(Path.Combine(RepositoryRoot(), ".github", "workflows", "ci.yml"));
+        // Bounded by the next top-level job key rather than by a named successor: a job inserted between the two
+        // would otherwise be folded into this block and silently satisfy the isolation assertions below.
+        string mergeJob = WorkflowJob(workflow, "pull-request-merge-ref");
+        workflow.IndexOf("\n  pull-request-merge-ref:", StringComparison.Ordinal)
+            .ShouldBeLessThan(workflow.IndexOf("\n  build:", StringComparison.Ordinal));
+
+        mergeJob.ShouldContain("name: pull-request synthetic merge build and test");
+        mergeJob.ShouldContain("if: github.event_name == 'pull_request'");
+        mergeJob.ShouldContain("timeout-minutes: 60");
+        mergeJob.ShouldContain("permissions:\n      contents: read");
+        mergeJob.ShouldNotContain("\n    needs:");
+        mergeJob.ShouldContain("ref: ${{ github.sha }}");
+        mergeJob.ShouldContain("persist-credentials: false");
+        mergeJob.ShouldContain("submodules: false");
+        mergeJob.ShouldContain(
+            "verify-pull-request-merge.sh \"$MERGE_SHA\" \"$PR_BASE_SHA\" \"$PR_HEAD_SHA\"");
+        mergeJob.ShouldContain("git submodule update --init");
+        mergeJob.ShouldNotContain("--recursive");
+        mergeJob.ShouldContain("dotnet restore Hexalith.ChatBot.slnx");
+        mergeJob.ShouldContain(
+            "dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -m:1");
+        mergeJob.ShouldContain("bash .github/scripts/run-merge-test-lanes.sh");
+        mergeJob.ShouldNotContain("actions/upload-artifact");
+        mergeJob.ShouldNotContain("machine-test-results");
+        mergeJob.ShouldNotContain("topology-acceptance-evidence");
+        mergeJob.ShouldNotContain("story-evidence-integrity-reports");
+        mergeJob.ShouldNotContain("provenance");
+
+        int mergeJobIndex = workflow.IndexOf(mergeJob, StringComparison.Ordinal);
+        mergeJobIndex.ShouldBeGreaterThanOrEqualTo(0);
+        string otherJobs = workflow.Remove(mergeJobIndex, mergeJob.Length);
+        otherJobs.ShouldNotContain("pull-request-merge-ref");
+    }
+
+    [Fact]
     public static void StoryEvidenceIntegrityGateShouldRemainFailClosedAndMachineBound()
     {
         string root = RepositoryRoot();
@@ -1148,6 +1186,15 @@ public static class ScaffoldArchitectureTests
             .Where(static include => !string.IsNullOrWhiteSpace(include))
             .Select(static include => include!)
             .ToArray();
+    }
+
+    private static string WorkflowJob(string source, string name)
+    {
+        Match match = Regex.Match(
+            source,
+            $"(?ms)^  {Regex.Escape(name)}:.*?(?=^  \\S|\\z)");
+        match.Success.ShouldBeTrue($"workflow job '{name}' must exist");
+        return match.Value;
     }
 
     private static string WorkflowBlock(string source, string name, string nextName)

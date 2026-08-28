@@ -35,6 +35,40 @@ env:
   UseHexalithProjectReferences: true
 
 jobs:
+  pull-request-merge-ref:
+    name: pull-request synthetic merge build and test
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout synthetic pull-request merge
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          ref: ${{ github.sha }}
+      - name: Verify synthetic merge parents
+        env:
+          MERGE_SHA: ${{ github.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash .github/scripts/verify-pull-request-merge.sh "$MERGE_SHA" "$PR_BASE_SHA" "$PR_HEAD_SHA"
+      - name: Initialize root-declared references submodules
+        run: git submodule update --init
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.302
+      - name: Restore synthetic merge
+        run: dotnet restore Hexalith.ChatBot.slnx
+      - name: Build synthetic merge
+        run: dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -m:1
+      - name: Test synthetic merge ordinary lanes
+        run: bash .github/scripts/run-merge-test-lanes.sh
+
   build:
     runs-on: ubuntu-latest
     permissions:

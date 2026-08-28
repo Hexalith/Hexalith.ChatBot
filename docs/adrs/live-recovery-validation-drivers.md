@@ -83,6 +83,14 @@ The rebuild driver receives narrow source/evidence interfaces rather than a gene
 
 The canonical reports remain the verdict authority. A metadata-only manifest adds run/scenario ULIDs, UTC bounds, repository/topology/configuration versions, safe tenant and dataset locators, configured corpus volume, per-scenario exercised dataset volume, driver mode, fault/restore/cleanup actions, expected/observed scope, measurements and targets, verdict dimensions, assertions, coverage, deviations, durable residual identifiers, and raw-artifact locators.
 
+Release validation remains per commit and non-cancelling: every pushed SHA retains its own recovery producer and
+independent evidence-gate verdict even when runs finish out of order. Publication eligibility is a separate final
+decision. Immediately before semantic-release on `main`, the workflow fetches remote `main`; only an exact match
+publishes, a strict ancestor succeeds explicitly as `superseded` without publishing, and missing or divergent
+history fails closed. The configured `next`, `alpha`, and `beta` prerelease branches bypass this `main` comparison
+and retain their existing semantic-release behavior. This guard does not weaken, replace, serialize, or cancel any
+validated SHA's recovery verdict.
+
 The required lanes initialize a metadata-only workflow-attempt envelope before checkout, finalize it under `if: always()`, and use `if: always()` artifact upload with `if-no-files-found: error` and an explicit 30-day retention policy. They upload the raw `.trx` plus generated reports/manifests under `TestResults` when produced and always retain the workflow envelope on an ordinary runner/step failure. State-store assertions are captured in the domain report verdicts; the workflow envelope is diagnostic and cannot substitute for the domain attempt summary. The lane does not currently claim separate logs, traces, metrics, or state snapshots. Local ignored `TestResults` files are diagnostic only and are not repository-retained evidence.
 
 Evidence older than `MaximumEvidenceAge` (8 days, matching the 7-day cadence) is rejected as `stale_result`. Note the asymmetry with the 30-day artifact retention: an artifact aged 8–30 days is still downloadable but is no longer citable for ratification.
@@ -224,6 +232,8 @@ sits above the constant in the precedence chain and the unconditional form faile
 
 - Ordinary deployments remain non-destructive and retain inert deferred live-driver defaults.
 - The destructive scheduler is the Tier-3/release workflow (CI: scheduled/manual; release: per-commit non-cancelling concurrency — N concurrent 5.5-hour jobs accepted rather than a cancellable shared queue), never `PeriodicEnforcementBackgroundService` and never a second product hosted service.
+- Out-of-order `main` validation completion preserves every per-SHA verdict, but only the freshly fetched exact
+  remote head may invoke semantic-release; included older SHAs finish successfully as superseded.
 - A story-completion transition may additionally run the same live class inside `story-evidence-integrity`, but only when its active contract declares current-run `recovery-primary`; this is evidence production, not a product scheduler.
 - AppHost lifecycle control stays outside ChatBot; the bounded sandbox controller can affect only closed provider/component switches for the dedicated test tenant.
 - A sandbox pass narrows uncertainty but does not erase the named external-service, durability, scale, or production-control residuals.
