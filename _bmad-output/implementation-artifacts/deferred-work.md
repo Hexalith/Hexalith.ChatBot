@@ -552,6 +552,7 @@ reason: **[HIGH · pre-existing production binding] The scheduled controls still
 status: open
 decision: 2026-08-27 Build durable bindings — Assign owners and implement production bindings for outbound trace, derived store, WORM audit, and operator alerts with production-data scheduler evidence.
 decision: 2026-08-26 Build durable bindings — Assign owners and implement production bindings for outbound trace, derived store, WORM audit, and operator alerts with production-data scheduler evidence.
+resolution-note: Story 12.16 replaces only the Production derived-store and vector-reindex defaults with validated Hexalith.Memories service/client adapters. This entry stays open because the outbound-trace, WORM-audit, and operator-alert sinks remain process-local and the live Aspire acceptance lane was not executable without the configured mailbox client secret.
 
 ### DW-64: [MEDIUM · pre-existing runtime scaling] Cadence ownership and status are process-local.
 
@@ -569,7 +570,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-14-wire-t
 location: n/a
 severity: high
 reason: **[HIGH · owned by Story 12.16] The periodic correction-propagation SLO-deadline sweep (AC1 item 5) was never built.** Approved as a deviation by Jerome on 2026-07-31; recorded here because until now it existed only as prose in Story 12.14's Completion Notes, where no sweep or audit would find it. `ICorrectionPropagationCoordinator` exposes only `IsReady` and `StartAsync` — there is no sweep/scan method and no store seam enumerating in-flight or incomplete propagations, so a periodic scanner has nothing to iterate. SLO enforcement is currently live **inline and synchronously**: `DaprCorrectionPropagationCoordinator.StartAsync` sets `EstimatedCompletionAtUtc` via `CorrectionPropagationSlo.DeadlineFor`, and `InMemoryVectorReindexer` checks `IsBreached` within the same call. A *periodic* sweep only has in-flight work to catch once the reindex is asynchronous, which is why this is coupled to Story 12.16 (live Hexalith.Memories binding + the async-reindex question) rather than to 12.14. Story 9.6 defers both halves for the same reason and was deliberately not rewritten. **Do not close this until 12.16 either builds the sweep or records why an async reindex still does not need one.**
-status: open
+status: done 2026-08-28
+resolution: Story 12.16 chose a durable asynchronous Memories correction operation whose status is polled by the existing durable ChatBot correction workflow. `CorrectionPropagationWorkflowRunner` uses durable timers, never treats scheduled/nonterminal work as complete, and routes terminal failure or the existing 60-minute M2 deadline to the audit-before-alert delay path. Because no scheduled correction is separately acknowledged as completed, there is no independent in-flight set for a periodic ChatBot sweep. Covered by `MemoriesCorrectionIsPolledWithADurableTimerAndCompletesOnlyAfterTerminalEvidence`, `ANonterminalMemoriesStatusRemainsPendingForDurablePolling`, and the existing M2 deadline tests.
 
 ### DW-66: [MEDIUM · mitigated 2026-07-31; durable fix owed to `Hexalith.Builds`] `Hexalith.EventStore.Gateway` is missing from the shared package catalog.
 
@@ -610,7 +612,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-14-wire-t
 location: DerivedStoreIsolationProbeCoordinator.cs:243-244
 severity: medium
 reason: **[MEDIUM · coupled to the distributed cadence-lease item above] The now-deterministic derived-store sentinel id makes the isolation probe fail-open under concurrent sweeps.** `DerivedStoreIsolationProbeCoordinator.cs:243-244` — the round-1 patch removed the run correlation id from `SentinelResourceId` to make the probe idempotent (correctly: nightly activation of the old per-run id would have grown live derived state without bound). The consequence is that `iso-probe:{segment}:{ownerTenant}` is now a *shared mutable key* across runs. If two sweeps overlap on the same `(class, ownerTenant)` — two replicas, or a manual release-gate invocation racing the nightly sweep — run B's `finally` `InvalidateAsync` (`:126-128`) can delete run A's sentinel in the window between A's `PutAsync` (`:98-100`) and A's cross-tenant `GetAsync` (`:105-107`). A then observes `null`, `DerivedStoreIsolationVerifier.Verify` returns Isolated, and a genuinely leaky store reports **zero breaches** to the M2 stop-ship signal. `SweepAllTenantPairsAsync` is sequential, so a single process is safe today; the exposure begins exactly where the recorded "horizontally scaled replicas can execute the same global sweep" deferral does — but note that deferral describes duplicate *writes/alerts*, not a **masked breach**, which is strictly worse. Resolve together with distributed cadence leasing; do not close that item without covering this. Owner: the deployment/scale owner.
-status: open
+status: done 2026-08-28
+resolution: Story 12.16 makes every sentinel identity unique to the complete run correlation, ordered tenant pair, and category; cleanup deletes only that fenced identity, awaits the delete, and confirms a same-tenant residual read is empty. Cleanup failure, residual presence, and zero four-category coverage all become stop-ship outcomes. This removes the shared mutable sentinel key that allowed one overlapping run to mask another. Covered by `CorrectlyPartitionedStoreSweepsWithZeroBreachesAndNoAlert`, cleanup-failure/residual tests, and `ZeroFourCategoryCoverageIsStopShipInsteadOfVacuousSuccess`. The broader distributed cadence lease in DW-64 remains open.
 decision: 2026-08-28 Lease and fence cleanup — Serialize matching probes through the distributed cadence lease, fence cleanup to its generation, and add concurrent-sweep tests.
 decision: 2026-08-28 Lease and fence cleanup — Serialize matching probes through the distributed cadence lease, fence cleanup to its generation, and add concurrent-sweep tests.
 
@@ -1167,3 +1170,12 @@ status: done 2026-08-28
 decision: 2026-08-28 Close review reminder — The completed follow-up and separately triaged concrete residuals make the generic reminder redundant.
 resolution: closed by human decision: The completed follow-up and separately triaged concrete residuals make the generic reminder redundant.
 decision: 2026-08-28 Close review reminder — The completed follow-up and separately triaged concrete residuals make the generic reminder redundant.
+
+### DW-137: [HIGH · Story 12.16 blocker] ChatBot has no canonical Memories ingestion result from which to finalize the required correction binding.
+
+origin: `spec-12-16-bind-the-live-hexalith-memories-derived-store-backing.md`, 2026-08-28
+location: ChatBot mailbox/source-association-to-Memories ingestion boundary (absent)
+source_spec: `spec-12-16-bind-the-live-hexalith-memories-derived-store-backing.md`
+severity: high
+reason: ChatBot never calls `MemoriesClient.IngestAsync`; the metadata-only mailbox projection and folder attachment capture paths contain no authoritative prior Memories case id or ordered canonical message/attachment `MemoryUnitId` results. It therefore cannot prove all individual ingests succeeded or construct the exact finalization manifest. Inferring case/unit identities from ChatBot project or attachment ids is prohibited by the spec's Block If rule. The correction adapter remains intentionally fail-closed on a missing binding. Closure requires an owned message/attachment-to-Memories ingestion workflow that returns the prior case plus every ordered canonical unit, calls `FinalizeDerivedStoreBindingAsync` only after complete success, and proves the live persisted end-state.
+status: open
