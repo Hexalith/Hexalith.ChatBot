@@ -41,6 +41,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
     private readonly HttpClient _securityClient;
     private readonly ReadModelProjectConversationProjectionStore _readModels;
     private readonly IReadModelConditionalEraser _readModelEraser;
+    private readonly RecoveryIntakeReadModelProbe _intakeReadModels;
     private readonly EventStoreDurableStateProbe _durableState;
     private string _controlAccessToken;
     private readonly string _mailboxClientSecret;
@@ -81,6 +82,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         _controllerSecret = controllerSecret;
         _readModels = new ReadModelProjectConversationProjectionStore(readModelStore);
         _readModelEraser = readModelEraser;
+        _intakeReadModels = new RecoveryIntakeReadModelProbe(readModelEraser);
         _durableState = durableState;
         _chatBotClient = application.CreateHttpClient("chatbot");
         _chatBotClient.Timeout = TimeSpan.FromSeconds(30);
@@ -465,7 +467,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
                 _graphRecoveredIntakeRef,
                 AbsenceConfirmationWindow,
                 cancellationToken);
-            Task<bool> controlTenantReadModelsAbsent = RemainsIntakeReadModelsAbsentAsync(
+            Task<bool> controlTenantReadModelsAbsent = _intakeReadModels.RemainsAbsentAsync(
                 RecoveryValidationTopology.ControlTenantRef,
                 _graphRecoveredIntakeRef,
                 AbsenceConfirmationWindow,
@@ -615,7 +617,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         bool complete = true;
         foreach ((string cleanupTenant, string cleanupIntake) in intakeTargets)
         {
-            complete &= await AreIntakeReadModelsAbsentAsync(
+            complete &= await _intakeReadModels.AreAbsentAsync(
                 cleanupTenant,
                 cleanupIntake,
                 cancellationToken).ConfigureAwait(false);
@@ -680,56 +682,10 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
     /// <summary>Erases every read model an intake materializes, not just its source-email view.</summary>
     private async Task EraseIntakeReadModelsAsync(string tenantId, string intakeId, CancellationToken cancellationToken)
     {
-        await EraseReadModelAsync(
-            ProjectConversationSourceEmailView.KeyFor(tenantId, intakeId),
-            cancellationToken).ConfigureAwait(false);
-        await EraseReadModelAsync(
-            ProjectConversationAttachmentSetView.KeyFor(tenantId, intakeId),
-            cancellationToken).ConfigureAwait(false);
-        await EraseReadModelAsync(
-            AttachmentIndexKeyFor(tenantId, intakeId),
-            cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task<bool> AreIntakeReadModelsAbsentAsync(
-        string tenantId,
-        string intakeId,
-        CancellationToken cancellationToken)
-    {
-        foreach (string key in IntakeReadModelKeys(tenantId, intakeId))
+        foreach (string key in RecoveryIntakeReadModelProbe.KeysFor(tenantId, intakeId))
         {
-            (bool present, _) = await _readModelEraser.TryReadEtagAsync(
-                ChatBotReadModelStoreNames.StateStoreName,
-                key,
-                cancellationToken).ConfigureAwait(false);
-            if (present)
-            {
-                return false;
-            }
+            await EraseReadModelAsync(key, cancellationToken).ConfigureAwait(false);
         }
-
-        return true;
-    }
-
-    private async Task<bool> RemainsIntakeReadModelsAbsentAsync(
-        string tenantId,
-        string intakeId,
-        TimeSpan window,
-        CancellationToken cancellationToken)
-    {
-        Stopwatch timer = Stopwatch.StartNew();
-        do
-        {
-            if (!await AreIntakeReadModelsAbsentAsync(tenantId, intakeId, cancellationToken).ConfigureAwait(false))
-            {
-                return false;
-            }
-
-            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
-        }
-        while (timer.Elapsed < window);
-
-        return await AreIntakeReadModelsAbsentAsync(tenantId, intakeId, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<bool> RemainsReadModelKeyAbsentAsync(
@@ -759,17 +715,6 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
             cancellationToken).ConfigureAwait(false);
         return !finalPresent;
     }
-
-    private static string[] IntakeReadModelKeys(string tenantId, string intakeId)
-        =>
-        [
-            ProjectConversationSourceEmailView.KeyFor(tenantId, intakeId),
-            ProjectConversationAttachmentSetView.KeyFor(tenantId, intakeId),
-            AttachmentIndexKeyFor(tenantId, intakeId),
-        ];
-
-    private static string AttachmentIndexKeyFor(string tenantId, string intakeId)
-        => $"{tenantId}:project-conversation:{intakeId}:attachments";
 
     private async Task EraseReadModelAsync(string key, CancellationToken cancellationToken)
     {

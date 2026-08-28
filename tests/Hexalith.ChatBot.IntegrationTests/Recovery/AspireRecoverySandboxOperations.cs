@@ -70,6 +70,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     /// </summary>
     private readonly ReadModelGovernedOperationViewStore _governedOperationProjections;
     private readonly IReadModelConditionalEraser _readModelEraser;
+    private readonly RecoveryIntakeReadModelProbe _intakeReadModels;
     private readonly EventStoreDurableStateProbe _durableState;
     private readonly string _mailboxClientSecret;
     private readonly string _controllerSecret;
@@ -119,6 +120,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         _readModels = new ReadModelProjectConversationProjectionStore(readModelStore);
         _governedOperationProjections = new ReadModelGovernedOperationViewStore(readModelStore);
         _readModelEraser = readModelEraser;
+        _intakeReadModels = new RecoveryIntakeReadModelProbe(readModelEraser);
         _durableState = durableState;
         _chatBotClient = application.CreateHttpClient("chatbot");
         _chatBotClient.Timeout = TimeSpan.FromSeconds(30);
@@ -867,7 +869,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             _controlledRejectedCandidateRef,
             AbsenceConfirmationWindow,
             cancellationToken);
-        Task<bool> candidateReadModelsAbsent = RemainsIntakeReadModelsAbsentAsync(
+        Task<bool> candidateReadModelsAbsent = _intakeReadModels.RemainsAbsentAsync(
             RecoveryValidationTopology.StorageTenantRef,
             _controlledRejectedCandidateRef,
             AbsenceConfirmationWindow,
@@ -877,7 +879,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             _controlledPreFaultIntakeRef,
             AbsenceConfirmationWindow,
             cancellationToken);
-        Task<bool> controlPreReadModelsAbsent = RemainsIntakeReadModelsAbsentAsync(
+        Task<bool> controlPreReadModelsAbsent = _intakeReadModels.RemainsAbsentAsync(
             RecoveryValidationTopology.ControlTenantRef,
             _controlledPreFaultIntakeRef,
             AbsenceConfirmationWindow,
@@ -887,7 +889,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             _controlledRejectedCandidateRef,
             AbsenceConfirmationWindow,
             cancellationToken);
-        Task<bool> controlCandidateReadModelsAbsent = RemainsIntakeReadModelsAbsentAsync(
+        Task<bool> controlCandidateReadModelsAbsent = _intakeReadModels.RemainsAbsentAsync(
             RecoveryValidationTopology.ControlTenantRef,
             _controlledRejectedCandidateRef,
             AbsenceConfirmationWindow,
@@ -897,7 +899,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             _controlledPostRecoveryIntakeRef,
             AbsenceConfirmationWindow,
             cancellationToken);
-        Task<bool> controlPostReadModelsAbsent = RemainsIntakeReadModelsAbsentAsync(
+        Task<bool> controlPostReadModelsAbsent = _intakeReadModels.RemainsAbsentAsync(
             RecoveryValidationTopology.ControlTenantRef,
             _controlledPostRecoveryIntakeRef,
             AbsenceConfirmationWindow,
@@ -1117,7 +1119,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
             _reconciledIntakeRef,
             AbsenceConfirmationWindow,
             cancellationToken);
-        Task<bool> controlTenantReadModelsAbsent = RemainsIntakeReadModelsAbsentAsync(
+        Task<bool> controlTenantReadModelsAbsent = _intakeReadModels.RemainsAbsentAsync(
             RecoveryValidationTopology.ControlTenantRef,
             _reconciledIntakeRef,
             AbsenceConfirmationWindow,
@@ -1213,7 +1215,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 continue;
             }
 
-            complete &= await AreIntakeReadModelsAbsentAsync(
+            complete &= await _intakeReadModels.AreAbsentAsync(
                 cleanupTenant,
                 cleanupIntake,
                 cancellationToken).ConfigureAwait(false);
@@ -1281,67 +1283,11 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     /// </summary>
     private async Task EraseIntakeReadModelsAsync(string tenantId, string intakeId, CancellationToken cancellationToken)
     {
-        await EraseReadModelAsync(
-            ProjectConversationSourceEmailView.KeyFor(tenantId, intakeId),
-            cancellationToken).ConfigureAwait(false);
-        await EraseReadModelAsync(
-            ProjectConversationAttachmentSetView.KeyFor(tenantId, intakeId),
-            cancellationToken).ConfigureAwait(false);
-        await EraseReadModelAsync(
-            AttachmentIndexKeyFor(tenantId, intakeId),
-            cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task<bool> AreIntakeReadModelsAbsentAsync(
-        string tenantId,
-        string intakeId,
-        CancellationToken cancellationToken)
-    {
-        foreach (string key in IntakeReadModelKeys(tenantId, intakeId))
+        foreach (string key in RecoveryIntakeReadModelProbe.KeysFor(tenantId, intakeId))
         {
-            (bool present, _) = await _readModelEraser
-                .TryReadEtagAsync(ChatBotReadModelStoreNames.StateStoreName, key, cancellationToken)
-                .ConfigureAwait(false);
-            if (present)
-            {
-                return false;
-            }
+            await EraseReadModelAsync(key, cancellationToken).ConfigureAwait(false);
         }
-
-        return true;
     }
-
-    private async Task<bool> RemainsIntakeReadModelsAbsentAsync(
-        string tenantId,
-        string intakeId,
-        TimeSpan window,
-        CancellationToken cancellationToken)
-    {
-        Stopwatch timer = Stopwatch.StartNew();
-        do
-        {
-            if (!await AreIntakeReadModelsAbsentAsync(tenantId, intakeId, cancellationToken).ConfigureAwait(false))
-            {
-                return false;
-            }
-
-            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
-        }
-        while (timer.Elapsed < window);
-
-        return await AreIntakeReadModelsAbsentAsync(tenantId, intakeId, cancellationToken).ConfigureAwait(false);
-    }
-
-    private static string[] IntakeReadModelKeys(string tenantId, string intakeId)
-        =>
-        [
-            ProjectConversationSourceEmailView.KeyFor(tenantId, intakeId),
-            ProjectConversationAttachmentSetView.KeyFor(tenantId, intakeId),
-            AttachmentIndexKeyFor(tenantId, intakeId),
-        ];
-
-    private static string AttachmentIndexKeyFor(string tenantId, string intakeId)
-        => $"{tenantId}:project-conversation:{intakeId}:attachments";
 
     private async Task EraseReadModelAsync(string key, CancellationToken cancellationToken)
     {

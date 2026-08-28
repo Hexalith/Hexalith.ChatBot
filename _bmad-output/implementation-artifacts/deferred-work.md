@@ -28,7 +28,9 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: AspireRecoverySandboxOperations.cs
 severity: low
 reason: **[LOW · code hygiene]** Duplicated read-model-key helpers (`IntakeReadModelKeys`, `AttachmentIndexKeyFor`, `AreIntakeReadModelsAbsentAsync`, `RemainsIntakeReadModelsAbsentAsync`) independently added to both `AspireRecoverySandboxOperations.cs` and `AspireScopedOutageOperations.cs`. **Release-claim impact:** none directly; a future read-model key-shape change must be made in two places by hand. **Owner:** ops-harness code hygiene. **Closure evidence:** shared helper extraction.
-status: open
+status: done 2026-08-28
+resolution: resolved by sweep bundle dw-shared-recovery-read-model-keys
+resolution-undo: ebaf85466a0a206803a4214c894364d6aff422801162719b04c4820660feb084 2026-08-28 7374617475733a206f70656e
 
 ### DW-4: [LOW · design invariant] Graph scoped-outage lane hardcodes `RecoveryPhase` notification identity at every call site with no `CheckpointPhase` concept.
 
@@ -1190,3 +1192,43 @@ severity: high
 reason: ChatBot never calls `MemoriesClient.IngestAsync`; the metadata-only mailbox projection and folder attachment capture paths contain no authoritative prior Memories case id or ordered canonical message/attachment `MemoryUnitId` results. It therefore cannot prove all individual ingests succeeded or construct the exact finalization manifest. Inferring case/unit identities from ChatBot project or attachment ids is prohibited by the spec's Block If rule. The correction adapter remains intentionally fail-closed on a missing binding. Closure requires an owned message/attachment-to-Memories ingestion workflow that returns the prior case plus every ordered canonical unit, calls `FinalizeDerivedStoreBindingAsync` only after complete success, and proves the live persisted end-state.
 status: done 2026-08-28
 resolution: already resolved: Commit b9d49cb; src/Hexalith.ChatBot.Server/Adapters/Memories/IngestionBindingStartSourceActivity.cs:35 starts Memories ingestion, IngestionBindingWorkflowRunner.cs:29-38 collects canonical MemoryUnitId results before finalization, and IngestionBindingFinalizeActivity.cs:19-30 calls FinalizeDerivedStoreBindingAsync.
+
+### DW-138: The harness copy of the attachment-index key shape is still a hand-copied twin of the production factory, so a production rename would silently make recovery absence checks vacuously true.
+origin: spec-deferred 5325ee2eab4f
+location: tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryIntakeReadModelProbe.cs:48
+source_spec: `spec-shared-recovery-read-model-keys.md`
+severity: medium
+reason: RecoveryIntakeReadModelProbe.KeysFor builds the third key as the literal `{tenantId}:project-conversation:{intakeId}:attachments`, while production writes it from the private `AttachmentIndexKeyFor` in ReadModelProjectConversationProjectionStore. The first two keys are genuinely tethered (they call the public KeyFor factories); the third is compared only against a restatement of itself in KeysPreserveCanonicalShapesAndOrder. Editing the production shape breaks no test, and the harness would then erase and assert absence of a key that can never exist. This story reduced the number of harness copies from two to one but could not close the gap: the intent lists production as read-only evidence and forbids changing production read-model keys or public contracts.
+status: open
+
+### DW-139: The "canonical" intake read-model set covers three keys while an intake also materializes per-intake items and participants entries, so cleanup and cross-tenant isolation checks cannot observe leaks t
+origin: spec-deferred 9e2be3ea29d2
+location: tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryIntakeReadModelProbe.cs:43
+source_spec: `spec-shared-recovery-read-model-keys.md`
+severity: medium
+reason: Both operations classes document EraseIntakeReadModelsAsync as erasing "every read model an intake materializes", but ReadModelProjectConversationProjectionStore also persists `{tenant}:project-conversation:{intake}:items` and `...:participants` plus the item and participant views they index. Those are outside the trio, so they survive cleanup and the absence probes are blind to them. This predates the change, but the change names the trio canonical and pins it with a new test.
+status: open
+
+### DW-140: LiveProjectionRebuildDriverTests.RebuildUsesOnlyTheSelectedTenantImmutableSourceAndWormChain fails on a write-count assertion and already failed at this story's baseline commit.
+origin: spec-deferred 3257e0491634
+location: tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveProjectionRebuildDriverTests.cs:63
+source_spec: `spec-shared-recovery-read-model-keys.md`
+severity: medium
+reason: Shouldly.ShouldAssertException: readModels.Writes should be 4 but was 6. Reproduced on the patched tree, on HEAD, and on a tree restored to baseline 53c41666742c8bf359783e24997581467f5afae7 with the two new files removed, so it is unrelated to this refactor and to its patches. The counter involved is Writes, which this story never touched.
+status: open
+
+### DW-141: The integration test project has no clean build configuration in this workspace: the default Debug source-reference mode and the package mode each fail for different pre-existing dependency-drift reas
+origin: spec-deferred 77e48253b098
+location: references/Hexalith.EventStore/src/Hexalith.EventStore.Contracts/Hexalith.EventStore.Contracts.csproj
+source_spec: `spec-shared-recovery-read-model-keys.md`
+severity: high
+reason: `dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug -m:1` fails with CS1704 ("An assembly with the same simple name 'Hexalith.Commons.UniqueIds' has already been imported") in references/Hexalith.EventStore/src/Hexalith.EventStore.Contracts. The super-repo sets UseHexalithProjectReferences=true for Debug, which turns on HexalithCommonsFromSource inside the EventStore submodule, so a source-built UniqueIds 3.97 and the transitively resolved package 2.30 land in the same compile closure. Forcing package mode with -p:UseHexalithProjectReferences=false instead fails with CS0234/CS0246 because the published Hexalith.Memories.Contracts package lacks the Hexalith.Memories.Contracts.V1.DerivedStores namespace that src/Hexalith.ChatBot.Server consumes. Only -p:HexalithCommonsFromSource=false builds clean. Neither failure is in any file this story touched.
+status: open
+
+### DW-142: Follow-up review still recommended for dw-shared-recovery-read-model-keys after the damping cap was spent
+origin: review-budget-followup
+location: n/a
+source_spec: `spec-shared-recovery-read-model-keys.md`
+severity: low
+reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260828-185552-dcc0; this entry preserves the lingering recommendation for a deliberate later review.
+status: open

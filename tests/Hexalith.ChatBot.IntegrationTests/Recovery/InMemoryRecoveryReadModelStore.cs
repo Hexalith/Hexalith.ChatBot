@@ -13,6 +13,7 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
     private readonly ConcurrentDictionary<string, Entry> _entries = new(StringComparer.Ordinal);
     private int _writes;
     private int _reads;
+    private int _readAttempts;
     private int _erases;
     private long _version;
 
@@ -22,10 +23,33 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
     /// <summary>When true, every write attempt throws before persisting.</summary>
     public bool RejectWrites { get; set; }
 
+    /// <summary>
+    /// When true, every read attempt throws before observing storage. The attempt is still counted, so
+    /// <see cref="FailOnReadNumber"/> keeps the same numbering under this rejection.
+    /// </summary>
+    public bool RejectReads { get; set; }
+
+    /// <summary>
+    /// When set, the Nth read attempt throws before observing storage. Attempts are counted whether or not they
+    /// succeed, so only that single attempt fails and later reads observe storage normally.
+    /// </summary>
+    public int? FailOnReadNumber { get; set; }
+
+    /// <summary>
+    /// Invoked with the 1-based read-attempt number after the injected-failure seams have been evaluated and
+    /// before that attempt observes storage. Tests use it to mutate storage at an exact attempt instead of
+    /// racing a polling loop on wall-clock time.
+    /// </summary>
+    public Action<int>? OnReadAttempt { get; set; }
+
     /// <summary>Gets the number of successful persisted writes.</summary>
     public int Writes => Volatile.Read(ref _writes);
 
-    /// <summary>Gets the number of persisted reads.</summary>
+    /// <summary>
+    /// Gets the number of persisted reads that completed their storage observation, counting both value reads and
+    /// etag probes. A read is counted only after storage has been observed, so callers may await this counter to
+    /// know that an observation has already happened.
+    /// </summary>
     public int Reads => Volatile.Read(ref _reads);
 
     /// <summary>Gets the number of successful persisted erases.</summary>
@@ -39,11 +63,14 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
         where TValue : class
     {
         cancellationToken.ThrowIfCancellationRequested();
-        Interlocked.Increment(ref _reads);
+        BeginRead();
         if (!_entries.TryGetValue(CompositeKey(storeName, key), out Entry? entry))
         {
+            CompleteRead();
             return Task.FromResult(new ReadModelEntry<TValue>(null, null));
         }
+
+        CompleteRead();
 
         if (entry.Value is not TValue typed)
         {
@@ -163,10 +190,15 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(
-            _entries.TryGetValue(CompositeKey(storeName, key), out Entry? entry)
-                ? (true, entry.ETag)
-                : (false, string.Empty));
+        BeginRead();
+        if (!_entries.TryGetValue(CompositeKey(storeName, key), out Entry? entry))
+        {
+            CompleteRead();
+            return Task.FromResult((false, string.Empty));
+        }
+
+        CompleteRead();
+        return Task.FromResult((true, entry.ETag));
     }
 
     private static string CompositeKey(string storeName, string key)
@@ -183,6 +215,25 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
             throw new InvalidOperationException("Injected read-model write failure.");
         }
     }
+
+    private void BeginRead()
+    {
+        int attempt = Interlocked.Increment(ref _readAttempts);
+        if (RejectReads)
+        {
+            throw new InvalidOperationException("Injected read-model read rejection.");
+        }
+
+        if (FailOnReadNumber is int failAt && attempt == failAt)
+        {
+            throw new InvalidOperationException(
+                $"Injected read-model read failure on read attempt {failAt.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
+        }
+
+        OnReadAttempt?.Invoke(attempt);
+    }
+
+    private void CompleteRead() => Interlocked.Increment(ref _reads);
 
     private string NextEtag()
         => Interlocked.Increment(ref _version).ToString(System.Globalization.CultureInfo.InvariantCulture);
