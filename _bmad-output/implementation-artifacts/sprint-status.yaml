@@ -1,5 +1,5 @@
-# generated: 2026-07-20T11:30:23+02:00
-# last_updated: 2026-08-09
+# generated: 07-20-2026 11:30
+# last_updated: 08-29-2026 00:16
 # project: chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -36,8 +36,8 @@
 # - A story moves from `review` to `done` only when the TE-2 `story-evidence-integrity` check passes for that exact proposed transition.
 # - Until TE-2 self-validates and the check is required, no subsequent story may move to `done`; stories remain in `review`/`in-progress` without implying product failure.
 
-generated: 2026-07-20T11:30:23+02:00
-last_updated: 2026-08-26
+generated: 07-20-2026 11:30
+last_updated: 08-29-2026 00:16
 project: chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -46,6 +46,13 @@ story_location: _bmad-output/implementation-artifacts
 development_status:
   # Reopened for corrected primary-path evidence by sprint-change-proposal-2026-07-17.
   epic-1: in-progress
+  # Canonical split of historical Story 1.1. Statuses preserve the approved rebaseline and recorded evidence.
+  1-1a-solution-scaffold-root-config-and-build-green-baseline: done
+  1-1b-references-eventstore-submodule-and-sibling-dependency-resolution: done
+  1-1c-aspire-dapr-topology-and-local-run-verification: review
+  1-1d-ci-release-skeleton-and-scaffold-quality-gates: done
+  1-1e-centralize-nuget-package-reference-version-authority: in-progress
+  1-1f-standardize-reusable-domain-module-ci-cd-and-release-gates: backlog
   1-2-establish-the-openapi-contract-spine-typed-client-and-ichatbotcommand: done
   1-3-commandgateway-admission-spine-with-tenant-binding-and-authorization: done
   1-4-fail-closed-audit-commit-seam-with-pre-and-post-commit-audit-emission: done

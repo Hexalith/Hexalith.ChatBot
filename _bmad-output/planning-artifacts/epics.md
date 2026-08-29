@@ -7,7 +7,7 @@ stepsCompleted:
 status: implementation-readiness-rebaseline
 completedAt: "2026-05-29"
 epicCount: 13
-storyCount: 112
+storyCount: 116
 technicalEnablerCount: 2
 storyEvidenceIntegrityAlignedAt: "2026-08-03"
 correctedAt: "2026-05-30"
@@ -17,6 +17,9 @@ hostReuseAlignedAt: "2026-06-09"
 securityHostReuseAlignedAt: "2026-06-26"
 implementationReadinessRebaselinedAt: "2026-07-17"
 packageVersionAuthorityCorrectedAt: "2026-07-18"
+ciCdAlignmentAt: "2026-07-18"
+recoveryDeferralsAlignedAt: "2026-07-20"
+inventoryReconciledAt: "2026-08-29"
 inputDocuments:
   - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md"
   - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/addendum.md"
@@ -27,6 +30,9 @@ inputDocuments:
   - "_bmad-output/planning-artifacts/implementation-readiness-report-2026-07-17.md"
   - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-17.md"
   - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-18.md"
+  - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-18-ci-cd-alignment.md"
+  - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-20.md"
+  - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-20-epic12-recovery-deferrals.md"
   - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-08-03.md"
 ---
 
@@ -551,7 +557,7 @@ Every FR (and sub-FR) maps to exactly one primary epic below. Cross-cutting FRs 
 
 ## Epic List
 
-13 independently valuable product epics across the 3 fixed increments (M0 → M1 → M2), containing 112 assignable product stories. Dependency flow is strictly forward. Technical Enablers TE-1 and TE-2 are tracked in `technical-enablers.md` and are excluded from these counts. M0's first four epics deliver the complete vertical email-to-governed-action loop. The non-negotiable safety floor (tenant isolation, authorization, fail-closed, audit-of-the-command, idempotency, safe AI approval) is established in Epic 1 and inherited by all later epics; it is never trimmed.
+13 independently valuable product epics across the 3 fixed increments (M0 → M1 → M2), containing 116 assignable product stories. Dependency flow is strictly forward. Technical Enablers TE-1 and TE-2 are tracked in `technical-enablers.md` and are excluded from these counts. M0's first four epics deliver the complete vertical email-to-governed-action loop. The non-negotiable safety floor (tenant isolation, authorization, fail-closed, audit-of-the-command, idempotency, safe AI approval) is established in Epic 1 and inherited by all later epics; it is never trimmed.
 
 ### ▸ Increment M0 — Vertical Thesis Path (UI-only)
 

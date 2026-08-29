@@ -20,8 +20,10 @@ This index exists so readiness and planning workflows can discover nested PRD an
 
 ## Current Readiness Notes
 
-- `epics.md` contains 13 canonical product epics and 112 assignable product stories. TE-1 and TE-2 are tracked in `technical-enablers.md` and excluded from product counts; TE-2 governs prospective `done` transitions.
-- Epic 10 is part of the M2 release-readiness sequence and must close before MVP readiness sign-off.
-- Stories 8.7a/8.7b (control-plane runtime activation) own FR74/FR75 runtime enforcement materialization; the Epic 7 control floor is wired but inert until they land (readiness CR-2).
-- Epic 11 (DomainService SDK host adoption, architecture D8) closes readiness pass-2 Issue #1 and must close before MVP readiness sign-off; Story 11.1 (ADR → `docs/adrs/domainservice-sdk-host-adoption.md`) gates Stories 11.2–11.6, Stories 11.5/11.6 land after 8.7a/8.7b, and Story 11.7 closes the retained AppHost security-service helper reuse gap. See `sprint-change-proposal-2026-06-09-host-reuse.md`, `sprint-change-proposal-2026-06-26.md`, and `implementation-readiness-report-2026-06-09-pass-2.md`.
-- Story 10.6a (streaming transport ADR → `docs/adrs/ai-response-streaming-transport.md`) must be accepted before Story 10.6b is assigned (readiness CR-1).
+- `epics.md` contains 13 canonical product epics and 116 assignable product stories. The 2026-07-17 rebaseline established 111 stories; Story 1.1e, Story 1.1f, and Stories 12.14–12.16 account for the five approved additions. TE-1 and TE-2 are tracked in `technical-enablers.md` and excluded from product counts.
+- Epic 13 owns the complete governed interactive workspace and UI-conformance outcome and must close before MVP readiness sign-off.
+- Canonical Story 9.1 owns durable runtime control activation; Stories 9.2–9.6 own the user-value controls. Legacy Stories 8.7a/8.7b remain historical implementation evidence only.
+- DomainService SDK host adoption is tracked outside the product hierarchy as TE-1 and is recorded complete in `technical-enablers.md`; it is not canonical Epic 11. Canonical Epic 11 owns operational dashboards and observability.
+- AI-response streaming transport is resolved by `docs/adrs/ai-response-streaming-transport.md` and owned with the live interaction contract by canonical Story 13.2; legacy Stories 10.6a/10.6b remain historical evidence.
+- Stories 12.14–12.16 own the approved Epic 12 runtime-scheduler, live recovery-driver, and Memories-binding deferrals. Sprint status remains authoritative for their current delivery state.
+- TE-2 governs prospective `done` transitions. Its repository implementation is complete, but the technical-enabler record remains in review until the required protected check is active.
