@@ -35,12 +35,24 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
     /// </summary>
     public int? FailOnReadNumber { get; set; }
 
+    /// <summary>When set, reads of this exact read-model key throw before observing storage.</summary>
+    public string? FailOnReadKey { get; set; }
+
+    /// <summary>When set, erasure of this exact read-model key throws before changing storage.</summary>
+    public string? FailOnEraseKey { get; set; }
+
     /// <summary>
     /// Invoked with the 1-based read-attempt number after the injected-failure seams have been evaluated and
     /// before that attempt observes storage. Tests use it to mutate storage at an exact attempt instead of
     /// racing a polling loop on wall-clock time.
     /// </summary>
     public Action<int>? OnReadAttempt { get; set; }
+
+    /// <summary>Invoked with the exact read-model key before each storage observation.</summary>
+    public Action<string>? OnReadKey { get; set; }
+
+    /// <summary>Invoked with the exact read-model key after a successful erase.</summary>
+    public Action<string>? OnEraseKey { get; set; }
 
     /// <summary>Gets the number of successful persisted writes.</summary>
     public int Writes => Volatile.Read(ref _writes);
@@ -63,7 +75,7 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
         where TValue : class
     {
         cancellationToken.ThrowIfCancellationRequested();
-        BeginRead();
+        BeginRead(key);
         if (!_entries.TryGetValue(CompositeKey(storeName, key), out Entry? entry))
         {
             CompleteRead();
@@ -163,6 +175,11 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(etag);
+        if (string.Equals(FailOnEraseKey, key, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Injected named read-model erase failure.");
+        }
+
         string compositeKey = CompositeKey(storeName, key);
         if (!_entries.TryGetValue(compositeKey, out Entry? current))
         {
@@ -178,6 +195,7 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
         if (removed)
         {
             Interlocked.Increment(ref _erases);
+            OnEraseKey?.Invoke(key);
         }
 
         return Task.FromResult(removed);
@@ -190,7 +208,7 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        BeginRead();
+        BeginRead(key);
         if (!_entries.TryGetValue(CompositeKey(storeName, key), out Entry? entry))
         {
             CompleteRead();
@@ -216,8 +234,9 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
         }
     }
 
-    private void BeginRead()
+    private void BeginRead(string key)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
         int attempt = Interlocked.Increment(ref _readAttempts);
         if (RejectReads)
         {
@@ -230,7 +249,13 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
                 $"Injected read-model read failure on read attempt {failAt.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
         }
 
+        if (string.Equals(FailOnReadKey, key, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Injected named read-model read failure.");
+        }
+
         OnReadAttempt?.Invoke(attempt);
+        OnReadKey?.Invoke(key);
     }
 
     private void CompleteRead() => Interlocked.Increment(ref _reads);

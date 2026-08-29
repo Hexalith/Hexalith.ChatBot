@@ -35,11 +35,25 @@ internal sealed class SubscriptionRecoveryCleanupState
     /// <summary>Gets or sets whether subscription sentinels stayed unchanged during the fault.</summary>
     internal bool SubscriptionFaultLeftStateUnchanged { get; set; }
 
+    /// <summary>Gets every distinct canonical intake or candidate identity exposed by a producer response.</summary>
+    internal HashSet<string> StorageIntakeRefs { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Gets identities whose storage-tenant aggregate must remain absent after cleanup.</summary>
+    internal HashSet<string> StorageDurableAbsenceRefs { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Gets identities whose control-tenant aggregate and read models must remain absent.</summary>
+    internal HashSet<string> ControlTenantAbsenceRefs { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Gets whether this generation owns state that cleanup must handle.</summary>
+    internal bool HasOwnedState => AffectedTenantSentinel is not null ||
+        ControlTenantSentinel is not null ||
+        StorageIntakeRefs.Count > 0 ||
+        ControlTenantAbsenceRefs.Count > 0;
+
     /// <summary>Detaches the active generation and replaces it with a fresh empty generation.</summary>
     /// <param name="activeState">The active generation field to replace.</param>
     /// <returns>The detached generation that cleanup must use exclusively.</returns>
-    internal static SubscriptionRecoveryCleanupState DetachAndReset(
-        ref SubscriptionRecoveryCleanupState activeState)
+    internal static SubscriptionRecoveryCleanupState DetachAndReset(ref SubscriptionRecoveryCleanupState activeState)
     {
         ArgumentNullException.ThrowIfNull(activeState);
         SubscriptionRecoveryCleanupState detached = activeState;

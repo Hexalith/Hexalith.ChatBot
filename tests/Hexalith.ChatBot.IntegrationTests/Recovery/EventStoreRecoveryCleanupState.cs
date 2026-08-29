@@ -18,7 +18,7 @@ internal sealed class EventStoreRecoveryCleanupState
     /// <summary>Gets or sets the independent control-tenant note used by the isolation probe.</summary>
     internal string? ControlTenantNoteRef { get; set; }
 
-    /// <summary>Gets whether this generation owns any state that cleanup must handle.</summary>
+    /// <summary>Gets whether this generation owns state that cleanup must handle.</summary>
     internal bool HasOwnedState => CheckpointNoteRefs.Count > 0 ||
         !string.IsNullOrWhiteSpace(ControlTenantNoteRef) ||
         !string.IsNullOrWhiteSpace(FaultProbeNoteRef);
@@ -26,8 +26,7 @@ internal sealed class EventStoreRecoveryCleanupState
     /// <summary>Detaches the active generation and replaces it with a fresh empty generation.</summary>
     /// <param name="activeState">The active generation field to replace.</param>
     /// <returns>The detached generation that cleanup must use exclusively.</returns>
-    internal static EventStoreRecoveryCleanupState DetachAndReset(
-        ref EventStoreRecoveryCleanupState activeState)
+    internal static EventStoreRecoveryCleanupState DetachAndReset(ref EventStoreRecoveryCleanupState activeState)
     {
         ArgumentNullException.ThrowIfNull(activeState);
         EventStoreRecoveryCleanupState detached = activeState;

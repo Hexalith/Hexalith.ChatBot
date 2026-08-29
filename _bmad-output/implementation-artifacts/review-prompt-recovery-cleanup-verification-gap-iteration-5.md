@@ -1,0 +1,7 @@
+Read `/home/administrator/projects/hexalith/chatbot/_bmad/render/bmad-build/chatbot-53421bd87e70/7b69de11d523e258c5a7/review-prompts/verification-gap.md` completely and follow it as your review instructions.
+
+Review content:
+
+The complete change set in /home/administrator/projects/hexalith/chatbot since baseline commit 9fb71f24bbb9148eb6a406f889e046118c81e491, covering tracked and untracked files as they existed when this prompt was generated. Inspect tracked changes with `git diff --no-ext-diff 9fb71f24bbb9148eb6a406f889e046118c81e491 -- .` and `git status --short`. Read these untracked implementation files completely: `tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryDurableStateMessageHandler.cs`, `tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoverySandboxOperationsTestSeam.cs`, and `tests/Hexalith.ChatBot.IntegrationTests/Recovery/ScopedOutageOperationsTestSeam.cs`. The governing implementation spec is `_bmad-output/implementation-artifacts/spec-recovery-cleanup-state-isolation.md`; review the implementation and verification against it, while recognizing that `references/Hexalith.Builds` is a pre-existing unrelated user worktree change. Exclude the three `review-prompt-recovery-cleanup-*-iteration-5.md` workflow handoff files, which were created only after the review content was frozen.
+
+Do not invoke any skill. If the instruction file is unreadable, report that exact failure and stop. Return only the review result.
