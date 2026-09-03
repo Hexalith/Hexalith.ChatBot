@@ -42,10 +42,17 @@ HexalithChatBotResources resources = builder.AddHexalithChatBot(eventStore, tena
 IResourceBuilder<IDaprComponentResource> memoriesPubSub = builder
     .AddDaprComponent("pubsub", "pubsub.redis")
     .WithMetadata("redisHost", ChatBotAspireModule.ResolveRedisHost(builder.Configuration));
+IResourceBuilder<IDaprComponentResource> memoriesSecretStore = builder.AddDaprComponent(
+    "secretstore",
+    "secretstores.local.file",
+    new DaprComponentOptions
+    {
+        LocalPath = ResolveDaprConfigPath(builder.AppHostDirectory, "secretstore.memories.yaml"),
+    });
 HexalithMemoriesSearchIndexServerResources memories = builder.AddHexalithMemoriesSearchIndexServer(
     resources.EventStore,
     memoriesPubSub,
-    ResolveDaprConfigPath(builder.AppHostDirectory, "secretstore.memories.yaml"),
+    memoriesSecretStore,
     ResolveDaprConfigPath(builder.AppHostDirectory, "llm.memories.yaml"));
 EndpointReference memoriesHttp = memories.Server.GetEndpoint("http");
 ReferenceExpression memoriesEndpoint = ReferenceExpression.Create($"{memoriesHttp}");

@@ -728,7 +728,7 @@ public static class ScaffoldArchitectureTests
     {
         string root = RepositoryRoot();
 
-        File.ReadAllText(Path.Combine(root, "global.json")).ShouldContain("\"version\": \"10.0.302\"");
+        File.ReadAllText(Path.Combine(root, "global.json")).ShouldContain("\"version\": \"10.0.400\"");
         File.ReadAllText(Path.Combine(root, "global.json")).ShouldContain("\"rollForward\": \"latestPatch\"");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<TargetFramework>net10.0</TargetFramework>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<Nullable>enable</Nullable>");
