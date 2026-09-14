@@ -2,43 +2,47 @@
 
 ## Overall verdict
 
-The Update pass closed the five medium and three low findings as claimed: an authoritative inherited-token source is named, every component prose row carries its `{components.*}` reference, WCAG 2.2 AA target sizes (44×44, 24×24 CSS px) are stated concretely, French expansion/truncation rules name the columns that may collapse and the ones that must not, the scope reconciliation is now a table, and the spine-only visual-reference decision is explicit. One previously-passing area regressed mechanically: `sources:` frontmatter in both spines points at `../../prd.md` and `../../prd-validation-report.md` which do not exist at that path — the real PRD lives under `prds/prd-Hexalith.ChatBot-2026-05-28/`, so source resolution fails for two of three references. Otherwise the spine pair is a clean, extractable contract: all 17 components are paired across both files, all 9 PRD journeys (8 user + 1 system) map to Key Flows with protagonist, climax, and failure path, and every state family the PRD implies is enumerated per-surface.
+The spine pair is **broken as a current downstream contract** despite strong structure and substantial behavioral detail. Its nine flows semantically cover the nine source journeys, all four frontmatter sources resolve, all 17 locally declared components pair across the spines, and visual-reference handling is explicit; however, the contract cannot be source-extracted deterministically because source names and S1–S10 mappings are not preserved, the DESIGN color map violates the required token type, and current safety requirements for expired evidence and correction propagation are absent. The 2026-05-10 PRD validation report is stale context, not the current source verdict: the current PRD and approved addendum contents govern this review.
 
-## 1. Flow coverage — strong
+## 1. Flow coverage — thin
 
-Cross-walked the 8 PRD user journeys + 1 System journey against EXPERIENCE.md §Key Flows. Every journey has a Key Flow with verbatim protagonist (Amira UJ1/UJ8, Marc UJ2, Elena UJ3, Priya UJ4, Nora UJ5, Leo UJ6, Sofia UJ7) and the system journey is captured as Flow 9. Each flow has numbered steps, a labeled **Climax** beat, and a `Failure:` path. Flow 1 even adds a back-reference (`Source journey mapping: Journey 8 covers the review step in more detail as Flow 8.`) which is good cross-spine hygiene.
-
-### Findings
-
-- **low** Flow 9 introduces a protagonist name "Ari" for the AI agent that does not appear in any source PRD or brief; the PRD names the actor only as "project-aware AI agent." Not wrong, but it is invented framing. (EXPERIENCE.md:350). *Fix:* either drop the name and call it "Project-aware AI agent" or note in `.decision-log.md` that "Ari" is a UX-side personification for the system actor.
-
-## 2. Token completeness — strong
-
-YAML frontmatter declares `colors` (15 keys, all `var(--colorFluent…)` indirection), `typography` (5 roles using the supported `note:` field), `rounded` (sm/md/lg), `spacing` (8 keys), and `components` (17 entries). Every `{path.to.token}` reference resolves. The frontmatter convention is the platform-inheritance pattern the design-md spec allows (line 48 of `design-md-spec.md`: "When inheriting from native platforms… use a `note` field instead of literal values"). Inherited authoritative source is now named in §Colors line 141: `Hexalith.FrontComposer` Fluent UI v5 integration + `Hexalith.FrontComposer/docs/fluent-ui-v5-contingency.md`. Contrast targets are explicit for all eight load-bearing pairs (lines 154–163).
+Extracted the nine source journeys at `prd.md:319-427`, the S1–S10 source surface inventory at `prd.md:519-539`, 111 current FR identifiers (FR1–FR96 plus suffixed requirements), and 77 current NFR identifiers (NFR1–NFR70 plus suffixed requirements). EXPERIENCE.md has nine numbered Key Flows, each with a named protagonist, numbered steps, an explicit climax, and a failure path (`EXPERIENCE.md:256-355`), but it does not preserve a machine-checkable journey/requirement/surface crosswalk.
 
 ### Findings
 
-- **low** The contrast table cites `4.5:1` for the metadata pair "when text communicates status or recovery." For purely decorative muted helper text the table is silent. (DESIGN.md:157). *Fix:* add a one-line clause that purely decorative muted text follows Fluent's non-essential-text guidance, or remove the conditional.
+- **high** None of the nine Key Flow headings preserves its source journey heading verbatim or carries its UJ/System-journey identifier; for example, source `Journey 1: Business Contributor Requests AI Help From a Project Conversation` becomes `Flow 1 - Project contributor asks AI for help`. The only explicit mapping note links Flow 1 to Journey 8 rather than identifying Flow 1 as UJ1 (`prd.md:321-335`; `EXPERIENCE.md:258-270`). A consumer cannot deterministically join the flows to the current 188 requirement identifiers or tell which later suffixed requirements were incorporated. *Fix:* use each exact source journey heading (including `System Journey`) and add a compact `Source mapping` line per flow with its UJ, FR/NFR ranges, and S-surface identifiers.
+- **high** The source declares ten UI surfaces, while the UX IA declares nine differently partitioned surfaces without a crosswalk; S4 Correction Surface, S6 Outbound Approval, S7 Cross-surface Attribution View, and S10 Admin Queue Operations are only implicit or merged. Flow 6 exercises CLI behavior but never lands on S7, and Flow 5 reviews queues but does not exercise S10 retry/requeue/quarantine/dismiss behavior (`prd.md:519-539`; `EXPERIENCE.md:32-46,303-321`). *Fix:* add an S1–S10-to-IA mapping and extend the relevant flows so each source surface is reached and its load-bearing action and failure path are exercised; add a flow if a merged surface cannot close cleanly.
 
-## 3. Component coverage — strong
+## 2. Token completeness — broken
 
-All 17 components in `DESIGN.md.components` frontmatter (project-context-header, conversation-shell, conversation-stream, composer-action-entry, actor-badge, evidence-chip, risk-chip, attachment-row, evidence-drawer, ai-proposal-panel, approval-controls, approval-panel, blocked-state, association-candidate-row, queue-row, audit-timeline, status-toast-banner) appear with prose rows in `DESIGN.md §Components` and with behavioral rows in `EXPERIENCE.md §Component Patterns`. Names match across both files. The "pair the prose with the frontmatter token" fix is applied: every DESIGN.md prose bullet ends with the corresponding `{components.<name>}` token reference (lines 212–228).
-
-### Findings
-
-- **medium** `actor-badge` is broader in DESIGN.md (line 216: identifies "human user, external party, service client, AI actor, background worker, CLI, MCP, or mailbox event") than in EXPERIENCE.md (line 72: "Identifies actor type and resolved party/user/client"). The behavioral spec drops five of the eight named actor categories. Downstream dev will not know whether CLI/MCP/background-worker/mailbox-event/AI-actor need their own visual treatment or share one. (EXPERIENCE.md:72, DESIGN.md:216). *Fix:* in EXPERIENCE.md Component Patterns row for Actor badge, enumerate the same eight actor types DESIGN.md does, and state whether they share one visual or differentiate.
-
-## 4. State coverage — strong
-
-§State Patterns (lines 86–106) defines 17 named states. §Surface state coverage (lines 108–120) cross-walks every IA surface to its required states (cold load, empty, focus/active, error, retryable failure, terminal failure, unauthorized/redacted, dependency degraded are all named where they apply). The state-to-feedback matrix (lines 122–134) maps state families to feedback primitives (skeleton+`aria-busy`, polite toast, persistent banner, error summary with focus move, assertive announcement, non-interrupting "new updates" affordance). This is one of the strongest parts of the spine.
+Extracted 15 color tokens, five typography roles, three radii, nine spacing tokens, 17 component token objects, and every `{path.to.token}` occurrence in DESIGN.md. All 35 unique brace references resolve, radii and spacing are valid CSS dimensions, component references resolve recursively, and load-bearing contrast targets are stated for light, dark, and forced-colors behavior (`DESIGN.md:12-129,153-166`).
 
 ### Findings
 
-- None at medium or above. The coverage is complete across the 9 surfaces and ties cleanly to FR67 / FR76 / FR77 / FR79 acceptance criteria.
+- **critical** All 15 `colors` values are `var(--...)` strings rather than the hex strings required by the DESIGN.md color schema; none supplies a light/dark hex pair (`DESIGN.md:12-27`; `design-md-spec.md:9-19`). The project correctly requires inherited Fluent roles instead of hard-coded product colors, but putting inherited CSS variables into a schema field whose values downstream consumers mirror as hex makes the machine contract invalid. *Fix:* do not redeclare unchanged Fluent roles as local `colors`; express inheritance in Brand & Style/Colors and keep only genuine product color deltas in the schema. If the downstream schema requires local colors, define a repository-approved translation that satisfies both the hex type and the no-theme-redefinition rule before retaining this map.
+- **medium** Each typography role is defined only with `note`, although the typography object type permits `fontFamily`, `fontSize`, `fontWeight`, `lineHeight`, and `letterSpacing`; the semantic `note` exception is documented for native platform conventions, not an inherited web UI system (`DESIGN.md:28-38`; `design-md-spec.md:15-18,45-49`). *Fix:* omit unchanged Fluent typography roles and state inheritance in prose, or encode only actual brand-layer deltas with the supported fields.
 
-## 5. Visual reference coverage — adequate
+## 3. Component coverage — thin
 
-The workspace has empty `imports/` and `.working/` folders; no `mockups/` or `wireframes/` folder exists. The spine-only decision is logged explicitly in two places: EXPERIENCE.md:29 ("this update intentionally keeps the UX contract spine-only… spines win on conflict") and `.decision-log.md:66` ("the spine-only visual-reference decision: no mockups, wireframes, or imports are required for MVP handoff"). Not penalizing further — the decision is owned.
+The 17 local component identifiers in DESIGN frontmatter all have a substantive visual bullet in DESIGN.md.Components and a substantive behavioral row in EXPERIENCE.md.Component Patterns; normalized names pair one-to-one (`DESIGN.md:53-129,211-229`; `EXPERIENCE.md:63-85`). Inherited Fluent/FrontComposer primitives may remain inherited when the product defines no delta, but the current sources introduce additional product-specific deltas that are not represented in either component inventory.
+
+### Findings
+
+- **high** Current source-mandated product components are missing from both component contracts: the `informational` / `actionable` classification badge with detected intent, the collapsed-by-default `AI summary` block with model/time/evidence provenance, the detailed “why this project” panel, and the per-reference freshness chip that blocks approval when expired (`prd.md:523-526,1194-1201,1441`; `DESIGN.md:211-229`; `EXPERIENCE.md:63-85`). These are load-bearing distinctions, not generic Fluent defaults, and a downstream builder cannot infer their visual anatomy and behavioral rules safely. *Fix:* add identically named component tokens/specs and behavioral rows for these four concepts, including non-color distinction, source-default expansion behavior, provenance, freshness states, and approval blocking.
+- **medium** Several inherited primitives acquire product-specific behavior outside Component Patterns—skeleton busy-region replacement, error summary focus, dialog/sheet focus containment and single-level stacking, and queue filters—yet have no named local row or explicit inheritance-plus-delta mapping (`EXPERIENCE.md:123-140,150-172`). *Fix:* add rows for only those primitives with a behavioral delta, naming the exact FrontComposer/Fluent component to inherit; leave unchanged library components omitted.
+
+## 4. State coverage — broken
+
+Walked all nine UX IA surfaces against the general state table, per-surface state matrix, and feedback matrix (`EXPERIENCE.md:87-140`). Cold load, empty, selection/focus landing, validation, retryable and terminal error, degraded dependency, permission-denied/redacted, and most pending/success states are well covered, but two current source safety contracts are absent.
+
+### Findings
+
+- **critical** The experience has no `fresh` / `stale` / `expired` evidence-reference states and no `evidence-expired` approval block, although NFR48 requires a visible timestamp/state chip for every evidence reference and forbids approval against expired evidence (`prd.md:1441`; `EXPERIENCE.md:89-140`). “Stale filters” on Operational Queues is unrelated. *Fix:* add evidence freshness to Association Review, AI Action Review, Conversation Detail, and Audit Investigation; define the chip announcement, timestamp, stale treatment, expired treatment, and disabled-with-reason approval path.
+- **high** The canonical correction substates `Correcting` and `Correction-delayed` are missing. EXPERIENCE.md jumps from “Corrected association” / “correction applied” to completion, omitting progress, estimated completion, the AI-context-use block, p95 breach handling, responsible owner, next safe action, and P2 escalation required by FR91a/NFR17a (`prd.md:450-451,1324-1325`; `EXPERIENCE.md:98,114,205-213`). *Fix:* add both states to Conversation Detail, Correction/Association Review, Files and Context, Operational Queues, and Audit Investigation as applicable, and map each to feedback, focus, recovery, and AI-action gating.
+
+## 5. Visual reference coverage — strong
+
+There are no files or directories under `imports/`, `mockups/`, or `wireframes/` in the UX workspace, so there are no orphans or unspecific artifact references. The spine-only decision explicitly names every affected IA surface and states once that future visual references may extend the handoff but the spines win on conflict (`EXPERIENCE.md:30`).
 
 ### Findings
 
@@ -46,38 +50,38 @@ The workspace has empty `imports/` and `.working/` folders; no `mockups/` or `wi
 
 ## 6. Bloat & overspecification — adequate
 
-DESIGN.md carries editorial voice without restating PRD prose ("the interface should feel closer to an enterprise command workspace than to a social chat feed" — that earns its place). EXPERIENCE.md prose stays operational. The §Inspiration & Anti-patterns section (lines 237–245) is borderline — five bullets, four of them already covered by the §Foundation paragraph and the §Voice and Tone do/don't table. §Product-Specific Concerns (lines 247–259) also overlaps thematically with §Foundation and §State Patterns.
+Most prose carries downstream decisions rather than decorative narrative, and the detailed state/accessibility material is proportionate to the product's governance risk. The main overspecification is a local visual scale that duplicates the inherited UI system; the remaining repetition is minor.
 
 ### Findings
 
-- **low** §Inspiration & Anti-patterns (EXPERIENCE.md:237–245) restates posture already established in §Foundation and §Brand & Style. Three of the four "Rejected:" bullets repeat behavioral rules that are already enforced in §Component Patterns (AI proposal panel, blocked state) and §Interaction Primitives (banned interactions). *Fix:* either delete this section or compress to one line that names the inspirations and points to the operative spec sections.
+- **high** DESIGN.md declares a local 4/8/12px radius scale and nine spacing/density values while simultaneously saying buttons, inputs, menus, tabs, drawers, dialogs, cards, panels, radii, density, and spacing inherit Fluent/FrontComposer defaults (`DESIGN.md:39-52,136,180-190,203-209`). This creates two sources of truth and invites the raw CSS/theme recreation prohibited by the repository UX baseline (`references/Hexalith.AI.Tools/hexalith-ux-instructions.md:22-36`). *Fix:* remove inherited pixel scales or mark and justify only true product deltas, expressed through Fluent component parameters or Fluent 2 tokens.
+- **low** The same touch-target contract is stated in Accessibility Floor and Responsive & Platform (`EXPERIENCE.md:201,244`). *Fix:* keep the normative thresholds in Accessibility Floor and reference that rule from Responsive & Platform.
 
-- **low** §Product-Specific Concerns table (EXPERIENCE.md:247–259) restates concerns the IA, Component Patterns, and State Patterns already encode. "Tenant isolation," "multi-actor conversation," "external participants," and "auditability" are already enforced by named components/states/flows. *Fix:* keep only rows that introduce a UX requirement not visible elsewhere ("Internationalization" qualifies because it pins the English+French scope); fold the rest.
+## 7. Inheritance discipline — broken
 
-## 7. Inheritance discipline — adequate
-
-UJ names are verbatim from the PRD (Journey 1 → Flow 1, etc., though EXPERIENCE.md uses "Flow N" framing not "Journey N" — that is the convention this skill prefers). Component names are identical across the DESIGN.md frontmatter, the DESIGN.md §Components prose, and the EXPERIENCE.md §Component Patterns table. Glossary terms (Actor, Party, Evidence chip, Risk chip, Blocked state, Audit timeline, Command surface) carry the PRD glossary's intent. Inherited UI system is named twice (DESIGN.md:135, EXPERIENCE.md:16).
-
-### Findings
-
-- **medium** Both spines' `sources:` frontmatter is broken. DESIGN.md:7–10 and EXPERIENCE.md:6–9 list `- ../../prd.md`, `- ../../product-brief-Hexalith.ChatBot.md`, `- ../../prd-validation-report.md`. From the spine location, `../../` resolves to `_bmad-output/planning-artifacts/` — only the product brief actually lives there. The current PRD lives at `_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md`; the root-level `prd-validation-report.md` formerly at that location has been deleted (visible in `git status` as ` D _bmad-output/planning-artifacts/prd-validation-report.md`). Source-extracting consumers that try to follow these references will fail. *Fix:* update `sources:` to `- ../../prds/prd-Hexalith.ChatBot-2026-05-28/prd.md`, keep the product-brief path, drop the deleted `prd-validation-report.md` entry or repoint it to the current `prds/prd-Hexalith.ChatBot-2026-05-28/review-rubric-v2.md` if validation traceability is wanted.
-
-- **low** `EXPERIENCE.md §Foundation` (line 16) calls DESIGN.md "the visual identity reference" but does not say that the visual identity of the FrontComposer/Fluent UI v5 platform is itself the inherited source; a reader landing on EXPERIENCE.md first could think DESIGN.md is the authoritative palette. The chain is: Fluent UI v5 → FrontComposer → DESIGN.md (semantic narrowing) → EXPERIENCE.md (behavioral spec). *Fix:* add a one-line inheritance chain in §Foundation matching what DESIGN.md:141 already states.
-
-## 8. Shape fit — strong
-
-DESIGN.md canonical order is followed exactly: Brand & Style (131) → Colors (139) → Typography (167) → Layout & Spacing (179) → Elevation & Depth (191) → Shapes (202) → Components (210) → Do's and Don'ts (230). EXPERIENCE.md required defaults are all present: Foundation (14), Information Architecture (31), Voice and Tone (47), Component Patterns (62), State Patterns (86), Interaction Primitives (136), Accessibility Floor (182), Key Flows (261). Required-when-applicable §Responsive & Platform (223) is present because the PRD names mobile/triage scope. Invented sections: §Inspiration & Anti-patterns and §Product-Specific Concerns (see Pass 2 §6 above) — they exist but partially restate.
+All four relative `sources:` paths resolve from both spines, the two spines use the same source list, the 17 local component names normalize consistently across their sections, and every explicit token reference resolves. The current contract still fails inheritance discipline because it neither resolves a load-bearing source conflict nor clearly distinguishes binding source material from historical validation metadata.
 
 ### Findings
 
-- None at medium or above; the shape is correct.
+- **high** The source pair conflicts on the risk taxonomy: the PRD exposes four user-relevant outcomes (`Low-risk read-only`, `Approval-required`, `Denied`, `Unsupported`), while the approved addendum says the classifier emits only `low-risk` or `approval-required` and rejects disallowed commands before classification. The Risk chip and AI Action Review say “risk class” without committing which taxonomy is displayed or how denied/unsupported outcomes are represented (`prd.md:1215-1224`; `addendum.md:25-33`; `DESIGN.md:219`; `EXPERIENCE.md:77,334-343`). *Fix:* record the UX reconciliation explicitly: distinguish classifier output from user-visible disposition/effect labels, define the chip vocabulary, and map each source outcome to review/refusal behavior.
+- **medium** The fourth source is a 2026-05-10 validation report whose frontmatter and verdict describe an earlier PRD path and only 96 FRs / 70 NFRs; the current PRD records that those findings were addressed and now includes suffixed requirements (`DESIGN.md:7-11`; `EXPERIENCE.md:6-10`; `prd-validation-report.md:1-21,119-174`; `prd.md:42-50`). Listing the report beside binding PRD sources without a role marker invites downstream consumers to treat its stale `Critical` verdict as current contract evidence. *Fix:* remove it from binding `sources`, or classify it explicitly as historical/context-only validation evidence with its target revision.
+- **medium** DESIGN.md names `Hexalith.FrontComposer/docs/fluent-ui-v5-contingency.md` as the authoritative implementation source, but that path does not resolve from the repository or spine location; the actual root-declared submodule path is `references/Hexalith.FrontComposer/docs/fluent-ui-v5-contingency.md` (`DESIGN.md:142`). *Fix:* use the resolving repository-relative path, preferably as an inline link, and add it as an explicitly inherited UI-system source if consumers are expected to load it.
+
+## 8. Shape fit — adequate
+
+DESIGN.md follows the canonical order exactly: Brand & Style → Colors → Typography → Layout & Spacing → Elevation & Depth → Shapes → Components → Do's and Don'ts (`DESIGN.md:132-240`). EXPERIENCE.md contains every required default in order, and both conditional sections are justified: Responsive & Platform is required by multi-form-factor use, while Inspiration & Anti-patterns is supported by the intake references (`EXPERIENCE.md:15-355`; `.decision-log.md:7-17`).
+
+### Findings
+
+- **low** `Product-Specific Concerns` contains only an Internationalization row that restates the fuller Localization contract immediately above it, so the invented section does not earn a separate place (`EXPERIENCE.md:224-230,250-254`). *Fix:* remove the section and keep English/French scope in Localization, or expand it only if a distinct product concern cannot live in an existing required section.
 
 ## Mechanical notes
 
-- **Source frontmatter cross-refs broken** — two of three `sources:` paths in both DESIGN.md and EXPERIENCE.md do not resolve. See Finding §7.1 for the fix. This is the main mechanical hit.
-- **No Mermaid blocks present** in either spine — nothing to lint.
-- **`prd-validation-report.md` referenced in both spines + `.decision-log.md` line 22 has been deleted** (visible in repo `git status` at session start as ` D _bmad-output/planning-artifacts/prd-validation-report.md`). Any consumer following the citation chain will dead-end.
-- **Glossary parity not formally restated** — DESIGN.md and EXPERIENCE.md both use PRD-glossary terms ("evidence chip," "risk chip," "blocked state," "actor badge," "approval panel," "audit timeline") consistently, but neither spine carries a duplicated Glossary section. The skill default is to inherit from the PRD glossary, which is acceptable; not a finding, just a confirmation.
-- **Frontmatter completeness** — DESIGN.md frontmatter has `name`, `description`, `status: final`, dates, sources, colors, typography, rounded, spacing, components: complete. EXPERIENCE.md frontmatter has `name`, `status: final`, dates, sources: complete. EXPERIENCE.md does not duplicate token tables, which matches the convention that DESIGN.md owns visual tokens.
-- **Component name normalization** — DESIGN.md frontmatter uses kebab-case (`composer-action-entry`, `ai-proposal-panel`); the prose uses sentence-case with slashes (`Composer/action entry`, `AI proposal panel`); EXPERIENCE.md uses the same sentence-case. The pairing relies on a name-equality check that humans can do but a strict machine resolver might miss. Not a finding given the explicit `{components.composer-action-entry}` style references in the DESIGN.md prose disambiguate the mapping, but flagging for the consumer-side resolver to be aware.
-- **Touch target citation duplicated, scope justified** — EXPERIENCE.md §Accessibility Floor line 193 and §Responsive & Platform line 235 both state the 44×44 and 24×24 thresholds. The two paragraphs scope to different audiences (a11y reviewer vs. responsive implementer), so the repetition is justified.
+- Both YAML frontmatter blocks parse structurally; DESIGN.md contains 15 colors, five typography roles, three radii, nine spacing tokens, and 17 component objects. The schema-type defects are reported in §2.
+- All four source paths resolve from both spines: current PRD, approved addendum, product brief, and historical PRD validation report. The stale report is not used as the current source verdict.
+- The current source catalog contains 111 distinct FR identifiers and 77 distinct NFR identifiers; the historical validation report's counts of 96 and 70 predate the suffixed requirements.
+- All 35 unique `{path.to.token}` references in DESIGN.md resolve. EXPERIENCE.md contains no `{path.to.token}` references; it links visual behavior to DESIGN.md by normalized component name and the general `DESIGN.md.Components` statement.
+- All 17 locally declared component names pair across DESIGN.md and EXPERIENCE.md after kebab-case/sentence-case normalization. Missing current source components are listed in §3.
+- No `imports/`, `mockups/`, or `wireframes/` files exist, and the spine-only/spines-win decision is explicit.
+- No Mermaid blocks are present in either spine.
+- Journey labels and S1–S10 surface names are not preserved verbatim; see §§1 and 7. Canonical lifecycle names also drift to prose labels, with the load-bearing omissions called out in §4.

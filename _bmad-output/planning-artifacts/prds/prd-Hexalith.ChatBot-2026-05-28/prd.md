@@ -1,7 +1,7 @@
 ---
 title: Product Requirements Document - Hexalith.ChatBot
 created: "2026-05-10"
-updated: "2026-05-28"
+updated: "2026-09-14"
 stepsCompleted:
   - step-01-init
   - step-02-discovery
@@ -22,13 +22,16 @@ stepsCompleted:
   - step-e-02-review
   - step-e-03-edit
 inputDocuments:
-  - "D:/Hexalith.ChatBot/_bmad-output/planning-artifacts/product-brief-Hexalith.ChatBot.md"
+  - "_bmad-output/planning-artifacts/product-brief-Hexalith.ChatBot.md"
+  - "_bmad-output/planning-artifacts/architecture/architecture-chatbot-epic-12-recovery-provenance-2026-08-24/ARCHITECTURE-SPINE.md"
+  - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/source-manifest.md"
+  - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/qualification-evidence.md"
 documentCounts:
   productBriefs: 1
   research: 0
   brainstorming: 0
-  projectDocs: 0
-  projectContext: 0
+  projectDocs: 3
+  projectContext: 1
 classification:
   projectType: saas_b2b
   domain: enterprise collaboration / AI project workspace
@@ -36,10 +39,14 @@ classification:
   projectContext: greenfield product on existing Hexalith platform
 workflowType: 'prd'
 releaseMode: single-release
-status: final
+status: draft
 completedAt: "2026-05-10T21:29:40.8096941+02:00"
-lastEdited: "2026-05-28"
+lastEdited: "2026-09-14"
 editHistory:
+  - date: "2026-09-14"
+    changes: "Reopened the PRD to reconcile the 2026-09-13 validation findings, recovered decision memory, current product brief, and Epic 12 recovery-provenance architecture. Tightened AI approval, allowlist, audit atomicity, tenant isolation, authenticity, replay, idempotency, classifier, lifecycle, chat, ownership, release-gate, recovery-evidence, policy-schema, privacy, and source-lineage contracts."
+  - date: "2026-06-09"
+    changes: "Approved governed interactive chat as an MVP write surface through the shared command gateway and FrontComposer shell."
   - date: "2026-05-10"
     changes: "Addressed validation findings for NFR measurability, B2B SaaS entitlement/RBAC coverage, MVP scope deltas, CLI/MCP parity exception, and FR actor clarity."
   - date: "2026-05-28"
@@ -65,7 +72,7 @@ The MVP proves one narrow but valuable loop: an authorized external participant 
 
 ChatBot does not own core project records, files, parties, identity, or event history (it does own substantial derived state — see §Data Governance Surface). It owns orchestration concerns: channel intake, project-context resolution, task-intent capture, approval routing, AI-action mediation, and cross-surface command exposure. Durable source-of-truth state remains in the appropriate Hexalith bounded contexts and is changed only through their commands and events.
 
-The user-voice anchor from the product brief: *"I can collaborate simply with others on a project or subject, and the AI can help move the work forward without losing context."* The MVP increments are how that promise becomes shippable — M0 proves the loop for one team, M1 makes it reach across UI/CLI/MCP, M2 makes it operable in production.
+The user-voice anchor from the product brief: *"I can collaborate simply with others on a project or subject, and the AI can help move the work forward without losing context."* In MVP language, a "subject" is plain-language framing only: actionable collaboration must resolve to one governed Project boundary. A general non-project workspace type is post-MVP. The MVP increments are how that promise becomes shippable — M0 proves the loop for one team, M1 makes it reach across UI/CLI/MCP, M2 makes it operable in production.
 
 ### What Makes This Special
 
@@ -91,11 +98,11 @@ Hexalith.ChatBot is classified as a B2B SaaS product in the enterprise collabora
 
 The PRD context is a greenfield product definition on an existing Hexalith platform. The product is new, but it depends on existing Hexalith services and infrastructure, including Hexalith.Conversations, Hexalith.Projects, Hexalith.Folders, Hexalith.Parties, Hexalith.Tenants, Hexalith.EventStore, Keycloak, Aspire, and Hexalith.FrontComposer.
 
-Source context for downstream architecture and story creation is the current Hexalith module planning context available in the repository on 2026-05-28, including the project-context artifacts for Hexalith.Conversations, Hexalith.Projects, Hexalith.Folders, Hexalith.Parties, Hexalith.Tenants, Hexalith.EventStore, Hexalith.FrontComposer, Hexalith.Memories, and Hexalith.Commons where applicable.
+Source context for downstream architecture and story creation is the repository baseline enumerated in `source-manifest.md`, refreshed on 2026-09-14. The manifest pins the direct product/architecture inputs and the checked-out revisions for Hexalith.Conversations, Hexalith.Projects, Hexalith.Folders, Hexalith.Parties, Hexalith.Tenants, Hexalith.EventStore, Hexalith.FrontComposer, Hexalith.Memories, and Hexalith.Commons.
 
 **Material-change re-check protocol.** A "material change" to a sibling bounded-context artifact is one that changes any of: the command/event contract surface ChatBot depends on (command names, event names, schemas, error codes), the authorization model (role names, scope semantics, policy claims), the identifier model (party-ID format, project-ID lifecycle, conversation-ID semantics), the integration topology (replacing or removing one of the named integrations in §Integration List), or any RBAC matrix entry that ChatBot's FRs reference. Editorial revisions, internal refactoring, and documentation-only changes are not material.
 
-The **System Architect** owns the trigger for re-check; the Architect monitors the sibling repositories' release notes and PRD updates and opens a re-check task within 5 business days of any material change. The re-check produces either (a) a confirmation that ChatBot integration assumptions still hold, or (b) a list of required PRD/architecture/story updates with owners and a target completion date. The re-check outcome is logged to `.decision-log.md` regardless of result.
+The **System Architect** owns the trigger for re-check; the Architect monitors the sibling repositories' release notes and PRD updates and opens a re-check task within 5 business days of any material change. The re-check produces either (a) a confirmation that ChatBot integration assumptions still hold, or (b) a list of required PRD/architecture/story updates with owners and a target completion date. The re-check outcome is appended to `.memlog.md` and refreshes `source-manifest.md` regardless of result.
 
 ## Success Criteria
 
@@ -125,7 +132,7 @@ Technical success requires email ingestion, project association, participant aut
 
 Mailbox-to-project association must support deterministic routing signals such as project-specific mailbox aliases, conversation identifiers, explicit project references, participant identity, and mailbox routing rules. Deterministic signals must take precedence over AI-generated inference. AI may rank candidates or summarize evidence, but it must not override fail-closed association rules.
 
-Association confidence must be configurable and auditable. `T_high` and `T_low` are tenant or deployment policy thresholds calibrated against the evaluation dataset and reviewed through audit evidence. Emails above `T_high` are eligible for automatic association when required deterministic evidence is present. Emails between `T_low` and `T_high` require user choice from a candidate project list. Emails below `T_low` are deferred or rejected. No email may be silently associated when required deterministic signals conflict.
+Association confidence must be configurable and auditable. `T_high` and `T_low` are tenant-policy thresholds calibrated against the evaluation dataset and reviewed through audit evidence. Emails at or above `T_high` are eligible for automatic association only when required deterministic evidence is present and no conflict exists. Every other scorer outcome enters `NeedsReview`; `T_low` affects candidate ranking and presentation, not automatic disposition. No email may be silently associated when evidence conflicts, is stale, is unauthorized, or the scorer fails.
 
 Authorization must be enforced at command and query boundaries across UI, CLI, and MCP. External participants, AI agents, and automation clients must resolve to scoped parties before accessing files, creating task requests, triggering commands, or sending outbound communication. Unauthorized projects must never appear as candidates, evidence, logs visible to the user, CLI output, or MCP response payloads.
 
@@ -137,17 +144,17 @@ The system must preserve auditability. Every auto-association, user-selected ass
 
 Primary MVP outcomes:
 
-- Correct email-to-project association rate, including automatic deterministic matches and user-resolved ambiguous matches.
-- Automatic association reassignment rate.
-- Ambiguous association resolution rate.
-- Median time to resolve ambiguous association.
-- Percentage of ambiguous associations resolved using presented evidence without manual context re-entry.
-- Percentage of unresolved or unauthorized emails routed to visible review or failure states.
+- **SM1 — Association correctness:** correct email-to-project association rate, including automatic deterministic matches and user-resolved ambiguous matches.
+- **SM2 — Reassignment rate:** automatic associations later corrected or reassigned.
+- **SM3 — Review resolution:** ambiguous association resolution rate.
+- **SM4 — Review time:** median time to resolve ambiguous association.
+- **SM5 — Evidence sufficiency:** percentage of ambiguous associations resolved using presented evidence without manual context re-entry.
+- **SM6 — Safe routing:** percentage of unresolved or unauthorized emails routed to visible review or failure states; target `100%`.
 
 Association quality outcomes (anchored to A9a evaluation dataset, owned by the **Test Architect**):
 
-- For the A9a evaluation dataset, deterministic email-to-project association achieves at least `95% precision` and `90% recall` for non-ambiguous messages. These targets are calibration targets, not contractual commitments to tenants; calibration runs occur before each pilot phase, before M0 release, before M1 release, and quarterly thereafter. [ASSUMPTION A9a]
-- The A9a evaluation dataset produces `0` critical false-positive associations involving unauthorized projects, where "critical false-positive" is defined in `addendum.md` §Confidence Thresholds as auto-association of a message into a project the sender is not authorized to read. [ASSUMPTION A9a]
+- **SM7 — Association precision/recall:** on the A9a evaluation dataset, deterministic association achieves at least `95% precision` and `90% recall` for non-ambiguous messages. These are calibration targets, not tenant commitments; runs occur before each pilot phase, before M0 and M1 gates, and quarterly afterward. [ASSUMPTION A9a]
+- **SM-C1 — Unauthorized-association counter-metric:** `0` critical false-positive associations into a Project the sender is not authorized to read. [ASSUMPTION A9a]
 - Deterministic project matches are attached automatically only when required evidence is present.
 - Ambiguous messages produce suggested project candidates with supporting evidence, confidence scores, and explicit user choice.
 - Each candidate project includes evidence signals when available, such as sender or domain match, project keyword match, thread history, attachment metadata, referenced ticket or document, or prior user correction.
@@ -159,7 +166,7 @@ Control and audit outcomes:
 - No ambiguous message is attached to a project without user confirmation.
 - No unresolved sender can access project files, create task requests, trigger commands, or send outbound project communication.
 - No cross-tenant project, participant, file, approval, command, or projection access is permitted.
-- Risky AI actions require approval before execution.
+- Risky AI actions require approval before execution and tenant policy cannot downgrade a boundary-crossing effect.
 - Low-risk AI assistance executes only within tenant policy and authorized project scope.
 - Attachments from associated emails are stored in the selected project's governed folder structure.
 - Repeated processing of the same email or message ID is idempotent: no duplicate project artifacts, no duplicate audit decisions except retry metadata, and identical final status unless source data changed.
@@ -168,8 +175,9 @@ Control and audit outcomes:
 
 Cross-surface parity outcomes:
 
+- **SM15 — Governed machine-surface adoption:** by M1 exit, at least one pilot workflow uses CLI or MCP for a parity-set operation without bypassing authorization, approval, idempotency, or audit.
 - MVP parity means UI, CLI, and MCP expose the same core governed operations for the email-to-project workflow. Interaction design, batching, and presentation may differ by surface.
-- The MVP parity set includes ingest/status, project candidate review, project association decision, attachment storage/status, task request capture, approval decision, retry, audit lookup, and status lookup.
+- The singular M1 parity exit set is: intake-status inspection, candidate review, association decision (`confirm`, `reject`, `defer`, `correct`), attachment storage/status inspection, task-intent capture/status, AI-action approval decision, approved-command execution, retry, operation status, and audit lookup. Ingestion and attachment storage may be event-driven rather than manually initiated on every surface, but their status and governed decisions are equivalent.
 - For ambiguous emails, UI, CLI, and MCP responses return the same ordered candidate list, evidence snippets, confidence scores, and rejection or defer reasons.
 - For every core MVP operation, UI, CLI, and MCP share the same backend behavior and produce equivalent state transitions.
 - Automated parity tests verify create, associate, choose candidate, reject, defer, retry, status, and audit lookup.
@@ -181,16 +189,22 @@ Validation outcomes:
 
 Pilot adoption outcomes (numeric targets are starter values per A11; final targets fix after a 2–4 week baseline measurement at the pilot tenant — see A11):
 
-- At least one pilot tenant uses the workflow for `4` consecutive weeks with at least `2` monitored project mailbox patterns and at least `5` active projects represented in the evaluation sample. [ASSUMPTION A11]
-- At least `70%` of ambiguous association decisions in the pilot are resolved from presented evidence without manual context re-entry. The `70%` is a directional target chosen against the pilot baseline; it ratchets up across increments (M0 → M1 → M2) as evidence quality improves. [ASSUMPTION A11]
-- Median time from email receipt to available governed project context is reduced by at least `40%` compared with the pilot tenant's current manual email-to-project update process, measured against the A11 baseline. [ASSUMPTION A11]
-- Manual project updates sourced from email are reduced by at least `30%` for pilot projects included in the monitored workflow. [ASSUMPTION A11]
-- Pilot users complete at least `10` governed AI action reviews in M0 and at least `30` across M0 + M1, with approval, rejection, refusal, and audit outcomes visible across UI (M0) and at least one machine surface (M1).
+- **SM8 — Pilot continuity:** one pilot tenant uses the workflow for `4` consecutive weeks with the one controlled M0 mailbox pattern, expands to at least `2` patterns by M1 exit, and represents at least `5` active Projects in the evaluation sample. [ASSUMPTION A11]
+- **SM9 — Evidence-led resolution:** at least `70%` of ambiguous decisions are resolved from presented evidence without manual context re-entry. [ASSUMPTION A11]
+- **SM10 — Context lead time:** median email-to-governed-context time falls at least `40%` from the A11 baseline. [ASSUMPTION A11]
+- **SM11 — Manual-update reduction:** manual Project updates sourced from email fall at least `30%` for pilot Projects. [ASSUMPTION A11]
+- **SM12 — Governed review use:** pilot users complete at least `10` AI-action reviews in M0 and `30` cumulatively by M1, with approval, rejection, refusal, and audit outcomes visible on UI and at least one machine surface.
 
 AI-action and attachment-handling outcomes (replacing the product-brief metrics that no longer fit the email-only MVP shape):
 
-- **AI-action-execution success rate** (replaces the brief's "task completion rate"): of governed AI actions that pass approval and execute through an allowlisted command, `≥ 95%` complete successfully (no command-execution failure, no rollback) per A11 baseline window. The brief's "task completion rate" framing assumed full task-lifecycle ownership, which is out of MVP per A8; AI-action-execution is the MVP equivalent. [ASSUMPTION A11]
-- **Attachment auto-handling rate** (replaces the brief's "document management automation rate"): of attachments captured from associated project email, `≥ 90%` are auto-stored into the correct governed project folder with classification metadata, without manual user intervention; the remainder route to UI review with a reason from the FR77 catalog. The brief's "document management automation" framing assumed broader document intelligence, which is out of MVP per the §Out-of-scope list; attachment auto-handling is the MVP equivalent. [ASSUMPTION A11]
+- **SM13 — AI-action execution:** of approved governed AI actions, `≥ 95%` complete successfully without command failure or rollback per A11 window. [ASSUMPTION A11]
+- **SM14 — Attachment auto-handling:** `≥ 90%` of attachments from associated email are stored in the correct governed Project folder with classification metadata; the remainder enter review with an FR77 reason. [ASSUMPTION A11]
+
+Counter-metrics prevent throughput from weakening trust:
+
+- **SM-C2 — Unauthorized disclosure:** `0` unauthorized Project names, evidence, files, or audit details disclosed on any surface.
+- **SM-C3 — Approval quality:** rubber-stamp approval rate remains `<= 15%` over a rolling 7-day window; crossing the threshold triggers workflow-tuning review but never approval bypass.
+- **SM-C4 — Automation quality:** gains in SM10, SM11, or SM14 must not increase SM2 or the critical-false-positive count in SM-C1.
 
 The **Test Architect** owns the measurement of the association quality outcomes, and the **Product Lead** owns the measurement of the pilot adoption outcomes. Both report results into the §Validation outcomes review before each increment release.
 
@@ -229,15 +243,22 @@ The cost of keeping CLI and MCP in the MVP is reduced breadth elsewhere: no addi
 
 #### Minimum Release Slice — Three Increments
 
-The MVP is delivered in three increments within the single release window. Each increment is releasable to the pilot cohort on its own; M0 proves the thesis, M1 proves parity and governance breadth, M2 proves operational readiness. The named team (one product lead, one architect, backend/service engineers, one frontend engineer, one CLI/MCP engineer, one security/identity engineer, one QA/test architect, DevOps) sizes the per-increment scope. If any increment slips, the rule is to shorten breadth inside the increment, never to break the dependency order.
+The MVP is delivered in three increments within one release window. M0 is a controlled pilot-preview deployment, M1 is the governed cross-surface pilot, and M2 is the MVP production/release-candidate gate. A pilot deployment is not permission to claim MVP completion or production readiness. The named team (one product lead, one architect, backend/service engineers, one frontend engineer, one CLI/MCP engineer, one security/identity engineer, one QA/test architect, DevOps) sizes the per-increment scope. If any increment slips, breadth may shrink but dependency order and safety gates do not.
 
 The three increments share a common non-negotiable: no increment is shippable if tenant isolation, authorization, fail-closed behavior (as contracted in NFR15a — see Reliability NFRs), idempotency (per the per-operation-class table in `addendum.md`), audit completeness (per NFR50a), or safe AI approval behavior is removed. If resources are constrained, trim dashboards, advanced mailbox inference, advanced approval-policy flexibility, document-intelligence breadth, and UI polish before trimming any increment's safety floor.
+
+| Increment gate | Audience/environment | Mandatory approval evidence | Owner and approver | Disable/rollback condition | Permitted claim |
+| --- | --- | --- | --- | --- | --- |
+| M0 | Named internal users in one configured tenant and one controlled mailbox pattern | End-to-end UI loop; M0 authenticity; first-store tenant-isolation tests; authorization, atomic audit, idempotency, and WCAG evidence | Product Lead + Test Architect; Security approves safety evidence | Any tenant leak, unauthorized disclosure/mutation, unaudited mutation, or critical association false positive disables intake/AI execution | Controlled pilot preview only |
+| M1 | Approved pilot users and automation clients on the governed cross-surface environment | Singular parity-set contract tests; exact AI allowlist; governed composer; service-client, outbound, policy-schema, and M1 WCAG evidence | Product Lead + System Architect + Test Architect; Security approves programmable surfaces | Parity divergence, command-spine bypass, policy drift, or unsafe outbound disables the affected surface/command | Governed cross-surface pilot only |
+| M2 | Production-shaped multi-tenant release-candidate environment | A10 recovery evidence, A11 SLO completion, replay isolation, per-store isolation, audit reconstructability, privacy decision, and production operability | Product Lead + System Architect + DevOps + Test Architect; Security and Compliance approve | Any stop-ship gate failure blocks production release or disables the affected store/surface | MVP production/release candidate |
 
 ##### Increment M0 — Vertical Thesis Path (UI-only)
 
 M0 proves one complete email-to-governed-action loop end-to-end, in the UI, for one tenant, with humans driving every decision point.
 
 - One controlled Microsoft 365 / Exchange mailbox pattern for one configured tenant, with stable message identity, conversation/thread identifiers, attachment metadata, and delivery/retry state.
+- Minimum inbound-authenticity floor: provider DMARC/DKIM/SPF verdict passthrough, required-header discrepancy capture, delegated-sender evidence, external-sender posture, safe `strict` default, and fail-closed review/block routing (FR48a–FR48d).
 - Deterministic association using explicit project identifier, mailbox routing rule, or conversation/thread identifier (the three signals listed; learned/inferred matching is out of scope for M0).
 - Ambiguous association review in the UI: candidate projects with ranked evidence; user can confirm, reject, defer, or correct a prior association.
 - Governed attachment capture into Hexalith.Folders with metadata, status, and quarantine of unsafe attachments.
@@ -245,7 +266,7 @@ M0 proves one complete email-to-governed-action loop end-to-end, in the UI, for 
 - Keycloak-backed identity and tenant scope; fail-closed authorization enforced at the command/query boundary per NFR15a.
 - M0 lifecycle states: Received, Proposed, Associated, NeedsReview, Deferred, Rejected, Failed, Skipped, Corrected. The full state-transition matrix expands in M1, but `Skipped` is part of the M0 command-spine contract because duplicate suppression and out-of-scope mailbox rules need a terminal safe state.
 - Required audit events for M0 ops: message intake, candidate generation, association decision, attachment handling, AI action proposal, approval decision, command execution result, retry/duplicate suppression, correction.
-- Negative isolation tests across the M0 actor set: human user, tenant admin, project owner, background worker, M365 event, AI actor.
+- Native-store and API negative tenant-isolation tests for every M0 record class, plus actor tests for human user, tenant admin, project owner, background worker, M365 event, and AI actor. No M0 store may be piloted until its below-application isolation proof passes.
 - Dependency failure handling for M0 dependencies: M365, Keycloak, Hexalith.Projects/Folders/Parties, EventStore, attachment scanner, AI service.
 - WCAG 2.2 AA conformance applies only to the M0 UI surfaces enumerated in NFR60: ambiguous association review, AI action approval, and the project conversation view that hosts them. Later increments inherit the bar as their surfaces are added.
 
@@ -255,8 +276,7 @@ M0 is not shippable without every item listed above for Increment M0. Outbound c
 
 M1 extends the M0 loop across surfaces and completes the governance model that the parity bet depends on.
 
-- CLI operation parity for inspect, associate, reject, defer, correct, retry, approve, execute, status, and audit lookup.
-- MCP operation parity for governed AI-agent/tool access to the same authorized command model.
+- CLI and MCP parity for the singular exit set: intake-status inspection, candidate review, confirm/reject/defer/correct association, attachment storage/status inspection, task-intent capture/status, AI-action approval, approved-command execution, retry, operation status, and audit lookup.
 - Cross-surface parity enforced by a single shared command pipeline at the architectural layer (see FR81a and `addendum.md` §Shared Command Pipeline). Contract tests verify the invariant; they do not enforce it.
 - Service-client permissions and Keycloak service-account flows.
 - One outbound draft-and-send path that preserves sender authority (per FR48 + `addendum.md` §Inbound Message Authenticity → "Authority class mapping"), recipients, approved content, and audit history.
@@ -264,23 +284,25 @@ M1 extends the M0 loop across surfaces and completes the governance model that t
 - Per-tenant, per-role, per-project, per-action-type, per-recipient, per-risk-class approval policies — surfaced through the Tenant Policy Schema in `addendum.md` §Tenant Policy Schema.
 - Tenant-admin permission model as its own FR group (FR75a–FR75g): what admins can see, what they can operate on, the audit obligations attached to admin actions, and the absence of any bypass to authorization or audit.
 - Versioned command allowlist artifact under change control (see `addendum.md` §Command Allowlist v1).
+- Governed interactive composer (`S1a`) in FrontComposer: message admission through CommandGateway, attributed response/proposal, safe streaming, stop/cancel, idempotent retry, typed failure, and conversion of every risky request into a mandatory-approval proposal.
 - Risk-classifier mechanism named, calibrated against the evaluation dataset (see A9a), with a stated misclassification fallback and audit chain when classification disagrees with reviewer action.
-- Negative isolation tests across the remaining actor types: CLI client, MCP client, service client.
-- Inbound-message-authenticity checks (DMARC/DKIM/SPF, header inspection, on-behalf-of disambiguation, external-sender posture) — see FR48a–FR48d.
+- Native-store/API isolation tests for every M1 record and machine surface, plus actor tests for CLI client, MCP client, and service client. Customer multi-tenant rollout remains blocked until the M2 gate.
+- Advanced inbound-authenticity policy tuning and broader controlled-provider compatibility; the minimum authenticity floor is already mandatory in M0.
+- WCAG 2.2 AA evidence for the governed composer, correction, outbound approval, tenant policy, and M1 admin surfaces.
 
 ##### Increment M2 — Operations, Recovery, Continuity
 
 M2 makes the system operable in production by tenant administrators and Hexalith ops, with recovery and continuity guarantees.
 
 - Operational dashboards for mailbox processing, failed associations, approval queues, duplicate handling, AI action outcomes, and audit lag.
-- Recovery: RPO ≤ 15 min and RTO ≤ 4 hr remain provisional (see A10). Story 12.15 supplies authentic hosted continuity-safety evidence; DW-52 supplies a distinct locally verified controlled-loss RPO mechanism, but no hosted artifact from that channel is yet cited and the lane's 180-second ceiling leaves the 4-hour RTO residual open.
-- Replay/simulation contract: replay events run against a separate test tenant with outbound adapters intercepted; replay records are distinguishable from production records in audit (see FR95a and `addendum.md` §Replay Isolation).
-- Idempotency contract per operation class, defined in `addendum.md` §Idempotency Keys (key composition, replay window, equivalence rule, conflict response).
+- Recovery: RPO ≤ 15 min and RTO ≤ 4 hr remain provisional (A10). There is no current qualifying hosted four-job bundle; fresh exact-candidate controlled-loss evidence and an RTO-capable full-window or production-shaped drill are stop-ship M2 gates. Current details live in `qualification-evidence.md`.
+- Replay/simulation denies production credentials/resources at composition time, replaces every effectful adapter, enforces egress denial, and proves before/after invariance across production stores and external-resource ledgers (FR95a and `addendum.md` §Replay Isolation).
+- Durable mutations and decisions use stable `operation_id` / `decision_slot_id` identities with lifetime deduplication and expected-revision concurrency; time-window hashes apply only to safe non-mutating proposal suppression.
 - Tamper-evident audit chain implemented as an append-only WORM store with hash-chained envelopes (see NFR49a).
 - Audit completeness as a production observable: the fraction of state-mutating operations whose audit chain reconstructs the operation end-to-end ≥ 99.5% per rolling 7-day window (see NFR50a).
-- Cross-tenant isolation tests for vector indexes, embedding stores, and prompt-context caches (see FR55a / NFR9a).
-- WCAG 2.2 AA conformance extended to M1 surfaces with UI (admin dashboards, approval-policy configuration). CLI and MCP are outside WCAG scope.
-- Performance and operability instrumentation across all operation classes; SLOs published per NFR42a.
+- Native-store isolation tests for M2 vector indexes, embedding stores, and prompt-context caches, recurring production probes for all record classes, and the first authorized multi-tenant rollout gate (FR55a / NFR9a).
+- WCAG 2.2 AA conformance for M2 operational, compliance, and queue-operation surfaces. CLI and MCP are outside WCAG scope.
+- Complete A11-calibrated SLO catalog with numeric targets, error budgets, live signal provenance, alert routing, and burn tests. Unsupported rows block the corresponding production-readiness claim.
 
 This sequencing depends on A2, A3, A8, A9, and A10. Architecture and epics must preserve the increment dependency order (M0 → M1 → M2); within an increment, internal ordering is an architecture concern.
 
@@ -290,6 +312,8 @@ Out of scope for MVP:
 - General email client replacement.
 - Full task lifecycle management.
 - Full document intelligence over attachments.
+- General user-upload ingestion outside governed mailbox attachment capture.
+- General non-project "subject" workspaces that cannot resolve to a governed Project boundary.
 - Broad knowledge management.
 - Unrestricted command execution or automation.
 - Cross-tenant association suggestions.
@@ -307,6 +331,7 @@ Growth scope includes broader channel and automation capabilities after the cont
 - More advanced task orchestration across scheduled, file-triggered, and conversation-triggered workflows (composed from the trigger types above).
 - Expanded operational dashboards for mailbox processing, failed associations, approval queues, duplicate handling, and AI action outcomes.
 - Deeper document intelligence for classification, extraction, summarization, and comparison.
+- General user-upload ingestion into governed Project folders, after mailbox attachment capture proves the authorization, provenance, and retention model.
 
 ### Vision (Future)
 
@@ -314,7 +339,7 @@ The long-term vision is a governed AI-native project collaboration layer for the
 
 In the vision state, Hexalith.ChatBot provides reusable project-aware AI workers, multi-channel conversation capture, governed task execution, audit-ready action history, document intelligence, reusable MCP tools, and consistent command access across human and machine surfaces. The product becomes the safe operating boundary where enterprise collaboration and agentic automation meet.
 
-[NOTE FOR PM] The "ChatBot" name reflects the vision-state interactive surface. In M0 the user-visible interaction model was the project conversation view + ambiguous association review + AI action approval, with no conversational chat surface. **Updated 2026-06-09 (`sprint-change-proposal-2026-06-09.md`, approved):** the interactive chat surface is now pulled into scope as a **governed write surface**, delivered in **Epic 10** (Interactive Chat Surface & FrontComposer Shell Adoption). This is option (b) above made first-class rather than "thin": a composer that wraps the existing governed affordances — every message is admitted through CommandGateway and a risky request becomes an AI-action proposal (approval-required), so the safety floor is unchanged and no ungoverned/freeform textbox is introduced. This resolves the long-standing naming-vs-scope finding ("make the chat surface a first-class MVP concern"). Positioning during the MVP window may still lead with "Governed AI Project Workspace"; the chat surface and the workspace are the same surface. Epic 10 also adopts the Hexalith.FrontComposer Shell as the mandated UI composition layer (closing the Story 1.14 deferred shell swap).
+The governed interactive chat surface is an M1 MVP write surface delivered through FrontComposer. Every submission enters CommandGateway; read-only/no-external-effect assistance may return an attributed response, while any boundary-crossing request becomes a mandatory-approval proposal. There is no ungoverned freeform write path. Epic 10 owns the implementation handoff; this PRD owns the behavior and gate.
 
 ## User Journeys
 
@@ -326,7 +351,7 @@ Before Hexalith.ChatBot, Amira would have copied the thread into a separate AI t
 
 In Hexalith.ChatBot, Amira opens the project conversation and sees the message associated with the project. The external sender is resolved as a party, the attachments are linked to governed project folders, and the system shows why this email belongs in this project. Amira expects the AI to understand the project without re-explaining the thread, but she also needs to know whether the AI is using approved context or guessing.
 
-Amira asks the AI to compare the attached document with current project folder content and draft a response. The AI does not act as an unbounded assistant. It creates a proposed project action with visible project scope, requester identity, input files, intended command, expected output, and risk classification. Before approval, Amira sees a plain-language summary of what will happen and why approval is required. Because the action may expose file contents and produce outbound communication, the system routes it for approval instead of executing silently.
+In M1, Amira submits the request through the governed composer. The UI immediately shows admission state and attribution; a safe read-only response may stream with stop/cancel and retry controls. Her request to compare files and draft external communication crosses file and outbound boundaries, so the system creates a proposed action with visible Project scope, requester identity, input files, command, expected output, and risk classification. The action cannot execute until an authorized reviewer approves it.
 
 The value moment is controlled acceleration. Amira can review the proposed AI action inside the same project conversation, approve it, reject it, or request changes. After approval, the action executes through the governed command model, and the result is recorded back into the project conversation with audit history.
 
@@ -450,7 +475,23 @@ Canonical state definitions:
 | `Correcting` (sub-state of `Corrected`) | The correction has been recorded but derived-store invalidation is still in progress per FR91a / NFR17a. The corrected item remains in `Correcting` until all derived stores acknowledge invalidation. AI actions cannot use the corrected project context until this sub-state clears. | No (transient) |
 | `Correction-delayed` (sub-state of `Correcting`) | Derived-store invalidation has exceeded the NFR17a SLO. Surfaces the responsible owner role and the next safe action; triggers a P2 incident. Clears to `Corrected` when invalidation completes. | No (transient, incident-flagged) |
 
-Valid transitions must be defined in the state model for FR87-FR89. Deferred items are not skipped; they remain active review items. Skipped items are terminal unless an authorized reprocess command creates a new workflow instance or superseding decision.
+The following versioned matrix is the authoritative M0/M1 association transition contract. Every mutating command carries a stable `operation_id`, expected workflow revision, actor authority, reason, and canonical audit envelope.
+
+| Source | Command / actor | Guard or reason | Destination | Increment | Concurrency and audit / successor rule |
+| --- | --- | --- | --- | --- | --- |
+| none | `CaptureMailboxEvent` / mailbox client | Tenant/mailbox/authenticity admission succeeds | `Received` | M0 | Provider identity deduplicates indefinitely; `MessageReceived` commits atomically |
+| `Received` | `ProposeEmailProjectAssociation` / worker | Authorized evidence is fresh and scorer succeeds | `Associated` when `>= T_high` with deterministic evidence; otherwise `NeedsReview` | M0 | Expected revision; reason distinguishes below-threshold, no-candidate, conflict, stale, unauthorized, and scorer-error |
+| `Received` or `Proposed` | `SkipEmailAssociation` / worker or authorized reviewer | Duplicate or declared out-of-scope mailbox rule | `Skipped` | M0 | Terminal `AssociationSkipped`; reprocess creates a successor workflow |
+| `Proposed`, `NeedsReview`, or `Deferred` | `ConfirmEmailProjectAssociation` / authorized Project actor | Candidate/evidence still fresh and actor can access target Project | `Associated` | M0 | One `decision_slot_id`; competing decision is `decision-conflict` |
+| `Proposed`, `NeedsReview`, or `Deferred` | `RejectEmailProjectAssociation` / authorized reviewer | Explicit reject-all reason | `Rejected` | M0 | Terminal; reprocess creates audit-linked successor |
+| `Proposed` or `NeedsReview` | `DeferEmailProjectAssociation` / authorized reviewer | Owner and revisit condition supplied | `Deferred` | M0 | Active item; expected revision and `AssociationDeferred` |
+| `Deferred` | `ResumeEmailAssociationReview` / assigned reviewer | Revisit condition met and evidence refreshed | `NeedsReview` | M1 | Prior defer remains immutable |
+| non-terminal | processing failure / command spine | Retry policy exhausted or non-retryable typed failure | `Failed` | M0 | Terminal; reprocess creates audit-linked successor |
+| `Associated` | `CorrectEmailProjectAssociation` / Project owner | Replacement Project authorized; predecessor revision current | `Correcting` | M0 | New correction operation; predecessor association remains immutable |
+| `Correcting` | invalidation acknowledgements / worker | Every affected derived store confirms invalidation/rebuild | `Corrected` | M0+ | Per-store outcomes audited; AI context blocked until completion |
+| `Correcting` | SLO monitor / worker | NFR17a exceeded | `Correction-delayed` | M0+ | P2 incident; returns to `Corrected` only after all acknowledgements |
+
+Deferred items are not skipped. `Rejected`, `Failed`, and `Skipped` never reopen in place; authorized reprocessing creates a new workflow ID with `supersedes_workflow` / `superseded_by_workflow` links.
 
 Core queries:
 
@@ -486,14 +527,7 @@ Core events:
 - Approval accepted, rejected, revised, or canceled.
 - Command execution succeeded or failed.
 
-Context ownership:
-
-- Hexalith.ChatBot owns AI-mediated collaboration workflows and user-facing assistant interactions, plus the derived stores enumerated in §Data Governance Surface.
-- Hexalith.Projects owns project identity, membership, and project conversation boundaries.
-- Hexalith.Parties owns external participant identity resolution.
-- Email ingestion owns message capture, headers, attachments, and delivery state.
-- Audit/compliance owns immutable event records and investigation views.
-- ChatBot references these source-of-truth contexts by ID; it does not duplicate their authority. Where ChatBot derives its own state from sibling sources (associations, candidate rankings, evidence snapshots, AI action proposals, approval records, projections, policy snapshots, lifecycle), the derived state is governed under §Data Governance Surface.
+Context ownership is canonical in §Context Ownership. In summary: Hexalith.Projects owns Project identity/membership/boundaries; Hexalith.Conversations owns conversation identity/messages; Hexalith.EventStore owns durable command/event and canonical audit-envelope persistence; ChatBot owns orchestration and rebuildable investigation views plus the derived stores enumerated below.
 
 #### Data Governance Surface (Hexalith.ChatBot first-class durable records)
 
@@ -501,7 +535,7 @@ ChatBot does not own the source records (project, party, message, file), but it 
 
 | Record class | Source | Retention class | Redaction sensitivity | Isolation surface | Owner increment |
 |---|---|---|---|---|---|
-| Association record | derived from mailbox event + project ID | GDPR-aligned, default 7 years, configurable per `tenant-policy.audit.retention` | high (carries project name + sender identity) | per-tenant store partition | M0 |
+| Association record | derived from mailbox event + Project ID | data-class contract, default 7 years, configurable within `data.retention-class` bounds | high (carries Project name + sender identity) | per-tenant store partition | M0 |
 | Candidate ranking | derived from scorer kernel + evidence | short-term (60 days default) | medium (carries evidence references) | per-tenant store partition | M0 |
 | Evidence snapshot | extracted from message + provider headers | bound to associated message retention | high (carries message content fragments) | per-tenant store partition | M0 |
 | AI action proposal | derived from task-intent kernel | bound to audit retention | high (carries proposal text, file references) | per-tenant store partition | M0 |
@@ -510,11 +544,11 @@ ChatBot does not own the source records (project, party, message, file), but it 
 | Policy snapshot | derived from Tenant Policy Schema state | audit retention | medium (no PII; carries policy values) | per-tenant store partition | M1 |
 | Lifecycle state | derived from workflow events | bound to workflow retention | low | per-tenant store partition | M0 |
 | Workflow instance map (predecessor → successor) | derived from terminal-state reprocessing | audit retention | low | per-tenant store partition | M0 |
-| Vector index / embedding store / prompt-context cache | derived from project files + conversations | configurable per `tenant-policy.ai-context.retention` | high (derived material can leak source content) | per-tenant store partition enforced at the store layer per FR55a / NFR9a | M2 |
+| Vector index / embedding store / prompt-context cache | derived from Project files + conversations | configurable per `ai-context.retention` | high (derived material can leak source content) | per-tenant store partition enforced at the store layer per FR55a / NFR9a | M2 |
 | Outbound trace store (test-tenant only) | derived from replay/simulation per FR95a | bounded by test-tenant retention policy | medium | test-tenant only; nightly probe asserts no production presence | M2 |
 | Approval queue / failed-association queue / unresolved-party queue (operational views) | projections | rebuilt on demand | inherits source class | per-tenant store partition | M1 |
 
-Each record class carries tenant ID, source provenance, derivation kernel version, redaction state, and retention class in its row. Cross-tenant queries are not possible at the store-access layer (FR55a / NFR9a). Deletion follows the NFR49a retention path; mutation is restricted to authorized retention workflows.
+Each record class carries tenant ID, source provenance, derivation contract version, redaction state, and retention class. Partitioning and native-store negative isolation tests are required in the first increment that introduces each class; a store cannot enter multi-tenant use or surface through CLI/MCP/service clients before that proof passes. M2 adds recurring production probes and the M2-specific vector/embedding/prompt-cache proofs. Deletion follows the NFR49a retention path; mutation is restricted to authorized retention workflows.
 
 ### UI Surface Inventory (handoff to UX)
 
@@ -526,6 +560,7 @@ The eight journeys plus the System Journey imply distinct UI surfaces. The PRD d
 - **S3 — AI action approval** (UJ1, UJ8): proposed-action surface per FR42 acceptance bullets — command, input files, recipients, sender authority, risk classification, policy snapshot, expected outcome, approve / reject / request-revision / cancel.
 
 **M1 UI surfaces:**
+- **S1a — Governed chat composer** (UJ1, System Journey): submits through CommandGateway, displays admission/attribution, streams safe responses, supports stop/cancel and idempotent retry, converts risky requests into mandatory-approval proposals, and renders typed failure/audit outcomes (FR28a–FR28f).
 - **S4 — Correction surface** (UJ4): correction affordance with `correcting` state from FR91a, predecessor display.
 - **S5 — Tenant admin configuration** (UJ5): Tenant Policy Schema editor (per `addendum.md` §Tenant Policy Schema), mailbox configuration, approval-policy configuration, allowlist version pin, two-person-rule confirmation for security-sensitive knobs.
 - **S6 — Outbound approval** (UJ8 outbound extension): pre-send approval surface for outbound communication.
@@ -548,7 +583,8 @@ The journeys reveal these capability areas:
 - Email-to-project association with deterministic signals, confidence bands, candidate evidence, and fail-closed ambiguity handling.
 - User-controlled association decisions: select candidate, reject all, defer, escalate, or correct a previous association.
 - Correction decisions that can inform future evidence while never bypassing authorization, tenant scope, or fail-closed rules.
-- AI action mediation with low-risk tenant policy and MVP confirmation gates for externally visible or project-mutating actions.
+- Governed M1 chat admission, response streaming, stop/cancel, retry, typed failure, audit attribution, and mandatory proposal conversion for every boundary-crossing action.
+- AI action mediation with low-risk policy limited to product-declared read-only/no-external-effect subtypes and non-downgradable approval for boundary-crossing actions.
 - AI agent scoping with explicit project, requester, input file, policy, tool, command, authorization, evidence, and audit boundaries.
 - Governed attachment storage in project folders with duplicate, retry, scan, block, move, and relink protection.
 - Tenant-scoped authorization enforced at command and query boundaries.
@@ -591,7 +627,7 @@ Outbound project email must be governed. Sending or drafting external responses 
 
 ### Integration Requirements
 
-Hexalith.ChatBot must integrate with existing Hexalith bounded contexts rather than duplicating their authority. Hexalith.Projects owns project identity and project boundaries. Hexalith.Parties owns internal and external participant records. Hexalith.Folders owns governed project folders and files. Hexalith.Tenants owns tenant facts and authorization context. Hexalith.EventStore supports command/event flow, audit-friendly outcomes, and projections.
+Hexalith.ChatBot must integrate with existing Hexalith bounded contexts rather than duplicating their authority. The canonical ownership and integration contract is §Context Ownership; this section adds only the local constraint that ChatBot may orchestrate those contexts but may not absorb their source-of-truth roles.
 
 The product must use stable identifiers across these contexts so email-derived decisions, attachment links, AI actions, approval records, CLI operations, MCP calls, and audit views can be correlated without copying source-of-truth records into ChatBot-owned storage.
 
@@ -678,11 +714,12 @@ The technical architecture must support strict tenant isolation, command/query a
 This section is the **canonical** ownership listing for the PRD. The §Context Ownership block inside §Shared Workflow Contract and the brief framing in the §Executive Summary point here rather than repeat. ChatBot's first-class durable records are detailed in §Data Governance Surface.
 
 - Hexalith.ChatBot owns AI-mediated collaboration workflows, user-facing assistant interactions, and the derived records enumerated in §Data Governance Surface (associations, candidate rankings, evidence snapshots, AI action proposals, approval records, policy snapshots, projections, lifecycle, vector indexes, replay traces, queue projections).
-- Hexalith.Projects owns project identity, membership, and project conversation boundaries.
+- Hexalith.Projects owns Project identity, membership, and the boundary that relates a Project to conversation IDs.
+- Hexalith.Conversations owns conversation identity, messages, append semantics, and message history. The stable MVP command ID `Project.AppendConversationMessage` is consumed as a Hexalith.Conversations-owned contract despite its legacy prefix; a rename requires the material-change protocol.
 - Hexalith.Parties owns internal and external participant identity resolution.
 - Hexalith.Folders owns governed project folders, attachment storage, file access control, and file metadata.
 - Hexalith.Tenants owns tenant facts, tenant boundaries, tenant policies, and authorization context.
-- Hexalith.EventStore supports command/event flow, event-backed traceability, projections, retries, duplicate suppression records, and audit-friendly outcomes.
+- Hexalith.EventStore owns durable command/event flow and the atomic canonical audit envelope committed with state mutations. ChatBot owns rebuildable audit/investigation projections, not a competing canonical audit store.
 - Mail integration owns message capture, headers, attachments, delivery state, and Microsoft 365 / Exchange synchronization concerns.
 - Other contexts consume decisions through published contracts rather than duplicating decision logic.
 
@@ -753,6 +790,8 @@ Expired, revoked, over-scoped, and under-scoped service-client credentials must 
 
 MVP command contracts include the canonical governed workflow operations listed in this section. Architecture may split or compose them, but UI/API, CLI, and MCP must expose equivalent authorization outcomes, state transitions, audit behavior, and redaction semantics for the parity set.
 
+This complete operation catalog is not an AI allowlist. Surface exposure is separately governed, and the AI-invocable set is the exact deny-by-default version in `addendum.md` §Command Allowlist v1.
+
 - `CaptureMailboxEvent`
 - `ProposeEmailProjectAssociation`
 - `AssociateEmailToProject`
@@ -768,6 +807,9 @@ MVP command contracts include the canonical governed workflow operations listed 
 - `StoreEmailAttachmentInProjectFolder`
 - `CaptureTaskIntent`
 - `MarkTaskIntentDisposition`
+- `SubmitGovernedChatMessage`
+- `StopGovernedChatResponse`
+- `RetryGovernedChatMessage`
 - `ProposeAIAction`
 - `ApproveAIAction`
 - `RejectAIAction`
@@ -781,7 +823,7 @@ MVP command contracts include the canonical governed workflow operations listed 
 - `GrantServiceClientPermission`
 - `RevokeServiceClientPermission`
 
-Each command must include actor identity, tenant scope, correlation ID, idempotency key, target resource IDs, expected result codes, and audit metadata.
+Each mutating command must include actor identity, tenant scope, correlation ID, stable `operation_id`, target resource IDs, expected aggregate/workflow revision, expected result codes, applied policy/approval references, and canonical audit metadata. Human decisions additionally carry the authoritative `decision_slot_id`.
 
 MVP query contracts include:
 
@@ -855,6 +897,7 @@ Message identity must be stable enough for idempotency and audit reconstruction.
 MVP integrations are limited to the systems needed to prove the governed email-to-project collaboration loop:
 
 - Hexalith.Projects
+- Hexalith.Conversations
 - Hexalith.Parties
 - Hexalith.Folders
 - Hexalith.Tenants
@@ -1105,14 +1148,14 @@ The following functional requirements convert the validated scope, journeys, gov
 | Candidate project | A project the system may suggest for association after applying tenant, authorization, and evidence filters. Unauthorized projects must not appear as candidates. |
 | Command surface | The client or origin through which an operation is requested, including UI/API, CLI, MCP, background worker, mailbox event, or AI actor. |
 | Context package | The bounded project, requester, file, policy, evidence, command, and redaction context made available to an AI actor or governed command. Synonym: **Scoped AI context.** The PRD uses "Context package" in the FR/NFR catalog and "Scoped AI context" in narrative prose; the two terms refer to the same artifact. |
-| Evaluation dataset | The labeled corpus of mailbox events maintained by the Test Architect (see A9 / A9a) used to calibrate `T_high`, `T_low`, the risk classifier, and the precision/recall targets in §Measurable Outcomes. Cardinality, label taxonomy, and refresh cadence in A9a. |
+| Evaluation dataset | Offline, consented/redacted/synthetic qualification partitions maintained by the Test Architect (A9/A9a) for `AssociationScorer`, `TaskIntentDetector`, and `ActionRiskClassifier`. It is not a runtime dependency. |
 | Evidence | The auditable signals used to justify association, authorization, approval, refusal, correction, or investigation. |
 | External party | A customer, supplier, partner, organization, or contact represented through Hexalith.Parties and participating through email or another governed channel. |
 | Party | A tenant-scoped participant identity owned by Hexalith.Parties. A party may represent an internal or external participant. |
 | Projection | A derived read model or project view rebuilt from source records, commands, events, and audit history. |
 | Fail closed | A code path that, on encountering an error or unmet precondition that would otherwise let it proceed without enforcing a safety control, returns a typed error and writes no durable state — instead of falling back to permissive behavior. See NFR15a for the enumerated paths and conditions. |
-| Idempotency key | A stable identifier composed from operation-class-specific inputs that lets the system detect and suppress duplicate operations. Per-operation key composition, replay window, equivalence rule, and conflict response are in `addendum.md` §Idempotency Keys. |
-| Low-risk | A risk classification (per `addendum.md` §Risk Classifier) for read-only AI actions that may execute without approval when tenant policy `ai-action.low-risk-allowed = true` and the actor is authorized to the project. Distinct from `approval-required` and `denied`. |
+| Idempotency key | A stable `operation_id` for a durable mutation or `decision_slot_id` for one authoritative human decision. Canonical hashes are evidence and may suppress non-mutating proposals, but time windows never permit a durable operation to run twice. |
+| Low-risk | An `ActionRiskClassifier` result limited to product-declared read-only/no-external-effect subtypes enabled by `ai-action.low-risk-subtypes`. Boundary-crossing effects are structurally non-downgradable and remain `approval-required`. |
 | MCP | Model Context Protocol — the protocol surface through which AI agents and automation tools invoke governed Hexalith operations. MCP clients are first-class actors in the FR81a shared command pipeline. |
 | MVP parity set | The subset of governed operations exposed at full parity across UI, CLI, and MCP. Enumerated in §Cross-surface parity outcomes; verified by FR86 contract tests against the FR81a invariant. |
 | Operating baseline | A tenant- or deployment-specific configuration of NFR performance, capacity, and reliability targets. Default MVP values are in NFR24–NFR27 and NFR43; per-tenant overrides land via the Tenant Policy Schema in M1. |
@@ -1192,14 +1235,20 @@ High-risk FR groups require explicit acceptance scenario matrices before impleme
 - FR22: The system can represent associated email, participants, attachments, decisions, approvals, failures, and AI outcomes in the project context.
   - **Decomposition guidance for story authoring:** FR22 has seven first-class concerns. For story authoring, decompose into seven sub-stories — one per concern (associated-email rendering, participant rendering, attachment rendering, decision rendering, approval rendering, failure rendering, AI-outcome rendering). Each sub-story inherits the §S1 surface from §UI Surface Inventory and is acceptance-tested independently.
 - FR23: Authorized users can inspect why an email belongs to a project, including source evidence, confidence signals, human decisions, and later corrections.
-  - **Accept when:** the "why" panel for any associated email displays, at minimum: the originating signal class (explicit identifier / mailbox routing rule / thread identifier / human selection / correction), the matched value (e.g., project alias text, routing rule name, thread root message ID), the confidence score, the threshold band (`auto` / `ambiguous` / `fail-closed`) the score fell into, the decision actor (system or named user), the decision timestamp, and links to any superseding correction with its own evidence panel.
+  - **Accept when:** the "why" panel for any associated email displays, at minimum: the originating signal class (explicit identifier / mailbox routing rule / thread identifier / human selection / correction), matched value, confidence score, disposition (`auto` or `needs-review`), typed reason, visible-candidate rule, decision actor, decision timestamp, and links to superseding corrections.
 - FR24: Authorized users can see association, attachment, task, approval, command, failure, retry, and next-action status for a project conversation.
 - FR25: The system can keep project conversation context separate across tenants and projects.
 - FR26: The system can distinguish informational project context from actionable requests.
-  - **Accept when:** every email surfaced in the project conversation carries a visible classification badge `informational` or `actionable`; `actionable` items additionally surface the detected intent (per FR35) and the next-action affordance (review / capture / dismiss). The classification is derived from the same tag+heuristic kernel as the risk classifier and is reproducible for a given input.
+  - **Accept when:** every email carries an `informational` or `actionable` badge; actionable means `request-information`, `request-action`, or `request-decision` from the independently versioned `TaskIntentDetector`. The item surfaces detector version, evidence offsets, confidence, and review/capture/dismiss affordances. No action-risk result is implied.
 - FR27: The system can distinguish system-generated summaries from source evidence so users do not confuse AI interpretation with original email, attachment, or command facts.
   - **Accept when:** AI-generated content is visually distinct (typographic treatment + label `AI summary`), is preceded by a one-line provenance string (`Generated by <model+version> at <timestamp> from <source-evidence-IDs>`), and can be collapsed to reveal the source evidence directly. Source evidence display is the default; AI summaries are opt-in to expand. WCAG 2.2 AA non-color status applies (the distinction does not rely on color alone).
 - FR28: The system can preserve visible human-review history for each email, attachment, approval, AI action, and command.
+- FR28a — **Governed chat submission (M1):** Authorized users can submit a Project-scoped message through the FrontComposer `S1a` composer; every submission enters CommandGateway with actor, tenant, Project, conversation, stable `operation_id`, expected revision, and source attribution.
+- FR28b — **Admission outcome (M1):** The composer shows `accepted`, `needs-review`, `approval-required`, `denied`, `unsupported`, or typed failure before implying that AI work has started.
+- FR28c — **Safe response streaming (M1):** Eligible read-only/no-external-effect responses may stream with model/version, evidence provenance, and completion state; partial output is visually marked and never treated as a committed Project message.
+- FR28d — **Stop and cancel (M1):** Users can stop generation or cancel a pending request; the UI distinguishes stopped generation from cancellation of a governed proposal and records the outcome.
+- FR28e — **Risky-request conversion (M1):** Every request that modifies state, exposes files, sends externally, creates/assigns tasks, invokes tools, or acts on behalf becomes a mandatory-approval proposal and cannot stream or execute the boundary-crossing result first.
+- FR28f — **Retry, failure, and audit (M1):** Retrying the same submission with its `operation_id` returns the prior outcome or a typed conflict without duplicate messages/proposals; failures expose safe next actions and every attempt is attributed in the canonical audit chain.
 
 ### Files and Attachments
 
@@ -1212,27 +1261,27 @@ High-risk FR groups require explicit acceptance scenario matrices before impleme
 
 ### Task Intent and AI Action Mediation
 
-Risk classification defaults:
+Action-risk classifications and pre-classification dispositions:
 
-| Risk class | Default outcome | Examples | Required controls |
+| Classification or disposition | Default outcome | Examples | Required controls |
 | --- | --- | --- | --- |
 | Low-risk read-only | Allow only when tenant policy and project authorization permit it. | Summarize already-associated project conversation, list visible status, explain candidate evidence already visible to the actor. | Project scope, actor authorization, policy snapshot, source evidence references, audit record. |
 | Approval-required | Pause for authorized human approval before execution. | Draft or send external email, expose file content in generated output, create or assign a task, mutate project state, invoke an external tool, act on behalf of a participant. | Action preview, affected resources, recipients or destination, sender authority, approver identity, approval decision, command allowlist, audit record. |
 | Denied | Refuse and audit when policy or authorization blocks the action. | Cross-tenant access, unauthorized files, unresolved project association, unresolved actor identity, unapproved sender authority, command outside allowlist. | Safe refusal message, redacted reason, policy or authorization reference, audit record when security-sensitive. |
 | Unsupported | Decline or route to manual handling when the product does not support the action in MVP. | Full task lifecycle automation, autonomous project creation, broad document intelligence, arbitrary third-party workflow execution. | Clear unsupported-state response, optional task-intent capture, no project mutation unless separately approved. |
 
-Mixed requests inherit the strictest applicable risk class. For example, a request that combines read-only summarization with outbound drafting is approval-required. A request that includes any denied operation is denied or split only when the denied portion can be safely separated and audited.
+Only `Low-risk read-only` and `Approval-required` are `ActionRiskClassifier` outputs. `Denied` and `Unsupported` are dispositions resolved before classification. Mixed requests inherit the strictest applicable result; denied portions may be split only when separation is safe and audited.
 
 - FR35: The system can detect candidate task or action intent from authorized project conversation actors and preserve the source message evidence.
-  - **Data contract.** A captured task-intent record includes, at minimum: `tenant_id`, `project_id`, `source_message_id`, `requester_party_id`, `detected_intent_summary` (≤ 280 chars), `detected_action_kind` (enum: `request-information` / `request-action` / `request-decision` / `inform-only`), `source_evidence_offsets` (the message offsets/substrings that produced the detection), `kernel_version`, `confidence_score` (in `[0.0, 1.0]`, same domain as `addendum.md` §Risk Classifier), `detected_at`, `state` (per FR36–FR38). Detection precision/recall targets are calibrated against the A9a evaluation dataset's `risky-ai-candidate` and `actionable` labels; the target is precision ≥ 80% and recall ≥ 75% by M0 release, ratcheting to ≥ 90% / ≥ 85% by M1 release. [ASSUMPTION A9a]
+  - **Data contract.** A captured task-intent record includes `tenant_id`, `project_id`, `source_message_id`, `requester_party_id`, `detected_intent_summary` (<= 280 chars), `detected_action_kind` (`request-information|request-action|request-decision|informational`), `source_evidence_offsets`, `detector_version`, `confidence_score` in `[0.0,1.0]`, `detected_at`, and state. A9a has separate informational/actionable partitions; target precision/recall is >= 80%/75% at M0 and >= 90%/85% at M1. The offline corpus is not a runtime dependency. [ASSUMPTION A9a]
 - FR36: Authorized users can review captured task intent before governed action. The review surface displays the data contract from FR35 plus the source message in full and the available state transitions per FR37/FR38.
 - FR37: Authorized users can convert captured task intent into a governed task or action request. Conversion creates the proposal record per FR41 / `addendum.md` §Risk Classifier and links it to the source task-intent record. Conversion is itself an audited operation.
 - FR38: Authorized users can mark captured task intent as not actionable, duplicate, already handled, or out of scope. Each of these is a terminal state for the task-intent record (the record is preserved for evaluation per A9a); duplicate additionally links the predecessor task-intent ID.
-- FR39: The system can classify AI action requests by risk.
-- FR40: The system can allow low-risk AI assistance when tenant policy and project authorization permit it.
-- FR41: The system can require approval before AI actions that modify project state, expose files, send external communication, create or assign tasks, invoke tools, or act on behalf of a participant.
+- FR39: The system can classify AI action requests through the independently versioned categorical `ActionRiskClassifier` defined in `addendum.md`; it does not share scores or runtime artifacts with association or task-intent detection.
+- FR40: The system can allow only product-declared read-only/no-external-effect subtypes when tenant policy `ai-action.low-risk-subtypes` and Project authorization permit them.
+- FR41: The system must require approval before AI actions that modify Project state, expose files, send external communication, create or assign tasks, invoke tools, or act on behalf of a participant. These six effect classes are structurally non-downgradable by tenant policy.
 
-[NOTE FOR PM] FR41 + FR52 (tenant admins configure AI action policy) create a tension with NFR46 (prevent approval fatigue). The MVP default is approval-required for the six risky action classes above; tenant admins can downgrade `low-risk-allowed` per-tenant. This errs toward fatigue in the early pilot, on the assumption that AI action volume is low. If pilot data shows approval queue depth growing super-linearly with usage (NFR46 observable: rubber-stamp rate `> 15%` in a rolling 7-day window), the tuning move is to ratchet `tenant-policy.ai-action.low-risk-allowed` to `true` for the action classes whose review consistently approves without revision, not to add coarse-grained policy shortcuts. Revisit at the M1 → M2 increment boundary against pilot telemetry.
+Approval-fatigue mitigation uses prioritization, grouping, digesting, notification ceilings, and staffing/escalation. The SM-C3 threshold triggers workflow tuning, never approval bypass.
 - FR42: Authorized users can approve or reject proposed AI actions after reviewing the action summary, affected project resources, external recipients, sender authority, risk classification, and expected outcome.
   - **Accept when:** the approval surface for any pending AI action displays, at minimum: the proposed command name (from the current allowlist version), the input files (each rendered as a tappable evidence reference with redaction state), the proposed outbound recipients if any, the sender authority class the action would use (per `addendum.md` §Inbound Message Authenticity), the risk classification with the input tuple that produced it (per `addendum.md` §Risk Classifier), the policy snapshot ID, the expected post-state (resource changes, side effects, audit events that will be emitted), and the approver's available decisions: `approve` / `reject` / `request-revision` / `cancel`. Approval requires the user to have authority for the action's risk class; the surface disables `approve` with a reason string when the user lacks authority.
 - FR43: The system can execute approved AI actions only through allowlisted governed commands.
@@ -1244,21 +1293,21 @@ Mixed requests inherit the strictest applicable risk class. For example, a reque
 
 - FR47: Authorized users can create outbound project email drafts within approved project and sender authority.
 - FR48: The system can distinguish draft-only, authenticated-user send, shared-mailbox send, send-on-behalf, and approved service-send authority. The mapping rule from M365 / Exchange permission models to ChatBot sender-authority classes is defined in `addendum.md` §Inbound Message Authenticity; the conflict case (M365 grants send-on-behalf but ChatBot grants no such authority) resolves to fail-closed (the action cannot be taken from ChatBot, even if the underlying mailbox would accept it).
-- FR48a — **Inbound provider authenticity passthrough (M1).** Every inbound message intake event records the M365 / Exchange DMARC, DKIM, and SPF verdicts as-supplied by the provider. ChatBot does not re-verify; the provider is the source of truth.
-- FR48b — **Inbound header inspection (M1).** The mailbox adapter parses `Received`, `Authentication-Results`, `From`, `Reply-To`, `Sender`, and `X-Original-Sender` headers and records disagreements between `From` / `Sender` / `Reply-To` as intake metadata. Disagreements do not block ingestion but feed the risk classifier and surface to the reviewer.
-- FR48c — **On-behalf-of disambiguation (M1).** When a delegated-send relationship is expressed by the provider, the recorded sender authority is the delegate's identity, with the principal's identity preserved as `principal_for`. Outbound actions follow the same rule symmetrically.
-- FR48d — **External-sender posture (M1).** Messages from senders with no resolved tenant party are flagged `external_sender = true`. The tenant policy `mailbox.authenticity-strictness` knob (`permissive` / `strict` / `paranoid`) controls whether external-sender messages auto-associate, route to NeedsReview, or fail closed.
+- FR48a — **Inbound provider authenticity passthrough (M0).** Every inbound event records the M365 / Exchange DMARC, DKIM, and SPF verdicts as supplied by the provider.
+- FR48b — **Inbound header inspection (M0).** The mailbox adapter parses the required authenticity/sender headers and records discrepancies as intake metadata and review reason codes; discrepancies never silently broaden trust.
+- FR48c — **On-behalf-of disambiguation (M0).** Delegated-send evidence records the delegate as sender authority and preserves the principal as `principal_for`; outbound applies the same identity rule.
+- FR48d — **External-sender posture (M0).** Unresolved external senders carry `external_sender = true`. `mailbox.authenticity-strictness` supports `strict` or `paranoid` only: anomalies route to `NeedsReview` or are blocked. Advanced tuning remains M1.
 - FR49: The system can require approval before outbound project communication leaves the project boundary.
 - FR50: The system can preserve proposed content, approved content, recipients, sender authority, project context, requester, approver, and decision outcome in approval records.
 
 ### Admin, Governance, and Audit
 
 - FR51: Tenant administrators can configure mailbox integration settings and monitored mailbox patterns.
-- FR52: Tenant administrators can configure AI action policy for low-risk and approval-required actions.
+- FR52: Tenant administrators can enable product-declared low-risk read-only subtypes and configure approval routing; they cannot downgrade the mandatory-approval effects in FR41 or extend the AI allowlist.
 - FR53: Tenant administrators can review mailbox permission status and degraded mailbox processing states.
 - FR54: Compliance or support reviewers can investigate association decisions, approval decisions, command outcomes, and risky AI actions.
 - FR55: The system can produce audit records for security-sensitive association, participant, file, approval, command, AI, retry, and duplicate-handling events.
-- FR55a — **Cross-tenant isolation in derived stores (M2).** Vector indexes, embedding stores, prompt-context caches, candidate-ranking caches, and any other derived store that holds material derived from tenant data must enforce tenant isolation by construction (per-tenant store partitioning or row-level tenant scoping verified at every read). Cross-tenant queries are not possible at the store-access layer, not merely filtered at the application layer. Verification: a periodic isolation probe (per NFR59) attempts cross-tenant reads through the store-access layer and asserts they fail at the layer below the application.
+- FR55a — **Cross-tenant isolation at store introduction (M0+).** Every derived store that holds tenant material must enforce tenant isolation by construction and pass a negative native-store/API test in the first increment that introduces it. No store may enter multi-tenant use or surface through CLI/MCP/service clients before that proof passes. M2 adds the vector/embedding/prompt-cache proofs and recurring production probes.
 - FR56: Authorized users can query audit records by tenant, actor, command, resource, decision, reason, correlation, and time context.
 - FR57: The system can hide unauthorized project names, candidate evidence, file metadata, audit details, CLI output, MCP payloads, and error details.
 - FR58: Authorized administrators or reviewers can access operational support for tenant data retention, export, and deletion workflows.
@@ -1432,7 +1481,7 @@ The following non-functional requirements define the quality bar for the same ca
 - NFR44: Runbook-ready diagnostics for any single workflow item must include, at minimum: correlation ID, tenant ID, mailbox ID, workflow item ID, current state, last transition (timestamp + actor + from-state), retry count, failure reason code (from the FR77 message catalog), and the next safe action affordance. Observable: a randomly sampled `100` workflow items per week must each render a complete diagnostic; any item missing a required field is a defect. "Runbook-ready" means an on-call engineer with no prior context can reach the correct next step from the diagnostic alone.
 - NFR45: Support diagnostics must be shareable through redacted support bundles that preserve correlation, state, and reason context without exposing restricted tenant, project, participant, file, message, or audit evidence.
 - NFR46: The system must prevent approval fatigue with concrete, measurable mechanisms:
-  - **Prioritization:** the approval queue orders items by `(risk-class × authority-of-affected-party × time-in-queue)`, configurable through `tenant-policy.approval.priority-weights` (see `addendum.md` §Tenant Policy Schema).
+  - **Prioritization:** the approval queue orders items by `(risk-class × authority-of-affected-party × time-in-queue)`, configurable through `approval.priority-weights` (see `addendum.md` §Tenant Policy Schema).
   - **Grouping:** items are grouped for review by `(requester × command × project)` so a reviewer can approve or reject a batch with one action when the items share the same input shape; batch approval emits one audit event per item, not per batch.
   - **Suppression / rate ceiling:** a per-user notification rate ceiling of `≤ 8` push notifications per hour and `≤ 30` per day (starter values per A11), with the remainder rolled up into a single digest. Duplicate proposals within the idempotency replay window (per `addendum.md` §Idempotency Keys) suppress automatically.
   - **Backlog SLO:** if any individual reviewer has `> 25` open approval items, the system surfaces a load alert to the tenant admin per NFR43.

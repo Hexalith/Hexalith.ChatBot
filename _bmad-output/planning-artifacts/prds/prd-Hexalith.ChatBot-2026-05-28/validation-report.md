@@ -1,242 +1,257 @@
 # Validation Report — Hexalith.ChatBot
 
-- **PRD:** `_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md`
-- **Rubric:** `.claude/skills/bmad-prd/assets/prd-validation-checklist.md`
-- **Run at:** 2026-05-28T15:30:00+02:00
+- **PRD:** /home/administrator/projects/hexalith/chatbot/_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md
+- **Addendum:** /home/administrator/projects/hexalith/chatbot/_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/addendum.md
+- **Rubric:** /home/administrator/projects/hexalith/chatbot/.agents/skills/bmad-prd/assets/prd-validation-checklist.md
+- **Run at:** 2026-09-13T12:59:10+02:00
 - **Grade:** Poor
+- **Gate:** STOP — not safe for product approval or unqualified downstream handoff
 
 ## Overall verdict
 
-After two prior validation cycles the PRD has hardened into a usable contract — lifecycle states are reconciled, the FR/NFR catalog is contiguous and cross-referenced through the Traceability table, the minimum release slice names an executable first increment, and the Open Assumptions table is properly indexed and inline-linked. What still holds back the rubric review from "strong" is that zero `[NOTE FOR PM]` callouts and zero Open Questions mean every trade-off reads as resolved (smoothing tensions to neutral), and several FRs at the heart of the user experience (FR23, FR26, FR27, FR42, FR67, FR76, FR77) still specify capability in adjectives rather than testable consequence — story authors will invent the missing detail at story time.
+The product thesis, named journeys, staged scope, measurable outcomes, and non-negotiable trust floor are unusually substantive. The current PRD/addendum pair is not safe to use as the sole implementation or release authority, however: two binding AI-governance rules permit readings that contradict mandatory approval and least privilege, while late chat-surface and recovery changes have not been reconciled through the full requirement set. Treat the product strategy as sound but the requirements contract as blocked until the critical and high findings below are resolved.
 
-The adversarial review materially shifts the picture. It reads the same artifact as a 1,260-line policy manifesto whose "minimum slice" is wider than most teams ship in two quarters, whose load-bearing safety controls (fail-closed, allowlisted commands, risk classification, cross-surface parity) are described as system properties rather than enforced invariants, and whose quantitative targets — 95% precision, 90% recall, 0 critical false-positives, RPO ≤ 15 min, RTO ≤ 4 hr, pilot adoption thresholds — anchor to a "tenant policy" / "evaluation dataset" / "operating baseline" that does not yet exist. Six Critical findings name a single underlying pattern: the named team (one frontend engineer, one CLI/MCP engineer, one security engineer) cannot ship the named release, and the PRD repeatedly defers unresolved decisions to artifacts it does not produce. The grade is set **Poor** because critical-severity findings are present; the rubric's positive verdict on spec craft and the adversarial verdict on buildability are both real, and both must be reconciled before architecture starts.
+The adversarial reviewer independently confirmed the stop decision and materially widened the risk picture. In addition to the two AI-governance contradictions, it found that the post-commit audit sequence cannot satisfy the stated fail-closed invariant and that native-store tenant-isolation proof arrives after affected stores and programmable surfaces ship. The two reviews reported 6 Critical, 17 High, 9 Medium, and 1 Low findings before deduplication; the six Critical reports describe four unique blockers.
 
 ## Dimension verdicts
 
-- Decision-readiness — adequate
+- Decision-readiness — broken
 - Substance over theater — adequate
 - Strategic coherence — strong
 - Done-ness clarity — thin
-- Scope honesty — strong
-- Downstream usability — adequate
-- Shape fit — strong
+- Scope honesty — thin
+- Downstream usability — thin
+- Shape fit — adequate
 
 ## Findings by severity
 
-### Critical (6)
+Counts below are reviewer-reported and intentionally not deduplicated. Repeated findings show independent confirmation; the source label identifies the full review.
 
-**[Adversarial]** — C1. "Minimum Release Slice" is wider than the rest of the PRD admits — the MVP is not an MVP (§ lines 213–229; 865–893)
-Nine workstreams expanded into 25 must-haves including tenant isolation across nine actor types, Keycloak, Aspire, dependency failure handling for seven dependency classes, security tests across nine actor types. The PRD admits "broad for a single MVP" then refuses to cut. Will either slip or quietly drop fail-closed under deadline.
-Fix: sequence the slice into three or more increments — Increment 1: deterministic association + UI review + audit lookup + UI only.
+### Critical (6 reports; 4 unique blockers)
 
-**[Adversarial]** — C2. Precision/recall targets have no provenance and no dataset behind them (§ line 141; A9 line 1159)
-"95% precision / 90% recall / 0 critical false-positives" against an evaluation dataset that A9 admits doesn't exist yet. Circular acceptance criterion.
-Fix: commit named owner, sampling protocol, target size, refresh cadence — or delete the numbers from Success Criteria.
+**[Rubric / Decision-readiness] — The approval-fatigue override contradicts the safety invariant (§Task Intent and AI Action Mediation; FR41; NFR16; addendum §Tenant Policy Schema)**
 
-**[Adversarial]** — C3. T_high and T_low are fictional knobs with no operating range (§ line 120; FR9 line 1018)
-Score function unspecified, score domain unspecified, calibration protocol unspecified, no guardrail on bad-default deployments or threshold changes. Decision log "clarification" is "tenant policy" — the punt, not the resolution.
-Fix: specify score domain, safe-default initial values, calibration protocol against evaluation dataset, guardrail on threshold changes.
+FR41 requires approval for state mutation, file exposure, external send, task creation, tool invocation, and acting on behalf, while the PM note and schema permit those same classes to be marked low-risk-allowed.
 
-**[Adversarial]** — C4. "Fail closed" is used 20+ times but has multiple silent escape hatches (§ examples lines 116, 154, 472, 476, 595, 597, 716, 768, 771, 1109, 1184)
-NFR15 lets non-security-sensitive transitions silently mutate state when audit is down. NFR22 + line 771 collapse approval routing during AI outage. Line 476 lets non-risky actions skip audit; "risky" is behaviorally classified, so a wrongly-classified action skips audit. Token, not contract.
-Fix: enumerate every code path that can write durable state; define "fail closed" at each as an invariant, not a behavioral test.
+Fix: Restrict low-risk-allowed to enumerated read-only action subtypes; make all six boundary-crossing classes structurally non-downgradable and reject policy snapshots that attempt otherwise.
 
-**[Adversarial]** — C5. Cross-surface parity is enforced by aspiration, not by an invariant (§ lines 161–167; FR81–FR86; lines 723–728)
-"Contract tests" + "automated parity tests" enforce parity. Parity is a quality the system has, not an invariant the architecture forbids violating. Drifts the first time a surface gains a feature another lacks.
-Fix: require a single shared command pipeline at the architectural layer. Parity becomes structural, not test-outcome.
+**[Rubric / Decision-readiness] — M1's AI-command allowlist is denylist-shaped and can include privileged mutations (§Command and Query Contracts; FR19, FR43, FR75a–FR75g; addendum §Command Allowlist v1)**
 
-**[Adversarial]** — C6. "Single release" with all eight journeys is unbuildable on the named team (§ line 847; lines 851–863)
-Singular frontend, singular CLI/MCP, singular security engineer to deliver 8 journeys, 27 commands, 14 queries, 9 lifecycle states, 3 surfaces with parity, WCAG 2.2 AA, RPO ≤ 15min / RTO ≤ 4hr, evaluation datasets, pilot. No team-load reconciliation. 6–12 person-year backlog packaged as one release.
-Fix: reconcile team to scope or scope to team. Grow the team or shrink the release.
+The binding v1 definition is the full catalog minus commands tagged disallowed-for-AI, but no exact membership or complete tag set exists; the catalog includes outbound, identity, and governance mutations.
 
-### High (12)
+Fix: Use an exact versioned, deny-by-default AI-invocable set; enumerate approval metadata for every member and mark outbound, identity, policy, allowlist, and admin mutations human/service-only.
 
-**[Done-ness clarity]** — Soft outcomes on user-facing FRs at the value moment (§ FR23, FR26, FR27, FR42, FR67, FR76, FR77 — lines 1038, 1041–1042, 1074, 1108, 1117–1118)
-FRs specify capability but not testable consequence. Story authors will invent field lists and visual treatments at story time.
-Fix: add explicit acceptance bullets under each FR, or extend the Functional Acceptance Guidance matrix to include FR21–FR28.
+**[Adversarial / C1] — Tenant policy can exempt the exact action classes declared non-negotiably approval-required (addendum §Tenant Policy Schema; PRD FR41 and related MVP commitments)**
 
-**[Adversarial]** — H1. "Magic constants" appear with no derivation (§ lines 176–180, 1172, 1196–1199, 1221, 1240–1241)
-Pilot thresholds, cache staleness, p95 latencies, page sizes, RPO/RTO, projection rebuild — no derivation, no baseline measurement, no link to user research.
-Fix: cite the baseline / research / throughput model for each, or label as starter values to be calibrated in pilot.
+Independent confirmation of the rubric's first Critical finding. A tenant administrator can interpret the current schema as authorizing approval-free external send, file exposure, project mutation, or acting on behalf.
 
-**[Adversarial]** — H2. "Tenant policy" is the universal escape hatch (§ A4–A6 lines 1154–1156; NFR9, NFR23; many others)
-No master list of policy knobs and no schema. Admins configure an undocumented surface; security can't validate safe states; tests can't enumerate combinations.
-Fix: author a Tenant Policy Schema as a first-class artifact with allowed values and safe defaults, under change control.
+Fix: Make the six effect classes non-overridable throughout MVP; allow exemptions only for explicitly enumerated read-only, no-external-effect actions.
 
-**[Adversarial]** — H3. Risk classification is a system capability without naming the classifier (§ lines 1056–1063; FR39 line 1071)
-Heuristic? Tags? LLM? Static allowlist? The entire approval gate depends on this classifier being correct.
-Fix: name the classifier mechanism, its error rate as a first-class risk, the misclassification fallback, audit chain when classification disagrees with reviewer action.
+**[Adversarial / C2] — Binding and deployed AI allowlists disagree between almost every command and exactly two commands (addendum §Command Allowlist v1; decision log §2026-06-03)**
 
-**[Adversarial]** — H4. "Allowlisted commands" is the load-bearing security control with no allowlist (§ lines 199, 205, 211, 226, 502, 883; A8 line 1158)
-27-command catalog contains the ones an AI would invoke — either the allowlist is the whole catalog (decorative) or a subset (unspecified).
-Fix: enumerate the MVP allowlist explicitly as a versioned artifact under change control.
+Independent confirmation of the rubric's second Critical finding. The addendum allows the full catalog minus exclusions, while the later deployed decision allows only Project.AppendConversationMessage and ChatBot.ExecuteLowRiskAssistance.
 
-**[Adversarial]** — H5. The "evaluation dataset" is load-bearing and nobody owns it (§ A9 line 1159; lines 141, 170–172, 1139)
-Shared ownership ("QA / Product") = nobody owns it. No cardinality, label taxonomy, source provenance, redaction, refresh cadence, adversarial-example protocol.
-Fix: single named owner; sampling frame, target size, label taxonomy, refresh cadence, adversarial-example protocol before pilot.
+Fix: Replace the addendum rule with the exact two-command, immutable, version-identified set; separate the product operation catalog, surface exposure policy, and AI-invocable allowlist.
 
-**[Adversarial]** — H6. "Audit completeness" is invoked but never defined (§ lines 159, 162, 466, 795; NFR50 line 1231)
-Field-presence ≠ completeness. NFR50's 100% target is a tautology on the test corpus.
-Fix: define audit completeness as a production observable (e.g., "fraction of state-mutating operations whose audit chain reconstructs the operation end-to-end").
+**[Adversarial / C3] — Fail closed when audit is down is impossible under the specified post-commit audit sequence (addendum §Shared Command Pipeline; FR81a; NFR15/NFR15a; NFR49a/NFR50a)**
 
-**[Adversarial]** — H7. Idempotency promised across heterogeneous operations with no key contract (§ NFR13 line 1182; FR90 line 1137; line 698)
-"Equivalent inputs" does enormous work. Key composition, replay window, equivalence rule, conflict response unspecified per operation class.
-Fix: define per operation class; put the resulting contract in the addendum.
+The pipeline commits and publishes before post-commit audit emission, but the NFRs require no durable mutation when the audit writer is unavailable. No atomic boundary, outbox, compensation, or canonical-event-as-audit rule closes the crash gap.
 
-**[Adversarial]** — H8. Approval fatigue acknowledged but mitigation is hand-waved (§ line 547; NFR46 line 1224)
-Prioritization heuristic, grouping criteria, suppression policy unspecified. First time a user has 40 approvals queued, they rubber-stamp; governance promise dies.
-Fix: design the queue/grouping flow as a first-class FR with concrete grouping criteria and a per-user notification rate ceiling.
+Fix: Define one atomic durability boundary for the domain event, idempotency record, policy/approval references, and canonical audit envelope; treat investigation-view projection lag as an SLO, not mutation failure.
 
-**[Adversarial]** — H9. Rejected/Failed are claimed terminal "unless reprocessed" — that is not terminal (§ lines 380–392)
-PRD does both at once: terminal and non-terminal.
-Fix: pick one. Recommended: terminal states are terminal; reprocess creates a new workflow instance with a new ID and an audit link to the predecessor.
+**[Adversarial / C4] — Store-level tenant-isolation proof is scheduled after affected stores and machine surfaces release (§Minimum Release Slice; §Data Governance Surface; FR55a; NFR9a)**
 
-**[Adversarial]** — H10. WCAG 2.2 AA + screen-reader + keyboard review on one frontend engineer (§ NFR60 line 1247; team list line 847)
-Multi-month accessibility effort on a complex governance UI vs. one frontend engineer. Either the bar is theater or the team is wrong; both cannot be true.
-Fix: resolve via C6. Commit external accessibility consultancy, or narrow NFR60 to increment-1 surfaces with explicit deferrals.
+M0 creates candidate/evidence/approval stores and M1 exposes programmable clients, yet the native-store no-filter isolation guarantee and nightly probe are assigned to M2.
 
-**[Adversarial]** — H11. "No admin/debug bypass" + required tenant-admin operational dashboards is unworkable (§ line 694; FR53, FR67–FR75)
-Admins must operate eight queues / dashboards without bypassing authorization. Creates a complex admin permission model the PRD does not describe.
-Fix: design the tenant-admin permission model explicitly as its own FR group — what admins can see vs. operate on, with audit obligations.
+Fix: Move partitioning and negative native-API isolation tests into the first increment that creates each store, with explicit exit gates before multi-tenant use.
 
-### Medium (17)
+### High (17)
 
-**[Decision-readiness]** — No live tensions surfaced (§ Executive Summary → Scope)
-Zero `[NOTE FOR PM]` callouts and zero Open Questions across the entire document.
-Fix: add 2–3 `[NOTE FOR PM]` callouts at real tensions (line 211 parity vs. velocity, line 1073 approval-required vs. fatigue, line 229 vertical slice sequencing).
+**[Rubric / Decision-readiness] — M2 cannot receive an evidence-based recovery release decision (§Increment M2; A10; NFR56–NFR59; addendum §Recovery-validation commitments)**
 
-**[Substance over theater]** — Adjective-only NFRs at user-trust hot spots (§ NFR40, NFR42, NFR44, NFR46, NFR48 — lines 1218, 1220, 1222, 1224, 1226)
-"Enough next-action guidance," "preserve user trust," "runbook-ready," "preventing approval fatigue," "evidence freshness indicators must exist" — adjective-only.
-Fix: attach at least one observable threshold to each.
+The hosted run expired under the document's eight-day rule, predates controlled-loss validation, and cannot test a four-hour RTO inside a 180-second lane.
 
-**[Done-ness clarity]** — Task-intent FRs lack a data contract (§ FR35–FR38, lines 1067–1070)
-Record fields, detection mechanism, recall/precision threshold unspecified.
-Fix: add 1–2 lines to FR35 specifying minimum record fields and reference NFR68 for the precision/recall bar.
+Fix: Define the stop-ship gate and require fresh exact-commit controlled-loss evidence plus a full-window or separately evidenced pre-production RTO drill.
 
-**[Done-ness clarity]** — NFR60 "core UI review workflows" unenumerated (§ line 1247)
-"Core" is not enumerated; accessibility testing over- or under-covers.
-Fix: enumerate the in-scope screens.
+**[Rubric / Decision-readiness] — The M2 SLO catalog fails NFR42a's completion contract (NFR42a; addendum §Operating Baselines)**
 
-**[Downstream usability]** — Glossary missing load-bearing terms (§ Glossary, lines 953–968)
-"Policy snapshot," "Operating baseline" / "Tenant or deployment profile," "Idempotency key," and the disambiguation of "Scoped AI context" / "AI context package" vs "Context package" missing.
-Fix: add these terms; clarify whether "Scoped AI context" and "Context package" are synonymous.
+Multiple targets and nearly all error budgets remain calibration-pending, and only audit projection lag has a live signal.
 
-**[Adversarial]** — M1. Source-context date pin is a future-fragility hazard (§ lines 88–90)
-Nine sibling submodules makes re-check effectively guaranteed by architecture-start. "Materially" undefined; nobody triggers the re-check.
-Fix: define "material change," name the trigger role, describe how re-check feeds back.
+Fix: Make A11 calibration and live-signal wiring an M2 gate, or provide bounded provisional values and ratcheting rules for every required field.
 
-**[Adversarial]** — M2. ChatBot owns derived state nobody else owns — but the framing minimizes the surface (§ lines 64–65; 428–435; 580–589)
-Association decisions, candidate rankings, evidence snapshots, AI action proposals, approval records, projections, policy snapshots, lifecycle — all durable, security-sensitive.
-Fix: replace the "doesn't own records" framing with an explicit Data Governance Surface section listing ChatBot's first-class durable records.
+**[Rubric / Done-ness clarity] — Three classifiers are conflated into one undefined kernel (addendum §§Confidence Thresholds, Risk Classifier; FR35; A9a)**
 
-**[Adversarial]** — M3. Capability described at the noun level (§ FR21–FR34, FR55–FR63, FR67–FR80)
-FR22 has 7 first-class concerns, FR55 has 8 event families, FR67 has 8 dashboards, FR74 has 13 capabilities in one bullet.
-Fix: decompose before story creation. Extend the Functional Acceptance Guidance matrix to all FRs above a noun-density threshold.
+Association scoring, task-intent detection, and action-risk classification have incompatible inputs, numeric/categorical outputs, and label taxonomies.
 
-**[Adversarial]** — M4. Cross-tenant cache pollution mentioned once and not addressed (§ line 593)
-Vector index artifacts and embedding stores have well-known multi-tenancy traps. PRD names the concern; addresses it nowhere.
-Fix: add an FR/NFR pair covering per-tenant isolation in vector / embedding / cache stores, with a test obligation.
+Fix: Define separate versioned contracts, datasets, calibration targets, and failure states for AssociationScorer, TaskIntentDetector, and ActionRiskClassifier.
 
-**[Adversarial]** — M5. "Sender authority" is invoked repeatedly without a definition (§ lines 486, 738, 1083, 1085; FR48)
-Five-class taxonomy mapped to Microsoft Graph permission models; who maps actions to authority unspecified.
-Fix: define the mapping rule and the conflict case (user has M365 send-on-behalf but no ChatBot grant).
+**[Rubric / Done-ness clarity] — Below-T_low association has incompatible lifecycle outcomes (§Technical Success; §Shared Workflow Contract; addendum §Confidence Thresholds)**
 
-**[Adversarial]** — M6. "Visible failure states" do not define a UX contract (§ FR66, FR69, FR76–FR79; NFR17, NFR39)
-"Visible" — queue row? toast? email? combination? Notification routing is configurable; tenants will turn it off.
-Fix: define visible-state contract as minimum: in-queue + audit event + configurable notification.
+The PRD says deferred or rejected, while the addendum says NeedsReview; scorer failure also maps to NeedsReview with different evidence.
 
-**[Adversarial]** — M7. Stable identifiers across bounded contexts, but ChatBot doesn't mint IDs (§ lines 492–493, 588)
-What happens when a sibling context renames, splits, merges, or deprecates an ID? Audit records become irreproducible.
-Fix: add an ID-evolution contract — required transitions, audit-record migration rules.
+Fix: Publish one canonical score/outcome/state table covering every band and failure case.
 
-**[Adversarial]** — M8. Replay/simulation promised at the same surface as production (§ FR95 line 1142; NFR69 line 1259)
-Mechanism preventing replay from sending external mail or mutating state unnamed.
-Fix: specify the architectural enforcement (separate test tenant, outbound-adapter interception, command flag) and the verification that distinguishes replay events in audit.
+**[Rubric / Done-ness clarity] — Acceptance readiness is specified for only four FR groups (§Functional Acceptance Guidance; §Functional Requirements)**
 
-**[Adversarial]** — M9. Correction-path invalidates AI context — cost hidden (§ Journey 4 lines 302–310; FR91 line 1138)
-Every derived index, cached prompt context, search index, vector embedding that touched the corrected association must be invalidated. Multi-minute to multi-hour background job per correction; treated as a UI action.
-Fix: add an NFR bounding correction-propagation latency and an FR describing the user-facing state during reindex.
+Participant/identity, conversation/context, files, outbound, admin/operations, and parts of recovery remain dependent on downstream invention.
 
-**[Adversarial]** — M10. External-party participation hides a phishing/spoofing problem (§ Journey 3 lines 296–300)
-"Sender spoofing/mismatch" in one phrase. Real corporate mail has forwarded threads, mailing-list rewrites, on-behalf-of headers, MTA-injected external-sender warnings.
-Fix: add an FR group for inbound-message-authenticity checks (DMARC/DKIM/SPF, header inspection, on-behalf-of disambiguation, external-sender posture).
+Fix: Complete the group-level acceptance matrix or explicitly mark every uncovered group blocked with an owner and prerequisite artifact.
 
-**[Adversarial]** — M11. "MVP must define" appears as a deflection (§ lines 462, 466, 484, 487, 638, 783, 787, 805)
-The PRD deferring to itself.
-Fix: resolve each "MVP must define" inline, or relocate it to an open-question with an owner and resolution date.
+**[Rubric / Done-ness clarity] — The binding tenant-policy schema is complete only for M0 (addendum §Tenant Policy Schema; FR52; FR73–FR75g; NFR35)**
 
-**[Adversarial]** — M12. Eight journeys imply eight UI surfaces with no UI inventory (§ Journeys 1–8 lines 262–356)
-Project conversation, ambiguous-association resolution, correction, admin config, CLI, compliance investigation, AI action review — no UI inventory anywhere.
-Fix: hand off the inventory to `bmad-ux`; do not let it lurk in journey prose.
+M1/M2 controls are prose categories rather than typed knobs with defaults, sensitivity, validation, and migration behavior.
 
-### Low (17)
+Fix: Enumerate every M1/M2 knob and cross-knob invariant in the declared schema format.
 
-**[Decision-readiness]** — Approval fatigue named but not reconciled with FR41 default
-Fix: tighten the FR41/FR52 escape hatch or add a `[NOTE FOR PM]` admitting MVP errs toward fatigue and will tune post-pilot.
+**[Rubric / Scope honesty] — The approved interactive-chat scope exists only as a PM note (§Vision; §UI Surface Inventory; §Functional Requirements)**
 
-**[Substance over theater]** — Innovation section duplicates "What Makes This Special" (§ lines 510–516; 66–72)
-Fix: trim or earn the duplication by surfacing a different pattern.
+The composer is absent from the surface inventory, increment scope, FRs, accessibility scope, and traceability.
 
-**[Strategic coherence]** — Pilot thresholds are not baselined (§ lines 174–180)
-Fix: add an `[ASSUMPTION]` (or extend A9) for a 2–4 week pilot baseline measurement period with a named owner.
+Fix: Reconcile the change into scope, a named surface, journeys, FRs, NFR60, commands, failure semantics, and traceability.
 
-**[Strategic coherence]** — No named owner for measuring success metrics (§ Success Criteria, lines 130–180)
-Fix: name the responsible role in Validation outcomes.
+**[Rubric / Downstream usability] — The brownfield source baseline cannot be reproduced (frontmatter inputs/counts; §Project Classification; material-change protocol)**
 
-**[Done-ness clarity]** — FR94 names operational metrics without publication shape (§ line 1141)
-Fix: point at NFR28 / NFR37 or specify the exposure surface (Prometheus / OpenTelemetry / dashboard).
+The only direct input uses a machine-specific D:/ path, project context is counted as zero, and sibling sources lack exact paths/revisions.
 
-**[Scope honesty]** — No `[NOTE FOR PM]` callouts anywhere
-Fix: see Decision-readiness finding.
+Fix: Use repository-relative paths, revisions/dates, and a versioned source/re-check manifest.
 
-**[Downstream usability]** — Lifecycle state list reorders relative to canonical (§ lines 700–712 vs. 380–391)
-Fix: reorder to match the canonical sequence.
+**[Adversarial / H1] — M0 trusts external email before inbound-authenticity controls exist (§Increment M0; Journey 3; FR48a–FR48d; addendum §Inbound Message Authenticity)**
 
-**[Downstream usability]** — UJs lack a "key acceptance hooks" extract per journey (§ UJ1–UJ8, lines 262–368)
-Fix: optional — add a 3–5 bullet extract at the end of each UJ.
+M0 associates external mail and admits attachments/context before DMARC/DKIM/SPF evidence and delegated-sender controls arrive in M1.
 
-**[Downstream usability]** — FR/NFR cross-references not machine-verified (§ Traceability, lines 972–983)
-Fix: machine-validate before architecture starts.
+Fix: Bring a minimum authenticity floor into M0 or limit M0 to trusted internal mailboxes.
 
-**[Adversarial]** — L1. "Hexalith.ChatBot" product name vs. email-only MVP (§ Title)
-Fix: rename or make the chat surface a first-class MVP concern.
+**[Adversarial / H2] — Replay isolation proves absence in the wrong store and ignores most side effects (addendum §Replay Isolation; FR95/FR95a; NFR69)**
 
-**[Adversarial]** — L2. Aspire named as a dependency but never described (§ lines 88, 753, 847, 889)
-Fix: one-line definition in the glossary.
+The probe can remain green while a misbound production adapter sends email, calls live tools/models, or mutates production state.
 
-**[Adversarial]** — L3. FrontComposer in classification context but not in integration list (§ line 88)
-Fix: add to integration list or remove from classification context.
+Fix: Deny production credentials/resources at composition time, replace every effectful adapter, enforce egress controls, and assert production-state before/after invariance.
 
-**[Adversarial]** — L4. Audit "tamper-evident" asserted without mechanism (§ NFR49 line 1230)
-Fix: name a class of mechanism (hash chain, append-only WORM, signed envelopes).
+**[Adversarial / H3] — Idempotency keys do not prevent delayed duplicate mutations or conflicting human decisions (addendum §Idempotency Keys; §Shared Workflow Contract; NFR13/NFR14)**
 
-**[Adversarial]** — L5. Glossary skips load-bearing terms (§ Glossary lines 953–969)
-"Fail closed," "low-risk," "approval-required," "policy snapshot," "operating baseline," "MVP parity set," "evaluation dataset" — none glossed.
-Fix: add. Cross-references the rubric's Downstream-usability finding.
+State-changing command deduplication lasts only 60 seconds and actor/decision-kind fields allow conflicting decisions to produce different keys.
 
-**[Adversarial]** — L6. ChatBot ownership boundaries listed three different ways (§ lines 64–65, 428–435, 580–589)
-Fix: pick one canonical list and reuse it.
+Fix: Use stable business operation/decision IDs with indefinite mutation idempotency, expected revisions, and a unique decision slot.
 
-**[Adversarial]** — L7. "MCP" never expanded (§ throughout)
-Fix: one-line glossary entry.
+**[Adversarial / H4] — The core Conversations bounded context disappears from the canonical ownership boundary (§Context Ownership; §Integration List; addendum §Command Allowlist v0)**
 
-**[Adversarial]** — L8. "Differentiating moment" claimed against an explicit disclaimer of market validation (§ lines 70–72; 520)
-Fix: either soften the claim or cite the validation source.
+The brief assigns conversations to Hexalith.Conversations, while the canonical PRD omits it, assigns conversation boundaries to Projects, and names an inconsistent append command.
 
-**[Adversarial]** — L9. Innovation section restates requirements at higher abstraction (§ lines 508–552)
-Fix: delete, or use to assert something genuinely new.
+Fix: Name one owner for conversation identity/messages, add the integration and contract version, and define the Projects reference boundary.
+
+**[Adversarial / H5] — Three security-relevant classifiers are conflated into one undefined kernel (addendum §§Confidence Thresholds, Risk Classifier; FR26; FR35; A9a)**
+
+Independent confirmation of the rubric classifier finding, including the absent actionable label and an improper live dependency on calibration data.
+
+Fix: Separate and version all three classifier contracts; make calibration data offline rather than a runtime availability dependency.
+
+**[Adversarial / H6] — The lifecycle has no single executable transition contract (§Technical Success; §Shared Workflow Contract; §Association Lifecycle; decision log; addendum §Confidence Thresholds)**
+
+Threshold results, Skipped increment ownership, paths out of Deferred/NeedsReview, and terminal/superseding semantics conflict.
+
+Fix: Publish a versioned transition table with commands, actors, guards, destinations, increments, concurrency, audit events, and supersession rules.
+
+**[Adversarial / H7] — The chat-surface scope change was not integrated as a product contract (product brief; PRD §Vision note, surfaces, FR21–FR28, command contracts, NFR60; sprint-change proposal)**
+
+Independent confirmation of the rubric chat-surface finding, extended to streaming, stop/cancel, risky-request conversion, retry/idempotency, and audit outcomes.
+
+Fix: Add the versioned surface and complete behavioral, command, failure, telemetry, accessibility, and traceability contract.
+
+**[Adversarial / H8] — M2 production readiness uses expired, commit-stale recovery evidence (§Increment M2; A10; NFR56–NFR59; addendum recovery commitments; decision log)**
+
+Independent confirmation of the rubric recovery finding, with the added mismatch between evidence commit 17aa94d and reviewed checkout f0ba70e.
+
+Fix: Require a fresh exact-commit hosted controlled-loss bundle plus production-shaped/full-window recovery evidence before MVP-complete claims.
+
+**[Adversarial / H9] — The master tenant-policy schema omits most required knobs (addendum §Tenant Policy Schema; FR48d; NFR12; NFR46)**
+
+Independent confirmation of the rubric schema finding, including authenticity, authority, allowlist, routing, residency, retention, replay, and idempotency controls.
+
+Fix: Publish the full closed schema with types, safe defaults, authorizers, sensitivity, validation dependencies, failure behavior, and drift tests.
+
+### Medium (9)
+
+**[Rubric / Scope honesty] — General user-upload ingestion disappeared without an explicit disposition (§MVP; §Files and Attachments; §Out of scope)**
+
+The brief included user uploads, while the PRD covers mailbox attachments and neither commits nor defers general upload.
+
+Fix: Assign it to an increment or explicitly mark it post-MVP/non-goal with rationale.
+
+**[Rubric / Downstream usability] — Success outcomes have no stable IDs (§Measurable Outcomes; §Traceability Overview)**
+
+Strong numeric metrics cannot be cited stably by stories or release evidence.
+
+Fix: Add SM identifiers, identify metric/counter-metric pairs, and reference them from traceability and increment gates.
+
+**[Rubric / Shape fit] — Requirements are mixed with mutable implementation evidence (A10; PM note; addendum §§Operating Baselines, Recovery-validation commitments)**
+
+Commit/run status and code-as-authority statements make the requirements artifact age with implementation evidence and invert product authority.
+
+Fix: Keep targets and gates in the PRD; move run locators and current measurements to a versioned qualification-evidence artifact.
+
+**[Adversarial / M1] — GDPR erasure and immutable WORM retention remain an assumption (§Compliance; Data Governance; A6; NFR49a/NFR53/NFR54)**
+
+Seven-year retention and crypto-erasure lack DPO/legal approval, key granularity, backup propagation, legal-hold precedence, and surviving-metadata rules.
+
+Fix: Obtain a data-protection decision and define purpose, legal basis, hold precedence, key scope, destruction propagation, and proof.
+
+**[Adversarial / M2] — Brief reductions are not governed as a signed scope change; user upload silently disappears (product brief; PRD scope; decision log)**
+
+This independently confirms the upload gap and notes that other reductions have decisions but no named product approver.
+
+Fix: Create a signed retained/deferred/dropped mapping, decide upload, and mark the brief superseded or updated.
+
+**[Adversarial / M3] — Final metadata and source lineage are stale (PRD/addendum frontmatter; decision log; missing .memlog.md)**
+
+May timestamps coexist with June/August content, the direct source path is machine-specific, and later decisions live only in the legacy log.
+
+Fix: Recover the canonical memlog, pin repository-relative inputs/revisions, refresh metadata, and distinguish final-planning from release-ratified.
+
+**[Adversarial / M4] — The operating-baseline catalog has missing targets and only one live signal (addendum §Operating Baselines; NFR42a/NFR43; A11)**
+
+This is the adversarial counterpart to the rubric's High SLO finding.
+
+Fix: Make A11 calibration an entry/exit gate and require numeric catalog rows, live provenance, routing, and burn tests.
+
+**[Adversarial / M5] — ID evolution invents an unowned cross-repository dependency (addendum §ID Evolution Contract; §Integration Contracts; §Context Ownership)**
+
+The required IdentityEvolved event is not established in sibling contracts and lacks owners, versioning, ordering, idempotency, and reconciliation.
+
+Fix: Secure producer acceptance and define the versioned event/reconciliation contract before treating it as binding.
+
+**[Adversarial / M6] — Single release and independently releasable increments lack enforceable gate semantics (frontmatter; §Minimum Release Slice; §Project Scoping)**
+
+Pilot, release, production, and MVP-complete are used without a release-state model, evidence authority, or rollback/disable conditions.
+
+Fix: Define environments/audiences, safety gates, evidence owners, approvers, rollback rules, and allowed claims for M0/M1/M2.
+
+### Low (1)
+
+**[Rubric / Substance over theater] — Repeated risk and ownership sections obscure canonicality (§Key Product Risks; §Risk Mitigations; §Shared Workflow Contract; §Context Ownership)**
+
+Repeated material makes it harder to know which section is authoritative.
+
+Fix: Keep one canonical risk register and one canonical ownership section; turn repetitions into concise references.
 
 ## Mechanical notes
 
-- FR IDs contiguous FR1–FR96; NFR IDs contiguous NFR1–NFR70 (spot-check, not machine-verified).
-- No inline `[ASSUMPTION]` tags; assumptions centralized as A1–A9 with owners and revisit conditions. A1, A2, A3, A5, A6, A8, A9 are inline-cited; A4 and A7 are platform-baseline and not inline-cited (acceptable).
-- Zero `[NOTE FOR PM]` callouts and zero Open Questions — flagged across multiple dimensions as a tension-smoothing pattern.
-- UJ protagonists all named (Amira, Marc, Elena, Priya, Nora, Leo, Sofia, plus System Journey).
-- Lifecycle terminology stable across §"Shared Workflow Contract" (lines 380–391) and §"Association Lifecycle and States" (lines 700–712); the second list reorders the same states — cosmetic.
-- Decision log is sparse — captures normalization and a thin set of major decisions; deeper rationale lives in the PRD body, not the log.
-- No `addendum.md` exists. Several findings (idempotency-key contract, policy schema, allowlist enumeration, classifier mechanism) belong in an addendum that does not yet exist.
+- PRD and addendum frontmatter still report 2026-05-28 despite approved June changes and August recovery evidence.
+- The current workflow's canonical .memlog.md is absent; material later decisions live in the legacy .decision-log.md.
+- The PRD places Skipped in M0, while the decision log says it is M1 and records no later reversal.
+- Base FR1–FR96 and NFR1–NFR70 IDs are unique and contiguous; letter-suffixed additions are unique.
+- Range references should state whether letter-suffixed IDs are included.
+- Assumption markers resolve, but A9a does not define the actionable label used by FR35.
+- All human journeys have named protagonists; the system journey is appropriately system-focused.
+- The addendum sends classifier error-rate measurement to NFR50a, which defines audit-chain completeness instead.
+- Historical May review variants remain beside the current reviews. They were read for context but are not treated as selected reviewers for this run.
 
 ## Reviewer files
 
-- `review-rubric.md`
-- `review-adversarial-general.md`
+- review-rubric.md — current rubric walker
+- review-adversarial-general.md — current adversarial reviewer
+- orient-extract.md — current source orientation
+
+Historical context retained but excluded from this run's counts:
+
+- review-rubric-v2.md
+- review-adversarial-v2.md

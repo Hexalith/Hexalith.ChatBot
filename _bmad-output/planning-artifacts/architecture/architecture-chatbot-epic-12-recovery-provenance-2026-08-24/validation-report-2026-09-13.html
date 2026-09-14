@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="BMad Architecture validation report for Epic 12 recovery-primary provenance, generated 2026-09-13.">
+  <title>Architecture Spine Validation Report — 2026-09-13</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #566078;
+      --line: #d8deea;
+      --paper: #ffffff;
+      --canvas: #f3f6fb;
+      --navy: #172c55;
+      --blue: #275fb3;
+      --critical: #9d1834;
+      --critical-bg: #fff0f3;
+      --high: #a94712;
+      --high-bg: #fff4ea;
+      --medium: #7d6100;
+      --medium-bg: #fff9da;
+      --pass: #17633a;
+      --pass-bg: #eaf8ef;
+      --fail-bg: #fff0f3;
+      --shadow: 0 12px 38px rgba(25, 44, 80, 0.09);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--ink);
+      font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    a { color: var(--blue); text-underline-offset: 0.18em; }
+    a:hover { text-decoration-thickness: 2px; }
+    a:focus-visible, summary:focus-visible { outline: 3px solid #80aaf0; outline-offset: 3px; }
+
+    .skip-link {
+      position: fixed;
+      top: 0.5rem;
+      left: 0.5rem;
+      z-index: 10;
+      transform: translateY(-200%);
+      padding: 0.65rem 0.9rem;
+      background: var(--paper);
+      border: 2px solid var(--blue);
+      border-radius: 0.4rem;
+    }
+    .skip-link:focus { transform: none; }
+
+    main {
+      width: min(1120px, calc(100% - 2rem));
+      margin: 1.5rem auto 4rem;
+    }
+
+    .verdict {
+      margin: 0 0 1rem;
+      padding: 1rem 1.2rem;
+      border: 2px solid var(--critical);
+      border-left-width: 0.65rem;
+      border-radius: 0.65rem;
+      background: var(--critical-bg);
+      color: var(--critical);
+      font-weight: 850;
+      letter-spacing: 0.015em;
+    }
+
+    .hero, .panel, details.finding {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(1.35rem, 4vw, 2.75rem);
+      border-radius: 1rem;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 0.4rem;
+      background: linear-gradient(90deg, var(--critical), var(--high), var(--blue));
+    }
+
+    .eyebrow {
+      margin: 0 0 0.45rem;
+      color: var(--blue);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 { color: var(--navy); line-height: 1.2; }
+    h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -0.035em; }
+    h2 { margin: 0 0 1rem; font-size: clamp(1.45rem, 3vw, 2rem); }
+    h3 { margin: 0; font-size: 1.05rem; }
+
+    .dek { max-width: 78ch; margin: 1rem 0 0; color: var(--muted); font-size: 1.08rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 0.55rem 1rem; margin-top: 1.25rem; color: var(--muted); font-size: 0.92rem; }
+    .meta span { display: inline-flex; gap: 0.35rem; }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.85rem;
+      margin: 1rem 0 0;
+    }
+
+    .card {
+      min-height: 7.4rem;
+      padding: 1rem;
+      border: 1px solid var(--line);
+      border-radius: 0.75rem;
+      background: var(--paper);
+    }
+    .card .label { display: block; color: var(--muted); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+    .card .value { display: block; margin-top: 0.35rem; color: var(--navy); font-size: 1.75rem; font-weight: 850; }
+    .card .note { display: block; margin-top: 0.2rem; color: var(--muted); font-size: 0.84rem; }
+    .card.pass { border-top: 0.35rem solid var(--pass); background: var(--pass-bg); }
+    .card.fail { border-top: 0.35rem solid var(--critical); background: var(--fail-bg); }
+    .card.high { border-top: 0.35rem solid var(--high); background: var(--high-bg); }
+    .card.medium { border-top: 0.35rem solid var(--medium); background: var(--medium-bg); }
+
+    nav.toc {
+      margin-top: 1rem;
+      padding: 0.9rem 1.1rem;
+      border: 1px solid var(--line);
+      border-radius: 0.7rem;
+      background: rgba(255, 255, 255, 0.72);
+    }
+    nav.toc strong { color: var(--navy); }
+    nav.toc ul { display: flex; flex-wrap: wrap; gap: 0.35rem 1.2rem; margin: 0.4rem 0 0; padding-left: 1.2rem; }
+
+    section { scroll-margin-top: 1rem; margin-top: 2rem; }
+    .panel { padding: clamp(1.1rem, 3vw, 1.7rem); border-radius: 0.85rem; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+    .status-line {
+      padding: 0.9rem 1rem;
+      border-radius: 0.65rem;
+      font-weight: 700;
+    }
+    .status-line.pass { background: var(--pass-bg); color: var(--pass); }
+    .status-line.fail { background: var(--critical-bg); color: var(--critical); }
+
+    details.finding {
+      margin: 0 0 0.85rem;
+      border-radius: 0.8rem;
+      overflow: clip;
+    }
+    details.finding.critical { border-left: 0.48rem solid var(--critical); }
+    details.finding.high { border-left: 0.48rem solid var(--high); }
+    details.finding.medium { border-left: 0.48rem solid var(--medium); }
+
+    details.finding > summary {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 0.8rem;
+      padding: 1rem 1.1rem;
+      cursor: pointer;
+      list-style: none;
+      color: var(--navy);
+      font-weight: 780;
+    }
+    details.finding > summary::-webkit-details-marker { display: none; }
+    details.finding > summary::after { content: "+"; color: var(--muted); font-size: 1.4rem; font-weight: 500; }
+    details[open].finding > summary::after { content: "−"; }
+    details.finding[open] > summary { border-bottom: 1px solid var(--line); }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 5.1rem;
+      padding: 0.25rem 0.55rem;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 850;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .badge.critical { background: var(--critical); }
+    .badge.high { background: var(--high); }
+    .badge.medium { background: var(--medium); }
+
+    .finding-body { padding: 0.3rem 1.25rem 1.15rem; }
+    .finding-body dl { display: grid; grid-template-columns: 8.8rem 1fr; gap: 0.3rem 1rem; }
+    .finding-body dt { color: var(--navy); font-weight: 800; }
+    .finding-body dd { margin: 0 0 0.65rem; }
+    .disposition { padding: 0.8rem 0.9rem; border: 1px solid #b9c9e4; border-radius: 0.55rem; background: #f1f6ff; }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    th, td { padding: 0.72rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: #edf2fa; color: var(--navy); font-size: 0.78rem; letter-spacing: 0.035em; text-transform: uppercase; }
+    tbody tr:last-child td { border-bottom: 0; }
+
+    code {
+      padding: 0.09em 0.3em;
+      border-radius: 0.25rem;
+      background: #edf1f7;
+      color: #24324b;
+      font: 0.9em/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      overflow-wrap: anywhere;
+    }
+    .command { display: block; padding: 0.75rem; border-left: 0.25rem solid var(--blue); }
+    ul, ol { padding-left: 1.3rem; }
+    li + li { margin-top: 0.35rem; }
+    .muted { color: var(--muted); }
+    .no-margin { margin: 0; }
+    .callout { padding: 1rem; border-left: 0.45rem solid var(--blue); background: #eef5ff; border-radius: 0.55rem; }
+
+    footer { margin-top: 2rem; color: var(--muted); font-size: 0.86rem; text-align: center; }
+
+    @media (max-width: 840px) {
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .split { grid-template-columns: 1fr; }
+      details.finding > summary { grid-template-columns: auto minmax(0, 1fr); }
+      details.finding > summary::after { display: none; }
+      .finding-body dl { grid-template-columns: 1fr; }
+      .finding-body dt { margin-top: 0.55rem; }
+    }
+
+    @media (max-width: 520px) {
+      main { width: min(100% - 1rem, 1120px); margin-top: 0.5rem; }
+      .cards { grid-template-columns: 1fr; }
+      .card { min-height: 0; }
+      nav.toc ul { display: block; }
+      details.finding > summary { align-items: start; gap: 0.55rem; padding: 0.9rem; }
+      .badge { min-width: 4.6rem; }
+    }
+
+    @media print {
+      @page { margin: 14mm; }
+      body { background: #fff; color: #000; font-size: 10pt; }
+      main { width: 100%; margin: 0; }
+      .skip-link, nav.toc { display: none; }
+      .hero, .panel, details.finding { box-shadow: none; break-inside: avoid; }
+      section { margin-top: 1rem; }
+      a { color: inherit; text-decoration: none; }
+      a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 8pt; overflow-wrap: anywhere; }
+      details.finding > * { display: block !important; }
+      details.finding > summary::after { display: none; }
+      .cards { grid-template-columns: repeat(4, 1fr); }
+      .card { min-height: 0; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#report">Skip to report</a>
+  <main id="report">
+    <p class="verdict">CHANGES REQUIRED &mdash; not valid as a current build substrate.</p>
+
+    <header class="hero">
+      <p class="eyebrow">BMad Architecture &middot; Validate</p>
+      <h1>Architecture Spine Validation Report</h1>
+      <p class="dek">Epic 12 <code>recovery-primary</code> provenance retains a coherent trust core, but it no longer converges with current enforcement, publication, lifecycle ownership, and supported technology baselines.</p>
+      <div class="meta" aria-label="Report metadata">
+        <span><strong>Generated:</strong> 2026-09-13</span>
+        <span><strong>Target:</strong> <a href="ARCHITECTURE-SPINE.md">ARCHITECTURE-SPINE.md</a></span>
+        <span><strong>Mode:</strong> Read-only validation</span>
+      </div>
+
+      <div class="cards" aria-label="Validation summary">
+        <div class="card pass">
+          <span class="label">Mechanical lint</span>
+          <span class="value">PASS</span>
+          <span class="note">0 deterministic findings</span>
+        </div>
+        <div class="card fail">
+          <span class="label">Semantic gate</span>
+          <span class="value">FAIL</span>
+          <span class="note">Current build substrate rejected</span>
+        </div>
+        <div class="card high">
+          <span class="label">Blocking severity</span>
+          <span class="value">1 + 6</span>
+          <span class="note">Critical + High</span>
+        </div>
+        <div class="card medium">
+          <span class="label">Non-blocking tail</span>
+          <span class="value">2 + 0</span>
+          <span class="note">Medium + Low</span>
+        </div>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="Report contents">
+      <strong>Jump to</strong>
+      <ul>
+        <li><a href="#separation">Gate separation</a></li>
+        <li><a href="#blocking">Critical and High</a></li>
+        <li><a href="#tail">Medium and Low</a></li>
+        <li><a href="#matrix">Reviewer matrix</a></li>
+        <li><a href="#method">Evidence and method</a></li>
+        <li><a href="#update">Update decision</a></li>
+      </ul>
+    </nav>
+
+    <section id="separation" class="panel">
+      <h2>Mechanical conformance is not semantic validity</h2>
+      <div class="split">
+        <div class="status-line pass"><strong>PASS &mdash; mechanics.</strong> The deterministic linter found no placeholders, duplicate AD IDs, missing Binds/Prevents/Rule fields, or structurally unpinned stack entries.</div>
+        <div class="status-line fail"><strong>FAIL &mdash; semantics and currency.</strong> Current brownfield code, external repository controls, lifecycle seams, and supported versions contradict or exceed the final 2026-08-24 contract.</div>
+      </div>
+      <p>The exact-head, exact-path, current-run-only, single-writer attestation model remains a sound core. The findings below prevent that core from operating as an authoritative, current consistency contract.</p>
+    </section>
+
+    <section id="blocking">
+      <h2>Decision register &mdash; Critical and High</h2>
+
+      <details class="finding critical" open>
+        <summary><span class="badge critical">Critical</span><span>ARCVAL-001 &mdash; Completion gate is neither externally enforced nor uniquely transition-scoped</span></summary>
+        <div class="finding-body">
+          <dl>
+            <dt>Supports</dt>
+            <dd>Rubric <code>R-001</code>; Adversarial <code>A-001</code>.</dd>
+            <dt>Local evidence</dt>
+            <dd><a href="ARCHITECTURE-SPINE.md#L51-L55">AD-2 calls the result “the required check”</a>, while the <a href="../../technical-enablers.md#L34-L52">TE-2 ledger</a>, <a href="../../../implementation-artifacts/sprint-status.yaml#L30-L37">sprint workflow notes</a>, and <a href="../../../../docs/story-evidence-integrity.md#L3-L5">developer guide</a> say activation is incomplete. The <a href="../../../../.github/workflows/ci.yml#L3-L15">same workflow and job identity</a> serves pull request, push, schedule, and manual dispatch; schedule/manual can emit a successful <code>no-transition</code> result. Live GitHub queries on 2026-09-13 returned HTTP 404 <code>Branch not protected</code> and empty branch-rule/ruleset arrays.</dd>
+            <dt>External evidence</dt>
+            <dd>GitHub says <a href="https://docs.github.com/en/enterprise-cloud@latest/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/troubleshooting-rules#troubleshooting-required-status-checks">required checks are matched by check/job name, not workflow or event trigger type</a>.</dd>
+            <dt>Consequence</dt>
+            <dd>A red transition result remains advisory, while an indistinguishable green no-transition result may appear for the same commit. CI and repository administration can each obey the text yet fail to enforce the intended transition.</dd>
+            <dt>Disposition</dt>
+            <dd class="disposition"><strong>Discuss.</strong> Choose a transition-only required workflow or distinct transition-gate identity; record protected branches, expected source/app, owner, activation state, and verification. Keep schedule/manual diagnostics under another identity and say “must be required” until verified.</dd>
+          </dl>
+        </div>
+      </details>
+
+      <details class="finding high" open>
+        <summary><span class="badge high">High</span><span>ARCVAL-002 &mdash; Pre-validation artifact contradicts the publication boundary</span></summary>
+        <div class="finding-body">
+          <dl>
+            <dt>Supports</dt>
+            <dd>Rubric <code>R-002</code>.</dd>
+            <dt>Local evidence</dt>
+            <dd><a href="ARCHITECTURE-SPINE.md#L51-L67">AD-2 and AD-4</a> define one post-validation path and exclude completion-run operational reports/manifests from upload and A10. Current test code writes <code>TestResults/live-recovery/&lt;runId&gt;</code> with label <code>artifact:completion-recovery-evidence</code>; the <a href="../../../../.github/workflows/ci.yml#L349-L395">workflow uploads that tree before attestation/validation</a>, then uploads <code>story-evidence-integrity-reports</code> later. The <a href="../../../../docs/story-evidence-integrity.md#L112-L118">guide</a> and <a href="../../../../docs/adrs/live-recovery-validation-drivers.md#L133-L139">ADR</a> retain the old contract. Raw producer TRX remains outside upload, so no raw-payload leak was demonstrated.</dd>
+            <dt>External evidence</dt>
+            <dd>Not required; this is a direct repository-versus-spine contradiction.</dd>
+            <dt>Consequence</dt>
+            <dd>Two archives carry overlapping completion material with no authority rule; consumers can mistake pre-attestation diagnostics for completion or A10 evidence.</dd>
+            <dt>Disposition</dt>
+            <dd class="disposition"><strong>Discuss.</strong> Suppress operational publication, or define a separate closed-schema, non-authoritative diagnostic artifact with owner, retention/failure rules, truthful layout, and executable exclusion from TE-2 and A10.</dd>
+          </dl>
+        </div>
+      </details>
+
+      <details class="finding high" open>
+        <summary><span class="badge high">High</span><span>ARCVAL-003 &mdash; Completion toolchain has conflicting version authorities</span></summary>
+        <div class="finding-body">
+          <dl>
+            <dt>Supports</dt>
+            <dd>Rubric <code>R-003</code>; Reality <code>V-001</code>, <code>V-005</code>.</dd>
+            <dt>Local evidence</dt>
+            <dd>The spine <a href="ARCHITECTURE-SPINE.md#L85-L95">pins .NET SDK 10.0.302</a>, as do CI setup steps, while <a href="../../../../global.json#L1-L6"><code>global.json</code></a> requires feature band 10.0.400 with <code>latestPatch</code>; local resolution selected 10.0.401 and architecture tests assert 10.0.400. The <a href="../../../../src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj#L1">AppHost</a> uses Aspire 13.5.3 while the <a href="../../../../docs/adrs/live-recovery-validation-drivers.md#L13-L19">ADR</a> and companion architecture still say 13.4.6; Aspire is absent from the spine stack.</dd>
+            <dt>External evidence</dt>
+            <dd>Microsoft's <a href="https://dotnetcli.blob.core.windows.net/dotnet/release-metadata/10.0/releases.json">release metadata</a> identifies 10.0.401 as the 2026-09-08 security servicing SDK, and its <a href="https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core">support policy</a> requires the latest patch. <a href="https://github.com/microsoft/aspire/releases/tag/v13.5.3">Aspire 13.5.3</a> is current; reviewer API inspection found the required resource-command APIs intact.</dd>
+            <dt>Consequence</dt>
+            <dd>Hosted completion can depend on ambient runner inventory, while reviewers reason from compiler and topology versions different from the executed producer.</dd>
+            <dt>Disposition</dt>
+            <dd class="disposition"><strong>Autofix.</strong> Make <code>global.json</code> the single .NET authority, derive or assert CI agreement, update the spine/companions, and add or explicitly inherit the AppHost/Aspire authority.</dd>
+          </dl>
+        </div>
+      </details>
+
+      <details class="finding high" open>
+        <summary><span class="badge high">High</span><span>ARCVAL-004 &mdash; AD-5's exact timeout ladder is stale</span></summary>
+        <div class="finding-body">
+          <dl>
+            <dt>Supports</dt>
+            <dd>Rubric <code>R-004</code>; Reality <code>V-003</code>.</dd>
+            <dt>Local evidence</dt>
+            <dd><a href="ARCHITECTURE-SPINE.md#L69-L73">AD-5</a> binds 265 minutes in-process and a 280-minute live step. Since commit <code>13195ef</code>, the <a href="../../../../.github/workflows/ci.yml#L285-L320">workflow</a> deliberately uses 250 minutes in-process, maximum 265-minute external <code>SIGINT</code>, and a 285-minute step so its cleanup guard stays reachable. Minute-330 closeout, 40-minute admission refusal, 10-minute initialization, and the final reserve still match.</dd>
+            <dt>External evidence</dt>
+            <dd>GNU confirms the relevant <a href="https://www.gnu.org/software/coreutils/manual/html_node/timeout-invocation.html"><code>timeout</code> and <code>--kill-after</code> semantics</a>; the failure is brownfield drift.</dd>
+            <dt>Consequence</dt>
+            <dd>A maintainer following the spine can restore obsolete values and recreate the cancellation/cleanup race that current code fixed.</dd>
+            <dt>Disposition</dt>
+            <dd class="disposition"><strong>Autofix.</strong> In an Update, append the post-finalization decision and ratify <code>250 in-process / 265 external / 285 step / 330 closeout / 360 job</code>, including invariant inequalities and value ownership; reconcile the guide and ADR.</dd>
+          </dl>
+        </div>
+      </details>
+
+      <details class="finding high" open>
+        <summary><span class="badge high">High</span><span>ARCVAL-005 &mdash; Dapr 1.18.0 predates maintained patches and published CVE fixes</span></summary>
+        <div class="finding-body">
+          <dl>
+            <dt>Supports</dt>
+            <dd>Reality <code>V-002</code>.</dd>
+            <dt>Local evidence</dt>
+            <dd>The spine <a href="ARCHITECTURE-SPINE.md#L89-L95">pins Dapr CLI/runtime 1.18.0/1.18.0</a>; installer and workflow agree. The reviewer confirmed the recorded 1.18.0 CLI archive digest is authentic.</dd>
+            <dt>External evidence</dt>
+            <dd>Current releases are <a href="https://github.com/dapr/cli/releases/tag/v1.18.2">CLI 1.18.2</a> and <a href="https://github.com/dapr/dapr/releases/tag/v1.18.4">runtime 1.18.4</a>. <a href="https://github.com/dapr/dapr/releases/tag/v1.18.2">Runtime 1.18.2 notes</a> identify <code>daprd</code> as affected while recording dependency upgrades for CVE-2025-69725 and CVE-2026-2303. The <a href="https://docs.dapr.io/operations/support/support-release-policy/">support page</a> confirms the minor line but predates later patches.</dd>
+            <dt>Consequence</dt>
+            <dd>The evidence lane tests actors/workflows on an exact runtime missing known security and reliability fixes, diverging from maintained 1.18 behavior.</dd>
+            <dt>Disposition</dt>
+            <dd class="disposition"><strong>Discuss.</strong> Verify CLI/runtime patch pairing, adopt maintained 1.18 patches, refresh the CLI digest, and rerun focused live/provenance checks before rebinding.</dd>
+          </dl>
+        </div>
+      </details>
+
+      <details class="finding high" open>
+        <summary><span class="badge high">High</span><span>ARCVAL-006 &mdash; The 30-minute closeout reserve has no internal budget owner</span></summary>
+        <div class="finding-body">
+          <dl>
+            <dt>Supports</dt>
+            <dd>Adversarial <code>A-002</code>.</dd>
+            <dt>Local evidence</dt>
+            <dd><a href="ARCHITECTURE-SPINE.md#L69-L73">AD-5</a> assigns one final reserve to Dapr cleanup, projection, attestation, validation, and upload without sub-deadlines or a protected publication floor. In the <a href="../../../../.github/workflows/ci.yml#L321-L455">workflow closeout</a>, <code>dapr uninstall --all</code> has no step timeout and later phases have no remaining-time admission rule.</dd>
+            <dt>External evidence</dt>
+            <dd>GitHub's <a href="https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax">workflow syntax</a> confirms the surrounding job/step ceiling; the allocation gap is local.</dd>
+            <dt>Consequence</dt>
+            <dd>Slow teardown can consume the reserve before failure evidence is retained, yielding neither complete cleanup nor enough metadata to reconstruct failure.</dd>
+            <dt>Disposition</dt>
+            <dd class="disposition"><strong>Discuss.</strong> Allocate enforceable sub-budgets or absolute deadlines, including a non-consumable finalizer/publication floor and minimum timeout metadata.</dd>
+          </dl>
+        </div>
+      </details>
+
+      <details class="finding high" open>
+        <summary><span class="badge high">High</span><span>ARCVAL-007 &mdash; Dapr teardown does not prove producer-owned domain cleanup</span></summary>
+        <div class="finding-body">
+          <dl>
+            <dt>Supports</dt>
+            <dd>Adversarial <code>A-003</code>.</dd>
+            <dt>Local evidence</dt>
+            <dd>Story 12.15 makes cleanup failure stop-ship, but the spine names only “DAPR cleanup.” The live test can log a partition-erase exception and continue; the outer <a href="../../../../.github/workflows/ci.yml#L321-L323">workflow observes only <code>dapr uninstall --all</code></a>. Sanitizer and sidecar carry no cleanup status; no AD defines mutation set, postconditions, quiescence, or a linearization point.</dd>
+            <dt>External evidence</dt>
+            <dd>Not required; the current local ownership split demonstrates the counterexample.</dd>
+            <dt>Consequence</dt>
+            <dd>TE-2 can attest a pass while test-owned persistent state remains unproven clean, poisoning later runs or leaving destructive validation state.</dd>
+            <dt>Disposition</dt>
+            <dd class="disposition"><strong>Discuss.</strong> Define a producer mutation set and cleanup receipt after restoration, compensating deletes, quiescence, and postcondition reads. Require it before projection/attestation and fail closed when absent, false, or timed out.</dd>
+          </dl>
+        </div>
+      </details>
+    </section>
+
+    <section id="tail" class="panel">
+      <h2>Medium and Low tail</h2>
+      <p><strong>2 Medium &middot; 0 Low.</strong> Neither Medium item alone blocks the gate, but each needs an explicit update decision or bounded deferral.</p>
+
+      <details class="finding medium">
+        <summary><span class="badge medium">Medium</span><span>ARCVAL-008 &mdash; Known freshness-override gap is absent from Deferred</span></summary>
+        <div class="finding-body">
+          <p><strong>Supports:</strong> Rubric <code>R-005</code>.</p>
+          <p>The existing <code>DW-124</code> gap is missing from <a href="ARCHITECTURE-SPINE.md#L108-L113">Deferred</a>. Exact CI planning rejects a falsely named lane, but standalone attest/validate can grant a contract-authored lane name the privileged 360-minute freshness window without the same binding check.</p>
+          <p class="disposition"><strong>Defer.</strong> Carry the owner, risk, and closure test into Deferred, or bind every age-overridden lane during standalone attestation.</p>
+        </div>
+      </details>
+
+      <details class="finding medium">
+        <summary><span class="badge medium">Medium</span><span>ARCVAL-009 &mdash; Current action majors are moving tags, not immutable pins</span></summary>
+        <div class="finding-body">
+          <p><strong>Supports:</strong> Reality <code>V-004</code>.</p>
+          <p><code>actions/upload-artifact@v7</code> and <code>actions/download-artifact@v8</code> are current majors, but <a href="ARCHITECTURE-SPINE.md#L85-L93">the spine calls them “pins”</a>. GitHub's <a href="https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/find-and-customize-actions">official guidance</a> says tags can move or be deleted; full commit SHAs are immutable.</p>
+          <p class="disposition"><strong>Discuss.</strong> Pin reviewed full SHAs with release comments and automated updates, or explicitly accept moving majors and correct the spine terminology.</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="matrix" class="panel">
+      <h2>Reviewer-lens matrix</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Lens</th><th>Lens verdict</th><th>Original findings</th><th>Synthesized coverage</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><a href="reviews/review-validation-2026-09-13-rubric.md">Good-spine rubric</a></td>
+              <td>Not valid as a current build substrate</td>
+              <td><code>R-001</code> Critical; <code>R-002</code>&ndash;<code>R-004</code> High; <code>R-005</code> Medium</td>
+              <td>ARCVAL-001, -002, -003, -004, -008</td>
+            </tr>
+            <tr>
+              <td><a href="reviews/review-validation-2026-09-13-reality.md">Reality and version currency</a></td>
+              <td>Revise</td>
+              <td><code>V-001</code>&ndash;<code>V-002</code> High; <code>V-003</code>&ndash;<code>V-005</code> Medium</td>
+              <td>ARCVAL-003, -004, -005, -009; Aspire portion of -003</td>
+            </tr>
+            <tr>
+              <td><a href="reviews/review-validation-2026-09-13-adversarial.md">Adversarial two-unit composition</a></td>
+              <td>Changes required</td>
+              <td><code>A-001</code>&ndash;<code>A-003</code> High</td>
+              <td>ARCVAL-001, -006, -007</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted">Severity was raised where a Medium currency observation corroborated a High brownfield contradiction (<code>V-003</code> into ARCVAL-004; <code>V-005</code> into ARCVAL-003). <code>R-001</code> and <code>A-001</code> were merged because they expose the same required-check boundary: the control is absent, and enabling it by name alone remains ambiguous.</p>
+    </section>
+
+    <section id="strengths" class="panel">
+      <h2>Confirmed strengths</h2>
+      <ul>
+        <li>AD-1's current-run source, exact path/locator, and single-consumer cardinality still match policy and planner behavior.</li>
+        <li>Planning remains before Dapr setup and fails closed across contract, lifecycle, scope, mapping, path, and cardinality checks.</li>
+        <li><code>ProvenanceAttestor</code> is still the sole TE-2 sidecar writer; validation re-hashes inputs; raw recovery TRX remains outside uploads.</li>
+        <li>AD-3's completion-versus-scheduled/release A10 separation and read-only repository permissions remain enforced.</li>
+        <li>The Dapr 1.18.0 CLI digest is authentic; the 360-minute job ceiling and 30-day retention setting are confirmed.</li>
+        <li>Hosted <code>recovery-primary</code> execution remains unproven after finalization and is correctly still Deferred.</li>
+      </ul>
+    </section>
+
+    <section id="method" class="panel">
+      <h2>Evidence and method</h2>
+      <ol>
+        <li>Deterministic lint passed with zero findings:</li>
+      </ol>
+      <code class="command">uv run .agents/skills/bmad-architecture/scripts/lint_spine.py --workspace _bmad-output/planning-artifacts/architecture/architecture-chatbot-epic-12-recovery-provenance-2026-08-24</code>
+      <ol start="2">
+        <li>Three independent lenses inspected the spine, adjacent memlog, declared sources/companions, current implementation, repository history/configuration, and dated official evidence where needed.</li>
+        <li>This synthesis normalized severity, merged overlapping causes, retained every reviewer ID in the matrix, and assigned one disposition per synthesized finding. The linked reviews remain the full evidence record.</li>
+        <li><strong>Validation made no changes to <a href="ARCHITECTURE-SPINE.md"><code>ARCHITECTURE-SPINE.md</code></a> or <a href=".memlog.md"><code>.memlog.md</code></a>.</strong></li>
+      </ol>
+    </section>
+
+    <section id="update" class="panel">
+      <h2>Update decision</h2>
+      <p class="callout"><strong>Offer:</strong> roll these findings into a BMad Architecture Update, preserving AD IDs and appending decisions to the existing memlog before re-distilling and rerunning the gate.</p>
+      <p>The minimum blocker set before the spine can return to <strong>valid as a current build substrate</strong> is:</p>
+      <ol>
+        <li><strong>Enforcement and authority:</strong> ARCVAL-001 and ARCVAL-002 &mdash; a uniquely transition-scoped external gate and one explicit diagnostic-versus-authoritative artifact contract.</li>
+        <li><strong>Executable lifecycle:</strong> ARCVAL-004, ARCVAL-006, and ARCVAL-007 &mdash; the current timeout ladder, allocated closeout deadlines, and a required producer-domain cleanup receipt.</li>
+        <li><strong>Supported version baseline:</strong> ARCVAL-003 and ARCVAL-005 &mdash; single version authorities and supported .NET/Aspire/Dapr patch levels with focused verification.</li>
+      </ol>
+      <p>ARCVAL-008 and ARCVAL-009 may be resolved in the Update or explicitly bounded under Deferred/accepted policy; they must not remain implicit. Then rerun lint and all three lenses. Do not promote hosted-duration evidence until a transition-declared hosted run actually exercises and validates <code>recovery-primary</code>.</p>
+    </section>
+
+    <footer>
+      Architecture Spine Validation Report &middot; Generated 2026-09-13 &middot; Read-only validation
+    </footer>
+  </main>
+</body>
+</html>

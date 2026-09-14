@@ -1,5 +1,5 @@
 # generated: 07-20-2026 11:30
-# last_updated: 08-29-2026 00:16
+# last_updated: 09-14-2026 08:55
 # project: chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -37,7 +37,7 @@
 # - Until TE-2 self-validates and the check is required, no subsequent story may move to `done`; stories remain in `review`/`in-progress` without implying product failure.
 
 generated: 07-20-2026 11:30
-last_updated: 08-29-2026 00:16
+last_updated: 09-14-2026 08:55
 project: chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -49,7 +49,7 @@ development_status:
   # Canonical split of historical Story 1.1. Statuses preserve the approved rebaseline and recorded evidence.
   1-1a-solution-scaffold-root-config-and-build-green-baseline: done
   1-1b-references-eventstore-submodule-and-sibling-dependency-resolution: done
-  1-1c-aspire-dapr-topology-and-local-run-verification: review
+  1-1c-aspire-dapr-topology-and-local-run-verification: in-progress
   1-1d-ci-release-skeleton-and-scaffold-quality-gates: done
   1-1e-centralize-nuget-package-reference-version-authority: in-progress
   1-1f-standardize-reusable-domain-module-ci-cd-and-release-gates: backlog

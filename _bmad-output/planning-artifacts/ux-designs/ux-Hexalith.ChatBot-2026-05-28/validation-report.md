@@ -1,110 +1,198 @@
 # Validation Report — Hexalith.ChatBot
 
-- **DESIGN.md:** `_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/DESIGN.md`
-- **EXPERIENCE.md:** `_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/EXPERIENCE.md`
-- **Run at:** 2026-05-28T18:46:01+02:00
+- **DESIGN.md:** `/home/administrator/projects/hexalith/chatbot/_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/DESIGN.md`
+- **EXPERIENCE.md:** `/home/administrator/projects/hexalith/chatbot/_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/EXPERIENCE.md`
+- **Run at:** 2026-09-13T13:48:18+02:00
 
 ## Overall verdict
 
-The Update pass closed every prior medium and low finding cleanly: the authoritative inherited-token source is named, every component prose row carries its `{components.*}` reference, WCAG 2.2 AA touch-target minima are stated concretely (44×44 / 24×24 CSS px with destructive/approval carve-out), French expansion and column-collapse rules name what may collapse and what must not, the scope reconciliation is now a table, and the spine-only visual-reference decision is logged. All 17 components pair across both files; all 8 PRD user journeys plus the 1 system journey map to Key Flows with named protagonist, climax beat, and failure path. State coverage is the strongest part of the spine pair — 17 named states, per-surface coverage, and a state-to-feedback matrix tied to live-region politeness.
+The spine pair is broken as a current downstream contract despite strong structure and substantial behavioral detail. Its nine flows semantically cover the nine source journeys, all four frontmatter sources resolve, all 17 locally declared components pair across the spines, and visual-reference handling is explicit; however, the contract cannot be source-extracted deterministically because source names and S1–S10 mappings are not preserved, the DESIGN color map violates the required token type, and current safety requirements for expired evidence and correction propagation are absent.
 
-Two material things remain. A mechanical regression broke `sources:` resolution: both spines point at `../../prd.md` and `../../prd-validation-report.md` which no longer exist at that path (PRD moved into `prds/`; old validation report deleted). And the accessibility lens, while confirming the prior three findings all closed, surfaces five new mediums clustered around AI-specific accessibility: keyboard reach for streaming-stop, live-region politeness mapping for AI proposal/projection/rejection events, redaction enforcement on export/copy paths, focusability of disabled approval controls, and WCAG 2.1.4 single-key shortcut governance. None are critical; the contract still ships, but the sources fix should land before any consumer extracts from the spine.
+The specialist reviews reinforce that the original June accessibility and governance foundation is unusually strong, but later source changes did not reach the peer spines. Accessibility is thin for current governed-chat semantics, while governance and safety are broken by an unresolved approval-boundary contradiction and missing evidence-freshness, correction, bounded-admin, and informed-approval contracts.
 
 ## Category verdicts
 
-- Flow coverage — **strong**
-- Token completeness — **strong**
-- Component coverage — **strong**
-- State coverage — **strong**
-- Visual reference coverage — **adequate**
-- Bloat & overspecification — **adequate**
-- Inheritance discipline — **adequate**
-- Shape fit — **strong**
-- Accessibility lens — **adequate**
+- Flow coverage — thin
+- Token completeness — broken
+- Component coverage — thin
+- State coverage — broken
+- Visual reference coverage — strong
+- Bloat & overspecification — adequate
+- Inheritance discipline — broken
+- Shape fit — adequate
 
 ## Findings by severity
 
-### Critical (0)
+### Critical (3)
 
-No critical findings.
+**[Rubric / Token completeness] — Color tokens violate the DESIGN.md schema (§ `DESIGN.md:12-27`)**
 
-### High (0)
+All 15 `colors` values are Fluent CSS-variable strings rather than the hex strings required by the DESIGN.md schema. The inherited Fluent posture is correct, but placing those references in a hex-valued machine contract is not.
+Fix: remove unchanged inherited Fluent roles from local `colors` and explain inheritance in prose, or establish a repository-approved schema translation before retaining local color tokens.
 
-No high findings.
+**[Rubric / State coverage] — Evidence freshness and approval blocking are absent (§ `prd.md:1441`; `EXPERIENCE.md:89-140`)**
 
-### Medium (7)
+No `fresh`, `stale`, or `expired` evidence states exist, and no `evidence-expired` path blocks approval. A downstream implementation can therefore approve against expired evidence.
+Fix: define freshness chips, timestamps, announcements, stale/expired treatments, and the disabled-with-reason approval path on every evidence-bearing surface.
 
-**[Component coverage]** — actor-badge actor-type list does not pair across spines (DESIGN.md:216 / EXPERIENCE.md:72)
-DESIGN.md enumerates eight actor categories (human user, external party, service client, AI actor, background worker, CLI, MCP, mailbox event). EXPERIENCE.md drops five of them. Downstream dev will not know whether CLI / MCP / background-worker / mailbox-event / AI-actor share one visual or differentiate.
-*Fix:* in EXPERIENCE.md Component Patterns row for Actor badge, enumerate the same eight actor types DESIGN.md does, and state whether they share one visual or differentiate.
+**[Governance & Safety] — The authoritative sources contradict each other on approval boundaries (§ `prd.md:1215-1237`; `addendum.md:25-33,65-74`)**
 
-**[Inheritance discipline]** — `sources:` frontmatter paths broken in both spines (DESIGN.md:7–10 / EXPERIENCE.md:6–9)
-Both spines list `- ../../prd.md` and `- ../../prd-validation-report.md`. From the spine location, `../../` resolves to `_bmad-output/planning-artifacts/` — only the product brief actually lives there. The current PRD lives at `_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md`; the root-level `prd-validation-report.md` was deleted (visible in `git status`). Source-extracting consumers will hit dead links.
-*Fix:* update `sources:` to `- ../../prds/prd-Hexalith.ChatBot-2026-05-28/prd.md`, keep the product-brief path, drop the deleted `prd-validation-report.md` entry or repoint to `prds/prd-Hexalith.ChatBot-2026-05-28/review-rubric-v2.md` if validation traceability is wanted.
+Six boundary-crossing action classes are described both as necessarily approval-required and as tenant-downgradable to low-risk; the PRD also exposes denied/unsupported while the addendum defines a two-output classifier. Backend and UI teams can implement different safety boundaries while following different authoritative passages.
+Fix: approve one canonical evaluation order and user-visible disposition taxonomy. Until reconciled, require human approval for all six boundary-crossing effect classes and align the PRD, addendum, policy schema, and both spines.
 
-**[Accessibility]** — No keyboard rule for interrupting a streaming AI response (EXPERIENCE.md:71, :113, :178)
-Reduced-motion acknowledges streaming text but does not specify that Stop/Cancel must be keyboard-reachable while streaming, occupy a stable focusable position (no inline appear/disappear that steals focus), and announce cancellation via the state-to-feedback matrix.
-*Fix:* add a bullet under "Reduced motion and auto-scroll" or "Conversation and audit semantics" requiring an always-keyboard-reachable stop/cancel affordance during streaming, with a polite "Response stopped" announcement and stable focus return to the composer or AI proposal panel.
+### High (16)
 
-**[Accessibility]** — Live-region politeness not pinned to AI-specific events (EXPERIENCE.md:100–102, :124–134)
-State-family politeness is defined, but the async AI events ("AI proposal ready," "Command accepted, projection pending," "Approval rejected") leave the screen-reader experience underspecified — likely to over-announce on each projection-pending tick, or under-announce a rejection on the user's own action.
-*Fix:* add a small mapping table: AI proposal ready → polite (one announcement on user's own request); projection pending → polite (one announcement, not repeated on each poll); approval rejected on the current user's submitted action → assertive; rejection observed in a queue for someone else → polite or none.
+**[Rubric / Flow coverage] — Source journey names are not preserved (§ `prd.md:319-427`; `EXPERIENCE.md:256-355`)**
 
-**[Accessibility]** — No accessibility rule for PII redaction on export / copy (EXPERIENCE.md:60, :105, :118, :194, :251)
-Redaction is enforced on screen, but exports, audit copy actions, and "copy email body" affordances are unconstrained. A screen reader announcing the unredacted text from a copy, or a transcript download containing identities the on-screen view suppressed, would break tenant isolation specifically for AT users.
-*Fix:* add an Accessibility Floor bullet stating that any export, copy, or "read aloud" affordance applies the same redaction as the visual surface, and the export's accessible name/description must not contain the redacted source text. Pair with a screen-reader-equivalent affordance for "this export is redacted; full detail requires escalation."
+All nine UX flows are structurally complete, but none keeps the exact source journey heading or a stable UJ/System Journey identifier.
+Fix: use the exact source headings and add a compact mapping from each flow to its UJ, FR/NFR ranges, and S-surface identifiers.
 
-**[Accessibility]** — Disabled approval controls undermine the "tooltip-only is insufficient" rule (EXPERIENCE.md:79, :164)
-EXPERIENCE.md:164 rejects tooltip-only explanations for disabled state, but :79 still lets the disabled approval button itself be the explanation surface. Fluent UI v5 disabled buttons are non-focusable by default — a screen-reader user tabbing through Approve/Reject/Revise/Cancel will silently skip the reason.
-*Fix:* require disabled approval/association/correction controls to either remain focusable with `aria-disabled="true"` plus an announced reason, OR be paired with an adjacent focusable "Why unavailable?" affordance.
+**[Rubric / Flow coverage] — S1–S10 do not map deterministically to the nine IA surfaces (§ `prd.md:519-539`; `EXPERIENCE.md:32-46`)**
 
-**[Accessibility]** — No rule on single-key shortcuts (WCAG 2.1.4) (EXPERIENCE.md:145)
-Command-palette and keyboard shortcuts are permitted for developers/operators, but the spine does not require single-character or modifier-free shortcuts to be remappable, disable-able, or only active on focus. Inside a chat composer, this is a known accessibility footgun for speech-input users.
-*Fix:* add a bullet requiring single-character/modifier-free shortcuts to be disabled by default inside text-entry controls and remappable or globally disable-able in user settings; document where the toggle lives.
+Correction Surface, Outbound Approval, Cross-surface Attribution View, and Admin Queue Operations are implicit or merged, leaving surface closure unprovable.
+Fix: add an explicit S1–S10 crosswalk and ensure each source surface's load-bearing action and failure path appears in a flow.
 
-### Low (10)
+**[Rubric / Component coverage] — Current product-specific affordances are missing (§ `prd.md:1194-1201,1441`; `DESIGN.md:211-229`; `EXPERIENCE.md:63-85`)**
 
-**[Flow coverage]** — Flow 9 invents a name ("Ari") for the system actor (EXPERIENCE.md:350)
-The PRD names the actor only as "project-aware AI agent." Inventing "Ari" is not wrong, but it is unsourced framing.
-*Fix:* drop the name and call it "Project-aware AI agent," or log "Ari" in `.decision-log.md` as a UX-side personification for the system actor.
+The spines lack paired visual and behavioral contracts for informational/actionable classification, AI-summary provenance, “why this project,” and evidence freshness.
+Fix: add identically named components in both spines, including non-color distinctions, disclosure behavior, provenance, freshness, and approval blocking.
 
-**[Token completeness]** — Contrast table silent on purely decorative muted text (DESIGN.md:157)
-The metadata pair cites 4.5:1 "when text communicates status or recovery"; decorative muted helper text has no rule.
-*Fix:* add a one-line clause that purely decorative muted text follows Fluent's non-essential-text guidance, or remove the conditional.
+**[Rubric / State coverage] — Canonical correction states are missing (§ `prd.md:450-451,1324-1325`; `EXPERIENCE.md:98,114`)**
 
-**[Bloat & overspecification]** — §Inspiration & Anti-patterns restates posture already established (EXPERIENCE.md:237–245)
-Five bullets, four covered by §Foundation and the Voice and Tone do/don't table; three of the "Rejected:" bullets repeat rules already enforced in §Component Patterns and §Interaction Primitives.
-*Fix:* delete the section or compress to one line that names the inspirations and points to the operative spec sections.
+The UX jumps to corrected/completed and omits `Correcting` and `Correction-delayed`, propagation progress, AI-context blocking, p95 breach handling, owner, and escalation.
+Fix: add both states across conversation, association/correction, files/context, queues, and audit, with feedback, focus, recovery, and AI-action gating.
 
-**[Bloat & overspecification]** — §Product-Specific Concerns table mostly restates encoded concerns (EXPERIENCE.md:247–259)
-Tenant isolation, multi-actor conversation, external participants, and auditability are already enforced by named components, states, and flows.
-*Fix:* keep only rows that introduce a UX requirement not visible elsewhere (Internationalization qualifies — it pins the en/fr scope); fold the rest.
+**[Rubric / Bloat & overspecification] — Local pixel scales duplicate Fluent inheritance (§ `DESIGN.md:39-52,180-209`)**
 
-**[Inheritance discipline]** — EXPERIENCE.md §Foundation does not state the inheritance chain (EXPERIENCE.md:16)
-It calls DESIGN.md "the visual identity reference" but does not say the FrontComposer/Fluent UI v5 platform is itself the inherited source. The chain is Fluent UI v5 → FrontComposer → DESIGN.md → EXPERIENCE.md.
-*Fix:* add a one-line inheritance chain in §Foundation matching DESIGN.md:141.
+The local radius and spacing scales compete with the stated FrontComposer/Fluent defaults and can lead to raw CSS or theme recreation.
+Fix: remove inherited scales or retain only justified product deltas expressed through Fluent component parameters or Fluent 2 tokens.
 
-**[Accessibility]** — Repeated landmark roles need unique accessible names (EXPERIENCE.md:159)
-Landmarks are listed but no rule says repeated roles within a surface need unique `aria-label`. Conversation Detail + Evidence drawer + AI proposal panel can all read as "complementary."
-*Fix:* add a sentence requiring unique `aria-label` on repeated landmark roles within a single surface.
+**[Rubric / Inheritance discipline] — Risk taxonomy is not reconciled in the UX (§ `prd.md:1215-1224`; `addendum.md:25-33`; `EXPERIENCE.md:77,334-343`)**
 
-**[Accessibility]** — aria-busy cleanup and focus preservation undefined (EXPERIENCE.md:126)
-Skeleton/`aria-busy` rule does not say when `aria-busy` is cleared, or whether focus inside a busy region is preserved across the skeleton-to-real-content swap.
-*Fix:* require `aria-busy` to be cleared on the same node, focus preserved or moved to a labelled landing point, and newly-loaded historical content to not announce.
+The Risk chip and approval flow do not distinguish classifier output from user-visible dispositions such as denied and unsupported.
+Fix: define the displayed vocabulary and map each source outcome to review, refusal, and execution behavior.
 
-**[Accessibility]** — Dark mode and forced-colors contrast not pinned (DESIGN.md:154–163, :165)
-Contrast table covers the required pairs but does not say which apply in dark mode or Windows High Contrast / forced-colors. The "inherited from Fluent UI/FrontComposer" escape clause is correct but leaves QA without a test target; status chips that rely on background fill lose meaning under forced-colors.
-*Fix:* add a row or sentence pinning the same minima (4.5:1 text, 3:1 non-text) explicitly to light and dark, and stating that status-chip meaning must survive forced-colors via icon, text label, or border — not background fill alone.
+**[Accessibility] — Current accessibility rules are split across unreferenced peer artifacts (§ `DESIGN.md:4-11`; `EXPERIENCE.md:3-10`; `index.md:8-18`)**
 
-**[Accessibility]** — Form validation needs explicit error-association rule (EXPERIENCE.md:131, :204)
-Focus-move to summary is required, but `aria-describedby` from each invalid input to its message and `aria-invalid` on the field are not.
-*Fix:* add the standard `aria-describedby` / `aria-invalid` association requirement to Accessibility Floor or Tenant Configuration recovery.
+The spines predate the first-class chat, current ten-surface inventory, and later binding UX addenda, so required accessibility behavior depends on discovery order.
+Fix: run an Update pass that distills all binding accessibility deltas into the peer spines and records supplemental inputs as provenance.
 
-**[Accessibility]** — Actor-type label not required to precede message text in accessible name (EXPERIENCE.md:169)
-Actor type and identity are exposed per message but the order is not pinned. Screen-reader users may hear the AI proposal text before learning it is from AI.
-*Fix:* require the actor-type label to precede message content in the accessible name/description.
+**[Accessibility] — AI summaries are not programmatically distinguished from source evidence (§ `prd.md:1198-1201,1469-1472`; `DESIGN.md:217-223`; `EXPERIENCE.md:73-81`)**
+
+Screen-reader users can encounter generated interpretation without first hearing its label, provenance, or source relationship.
+Fix: add paired Source evidence and AI summary components with semantic headings, provenance before content, source evidence open by default, a keyboard disclosure, and non-color distinction.
+
+**[Accessibility] — Evidence-expiry behavior is not accessible (§ `prd.md:1441`; `EXPERIENCE.md:76,101,115-139`)**
+
+The contract lacks accessible timestamp/state associations, transition announcements, focus preservation, and an explained disabled approval control.
+Fix: add a freshness pattern with text, timestamp, accessible name/description, forced-colors treatment, one-time expiry announcement, and `aria-disabled` approval reason.
+
+**[Accessibility] — Correction progress and delay lack accessible states (§ `prd.md:450-451,1324-1325`; `EXPERIENCE.md:98,103,107,114-120`)**
+
+Assistive-technology behavior is undefined while derived stores invalidate and AI use remains unsafe.
+Fix: define programmatic state labels, meaningful progress semantics, deduplicated announcements, estimated completion, owner/next action, and focus-preserving updates.
+
+**[Accessibility] — Incremental AI output lacks a bounded announcement policy (§ `EXPERIENCE.md:127-139,181,194-200`; `epic10-chat-surface-elaboration.md:37-47`)**
+
+Nothing prevents streaming chunks from being placed in a live region and repeatedly interrupting screen-reader reading.
+Fix: keep streamed content outside live regions and announce only deduplicated start, complete, stopped, and failure transitions from a separate status region.
+
+**[Governance & Safety] — Evidence freshness is visual but not fail-closed (§ `DESIGN.md:147,218-224`; `EXPERIENCE.md:75-81,89-121`)**
+
+Warning color may imply staleness, but no evidence timestamp, freshness state, expiry block, refresh path, or audit outcome is required.
+Fix: make freshness explicit on every evidence-bearing surface and block approval/association on expired evidence with reason `evidence-expired`.
+
+**[Governance & Safety] — Correction may appear complete before derived context is safe (§ `EXPERIENCE.md:98,114,293-301`; `prd.md:435-451,1322-1325`)**
+
+The contract can expose contaminated derived context because it lacks acknowledgement from every store and a visible delayed-correction path.
+Fix: add correcting/delayed states, store-progress or safe summary, owner/estimate/escalation, and block affected AI actions until all invalidations acknowledge.
+
+**[Governance & Safety] — Bounded administration and two-person control are absent (§ `EXPERIENCE.md:43,120,303-311`; `prd.md:1288-1300`)**
+
+Nora's flow lets one admin activate security-sensitive settings and does not separate aggregate queue visibility from project-detail authority.
+Fix: add proposal, distinct second-admin approval, conflict, rejection, expiry/cancel, activation, justification, policy-version, scope, and audit-link states.
+
+**[Governance & Safety] — Denial copy can disclose resource existence (§ `EXPERIENCE.md:52-61,106,111-116`)**
+
+“You do not have access to this project” and a visible “unauthorized candidate suppressed” state reveal that a forbidden resource exists.
+Fix: use existence-neutral copy and collapse unauthorized candidates into an indistinguishable no-safe-result state; retain precise causes only in authorized audit evidence.
+
+**[Governance & Safety] — Approval review lacks authority and effect detail (§ `DESIGN.md:222-224`; `EXPERIENCE.md:79-81,334-343`; `addendum.md:124-149`)**
+
+The reviewer cannot see sender-authority/delegation, classifier input/version, policy snapshot, expected post-state, side effects, and audit events needed for informed approval.
+Fix: add all mandatory proposal fields and revalidate authority, policy, and effect set immediately before execution; changes require a refreshed proposal.
+
+### Medium (11)
+
+**[Rubric / Token completeness] — Typography uses an unsupported semantic exception (§ `DESIGN.md:28-38`; `design-md-spec.md:15-18,45-49`)**
+
+Every web typography role uses only `note`, although that semantic exception is documented for native platform conventions.
+Fix: omit unchanged Fluent roles and document inheritance in prose, or encode genuine brand deltas using supported typography fields.
+
+**[Rubric / Component coverage] — Inherited primitives with behavioral deltas are unnamed (§ `EXPERIENCE.md:123-172`)**
+
+Busy replacement, error-summary focus, dialog/sheet containment, and queue filtering add product behavior but lack exact inherited-component mappings.
+Fix: add rows only for primitives with behavioral deltas and name the exact FrontComposer/Fluent component inherited.
+
+**[Rubric / Inheritance discipline] — Historical PRD validation is presented as binding (§ frontmatter `sources`; `prd-validation-report.md:1-21`)**
+
+The fourth source validates an older PRD revision and can mislead consumers with a stale Critical verdict and obsolete requirement counts.
+Fix: remove it from binding sources or mark it explicitly as historical/context-only with its target revision.
+
+**[Rubric / Inheritance discipline] — FrontComposer implementation reference is broken (§ `DESIGN.md:142`)**
+
+The cited path omits the root `references/` segment.
+Fix: link to `references/Hexalith.FrontComposer/docs/fluent-ui-v5-contingency.md` and declare it as inherited UI-system evidence if consumers must load it.
+
+**[Accessibility] — Classification and “why” disclosure lack accessible component behavior (§ `prd.md:1194-1201`; `EXPERIENCE.md:73-78`)**
+
+Badge/message association, disclosure reading order, labelled facts, expanded state, focus return, and update-announcement rules are unspecified.
+Fix: define accessible classification and association-explanation patterns in both spines.
+
+**[Accessibility] — Mixed-language content lacks language metadata (§ `EXPERIENCE.md:224-230`)**
+
+English/French translation rules do not set the page language or identify email, AI, and quoted content in a different language.
+Fix: bind root `lang` to the UI locale, apply language-of-parts metadata when known, persist locale across navigation, and test EN/FR screen-reader output.
+
+**[Accessibility] — Focus may be obscured by sticky chrome or panels (§ `DESIGN.md:164,180-190`; `EXPERIENCE.md:167-172,232-244`)**
+
+Focus order and contrast are covered, but WCAG 2.2 Focus Not Obscured is not.
+Fix: require focused controls to remain at least partially visible, define scroll margins, and test programmatic focus at 200% and 400% zoom.
+
+**[Accessibility] — Association candidate radiogroup behavior is undefined (§ `implementation-conformance-addendum-2026-07-17.md:34-44`; `EXPERIENCE.md:75,95-96,115,199`)**
+
+Selection, arrow-key movement, announced position/count, validation, focus recovery, and refresh behavior are left to inference.
+Fix: define one named radiogroup and decision bar; selection must not commit, and invalid confirmation must focus the existing error summary.
+
+**[Governance & Safety] — AI-summary provenance is missing (§ `DESIGN.md:214-217`; `EXPERIENCE.md:70-73,174-180`)**
+
+Generated interpretation can be mistaken for authoritative mail, file, or command evidence.
+Fix: add an AI-summary component with model/version/time/source IDs, non-color distinction, source-first default, audit linkage, and redaction-safe exported representations.
+
+**[Governance & Safety] — Replay and conflict outcomes are underspecified (§ `EXPERIENCE.md:58-59,103-105,207-213`; `addendum.md:87-102`)**
+
+Retry counts and duplicate-safety notes exist, but operation identity, prior-outcome reuse, already-decided/sent/corrected conflicts, attempt ceilings, and replay windows do not.
+Fix: define a shared operation-status pattern with idempotency identity, original-outcome link, eligibility, ceiling, and stable status/reason codes.
+
+**[Governance & Safety] — UI/CLI/MCP parity lacks a complete outcome map (§ `EXPERIENCE.md:44,121,240,313-321,345-355`; `prd.md:1307-1315`)**
+
+The UX asserts parity, but only a CLI subset is exercised and MCP lacks explicit failure/recovery behavior.
+Fix: link to the canonical parity set and add a UI/API–CLI–MCP outcome matrix covering normalized input, authorization, transition, redaction/reason, operation identity, audit origin, and long-running status.
+
+### Low (2)
+
+**[Rubric / Bloat & overspecification] — Touch-target rules are duplicated (§ `EXPERIENCE.md:201,244`)**
+
+The same target-size contract appears in Accessibility Floor and Responsive & Platform.
+Fix: keep the normative rule in Accessibility Floor and reference it from Responsive & Platform.
+
+**[Rubric / Shape fit] — Product-Specific Concerns does not earn a separate section (§ `EXPERIENCE.md:224-230,250-254`)**
+
+Its only row restates the fuller localization contract immediately above it.
+Fix: remove it or expand it only for a distinct concern that cannot fit an existing section.
 
 ## Reviewer files
 
 - `review-rubric.md`
 - `review-accessibility.md`
+- `review-governance-safety.md`

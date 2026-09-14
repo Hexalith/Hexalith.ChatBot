@@ -10,17 +10,14 @@
     --border: #e7e5e4;
     --text: #1c1917;
     --muted: #78716c;
-
     --verdict-strong: #16a34a;
     --verdict-adequate: #65a30d;
     --verdict-thin: #d97706;
     --verdict-broken: #dc2626;
-
     --sev-low: #64748b;
     --sev-medium: #ca8a04;
     --sev-high: #ea580c;
     --sev-critical: #dc2626;
-
     --grade-exc: #16a34a;
     --grade-good: #65a30d;
     --grade-fair: #d97706;
@@ -36,7 +33,6 @@
     font-size: 15px;
   }
   .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
-
   header.report-header {
     display: flex;
     align-items: flex-start;
@@ -47,20 +43,12 @@
     margin-bottom: 24px;
   }
   .title h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
-  .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
-  .grade {
-    padding: 10px 18px;
-    border-radius: 8px;
-    font-weight: 600;
-    color: white;
-    font-size: 15px;
-    white-space: nowrap;
-  }
+  .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; overflow-wrap: anywhere; }
+  .grade { padding: 10px 18px; border-radius: 8px; font-weight: 600; color: white; font-size: 15px; white-space: nowrap; }
   .grade-excellent { background: var(--grade-exc); }
   .grade-good { background: var(--grade-good); }
   .grade-fair { background: var(--grade-fair); }
   .grade-poor { background: var(--grade-poor); }
-
   .synthesis {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -72,94 +60,30 @@
   }
   .synthesis p { margin: 0 0 10px; }
   .synthesis p:last-child { margin-bottom: 0; }
-
-  .dimension-summary {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 10px;
-    margin-bottom: 24px;
-  }
-  .dim-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 14px;
-  }
+  .dimension-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 24px; }
+  .dim-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
   .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
   .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
-
   section.dimension, section.reviewer-section { margin-bottom: 14px; }
-  section.dimension details, section.reviewer-section details {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  section summary {
-    padding: 14px 20px;
-    cursor: pointer;
-    user-select: none;
-    list-style: none;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+  section.dimension details, section.reviewer-section details { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  section summary { padding: 14px 20px; cursor: pointer; user-select: none; list-style: none; display: flex; align-items: center; gap: 12px; }
   section summary::-webkit-details-marker { display: none; }
-  section summary::before {
-    content: "▸";
-    display: inline-block;
-    color: var(--muted);
-    transition: transform 0.15s ease;
-  }
+  section summary::before { content: "▸"; display: inline-block; color: var(--muted); transition: transform 0.15s ease; }
   section details[open] summary::before { transform: rotate(90deg); }
-  section summary h2 {
-    display: inline;
-    margin: 0;
-    font-size: 16px;
-    font-weight: 600;
-    letter-spacing: -0.005em;
-    flex: 1;
-  }
-  .verdict-pill {
-    font-size: 11px;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: white;
-  }
+  section summary h2 { display: inline; margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.005em; flex: 1; }
+  .verdict-pill { font-size: 11px; padding: 3px 10px; border-radius: 999px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: white; }
   .verdict-strong { background: var(--verdict-strong); }
   .verdict-adequate { background: var(--verdict-adequate); }
   .verdict-thin { background: var(--verdict-thin); }
   .verdict-broken { background: var(--verdict-broken); }
-
   .dim-body { padding: 4px 20px 18px; }
   .dim-judgment { color: var(--text); font-size: 14.5px; }
   .dim-judgment p { margin: 0 0 10px; }
-
   .findings-list { padding: 0 20px 4px; }
-  article.finding {
-    padding: 14px 0;
-    border-top: 1px solid var(--border);
-  }
+  article.finding { padding: 14px 0; border-top: 1px solid var(--border); }
   article.finding:first-child { border-top: none; }
-  article.finding header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 6px;
-  }
-  .badge {
-    font-size: 10.5px;
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    line-height: 1.4;
-  }
+  article.finding header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .badge { font-size: 10.5px; padding: 3px 8px; border-radius: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.4; }
   .badge-sev-low { background: rgba(100, 116, 139, 0.12); color: var(--sev-low); }
   .badge-sev-medium { background: rgba(202, 138, 4, 0.14); color: var(--sev-medium); }
   .badge-sev-high { background: rgba(234, 88, 12, 0.14); color: var(--sev-high); }
@@ -168,527 +92,145 @@
   .finding-location { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--muted); }
   .finding-note, .finding-fix { margin-top: 6px; font-size: 14px; }
   .finding-fix strong { color: var(--muted); font-weight: 500; }
-
-  .reviewer-source {
-    font-size: 12px;
-    color: var(--muted);
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  }
-
-  .mechanical {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px 20px;
-    margin-top: 24px;
-    font-size: 14px;
-  }
+  .reviewer-source { font-size: 12px; color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .mechanical { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-top: 24px; font-size: 14px; }
   .mechanical h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
   .mechanical ul { margin: 0; padding-left: 20px; }
   .mechanical li { margin-bottom: 4px; color: var(--text); }
-
-  footer.report-footer {
-    margin-top: 40px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-    font-size: 12px;
-    color: var(--muted);
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  }
+  footer.report-footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
   footer .meta { display: flex; gap: 24px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
   <div class="container">
-
     <header class="report-header">
       <div class="title">
         <h1>Hexalith.ChatBot — Validation Report</h1>
-        <div class="subtitle">_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md</div>
+        <div class="subtitle">/home/administrator/projects/hexalith/chatbot/_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md</div>
       </div>
-      <div class="grade grade-poor">Poor</div>
+      <div class="grade grade-poor">Poor · STOP</div>
     </header>
 
     <div class="synthesis">
-      <p>After two prior validation cycles the PRD has hardened into a usable contract — lifecycle states are reconciled, the FR/NFR catalog is contiguous and cross-referenced through the Traceability table, the minimum release slice names an executable first increment, and the Open Assumptions table is properly indexed and inline-linked. What still holds back the rubric review from "strong" is that zero <code>[NOTE FOR PM]</code> callouts and zero Open Questions mean every trade-off reads as resolved (smoothing tensions to neutral), and several FRs at the heart of the user experience (FR23, FR26, FR27, FR42, FR67, FR76, FR77) still specify capability in adjectives rather than testable consequence — story authors will invent the missing detail at story time.</p>
-      <p>The adversarial review materially shifts the picture. It reads the same artifact as a 1,260-line policy manifesto whose "minimum slice" is wider than most teams ship in two quarters, whose load-bearing safety controls (fail-closed, allowlisted commands, risk classification, cross-surface parity) are described as system properties rather than enforced invariants, and whose quantitative targets — 95% precision, 90% recall, 0 critical false-positives, RPO ≤ 15 min, RTO ≤ 4 hr, pilot adoption thresholds — anchor to a "tenant policy" / "evaluation dataset" / "operating baseline" that does not yet exist. Six Critical findings name a single underlying pattern: the named team (one frontend engineer, one CLI/MCP engineer, one security engineer) cannot ship the named release, and the PRD repeatedly defers unresolved decisions to artifacts it does not produce. The grade is set <strong>Poor</strong> because critical-severity findings are present; the rubric's positive verdict on spec craft and the adversarial verdict on buildability are both real, and both must be reconciled before architecture starts.</p>
+      <p>The product thesis, named journeys, staged scope, measurable outcomes, and non-negotiable trust floor are unusually substantive. The current PRD/addendum pair is not safe to use as the sole implementation or release authority, however: two binding AI-governance rules permit readings that contradict mandatory approval and least privilege, while late chat-surface and recovery changes have not been reconciled through the full requirement set. Treat the product strategy as sound but the requirements contract as blocked until the critical and high findings below are resolved.</p>
+      <p>The adversarial reviewer independently confirmed the stop decision and widened the risk picture. It additionally found that the post-commit audit sequence cannot satisfy the fail-closed invariant and that native-store tenant-isolation proof arrives after affected stores and programmable surfaces ship. Across both reviews there are 6 Critical, 17 High, 9 Medium, and 1 Low reports before deduplication; the Critical reports describe four unique blockers.</p>
     </div>
 
     <div class="dimension-summary">
-      <div class="dim-card">
-        <div class="dim-name">Decision-readiness</div>
-        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
-      </div>
-      <div class="dim-card">
-        <div class="dim-name">Substance over theater</div>
-        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
-      </div>
-      <div class="dim-card">
-        <div class="dim-name">Strategic coherence</div>
-        <div class="dim-verdict" style="color: var(--verdict-strong)">strong</div>
-      </div>
-      <div class="dim-card">
-        <div class="dim-name">Done-ness clarity</div>
-        <div class="dim-verdict" style="color: var(--verdict-thin)">thin</div>
-      </div>
-      <div class="dim-card">
-        <div class="dim-name">Scope honesty</div>
-        <div class="dim-verdict" style="color: var(--verdict-strong)">strong</div>
-      </div>
-      <div class="dim-card">
-        <div class="dim-name">Downstream usability</div>
-        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
-      </div>
-      <div class="dim-card">
-        <div class="dim-name">Shape fit</div>
-        <div class="dim-verdict" style="color: var(--verdict-strong)">strong</div>
-      </div>
+      <div class="dim-card"><div class="dim-name">Decision-readiness</div><div class="dim-verdict" style="color: var(--verdict-broken)">broken</div></div>
+      <div class="dim-card"><div class="dim-name">Substance over theater</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Strategic coherence</div><div class="dim-verdict" style="color: var(--verdict-strong)">strong</div></div>
+      <div class="dim-card"><div class="dim-name">Done-ness clarity</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
+      <div class="dim-card"><div class="dim-name">Scope honesty</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
+      <div class="dim-card"><div class="dim-name">Downstream usability</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
+      <div class="dim-card"><div class="dim-name">Shape fit</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
     </div>
 
     <section class="dimension">
-      <details>
-        <summary>
-          <h2>Decision-readiness</h2>
-          <span class="verdict-pill verdict-adequate">adequate</span>
-        </summary>
-        <div class="dim-body">
-          <div class="dim-judgment">
-            <p>The big bet is visible (governance-first MVP, CLI/MCP parity as intentional scope), the cost is named, and assumptions A1–A9 are owned and inline-linked at the points they bite. Where the PRD smooths trade-offs to neutral: zero <code>[NOTE FOR PM]</code> callouts and zero Open Questions. The choice to require approval for almost every externally-visible AI action is presented as obvious; approval fatigue is acknowledged later (line 546) without naming the unresolved tension.</p>
-          </div>
-        </div>
+      <details open>
+        <summary><h2>Decision-readiness</h2><span class="verdict-pill verdict-broken">broken</span></summary>
+        <div class="dim-body"><div class="dim-judgment">
+          <p>The PRD states real decisions and trade-offs, including the email wedge, fixed M0/M1/M2 order, deferred machine parity, and protected safety floor. It cannot support an unambiguous green-light decision because approval policy may waive mandatory controls, the M1 AI allowlist is unsafe by default, and M2 release obligations lack complete evidence and SLO definitions.</p>
+        </div></div>
         <div class="findings-list">
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-medium">medium</span>
-              <h3 class="finding-title">No live tensions surfaced — every trade-off reads as resolved</h3>
-              <span class="finding-location">Executive Summary → Scope</span>
-            </header>
-            <div class="finding-note">Zero <code>[NOTE FOR PM]</code> callouts and zero Open Questions. A2/A3/A8 are formally tagged as assumptions but read as confirmed direction, not open tensions.</div>
-            <div class="finding-fix"><strong>Fix:</strong> add 2–3 <code>[NOTE FOR PM]</code> callouts at real tensions — line 211 (CLI/MCP parity cost vs. velocity), line 1073 (approval-required default vs. approval fatigue threshold), line 229 (vertical slice sequencing if M365 permission grants delay pilot).</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-low">low</span>
-              <h3 class="finding-title">Approval fatigue named in Innovation/Risk Mitigation but not reconciled with FR41 default</h3>
-              <span class="finding-location">line 546; FR41 line 1073</span>
-            </header>
-            <div class="finding-note">FR41 makes approval mandatory for a broad list of action classes; the risk section says mitigation needs "tenant policy for low-risk read-only assistance," but FR41 + the risk-class table (lines 1057–1063) put almost every useful action in "approval-required."</div>
-            <div class="finding-fix"><strong>Fix:</strong> either tighten the policy escape hatch in FR41/FR52, or add a <code>[NOTE FOR PM]</code> admitting MVP intentionally errs toward fatigue and will tune post-pilot.</div>
-          </article>
+          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">Approval-fatigue override contradicts the safety invariant</h3><span class="finding-location">FR41; NFR16; addendum §Tenant Policy Schema</span></header><div class="finding-note">The PM note and schema permit the six boundary-crossing classes that FR41 says always require approval to be marked low-risk-allowed.</div><div class="finding-fix"><strong>Fix:</strong> Restrict low-risk-allowed to enumerated read-only actions and make the six effect classes structurally non-downgradable.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">M1 AI allowlist is denylist-shaped and can include privileged mutations</h3><span class="finding-location">FR19, FR43, FR75a–g; addendum §Command Allowlist v1</span></header><div class="finding-note">The full-catalog-minus-exclusions rule has no exact membership or complete tag set and includes outbound, identity, and governance operations.</div><div class="finding-fix"><strong>Fix:</strong> Use an exact, versioned, deny-by-default AI-invocable set with per-member approval metadata.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">M2 cannot receive an evidence-based recovery release decision</h3><span class="finding-location">§Increment M2; A10; NFR56–59</span></header><div class="finding-note">The hosted run expired under the eight-day rule, predates controlled-loss validation, and cannot test a four-hour RTO inside a 180-second lane.</div><div class="finding-fix"><strong>Fix:</strong> Require fresh exact-commit controlled-loss evidence and a full-window/pre-production RTO drill.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">M2 SLO catalog fails NFR42a's completion contract</h3><span class="finding-location">NFR42a; addendum §Operating Baselines</span></header><div class="finding-note">Multiple targets and nearly all error budgets remain calibration-pending; only audit projection lag has a live signal.</div><div class="finding-fix"><strong>Fix:</strong> Gate M2 on calibration/live signals or supply bounded provisional values and ratcheting rules.</div></article>
         </div>
       </details>
     </section>
 
     <section class="dimension">
       <details>
-        <summary>
-          <h2>Substance over theater</h2>
-          <span class="verdict-pill verdict-adequate">adequate</span>
-        </summary>
-        <div class="dim-body">
-          <div class="dim-judgment">
-            <p>Vision is specific to this product family — would not swap into a generic B2B SaaS PRD. Eight UJ protagonists each drive distinct requirements rather than decorating. Many NFRs are well-bounded with numeric thresholds (NFR6, NFR24, NFR25, NFR26, NFR43, NFR56). Theater risk is moderate: several NFRs at user-trust hot spots still drift to adjective-only.</p>
-          </div>
-        </div>
+        <summary><h2>Substance over theater</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
+        <div class="dim-body"><div class="dim-judgment"><p>The journeys, controls, product-specific NFRs, and differentiated authority boundaries are earned. Repetition, rather than empty content, is the main drag.</p></div></div>
         <div class="findings-list">
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-medium">medium</span>
-              <h3 class="finding-title">Adjective-only NFRs at user-trust hot spots</h3>
-              <span class="finding-location">NFR40, NFR42, NFR44, NFR46, NFR48 — lines 1218, 1220, 1222, 1224, 1226</span>
-            </header>
-            <div class="finding-note">"User-appropriate language with enough next-action guidance" (NFR40), "preserve user trust" (NFR42), "runbook-ready" (NFR44), "preventing approval fatigue by prioritizing, grouping, and suppressing" (NFR46), "evidence freshness indicators must exist" (NFR48) — outcomes specified only in adjectives at moments the product's reputation rises or falls.</div>
-            <div class="finding-fix"><strong>Fix:</strong> attach at least one observable threshold to each — e.g., NFR46 "no actor receives more than N approval notifications per hour without grouping"; NFR48 "evidence is shown with freshness band: &lt;5 min fresh, &lt;1 hr aging, older = stale and requires re-confirmation."</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-low">low</span>
-              <h3 class="finding-title">Innovation section duplicates "What Makes This Special"</h3>
-              <span class="finding-location">lines 510–516; lines 66–72</span>
-            </header>
-            <div class="finding-note">"Detected Innovation Areas" restates the Exec Summary without adding a different angle.</div>
-            <div class="finding-fix"><strong>Fix:</strong> trim and point back to Exec Summary, or earn the duplication by surfacing a different pattern (e.g., deterministic-evidence-first ordering vs. AI inference at line 118).</div>
-          </article>
+          <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Repeated risk and ownership sections obscure canonicality</h3><span class="finding-location">§Key Product Risks; §Risk Mitigations; §Context Ownership</span></header><div class="finding-note">Repeated association, leakage, AI-action, mailbox, and ownership material makes authority harder to determine.</div><div class="finding-fix"><strong>Fix:</strong> Keep one canonical risk register and ownership section; turn repetitions into links.</div></article>
         </div>
       </details>
     </section>
 
     <section class="dimension">
       <details>
-        <summary>
-          <h2>Strategic coherence</h2>
-          <span class="verdict-pill verdict-strong">strong</span>
-        </summary>
-        <div class="dim-body">
-          <div class="dim-judgment">
-            <p>Thesis ("AI as a governed project actor, not a disconnected assistant") and feature set follow each other. The differentiating moment maps directly onto the Minimum Release Slice, which maps onto FR groups via Traceability. Success Metrics validate the thesis (4 consecutive weeks, 2 mailbox patterns, 70% evidence-resolved decisions, 40% time reduction, 10 governed AI reviews) rather than DAU/MAU theater. Counter-metric posture is implicit. MVP scope kind ("experience proof + platform proof") is named explicitly and the scope logic matches.</p>
-          </div>
-        </div>
+        <summary><h2>Strategic coherence</h2><span class="verdict-pill verdict-strong">strong</span></summary>
+        <div class="dim-body"><div class="dim-judgment"><p>The email-to-authorized-project-work thesis is clear. The staged feature sequence and success/counter-metrics consistently validate that thesis, and post-MVP deferrals preserve it.</p><p>No substantive findings.</p></div></div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details open>
+        <summary><h2>Done-ness clarity</h2><span class="verdict-pill verdict-thin">thin</span></summary>
+        <div class="dim-body"><div class="dim-judgment"><p>Some high-risk requirements are exemplary, but quality is uneven. Engineers cannot derive one deterministic acceptance oracle without selecting among conflicting classifier, lifecycle, policy, and SLO statements.</p></div></div>
         <div class="findings-list">
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-low">low</span>
-              <h3 class="finding-title">Pilot thresholds are not baselined</h3>
-              <span class="finding-location">lines 174–180</span>
-            </header>
-            <div class="finding-note">"Reduced by 40% compared with the pilot tenant's current manual email-to-project update process" and "reduced by 30% for pilot projects" presume the pilot tenant has a measurable baseline.</div>
-            <div class="finding-fix"><strong>Fix:</strong> add an <code>[ASSUMPTION]</code> (or extend A9) that pilot onboarding will include a 2–4 week baseline measurement period before workflow goes live, and name who measures it.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-low">low</span>
-              <h3 class="finding-title">No named owner for measuring success metrics</h3>
-              <span class="finding-location">Success Criteria, lines 130–180</span>
-            </header>
-            <div class="finding-note">Outcomes listed but not attributed. Architecture and QA will back-infer who runs the evaluation dataset and who reports pilot adoption.</div>
-            <div class="finding-fix"><strong>Fix:</strong> add a sentence in Validation outcomes naming the responsible role (Product + QA + Tenant Admin lead?).</div>
-          </article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Three classifiers are conflated into one undefined kernel</h3><span class="finding-location">addendum §§Confidence Thresholds, Risk Classifier; FR35; A9a</span></header><div class="finding-note">Association scoring, task intent, and action risk use incompatible inputs, outputs, and label taxonomies.</div><div class="finding-fix"><strong>Fix:</strong> Define separate versioned scorer/classifier contracts, datasets, calibration targets, and failure states.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Below-T_low association has incompatible lifecycle outcomes</h3><span class="finding-location">§Technical Success; §Shared Workflow Contract; addendum §Confidence Thresholds</span></header><div class="finding-note">The PRD says deferred or rejected; the addendum says NeedsReview, including distinct scorer-error behavior.</div><div class="finding-fix"><strong>Fix:</strong> Publish one canonical score/outcome/state table covering all bands and failures.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Acceptance readiness is specified for only four FR groups</h3><span class="finding-location">§Functional Acceptance Guidance</span></header><div class="finding-note">Identity, conversations, files, outbound, operations, and recovery still rely on downstream invention.</div><div class="finding-fix"><strong>Fix:</strong> Complete the matrix or explicitly block each uncovered group with an owner and prerequisite.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Tenant-policy schema is complete only for M0</h3><span class="finding-location">addendum §Tenant Policy Schema; FR52; FR73–75g; NFR35</span></header><div class="finding-note">M1/M2 controls are prose categories, not typed knobs with defaults, sensitivity, validation, and migration rules.</div><div class="finding-fix"><strong>Fix:</strong> Enumerate every M1/M2 knob and cross-knob invariant in the declared schema format.</div></article>
         </div>
       </details>
     </section>
 
     <section class="dimension">
       <details open>
-        <summary>
-          <h2>Done-ness clarity</h2>
-          <span class="verdict-pill verdict-thin">thin</span>
-        </summary>
-        <div class="dim-body">
-          <div class="dim-judgment">
-            <p>The weakest dimension. §"Functional Acceptance Guidance" (lines 984–1006) sets a baseline and the high-risk FR matrix (lines 1001–1006) demands matrices for FR1–12, FR39–46, FR55–63, FR81–89 before stories. But the FRs themselves are frequently soft, and FR groups <em>outside</em> the high-risk matrix (notably FR21–28 "Project Conversation and Context" and FR64–80 "Reliability/Operations") have no explicit acceptance scaffolding at all. Concrete examples: FR23 "inspect why an email belongs to a project" is unbounded; FR26 "distinguish informational from actionable" gives no mechanism; FR42 approval summary has no length/structure; FR71 "next required human action" has no testable definition; FR76/FR77 use "user-safe language" and "next-step guidance" — adjectival.</p>
-          </div>
-        </div>
+        <summary><h2>Scope honesty</h2><span class="verdict-pill verdict-thin">thin</span></summary>
+        <div class="dim-body"><div class="dim-judgment"><p>The May scope reductions are mostly candid, but later chat scope and inherited file-upload scope are not reconciled with the same discipline.</p></div></div>
         <div class="findings-list">
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-high">high</span>
-              <h3 class="finding-title">Soft outcomes on user-facing FRs at the value moment</h3>
-              <span class="finding-location">FR23, FR26, FR27, FR42, FR67, FR76, FR77 — lines 1038, 1041–1042, 1074, 1108, 1117–1118</span>
-            </header>
-            <div class="finding-note">These FRs drive the contributor and reviewer experience, and they specify capability but not testable consequence. A story author will have to invent the field list and visual treatment, so experience drift will happen at story time, after the PRD is "done."</div>
-            <div class="finding-fix"><strong>Fix:</strong> add explicit acceptance bullets under each FR, or extend the §"Functional Acceptance Guidance" matrix to include FR21–FR28 as a required-scenario group — UJ1 + UJ4 + UJ8 hang on these FRs.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-medium">medium</span>
-              <h3 class="finding-title">Task-intent FRs lack a data contract</h3>
-              <span class="finding-location">FR35–FR38, lines 1067–1070</span>
-            </header>
-            <div class="finding-note">"Candidate action requests" can be reviewed/converted/dispositioned but the task-intent record fields, detection mechanism (rule-based or AI), and recall/precision threshold are unspecified.</div>
-            <div class="finding-fix"><strong>Fix:</strong> add 1–2 lines to FR35 specifying minimum record fields (source message ID, candidate verb, affected resource, requester party, confidence) and reference NFR68 for the precision/recall bar.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-medium">medium</span>
-              <h3 class="finding-title">NFR60 "core UI review workflows" unenumerated</h3>
-              <span class="finding-location">line 1247</span>
-            </header>
-            <div class="finding-note">"Core" is not enumerated. Accessibility testing will either over-cover (slow) or under-cover (gaps).</div>
-            <div class="finding-fix"><strong>Fix:</strong> enumerate: "ambiguous association review, AI action approval/preview, attachment status, audit lookup, queue list/filter, refusal/denied message screens."</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-low">low</span>
-              <h3 class="finding-title">FR94 names operational metrics but not the publication shape</h3>
-              <span class="finding-location">line 1141</span>
-            </header>
-            <div class="finding-note">Lists metric names (ingestion/association/approval/command latency, retry exhaustion, duplicate suppression, audit projection lag) but not exposure surface (Prometheus? OpenTelemetry? dashboard?).</div>
-            <div class="finding-fix"><strong>Fix:</strong> point at NFR28 / NFR37 or specify the exposure surface.</div>
-          </article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Approved interactive-chat scope exists only as a PM note</h3><span class="finding-location">§Vision; §UI Surface Inventory; §Functional Requirements</span></header><div class="finding-note">The composer is absent from increment scope, surfaces, FRs, command/failure behavior, accessibility scope, and traceability.</div><div class="finding-fix"><strong>Fix:</strong> Reconcile the change through scope, surfaces, journeys, FRs, NFR60, commands, and traceability.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">General user-upload ingestion disappeared without disposition</h3><span class="finding-location">§MVP; §Files and Attachments; §Out of scope</span></header><div class="finding-note">The brief includes user upload; the PRD covers mailbox attachments but neither commits nor defers general upload.</div><div class="finding-fix"><strong>Fix:</strong> Assign it to an increment or explicitly make it post-MVP/non-goal with rationale.</div></article>
         </div>
       </details>
     </section>
 
     <section class="dimension">
-      <details>
-        <summary>
-          <h2>Scope honesty</h2>
-          <span class="verdict-pill verdict-strong">strong</span>
-        </summary>
-        <div class="dim-body">
-          <div class="dim-judgment">
-            <p>Non-Goals appear in three places and do real work (autonomous project creation, full task lifecycle, document intelligence, cross-tenant suggestions, subscription tiers, general email client replacement). Open Assumptions A1–A9 are indexed with owners and revisit conditions; the most consequential are inline-linked. CLI/MCP scope-inclusion cost is named honestly. De-scoping logic states what cannot be trimmed. No <code>[NOTE FOR PM]</code> or Open Questions — reads as scope-honesty under-rotation on tensions (cross-references the Decision-readiness finding).</p>
-          </div>
-        </div>
-        <div class="findings-list">
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-low">low</span>
-              <h3 class="finding-title">No <code>[NOTE FOR PM]</code> callouts anywhere</h3>
-              <span class="finding-location">throughout</span>
-            </header>
-            <div class="finding-note">Leaves deferred decisions invisible at the points where downstream artifacts will hit them. Already noted under Decision-readiness.</div>
-            <div class="finding-fix"><strong>Fix:</strong> see Decision-readiness finding.</div>
-          </article>
-        </div>
-      </details>
-    </section>
-
-    <section class="dimension">
-      <details>
-        <summary>
-          <h2>Downstream usability</h2>
-          <span class="verdict-pill verdict-adequate">adequate</span>
-        </summary>
-        <div class="dim-body">
-          <div class="dim-judgment">
-            <p>Glossary present, FR1–FR96 / NFR1–NFR70 contiguous, Traceability table maps journeys to FR/NFR ranges, lifecycle states reconciled across the Shared Workflow Contract table and the §"Association Lifecycle" required-states list, Command and Query Contracts enumerate concrete operation names (improvement over prior partial list). Weaknesses: glossary drift on "Policy snapshot," "Operating baseline," "Idempotency key," and the "Scoped AI context" vs "Context package" pair; lifecycle state list reorders relative to canonical; UJ Traceability "Validation focus" still requires reading prose; cross-references are not machine-verified.</p>
-          </div>
-        </div>
-        <div class="findings-list">
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-medium">medium</span>
-              <h3 class="finding-title">Glossary missing load-bearing terms</h3>
-              <span class="finding-location">Glossary, lines 953–968</span>
-            </header>
-            <div class="finding-note">"Policy snapshot," "Operating baseline" / "Tenant or deployment profile," "Idempotency key," and the disambiguation of "Scoped AI context" / "AI context package" vs "Context package" are used across FRs and NFRs but not glossed.</div>
-            <div class="finding-fix"><strong>Fix:</strong> add these 4–5 terms; clarify whether "Scoped AI context" and "Context package" are synonymous.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-low">low</span>
-              <h3 class="finding-title">Lifecycle state list reorders relative to canonical table</h3>
-              <span class="finding-location">lines 700–712 vs. lines 380–391</span>
-            </header>
-            <div class="finding-note">Names match; order does not. Cosmetic now, but invites copy-paste drift in architecture.</div>
-            <div class="finding-fix"><strong>Fix:</strong> reorder the 700–712 list to match the canonical sequence.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-low">low</span>
-              <h3 class="finding-title">UJs lack a "key acceptance hooks" extract per journey</h3>
-              <span class="finding-location">UJ1–UJ8, lines 262–368</span>
-            </header>
-            <div class="finding-note">Story creation will have to re-read prose to find the testable bits.</div>
-            <div class="finding-fix"><strong>Fix:</strong> optional — add a 3–5 bullet "what story creation should extract" at the end of each UJ, or rely on the Traceability table being sufficient.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-low">low</span>
-              <h3 class="finding-title">FR/NFR cross-references not machine-verified</h3>
-              <span class="finding-location">Traceability Overview, lines 972–983</span>
-            </header>
-            <div class="finding-note">Spot-check passed but no automated check has been done.</div>
-            <div class="finding-fix"><strong>Fix:</strong> before architecture starts, machine-validate that every FR/NFR ID cited in the table resolves.</div>
-          </article>
-        </div>
-      </details>
-    </section>
-
-    <section class="dimension">
-      <details>
-        <summary>
-          <h2>Shape fit</h2>
-          <span class="verdict-pill verdict-strong">strong</span>
-        </summary>
-        <div class="dim-body">
-          <div class="dim-judgment">
-            <p>PRD shape matches the product: B2B SaaS, multi-stakeholder, chain-top (PRD → UX → architecture → stories). UJs with named protagonists are load-bearing and present. CLI/MCP-as-MVP-scope is justified by the product's nature (automation builders and AI agents as first-class actors); parity rigor is earned. Brownfield context correctly handled: dependent Hexalith bounded contexts named (Projects, Parties, Folders, Tenants, EventStore, Keycloak, Aspire, FrontComposer, Memories, Commons). Source-context date footnote at line 90 is exactly the right move for a chain-top PRD. Single-release MVP shape matches the thesis "the full vertical path or it does not prove the bet."</p>
-          </div>
-        </div>
-        <div class="findings-list">
-        </div>
-      </details>
-    </section>
-
-    <section class="reviewer-section">
       <details open>
-        <summary>
-          <h2>Adversarial review — Critical findings</h2>
-          <span class="reviewer-source">review-adversarial-general.md</span>
-        </summary>
-        <div class="dim-body">
-          <div class="dim-judgment">
-            <p>A 1,260-line incantation of governance vocabulary that promises a fully governed, fail-closed, cross-surface, multi-tenant, audit-perfect, AI-mediated, idempotent email-to-project platform — and then calls it an MVP delivered in one release. The PRD repeats the same five risk-management adjectives in every section while quietly punting nearly every quantitative target to "tenant policy," "evaluation dataset," "operating baseline," or "depends on A1–A9." It has a clear thesis and a usable lifecycle model, but the so-called "minimum slice" is wider than most teams ship in two quarters, and the precision/recall, latency, RPO/RTO, adoption, and accessibility numbers are presented as commitments without a single referenced baseline measurement. Not yet a buildable PRD — a maximalist policy manifesto that hopes architecture and stories will silently absorb the scope it refuses to cut.</p>
-          </div>
-        </div>
+        <summary><h2>Downstream usability</h2><span class="verdict-pill verdict-thin">thin</span></summary>
+        <div class="dim-body"><div class="dim-judgment"><p>The glossary, named protagonists, ID catalogs, lifecycle table, and surface inventory provide useful extraction anchors. Unpinned brownfield lineage and missing metric IDs weaken reproducibility.</p></div></div>
         <div class="findings-list">
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-critical">critical</span>
-              <h3 class="finding-title">C1. "Minimum Release Slice" is wider than the rest of the PRD admits — the MVP is not an MVP</h3>
-              <span class="finding-location">lines 213–229; 865–893</span>
-            </header>
-            <div class="finding-note">The "minimum" slice enumerates nine workstreams; the must-have list expands this into 25 bullets including tenant isolation across nine actor types, Keycloak, Aspire, dependency failure handling for seven dependency classes, and security tests across nine actor types. This is the entire product, not a vertical slice. The PRD admits "the release is broad for a single MVP" (line 942) and then refuses to cut anything because "trust requires the full vertical path." Without explicit, ruthless sequencing, this PRD will either slip indefinitely or quietly drop fail-closed behavior under deadline pressure — which the PRD itself names as the worst possible outcome.</div>
-            <div class="finding-fix"><strong>Fix:</strong> sequence the minimum slice into three or more increments. Increment 1: deterministic association + UI review + audit lookup + one surface (UI). CLI/MCP parity, AI mediation, and outbound send move to later increments.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-critical">critical</span>
-              <h3 class="finding-title">C2. Precision/recall targets have no provenance and no dataset behind them</h3>
-              <span class="finding-location">line 141; A9 line 1159</span>
-            </header>
-            <div class="finding-note">"95% precision," "90% recall," "0 critical false-positives" against "seeded evaluation datasets" — no baseline, no dataset size, no class balance, no labeling protocol, no inter-rater agreement, no owner. A9 reveals the dataset is still an assumption. The acceptance threshold is anchored to a dataset that does not exist yet, will be built by an unnamed party, and will be calibrated by the same team that has to hit the threshold — a textbook circular acceptance criterion.</div>
-            <div class="finding-fix"><strong>Fix:</strong> commit a named owner, sampling protocol, target dataset size, and refresh cadence — or delete the precision/recall/false-positive numbers from Success Criteria.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-critical">critical</span>
-              <h3 class="finding-title">C3. T_high and T_low are fictional knobs with no operating range</h3>
-              <span class="finding-location">line 120; FR9 line 1018</span>
-            </header>
-            <div class="finding-note">Confidence thresholds introduced as tenant policy. Nothing specifies the underlying scoring function, the domain of the score, how a tenant admin would calibrate against precision/recall targets without statistical training, what happens if a deployment ships with bad defaults, or who validates a tenant's threshold change before it goes live. A misconfigured T_high of 0.1 will auto-associate everything; no guardrail is named. The decision log's "clarified" resolution is "tenant policy" — that is the punt, not the resolution.</div>
-            <div class="finding-fix"><strong>Fix:</strong> specify the score domain, safe-default initial values, the calibration protocol against the evaluation dataset, and the guardrail on threshold changes (review queue, audit event, ramp limits).</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-critical">critical</span>
-              <h3 class="finding-title">C4. "Fail closed" is repeated 20+ times but has multiple silent escape hatches</h3>
-              <span class="finding-location">examples lines 116, 154, 472, 476, 595, 597, 716, 768, 771, 1109, 1184</span>
-            </header>
-            <div class="finding-note">NFR15 allows non-security-sensitive invalid transitions to silently mutate state when audit is down — who decides which is which? NFR22 + line 771: risk classification can't run during AI provider outage, so approval routing can't run, so the "approval-required" risk class collapses to "human guesses without classifier." Line 476 implicitly authorizes non-risky actions to proceed without audit; "risky" is behaviorally defined, so a wrongly-classified action can write project state with no audit. The phrase is used as a token, not a contract.</div>
-            <div class="finding-fix"><strong>Fix:</strong> enumerate every code path that can write durable state. Define "fail closed" at each one as an invariant (not a behavioral test). Close the NFR15 "security-sensitive" carve-out.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-critical">critical</span>
-              <h3 class="finding-title">C5. Cross-surface parity is enforced by aspiration, not by an invariant</h3>
-              <span class="finding-location">lines 161–167; FR81–FR86; lines 723–728</span>
-            </header>
-            <div class="finding-note">UI/CLI/MCP "expose the same core governed operations" with "equivalent authorization outcomes, state transitions, audit behavior, and redaction semantics" — enforcement is "contract tests" + "automated parity tests." Parity is a quality the system <em>has</em>, not an invariant the architecture forbids violating. The first time CLI gains a feature UI lacks (or vice versa), parity drifts and tests catch some fraction. For a security-critical surface, "we'll test for parity" ≠ "we cannot construct a non-parity code path."</div>
-            <div class="finding-fix"><strong>Fix:</strong> require a single shared command pipeline at the architectural layer that all three surfaces invoke. Parity becomes a structural property, not a test outcome.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-critical">critical</span>
-              <h3 class="finding-title">C6. "Single release" with all eight journeys is unbuildable on the named team</h3>
-              <span class="finding-location">line 847; lines 851–863</span>
-            </header>
-            <div class="finding-note">Singular frontend, singular CLI/MCP, singular security engineer. The release must deliver 8 user journeys + system journey, 27 commands, 14 queries, 9 lifecycle states with transitions, 3 first-class surfaces with parity, WCAG 2.2 AA, full audit reconstructability, RPO ≤ 15 min / RTO ≤ 4 hrs, seeded evaluation datasets, and pilot with 4 consecutive weeks. No team-load reconciliation anywhere. The decision log claims "MVP sequencing within the single release" was addressed, but sequencing-within-a-release ≠ cutting scope. This is a 6–12 person-year backlog packaged as one release.</div>
-            <div class="finding-fix"><strong>Fix:</strong> reconcile team to scope or scope to team. Grow the team to match the named bar, or shrink the release to what the named team can ship with margin.</div>
-          </article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Brownfield source baseline cannot be reproduced</h3><span class="finding-location">frontmatter inputs/counts; §Project Classification</span></header><div class="finding-note">The only direct input is machine-specific, project context is counted as zero, and sibling sources lack exact paths and revisions.</div><div class="finding-fix"><strong>Fix:</strong> Use repository-relative paths, revisions/dates, and a versioned source/re-check manifest.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Success outcomes have no stable IDs</h3><span class="finding-location">§Measurable Outcomes; §Traceability Overview</span></header><div class="finding-note">Strong numeric metrics cannot be cited stably by stories or release evidence.</div><div class="finding-fix"><strong>Fix:</strong> Add SM identifiers, metric/counter-metric pairs, and trace/increment references.</div></article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary><h2>Shape fit</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
+        <div class="dim-body"><div class="dim-judgment"><p>The deep multi-stakeholder B2B shape fits, but mutable implementation status and code-as-authority statements blur the boundary between product requirements, architecture, and qualification evidence.</p></div></div>
+        <div class="findings-list">
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Requirements are mixed with mutable implementation evidence</h3><span class="finding-location">A10; PM note; addendum §§Operating Baselines, Recovery commitments</span></header><div class="finding-note">Commit/run status and code-as-authority statements make the requirement age with evidence and invert product authority.</div><div class="finding-fix"><strong>Fix:</strong> Keep targets and gates in the PRD; move run locators/current measurements to a versioned qualification-evidence artifact.</div></article>
         </div>
       </details>
     </section>
 
     <section class="reviewer-section">
       <details>
-        <summary>
-          <h2>Adversarial review — High findings (11)</h2>
-          <span class="reviewer-source">review-adversarial-general.md</span>
-        </summary>
-        <div class="dim-body">
-          <div class="dim-judgment">
-            <p>Eleven High findings — the load-bearing decoration pattern. Magic numbers without derivation, "tenant policy" as universal escape hatch, AI risk classifier described as a capability with no implementation, "allowlisted commands" with no allowlist, evaluation dataset nobody owns, idempotency promised across heterogeneous operations with no key contract, approval fatigue acknowledged but mitigation hand-waved, lifecycle terminal states that are not terminal, accessibility bar that one frontend engineer cannot meet, no admin/debug bypass colliding with tenant-admin operational dashboards.</p>
-          </div>
-        </div>
+        <summary><h2>Adversarial general review</h2><span class="reviewer-source">review-adversarial-general.md</span></summary>
+        <div class="dim-body"><div class="dim-judgment">
+          <p><strong>STOP — not safe for product approval or unqualified downstream handoff.</strong> The product thesis and control intentions are strong, but four direct trust-boundary failures and nine High gaps make architecture/story freeze unsafe. UX exploration can continue against stable journeys.</p>
+        </div></div>
         <div class="findings-list">
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-high">high</span>
-              <h3 class="finding-title">H1. "Magic constants" appear with no derivation</h3>
-              <span class="finding-location">lines 176–180, 1172, 1196–1199, 1221, 1240–1241</span>
-            </header>
-            <div class="finding-note">Pilot thresholds, cache staleness, p95 latencies, page sizes, RPO/RTO, projection rebuild — every number is a "default" tenant policy can override (A4). A default with no derivation is a guess wearing a number.</div>
-            <div class="finding-fix"><strong>Fix:</strong> for each named threshold, either cite the baseline measurement / user research / throughput model that produced it, or label it explicitly as a starter value to be calibrated in the first pilot increment.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-high">high</span>
-              <h3 class="finding-title">H2. "Tenant policy" is the universal escape hatch</h3>
-              <span class="finding-location">A4–A6 lines 1154–1156; NFR9, NFR23; many others</span>
-            </header>
-            <div class="finding-note">Confidence thresholds, AI provider telemetry/retention/region, audit retention, low-risk AI permission, residency, performance baselines, notification routing, retry policy, rate limits, accessibility thresholds, consent rules, RBAC restrictions — all deferred to tenant policy with no master list and no schema. Without a policy contract: admins configure an undocumented surface, security can't validate it's closed under safe states, tests can't enumerate combinations, and "tenant policy" becomes the place every unresolved decision hides.</div>
-            <div class="finding-fix"><strong>Fix:</strong> author a Tenant Policy Schema as a first-class artifact. Every "tenant policy" reference resolves to a key with allowed values and safe defaults. Put it under change control.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-high">high</span>
-              <h3 class="finding-title">H3. Risk classification is a system capability without naming the classifier</h3>
-              <span class="finding-location">lines 1056–1063; FR39 line 1071</span>
-            </header>
-            <div class="finding-note">FR39 says the system "can classify AI action requests by risk." Heuristic? Tags? LLM? Static allowlist? The risk table includes "expose file content in generated output" — determining whether an action exposes file content requires reasoning about non-deterministic model output. The entire approval gate depends on this classifier being correct. The decision log does not record this as resolved.</div>
-            <div class="finding-fix"><strong>Fix:</strong> name the classifier mechanism, its error rate as a first-class risk, the fallback for misclassification, and the audit chain when classification disagrees with reviewer action.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-high">high</span>
-              <h3 class="finding-title">H4. "Allowlisted commands" is the load-bearing security control with no allowlist</h3>
-              <span class="finding-location">lines 199, 205, 211, 226, 502, 883; A8 line 1158</span>
-            </header>
-            <div class="finding-note">"Allowlist of project collaboration commands" appears repeatedly as the safety boundary for AI execution. The PRD does not name a single command in the allowlist. A8 records it as an assumption. The 27-command catalog (lines 647–673) contains the ones an AI would invoke — so either the allowlist is the whole catalog (concept decorative) or a subset (unspecified). Acceptance tests cannot be written against an unspecified subset.</div>
-            <div class="finding-fix"><strong>Fix:</strong> enumerate the MVP allowlist explicitly. State the criteria for adding/removing entries. Make the allowlist a versioned artifact under change control.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-high">high</span>
-              <h3 class="finding-title">H5. The "evaluation dataset" is load-bearing and nobody owns it</h3>
-              <span class="finding-location">A9 line 1159; lines 141, 170–172, 1139</span>
-            </header>
-            <div class="finding-note">Dataset basis for precision/recall (C2), pilot validation, regression history (FR92), and NFR50's "100% audit field presence." Owner of A9 is "QA / Product" — shared ownership means nobody owns it. No spec for cardinality, label taxonomy, source provenance, redaction, refresh cadence, drift handling, or adversarial-example protocol. NFR50's "100%" is a tautology and precision/recall targets are unfalsifiable.</div>
-            <div class="finding-fix"><strong>Fix:</strong> single named owner. Sampling frame, target size, label taxonomy, refresh cadence, adversarial-example protocol all written before pilot starts.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-high">high</span>
-              <h3 class="finding-title">H6. "Audit completeness" is invoked as a metric but never defined</h3>
-              <span class="finding-location">lines 159, 162, 466, 795; NFR50 line 1231</span>
-            </header>
-            <div class="finding-note">Field-presence ≠ completeness. NFR50's "100% required field presence" on the evaluation dataset is a field-presence test, not a completeness test, and measures the test corpus, not production.</div>
-            <div class="finding-fix"><strong>Fix:</strong> define audit completeness as a production observable. "Fraction of state-mutating operations whose audit chain reconstructs the operation end-to-end" is one workable definition; pick one and instrument it.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-high">high</span>
-              <h3 class="finding-title">H7. Idempotency promised across heterogeneous operations with no key contract</h3>
-              <span class="finding-location">NFR13 line 1182; FR90 line 1137; line 698</span>
-            </header>
-            <div class="finding-note">Mailbox intake, attachment capture, association decisions, approvals, command execution, outbound communication, notifications, audit projection — each class has different identity semantics. The PRD doesn't say what an idempotency key is composed of, how long the replay window lasts, or what "equivalent inputs" means when a duplicate approval comes in with a different actor at a different time.</div>
-            <div class="finding-fix"><strong>Fix:</strong> per operation class, define key composition, replay window, equivalence rule, and conflict response. Put the resulting contract in the addendum or an architecture appendix.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-high">high</span>
-              <h3 class="finding-title">H8. Approval fatigue acknowledged but mitigation is hand-waved</h3>
-              <span class="finding-location">line 547; NFR46 line 1224</span>
-            </header>
-            <div class="finding-note">"Must prevent approval fatigue by prioritizing, grouping, and suppressing duplicate or low-value notifications according to tenant policy." Prioritization heuristic? Grouping criteria? Suppression policy? The very first time a user has 40 approvals in their queue, they will rubber-stamp them, and the governance promise dies that day.</div>
-            <div class="finding-fix"><strong>Fix:</strong> design the queue/grouping flow as a first-class FR with concrete grouping criteria (by project, by risk class, by external party) and a per-user notification rate ceiling. Don't leave it as one NFR line.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-high">high</span>
-              <h3 class="finding-title">H9. The lifecycle table claims Rejected and Failed are terminal "unless reprocessed" — that is not terminal</h3>
-              <span class="finding-location">lines 380–392</span>
-            </header>
-            <div class="finding-note">"Yes, unless reprocessed" reduces "terminal" to "currently inactive." A real lifecycle either marks these terminal and forces reprocess to create a new workflow instance with a new ID, or admits they are non-terminal and models the reprocess transition. The PRD does both at once.</div>
-            <div class="finding-fix"><strong>Fix:</strong> pick one. Recommended: terminal states are terminal; reprocess creates a new workflow instance with a new ID and an audit link to the predecessor.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-high">high</span>
-              <h3 class="finding-title">H10. WCAG 2.2 AA + screen-reader + keyboard review on one frontend engineer</h3>
-              <span class="finding-location">NFR60 line 1247; team list line 847</span>
-            </header>
-            <div class="finding-note">Ambiguous-association UI alone (multi-candidate ranked list with evidence snippets, confidence bands, reject/defer/correct/escalate actions, audit trail, redaction) is a multi-month accessibility effort. One frontend engineer. Either the bar is theater or the team is wrong; both cannot be true.</div>
-            <div class="finding-fix"><strong>Fix:</strong> resolve via C6 (team/scope reconciliation). Either commit external accessibility consultancy, or narrow NFR60 to the increment-1 surfaces with explicit deferrals for the rest.</div>
-          </article>
-          <article class="finding">
-            <header>
-              <span class="badge badge-sev-high">high</span>
-              <h3 class="finding-title">H11. "No admin/debug bypass" + required tenant-admin operational dashboards is unworkable</h3>
-              <span class="finding-location">line 694; FR53, FR67–FR75</span>
-            </header>
-            <div class="finding-note">Tenant admins must operate mailbox health, unresolved-party queues, ambiguous-association queues, approval queues, retry failures, duplicate suppression, authorization failures, audit projection. Reviewing "authorization failures" without an authorization-bypass surface means admins see "user X failed to access resource Y" without being able to see resource Y. Fine in principle but creates a complex admin permission model the PRD does not describe.</div>
-            <div class="finding-fix"><strong>Fix:</strong> design the tenant-admin permission model explicitly — what an admin can see vs. operate on, with which audit obligations. Likely warrants its own FR group.</div>
-          </article>
-        </div>
-      </details>
-    </section>
+          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">C1 — Tenant policy can exempt non-negotiably approval-required effects</h3><span class="finding-location">addendum §Tenant Policy Schema; FR41</span></header><div class="finding-note">A tenant can read the current policy as allowing approval-free mutation, file disclosure, external send, tool use, or acting on behalf.</div><div class="finding-fix"><strong>Fix:</strong> Make the six effect classes non-overridable; allow only enumerated read-only/no-effect exemptions.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">C2 — Binding and deployed AI allowlists conflict</h3><span class="finding-location">addendum §Command Allowlist v1; decision log 2026-06-03</span></header><div class="finding-note">The binding artifact allows almost the full catalog, while the deployed decision allows exactly two commands.</div><div class="finding-fix"><strong>Fix:</strong> Replace the binding section with the exact two-command set and deny unknown/missing metadata.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">C3 — Post-commit audit cannot satisfy fail-closed mutation</h3><span class="finding-location">addendum §Shared Command Pipeline; FR81a; NFR15/NFR15a</span></header><div class="finding-note">A crash after EventStore commit but before audit emission yields durable, unaudited state under the stated sequence.</div><div class="finding-fix"><strong>Fix:</strong> Establish one atomic event/idempotency/policy/audit boundary and project views asynchronously.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">C4 — Store-level tenant isolation arrives after affected releases</h3><span class="finding-location">§Minimum Release Slice; §Data Governance Surface; FR55a; NFR9a</span></header><div class="finding-note">M0/M1 may release derived stores and machine access before M2 native-store isolation proof.</div><div class="finding-fix"><strong>Fix:</strong> Gate each store's first increment on partitioning and negative native-API isolation tests.</div></article>
 
-    <section class="reviewer-section">
-      <details>
-        <summary>
-          <h2>Adversarial review — Medium and Low findings (21)</h2>
-          <span class="reviewer-source">review-adversarial-general.md</span>
-        </summary>
-        <div class="dim-body">
-          <div class="dim-judgment">
-            <p>Twelve Medium findings (source-context date fragility, ChatBot data-governance surface understated, FRs at noun level, cross-tenant cache/vector pollution, sender authority undefined, visible failure states without UX contract, ID evolution across bounded contexts, replay/simulation mechanism unspecified, correction-path invalidation cost hidden, phishing/spoofing problem named only in passing, "MVP must define" as deflection, eight journeys imply eight UI surfaces with no UI inventory). Nine Low findings (product name vs. email-only focus, Aspire/FrontComposer/MCP unexplained, "tamper-evident" without mechanism, glossary skips load-bearing terms, three different ownership lists, differentiation-thesis-as-self-assessment, Innovation section duplicates requirements). Read <code>review-adversarial-general.md</code> for verbatim phrasing of each.</p>
-          </div>
-        </div>
-        <div class="findings-list">
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H1 — M0 trusts external email before authenticity controls</h3><span class="finding-location">§Increment M0; Journey 3; FR48a–d</span></header><div class="finding-note">External mail can enter conversation, file, and AI context before authenticity evidence and delegated-sender controls ship.</div><div class="finding-fix"><strong>Fix:</strong> Bring minimum authenticity controls into M0 or restrict M0 to trusted internal mail.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H2 — Replay isolation proves absence in the wrong store</h3><span class="finding-location">addendum §Replay Isolation; FR95a; NFR69</span></header><div class="finding-note">A misbound adapter may cause real effects without writing the test outbound-trace record the probe checks.</div><div class="finding-fix"><strong>Fix:</strong> Deny production credentials/resources, replace all effectful adapters, enforce egress policy, and diff production state.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H3 — Idempotency does not prevent delayed duplicates or conflicting decisions</h3><span class="finding-location">addendum §Idempotency Keys; NFR13/NFR14</span></header><div class="finding-note">A 60-second command window and actor/decision-kind keys allow repeat mutations and concurrent approval/rejection.</div><div class="finding-fix"><strong>Fix:</strong> Use stable operation/decision IDs, indefinite mutation idempotency, expected revisions, and a unique decision slot.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H4 — Conversations disappears from the canonical ownership boundary</h3><span class="finding-location">§Context Ownership; §Integration List; addendum §Command Allowlist v0</span></header><div class="finding-note">Conversation ownership shifts from Hexalith.Conversations to Projects while the sole command still says it writes Conversations.</div><div class="finding-fix"><strong>Fix:</strong> Name one conversation owner and versioned command/integration contract.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H5 — Security-relevant classifiers share an undefined kernel</h3><span class="finding-location">addendum §§Confidence Thresholds, Risk Classifier; FR26; FR35; A9a</span></header><div class="finding-note">Association, task intent, and action risk are improperly coupled; actionable is absent from A9a and calibration data becomes a runtime dependency.</div><div class="finding-fix"><strong>Fix:</strong> Separate/version contracts and keep calibration data offline.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H6 — Lifecycle lacks one executable transition contract</h3><span class="finding-location">§Shared Workflow Contract; §Association Lifecycle; decision log</span></header><div class="finding-note">Threshold outcomes, Skipped increment ownership, Deferred/NeedsReview exits, and terminal supersession conflict.</div><div class="finding-fix"><strong>Fix:</strong> Publish a versioned transition table with actors, guards, states, increments, concurrency, events, and supersession.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H7 — Chat-surface change is not a product contract</h3><span class="finding-location">§Vision note; surfaces; FR21–28; commands; NFR60</span></header><div class="finding-note">Submit, stream, stop/cancel, retry, conversion, audit, accessibility, and increment semantics remain outside the PRD contract.</div><div class="finding-fix"><strong>Fix:</strong> Integrate the versioned surface and its full behavior, command, failure, telemetry, and traceability requirements.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H8 — Recovery evidence is expired and commit-stale</h3><span class="finding-location">§Increment M2; A10; NFR56–59; recovery commitments</span></header><div class="finding-note">The evidence applies to commit 17aa94d, not reviewed checkout f0ba70e, and cannot prove controlled loss or four-hour RTO.</div><div class="finding-fix"><strong>Fix:</strong> Require fresh exact-commit hosted controlled-loss and production-shaped/full-window evidence.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H9 — Master tenant-policy schema omits most required knobs</h3><span class="finding-location">addendum §Tenant Policy Schema; FR48d; NFR12; NFR46</span></header><div class="finding-note">Authenticity, authority, allowlist, routing, residency, retention, replay, and idempotency controls lack complete closed-schema definitions.</div><div class="finding-fix"><strong>Fix:</strong> Publish types, defaults, authorizers, sensitivity, validation, failure behavior, and drift tests for every knob.</div></article>
+
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">M1 — GDPR erasure versus WORM is still an assumption</h3><span class="finding-location">§Compliance; A6; NFR49a/NFR53/NFR54</span></header><div class="finding-note">Retention/crypto-erasure lacks DPO approval, key scope, backups, legal holds, and surviving-metadata rules.</div><div class="finding-fix"><strong>Fix:</strong> Obtain a data-protection decision and define the full erasure/retention contract.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">M2 — Brief reductions lack signed governance; upload vanished</h3><span class="finding-location">product brief; PRD scope; decision log</span></header><div class="finding-note">Scope reductions have rationale but no named approval, and general user upload has no disposition.</div><div class="finding-fix"><strong>Fix:</strong> Create an approved retained/deferred/dropped map and update or supersede the brief.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">M3 — Final metadata and lineage are stale</h3><span class="finding-location">PRD/addendum frontmatter; decision log; missing .memlog.md</span></header><div class="finding-note">May dates coexist with later content; sources are machine-specific or unpinned; decisions remain in a legacy log.</div><div class="finding-fix"><strong>Fix:</strong> Recover the memlog, pin inputs/revisions, refresh metadata, and separate planning-final from release-ratified.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">M4 — Operating baseline has missing targets and one live signal</h3><span class="finding-location">addendum §Operating Baselines; NFR42a/NFR43; A11</span></header><div class="finding-note">Operations can call M2 complete without numeric budgets or live evidence across required signals.</div><div class="finding-fix"><strong>Fix:</strong> Gate M2 on complete catalog rows, provenance, routing, and burn tests.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">M5 — ID evolution invents an unowned sibling dependency</h3><span class="finding-location">addendum §ID Evolution Contract; §Integration Contracts</span></header><div class="finding-note">IdentityEvolved is not established in producer contracts and lacks ownership, versioning, ordering, and reconciliation.</div><div class="finding-fix"><strong>Fix:</strong> Secure producer acceptance and a versioned event/reconciliation contract.</div></article>
+          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">M6 — Release and increment terms lack gate semantics</h3><span class="finding-location">frontmatter; §Minimum Release Slice; §Project Scoping</span></header><div class="finding-note">Pilot, release, production, and MVP-complete lack environments, approvers, evidence rules, and rollback conditions.</div><div class="finding-fix"><strong>Fix:</strong> Define the M0/M1/M2 release-state model and allowed claims.</div></article>
         </div>
       </details>
     </section>
@@ -696,20 +238,22 @@
     <div class="mechanical">
       <h3>Mechanical notes</h3>
       <ul>
-        <li>FR IDs contiguous FR1–FR96; NFR IDs contiguous NFR1–NFR70 (rubric walker spot-check, not machine-verified).</li>
-        <li>No inline <code>[ASSUMPTION]</code> tags; assumptions centralized as A1–A9 with owners and revisit conditions. A1, A2, A3, A5, A6, A8, A9 are inline-cited; A4 and A7 are platform-baseline and not inline-cited (acceptable).</li>
-        <li>Zero <code>[NOTE FOR PM]</code> callouts and zero Open Questions — flagged across multiple dimensions as a tension-smoothing pattern.</li>
-        <li>UJ protagonists all named (Amira, Marc, Elena, Priya, Nora, Leo, Sofia, plus System Journey).</li>
-        <li>Lifecycle terminology stable across §"Shared Workflow Contract" (lines 380–391) and §"Association Lifecycle and States" (lines 700–712); the second list reorders the same states — cosmetic.</li>
-        <li>Decision log is sparse — captures normalization and a thin set of major decisions; deeper rationale lives in the PRD body, not the log.</li>
-        <li>No <code>addendum.md</code> exists. Several findings (idempotency-key contract, policy schema, allowlist enumeration, classifier mechanism) belong in an addendum that does not yet exist.</li>
+        <li>PRD and addendum metadata still report 2026-05-28 despite June and August content.</li>
+        <li>The canonical .memlog.md is absent; material later decisions live in .decision-log.md.</li>
+        <li>Skipped is M0 in the PRD but M1 in the decision log, with no recorded reversal.</li>
+        <li>Base FR1–FR96 and NFR1–NFR70 IDs are unique and contiguous; letter-suffixed additions are unique.</li>
+        <li>Range references should state whether letter-suffixed IDs are included.</li>
+        <li>Assumption markers resolve, but A9a lacks the actionable label used by FR35.</li>
+        <li>All human journeys have named protagonists; the system journey is appropriately system-focused.</li>
+        <li>Classifier error-rate measurement incorrectly points to NFR50a, which defines audit completeness.</li>
+        <li>Historical May reviewer variants were read for context but excluded from current counts and sections.</li>
       </ul>
     </div>
 
     <footer class="report-footer">
       <div class="meta">
-        <span>Rubric: .claude/skills/bmad-prd/assets/prd-validation-checklist.md</span>
-        <span>Generated: 2026-05-28T15:30:00+02:00</span>
+        <span>Rubric: /home/administrator/projects/hexalith/chatbot/.agents/skills/bmad-prd/assets/prd-validation-checklist.md</span>
+        <span>Generated: 2026-09-13T12:59:10+02:00</span>
       </div>
     </footer>
   </div>
