@@ -276,6 +276,9 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 noteId,
                 correlationId,
                 DerivedRecordShape(viewAfterReplay, "replay"),
+                RequiredDerivedField(viewAfterReplay, "status", "replay"),
+                RequiredDerivedField(viewAfterReplay, "surfaceOrigin", "replay"),
+                [.. viewAfterReplay.EnumerateObject().Select(static property => property.Name).Order(StringComparer.Ordinal)],
                 cancellationToken).ConfigureAwait(true);
 
             // No restricted evidence leaks across the durable surfaces.
@@ -2225,6 +2228,13 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         // so 403 is the read-path answer for a note that was never created — and it excludes the transport and
         // server-fault results that made the old assertion vacuous. WaitForChatBotDaprSidecarAsync already treats
         // Forbidden as proof of a live sidecar on the same surface.
+        // Both reads must CONCLUDE at least once. A transient answer (503 while the spine is still starting, 429)
+        // is retried inside the window rather than failing the gate: only the governed-operations route is warmed by
+        // WaitForChatBotDaprSidecarAsync, so the operation-status route can still be cold here. OK is never
+        // tolerated at any point — that is the durable state this probe exists to disprove — and the window cannot
+        // end on transients alone, or the proof would pass without ever having been made.
+        bool projectionProven = false;
+        bool operationStatusProven = false;
         Stopwatch stopwatch = Stopwatch.StartNew();
         while (stopwatch.Elapsed < ProjectionStabilityWindow)
         {
@@ -2234,10 +2244,14 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 $"/api/v1/governed-operations/{noteId}",
                 correlationId,
                 cancellationToken).ConfigureAwait(false);
-            view.StatusCode.ShouldBe(
-                HttpStatusCode.Forbidden,
-                "An unauthenticated command must not create a durable projection, and the read of the never-created "
-                + "note must answer with the safe-not-found 403 rather than a transport or server fault.");
+            if (!IsTransientStatusCode(view.StatusCode))
+            {
+                view.StatusCode.ShouldBe(
+                    HttpStatusCode.Forbidden,
+                    "An unauthenticated command must not create a durable projection, and the read of the "
+                    + "never-created note must answer with the safe-not-found 403 rather than a transport fault.");
+                projectionProven = true;
+            }
 
             using HttpResponseMessage status = await GetAuthorizedAsync(
                 client,
@@ -2245,12 +2259,24 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 $"/api/v1/operations/{taskId}",
                 correlationId,
                 cancellationToken).ConfigureAwait(false);
-            status.StatusCode.ShouldBe(
-                HttpStatusCode.Forbidden,
-                "An unauthenticated command must not create durable operation status, and the read of the "
-                + "never-created operation must answer with the safe-not-found 403.");
+            if (!IsTransientStatusCode(status.StatusCode))
+            {
+                status.StatusCode.ShouldBe(
+                    HttpStatusCode.Forbidden,
+                    "An unauthenticated command must not create durable operation status, and the read of the "
+                    + "never-created operation must answer with the safe-not-found 403.");
+                operationStatusProven = true;
+            }
+
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
         }
+
+        projectionProven.ShouldBeTrue(
+            $"The governed-operations read never produced a conclusive answer within {ProjectionStabilityWindow}; "
+            + "the fail-closed proof was never actually made.");
+        operationStatusProven.ShouldBeTrue(
+            $"The operation-status read never produced a conclusive answer within {ProjectionStabilityWindow}; "
+            + "the fail-closed proof was never actually made.");
     }
 
     /// <summary>
@@ -2270,6 +2296,9 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         string noteId,
         string correlationId,
         string expectedShape,
+        string expectedStatus,
+        string expectedSurfaceOrigin,
+        string[] expectedFields,
         CancellationToken cancellationToken)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
@@ -2288,6 +2317,24 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             DerivedRecordShape(current, "replay").ShouldBe(
                 expectedShape,
                 "A delayed duplicate delivery must not mutate the durable projection's derived-record shape.");
+
+            // The derived-record shape covers six fields; these two are the other outcome-bearing ones a re-applied
+            // duplicate would move. Asserted by name rather than by whole-body equality so a volatile timestamp
+            // cannot flake a required gate.
+            RequiredDerivedField(current, "status", "replay").ShouldBe(
+                expectedStatus,
+                "A delayed duplicate delivery must not change the durable projection's status.");
+            RequiredDerivedField(current, "surfaceOrigin", "replay").ShouldBe(
+                expectedSurfaceOrigin,
+                "A delayed duplicate delivery must not rewrite the originating surface attribution.");
+
+            // Field-set equality, so a projection field added later cannot escape this gate forever simply by not
+            // being on the list above — a new or vanished property fails here, naming both sides.
+            string[] currentFields = [.. current.EnumerateObject().Select(static property => property.Name).Order(StringComparer.Ordinal)];
+            currentFields.ShouldBe(
+                expectedFields,
+                $"The durable projection's field set changed across the stability window. Expected: "
+                + $"{string.Join(", ", expectedFields)}. Observed: {string.Join(", ", currentFields)}.");
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
         }
     }

@@ -2,7 +2,7 @@
 title: 'Story 1.1c — close the 2026-09-13 Aspire/DAPR topology review findings'
 type: 'bugfix'
 created: '2026-09-14'
-status: 'in-progress'
+status: 'in-review'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: '76f355a038c4abdb3b9fdb3fb836c25053a18fb0'
@@ -271,9 +271,66 @@ tests use, driven with `--KeycloakPersistent=true` and a captured `Console.Error
 recording the gap. Close it in the same pass that re-runs the blocked suites. Mitigating factor: the warning is
 advisory, not a gate — a silent regression degrades a diagnostic rather than weakening the pre-expiry check itself.
 
+### Review pass 1 patches applied (2026-09-14)
+
+Eight of ten patch-routed entries were applied; two were deferred because they require NEW test code that cannot be
+compiled while the build blockers stand (recorded in `deferred-work.md`).
+
+- `RecoveryValidationTopologyContractTests.cs` — the tracked-realm restore is now synchronous and uncancellable, so a
+  killed or cancelled run can no longer leave `hexalith-realm.json` mutated. (high)
+- `ChatBotDeadLetterProjectionEndpoints.cs` — the body is read defensively from `HttpRequest` instead of bound as a
+  required complex parameter, so an empty, non-JSON or non-CloudEvent dead-letter body still drains with 200 rather
+  than failing minimal-API binding with 400 and redelivering forever. The caught exceptions are deliberately not
+  logged: their messages can quote the offending payload. (high)
+- `Hexalith.ChatBot.IntegrationTests.csproj` — `HexalithCommonsRoot` forwarding split into non-empty and empty
+  variants, matching the AppHost fix; `UseHexalithProjectReferences` still forwards in both. (medium)
+- `Story132ProductionBrowserAspireE2ETests.cs` — five independent 5-minute resource waits replaced by one shared
+  8-minute budget, mirroring `TopologyReadinessBudget`; both suites are steps of the same 30-minute job. (medium)
+- `TrivialGovernedCommandAspireE2eTests.cs` — the fail-closed probe now tolerates transient answers within its window
+  while never tolerating OK, and asserts both reads reached a conclusive answer so the window cannot end on
+  transients alone and pass vacuously. (medium)
+- `TrivialGovernedCommandAspireE2eTests.cs` — the stability assertion regained breadth: `status` and `surfaceOrigin`
+  are compared alongside the derived shape, plus field-set equality so a projection field added later cannot escape
+  the gate by not being on the list. Still name-based, so a volatile timestamp cannot flake a required gate. (medium)
+- `AppHostTopologyTests.cs` — subscriber discovery is now recursive (`SearchOption.AllDirectories`);
+  `Projections/DerivedStores/` already exists. (low)
+- `Program.cs` — README cross-reference repointed to the anchor that resolves. (low)
+
+Re-verified after patching: `Hexalith.ChatBot.AppHost.Tests` 15/15, 0 warnings. The other suites remain unbuildable,
+so the six patches touching `Server` and `IntegrationTests` are unverified for the same reason as the original change
+set — they must be exercised in the pass that resolves the blockers.
+
 ## Spec Change Log
 
 ## Review Triage Log
+
+### Pass 1 — 2026-09-14 (blind-hunter, edge-case-hunter, verification-gap)
+
+| Verdict | Finding | Evidence |
+|---|---|---|
+| high | Realm-mutation test can corrupt a tracked file (blind, edge E4, vgap) | Confirmed `RecoveryValidationTopologyContractTests.cs:728` writes `src/.../KeycloakRealms/hexalith-realm.json`; `:739` restores with `TestContext.Current.CancellationToken`, already cancelled on a killed run, so the restore throws and the tracked realm stays mutated. No parallelism disabled in the assembly. |
+| high | Malformed dead-letter body returns 400, not 200 (blind, edge E1) | Confirmed `ChatBotDeadLetterProjectionEndpoints.cs:58` binds `DeadLetteredChatBotEvent` as a required complex parameter; empty/non-JSON fails minimal-API binding before the handler. Contradicts the file's own "Always 200" comment and matrix row 5. |
+| medium | `HexalithCommonsRoot` forwarding fixed at one of two sites (blind, vgap) | Confirmed `tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj:10` still forwards unconditionally — the same empty-global-property hard break the AppHost comment describes. |
+| medium | Topology budget half-applied inside the same CI job (blind) | Confirmed `Story132ProductionBrowserAspireE2ETests.cs:379-380` still waits `FromMinutes(5)` per resource; both suites are steps of the same `timeout-minutes: 30` job. |
+| medium | Strict 403 applied to a route the suite never warms (blind, edge E5) | `WaitForChatBotDaprSidecarAsync` warms `/api/v1/governed-operations/{id}` only; `AssertNoDurableStateWasCreatedAsync` now hard-asserts 403 on `/api/v1/operations/{taskId}` too, with no transient tolerance inside its poll loop. |
+| medium | Stability assertion narrowed from whole-body to 7 fields (blind, edge E11) | `AssertGovernedOperationViewRemainsStableAsync` now compares `DerivedRecordShape` + `noteId`; a duplicate delivery mutating status, body, or any later-added field escapes the gate permanently. |
+| medium | Dead-letter subscription metadata never executed or observed (vgap, blind) | Pre-verified by the gap layer: no test reads `/dapr/subscribe` or `ITopicMetadata`; deleting `.WithTopic(...)` leaves all three new tests green. |
+| medium | `KeycloakPersistent` warning has no behavioral guard (blind) | Confirmed zero tests reference the key; coverage is `ShouldContain("docker rm -f")` on source text. Also `bool.TryParse` silently skips the warning for `"1"`/`"yes"`. Matches the gap recorded in the Matrix test audit above. |
+| low | Subscriber discovery is prefix- and depth-coupled (blind, edge E9) | `Directory.EnumerateFiles(projectionsDirectory, "*ProjectionEndpoints.cs")` is top-level only; `Projections/DerivedStores/` exists, so a subscriber added there escapes the `DeadLetterTopic` loop. |
+| low | Broken README anchor in the AppHost comment (blind) | `Program.cs:192` cites `README.md#Aspire-and-DAPR`; GitHub lower-cases anchors and the new content is `### Local-development seed-credential policy`. |
+| false | Drift guard blind to an SDK verb change (blind) | Refuted: the regex matches only `MapPost`/rebuild-helper literals, so a `MapPost`→`MapPut` change removes the route from `mappedRoutes` and the `ungrantable` assertion (granted ⊄ mapped) fails. The guard catches it. |
+| false | `origin: "replay"` mislabels the stability call site (blind) | Refuted: `AssertGovernedOperationViewRemainsStableAsync` runs after the idempotent replay, so "replay" is accurate at `:278`, `:2285` and `:2288`. |
+| low (rejected) | Unauthenticated drain endpoint (edge E2) | All seven existing projection subscribers are equally unauthenticated; this is the established sidecar-local convention, not introduced here, and the fix adds guards. |
+| low (rejected) | `ExpectedEventStoreOperations` is a third route copy (blind) | Real duplication, but the drift guard asserts set equality both ways, so divergence fails loudly rather than drifting silently; the fix restructures the test. |
+| low (rejected) | No metric/counter on the drain (blind) | Alerting design choice beyond the recorded intent; fix adds public surface. |
+| low (rejected) | Dead-letter log omits tenant/aggregate/event type (blind) | The spec's Always rule enumerated topic, pubsub, message and correlation id; the implementation followed it. Operability nicety, not a defect in what was asked. |
+| low (rejected) | TRX guard one-liner duplicated four times (blind) | Workflow duplication is already recorded in `deferred-work.md` as cosmetic; extraction adds a script plus wiring. |
+| low (rejected) | Topic == dead-letter topic collision unguarded (edge E3) | Reachable only by misconfiguration; fix adds a branch. |
+| low (rejected) | `JsonDocument.Parse` / `ValueKind` unguarded on the realm (edge E7, E8) | The realm is a tracked, controlled file; a malformed one is developer error and the raw parser error names the position. |
+| maybe-false | Widened endpoint assertion may fail on URL-activation timing (edge E6) | Cannot tell from static evidence whether `WaitForResourceHealthyAsync` guarantees an active URL for `security`/`chatbot-ui`/`eventstore-admin-ui`. A live Tier-3 run recording `ASPIRE_RESOURCE_EVIDENCE` settles it. Deferred. |
+| medium (deferred) | Workflow assertions cannot see step order (edge E10) | Real and repo-wide pre-existing: `ShouldContain` cannot tell that the counter guard follows its own `dotnet test` step in the same job. Not caused by this story. |
+| medium (deferred) | Other independent waits still sum past the job budget (edge E12) | `StartupTimeout` 3 min, `SelectedResourceValidationTimeout` 5 min and a 6-min M2 deadline remain outside the shared budget. Pre-existing; outside the recorded intent, which targeted the 7x5-minute resource loop. |
+| low (deferred) | `accesscontrol.local.yaml` remains ungoverned (blind) | Pre-existing: its whole coverage is two `ShouldContain` strings. Not caused by this story. |
 
 ## Design Notes
 

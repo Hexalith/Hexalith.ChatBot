@@ -362,7 +362,7 @@ public static class AppHostTopologyTests
         // DeadLetterTopic with nothing failing. Discovered from disk so an eighth subscriber is covered the day
         // it is added.
         string[] subscriberFiles = [.. Directory
-            .EnumerateFiles(projectionsDirectory, "*ProjectionEndpoints.cs")
+            .EnumerateFiles(projectionsDirectory, "*ProjectionEndpoints.cs", SearchOption.AllDirectories)
             .Where(static path => !Path.GetFileName(path).StartsWith("ChatBotDeadLetter", StringComparison.Ordinal))
             .Order(StringComparer.Ordinal)];
         subscriberFiles.Length.ShouldBe(

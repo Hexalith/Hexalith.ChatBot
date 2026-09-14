@@ -736,7 +736,13 @@ public sealed class RecoveryValidationTopologyContractTests
         }
         finally
         {
-            await File.WriteAllTextAsync(realmPath, original, TestContext.Current.CancellationToken).ConfigureAwait(true);
+            // Restored SYNCHRONOUSLY and WITHOUT a cancellation token, on purpose. This is the one test in this
+            // assembly that mutates a TRACKED source file, and the restore must run even when the test is killed or
+            // the run is cancelled. Passing TestContext.Current.CancellationToken here meant that on a cancelled run
+            // — the exact scenario the CI topology lane's 30-minute cap produces — the restore threw and left the
+            // realm template holding a literal expiry, after which every AppHost start in the repository fails until
+            // someone notices the dirty working tree.
+            File.WriteAllText(realmPath, original);
         }
     }
 

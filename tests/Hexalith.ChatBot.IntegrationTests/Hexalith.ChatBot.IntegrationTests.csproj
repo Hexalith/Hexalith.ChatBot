@@ -5,9 +5,19 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Contracts\Hexalith.ChatBot.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Server\Hexalith.ChatBot.Server.csproj" />
+    <!-- HexalithCommonsRoot is forwarded only when NON-EMPTY, for the reason spelled out in
+         src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj: AdditionalProperties pins the property
+         GLOBALLY for the referenced build, and a referenced project's own Condition="'$(HexalithCommonsRoot)' == ''"
+         fallback cannot override a global property. Forwarding an empty value turns an undetected Commons root into
+         a hard break instead of letting RecoverySandbox fall back. -->
     <ProjectReference Include="..\Hexalith.ChatBot.RecoverySandbox\Hexalith.ChatBot.RecoverySandbox.csproj"
                       IsAspireProjectResource="false"
+                      Condition="'$(HexalithCommonsRoot)' != ''"
                       AdditionalProperties="HexalithCommonsRoot=$(HexalithCommonsRoot);UseHexalithProjectReferences=$(UseHexalithProjectReferences)" />
+    <ProjectReference Include="..\Hexalith.ChatBot.RecoverySandbox\Hexalith.ChatBot.RecoverySandbox.csproj"
+                      IsAspireProjectResource="false"
+                      Condition="'$(HexalithCommonsRoot)' == ''"
+                      AdditionalProperties="UseHexalithProjectReferences=$(UseHexalithProjectReferences)" />
     <!-- Tier-3 Aspire E2E: reference the AppHost as a non-resource so Projects.Hexalith_ChatBot_AppHost
          is generated for DistributedApplicationTestingBuilder. -->
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.AppHost\Hexalith.ChatBot.AppHost.csproj">

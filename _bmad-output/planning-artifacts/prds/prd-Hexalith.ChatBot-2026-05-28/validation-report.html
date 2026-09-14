@@ -5,257 +5,136 @@
 <title>PRD Validation: Hexalith.ChatBot</title>
 <style>
   :root {
-    --bg: #fafaf9;
-    --surface: #ffffff;
-    --border: #e7e5e4;
-    --text: #1c1917;
-    --muted: #78716c;
-    --verdict-strong: #16a34a;
-    --verdict-adequate: #65a30d;
-    --verdict-thin: #d97706;
-    --verdict-broken: #dc2626;
-    --sev-low: #64748b;
-    --sev-medium: #ca8a04;
-    --sev-high: #ea580c;
-    --sev-critical: #dc2626;
-    --grade-exc: #16a34a;
-    --grade-good: #65a30d;
-    --grade-fair: #d97706;
-    --grade-poor: #dc2626;
+    --bg: #fafaf9; --surface: #ffffff; --border: #e7e5e4; --text: #1c1917; --muted: #78716c;
+    --verdict-strong: #16a34a; --verdict-adequate: #65a30d; --verdict-thin: #d97706; --verdict-broken: #dc2626;
+    --sev-low: #64748b; --sev-medium: #ca8a04; --sev-high: #ea580c; --sev-critical: #dc2626;
+    --grade-exc: #16a34a; --grade-good: #65a30d; --grade-fair: #d97706; --grade-poor: #dc2626;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-    font-size: 15px;
-  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; font-size: 15px; }
   .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
-  header.report-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 24px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 24px;
-  }
+  header.report-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
   .title h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
   .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; overflow-wrap: anywhere; }
   .grade { padding: 10px 18px; border-radius: 8px; font-weight: 600; color: white; font-size: 15px; white-space: nowrap; }
-  .grade-excellent { background: var(--grade-exc); }
-  .grade-good { background: var(--grade-good); }
-  .grade-fair { background: var(--grade-fair); }
-  .grade-poor { background: var(--grade-poor); }
-  .synthesis {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--muted);
-    border-radius: 8px;
-    padding: 18px 22px;
-    margin-bottom: 24px;
-    font-size: 15.5px;
-  }
-  .synthesis p { margin: 0 0 10px; }
-  .synthesis p:last-child { margin-bottom: 0; }
+  .grade-excellent { background: var(--grade-exc); } .grade-good { background: var(--grade-good); } .grade-fair { background: var(--grade-fair); } .grade-poor { background: var(--grade-poor); }
+  .synthesis { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--muted); border-radius: 8px; padding: 18px 22px; margin-bottom: 24px; font-size: 15.5px; }
+  .synthesis p { margin: 0 0 10px; } .synthesis p:last-child { margin-bottom: 0; }
   .dimension-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 24px; }
   .dim-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
-  .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-  .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
+  .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; } .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
   section.dimension, section.reviewer-section { margin-bottom: 14px; }
   section.dimension details, section.reviewer-section details { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   section summary { padding: 14px 20px; cursor: pointer; user-select: none; list-style: none; display: flex; align-items: center; gap: 12px; }
-  section summary::-webkit-details-marker { display: none; }
-  section summary::before { content: "▸"; display: inline-block; color: var(--muted); transition: transform 0.15s ease; }
+  section summary::-webkit-details-marker { display: none; } section summary::before { content: "▸"; display: inline-block; color: var(--muted); transition: transform 0.15s ease; }
   section details[open] summary::before { transform: rotate(90deg); }
   section summary h2 { display: inline; margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.005em; flex: 1; }
   .verdict-pill { font-size: 11px; padding: 3px 10px; border-radius: 999px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: white; }
-  .verdict-strong { background: var(--verdict-strong); }
-  .verdict-adequate { background: var(--verdict-adequate); }
-  .verdict-thin { background: var(--verdict-thin); }
-  .verdict-broken { background: var(--verdict-broken); }
-  .dim-body { padding: 4px 20px 18px; }
-  .dim-judgment { color: var(--text); font-size: 14.5px; }
-  .dim-judgment p { margin: 0 0 10px; }
+  .verdict-strong { background: var(--verdict-strong); } .verdict-adequate { background: var(--verdict-adequate); } .verdict-thin { background: var(--verdict-thin); } .verdict-broken { background: var(--verdict-broken); }
+  .dim-body { padding: 4px 20px 18px; } .dim-judgment { color: var(--text); font-size: 14.5px; } .dim-judgment p { margin: 0 0 10px; }
   .findings-list { padding: 0 20px 4px; }
-  article.finding { padding: 14px 0; border-top: 1px solid var(--border); }
-  article.finding:first-child { border-top: none; }
+  article.finding { padding: 14px 0; border-top: 1px solid var(--border); } article.finding:first-child { border-top: none; }
   article.finding header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
   .badge { font-size: 10.5px; padding: 3px 8px; border-radius: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.4; }
-  .badge-sev-low { background: rgba(100, 116, 139, 0.12); color: var(--sev-low); }
-  .badge-sev-medium { background: rgba(202, 138, 4, 0.14); color: var(--sev-medium); }
-  .badge-sev-high { background: rgba(234, 88, 12, 0.14); color: var(--sev-high); }
-  .badge-sev-critical { background: rgba(220, 38, 38, 0.14); color: var(--sev-critical); }
+  .badge-sev-low { background: rgba(100,116,139,.12); color: var(--sev-low); } .badge-sev-medium { background: rgba(202,138,4,.14); color: var(--sev-medium); }
+  .badge-sev-high { background: rgba(234,88,12,.14); color: var(--sev-high); } .badge-sev-critical { background: rgba(220,38,38,.14); color: var(--sev-critical); }
   .finding-title { margin: 0; font-size: 15px; font-weight: 500; flex: 1; min-width: 200px; }
   .finding-location { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--muted); }
-  .finding-note, .finding-fix { margin-top: 6px; font-size: 14px; }
-  .finding-fix strong { color: var(--muted); font-weight: 500; }
+  .finding-note, .finding-fix { margin-top: 6px; font-size: 14px; } .finding-fix strong { color: var(--muted); font-weight: 500; }
   .reviewer-source { font-size: 12px; color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
   .mechanical { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-top: 24px; font-size: 14px; }
   .mechanical h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  .mechanical ul { margin: 0; padding-left: 20px; }
-  .mechanical li { margin-bottom: 4px; color: var(--text); }
+  .mechanical ul { margin: 0; padding-left: 20px; } .mechanical li { margin-bottom: 4px; color: var(--text); }
   footer.report-footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
   footer .meta { display: flex; gap: 24px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
-  <div class="container">
-    <header class="report-header">
-      <div class="title">
-        <h1>Hexalith.ChatBot — Validation Report</h1>
-        <div class="subtitle">/home/administrator/projects/hexalith/chatbot/_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md</div>
-      </div>
-      <div class="grade grade-poor">Poor · STOP</div>
-    </header>
+<div class="container">
+  <header class="report-header">
+    <div class="title"><h1>Hexalith.ChatBot — Validation Report</h1><div class="subtitle">/home/administrator/projects/hexalith/chatbot/_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md</div></div>
+    <div class="grade grade-poor">Poor</div>
+  </header>
 
-    <div class="synthesis">
-      <p>The product thesis, named journeys, staged scope, measurable outcomes, and non-negotiable trust floor are unusually substantive. The current PRD/addendum pair is not safe to use as the sole implementation or release authority, however: two binding AI-governance rules permit readings that contradict mandatory approval and least privilege, while late chat-surface and recovery changes have not been reconciled through the full requirement set. Treat the product strategy as sound but the requirements contract as blocked until the critical and high findings below are resolved.</p>
-      <p>The adversarial reviewer independently confirmed the stop decision and widened the risk picture. It additionally found that the post-commit audit sequence cannot satisfy the fail-closed invariant and that native-store tenant-isolation proof arrives after affected stores and programmable surfaces ship. Across both reviews there are 6 Critical, 17 High, 9 Medium, and 1 Low reports before deduplication; the Critical reports describe four unique blockers.</p>
-    </div>
-
-    <div class="dimension-summary">
-      <div class="dim-card"><div class="dim-name">Decision-readiness</div><div class="dim-verdict" style="color: var(--verdict-broken)">broken</div></div>
-      <div class="dim-card"><div class="dim-name">Substance over theater</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
-      <div class="dim-card"><div class="dim-name">Strategic coherence</div><div class="dim-verdict" style="color: var(--verdict-strong)">strong</div></div>
-      <div class="dim-card"><div class="dim-name">Done-ness clarity</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
-      <div class="dim-card"><div class="dim-name">Scope honesty</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
-      <div class="dim-card"><div class="dim-name">Downstream usability</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
-      <div class="dim-card"><div class="dim-name">Shape fit</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
-    </div>
-
-    <section class="dimension">
-      <details open>
-        <summary><h2>Decision-readiness</h2><span class="verdict-pill verdict-broken">broken</span></summary>
-        <div class="dim-body"><div class="dim-judgment">
-          <p>The PRD states real decisions and trade-offs, including the email wedge, fixed M0/M1/M2 order, deferred machine parity, and protected safety floor. It cannot support an unambiguous green-light decision because approval policy may waive mandatory controls, the M1 AI allowlist is unsafe by default, and M2 release obligations lack complete evidence and SLO definitions.</p>
-        </div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">Approval-fatigue override contradicts the safety invariant</h3><span class="finding-location">FR41; NFR16; addendum §Tenant Policy Schema</span></header><div class="finding-note">The PM note and schema permit the six boundary-crossing classes that FR41 says always require approval to be marked low-risk-allowed.</div><div class="finding-fix"><strong>Fix:</strong> Restrict low-risk-allowed to enumerated read-only actions and make the six effect classes structurally non-downgradable.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">M1 AI allowlist is denylist-shaped and can include privileged mutations</h3><span class="finding-location">FR19, FR43, FR75a–g; addendum §Command Allowlist v1</span></header><div class="finding-note">The full-catalog-minus-exclusions rule has no exact membership or complete tag set and includes outbound, identity, and governance operations.</div><div class="finding-fix"><strong>Fix:</strong> Use an exact, versioned, deny-by-default AI-invocable set with per-member approval metadata.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">M2 cannot receive an evidence-based recovery release decision</h3><span class="finding-location">§Increment M2; A10; NFR56–59</span></header><div class="finding-note">The hosted run expired under the eight-day rule, predates controlled-loss validation, and cannot test a four-hour RTO inside a 180-second lane.</div><div class="finding-fix"><strong>Fix:</strong> Require fresh exact-commit controlled-loss evidence and a full-window/pre-production RTO drill.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">M2 SLO catalog fails NFR42a's completion contract</h3><span class="finding-location">NFR42a; addendum §Operating Baselines</span></header><div class="finding-note">Multiple targets and nearly all error budgets remain calibration-pending; only audit projection lag has a live signal.</div><div class="finding-fix"><strong>Fix:</strong> Gate M2 on calibration/live signals or supply bounded provisional values and ratcheting rules.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <section class="dimension">
-      <details>
-        <summary><h2>Substance over theater</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p>The journeys, controls, product-specific NFRs, and differentiated authority boundaries are earned. Repetition, rather than empty content, is the main drag.</p></div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Repeated risk and ownership sections obscure canonicality</h3><span class="finding-location">§Key Product Risks; §Risk Mitigations; §Context Ownership</span></header><div class="finding-note">Repeated association, leakage, AI-action, mailbox, and ownership material makes authority harder to determine.</div><div class="finding-fix"><strong>Fix:</strong> Keep one canonical risk register and ownership section; turn repetitions into links.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <section class="dimension">
-      <details>
-        <summary><h2>Strategic coherence</h2><span class="verdict-pill verdict-strong">strong</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p>The email-to-authorized-project-work thesis is clear. The staged feature sequence and success/counter-metrics consistently validate that thesis, and post-MVP deferrals preserve it.</p><p>No substantive findings.</p></div></div>
-      </details>
-    </section>
-
-    <section class="dimension">
-      <details open>
-        <summary><h2>Done-ness clarity</h2><span class="verdict-pill verdict-thin">thin</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p>Some high-risk requirements are exemplary, but quality is uneven. Engineers cannot derive one deterministic acceptance oracle without selecting among conflicting classifier, lifecycle, policy, and SLO statements.</p></div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Three classifiers are conflated into one undefined kernel</h3><span class="finding-location">addendum §§Confidence Thresholds, Risk Classifier; FR35; A9a</span></header><div class="finding-note">Association scoring, task intent, and action risk use incompatible inputs, outputs, and label taxonomies.</div><div class="finding-fix"><strong>Fix:</strong> Define separate versioned scorer/classifier contracts, datasets, calibration targets, and failure states.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Below-T_low association has incompatible lifecycle outcomes</h3><span class="finding-location">§Technical Success; §Shared Workflow Contract; addendum §Confidence Thresholds</span></header><div class="finding-note">The PRD says deferred or rejected; the addendum says NeedsReview, including distinct scorer-error behavior.</div><div class="finding-fix"><strong>Fix:</strong> Publish one canonical score/outcome/state table covering all bands and failures.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Acceptance readiness is specified for only four FR groups</h3><span class="finding-location">§Functional Acceptance Guidance</span></header><div class="finding-note">Identity, conversations, files, outbound, operations, and recovery still rely on downstream invention.</div><div class="finding-fix"><strong>Fix:</strong> Complete the matrix or explicitly block each uncovered group with an owner and prerequisite.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Tenant-policy schema is complete only for M0</h3><span class="finding-location">addendum §Tenant Policy Schema; FR52; FR73–75g; NFR35</span></header><div class="finding-note">M1/M2 controls are prose categories, not typed knobs with defaults, sensitivity, validation, and migration rules.</div><div class="finding-fix"><strong>Fix:</strong> Enumerate every M1/M2 knob and cross-knob invariant in the declared schema format.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <section class="dimension">
-      <details open>
-        <summary><h2>Scope honesty</h2><span class="verdict-pill verdict-thin">thin</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p>The May scope reductions are mostly candid, but later chat scope and inherited file-upload scope are not reconciled with the same discipline.</p></div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Approved interactive-chat scope exists only as a PM note</h3><span class="finding-location">§Vision; §UI Surface Inventory; §Functional Requirements</span></header><div class="finding-note">The composer is absent from increment scope, surfaces, FRs, command/failure behavior, accessibility scope, and traceability.</div><div class="finding-fix"><strong>Fix:</strong> Reconcile the change through scope, surfaces, journeys, FRs, NFR60, commands, and traceability.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">General user-upload ingestion disappeared without disposition</h3><span class="finding-location">§MVP; §Files and Attachments; §Out of scope</span></header><div class="finding-note">The brief includes user upload; the PRD covers mailbox attachments but neither commits nor defers general upload.</div><div class="finding-fix"><strong>Fix:</strong> Assign it to an increment or explicitly make it post-MVP/non-goal with rationale.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <section class="dimension">
-      <details open>
-        <summary><h2>Downstream usability</h2><span class="verdict-pill verdict-thin">thin</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p>The glossary, named protagonists, ID catalogs, lifecycle table, and surface inventory provide useful extraction anchors. Unpinned brownfield lineage and missing metric IDs weaken reproducibility.</p></div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Brownfield source baseline cannot be reproduced</h3><span class="finding-location">frontmatter inputs/counts; §Project Classification</span></header><div class="finding-note">The only direct input is machine-specific, project context is counted as zero, and sibling sources lack exact paths and revisions.</div><div class="finding-fix"><strong>Fix:</strong> Use repository-relative paths, revisions/dates, and a versioned source/re-check manifest.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Success outcomes have no stable IDs</h3><span class="finding-location">§Measurable Outcomes; §Traceability Overview</span></header><div class="finding-note">Strong numeric metrics cannot be cited stably by stories or release evidence.</div><div class="finding-fix"><strong>Fix:</strong> Add SM identifiers, metric/counter-metric pairs, and trace/increment references.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <section class="dimension">
-      <details>
-        <summary><h2>Shape fit</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p>The deep multi-stakeholder B2B shape fits, but mutable implementation status and code-as-authority statements blur the boundary between product requirements, architecture, and qualification evidence.</p></div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Requirements are mixed with mutable implementation evidence</h3><span class="finding-location">A10; PM note; addendum §§Operating Baselines, Recovery commitments</span></header><div class="finding-note">Commit/run status and code-as-authority statements make the requirement age with evidence and invert product authority.</div><div class="finding-fix"><strong>Fix:</strong> Keep targets and gates in the PRD; move run locators/current measurements to a versioned qualification-evidence artifact.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <section class="reviewer-section">
-      <details>
-        <summary><h2>Adversarial general review</h2><span class="reviewer-source">review-adversarial-general.md</span></summary>
-        <div class="dim-body"><div class="dim-judgment">
-          <p><strong>STOP — not safe for product approval or unqualified downstream handoff.</strong> The product thesis and control intentions are strong, but four direct trust-boundary failures and nine High gaps make architecture/story freeze unsafe. UX exploration can continue against stable journeys.</p>
-        </div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">C1 — Tenant policy can exempt non-negotiably approval-required effects</h3><span class="finding-location">addendum §Tenant Policy Schema; FR41</span></header><div class="finding-note">A tenant can read the current policy as allowing approval-free mutation, file disclosure, external send, tool use, or acting on behalf.</div><div class="finding-fix"><strong>Fix:</strong> Make the six effect classes non-overridable; allow only enumerated read-only/no-effect exemptions.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">C2 — Binding and deployed AI allowlists conflict</h3><span class="finding-location">addendum §Command Allowlist v1; decision log 2026-06-03</span></header><div class="finding-note">The binding artifact allows almost the full catalog, while the deployed decision allows exactly two commands.</div><div class="finding-fix"><strong>Fix:</strong> Replace the binding section with the exact two-command set and deny unknown/missing metadata.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">C3 — Post-commit audit cannot satisfy fail-closed mutation</h3><span class="finding-location">addendum §Shared Command Pipeline; FR81a; NFR15/NFR15a</span></header><div class="finding-note">A crash after EventStore commit but before audit emission yields durable, unaudited state under the stated sequence.</div><div class="finding-fix"><strong>Fix:</strong> Establish one atomic event/idempotency/policy/audit boundary and project views asynchronously.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">C4 — Store-level tenant isolation arrives after affected releases</h3><span class="finding-location">§Minimum Release Slice; §Data Governance Surface; FR55a; NFR9a</span></header><div class="finding-note">M0/M1 may release derived stores and machine access before M2 native-store isolation proof.</div><div class="finding-fix"><strong>Fix:</strong> Gate each store's first increment on partitioning and negative native-API isolation tests.</div></article>
-
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H1 — M0 trusts external email before authenticity controls</h3><span class="finding-location">§Increment M0; Journey 3; FR48a–d</span></header><div class="finding-note">External mail can enter conversation, file, and AI context before authenticity evidence and delegated-sender controls ship.</div><div class="finding-fix"><strong>Fix:</strong> Bring minimum authenticity controls into M0 or restrict M0 to trusted internal mail.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H2 — Replay isolation proves absence in the wrong store</h3><span class="finding-location">addendum §Replay Isolation; FR95a; NFR69</span></header><div class="finding-note">A misbound adapter may cause real effects without writing the test outbound-trace record the probe checks.</div><div class="finding-fix"><strong>Fix:</strong> Deny production credentials/resources, replace all effectful adapters, enforce egress policy, and diff production state.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H3 — Idempotency does not prevent delayed duplicates or conflicting decisions</h3><span class="finding-location">addendum §Idempotency Keys; NFR13/NFR14</span></header><div class="finding-note">A 60-second command window and actor/decision-kind keys allow repeat mutations and concurrent approval/rejection.</div><div class="finding-fix"><strong>Fix:</strong> Use stable operation/decision IDs, indefinite mutation idempotency, expected revisions, and a unique decision slot.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H4 — Conversations disappears from the canonical ownership boundary</h3><span class="finding-location">§Context Ownership; §Integration List; addendum §Command Allowlist v0</span></header><div class="finding-note">Conversation ownership shifts from Hexalith.Conversations to Projects while the sole command still says it writes Conversations.</div><div class="finding-fix"><strong>Fix:</strong> Name one conversation owner and versioned command/integration contract.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H5 — Security-relevant classifiers share an undefined kernel</h3><span class="finding-location">addendum §§Confidence Thresholds, Risk Classifier; FR26; FR35; A9a</span></header><div class="finding-note">Association, task intent, and action risk are improperly coupled; actionable is absent from A9a and calibration data becomes a runtime dependency.</div><div class="finding-fix"><strong>Fix:</strong> Separate/version contracts and keep calibration data offline.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H6 — Lifecycle lacks one executable transition contract</h3><span class="finding-location">§Shared Workflow Contract; §Association Lifecycle; decision log</span></header><div class="finding-note">Threshold outcomes, Skipped increment ownership, Deferred/NeedsReview exits, and terminal supersession conflict.</div><div class="finding-fix"><strong>Fix:</strong> Publish a versioned transition table with actors, guards, states, increments, concurrency, events, and supersession.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H7 — Chat-surface change is not a product contract</h3><span class="finding-location">§Vision note; surfaces; FR21–28; commands; NFR60</span></header><div class="finding-note">Submit, stream, stop/cancel, retry, conversion, audit, accessibility, and increment semantics remain outside the PRD contract.</div><div class="finding-fix"><strong>Fix:</strong> Integrate the versioned surface and its full behavior, command, failure, telemetry, and traceability requirements.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H8 — Recovery evidence is expired and commit-stale</h3><span class="finding-location">§Increment M2; A10; NFR56–59; recovery commitments</span></header><div class="finding-note">The evidence applies to commit 17aa94d, not reviewed checkout f0ba70e, and cannot prove controlled loss or four-hour RTO.</div><div class="finding-fix"><strong>Fix:</strong> Require fresh exact-commit hosted controlled-loss and production-shaped/full-window evidence.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">H9 — Master tenant-policy schema omits most required knobs</h3><span class="finding-location">addendum §Tenant Policy Schema; FR48d; NFR12; NFR46</span></header><div class="finding-note">Authenticity, authority, allowlist, routing, residency, retention, replay, and idempotency controls lack complete closed-schema definitions.</div><div class="finding-fix"><strong>Fix:</strong> Publish types, defaults, authorizers, sensitivity, validation, failure behavior, and drift tests for every knob.</div></article>
-
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">M1 — GDPR erasure versus WORM is still an assumption</h3><span class="finding-location">§Compliance; A6; NFR49a/NFR53/NFR54</span></header><div class="finding-note">Retention/crypto-erasure lacks DPO approval, key scope, backups, legal holds, and surviving-metadata rules.</div><div class="finding-fix"><strong>Fix:</strong> Obtain a data-protection decision and define the full erasure/retention contract.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">M2 — Brief reductions lack signed governance; upload vanished</h3><span class="finding-location">product brief; PRD scope; decision log</span></header><div class="finding-note">Scope reductions have rationale but no named approval, and general user upload has no disposition.</div><div class="finding-fix"><strong>Fix:</strong> Create an approved retained/deferred/dropped map and update or supersede the brief.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">M3 — Final metadata and lineage are stale</h3><span class="finding-location">PRD/addendum frontmatter; decision log; missing .memlog.md</span></header><div class="finding-note">May dates coexist with later content; sources are machine-specific or unpinned; decisions remain in a legacy log.</div><div class="finding-fix"><strong>Fix:</strong> Recover the memlog, pin inputs/revisions, refresh metadata, and separate planning-final from release-ratified.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">M4 — Operating baseline has missing targets and one live signal</h3><span class="finding-location">addendum §Operating Baselines; NFR42a/NFR43; A11</span></header><div class="finding-note">Operations can call M2 complete without numeric budgets or live evidence across required signals.</div><div class="finding-fix"><strong>Fix:</strong> Gate M2 on complete catalog rows, provenance, routing, and burn tests.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">M5 — ID evolution invents an unowned sibling dependency</h3><span class="finding-location">addendum §ID Evolution Contract; §Integration Contracts</span></header><div class="finding-note">IdentityEvolved is not established in producer contracts and lacks ownership, versioning, ordering, and reconciliation.</div><div class="finding-fix"><strong>Fix:</strong> Secure producer acceptance and a versioned event/reconciliation contract.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">M6 — Release and increment terms lack gate semantics</h3><span class="finding-location">frontmatter; §Minimum Release Slice; §Project Scoping</span></header><div class="finding-note">Pilot, release, production, and MVP-complete lack environments, approvers, evidence rules, and rollback conditions.</div><div class="finding-fix"><strong>Fix:</strong> Define the M0/M1/M2 release-state model and allowed claims.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <div class="mechanical">
-      <h3>Mechanical notes</h3>
-      <ul>
-        <li>PRD and addendum metadata still report 2026-05-28 despite June and August content.</li>
-        <li>The canonical .memlog.md is absent; material later decisions live in .decision-log.md.</li>
-        <li>Skipped is M0 in the PRD but M1 in the decision log, with no recorded reversal.</li>
-        <li>Base FR1–FR96 and NFR1–NFR70 IDs are unique and contiguous; letter-suffixed additions are unique.</li>
-        <li>Range references should state whether letter-suffixed IDs are included.</li>
-        <li>Assumption markers resolve, but A9a lacks the actionable label used by FR35.</li>
-        <li>All human journeys have named protagonists; the system journey is appropriately system-focused.</li>
-        <li>Classifier error-rate measurement incorrectly points to NFR50a, which defines audit completeness.</li>
-        <li>Historical May reviewer variants were read for context but excluded from current counts and sections.</li>
-      </ul>
-    </div>
-
-    <footer class="report-footer">
-      <div class="meta">
-        <span>Rubric: /home/administrator/projects/hexalith/chatbot/.agents/skills/bmad-prd/assets/prd-validation-checklist.md</span>
-        <span>Generated: 2026-09-13T12:59:10+02:00</span>
-      </div>
-    </footer>
+  <div class="synthesis">
+    <p>This is an adequate, unusually rigorous chain-top PRD: the product thesis, release gates, authority boundaries, success measures, and safety invariants are strong enough to guide decisions, and the document is candid that the artifact is final while M0/M1/M2 remain evidence-gated. It is not yet a clean implementation oracle, however: correction of already-stored attachments and the pre-pilot data-rights workflows lack complete actor/owner/surface contracts, while smaller state-machine and metric gaps would force downstream teams to invent behavior.</p>
+    <p>The adversarial and source-integrity passes materially lower the release verdict. Four normative contradictions can yield different conforming systems: an AI-bound MCP principal can appear to approve its own proposal; <code>Deferred</code> has incompatible legal transitions; correction completion omits source-owned and irreversible effects; and M1 depends on A11 measurements that the release-status contract labels M2-only. The gate is STOP until these are corrected.</p>
+    <p><strong>Counts:</strong> 4 Critical, 15 High, 16 Medium, and 8 Low reviewer reports; 36 unique findings after consolidation. The canonical severity-grouped detail is in <code>validation-report.md</code>.</p>
   </div>
+
+  <div class="dimension-summary">
+    <div class="dim-card"><div class="dim-name">Decision-readiness</div><div class="dim-verdict" style="color:var(--verdict-strong)">strong</div></div>
+    <div class="dim-card"><div class="dim-name">Substance over theater</div><div class="dim-verdict" style="color:var(--verdict-strong)">strong</div></div>
+    <div class="dim-card"><div class="dim-name">Strategic coherence</div><div class="dim-verdict" style="color:var(--verdict-adequate)">adequate</div></div>
+    <div class="dim-card"><div class="dim-name">Done-ness clarity</div><div class="dim-verdict" style="color:var(--verdict-adequate)">adequate</div></div>
+    <div class="dim-card"><div class="dim-name">Scope honesty</div><div class="dim-verdict" style="color:var(--verdict-strong)">strong</div></div>
+    <div class="dim-card"><div class="dim-name">Downstream usability</div><div class="dim-verdict" style="color:var(--verdict-adequate)">adequate</div></div>
+    <div class="dim-card"><div class="dim-name">Shape fit</div><div class="dim-verdict" style="color:var(--verdict-adequate)">adequate</div></div>
+  </div>
+
+  <section class="dimension"><details><summary><h2>Decision-readiness</h2><span class="verdict-pill verdict-strong">strong</span></summary><div class="dim-body"><div class="dim-judgment"><p>Release gates, authority, trade-offs, permitted claims, and open assumptions are stated as explicit decisions. Artifact finality does not waive increment evidence.</p></div></div></details></section>
+  <section class="dimension"><details><summary><h2>Substance over theater</h2><span class="verdict-pill verdict-strong">strong</span></summary><div class="dim-body"><div class="dim-judgment"><p>The email-to-governed-work thesis is specific, journeys are load-bearing, and NFRs contain product-specific bounds rather than generic adjectives.</p></div></div></details></section>
+  <section class="dimension"><details><summary><h2>Strategic coherence</h2><span class="verdict-pill verdict-adequate">adequate</span></summary><div class="dim-body"><div class="dim-judgment"><p>M0 proves the core loop, M1 extends the command model across surfaces, and M2 adds operational readiness. Most success measures test the thesis.</p></div></div><div class="findings-list"><article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">M1 machine-surface success proves one use, not business value</h3><span class="finding-location">SM15</span></header><div class="finding-note">A single CLI/MCP use can pass without repeated adoption or measurable benefit.</div><div class="finding-fix"><strong>Fix:</strong> Require repeated governed use, a benefit measure, and a maintenance/governance counter-metric.</div></article></div></details></section>
+  <section class="dimension"><details><summary><h2>Done-ness clarity</h2><span class="verdict-pill verdict-adequate">adequate</span></summary><div class="dim-body"><div class="dim-judgment"><p>The operation and state tables are unusually executable, but two M0 paths still force downstream invention.</p></div></div><div class="findings-list">
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Wrong-association correction has no owner contract for already-stored attachments</h3><span class="finding-location">UJ4 · FR91a</span></header><div class="finding-note">The journey promises move/relink behavior while Folders owns storage and Stored is terminal.</div><div class="finding-fix"><strong>Fix:</strong> Define the owner-supported reassignment or compensation contract and include it in correction completion.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">FR6 exposes a user action reserved to a worker</h3><span class="finding-location">FR6 · workflow table</span></header><div class="finding-note">The user capability and authoritative command matrix disagree on actors and required fields.</div><div class="finding-fix"><strong>Fix:</strong> Align FR6 with the table or add the missing user transition.</div></article>
+  </div></details></section>
+  <section class="dimension"><details><summary><h2>Scope honesty</h2><span class="verdict-pill verdict-strong">strong</span></summary><div class="dim-body"><div class="dim-judgment"><p>Increment scope, non-goals, and evidence gaps are explicit; affected claims remain blocked instead of being presented as complete.</p></div></div></details></section>
+  <section class="dimension"><details><summary><h2>Downstream usability</h2><span class="verdict-pill verdict-adequate">adequate</span></summary><div class="dim-body"><div class="dim-judgment"><p>Stable catalogs, glossary, trace anchors, and named journeys support extraction, but lifecycle shorthand still conflicts with the canonical path.</p></div></div><div class="findings-list"><article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Correction paths disagree across authoritative sections</h3><span class="finding-location">Shared Workflow · Association Lifecycle</span></header><div class="finding-note">One path says Associated → Corrected; the table uses Correcting and Correction-delayed, which the later state list omits.</div><div class="finding-fix"><strong>Fix:</strong> Publish one canonical path and enum representation everywhere.</div></article></div></details></section>
+  <section class="dimension"><details><summary><h2>Shape fit</h2><span class="verdict-pill verdict-adequate">adequate</span></summary><div class="dim-body"><div class="dim-judgment"><p>The security-sensitive B2B chain-top shape is appropriate, with meaningful journeys and dedicated governance/operations material.</p></div></div><div class="findings-list"><article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Pre-pilot data-rights workflows lack actor and delivery-surface contracts</h3><span class="finding-location">FR58 · RBAC · UI inventory</span></header><div class="finding-note">Gate-critical export, erasure, hold, and retention workflows have no mapped operator or M0 surface.</div><div class="finding-fix"><strong>Fix:</strong> Add roles, authority, queries, result delivery, recovery behavior, and an explicit pre-pilot surface/journey.</div></article></div></details></section>
+
+  <section class="reviewer-section"><details><summary><h2>Adversarial release-readiness review</h2><span class="reviewer-source">review-adversarial-current.md</span></summary><div class="dim-body"><div class="dim-judgment"><p><strong>Not release-ready.</strong> Four stop-ship ambiguities remain even if all evidence gates later pass.</p></div></div><div class="findings-list">
+    <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">AI-bound MCP principal can appear to approve its own AI action</h3><span class="finding-location">FR41 · FR49 · FR82–83</span></header><div class="finding-note">MCP receives approval operations while the principal class is bound per AI actor.</div><div class="finding-fix"><strong>Fix:</strong> Separate human-delegated and AI/tool principals and structurally enforce non-self-approval.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">Deferred has contradictory legal transitions</h3><span class="finding-location">Shared Workflow · FR6</span></header><div class="finding-note">The summary permits resume-only, while confirm/reject accept Deferred directly.</div><div class="finding-fix"><strong>Fix:</strong> Select and propagate one transition model.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">Correction completion ignores source-owned and irreversible effects</h3><span class="finding-location">UJ4 · FR91a</span></header><div class="finding-note">Conversations, Folders, sent mail, executed actions, and prior disclosures are outside completion acknowledgements.</div><div class="finding-fix"><strong>Fix:</strong> Require a cross-owner correction impact manifest and explicit irreversible-effect dispositions.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">M1 relies on undefined A11 metrics</h3><span class="finding-location">M1 gate · A11</span></header><div class="finding-note">M1 includes measures whose targets/denominators are provisional while A11 is declared M2-only.</div><div class="finding-fix"><strong>Fix:</strong> Create and gate on A11-M1 or replace the provisional metrics.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Gate approval validity is not machine-evaluable</h3><span class="finding-location">A5 · A6 · A13</span></header><div class="finding-note">Current/expired/invalidated lacks one record and reopening contract.</div><div class="finding-fix"><strong>Fix:</strong> Define a candidate-bound gate record with evidence, signers, expiry, supersession, and computed status.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Policy snapshot is M0-required but M1-owned</h3><span class="finding-location">M0 · Data Governance</span></header><div class="finding-note">Ownership and first use disagree, changing isolation and data-rights scope.</div><div class="finding-fix"><strong>Fix:</strong> Make the base snapshot M0 or split the record classes explicitly.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Indeterminate risk both enters review and forbids the proposal write</h3><span class="finding-location">Risk Classifier · NFR15a</span></header><div class="finding-note">The classifier and fail-closed persistence contract name incompatible outcomes.</div><div class="finding-fix"><strong>Fix:</strong> Define either a durable non-approvable review state or a typed no-write denial.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Approval freshness is undefined</h3><span class="finding-location">FR42 · NFR16</span></header><div class="finding-note">Expiry is enforced without a TTL, state/event, renewal, or drift rule.</div><div class="finding-fix"><strong>Fix:</strong> Define lifetimes, expiry transitions, digests, revalidation, and reapproval.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Association metrics use conflicting populations</h3><span class="finding-location">SM1 · SM7 · A9a</span></header><div class="finding-note">Recall populations disagree and the headline metric rewards abstention.</div><div class="finding-fix"><strong>Fix:</strong> Publish one evaluation protocol with separate correctness, abstention, and error measures.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Data-rights workflows cannot be operated end to end</h3><span class="finding-location">FR58 · A6</span></header><div class="finding-note">Actors, status/result queries, result access, and pre-pilot surfaces are absent.</div><div class="finding-fix"><strong>Fix:</strong> Define the complete operator journey and contracts.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Unknown outbound-send outcome is a dead end</h3><span class="finding-location">Outbound workflow · Retry Profiles</span></header><div class="finding-note">Investigation-required has no state, command, query, evidence, or resolver.</div><div class="finding-fix"><strong>Fix:</strong> Add unknown/reconciling states and auditable provider reconciliation.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Untrusted content is not governed as an AI instruction source</h3><span class="finding-location">System Journey · A5</span></header><div class="finding-note">Prompt-injection and instruction/data boundaries are absent.</div><div class="finding-fix"><strong>Fix:</strong> Add origin labels, authority invariants, review behavior, and adversarial fixtures.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Universal command spine applies AI-only stages to every mutation</h3><span class="finding-location">FR81a</span></header><div class="finding-note">Literal and loose readings both produce unsafe inconsistencies.</div><div class="finding-fix"><strong>Fix:</strong> Define a closed admission-stage matrix by operation/effect class.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">M365 authority conflates API permission and mailbox delegation</h3><span class="finding-location">M365 constraints · Authority mapping</span></header><div class="finding-note">The full evidence intersection is not required.</div><div class="finding-fix"><strong>Fix:</strong> Define the provider-neutral tuple and versioned adapter mapping.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Authenticity block has no canonical workflow outcome</h3><span class="finding-location">FR48a–d</span></header><div class="finding-note">Paranoid block has no state, retention, release, or reprocessing contract.</div><div class="finding-fix"><strong>Fix:</strong> Add an exact authenticity state family before association.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Audit reconstructability denominator is not independent</h3><span class="finding-location">NFR50a</span></header><div class="finding-note">Projection omissions can disappear from numerator and denominator.</div><div class="finding-fix"><strong>Fix:</strong> Reconcile against an independent command/event index.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Rubber-stamp rate is undefined</h3><span class="finding-location">SM-C3 · NFR46</span></header><div class="finding-note">No signal, formula, sample, or adjudication rule exists.</div><div class="finding-fix"><strong>Fix:</strong> Define the measure or replace it with observable proxies.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">NFR41 monitoring escape hatch defeats the target</h3><span class="finding-location">NFR41</span></header><div class="finding-note">Unavailable monitoring waives the obligation it should prove.</div><div class="finding-fix"><strong>Fix:</strong> Make monitoring a prerequisite and block unsupported claims.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Threshold change wording conflicts with schema ranges</h3><span class="finding-location">Confidence Thresholds</span></header><div class="finding-note">One clause implies evidence can undercut hard lower bounds.</div><div class="finding-fix"><strong>Fix:</strong> Make bounds absolute or version an exception mechanism.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">FR6 grants a transition reserved to a worker</h3><span class="finding-location">FR6</span></header><div class="finding-note">The command table contains no corresponding user transition.</div><div class="finding-fix"><strong>Fix:</strong> Remove it or define the complete user escalation operation.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Rejected policy attempts are called mutation envelopes</h3><span class="finding-location">NFR15a · NFR50</span></header><div class="finding-note">The term blurs committed mutations and non-mutating attempts.</div><div class="finding-fix"><strong>Fix:</strong> Use a separately typed rejected-attempt record and metric.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Security-attempt audit lacks completeness and overload behavior</h3><span class="finding-location">FR55 · NFR50</span></header><div class="finding-note">Loss, abuse volume, retention, and path failure are unspecified.</div><div class="finding-fix"><strong>Fix:</strong> Define attempt durability, loss/lag, deduplication, isolation, and fail-closed rules.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Tenant checkpoints lack cadence and coverage</h3><span class="finding-location">NFR49a</span></header><div class="finding-note">Periodic anchoring has no maximum lag, inventory, signing, or rebuild rule.</div><div class="finding-fix"><strong>Fix:</strong> Define cadence, coverage, keys, verification, and deletion tests.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Noisy-neighbor protection is optional</h3><span class="finding-location">NFR30</span></header><div class="finding-note">“Where technically possible” permits architecture choices to waive the goal.</div><div class="finding-fix"><strong>Fix:</strong> Name resources/measures and require bounded approved exceptions.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">NFR70 cannot literally apply state transitions to queries</h3><span class="finding-location">NFR70</span></header><div class="finding-note">The rule invites fake transitions or inconsistent interpretation.</div><div class="finding-fix"><strong>Fix:</strong> Separate mutation, query, and sensitive-read obligations.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Correcting state representation is inconsistent</h3><span class="finding-location">Association lifecycle</span></header><div class="finding-note">It is both a sub-state and a transition destination.</div><div class="finding-fix"><strong>Fix:</strong> Publish one enum/state representation.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">M0 is called human-driven despite automatic association</h3><span class="finding-location">M0</span></header><div class="finding-note">The prose overstates human involvement.</div><div class="finding-fix"><strong>Fix:</strong> Limit the claim to ambiguous and risky decisions.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Medium complexity understates the assurance surface</h3><span class="finding-location">frontmatter</span></header><div class="finding-note">The label can bias staffing and review rigor.</div><div class="finding-fix"><strong>Fix:</strong> Reclassify or narrowly qualify the label.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">NFR42a says an existing appendix will be created during M2</h3><span class="finding-location">NFR42a</span></header><div class="finding-note">Artifact-state wording is stale.</div><div class="finding-fix"><strong>Fix:</strong> Say the backlog is promoted to a candidate-bound catalog after A11.</div></article>
+  </div></details></section>
+
+  <section class="reviewer-section"><details><summary><h2>Source and downstream integrity review</h2><span class="reviewer-source">review-source-integrity-current.md</span></summary><div class="dim-body"><div class="dim-judgment"><p><strong>Conditional.</strong> Source provenance and gate truthfulness are strong, but two High contract collisions prevent unambiguous story extraction.</p></div></div><div class="findings-list">
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">M0 policy snapshot is also marked M1-only</h3><span class="finding-location">M0 · Data Governance</span></header><div class="finding-note">Independent confirmation of the ownership/first-use collision.</div><div class="finding-fix"><strong>Fix:</strong> Move ownership to M0 or split bootstrap and administration records.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Indeterminate risk classification has incompatible durable outcomes</h3><span class="finding-location">Risk Classifier · NFR15a</span></header><div class="finding-note">Independent confirmation of review-versus-no-write behavior.</div><div class="finding-fix"><strong>Fix:</strong> Choose and fully specify one canonical outcome.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Current source manifest trails the live checkout</h3><span class="finding-location">source-manifest.md</span></header><div class="finding-note">Three dependency advances are undisclosed, although inspected consumed contracts did not change.</div><div class="finding-fix"><strong>Fix:</strong> Refresh identities or mark it as a reviewed snapshot with a current recheck record.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Governed-chat vocabulary does not round-trip to canonical states</h3><span class="finding-location">FR28b · NFR32</span></header><div class="finding-note">Accepted/needs-review do not map cleanly to Admitted and the canonical workflow.</div><div class="finding-fix"><strong>Fix:</strong> Use canonical names or add a complete response-to-state mapping.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Project Association context is absent from the ownership map</h3><span class="finding-location">Architecture considerations</span></header><div class="finding-note">Downstream authors must guess whether it is a ChatBot subcontext or separate bounded context.</div><div class="finding-fix"><strong>Fix:</strong> Name it as a ChatBot capability or define the formal owner/API boundary.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Four-job recovery gate does not locate all four jobs</h3><span class="finding-location">A10 · qualification evidence</span></header><div class="finding-note">Exact evidence assembly depends on repository knowledge.</div><div class="finding-fix"><strong>Fix:</strong> List stable job IDs and the governing locator in the mutable evidence artifact.</div></article>
+  </div></details></section>
+
+  <div class="mechanical"><h3>Mechanical notes</h3><ul>
+    <li>Base FR/NFR/SM IDs are contiguous and unique; letter-suffixed additions are unique.</li>
+    <li>Every explicit FR, NFR, and A-token reference resolves; all 15 A11 target/evidence rows pair one-to-one.</li>
+    <li>Every named human journey has a named protagonist.</li>
+    <li>A4, A7, and A12 do not round-trip from the Assumptions Index to inline operative statements.</li>
+    <li>Association-state shorthand omits Correcting and Correction-delayed.</li>
+    <li>The direct product brief and Epic 12 architecture hashes match; activation remains correctly pending.</li>
+  </ul></div>
+
+  <footer class="report-footer"><div class="meta"><span>Rubric: /home/administrator/projects/hexalith/chatbot/.agents/skills/bmad-prd/assets/prd-validation-checklist.md</span><span>Generated: 2026-09-14T15:32:19+02:00</span></div></footer>
+</div>
 </body>
 </html>

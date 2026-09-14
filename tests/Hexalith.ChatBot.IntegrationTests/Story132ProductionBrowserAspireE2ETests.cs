@@ -373,12 +373,39 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
         DistributedApplication app,
         CancellationToken cancellationToken)
     {
+        // ONE shared wall-clock budget across the five resources, not five independent 5-minute waits. Per-resource
+        // timeouts multiply: five slow resources cost 25 minutes, and this suite runs as a step of the same
+        // `topology-acceptance` job (timeout-minutes: 30) that first runs the governed-command lane. A partial
+        // startup hang was then killed by the runner, skipping the `if: always()` artifact upload and losing the
+        // evidence this lane exists to produce. Mirrors TopologyReadinessBudget in TrivialGovernedCommandAspireE2eTests.
+        TimeSpan readinessBudget = TimeSpan.FromMinutes(8);
+        Stopwatch readinessClock = Stopwatch.StartNew();
         foreach (string resourceName in new[] { "security", "eventstore", "tenants", ChatBotResourceName, ChatBotUiResourceName })
         {
-            ResourceEvent resource = await app.ResourceNotifications
-                .WaitForResourceHealthyAsync(resourceName, cancellationToken)
-                .WaitAsync(TimeSpan.FromMinutes(5), cancellationToken)
-                .ConfigureAwait(true);
+            TimeSpan remaining = readinessBudget - readinessClock.Elapsed;
+            if (remaining <= TimeSpan.Zero)
+            {
+                throw new TimeoutException(
+                    $"The shared {readinessBudget} Story 13.2 topology readiness budget was exhausted before "
+                    + $"'{resourceName}' was waited on. Earlier resources consumed the whole budget.");
+            }
+
+            ResourceEvent resource;
+            try
+            {
+                resource = await app.ResourceNotifications
+                    .WaitForResourceHealthyAsync(resourceName, cancellationToken)
+                    .WaitAsync(remaining, cancellationToken)
+                    .ConfigureAwait(true);
+            }
+            catch (TimeoutException exception)
+            {
+                throw new TimeoutException(
+                    $"'{resourceName}' did not report healthy within the remaining {remaining} of the shared "
+                    + $"{readinessBudget} Story 13.2 topology readiness budget.",
+                    exception);
+            }
+
             output.WriteLine(
                 $"STORY132_ASPIRE_RESOURCE {resourceName} state={resource.Snapshot.State?.Text ?? "unknown"} "
                 + $"health={resource.Snapshot.HealthStatus?.ToString() ?? "unknown"}");

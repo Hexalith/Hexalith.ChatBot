@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 using Dapr;
@@ -55,16 +56,38 @@ internal static partial class ChatBotDeadLetterProjectionEndpoints
         _ = endpoints
             .MapPost(
                 DeadLetterDrainRoute,
-                (
-                    DeadLetteredChatBotEvent deadLettered,
+                async (
+                    HttpRequest request,
                     ILoggerFactory loggerFactory) =>
                 {
+                    // The body is read DEFENSIVELY rather than bound as a required complex parameter. A dead-lettered
+                    // message is by definition one the projection path already failed on, so it may be empty, not
+                    // JSON, or not a CloudEvent at all. Minimal-API binding rejects those with 400 BEFORE the handler
+                    // runs — a non-2xx, which is exactly the infinite-redelivery outcome this drain exists to end.
+                    DeadLetteredChatBotEvent? deadLettered = null;
+                    try
+                    {
+                        deadLettered = await request
+                            .ReadFromJsonAsync<DeadLetteredChatBotEvent>(request.HttpContext.RequestAborted)
+                            .ConfigureAwait(false);
+                    }
+                    catch (JsonException)
+                    {
+                        // Unparseable body: still drained, still metadata-only. The exception is deliberately NOT
+                        // logged — its message can quote the offending payload, which would leak the body the Epic 1
+                        // redaction floor keeps out of logs.
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // Unsupported or absent content type. Same posture as above.
+                    }
+
                     DeadLetterObserved(
                         loggerFactory.CreateLogger(typeof(ChatBotDeadLetterProjectionEndpoints)),
                         pubSubName,
                         deadLetterTopic,
-                        SafeIdentity(deadLettered.MessageId),
-                        SafeIdentity(deadLettered.CorrelationId));
+                        SafeIdentity(deadLettered?.MessageId),
+                        SafeIdentity(deadLettered?.CorrelationId));
 
                     // Always 200: a non-2xx here would make DAPR redeliver the poison message forever.
                     return Results.Ok();

@@ -190,7 +190,7 @@ static string ResolveDaprConfigPath(string appHostDirectory, string fileName)
 // rotation story this host does not own. The guardrail that matters here is the PRE-EXPIRY GATE below — it refuses
 // to start the topology against a grant that is already expired or close to it, which is the failure mode a stale
 // checked-in realm actually produces. Production provisioning and rotation of service-client grants live outside
-// this AppHost, in deployment configuration; do not add them here. See README.md#Aspire-and-DAPR.
+// this AppHost, in deployment configuration; do not add them here. See README.md#local-development-seed-credential-policy.
 static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration configuration)
 {
     const string expiryPlaceholder = "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__";

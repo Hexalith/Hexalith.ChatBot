@@ -3,6 +3,9 @@ stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]
 inputDocuments:
   - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md"
   - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/addendum.md"
+  - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/source-manifest.md"
+  - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/qualification-evidence.md"
+  - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/reconcile-full-sibling-a13-2026-09-14.md"
   - "_bmad-output/planning-artifacts/product-brief-Hexalith.ChatBot.md"
   - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/DESIGN.md"
   - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/EXPERIENCE.md"
@@ -24,23 +27,93 @@ workflowType: 'architecture'
 project_name: 'Hexalith.ChatBot'
 user_name: 'Jerome'
 date: '2026-05-28'
+updated: '2026-09-14'
 lastStep: 8
-status: 'complete'
+status: 'final'
 completedAt: '2026-05-28'
 implementationReadinessRebaselinedAt: '2026-07-17'
 packageVersionAuthorityCorrectedAt: '2026-07-18'
 independentValidationCorrectedAt: '2026-07-20'
+productAuthorityReconciledAt: '2026-09-14'
+releaseReadiness: 'blocked-open-gates'
+openReleaseGates: [A5, A6, A10, A11, A13]
 ---
 
 # Architecture Decision Document
 
-_This document builds collaboratively through step-by-step discovery. Sections are appended as we work through each architectural decision together._
+_Reconciled on 2026-09-14 to the finalized PRD and its normative appendices. Architectural design completeness is not implementation, qualification, pilot, or production readiness._
+
+## Normative Authority and Release-Gate Posture
+
+The product authority is the finalized PRD plus `addendum.md`. `source-manifest.md` fixes the reviewed
+brownfield revisions and consumed-contract hashes; it does not prove producer acceptance.
+`qualification-evidence.md` owns mutable evidence state, and
+`reconcile-full-sibling-a13-2026-09-14.md` is the single current A13 gate result across all nine contexts. If explanatory
+architecture prose conflicts with those sources, the PRD package wins and this document must be rechecked.
+The A13 result supersedes the initial five-gap extract only for gate status and incorporates the narrow H4/H12
+verification. Neither the initial extract nor the narrow verification is separate closure authority. A8 governs
+allowlist membership only, while A13 governs
+executable producer, authority, audit, concurrency, and fencing acceptance. The source manifest's current baseline is
+workspace revision `76f355a038c4abdb3b9fdb3fb836c25053a18fb0` with `material-gaps-recorded`; matching revisions,
+hashes, typed transports, interfaces, or architecture decisions do not establish owner acceptance or execution.
+
+The release posture is deliberately blocked:
+
+| Gate | State | Release effect |
+|---|---|---|
+| A5 — live AI provider | **OPEN** | Live AI is disabled; M0/M1 onboarding is blocked until the candidate/provider contract and negative evidence are accepted. |
+| A6 — data protection | **OPEN** | Pilot data/PII persistence, onboarding, and compliance claims are blocked until the data-class contract and independently witnessed owner-runtime evidence are accepted. |
+| A13 — owner execution, authority, audit, and fencing | **OPEN** | The indivisible exact-candidate owner bundle is unaccepted; Conversations append/assignment, onboarding, M0/M1, and tamper-evidence claims are blocked. |
+| A10 — recovery qualification | **OPEN / provisional** | No qualifying current hosted four-job controlled-loss/full-window evidence exists; M2 production and release-candidate claims are blocked. |
+| A11 — SLO qualification | **OPEN / unsupported** | Every SLO row is unsupported without a candidate-bound evidence bundle; M2 production and release-candidate claims are blocked. |
+
+M0 and M1 require current A5/A6/A13 approvals. M2 revalidates those three and additionally requires A10/A11.
+These gate approvals are necessary but not sufficient because the PRD's sole increment table owns all release evidence,
+disable conditions, sequencing, and permitted claims. The presence of code, interfaces, historical artifacts,
+architecture reviews, or planning status does not close any gate.
+Gate evidence identifies the exact candidate revision, contract/package versions, storage/provider profile,
+responsible producer, test runner, time, result, independent verification, and expiry/reopen rule. A5 is approved by
+Security + Architecture; A6 by Compliance/Data Protection + Architecture with Parties/EventStore owner evidence;
+A13 by the System Architect and Conversations/Projects/Tenants/EventStore owners with Security validating authority
+and fencing. Missing, expired, changed, mismatched, or partially accepted evidence leaves the gate open.
+
+## Architecture at a Glance — Decision Map
+
+**Critical design decisions — settled without closing qualification gates:**
+
+- **D1 — Sibling integration and orchestration:** event-driven integration, with the minimum hosted Dapr Workflow
+  correction binding owned by canonical Epic 2 before production correction claims.
+- **D2 — M0 association-proposal model:** deterministic candidate generation with evidence and human confirm/correct.
+- **D3 — FR81a placement:** every mutating origin enters one `CommandGateway`/EventStore command spine; adapters
+  never replicate a stage.
+- **D4 — Atomic mutation and audit ledger:** the domain event, lifetime idempotency result, applied policy/approval
+  references, and hash-linked canonical envelope commit together through the A13-gated actor-dispatched write target,
+  or none commit. The current EventStore baseline does not yet support the full unit.
+- **D5 — Internal decomposition:** modular monolith with hard, event-mediated seams.
+- **D6 — Derived-store modeling:** immutable decision snapshots use supersede-not-mutate; fresh live mirrors use
+  version-stamped event-driven projections.
+- **D7 — Contract surface:** OpenAPI 3.1 is the sole HTTP wire-contract source.
+- **D8 — Host-layer reuse:** ChatBot is an EventStore domain module; its admission layer mounts at the platform
+  pre-commit hook, while the AppHost remains only an ADR-scoped local-development umbrella.
+- **D9 — Canonical workflows and recovery:** the PRD owns family transitions; Retry Profiles own retryability,
+  maxima, backoff, exhaustion, recovery owner, and manual recovery commands.
+- **D10 — Cross-context authority:** owner-context authority is current and explicit; local mirrors never grant
+  trust-bearing authority.
+- **D11 — M0 governance bootstrap:** stable commands and two distinct current Tenants owners create governance;
+  direct seeding is prohibited.
+- **D12 — Evidence-gated release:** A5/A6/A13 block M0/M1; A10/A11 additionally block M2.
+- **D13 — Runtime control and work isolation:** one durable control/rate-limit view, fail-closed consumers,
+  tenant-partitioned fair scheduling, and one operational owner govern workload execution.
+
+Correction orchestration, A9a qualification, M365/Graph integration, checkpoint topology, and the deterministic
+association kernel shape the implementation. Vector activation, replay-only composition, dashboards, and learned
+association signals remain deferred implementation breadth, not deferred release gates.
 
 ## Project Context Analysis
 
 ### Requirements Overview
 
-**Functional Requirements (111 identifiers: FR1–FR96 plus lettered extensions):** ChatBot orchestrates a governed email-to-project
+**Functional Requirements (117 identifiers: FR1–FR96 plus lettered extensions):** ChatBot orchestrates a governed email-to-project
 collaboration loop over existing Hexalith bounded contexts. By capability area, with
 architectural implications:
 
@@ -69,14 +142,14 @@ architectural implications:
   adapters, canonical lifecycle state machine, idempotency keys, correction propagation (FR91a),
   replay isolation (FR95a).
 
-**Non-Functional Requirements (77 identifiers: NFR1–NFR70 plus lettered extensions) shaping architecture:**
+**Non-Functional Requirements (79 identifiers: NFR1–NFR70 plus lettered extensions) shaping architecture:**
 
 - **Security/privacy (NFR1–NFR12, NFR9a):** authorization at every boundary; redacted failure
   responses; encryption in transit/at rest; least-privilege M365 & service-client scopes; bounded
   auth-cache staleness (5 min normal / 60 s revocation); **derived-store tenant isolation by
   construction at the store layer**, not application filtering.
-- **Reliability/integrity (NFR13–NFR22, NFR13a/15a/17a):** per-operation-class idempotency contract
-  (8 classes); fail-closed invariant across 10 enumerated code paths; at-least-once worker delivery;
+- **Reliability/integrity (NFR13–NFR22, NFR13a/15a/17a):** per-operation-class idempotency contract;
+  one atomic fail-closed durability boundary across every enumerated mutation path; at-least-once worker delivery;
   AI-outage tolerance for non-AI workflows; correction-propagation SLO (p95 ≤ 10 min M0/M1, ≤ 60 min M2).
 - **Performance/scalability (NFR23–NFR30):** p95 2 s UI reads; 10 s candidate generation; CLI/MCP
   long-running → operation-id within 5 s, no 30 s hold; per-tenant rate limits/quotas/circuit breakers;
@@ -84,14 +157,17 @@ architectural implications:
 - **Integration (NFR31–NFR36):** M365/Graph tolerance for throttle/revoke/replay; contract-verifiable
   responses with stable identifiers/codes; versioned contracts; correlation context everywhere;
   server-side UTC time.
-- **Operability (NFR37–NFR48, NFR42a):** health/queue observability; published SLOs; message-catalog-driven
+- **Operability (NFR37–NFR48, NFR42a):** health/queue observability; A11-gated SLO qualification backlog; message-catalog-driven
   user-safe states; approval-fatigue mechanisms (prioritization, grouping, rate ceiling, rubber-stamp
   observable); evidence-freshness chips.
-- **Audit/compliance (NFR49–NFR55, NFR49a/50a):** tamper-evident append-only WORM hash-chained audit;
-  ≥99.5% audit-completeness production observable (reconstructability, not just field presence); GDPR
+- **Audit/compliance (NFR49–NFR55, NFR49a/50a):** `100%` of durable mutations atomically co-commit a
+  hash-linked canonical envelope; the rebuildable investigation view has a separate ≥99.5% M2 availability
+  target; GDPR
   retention classes; consent/lawful-basis metadata.
-- **Recovery (NFR56–NFR59):** RPO ≤ 15 min / RTO ≤ 4 hr remain provisional per A10. Story 12.15 supplied an authentic hosted safety bundle; DW-52 supplies a distinct locally verified controlled-loss RPO mechanism, but no hosted artifact from that channel is yet cited, and the lane's 180-second ceiling leaves the 4-hour RTO residual open. Projection rebuild
-  from source ≤ 4 hr; scoped outage degradation.
+- **Recovery (NFR56–NFR59):** RPO ≤ 15 min / RTO ≤ 4 hr remain provisional per A10. The prior hosted
+  bundle is historical, expired, predates the controlled-loss job, and could not demonstrate the four-hour recovery window;
+  the accepted Epic 12 contract remains `activation: pending`. Projection rebuild from source ≤ 4 hr and scoped
+  outage degradation also require fresh exact-candidate evidence.
 - **Accessibility (NFR60–NFR64):** WCAG 2.2 AA scoped per-increment to enumerated surfaces; non-color
   status; keyboard/screen-reader for core flows; English + French.
 - **Quality gates (NFR65–NFR70):** negative authorization tests across 9 actor types; isolated
@@ -99,7 +175,7 @@ architectural implications:
 
 ### Scale & Complexity
 
-- **Primary domain:** distributed backend/service orchestration (.NET 10 + DAPR + Hexalith.EventStore)
+- **Primary domain:** distributed backend/service orchestration (.NET 10 + Dapr + Hexalith.EventStore)
   with a Blazor/FrontComposer web UI and CLI + MCP machine surfaces.
 - **Complexity level:** High / enterprise (multi-tenant zero-tolerance isolation, GDPR, cross-surface
   parity, governed AI, M365 integration, event-sourced tamper-evident audit).
@@ -111,22 +187,24 @@ architectural implications:
 
 ### Technical Constraints & Dependencies
 
-- **Fixed platform stack:** .NET 10 (SDK 10.0.302, net10.0, nullable + warnings-as-errors, package-reference
-  versions owned solely by `references/Hexalith.Builds/Props/Directory.Packages.props`); DAPR (actors,
+- **Fixed platform stack:** .NET 10 (repository SDK pin 10.0.400, net10.0, nullable + warnings-as-errors, package-reference
+  versions owned solely by `references/Hexalith.Builds/Props/Directory.Packages.props`); Dapr (actors,
   at-least-once pub/sub, workflow, service invocation, deny-by-default ACLs);
   .NET Aspire orchestration; Hexalith.EventStore as the write-side foundation (CQRS/ES,
   `{tenant}:{domain}:{aggregateId}`, persist-then-publish, pure `Handle`/`Apply`, rejections-as-events,
-  ULIDs not GUIDs, `system` platform tenant, EventStore owns the envelope; **each service already runs its
-  own EventStore command pipeline + AggregateActor 5-step sequence**); Keycloak OIDC; Blazor + Fluent UI v5
+  ULIDs not GUIDs, `system` platform tenant, EventStore owns its current command/event envelope; the proposed
+  FR81a atomic canonical-audit contract is not in the pinned public contract and remains A13-blocked);
+  Keycloak OIDC; Blazor + Fluent UI v5
   (RC-pinned) via Hexalith.FrontComposer (Roslyn source generators, Fluxor, REST commands/queries +
   SignalR projection-nudge, MCP descriptors).
-- **Bounded-context dependencies (consume by stable ID, never duplicate authority):** Hexalith.Projects,
-  Parties, Folders, Tenants, Conversations, EventStore, Memories (Redis Vector / FalkorDB for AI
-  context/vector indexes), Commons.
+- **Bounded-context dependencies (consume by stable ID, never duplicate authority):** The reviewed baseline includes
+  these nine contexts: Projects, Conversations, Parties, Folders, Tenants, EventStore, FrontComposer, Memories, and
+  Commons. Memories is optional post-MVP/M2 and cannot expand M0/M1 authority.
 - **Module conventions inherited:** Contracts→Server dependency direction; CLI/MCP wrap the typed Client and
-  never bypass the command pipeline or touch DAPR directly; tenant isolation physical (not just filtered) for
+  never bypass the command pipeline or touch Dapr directly; tenant isolation physical (not just filtered) for
   indexes/caches/graphs; metadata-only logging (no payloads/PII/secrets); wrap sibling clients behind adapters
-  (e.g., `IParticipantDirectory` over Parties); local event-fed tenant-access projection that fails closed;
+  (e.g., `IParticipantDirectory` over Parties); local event-fed mirrors for display only and current owner/gateway
+  authorization for trust-bearing gates;
   contract-first FrontComposer annotations; additive, serialization-tolerant schema evolution (no V2 event types).
 - **Checkout-root submodule policy:** "root-declared" is relative to the repository checkout being validated.
   In the ChatBot umbrella, initialize only entries declared by ChatBot's root `.gitmodules`, non-recursively;
@@ -162,26 +240,27 @@ consumer lane is green, the unchanged ChatBot umbrella is validated separately a
    log, and error-body layers; `tenantId` from Keycloak claims only, never request body.
 2. **Authorization at command/query boundary** — two-layer (API gate + domain), inside the gateway; redacted
    denials that don't confirm resource existence. *Rule to lock: mirrors for display, live authorization for gates.*
-3. **Governed command admission gateway (FR81a)** — re-scoped from "a pipeline" to a **component + enforcement
-   discipline**: a `CommandGateway` admission layer (auth → tenant-bind → authorize → risk-classify →
-   approval-gate → coarse idempotency → pre-commit audit) that sits *in front of* EventStore's existing
-   per-context write pipeline (which owns fine idempotency → execute → publish → projection). Adapters
-   (UI/CLI/MCP) may construct only a typed `IChatBotCommand` and hand it to the gateway; governance interfaces
-   stay `internal` so stage-replication is a compile error, backed by an architecture test (NetArchTest).
-   Parity is enforced by construction + a differential-conformance harness, not by aspiration.
-4. **Fail-closed invariant (NFR15a)** — enforced at one injectable audit-commit seam every state-writing path
-   calls before persisting; **only pre-commit paths fail closed** (see #6).
-5. **Idempotency (NFR13a)** — **two altitudes**: coarse request-dedup at the gateway, fine event-dedup at the
-   aggregate (the existing idempotency cache). Never conflate them. At-least-once DAPR delivery tolerance.
-6. **Auditability & tamper-evidence (NFR49a/50a)** — **two-phase, resolving the NFR15a × NFR49a tension**:
-   *pre-commit* audit (intent/risk/approval) is a fail-closed gateway gate; *post-commit* WORM hash-chain audit
-   is fail-open-then-reconcile (the event log is the source of truth, the chain is rebuilt from it on recovery —
-   you cannot block-the-commit AND derive-the-chain on the same write). Completeness = reconstructability,
-   verified by a scheduled production assertion that rebuilds state from the log and diffs the projection.
+3. **Governed command spine (FR81a)** — every mutation from UI, CLI, MCP, service clients, AI actors, workers,
+   and mailbox events enters `CommandGateway` and the required A13-gated EventStore write target. Admission performs
+   authentication, tenant binding, the applicable owner-authority row, action-risk classification, approval validation,
+   stable operation identity,
+   expected-revision validation or an A13-approved owner guard, and canonical-envelope construction. Adapters may
+   only translate to typed commands; they never reproduce a stage.
+4. **Fail-closed atomicity (NFR15a)** — domain event, durable terminal idempotency result, applied policy/approval
+   references, and canonical audit envelope all commit or none commit. `AuditUnavailable` writes no authoritative
+   state. There is no post-commit repair route for a missing mutation envelope.
+5. **Idempotency and concurrency (NFR13a)** — durable `operation_id` and `decision_slot_id` identities live for
+   the governed record lifetime; expected revision controls races independently. A gateway cache may optimize
+   admission but never substitutes for the atomically committed terminal idempotency record.
+6. **Auditability & tamper-evidence (NFR49a/50a)** — canonical mutation envelopes are hash-linked inside the
+   aggregate command stream and co-commit with the mutation. A signed per-tenant checkpoint anchors stream heads.
+   Post-commit audit/investigation projections are rebuildable availability views only; they cannot authorize,
+   complete, or repair a mutation.
 7. **Redaction & data governance** — retention classes, redaction-aware audit, consistent redaction across
    UI/CLI/MCP/export; isolate redaction as a swappable policy stage (trim-safe to a coarse default).
-8. **Observability & SLOs** — OpenTelemetry; per-class latency/queue/lag metrics; published SLOs. *Emit structured
-   signal always; visualize later (dashboards are trim-able, emission is not).*
+8. **Observability & SLOs** — OpenTelemetry signal emission is mandatory; `unsupported` is mandatory until each
+   A11 row has candidate-bound targets, budgets, signals, routes, and burn tests. Dashboards are later presentation,
+   not evidence by themselves.
 9. **Governed AI mediation** — scoped context packaging, risk classification, approval gates, allowlisted commands,
    refusal behavior, AI-outage resilience for non-AI workflows.
 10. **Correlation & lifecycle-state consistency** — canonical state machine shared across surfaces; correlation
@@ -191,73 +270,34 @@ consumer lane is green, the unchanged ChatBot umbrella is validated separately a
     old events → new schema (event upcasting), or replay produces state divergent from live, making evidence
     snapshots/approval records non-reproducible and undermining NFR49a. Includes: projection schema version stamped
     in replay traces, *as-of* upstream resolution (don't re-query *current* Party/Folder data during rebuild), and
-    cross-context consumer-driven contract testing (Pact-style) against the 7 sibling contexts.
+    cross-context consumer-driven contract testing against the exact nine-context baseline in the source manifest.
 12. **Evidence & confidence capture** *(added — product-thesis finding)* — the product exists for *reliable
-    association*; every AI proposal must structurally carry its confidence, evidence basis, and human-correction
-    outcome as a first-class invariant, because that data IS the pilot's success measurement (A11 evidence-resolution)
-    and the model-improvement loop. A fully-governed, fully-audited system that proposes the wrong project passes
-    every other concern green while the product fails.
-13. **WORM-vs-erasure tension (GDPR)** *(added)* — tamper-evidence says "never mutate the log"; GDPR right-to-erasure
-    says "erase this person's data." The resolution (crypto-shredding / redaction-by-key-destruction / projection
-    tombstones over an immutable chain) is an architecture decision, not a policy footnote.
+    association*. Every AI proposal must structurally carry its confidence, evidence basis, and human-correction
+    outcome as a first-class invariant because these data form the pilot's success measurement (A11 evidence
+    resolution) and the model-improvement loop. A fully governed, fully audited system can pass every other concern
+    while still failing the product if it proposes the wrong project.
+13. **WORM-vs-erasure tension (GDPR)** *(added)* — immutable canonical envelopes and signed checkpoints do not
+    waive A6. Retention, legal-hold precedence, key granularity/custody, backup propagation, crypto-erasure, and
+    surviving metadata require the approved A6 contract and runtime proof before persistence or pilot claims.
+14. **Qualification authority** — planning and code reality can establish design fit, not release readiness.
+    A5/A6/A13 gate M0/M1; A10/A11 additionally gate M2; missing evidence is blocking or `unsupported`, never inferred.
 
-**Watch-list (monitor; may fold into the above):** reversibility/undo as the approval-fatigue antidote (vs more
-friction); AI cost/resource governance (B2B unit economics); explicit ordering-source (source version, not wall clock).
+**Watch list (monitor and merge into the concerns above when applicable):** reversibility or undo as the
+approval-fatigue antidote rather than more friction; AI cost and resource governance (B2B unit economics); and an
+explicit ordering source (source version, not wall-clock time).
 
-### Architectural Findings to Carry into Decisions (from Party Mode)
+### Brownfield Ratification Note
 
-- **Modular monolith with hard, event-mediated seams**, not premature service sharding — the real risk is a
-  *distended orchestrator* (shadow source of truth), not a distributed monolith. Candidate seams by derived-state
-  lifecycle: Association / Governance-Mediation / Lifecycle-Workflow / Projection-Query / Audit-Replay. Seam test:
-  *owns an aggregate with its own invariants, or just a folder?*
-- **FR81a = `CommandGateway` admission layer over EventStore's existing pipeline** (not a second pipeline), enforced
-  by Client-only adapter surface + NetArchTest + differential-conformance harness over surface-agnostic semantic
-  intents (event-sequence + state-store end-state equivalence; include rejection and retry intents).
-- **Two-phase audit** (pre-commit fail-closed gate vs post-commit reconcile-from-event-log) — resolve before M0 closes.
-- **Derived-store split:** decision snapshots immutable (FR91a = *supersede + re-evaluate-forward*; open proposals
-  re-evaluate, closed/approved proposals are immutable history); live mirrors fresh (event-driven, version-stamped,
-  order-tolerant projections).
-- **Correction propagation (FR91a):** implemented as an internal lifecycle saga with deterministic workflow
-  identifiers and durable lifecycle events; the aggregate owns the `correcting`/`current` lifecycle. Canonical Story 2.9 binds
-  the live topology to hosted Dapr Workflow through `AddChatBotCorrectionPropagationWorkflow()`, while EventStore
-  events and projections remain the lifecycle source of truth. `ReindexVectors(tenantId, correctionId, sourceVersion)`
-  stays an M2 activity and must be idempotent + version-guarded.
-- **M0 is a walking skeleton:** minimal *surface* (one tenant, one mailbox, one allowlisted command, UI-only) but a
-  *complete spine* — all gateway stage seams present and typed; tenant partitioning, fail-closed, and
-  audit/idempotency **real** from day one (retrofitting them touches every path). Epic 4 replaces the original
-  risk/approval stubs with the registered `DeterministicAiActionRiskClassifier` and `AiActionApprovalGate`
-  stages for governed AI mediation. Canonical Epics 7–10 land the M1 governance breadth on this spine — bounded
-  tenant-admin scopes (`AdminAuthorityEvaluator`), the versioned Tenant Policy Schema with a two-person rule,
-  administration, review operations, command/lifecycle governance, and the disable/quarantine/rate-limit control floor over a shared `GovernedOperationAggregate`. Canonical Story 9.1
-  owns the active server runtime path: a durable control-state/rate-limit read-side projection feeds projection-backed
-  service-client, AI-actor, command-capability, and outbound-channel providers, the runtime registrations no longer
-  resolve `AlwaysActive…`/`AlwaysUnlimited…` defaults, and one periodic enforcement runtime drives the canonical
-  8.2–8.7 notification/escalation evaluators, 11.4 alert coordinator, 11.5 runbook sampler, audit-completeness
-  publication, audit-projection-lag publication, and control-state freshness heartbeats. Two current evidence gaps
-  are explicit: canonical Story 9.2 cannot pass until the hosted mailbox worker consumes `GovernedControlStateView`;
-  the audit-projection-lag feed remains a separately owned release-readiness decision until a real projection
-  checkpoint source exposes committed/projected positions. Neither boundary permits a fabricated reading.
-- **A9a gate semantics by milestone:** *directional* at M0 (n≈100 positives gives ±~6pt CI — can't distinguish 88%
-  from 92%), *binding & CI-aware* at M1 (require lower confidence bound to clear). Budget inter-annotator-agreement /
-  label-quality work + a frozen held-out partition + dataset versioning.
-- **Safety floor vs trimmable richness:** the architect's deliverable is a dependency map proving no safety-floor
-  invariant (isolation, authorization, fail-closed gate, audit-of-the-command, the spine) rides inside a trimmable
-  stage (redaction depth, approval-policy richness, dashboards).
-
-### Open Architecture Questions (resolve in the Decisions step)
-
-1. **ChatBot → sibling-context contract: event-driven (publish an intent, the sibling decides) or invocation-driven
-   (call the sibling's command)?** This single choice determines whether ChatBot is an orchestrator or a puppeteer
-   and cascades into nearly every later decision.
-2. **M0's purpose: prove the *governed loop* or the *association heuristic*? Concretely — does M0 include AI-*proposed*
-   association with a human confirm/correct gesture, or human-only filing?** If human-only, the "reliable association"
-   thesis is untested and A11's 70% evidence-resolution target is unmeasurable.
+The multi-perspective reconciliation ratified D1–D13 without granting release qualification. Unique qualifiers now
+live with their owning decisions: lifecycle seams under D5, correction under D9, command-created M0 governance under
+D11, runtime controls under D13, A9a under governed AI mediation, and the non-trimmable safety floor in the
+implementation sequence. A5, A6, A10, A11, and A13 remain evidence and approval gates, not design alternatives.
 
 ## Starter Template Evaluation
 
 ### Primary Technology Domain
 
-Distributed **.NET service-oriented application** on the Hexalith platform: DAPR-based event-sourced
+Distributed **.NET service-oriented application** on the Hexalith platform: Dapr-based event-sourced
 backend (Hexalith.EventStore) + Blazor/Fluent UI web surface (Hexalith.FrontComposer) + CLI and MCP
 machine surfaces, composed and run via .NET Aspire. This is a **brownfield product on a fixed,
 opinionated platform**, not a greenfield free choice of stack.
@@ -275,11 +315,13 @@ opinionated platform**, not a greenfield free choice of stack.
 
 ### Selected Starter: New Hexalith module `Hexalith.ChatBot`, scaffolded from the canonical sibling-module template
 
-- **Foundation:** `Hexalith.EventStore` as a **root-declared git submodule under `references/Hexalith.EventStore`** (never recursive). Provides the
-  command/aggregate/projection/query/SignalR/CLI/MCP primitives ChatBot builds on.
+- **Foundation:** `Hexalith.EventStore` as a **root-declared git submodule under `references/Hexalith.EventStore`**
+  (never recursive). It provides the command/aggregate/projection/query/SignalR/CLI/MCP primitives that ChatBot
+  builds on.
 - **Closest structural reference:** `Hexalith.Folders` — most complete recent multi-surface sibling
   (REST + CLI + MCP + read-only Blazor UI + background workers + an **OpenAPI Contract Spine** with
-  generated client + idempotency helpers + parity-oracle tests). Maps almost 1:1 onto ChatBot's
+  generated client + idempotency helpers + parity-oracle tests). The `Hexalith.Folders` structure maps almost
+  one-to-one to ChatBot's
   cross-surface parity requirement (FR81a).
 - **Closest domain reference:** `Hexalith.Conversations` — reference implementation for conversation
   adapter patterns ChatBot may adopt later (`IParticipantDirectory` over Parties, local event-fed
@@ -299,55 +341,64 @@ opinionated platform**, not a greenfield free choice of stack.
   standalone `Aspire` and `ServiceDefaults` projects are retired; `AppHost` remains only as an ADR-scoped
   local-development umbrella while platform composition lacks dedicated ChatBot resource support.
 - Add EventStore as a **root-declared submodule under `references/Hexalith.EventStore`** (`git submodule update --init`, not `--recursive`).
-- Root config: `global.json` (SDK 10.0.302), `Directory.Build.props` (nullable, warnings-as-errors),
+- Root config: `global.json` (10.0.4xx selector: baseline `10.0.400`, `rollForward=latestPatch`, resolved
+  `10.0.401` during the 2026-09-14 review), `Directory.Build.props` (nullable, warnings-as-errors),
   version-free `Directory.Packages.props` importing
   `references/Hexalith.Builds/Props/Directory.Packages.props`, `.editorconfig`, `nuget.config`.
-- Wire Aspire AppHost + DAPR components: canonical EventStore actor/status store `statestore`, ChatBot derived
+- Wire Aspire AppHost + Dapr components: canonical EventStore actor/status store `statestore`, ChatBot derived
   state store `chatbot-statestore`, Redis pub/sub `chatbot-pubsub`, production deny-by-default
   `accesscontrol.yaml`, and local mTLS-off `accesscontrol.local.yaml`; verify `aspire run` brings up the topology.
 
-**Architectural Decisions Provided by the Platform "Starter" (originally web-verified May 2026; SDK status refreshed July 2026):**
+## Technology Baseline and Qualification Boundaries
+
+Repository pins were verified against repository state on 2026-09-14.
 
 | Concern | Decision | Verified status |
 |---|---|---|
-| Language & runtime | C# 14 / `net10.0`, SDK `10.0.302` (LTS), nullable, warnings-as-errors, shared Builds-owned package catalog | GA, released 2026-07-14; matches all siblings |
+| Language & runtime | `net10.0`; `global.json` baseline `10.0.400` with `rollForward=latestPatch`, resolved `10.0.401`; effective C# 14 under repository `LangVersion=latest` | Feature-band selector, not an exact SDK/language pin; checked-in CI/release still requests incompatible `10.0.302`, so no uniform/hermetic SDK or evidence claim |
 | Persistence / write model | Hexalith.EventStore (CQRS/ES, `{tenant}:{domain}:{aggregateId}`, persist-then-publish, pure Handle/Apply, rejections-as-events, ULIDs, `system` platform tenant) | Foundation submodule |
-| Messaging / orchestration | DAPR 1.18.x — at-least-once pub/sub (CloudEvents), actors via `IActorStateManager`, deny-by-default ACLs; canonical Epic 2 owns both the correction-propagation coordinator seam and minimum hosted Dapr Workflow production binding | Matches sibling pins |
-| Hosting / composition | .NET **Aspire 13.4.6** AppHost (K8s/AKS + Helm deploy — relevant to M2 ops) | 13.4.6 as declared by the AppHost SDK (corrected 2026-08-26: this row still named 13.3.x while the AppHost had moved, and Story 12.15's resource-command work requires 13.4.6) |
-| UI | Blazor + **Fluent UI v5 (RC, via FrontComposer)** — Roslyn source-gen, Fluxor, REST + SignalR projection-nudge, contract-first | ⚠️ Still RC May 2026 — inherited pre-GA dependency, pinned, do not upgrade casually |
-| CLI surface (M1) | System.CommandLine 2.0.x wrapping `Hexalith.ChatBot.Client` | Per Folders pin; verify at scaffold |
+| Messaging / orchestration | Dapr application .NET SDK `1.18.5`; current general CI/release CLI/runtime `1.18.0/1.18.0` plus checked-in CLI SHA-256 | Current general wiring only; non-qualifying for the accepted recovery-primary target |
+| Epic 12 `recovery-primary` target | Dapr CLI/runtime `1.18.2/1.18.4`; CLI archive SHA-256 `ccfff008fd16f50096a9192ad56697ac7052e3add6fa0a07789d87b4c4df8c40` | `activation: pending`; current recovery jobs still use mismatched `1.18.0/1.18.0` and cannot produce completion authority |
+| Hosting / composition | .NET **Aspire 13.5.3** AppHost | Declared by the current AppHost SDK and shared catalog |
+| Hosting integrations | `Aspire.Hosting.Keycloak 13.5.3-preview.1.26425.3`; `CommunityToolkit.Aspire.Hosting.Dapr 13.5.0-preview.1.260825-0345` | Deliberate prerelease pins; repository Dapr 1.18 pairing requires live topology evidence and is not upstream-certified by package presence |
+| Published runtime base | `mcr.microsoft.com/dotnet/aspnet:10.0-alpine` | Floating 10.0 patch; exact image digest belongs in candidate evidence |
+| UI | Blazor + prerelease **Fluent UI v5 `5.0.0-rc.5-26219.1`** via FrontComposer | Shared-catalog prerelease pin; upgrade only through dependency governance |
+| CLI surface (M1) | System.CommandLine `2.0.11` wrapping `Hexalith.ChatBot.Client` | Shared-catalog pin |
 | MCP surface (M1) | **ModelContextProtocol 2.2.0**; the implemented ChatBot MCP adapter uses stdio server transport, wraps `Hexalith.ChatBot.Client`, and translates tools to commands/queries without local governance | Pinned in the shared Builds catalog and evaluated through the consumer wrapper; architecture tests assert the evaluated pin and adapter boundary |
 | AI context / vector store | Hexalith.Memories (Redis Vector / FalkorDB) for scoped AI context + vector indexes (M2, NFR9a isolation) | Existing module |
-| Testing | xUnit **v3** 3.2.x, Shouldly, NSubstitute, Testcontainers; three-tier (unit / DAPR integration / Aspire E2E); conformance + isolation + idempotency as release gates | Greenfield module → v3 |
+| Testing | xUnit v3 `4.0.0`, Shouldly, NSubstitute, Testcontainers; unit / Dapr integration / Aspire E2E; conformance + isolation + idempotency as release gates | Shared-catalog pin; four UI contract assertions still expect `3.2.2`, so their passing status is not inferred |
 | Code organization | Fixed module boundaries; strict Contracts→Server direction; CLI/MCP/UI depend only on Client; governance interfaces `internal` in Server (mechanical FR81a parity guarantee, NetArchTest-verifiable) | Platform convention |
 | Solution / release | `.slnx` format; Conventional Commits + semantic-release | Platform convention |
 
-**Note:** Module scaffolding should be the **first implementation story**. Adopting the Folders-style
-Contract Spine should be decided early — it underpins cross-surface parity (FR81a).
+**Note:** The checked-in OpenAPI 3.1 Contract Spine remains the sole HTTP wire-contract source; the typed Client is
+generated from it through `Client/nswag.json`, and generation/parity-oracle checks are mandatory. PRD operation IDs,
+surface exposure, MCP tags, AI allowlist, and owner mappings remain separate deny-by-default artifacts.
+
+The Dapr application SDK, CLI, sidecar runtime, .NET SDK, and container digest are independent version planes.
+Topology/recovery evidence records all resolved identities; none is implied by `net10.0` or a NuGet package. Current
+upstream patches reviewed on 2026-09-14 (`Dapr.Client 1.18.7`, runtime `1.18.4`, System.CommandLine `2.0.12`,
+xUnit `4.0.1`) do not authorize upgrades. `NuGetAudit=false` means this review is not a vulnerability disposition.
+Even an independently activated Epic 12 completion lane cannot satisfy A10 without the separate fresh exact-candidate
+controlled-loss and full-window/production-shaped operational evidence.
 
 ## Core Architectural Decisions
 
-### Decision Priority Analysis
+### Decision Rationale and Qualification Boundary
 
-**Critical decisions (block implementation) — now made:**
-- **D1 — Sibling integration & orchestration:** event-driven, with the minimum hosted Dapr Workflow correction binding owned by canonical Epic 2 before production correction claims; later operational work hardens telemetry, alerts, scale, and continuity (resolves open question #1).
-- **D2 — M0 association-proposal model:** deterministic candidate generation + evidence + human confirm/correct (resolves open question #2; confirms PRD M0 scope).
-- **D3 — FR81a placement:** a `CommandGateway` admission layer in front of EventStore's existing per-context pipeline (not a second pipeline).
-- **D4 — Audit model:** two-phase — pre-commit fail-closed gate + post-commit WORM reconciled-from-event-log.
-- **D5 — Internal decomposition:** modular monolith with hard, event-mediated seams.
-- **D6 — Derived-store modeling:** immutable decision snapshots (supersede-not-mutate) vs. fresh live mirrors (event-driven projections).
-- **D7 — Contract surface:** OpenAPI 3.1 Contract Spine, contract-first.
-- **D8 — Host-layer reuse (added 2026-06-09, delivered through Technical Enabler TE-1):** ChatBot is an EventStore **domain module** hosted on the `Hexalith.EventStore.DomainService` SDK; the FR81a CommandGateway admission layer mounts as the SDK's pre-commit admission hook (EventStore platform prerequisite TE-1.2); standalone module-owned `Aspire` and `ServiceDefaults` projects are retired; `AppHost` is retained only as the ADR-scoped local-development umbrella because the current platform composition API does not yet express ChatBot's dedicated Dapr resource topology (accepted ADR: [`docs/adrs/domainservice-sdk-host-adoption.md`](../../docs/adrs/domainservice-sdk-host-adoption.md), tracking: [`technical-enablers.md`](technical-enablers.md)).
+The decision map above resolves the two architectural forks: integrations are event-driven with a narrowly owned
+workflow coordinator, and M0 uses deterministic association proposals with human confirmation or correction. The
+selected target is `[ADOPTED]` architecture, not proof that an owner context implements or accepts the contract.
+Post-commit projections and checkpoints cannot substitute for D4 canonical-audit durability.
 
-**Important decisions (shape architecture):** correction-propagation orchestration (aggregate-owned lifecycle plus coordinator/activity seam and hosted Dapr Workflow production binding in canonical Epic 2); runtime control activation in canonical Epic 9 before canonical Epic 11 observability hardening; association scorer placement (Association module, deterministic-only in M0); WORM audit backing; M365/Graph adapter boundary; A9a gate semantics by milestone.
-
-**Deferred (post-M0, mostly M2):** vector/embedding cross-tenant store isolation (NFR9a); replay/simulation test-tenant isolation (FR95a); operational dashboards; learned/AI candidate ranking (M1). CLI/MCP adapters were planned for M1 and are implemented in Epic 5; outbound send and inbound authenticity were planned for M1 and are implemented in Epic 6.
+Runtime-control activation precedes observability hardening. Association scoring remains deterministic in M0, and
+correction coordination remains subordinate to aggregate lifecycle truth. Existing code, story status, compatible
+interfaces, or platform packages are evidence inputs only and do not waive the release gates.
 
 ### Data Architecture
 
 - **Write model (platform):** Hexalith.EventStore CQRS/ES — persist-then-publish, pure `Handle`/`Apply`,
   rejections-as-events, ULIDs, `{tenant}:{domain}:{aggregateId}`. ChatBot is a new EventStore domain
-  service; its aggregates/projections auto-discovered from `Hexalith.ChatBot.Server`.
+  service; its aggregates and projections are auto-discovered from `Hexalith.ChatBot.Server`.
 - **ChatBot owns derived state, split by mutability (D6):**
   - **Immutable decision snapshots** — candidate rankings, evidence snapshots, AI-action proposals,
     approval records, policy snapshots. Append-only, **superseded not mutated**. FR91a correction =
@@ -357,83 +408,202 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
     **Event-driven projections** off siblings' published events, keyed on `{tenant}:{domain}:{aggregateId}`,
     **idempotent + order-tolerant** (version-stamped, last-writer-wins by *source version*, not arrival
     order). **Rule: mirrors for display, live authorization for gates.**
-- **Derived-store backing:** ChatBot-owned DAPR state store (Redis), tenant-partitioned, via EventStore
+- **Derived-store backing:** ChatBot-owned Dapr state store (Redis), tenant-partitioned, via EventStore
   projections. Association routing, operation status, and the S1 project-conversation read model all
   use this ChatBot-owned store in the live topology. Vector/embedding/prompt-context remains planned via
   **Hexalith.Memories** (Redis Vector / FalkorDB) with store-layer tenant isolation (NFR9a) — M2.
-- **Association scorer:** deterministic-signals kernel (explicit project ID / mailbox routing rule /
-  thread ID) in the **Association** module, producing `[0,1]` confidence vs `T_high`/`T_low`. Deterministic
-  only in M0; learned signals enter M1 (addendum §Confidence Thresholds / §Risk Classifier).
-- **Idempotency — two altitudes:** coarse request-dedup at the CommandGateway + fine event-dedup at the
-  aggregate (EventStore idempotency cache); per-operation-class keys per addendum §Idempotency Keys.
+- **Physical isolation convention:** physical partition/namespace identity derives only from trusted server tenant
+  context. Tenant-qualified addressing applies to aggregate/state keys (`tenant:domain:aggregateId`, with encoded
+  segments), caches, opaque cursors, topics/subscriptions, queues/dead letters, search/vector collections, prompt-
+  context records, and operational projections. Owner contexts keep sovereign isolation. Use store-native partition/
+  ACL enforcement wherever supported; an application predicate is never the sole control. A provider unable to pass
+  native-store and API negative-isolation proof fails its first persistence/exposure gate.
+- **First-store gate:** each ChatBot-owned record class carries tenant, source provenance,
+  `derivationContractVersion`, redaction state, retention class, and schema version; classifier/model versions are
+  additional fields only where applicable. Before its first persistence, the class requires A6-approved retention,
+  legal hold, export/delete, backup propagation, erasure, and surviving-metadata controls plus native-store and API
+  negative isolation proof. M2 cannot retroactively legitimize M0/M1 storage. M2 adds vector/embedding/prompt-cache
+  proofs and recurring production probes.
+- **Association scorer:** `AssociationScorer` is independently versioned and uses only authorized explicit
+  Project IDs, mailbox-routing rules, and conversation/thread identifiers in M0. It emits a finite `[0,1]` score,
+  visible candidates, evidence references, version, and one typed reason. Defaults are `T_high=0.90` and
+  `T_low=0.60`; `T_low` ranks review only. Only a conflict-free result at or above `T_high` with required evidence
+  may auto-associate. Every other automatic outcome enters `NeedsReview`; errors/non-finite values expose no
+  candidates. `Deferred` and `Rejected` are authorized human decisions only.
+- **Idempotency and concurrency:** the addendum's per-operation identities and semantic equivalence rules are
+  binding. The durable identity, canonical equivalence, logical outcome, and conflict disposition co-commit with
+  the event and canonical audit for the governed record lifetime. Expected revision is independent; gateway
+  deduplication is only an optimization. Retry attempts use stable child identities under the original operation.
 - **Derived-state versioning & deterministic replay (cross-cutting #11):** event upcasting for evolving
   AI-proposal/projection shapes; projection schema version stamped in replay traces; *as-of* upstream
   resolution on rebuild (never re-query *current* Party/Folder data); consumer-driven contract tests
-  (Pact-style) against the 7 sibling contexts.
+  against the exact nine-context baseline in `source-manifest.md`.
+- **Identifier evolution:** `IdentityEvolved` is proposed, not accepted. Until each producer accepts versioned
+  schema, authority, ordering, replay/idempotency, rollout, reconciliation, and fallback, ChatBot preserves the
+  original audit IDs, rejects operations whose current identity cannot be resolved, and routes authorized review.
+  Any accepted migration adds immutable links and never rewrites history; acceptance, versions, and rollout evidence
+  are recorded in the source manifest and memlog before the binding is restored.
 
 ### Authentication & Security
 
-- **Identity (platform):** Keycloak OIDC; `tenantId` from authenticated claims only, never request body;
+- **Identity (platform):** Keycloak OIDC; `tenantId` from authenticated claims or trusted service-client context,
+  never untrusted API/CLI/MCP/request-body values;
   cross-tenant identifiers rejected even with valid credentials in another tenant.
 - **Authorization:** two-layer — API gate (claims/tenant/RBAC) + domain authorization inside the
   CommandGateway, before any aggregate load. Redacted denials that don't confirm resource existence.
-- **Tenant isolation:** by construction at every layer incl. derived stores, caches, vector indexes,
+- **Owner authority:** ChatBot roles do not create Tenants or Project authority. Every command/query resolves
+  the applicable closed owner-authority row rather than indiscriminately requiring every owner: current Tenants
+  `TenantOwner` plus an explicit ChatBot grant for admin operations; current Projects resource grant for Project
+  operations; explicit audit/compliance grant plus Project authority for unredacted item evidence; and exact
+  case-sensitive Keycloak/EventStore claims, originating-resource authority, and operation scope for machine actors.
+  Current
+  owner/gateway evidence governs revocation-sensitive mutations; claims-only local fallback and mirror-based
+  authorization are forbidden for pilot. Missing, stale, unavailable, malformed, or case-mismatched owner evidence
+  denies, and the most restrictive result wins. Ordinary identity/policy cache staleness is at most five minutes and
+  explicit revocation at most 60 seconds. Global-admin labels and tenant-wide operational visibility never confer
+  Project mutation or unredacted evidence access. Every tenant-admin dashboard read uses the auditable-attempt path;
+  there is no adapter-specific aggregation threshold. Every accepted admin mutation co-commits its canonical envelope.
+  A13 remains open until owners accept the complete mapping.
+- **Tenant isolation:** by construction at every layer, including derived stores, caches, vector indexes,
   projections, logs, error bodies, pagination cursors. M0 is single-tenant but **tenant-partitioned by
   construction** so M1's second tenant is additive, not a rewrite.
-- **Fail-closed invariant (NFR15a, D4):** enforced at a **single injectable audit-commit seam** every
-  state-writing path calls before persisting; new state-writing paths fail by omission if they skip it
-  (test parametrized from the same path enumeration the code uses). Only **pre-commit** paths fail closed.
+- **Fail-closed invariant (NFR15a, D4):** every durable write reaches the single atomic commit seam. Missing
+  tenant/authority/policy/approval/concurrency/idempotency/audit durability returns the normative typed failure and
+  writes no authoritative state. Post-commit projection lag is a separate availability state.
+- **Closed tenant policy:** `addendum.md` is the sole policy catalog. Unknown knobs and unsafe combinations reject
+  atomically and leave the prior snapshot active. An unset/invalid row takes only its declared safe default; a row
+  with no pre-approval default blocks its named operation. Row-specific mutators/approvers, separation of duty, schema
+  versions, migrations, and audit are binding. Accepted policy versions co-commit canonical envelopes; rejected attempts
+  write no policy/domain/idempotency state and use the auditable-attempt path. Schema drift, dependencies, and unsafe
+  combinations are tested at every increment gate. `safety.controls` changes only through
+  `ApplySafetyControl`/`ReleaseSafetyControl`; service clients and AI actors cannot mutate policy. A6-dependent
+  region/retention/AI-context rows have no pre-approval default and block applicable persistence or invocation.
+- **Auditable-attempt availability:** denials, restricted reads, service-client failures, every tenant-admin dashboard
+  read, rejected policy changes, and classifier failures require the durable auditable-attempt path. If unavailable,
+  the command/query returns redacted `AuditUnavailable`, returns no protected data, writes no domain/idempotency state,
+  raises the Operations/Security audit-readiness incident signal, and remains incomplete; telemetry cannot substitute.
+- **M0 governance bootstrap:** two distinct current Tenants `TenantOwner` principals use
+  `GrantChatBotAdminRole`, `UpdateTenantPolicy`, and `GrantServiceClientPermission` under the target A13-pending
+  mapping. Tenant ownership does not itself confer a ChatBot grant: first admin, each policy row, and service grants
+  retain their distinct current initiator/independent approver, separation-of-duty, and named Security/A5/A6/schema/
+  owner conditions. A rejected, stale, unavailable, malformed, or scope-conflicting approval creates no version.
+  Direct database/state seeding is forbidden; absence of an accepted bootstrap path blocks M0 rather than permitting
+  a workaround. M0 admin is provisioning automation only; the broad role/policy editor begins at M1.
+- **M0 service clients:** bootstrap permits only `mailbox-ingestion-client` (one tenant/mailbox pattern, 90-day
+  auto-rotated credential), `audit-projection-client` (tenant-scoped event-read/projection-write, 90 days),
+  `background-retry-client` (tenant-scoped retry/status only, 30 days), and `ai-action-mediator-client` (one
+  requester/Project/proposal/approval/allowlisted command, expires on use/revocation/5 minutes). Machine identities
+  never inherit UI roles, and every grant/action carries its exact principal, tenant, scope, expiry, and audit facts.
+- **Mailbox authenticity and outbound authority:** the M0 adapter records provider DMARC/DKIM/SPF verdicts,
+  discrepancies in `Received`, `Authentication-Results`, `From`, `Reply-To`, `Sender`, and `X-Original-Sender`,
+  delegated sender/principal evidence, and `external_sender`. The closed policy is
+  `strict|paranoid`; MVP has no permissive mode. M1 outbound authority is exactly `draft-only`,
+  `authenticated-user send`, `shared-mailbox send`, `send-on-behalf`, or `approved service-send`; membership,
+  delegation, policy, Project authority, and approval are revalidated at execution. Typed mismatch outcomes are
+  `policy-blocked`, `delegation-mismatch`, `membership-revoked`, and `approval-missing`; no service send occurs
+  without its linked, current `Approved` proposal.
 - **Redaction:** a **swappable policy stage** (trim-safe to a coarse default), applied consistently across
   UI/CLI/MCP/export.
 
 ### API & Communication Patterns
 
-- **FR81a CommandGateway (D3) — the keystone:** a `CommandGateway` admission layer in `Hexalith.ChatBot.Server`
-  runs `auth → tenant-bind → authorize → risk-classify → approval-gate → coarse-idempotency → pre-commit-audit`,
-  then dispatches into EventStore's existing write path (`fine-idempotency → execute → publish → projection`)
-  and emits post-commit audit. **It is NOT a second command pipeline.**
+- **FR81a CommandGateway (D3) — the keystone:** every state-mutating UI, CLI, MCP, service-client, AI-actor,
+  worker, and mailbox operation enters one `CommandGateway`/EventStore spine:
+  `authenticate → tenant-bind → apply the applicable authorization row → perform action-risk classification →
+  validate approval → validate stable operation identity → validate expected revision or an A13-approved owner guard →
+  construct canonical envelope → atomically commit
+  event + terminal idempotency + policy/approval refs + envelope → publish/project`. It is not a second EventStore
+  pipeline, no origin may omit or duplicate a stage, and a failure before the atomic commit writes nothing.
 - **Parity by construction:** surface adapters (UI/CLI/MCP) depend only on `Hexalith.ChatBot.Client` and
-  construct only a typed `IChatBotCommand`; `IRiskClassifier`/`IApprovalGate`/`IAuditWriter` are `internal`
+  construct only a typed `IChatBotCommand`; equivalent input produces the same canonical semantic command payload and
+  identity tuple. Origin is attached immutably at the adapter boundary as the sole surface-specific envelope field;
+  the conformance oracle compares the semantic tuple and separately asserts expected origin, never byte-compares
+  origin-bearing envelopes. Authorization/state/reason/redaction/idempotency/audit
+  outcomes are equivalent. CLI/MCP cannot access databases, actors, queues, mailbox/index/tenant stores, or projections
+  directly. `IRiskClassifier`/`IApprovalGate`/`IAuditWriter` are `internal`
   to `.Server` (stage-replication = compile error). Enforced by a **NetArchTest** + a **differential-conformance
   harness** over surface-agnostic semantic intents (event-sequence + state-store end-state equivalence across
   UI/CLI/MCP; include rejection + retry intents). M0 started with thin CLI/MCP test shims; Epic 5 replaces that
   proof with production CLI and MCP adapter-backed conformance arms plus the UI/API client seam.
-- **Sibling integration & orchestration (D1):** writes to siblings go through their EventStore commands
-  (they own the aggregates); ChatBot maintains derived state from siblings' published events; multi-step
-  cross-context operations use coordinator/activity seams now and bind to Dapr Workflow before production saga
-  claims; synchronous invocation reserved for trivial single in-tenant writes.
+- **Sibling integration & orchestration (D1):** ChatBot invokes only owner-accepted public commands and consumes
+  published owner events; it never invents a producer target or dual-writes owner state. Multi-context work uses
+  coordinator/activity seams. The current Conversations append is a mapped target, not an executable guarantee,
+  and remains blocked by A13.
+- **Durable cross-context choreography:** a ChatBot aggregate atomically records orchestration intent/status and
+  dispatch eligibility. An idempotent worker submits the accepted owner command with the same `operation_id`, actor
+  authority, expected owner revision, policy/approval/evidence references, origin, and correlation. The owner aggregate
+  alone commits its effect and canonical envelope. The persisted owner event and committed revision are authoritative;
+  a synchronous response advances only when the accepted mapping proves it represents that same committed effect.
+  Response and event normalize to one coordinator-command identity derived from owner context, aggregate/effect
+  identity, and committed owner revision; duplicates replay the stored outcome, and each A13 mapping names its authority
+  signal and identity formula. A committed owner effect is reconciled through delivery/projection recovery and never retried as an
+  uncommitted ChatBot effect. No distributed dual-write is permitted, and every mapping remains A13-gated.
 - **Contract Spine (D7):** OpenAPI 3.1 spec is the single contract source → generated client + parity-oracle
-  rows + idempotency helpers (Folders pattern). Problem responses metadata-only (RFC 9457).
-- **Two-phase audit (D4):** *pre-commit* audit (intent/risk/approval) = fail-closed gateway gate; *post-commit*
-  WORM hash-chain audit (NFR49a) = **fail-open-then-reconcile** (event log is source of truth; chain rebuilt
-  from it on recovery — cannot block-the-commit AND derive-the-chain on the same write). Completeness (NFR50a)
-  = reconstructability, verified by a scheduled production assertion that rebuilds state and diffs the projection.
+  rows + idempotency helpers (Folders pattern). The PRD §Command and Query Contracts is the sole stable public-ID
+  catalog; ChatBot entry commands, surface exposure, MCP tags, AI allowlist members, and owner executable targets
+  are separate mappings. Every mutation carries actor, tenant, correlation, stable operation identity, target IDs,
+  expected revision/accepted owner guard, result codes, policy/approval references, and canonical audit metadata.
+  Queries apply the same tenant/role filters with no admin/debug bypass. Problem responses are metadata-only
+  (RFC 9457). Contract evolution is additive/backward-compatible by default; a breaking API/event/state change needs
+  an explicit version, deprecation window, compatibility handling, and migration.
+- **Atomic audit (D4):** the required A13-gated actor-dispatched aggregate target assigns predecessor/sequence and co-commits
+  the canonical hash-linked mutation envelope. Signed per-tenant checkpoints anchor aggregate-stream heads.
+  Audit/investigation projections, notifications, and UI views are post-commit consumers and may lag; none repairs
+  a missing envelope. `IProjectionActivationOutbox` is projection-only and cannot implement FR81a. The current
+  EventStore can conditionally co-commit an aggregate-local event batch but not the full terminal-idempotency/audit
+  unit. Before M0, A13 requires owner acceptance, supported-write-path ACLs, provider ETag/first-write fencing, and
+  concurrent-write, duplicate-predecessor, fork, reorder, checkpoint-rebuild, and recovery tests.
 - **Surfaces:** EventStore command/query + REST; CLI (M1); MCP server (M1, shared-catalog-pinned
   ModelContextProtocol 2.2.0 with stdio transport in the current implementation);
   SignalR projection-nudge (re-query on nudge, never trust payload).
+- **Long-running response boundary:** return operation identity and current status within five seconds p95. Never hold
+  a request beyond 30 seconds without a retrievable status containing retry count, partial-output marker, terminal
+  reason, next safe action, and correlation.
+
+### Canonical Lifecycle, Identity, and Retry
+
+- The PRD `Shared Workflow Contract` is the sole state/transition authority. The association family uses
+  `Received`, `Associated`, `Rejected`, `Deferred`, `NeedsReview`, `Failed`, `Skipped`, `Correcting`,
+  `Correction-delayed`, and `Corrected` exactly as defined there. Other workflow-specific states—participant,
+  attachment, task intent, AI action, chat, command, projection, governance, data-subject, and notification—remain
+  in their own closed families and must not be collapsed into the association enum.
+- The normative family row—not the verb in a command name—decides whether recovery is an in-place transition,
+  immutable version successor, linked workflow successor, linked attempt, or stored-outcome replay. Terminal and
+  reopen rules remain family-specific. Invalid transitions deterministically reject and use the auditable-attempt path.
+  Replaying an operation returns its recorded outcome; semantic drift returns the typed identity/revision conflict.
+- Retry Profile `v1` in `addendum.md` is the executable registry. Automatic-retry counts exclude the initial
+  attempt; backoff is exponential with full jitter. A deployment may reduce retries or make a reason terminal,
+  but the baseline and every stricter tenant/deployment profile still require System Architect and Test Architect
+  approval before first gate use. Raising a maximum or making a terminal reason retryable requires a new version and
+  fresh approval; architecture/addendum finality is not qualification. Each retry audit records the profile version;
+  retry state and canonical envelope co-commit; dead-letter routing is projection only and never authorizes another
+  attempt. Every exhausted item exposes typed reason, attempt count, next safe action, owner, and predecessor/successor IDs.
+- Approval, policy, admin-role, service-client, safety-control, and queue decisions use zero automatic retries.
+  Transport uncertainty resubmits the same `operation_id` only to retrieve the logical outcome. Unknown external
+  effects, committed effects, stale approval/revision, and terminal reasons are never blindly retried.
 
 ### Frontend Architecture
 
 - **Stack (platform):** Blazor + Fluent UI v5 (RC, via FrontComposer); Fluxor state; contract-first
   FrontComposer annotations; REST commands/queries + SignalR nudge.
 - **M0 surfaces (NFR60 scope):** S1 project conversation view, S2 ambiguous association review, S3 AI action
-  approval. The **conversation view is a read projection a future chat surface can write into via the same
-  CommandGateway** — chat becomes a new surface on the spine, not a new subsystem.
+  approval. The **conversation view is a read projection**. A future chat surface writes through the same
+  CommandGateway, making chat a new surface on the spine rather than a new subsystem.
 - **Governed chat surface (canonical Epic 13; originally delivered through legacy Epic 10):** the interactive composer is now in
   scope as that governed write surface. Every message is **admitted through CommandGateway**; a risky request
-  becomes an Epic 4 AI-action proposal (approval-required), never a direct execution. This is **not a
-  fake/freeform textbox that bypasses governance** — the original "no fake chat textbox" rule is preserved in
-  its intent: no ungoverned write path. The composer reuses the M0 allowlisted `Project.AppendConversationMessage`.
+  becomes an Epic 4 AI-action proposal (approval-required), never a direct execution. This is **not an ungoverned
+  free-form text box**. It preserves the original rule: no ungoverned write path. The composer reuses the M0
+  allowlisted `Project.AppendConversationMessage`.
 - **FrontComposer Shell adoption (canonical Story 13.1; legacy Story 10.1):** `Hexalith.ChatBot.UI` composes through the
   `FrontComposerShell` (`AddHexalithFrontComposerQuickstart()` → `AddHexalithDomain<TMarker>()`), consuming the
-  `Hexalith.FrontComposer` submodule read-only. This closes the Story 1.14 deferral (it shipped a temporary
-  token-alias bridge "until the shell wrapper lands"). FluentUI v5 is pinned identically in both repos
-  (`5.0.0-rc.3-26138.1`), so adoption is version-churn-free.
+  `Hexalith.FrontComposer` submodule read-only. Story 1.14 shipped a temporary token-alias bridge "until the shell
+  wrapper lands." This shell adoption closes that deferral. Fluent UI v5 is pinned identically in both repositories
+  (`5.0.0-rc.5-26219.1`), so adoption does not require a local version override.
 - **ChatBot UI Fluent-only conformance (canonical Epic 13; legacy Epic 12):** mirroring
   FrontComposer's project-wide rule, every `Hexalith.ChatBot.UI` `.razor` page/component must use FrontComposer
   or Fluent UI v5 components (Microsoft Fluent V2) — **never raw `<button>/<input>/<select>/<textarea>`** (raw
-  `<a>` nav links allowed). In Fluent v5 a raw control is never upgraded → it renders unstyled and drops the
-  NFR60–NFR64 accessibility affordances. Hand-authored CSS must not recreate primitives a Fluent component provides
+  `<a>` nav links allowed). Fluent v5 does not upgrade raw controls, so they render unstyled and lack the NFR60–NFR64
+  accessibility affordances. Hand-authored CSS must not recreate primitives a Fluent component provides
   (button styling, heading type-ramp, foreground role) nor use legacy v4/FAST tokens (`--type-ramp-*`,
   `--neutral-*`, `--accent-*`, `--palette-*`, `--design-unit`); custom CSS is permitted only for layout the
   design system does not own. **Enforced by `ChatBotFluentConformanceTests`** (Governance trait), mirroring
@@ -451,7 +621,11 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
   channel as the default. Canonical Story 13.2 owns the implemented ChatBot-owned,
   tenant-grouped, metadata-only SignalR hub at `/hubs/chatbot/project-conversation-changes`, enabled by
   `ChatBot:ProjectionChangeNotifications:Enabled=true`. The hub sends only an advisory tenant-scoped change signal;
-  the UI re-queries the typed project-conversation read model before rendering progress or terminal Stop/Cancel state.
+  it uses FrontComposer's wire-compatible `ProjectionChangedDetail` shape (`projectionType`, tenant, conversation
+  `groupScope`, bounded operation/source-version/correlation metadata). The UI re-queries the typed project-conversation
+  read model for authoritative attempt, sequence, state, attribution, provenance, partial marker, terminal reason, and
+  Stop/Cancel state. Partial output is visibly partial and never a committed Project message; stop/cancel/completion use
+  expected revision and first-commit-wins, and retry creates one immutable linked attempt rather than resuming output.
   This pivot was chosen after the EventStore projection relay proved unsuitable for the live ChatBot topology: the
   EventStore relay is signal-only and the ChatBot Dapr topology uses `chatbot-pubsub`, not the relay's `pubsub`
   component. The decision must not weaken the "never trust payload" or fail-closed posture.
@@ -459,28 +633,67 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 
 ### Infrastructure & Deployment
 
-- **Composition (platform/local shim):** .NET Aspire 13.4.6 local AppHost shim; DAPR components (`statestore` for EventStore
+- **Composition (platform/local shim):** .NET Aspire 13.5.3 local AppHost shim; Dapr components (`statestore` for EventStore
   actor/status/archive/checkpoint state, `chatbot-statestore` for ChatBot read models and coarse idempotency,
   `chatbot-pubsub` for Redis pub/sub, plus the ChatBot workflow state store for hosted saga coordination);
   production deny-by-default `accesscontrol.yaml`; local mTLS-off `accesscontrol.local.yaml`; canonical Story 2.9 binds
   correction propagation to hosted Dapr Workflow in the live topology while preserving EventStore as lifecycle truth.
-- **WORM audit backing:** append-only store with hash-chained envelopes per tenant; redaction via
-  key-destruction with the redaction key in a **separate KMS** (resolves WORM-vs-GDPR-erasure, cross-cutting
-  #13); nightly chain verification.
+- **Runtime controls and workload fairness (D13):** one durable, versioned current control/rate-limit projection is the
+  admission source for service clients, AI actors, command capabilities, mailbox sources, and outbound channels; gateway
+  and workers consume the same view. Stale/unavailable/malformed/unknown control fails closed, with no production
+  `AlwaysActive`/`AlwaysUnlimited` fallback. Work partitions by tenant then mailbox/Project/workflow and uses weighted
+  deficit round robin plus policy quotas/circuit breakers. Bounded renewable leases return expired work safely; poison
+  items enter the tenant-partitioned Retry Profile dead letter without starving other partitions. One
+  `OperationsControlWorker`, owned by `operations-admin`, performs periodic enforcement/notification/escalation and
+  publishes tenant-safe dependency health, control freshness, retry/dead-letter, queue-age, and audit-lag state. Missing
+  live sources report `unmeasurable|unsupported`; numeric thresholds remain A11-qualified and protected state A6-qualified.
+- **Canonical audit topology:** hash-linked envelopes live in the same aggregate command stream and atomic batch as
+  the mutation/idempotency/policy/approval facts. A separate signed per-tenant checkpoint anchors aggregate heads;
+  investigation projections or archival stores remain rebuildable derivatives. Key custody, retention, erasure,
+  backup propagation, and surviving metadata are target concerns under open A6, not proven implementation choices.
 - **Correction propagation (FR91a):** the aggregate owns the `correcting`/`current` lifecycle
   (`Apply(CorrectionStarted)`/`Apply(CorrectionCompleted)`). Hosted Dapr Workflow coordinates start,
   acknowledge, complete, delay, and vector-reindex activities through existing EventStore writer/activity seams.
   Reads during correction check the aggregate flag and block or serve `stale=true`;
   `ReindexVectors(tenantId, correctionId, sourceVersion)` remains an M2 activity and must be idempotent +
-  version-guarded.
-- **Deploy / recovery:** SDK-container images; Aspire 13.4 K8s/AKS + Helm (M2); RPO ≤ 15 min / RTO ≤ 4 hr
-  provisional per A10. The Story 12.15 hosted bundle authenticates the live safety lane; DW-52's separate controlled-loss channel is mechanism-ready and locally verified but has no cited hosted artifact, while the 180-second ceiling still prevents 4-hour RTO ratification. Replay/simulation runs against an isolated test tenant (FR95a, M2).
-- **Observability:** OpenTelemetry; structured emission always-on (dashboards trim-able, emission is not);
-  published SLOs (M2).
+  version-guarded. Required acknowledgements cover candidate ranking, evidence snapshot, consumed AI proposals,
+  operational queues, and M2 vector entries. Propagation p95 is `<=10 minutes` in M0/M1 and `<=60 minutes` in M2;
+  a missed store SLO emits `Correction-delayed`, exposes owner/next safe action, and triggers P2.
+- **Deploy / recovery:** SDK-container images; Aspire K8s/AKS + Helm is M2 target scope. A10 remains provisional:
+  the accepted Epic 12 contract is `activation: pending`; its diagnostic and completion artifacts have no A10
+  authority. Provisional targets are RPO `<=15 minutes` and RTO `<=4 hours` for source email records, attachments,
+  approvals, commands, policy snapshots, and audit records, plus projection rebuild `<=4 hours` from immutable sources
+  without mailbox re-ingestion. The 2026-08-27 hosted bundle expired on 2026-09-04 under the current eight-day policy,
+  predates the controlled-loss job, lacks its RPO evidence, and has only a 180-second ceiling. M2 requires a separate
+  fresh hosted four-job controlled-loss bundle bound to exact candidate, evidence-policy version, locator, producer,
+  timestamps/freshness, persisted loss bounds, RTO duration, cleanup, independent validation, and stable failure reason,
+  plus an RTO-capable full-window or retained production-shaped drill.
+- **Replay isolation:** M2 uses a replay-only composition root with no production credentials/locators, replaces
+  mail/model/tool/command/file/state/queue/outbound adapters, denies undeclared egress, stamps `replay_run_id`,
+  and excludes replay from production audit completeness. A separate gate-owned read-only verifier captures a
+  `ReplayInvarianceManifest v1` before replay and after termination; the candidate enumerates every protected production
+  store/resource ledger, and each row binds candidate, opaque resource ID, provider revision/snapshot token, and SHA-256
+  canonical metadata/state digest. Volatile timestamp/telemetry/lease fields form an explicit versioned exclusion list.
+  Replay starts only after a complete pre-manifest and passes only on exact inventory/row equality; missing, unreadable,
+  added, or changed resources fail. A composition, egress, verifier, or invariance failure is a stop-ship condition.
+- **Observability and A11:** OpenTelemetry emission is always on. The addendum's metric targets are normative
+  planning values and drift-tested against the code catalog, but are not supported/publishable SLOs until each exact
+  M2 candidate has stable metric name, numeric target/unit, window, error budget, alert threshold, timestamped
+  calibration source, tenant scope, live signal/provenance, accountable route/receiver, and passing burn-test result/
+  date/immutable locator. The qualification table pairs one-to-one by metric name. Missing, stale, failing,
+  unverifiable, or mismatched data yields `unsupported`; dashboards expose
+  `within-budget|approaching|exhausted|unsupported`. A11 also requires the 2–4 week pilot baseline, SM8-SM14/SM16
+  recalibration, and the frozen SM-C5 supported-request mix; all current rows remain unsupported with no candidate.
 
 ### Host-Layer Reuse (D8 — Technical Enabler TE-1)
 
-- **Decision:** ChatBot is an EventStore **domain module** hosted on the `Hexalith.EventStore.DomainService` SDK. Target state: ~2-line host (`AddEventStoreDomainService()` + admission-chain registration, `UseEventStoreDomainService()`); queries as `IDomainQueryHandler`; projections as `IDomainProjectionHandler`; read models on `IReadModelStore` + `ReadModelWritePolicy`; cursors via `IQueryCursorCodec`/`QueryCursorScope`; telemetry/health via `AddEventStoreDomainTelemetry`/`AddEventStoreDomainStateStoreHealthCheck`; composition via `AddEventStoreDomainModule(...)` from the platform AppHost (as `tenants`/`sample` are composed today).
+- **Decision:** ChatBot is an EventStore **domain module** hosted on the `Hexalith.EventStore.DomainService` SDK. The
+  target state uses an approximately two-line host: `AddEventStoreDomainService()` plus admission-chain registration,
+  followed by `UseEventStoreDomainService()`. Use `IDomainQueryHandler` for queries, `IDomainProjectionHandler` for
+  projections, `IReadModelStore` with `ReadModelWritePolicy` for read models, and `IQueryCursorCodec` with
+  `QueryCursorScope` for cursors. Use `AddEventStoreDomainTelemetry` and
+  `AddEventStoreDomainStateStoreHealthCheck` for telemetry and health. Compose the module from the platform AppHost by
+  using `AddEventStoreDomainModule(...)`, as `tenants` and `sample` are composed today.
 - **FR81a preserved:** the CommandGateway admission layer mounts as the SDK's **pre-commit admission hook** (EventStore platform prerequisite TE-1.2) — same stage order, same `internal` governance interfaces, same "NOT a second pipeline" invariant, now enforced at the platform seam.
 - **Implementation state after TE-1:** `Program.cs` uses the SDK host shape (`AddEventStoreDomainService(...)`, admission-stage registration, `UseEventStoreDomainService()`), public compatibility routes live outside `Program.cs`, custom `/process` plumbing is removed, queries/projections/read models/cursors/telemetry/health use SDK contracts, and standalone ChatBot `.Aspire`/`.ServiceDefaults` projects are retired.
 - **Retained exception:** `src/Hexalith.ChatBot.AppHost` remains as a thin local-development umbrella for EventStore, Tenants, ChatBot Server, ChatBot UI, Keycloak, and Dapr sidecars. Its internal Dapr wiring preserves `chatbot-statestore`, `chatbot-workflow-statestore`, and `chatbot-pubsub` because the current `AddEventStoreDomainModule(...)` API does not yet model those dedicated resources. This is not a production domain-hosting bypass.
@@ -490,8 +703,8 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 
 ### Internal Decomposition (modular monolith — D5)
 
-One deployable ChatBot service, hard internal seams by derived-state lifecycle, separate assemblies,
-events-only across seams (extraction-ready if M2 scale demands):
+ChatBot is one deployable service with hard internal seams organized by derived-state lifecycle, separate assemblies,
+and event-only communication across seams (extraction-ready if M2 scale demands):
 - **Association** — candidate generation, deterministic scoring, evidence snapshots, association lifecycle.
 - **Governance/Mediation** — risk classifier (tag+heuristic, no AI dependency), six risky action classes,
   AI-action proposals, approval records, command allowlist.
@@ -503,33 +716,71 @@ Seam test: *owns an aggregate with its own invariants, or just a folder?*
 
 ### Governed AI Mediation
 
-- **Risk classifier:** tag+heuristic (no AI-service dependency → approval gate survives AI outage, NFR22);
-  six risky action classes; fail-closed to approval-required on indeterminate.
+- **Task intent:** `TaskIntentDetector` is versioned independently from association and risk. It returns exactly
+  `informational|request-information|request-action|request-decision` plus confidence, evidence offsets, and version;
+  `actionable` is a derived grouping. Missing/invalid/unqualified artifacts return `detector-unavailable`, require
+  authorized review, and do not invoke the risk classifier. Its separate A9a partitions must reach precision/recall
+  `>=80%/75%` at M0 and `>=90%/85%` at M1.
+- **Risk classifier:** `ActionRiskClassifier` is a versioned categorical tag/heuristic contract with
+  `low-risk|approval-required`; `denied|unsupported` occur before classification. State mutation, file exposure,
+  outbound send, task creation/assignment, external-tool invocation, and acting on behalf of a participant are
+  structurally non-downgradable. Only product-declared read-only/no-external-effect subtypes can be low risk.
+  With a valid artifact, missing tags, unknown effect surface, or undeclared authority deterministically produces the
+  valid `approval-required` class. A missing, invalid, unqualified, failed, or non-contract artifact/output returns
+  `classifier-unavailable`, writes no proposal/domain/idempotency state, and uses the mandatory auditable-attempt path.
+  Optional M1 explanations cannot alter the result. Each reviewer disagreement or reclassification records the
+  classifier version, input tuple, original class, reviewer or product decision, and resolution; quality limits are
+  `<=1%` evaluation misclassification and `<=2%` sampled-production disagreement, independent of audit completeness.
 - **Execution:** approved actions execute only through allowlisted EventStore commands (M0 allowlist =
-  `Project.AppendConversationMessage`). The current M0 ChatBot adapter prepares metadata-only append results
-  before EventStore submission; it is not yet a durable sibling `Hexalith.Conversations` write binding.
-- **A9a gate semantics by milestone:** *directional* gate at M0 (n≈100 positives → ±~6pt CI), *binding +
-  CI-aware* at M1 (require lower confidence bound to clear). Budget inter-annotator-agreement / label-quality,
-  a frozen held-out partition, and dataset versioning.
+  `Project.AppendConversationMessage`). This is a stable product ID mapping to Conversations
+  `AppendMessageCommand` v1 / `MessageAppended`, not a Project-owned or currently executable guarantee.
+  Conversations owns the append and conversation-to-Project assignment. A13 blocks the mapping until producer,
+  authority, atomic-audit, concurrency, and lifetime duplicate evidence is owner-accepted and contract-tested.
+- **Allowlists:** the public operation catalog, per-surface exposure, MCP tags, AI allowlist, and owner targets are
+  distinct deny-by-default artifacts. M0 AI membership is exactly `Project.AppendConversationMessage`; M1 adds
+  exactly `ChatBot.ExecuteLowRiskAssistance`. Outbound sends, identity/role/policy/allowlist mutation, grants,
+  administration, destructive file operations, and unrestricted downstream commands are never AI-invocable.
+  Versions are immutable; tenants may pin or disable only and cannot add members or weaken approval. M0 membership
+  change requires PRD + memlog + dataset revalidation; M1 requires Security sign-off; M2 additionally requires the A9a
+  command-coverage run.
+- **A9a qualification:** separate versioned partitions cover association, task intent, and action risk, with at
+  least 500 messages at M0, 2,000 at M1, and 20 new adversarial examples per cycle. Association release evidence
+  targets 95% precision, 90% recall, and zero critical unauthorized false positives. A9a does not close A11.
 
-### Decision Impact Analysis
+### Implementation Sequence and Integration Flow
 
-**Implementation sequence (architecture-level; respects M0→M1→M2):**
-1. Module scaffold + EventStore submodule + Aspire AppHost (first story).
-2. Contract Spine skeleton + typed Client + `IChatBotCommand`.
-3. CommandGateway with all 9 stage seams (risk/approval stubbed; tenant-partition, fail-closed gate,
-   pre-commit audit, idempotency **real**) + NetArchTest + differential-conformance harness.
-4. Association module (deterministic scorer, candidate generation, lifecycle) + S2 review UI.
-5. WORM audit store + post-commit reconcile + completeness assertion.
-6. Governed AI mediation (classifier, proposal, approval gate, one allowlisted command) + S1/S3 UI.
-7. Event-driven projections/mirrors + correction propagation (Workflow + aggregate lifecycle).
+**Remediation and qualification sequence (architecture-level; respects M0→M1→M2):**
+1. Keep the Contract Spine and typed Client aligned to the complete PRD operation/query catalog and family state models.
+2. Establish the one supported atomic EventStore write path and A13 ownership for event + terminal idempotency +
+   policy/approval references + canonical hash-linked envelope; prove ACL/fencing/fork/reorder/rebuild behavior.
+3. Implement command-created M0 governance bootstrap with real deterministic classification, approval, policy,
+   service-client, and admin-role controls; no pilot-eligible stubs or direct seeding.
+4. Close A6 before applicable record persistence and A5 before live AI invocation; preserve non-AI workflows during
+   provider outage.
+5. Accept and prove the Conversations append/assignment and owner-authority mappings under A13, then qualify the
+   M0 vertical loop and first-store isolation without inferring readiness from local metadata preparation.
+6. Extend the singular parity set and full M1 governance only after M0 passes; run exact lifecycle/retry/authorization/
+   audit conformance across all surface origins.
+7. Activate and independently verify the recovery-evidence architecture, then close A10/A11 with fresh exact-
+   candidate operational evidence before any M2 production/release-candidate claim.
 
 **Cross-component dependencies:** the CommandGateway is the spine everything routes through; the Contract
 Spine constrains all three surfaces; event-driven projections depend on sibling event contracts (Pact tests);
 correction propagation spans Association + Lifecycle/Workflow + Projection + Audit; the **safety floor**
 (tenant isolation, authorization, fail-closed gate, audit-of-the-command, the gateway spine) must not ride
-inside any trim-able stage (redaction depth, approval-policy richness, dashboards) — a dependency map must
+inside any trimmable stage (redaction depth, approval-policy richness, dashboards) — a dependency map must
 prove this.
+
+**Integration flow:** adapters submit typed commands through the gateway to the A13-gated EventStore actor target;
+the atomic event/idempotency/policy/audit commit then feeds publications, projections, coordinator activities, and
+metadata-only SignalR nudges followed by authorized re-query. Keycloak supplies OIDC identity; M365/Exchange Graph,
+AI providers, sibling contexts, and the M2 Memories capability remain behind ChatBot-owned adapters.
+
+**Target M0 vertical path (gate-blocked):** mailbox intake → deterministic association evidence → S2 human confirm →
+gateway command → Folders attachment reference → project-conversation projection → governed S3 AI-action approval →
+`Project.AppendConversationMessage` mapping → A13-approved Conversations execution → atomic commit → projection →
+SignalR nudge → authorized UI re-query. Metadata-only command preparation is not owner execution; A5, A6, and A13
+must close before this path supports the M0 permitted claim.
 
 ## Implementation Patterns & Consistency Rules
 
@@ -554,15 +805,15 @@ type per file; `I`-prefixed interfaces; `_camelCase` private fields; `Async` suf
 - Aggregates/projections/state live in `Hexalith.ChatBot.Server` **only** (the only scanned assembly).
 
 **[ChatBot] Identifiers & resources:** ULIDs for `messageId`/`correlationId`/`aggregateId`/`causationId`
-(`Ulid.TryParse`, never `Guid`); EventStore identity `{tenant}:chatbot:{aggregateId}`; DAPR AppId `chatbot`,
+(`Ulid.TryParse`, never `Guid`); EventStore identity `{tenant}:chatbot:{aggregateId}`; Dapr app ID `chatbot`,
 EventStore actor/status store `statestore`, ChatBot derived state store `chatbot-statestore`, pub/sub component
 `chatbot-pubsub`, topic `chatbot.events`, deadletter `deadletter.chatbot.events`; kebab-case for
 convention-derived resource names.
 
-**[ChatBot] Lifecycle-state vocabulary (exact strings — shared across UI/CLI/MCP/audit):**
-`Received | Proposed | Associated | Rejected | Deferred | NeedsReview | Failed | Skipped | Corrected`
-+ sub-states `Correcting | Correction-delayed`. Status enums are stable strings (`healthy|degraded|failed|
-unknown`), never derived from counts. Agents must use these names verbatim — no synonyms.
+**[ChatBot] Lifecycle vocabulary:** state enums are family-specific and come from the PRD Shared Workflow
+Contract. Association uses exactly `Received | Associated | Rejected | Deferred | NeedsReview | Failed | Skipped |
+Corrected`, with `Correcting | Correction-delayed` sub-states. Other families retain their own closed enums;
+builders must not create a universal workflow enum or synonyms. Health and evidence states are separate vocabularies.
 
 ### Structure Patterns
 
@@ -577,7 +828,7 @@ broad type buckets. Cross-seam communication is events-only; no cross-module met
 internals. Governance interfaces (`IRiskClassifier`, `IApprovalGate`, `IAuditWriter`, `IIdempotencyStore`)
 are `internal` to `.Server`.
 
-**[ChatBot] Sibling integration:** every sibling client wrapped behind a ChatBot-owned adapter
+**[ChatBot] Sibling integration:** every sibling client is wrapped behind a ChatBot-owned adapter
 (`IProjectDirectory` over Projects, `IParticipantDirectory` over Parties, `IFolderStore` over Folders,
 `IConversationWriter` over Conversations). **Never call a sibling client from aggregate `Handle` logic.**
 Store stable IDs (`ProjectId`/`PartyId`/`FolderId`/`ConversationId`) in events — **never upstream PII**.
@@ -585,79 +836,65 @@ Store stable IDs (`ProjectId`/`PartyId`/`FolderId`/`ConversationId`) in events �
 ### Format Patterns
 
 **[ChatBot] Problem/error responses (Folders pattern, RFC 9457, metadata-only):** `{ category, code, message,
-correlationId, taskId?, retryable, clientAction, details.visibility }`. User-safe text drawn from a **versioned
+correlationId, taskId?, retryable, clientAction, details.visibility }`. User-safe text is drawn from a **versioned
 message catalog** (FR77): stable code + headline ≤80 chars + one-sentence reason that names no unauthorized
 project/file/party/audit detail. **Raw error text leaking to a user = release-blocking defect (NFR40).**
 
 **[ChatBot] Derived-record shape (every derived class):** carries `tenantId`, `sourceProvenance`,
-`derivationKernelVersion`, `redactionState`, `retentionClass`, `schemaVersion`. Decision snapshots are
+`derivationContractVersion`, `redactionState`, `retentionClass`, `schemaVersion`; scorer/detector/classifier or
+model version is added where applicable. Decision snapshots are
 append-only + superseded (never mutated); live mirrors are version-stamped projections.
 
 **[ChatBot] Evidence & confidence capture (cross-cutting #12 — every proposal/candidate):** `confidenceScore`
 ∈ `[0,1]`, `thresholdBand` (`auto|ambiguous|fail-closed`), `evidenceRefs[]` (typed signal class + matched
-value), `kernelVersion`, `detectedAt`, and (after human action) `correctionOutcome`. A *first-class* shape,
-not analytics bolted on later.
+value), `kernelVersion`, `detectedAt`, and (after human action) `correctionOutcome`. Treat this as a first-class
+shape, not as a later analytics addition.
 
 **[inherited] Data formats:** JSON camelCase; `System.Text.Json` only (shared options factory, never inline
 `new JsonSerializerOptions()`); `DateTimeOffset` UTC server-side, `{Action}At` naming, tenant-local only at
 presentation; cursor pagination `{ items, cursor, hasMore }` (never offset/limit); ETag/`If-None-Match`→304.
 
-### Communication Patterns
+### Communication and Process Enforcement
 
-**[ChatBot] Audit envelope (minimum fields, both phases):** `tenantId, actorId, actorType, commandName,
-resourceId, decision, reasonCode, correlationId, timestamp, policySnapshotId, sourceEvidenceRefs[],
-idempotencyKey?, stateTransition, redactionDecision, outcome`. **Pre-commit** audit = fail-closed gateway gate;
-**post-commit** WORM entry = hash-chained envelope (predecessor hash), fail-open-then-reconcile-from-event-log.
+The detailed rules remain authoritative under D3, D4, and D9. Builders apply these mechanics:
 
-**[ChatBot] Correlation propagation:** `correlationId` on every command/event/log/OTel activity, propagated
-across mailbox intake → association → file handling → approval → AI mediation → command execution → audit →
-UI/CLI/MCP/workers/sibling calls. Logs/traces are **metadata-only** (envelope metadata, never payloads/PII/secrets).
+| Decision | Implementation-facing requirement |
+|---|---|
+| D3 — one command spine | Every UI, CLI, MCP, service-client, AI-actor, worker, and mailbox mutation builds a typed `IChatBotCommand` and calls `IChatBotClient.SubmitAsync`; adapters never duplicate a gateway stage. |
+| D4 — atomic durability | Construct the canonical envelope with tenant, actor, command, stable operation/decision identity, revision, origin, transition, policy, evidence, redaction, outcome, and chain fields. Co-commit it with the event, lifetime terminal idempotency result, and policy/approval references. |
+| D4 — auditable attempts | Security-sensitive non-mutating denials, restricted reads, service-client failures, and every tenant-admin dashboard read use the separately measured auditable-attempt path. It never repairs missing mutation audit. |
+| D9 — lifecycle and retry | Validate the exact family row and Retry Profile v1. The row selects in-place change, immutable successor, linked workflow/attempt, or stored-outcome replay; projections and dead letters cannot authorize command re-execution. |
 
-**[inherited] Events & projections:** persist-then-publish; never publish before persistence; DAPR pub/sub is
-at-least-once + unordered → **all projection/event handlers idempotent + order-tolerant** (version-stamped,
-last-writer-wins by source version); SignalR nudges trigger re-query, never trusted as data; projection reads
-surface `stale|rebuilding|unavailable` rather than pretending freshness.
-
-**[ChatBot] Idempotency keys (two altitudes):** coarse request-dedup key at the CommandGateway + fine
-event-dedup at the aggregate; per-operation-class composition per addendum §Idempotency Keys; canonical-form
-normalization (key ordering, whitespace, NFC) before hashing.
-
-### Process Patterns
-
-**[ChatBot] CommandGateway flow (the spine — every state mutation, every surface):**
-`auth → tenant-bind → authorize → risk-classify → approval-gate → coarse-idempotency → pre-commit-audit →
-[EventStore: fine-idempotency → execute → publish → projection] → post-commit-audit`. **Surface adapters
-translate input into a typed `IChatBotCommand` and call `IChatBotClient.SubmitAsync` — they MUST NOT replicate
-any stage.** No path mutates state outside the gateway.
-
-**[ChatBot] Fail-closed (NFR15a):** all 10 state-writing paths route through one injectable audit-commit seam;
-on `tenantScope unresolved | authz failure | audit writer down | classifier indeterminate | command not in
-allowlist`, return a typed rejection and **write no durable state** (queue intent for replay, never partial write).
-
-**[ChatBot] Lifecycle transitions:** validated against an explicit state model; invalid transitions rejected +
-audited (rejected transition, actor, reason, correlation); terminal states (`Rejected`/`Failed`/`Skipped`)
-never move back — reprocess creates a **new workflow instance** with `supersedes`/`superseded_by` audit links.
-
-**[ChatBot delivery] Story-evidence integrity:** `done` is a gated state transition. One repository-owned validator reads the story, sprint ledger, explicit evidence contract, exact root/root-submodule diff, and policy-approved machine results. It fails closed unless File List and scoped change sets reconcile, result provenance matches the tested implementation digest, mandatory tests are non-vacuous, required primary paths executed, and every checked task/acceptance item has current evidence. `recovery-primary` completion is current-run only: a repository-owned static planner admits at most one contract with the exact policy-pinned paths/selector/`file:` locator before DAPR starts; the exact-head job stages the raw live TRX outside retention, requires cleanup, and projects a metadata-only canonical TRX before attestation. Scheduled/release recovery artifacts remain operational/A10 evidence and cannot satisfy story completion. The report is metadata-only and uses stable reason codes. This validates evidence integrity; it does not replace semantic or adversarial review.
+Propagate `correlationId` through commands, events, metadata-only logs/traces, workers, and sibling calls. Normalize
+idempotency input before hashing; treat expected revision as a separate guard. Persist before publish. Because Dapr
+pub/sub is at-least-once and unordered, projection handlers are idempotent, order-tolerant, and source-versioned;
+SignalR remains an advisory re-query nudge. Unresolved tenant or current-owner authority, invalid policy, approval,
+classifier, identity, or revision, an unsupported owner contract, or unavailable canonical-audit durability fails
+closed with the normative typed result and no authoritative domain or idempotency write.
 
 **[ChatBot] Correction propagation (FR91a):** aggregate owns `correcting`/`current` lifecycle via
-`Apply(CorrectionStarted/Completed)`; Epic 2's coordinator/activity seam coordinates required M0 derived-store
-invalidation and writes durable propagation events, while hosted Dapr Workflow runtime binding remains pending.
-Reads during correction check the flag and block or serve `stale=true`; AI actions cannot use corrected context
-until invalidation completes.
+`Apply(AssociationCorrectionStarted/AssociationCorrected)`; the coordinator records per-store
+`AssociationCorrectionStoreAcknowledged` events and `AssociationCorrectionDelayed` when the SLO is exceeded.
+Reads block AI use of corrected context until every required store acknowledges. Runtime implementation status is
+evidence input, not an architecture readiness claim.
 
 **[inherited] Domain correctness:** never throw for business-rule violations (return
 `DomainResult.Rejection([...])` — exceptions bypass the idempotency cache); aggregate `Handle` is pure
-(no I/O/DAPR/await/authz); authorization/orchestration outside aggregate logic; backward-compatible
+(no I/O, Dapr, `await`, or authorization); authorization and orchestration stay outside aggregate logic; backward-compatible
 deserialization for every event ever produced (no `V2` types — additive + upcasting).
 
 ### Enforcement Guidelines
 
-**All AI agents MUST:**
+**All AI agents must:**
 - Route every state mutation through the CommandGateway; adapters construct only `IChatBotCommand`.
-- Use the exact lifecycle-state strings and reason codes from the message catalog.
-- Stamp every derived record with tenant/provenance/kernel-version/redaction/retention/schema-version.
+- Use the exact family-specific lifecycle strings, stable operation IDs, decision slots, and reason codes.
+- Stamp every derived record with tenant/provenance/derivation-contract/redaction/retention/schema versions.
 - Keep `tenantId` from authenticated claims; fail closed on unresolved tenant/authz/audit.
+- Never seed M0 governance state; use the bootstrap commands and two distinct current Tenants owners.
+- Atomically persist the event, terminal lifetime outcome, policy/approval references, and canonical audit envelope.
+- Apply exact family lifecycle, concurrency, successor, and Retry Profile v1 semantics.
+- Treat `Project.AppendConversationMessage` as an A13-blocked Conversations mapping, not an executable Project command.
+- Keep diagnostic, story-completion, and A10 operational recovery evidence in disjoint authority channels.
 - Write tests in the same change: Tier 1 pure aggregate/Handle; cross-tenant isolation negative tests;
   fail-closed parametrized from the path enumeration; idempotency replay/conflict.
 
@@ -666,16 +903,16 @@ deserialization for every event ever produced (no `V2` types — additive + upca
   IIdempotencyStore`; dependency-direction edges; aggregates only in `.Server`.
 - **Conformance tests**: real-aggregate vs in-memory event-sequence equality.
 - **Differential-conformance harness**: same semantic intent across UI/CLI/MCP → identical event sequence +
-  state-store end-state (incl. rejection + retry intents). M0 shim coverage has been superseded by Epic 5
+  state-store end-state (including rejection and retry intents). M0 shim coverage has been superseded by Epic 5
   production-adapter arms for UI/API, CLI, and MCP.
-- **Cross-tenant isolation**: zero-leak negative tests across 9 actor types incl. cursors + error bodies.
+- **Cross-tenant isolation**: zero-leak negative tests across 9 actor types, including cursors and error bodies.
 - **Tier 2/3 inspect state-store end-state**, never just HTTP/exit codes.
 
 ### Pattern Examples
 
 **Good:**
-- `MarcConfirmsAssociation` (UI) and the CLI `chatbot associate` both build `AssociateEmailToProject` and
-  call `IChatBotClient.SubmitAsync` → identical `EmailAssociatedToProject` event.
+- `MarcConfirmsAssociation` (UI) and the CLI `chatbot associate` both build
+  `ConfirmEmailProjectAssociation` and call `IChatBotClient.SubmitAsync` → identical `AssociationConfirmed` event.
 - Unauthorized association attempt → `EmailAssociationUnauthorizedRejection` (structured) → message-catalog
   code `assoc-unauthorized` → UI shows "Association blocked. You do not have access to this project."
 
@@ -695,7 +932,7 @@ Increment markers: **[M0]** vertical loop · **[M1]** parity+governance · **[M2
 ```
 Hexalith.ChatBot/                              # umbrella module repo root
 ├── Hexalith.ChatBot.slnx                       # .slnx only (never .sln)
-├── global.json                                 # SDK 10.0.302, rollForward latestPatch
+├── global.json                                 # repository SDK pin 10.0.400, rollForward latestPatch
 ├── Directory.Build.props                       # net10.0, nullable, warnings-as-errors, Allman
 ├── Directory.Packages.props                    # version-free wrapper over the shared Builds catalog
 ├── Directory.Build.targets                     # SDK-container opt-in
@@ -706,7 +943,7 @@ Hexalith.ChatBot/                              # umbrella module repo root
 │   ├── Hexalith.Builds/                        # sole package-version catalog and shared build policy
 │   └── Hexalith.EventStore/                    # [M0] root-declared git submodule — foundation
 ├── docs/
-│   ├── adrs/                                    # idempotency, schema-evolution, audit-two-phase, gateway, saga
+│   ├── adrs/                                    # idempotency, schema-evolution, atomic-audit, gateway, saga
 │   ├── contract/                                # Contract Spine + parity-oracle docs
 │   └── exit-criteria/                           # per-increment evidence (M0/M1/M2 safety-floor proofs)
 ├── src/
@@ -723,16 +960,17 @@ Hexalith.ChatBot/                              # umbrella module repo root
 │   │   └── Generated/                           # NSwag-generated from spine (never hand-edit)
 │   ├── Hexalith.ChatBot.Server/                # [M0] the modular monolith (ONLY scanned assembly)
 │   │   ├── Gateway/                             # [M0] CommandGateway (the spine, D3)
-│   │   │   └── Stages/                          #   Auth, TenantBind, Authorize, RiskClassify, ApprovalGate,
-│   │   │                                        #   Idempotency(coarse), AuditPre  — internal interfaces
+│   │   │   └── Stages/                          #   Auth, TenantBind, Authorize, Risk/Approval, OperationIdentity,
+│   │   │                                        #   RevisionGuard, CanonicalEnvelope — internal interfaces
 │   │   ├── Association/                         # [M0] seam: Aggregates/, Scoring/ (deterministic kernel,
 │   │   │                                        #   T_high/T_low), Evidence/, Validators/
 │   │   ├── Governance/                          # [M0] seam: RiskClassifier/ (tag+heuristic), Approval/,
 │   │   │                                        #   AiMediation/, Allowlist/, Aggregates/  ; Outbound/ [M1]
-│   │   ├── Lifecycle/                           # [M0] seam: StateModel/ (transitions), Workflows/ (Epic 2
-│   │   │                                        #   coordinator/activity seam; hosted Dapr Workflow binding pending)
+│   │   ├── Lifecycle/                           # [M0] family state models + coordinator/activity seams;
+│   │   │                                        #   runtime status is evidence, never inferred from architecture
 │   │   ├── Projections/                         # [M0] seam: read models, queue projections, live mirrors
-│   │   ├── Audit/                               # [M0] seam: pre/post-commit, WORM hash-chain, replay traces [M2]
+│   │   ├── Audit/                               # [M0] domain audit facts + investigation projection;
+│   │   │                                        # canonical envelope/atomic stream boundary is A13-platform-owned
 │   │   ├── Adapters/                            # ports over siblings + external providers
 │   │   │   ├── Projects/  Parties/  Folders/  Conversations/   # [M0] IProjectDirectory, IParticipantDirectory…
 │   │   │   ├── Mailbox/                         # [M0] M365/Graph ingestion port (one mailbox pattern)
@@ -761,26 +999,48 @@ Hexalith.ChatBot/                              # umbrella module repo root
 
 ### Architectural Boundaries
 
-**API boundaries:** external = REST commands/queries (EventStore `CommandsController` + ChatBot query
-controllers) on `/api/v1/...`; internal EventStore invocation on `/process` (domain processor) + `/project`.
-CLI/MCP are governed clients over the same Contract Spine — **never direct data-plane access** (no DB, queue,
-mailbox store, index). Every external write enters via the **CommandGateway**.
+**API boundaries:** REST, UI, CLI, MCP, service SDKs, AI mediation, workers, and mailbox handlers are adapters over
+the same typed command/query contracts. No adapter uses direct DB, queue, mailbox-store, index, actor-state, or
+projection writes. Every mutation enters the **CommandGateway** and required A13-gated EventStore actor target; routes and host
+plumbing are code-owned seed, not alternate authority.
 
 **Component boundaries (modular-monolith seams):** Association ↔ Governance ↔ Lifecycle ↔ Projections ↔ Audit
 communicate **events-only** across seams; no cross-seam reach into internals. Governance stage interfaces
 (`IRiskClassifier`/`IApprovalGate`/`IAuditWriter`/`IIdempotencyStore`) are `internal` to `.Server`
 (NetArchTest-enforced). UI/CLI/MCP ↔ Server only through `IChatBotClient`.
 
-**Service boundaries (sibling contexts):** writes to Projects/Parties/Folders/Conversations go through their
-EventStore commands via ChatBot-owned adapter ports; ChatBot consumes their published events to build derived
-state. Multi-context operations use coordinator/activity seams now and bind to Dapr Workflow before production
-saga claims. Keycloak = identity boundary; M365/Graph = mailbox boundary (degraded per-mailbox, no tenant-wide
-fallback); AI provider = mediation boundary (non-AI workflows survive its outage).
+**Service boundaries (sibling contexts):** ChatBot uses only owner-accepted public contracts through local ports and
+consumes owner events to build derived state. Multi-context operations use coordinator/activity seams. Keycloak is
+the identity boundary; M365/Graph is the mailbox boundary (degraded per mailbox, no tenant-wide fallback); the AI
+provider is a mediation boundary and non-AI workflows survive its outage. Revision/hash compatibility does not
+equal producer acceptance or close A13.
 
-**Data boundaries:** EventStore = write-side source of truth for ChatBot aggregates; derived state in
-ChatBot-owned tenant-partitioned `chatbot-statestore` (Redis) via projections; vector/embedding in
-Hexalith.Memories [M2]; WORM audit chain in a dedicated append-only store with redaction keys in a **separate
-KMS**. Cross-tenant queries impossible at the store-access layer (NFR9a).
+**Data boundaries:** EventStore is the write-side source of truth for ChatBot aggregates and the proposed target owner
+of the atomic canonical mutation-envelope contract, pending A13 acceptance or an approved transactional alternative.
+ChatBot derived state lives in a tenant-
+partitioned store via projections; vector/embedding uses optional Memories at M2. Investigation/audit views may use
+separate stores but are never canonical mutation evidence. Every first-use store proves below-application isolation;
+A6 owns protection, retention, erasure, backup, and key-custody qualification.
+
+### Cross-Context Ownership Contract
+
+| Context | Sole source-of-truth ownership | ChatBot boundary / gate |
+|---|---|---|
+| ChatBot | Association decisions, AI-mediated workflows, assistant interactions, policy/approval snapshots, lifecycle, queues, and other PRD-enumerated derived records | Orchestrates owners; never absorbs their source records |
+| Projects | Project identity, lifecycle, membership/access, resource authorization | Current owner grant required; a ChatBot role or Project ID is not authority |
+| Conversations | Conversation identity, messages, append/history, conversation-to-Project assignment/reassignment | `Project.AppendConversationMessage` is a legacy product ID mapping to Conversations; executable path is A13-blocked |
+| Parties | Internal/external Party identity resolution | Store stable Party IDs; current owner evidence for trust-bearing use; A6 covers regulated PII runtime proof |
+| Folders | Governed folders, attachments, file access control, file metadata | Use opaque tenant-scoped IDs and owner authorization; A6 covers runtime protection proof |
+| Tenants | Tenant facts, boundaries, membership, tenant-policy and authorization context | ChatBot owns its application role/policy snapshots; owner mapping is A13-blocked |
+| EventStore | Current aggregate-local command/event-batch durability | Proposed atomic audit/idempotency/policy co-commit owner (or approved transactional alternative), supported path, ACLs, and fencing require A13 acceptance |
+| FrontComposer | Governed UI shell and progress transport contract | ChatBot owns composer lifecycle and authorization; nudges are advisory and require re-query |
+| Memories | Optional AI memory/vector/graph capability | Post-MVP/M2 only; never expands M0/M1 authority and requires first-store isolation |
+| Commons | Shared tenant-access evaluation mechanism and primitives | ChatBot retains closed application permissions and current owner checks |
+
+`IdentityEvolved` remains an unaccepted external proposal. The System Architect opens a source re-check within five
+business days when any consumed command/event schema, authorization or identifier semantic, integration topology,
+or referenced RBAC rule changes. The outcome is appended to the architecture memlog and refreshes the manifest;
+missing/inaccessible sources are blockers, and later working-tree content is never silently consumed.
 
 ### Requirements → Structure Mapping
 
@@ -791,7 +1051,8 @@ KMS**. Cross-tenant queries impossible at the store-access layer (NFR9a).
 | FR21–FR28 Conversation & context | `Projections/` + `Contracts/Queries/ProjectConversation*` + UI `S1` |
 | FR29–FR34 Files & attachments | `Adapters/Folders/` + `Server/Association/` (attachment lifecycle) |
 | FR35–FR46 Task intent & AI mediation | `Server/Governance/{AiMediation,RiskClassifier,Approval,Allowlist}` + UI `S3` |
-| FR47–FR50, FR48a–d Outbound + authenticity | `Server/Governance/Outbound/` + `Adapters/Mailbox/` **[M1]** |
+| FR48a–FR48d Inbound authenticity | `Adapters/Mailbox/` + intake admission/evidence **[M0]** |
+| FR47–FR50 Outbound authority + draft/send | `Server/Governance/Outbound/` + `Adapters/Mailbox/` **[M1]** |
 | FR51–FR63, FR75a–g Admin/governance/audit | `Server/Audit/` + `Projections/` (queues) + UI `S5/S8–S10` |
 | FR64–FR80 Reliability/ops/queues | `Workers/` + `Projections/` + `Lifecycle/StateModel/` |
 | FR81–FR96 Parity, state model, replay | `Gateway/` + `Contracts/openapi/` + `Conformance.Tests/` + `Lifecycle/` |
@@ -801,27 +1062,11 @@ KMS**. Cross-tenant queries impossible at the store-access layer (NFR9a).
 redaction → swappable stage in `Gateway` + `Contracts/Messages/`; evidence/confidence → `Association/Evidence/`
 + `Governance/AiMediation/`; derived-state versioning → `Projections/` (schema-versioned) + `docs/adrs/`.
 
-### Integration Points
-
-**Internal:** surface adapter → `IChatBotClient` → CommandGateway → EventStore write path → events → DAPR
-pub/sub → ChatBot projections + coordinator/activity seams → SignalR nudge → UI re-query.
-
-**External:** Keycloak (OIDC tokens, claims→tenant); M365/Exchange Graph (mailbox subscription/intake [M0],
-draft/send [M1]); AI provider (scoped-context mediation); sibling Hexalith services (commands + events);
-Hexalith.Memories (vector/graph [M2]).
-
-**Data flow (M0 happy path):** mailbox event → `Workers` intake → `Association` deterministic scoring →
-candidates+evidence projection → UI `S2` human confirm → `AssociateEmailToProject` via Gateway → attachment
-stored via `Adapters/Folders` → project conversation materialized by ChatBot projections → AI action proposed
-(`Governance`) → UI `S3` approval → `Project.AppendConversationMessage` prepared through the M0 metadata-only
-conversation writer and submitted through EventStore → audit (pre+post) →
-projection → SignalR nudge → UI.
-
 ### File Organization Patterns
 
 - **Configuration:** root-level `global.json`/`Directory.Build.props`/version-free
   `Directory.Packages.props`/`.editorconfig`; the package catalog is
-  `references/Hexalith.Builds/Props/Directory.Packages.props`; DAPR components under the local AppHost shim;
+  `references/Hexalith.Builds/Props/Directory.Packages.props`; Dapr components under the local AppHost shim;
   Contract Spine under `Contracts/openapi/`.
 - **Source:** by seam (lifecycle module), not type bucket; one type per file; `.g.cs`/`Generated/` never hand-edited.
 - **Tests:** mirror source boundaries; dedicated `Architecture` + `Conformance` projects; shared `fixtures/`
@@ -830,16 +1075,17 @@ projection → SignalR nudge → UI.
 
 ### Development Workflow Integration
 
-- **Dev server:** `aspire run` brings up ChatBot + DAPR sidecar, EventStore + Tenants sidecars, the UI surface
-  without a DAPR sidecar, and Keycloak with the tenant-claim realm import. Local self-hosted DAPR runs mTLS-off
+- **Dev server:** `aspire run` brings up ChatBot + Dapr sidecar, EventStore + Tenants sidecars, the UI surface
+  without a Dapr sidecar, and Keycloak with the tenant-claim realm import. Local self-hosted Dapr runs mTLS-off
   and therefore loads `accesscontrol.local.yaml`; production keeps deny-by-default `accesscontrol.yaml` under
   mTLS/Sentry. AppHost edits require Aspire restart.
 - **Build:** `dotnet build Hexalith.ChatBot.slnx`; shared Builds-owned package versions, exclusive-authority
   validation, and warnings-as-errors gate.
-- **Deploy:** SDK-container images per packable host; Aspire 13.4 K8s/AKS + Helm publish target [M2]; semantic-
-  release on merge to main.
+- **Deploy:** SDK-produced Server/UI runtime images per packable host; Aspire 13.5.3 K8s/AKS + Helm publish target
+  [M2], with resolved ASP.NET runtime image digest and shared DataProtection key ring (or explicit single-replica guard)
+  bound in candidate evidence; `semantic-release` on merge to `main`.
 
-### Domain-Module CI/CD Invariant
+## Delivery and Evidence Integrity
 
 - **Shared ownership:** every Hexalith domain module uses the reusable `Hexalith.Builds` domain CI and release
   workflows. Module callers contain only triggers, least-privilege permissions, concurrency, explicit secret
@@ -850,13 +1096,30 @@ projection → SignalR nudge → UI.
 - **Non-vacuous gates:** required Aspire/Dapr topology and browser tiers must execute their named tests. Missing,
   zero-test, self-skipped, or all-skipped evidence fails the lane; uploaded results do not substitute for passing
   execution.
-- **Story status transition gate:** CI detects each story or sprint-ledger transition to `done` and requires a matching TE-2 evidence contract and passing `story-evidence-integrity` report. Results come from machine files produced by the current exact implementation digest or from an approved retained exact-digest artifact within policy age. Narrative summaries, screenshots without direct invariant assertions, diagnostic fallbacks, and unrelated aggregate suites cannot satisfy a missing local primary-path obligation. Root-declared submodule changes require both the submodule diff and superproject gitlink to reconcile; nested submodules are never initialized.
-  The gate also detects contract-bound technical-enabler ledger transitions to `complete` and matching action transitions to `done`. Its versioned policy fixes PR and push event base/head selection, CI checks out and verifies the exact event head, a failed result-producing job fails the always-running gate, and retained provenance is immutable rather than re-attested by CI.
-  Recovery is deliberately narrower than the general retained-evidence rule: `recovery-primary` accepts only one transition-declared current-run consumer with canonical TRX/provenance paths. A side-effect-free planning command validates that exact binding and scope before the destructive lane; the exact-head evidence job pins Dapr CLI/runtime 1.18.0, preserves a fixed cleanup/publication reserve, stages unchecked raw output outside every upload, sanitizes the passing bound TRX, and only then attests. No future run/artifact identifier enters the canonical contract digest. Scheduled/release recovery bundles feed the independent recovery/A10 gate only.
+- **Story status:** CI detects each story or sprint-ledger transition to `done` and requires a matching TE-2 evidence
+  contract plus a passing `story-evidence-integrity` report. The File List and scoped change sets must reconcile,
+  result provenance must match the tested implementation digest, mandatory tests must be non-vacuous, required
+  primary paths must be executed, and every checked task or acceptance item must have current evidence. Root-declared
+  submodule changes require both the submodule diff and superproject gitlink; nested submodules are never initialized.
+- **Completion authority:** the versioned policy fixes PR and push base/head selection, verifies the exact event head,
+  and makes a failed result-producing job fail the always-running gate. It admits current-digest machine results or an
+  approved retained exact-digest artifact within policy age; narrative summaries, screenshots, diagnostic fallbacks,
+  and unrelated aggregate suites cannot replace required primary-path evidence.
+- **Recovery diagnostics:** `recovery-primary-diagnostics` is metadata-only and has no completion or A10 authority.
+- **Recovery completion:** `recovery-primary` admits exactly one transition-declared current-run producer bound to the
+  exact candidate and policy. A side-effect-free planner validates scope before the isolated destructive lane. The
+  accepted tool target is Dapr CLI/runtime `1.18.2/1.18.4`, with the CLI archive SHA-256 fixed by the policy. Raw live
+  TRX stays outside retention; the authority channel contains only the aggregate cleanup receipt, canonical sanitized
+  result, allowed independently validated reports, and provenance sidecars. Planning, production, timeout/no-test,
+  restoration, cleanup, projection, attestation, validation, or publication failure fails completion.
+- **A10 operational evidence:** scheduled/release controlled-loss and full-window bundles use a disjoint
+  retention/freshness channel. They can inform A10 but cannot satisfy story completion.
+- **Activation:** the Epic 12 architecture remains `activation: pending` until its unique pull-request check identity,
+  cleanup receipt, closeout deadlines, immutable tools, and fresh-runner isolation are independently verified.
 - **Release provenance:** reusable domain-module releases run only after successful push-triggered CI on `main`,
   check out and assert the triggering `workflow_run.head_sha`, do not repeat CI tests, and record the tested source
   SHA with released artifacts. The ChatBot umbrella is an explicit exception: its repository-owned release workflow
-  triggers on push/manual dispatch and reruns the required Aspire/DAPR and live-recovery gates for that exact
+  triggers on push/manual dispatch and reruns the required Aspire/Dapr and live-recovery gates for that exact
   `github.sha` before `semantic-release`; it must not be described as consuming `workflow_run.head_sha`.
 - **Security boundary:** reusable workflow callers use non-cancelling release concurrency, job-scoped write
   permissions, explicit named secrets, checkout-root-only non-recursive submodule initialization, CodeQL,
@@ -870,135 +1133,53 @@ projection → SignalR nudge → UI.
 
 ## Architecture Validation Results
 
-### Coherence Validation ✅
+### Coherence Validation — Design Contract Reconciled
 
-**Decision Compatibility:** All technology choices are platform-native and version-verified current (July 2026):
-.NET 10.0.302, Aspire 13.4.6, DAPR 1.18.x, MCP SDK 2.2.0 (shared-catalog-pinned), xUnit v3. No contradictory decisions remain —
-notably the apparent **NFR15a (fail-closed incl. "audit down") × NFR49a (WORM hash-chain) contradiction is
-resolved** by the two-phase audit model (pre-commit fail-closed gate vs post-commit reconcile-from-event-log).
-Two coherence caveats, both owned: **Fluent UI v5 is still RC** (inherited pre-GA, pinned, do-not-upgrade);
-sibling **Aspire versions span 13.1–13.3** (topology/integration note; ChatBot targets 13.3.x to match
-EventStore/Tenants).
+The command, lifecycle, ownership, authorization, audit, isolation, and recovery decisions now agree with the
+finalized PRD package. The old post-commit canonical-audit model is retired: D4 requires atomic mutation,
+lifetime idempotency, policy/approval references, and hash-linked audit. Post-commit projections and checkpoints
+have separate availability roles. Repository pins were verified against repository state at this revision; pin currency does not
+imply release qualification.
 
-**Pattern Consistency:** Patterns support the decisions by construction — the CommandGateway + Client-only
-adapter surface + NetArchTest operationalize FR81a "parity by construction"; the differential-conformance
-harness verifies it; the two-altitude idempotency + single audit-commit seam realize NFR13a/NFR15a;
-supersede-not-mutate + version-stamped projections realize FR91a/#11. Naming/communication/process patterns
-align with the EventStore foundation (rejections-as-events, persist-then-publish, ULIDs, metadata-only logging).
-
-**Structure Alignment:** The modular-monolith seams (Association/Governance/Lifecycle/Projections/Audit) map
-1:1 to the decisions and the FR→structure table; the Contract Spine sits in `Contracts/openapi/`; boundaries
-(API/component/service/data) are explicit and enforced (events-only across seams, governance interfaces
-`internal`, CLI/MCP/UI → Client only).
+Parity remains structural: every adapter origin builds the same typed command and reaches the same gateway and
+required A13-gated owner path. Family-specific lifecycle matrices, immutable successors, stable identities, exact retry
+profiles, current owner authorization, and first-store isolation prevent independently built units from choosing
+incompatible semantics.
 
 ### Requirements Coverage Validation
 
-**Functional Requirements Coverage ✅:** All 111 identifiers (the FR1–FR96 base sequence plus lettered extensions) map to a concrete home (see FR→Structure
-table). The two parked open questions are resolved (D1 event-driven+saga; D2 deterministic candidates +
-human confirm/correct). M0 covers the full vertical loop for one tenant/mailbox/command; FR47–50/48a–d
-(outbound+authenticity), CLI/MCP parity (FR82–83), and full lifecycle land in M1; replay/idempotency-contract/
-dashboards (FR95a/FR67 expanded) in M2 — per the fixed increment order, not as omissions.
+All 117 FR and 79 NFR identifiers map to the capability and physical locations above. The PRD remains sole authority
+for the operation/query catalog, workflow matrices, policy schema, retry registry, increments, and gate evidence.
+Canonical audit completeness remains a `100%` mutation invariant, not a current qualification claim or error budget;
+A6/A13 still block tamper-evidence claims, A11 remains `unsupported`, and A10 targets remain provisional.
 
-**Non-Functional Requirements Coverage ✅ (with M2-deferred detail):** Security/isolation (NFR1–12, 9a) —
-gateway authz + tenant-partition by construction + derived-store isolation. Reliability (NFR13–22, 15a) —
-fail-closed seam, two-phase audit, idempotency, AI-outage tolerance (tag+heuristic classifier has no AI
-dependency). Audit (NFR49–55, 49a/50a) — WORM hash chain + reconstructability assertion. Performance
-(NFR23–30) — architecturally supported (per-tenant rate limits/circuit breakers, projection reads, noisy-
-neighbor isolation); **specific SLO budgets calibrate at M2 per A11** (framed, not yet numeric). Recovery
-(NFR56–59) — **RPO/RTO targets remain provisional per A10**: Story 12.15 has authentic hosted safety evidence, DW-52's distinct controlled-loss RPO mechanism is locally verified without a cited hosted artifact, and the measurable-recovery-ceiling RTO residual remains open. Accessibility (NFR60–64) — WCAG 2.2
-AA per-increment to enumerated surfaces.
+### Release-Gate Validation — BLOCKED
 
-### Architecture Readiness Validation ✅ — Planning Revalidation Pending
+Architecture-document completeness is final, but implementation and release readiness are not established. The
+opening gate table remains the scan anchor: A5, A6, A10, A11, and A13 are all open. The PRD's increment table owns
+the complete evidence and permitted claims. The current nine-context reconciliation, compatible interfaces, local
+tests, historical artifacts, and this review cannot close a gate.
 
-**Decision Completeness:** All M0-critical decisions are documented with verified versions; M1/M2 decisions have
-explicit ownership. **Structure Completeness:** complete tree with per-file increment markers; all boundaries and
-integration points are specified. **Pattern Completeness:** mechanical enforcement covers architecture,
-conformance, parity, and isolation. The architecture is ready, but the corrected epic evidence and statuses remain
-subject to the post-rebaseline implementation-readiness rerun required by `sprint-change-proposal-2026-07-17.md`.
+### Critical Gaps and Required Evidence
 
-### Gap Analysis Results
-
-**Critical Gaps (block M0):** none. M0 is buildable as scoped (scaffold → Contract Spine → CommandGateway with
-real audit/idempotency/tenant-partition + deterministic risk classification and approval gate for AI mediation →
-deterministic Association → one allowlisted command → S1/S3/S2 UI).
-
-**Important Gaps (detail before M1/M2 — own with ADRs):**
-1. **WORM audit backing technology** not yet named (pattern is clear: append-only + hash-chain + separate-KMS
-   redaction keys). Needs an ADR before the M0 post-commit audit store is built.
-2. **M365 / Graph intake specifics** (subscription model, least-privilege permission scopes, webhook/replay
-   handling) — adapter boundary defined; concrete scopes pending A1 / pilot-tenant grant.
-3. **Audit↔execute transactionality spike** — confirm commit-boundary semantics before M0 closes.
-4. **M1 detail:** outbound sender-authority mapping enforcement is implemented in Epic 6; the tenant policy schema editor (S5), Keycloak
-   service-account flows, and the UI/API + CLI + MCP differential-conformance harness are implemented in Epics 5 and 7.
-5. **M2 detail:** vector/embedding store-layer isolation (NFR9a), replay test-tenant mechanics (FR95a),
-   operational dashboards (S8–S10), SLO calibration + continuity drill.
-
-**External dependencies (architecture relies on, not architecture-owned):** A9a evaluation dataset +
-label-quality / inter-annotator-agreement protocol (Test Architect); pilot-tenant M365 permission grant (A1);
-A11 baseline measurement for SLO/threshold calibration.
-
-**Nice-to-Have Gaps:** reversibility/undo pattern (approval-fatigue antidote); AI cost/resource governance
-model; explicit ordering-source documentation in the correlation/lifecycle ADR.
+A13 needs the indivisible owner-approved atomic-write, authority, Conversations, ACL, concurrency, fencing, and
+recovery bundle on one candidate. A6 needs the approved data-class contract and independently witnessed production
+protection/erasure evidence; A5 needs the candidate-bound provider contract and negative tests. A10 needs independent
+activation plus fresh controlled-loss and RTO-capable evidence. A11 needs every numeric SLO row, live provenance,
+calibration, route, burn test, baseline, and exact-candidate binding. Partial evidence closes none of them.
 
 ### Architecture Completeness Checklist
 
-**Requirements Analysis**
-- [x] Project context thoroughly analyzed
-- [x] Scale and complexity assessed
-- [x] Technical constraints identified
-- [x] Cross-cutting concerns mapped (13 — incl. the 3 Party-Mode additions)
+- [x] Final PRD and normative appendices reconciled.
+- [x] Shared command and atomic audit boundary defined.
+- [x] Family lifecycle, stable identity, concurrency, and retry ownership fixed.
+- [x] Authorization, M0 bootstrap, tenant policy, and cross-context ownership fixed.
+- [x] Deployment, replay, observability, and recovery evidence envelopes fixed.
+- [x] A5, A6, A10, A11, and A13 preserved as open release gates.
+- [ ] Implementation/release readiness — intentionally not asserted; requires the gate evidence above.
 
-**Architectural Decisions**
-- [x] Critical decisions documented with versions
-- [x] Technology stack fully specified
-- [x] Integration patterns defined
-- [x] Performance considerations addressed (architecturally; numeric SLO calibration deferred to M2/A11)
+### Start Here
 
-**Implementation Patterns**
-- [x] Naming conventions established
-- [x] Structure patterns defined
-- [x] Communication patterns specified
-- [x] Process patterns documented
-
-**Project Structure**
-- [x] Complete directory structure defined
-- [x] Component boundaries established
-- [x] Integration points mapped
-- [x] Requirements to structure mapping complete
-
-### Architecture Readiness Assessment
-
-**Overall Status:** READY FOR IMPLEMENTATION (M0 scope) — all 16 checklist items confirmed, no Critical Gaps
-open. M1/M2 carry intentional deferred detail (Important Gaps above), to be elaborated via ADRs before each
-increment begins, per the fixed M0→M1→M2 order.
-
-**Confidence Level:** High for M0; Medium for M1/M2 (by-design deferred detail, not unknown risk).
-
-**Key Strengths:**
-- Parity-by-construction is mechanically enforceable (CommandGateway + `internal` governance interfaces +
-  NetArchTest + differential harness), not aspirational.
-- The hardest contradiction (fail-closed × WORM) is resolved before implementation, not discovered during it.
-- Orchestration-not-ownership is preserved (sibling commands for writes, events for derived state, saga for
-  multi-context) — ChatBot stays an orchestrator, avoiding the "distended orchestrator" failure mode.
-- M0 is a true walking skeleton: minimal surface, complete safety-floor spine — M1/M2 are additive, not rewrites.
-
-**Areas for Future Enhancement:** learned/AI candidate ranking (M1); vector-store isolation + replay (M2);
-operational dashboards + SLO calibration (M2); reversibility/undo; AI cost governance.
-
-### Implementation Handoff
-
-**AI Agent Guidelines:**
-- Route every state mutation through the CommandGateway; adapters construct only `IChatBotCommand`.
-- Honor the safety floor (tenant isolation, authorization, fail-closed gate, audit-of-the-command, the gateway
-  spine) — never let it ride inside a trim-able stage.
-- Use exact lifecycle-state strings and message-catalog reason codes; stamp every derived record with
-  tenant/provenance/kernel-version/redaction/retention/schema-version.
-- Write the matching tests in the same change (Tier 1 aggregate, isolation negatives, fail-closed table,
-  idempotency); inspect state-store end-state in Tier 2/3.
-- Run the local TE-2 story-evidence preflight and attach its exact metadata report before proposing any story or technical enabler as `done`.
-
-**First Implementation Priority:** scaffold the `Hexalith.ChatBot` module (the canonical sibling-module shape +
-EventStore submodule under `references/` + Aspire AppHost), then the Contract Spine + `IChatBotClient`, then the CommandGateway
-with all nine stage seams (risk/approval stubbed; tenant-partition, fail-closed gate, pre-commit audit,
-idempotency real). Open ADRs for the WORM backing and the audit↔execute transactionality spike before the
-audit store lands.
+Use the enforcement checklist above. First establish the A13 atomic write, authority, and Conversations boundary for
+one exact candidate while live AI and pilot persistence remain disabled behind A5/A6. Only then can the M0 vertical
+loop be qualified; A10/A11 remain separate M2 gates.
