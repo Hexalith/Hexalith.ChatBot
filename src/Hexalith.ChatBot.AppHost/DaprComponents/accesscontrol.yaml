@@ -4,10 +4,23 @@ metadata:
   name: chatbot-accesscontrol
 spec:
   accessControl:
-    # PRODUCTION access-control posture for the chatbot inbound surface. Deny-by-default: the ONLY grant is the
-    # EventStore aggregate actor's POST service invocation of the chatbot domain processor (the /process
-    # round-trip) — a single POST-only allow for exactly one caller (eventstore), never a defaultAction:allow,
-    # so every other caller/operation (including the UI, which carries no sidecar) stays denied.
+    # PRODUCTION access-control posture for the chatbot inbound surface. Deny-by-default: the ONLY caller granted
+    # anything is the EventStore aggregate actor (appId "eventstore"), and it is granted only the POST routes the
+    # EventStore DomainService SDK actually invokes cross-app. Never a defaultAction:allow, so every other caller
+    # and operation (including the UI, which carries no sidecar) stays denied.
+    #
+    # ROUTE SET — the chatbot Server calls UseEventStoreDomainService() and registers IDomainProjectionHandler +
+    # IDomainQueryHandler, so the SDK maps the routes enumerated below onto the chatbot app. An earlier revision of
+    # this file granted only /process; under the mTLS-on posture described below that denied every other
+    # cross-app EventStore call (notably /replay-state, invoked by DaprAggregateStateReconstructor, and
+    # /project/v2/reconcile, invoked by NamedProjectionDispatchCoordinator). The grant is now the exact mapped POST
+    # surface, kept in lockstep with the SDK by DaprAccessControlConformanceTests, which parses the SDK's own route
+    # literals and fails naming any route this file omits.
+    #
+    # GET / (the SDK's banner endpoint) is deliberately EXCLUDED: it has no cross-app caller and this policy is
+    # POST-scoped. /project/rebuild/v1 and /project/rebuild/shared/v1 have no EventStore-side caller today but are
+    # granted with the rest of the rebuild family — splitting that family by current call sites is exactly the
+    # brittle, silently-denying failure mode the /process-only narrowing produced.
     #
     # IMPORTANT — this deny-by-default policy only takes effect when mTLS is ENABLED: DAPR matches per-caller
     # policies against the caller's VERIFIED SPIFFE identity (trustDomain "public" + the deployment namespace),
@@ -24,7 +37,50 @@ spec:
         trustDomain: "public"
         namespace: "default"
         operations:
+          # Command round-trip: the aggregate actor posts the domain-service request back to the chatbot processor.
           - name: /process
+            httpVerb: ["POST"]
+            action: allow
+          # Aggregate state reconstruction (DaprAggregateStateReconstructor).
+          - name: /replay-state
+            httpVerb: ["POST"]
+            action: allow
+          # Domain query dispatch.
+          - name: /query
+            httpVerb: ["POST"]
+            action: allow
+          # Stateless full-replay projection dispatch (Model a).
+          - name: /project
+            httpVerb: ["POST"]
+            action: allow
+          # Named projection dispatch and reconciliation (NamedProjectionDispatchCoordinator).
+          - name: /project/v2
+            httpVerb: ["POST"]
+            action: allow
+          - name: /project/v2/reconcile
+            httpVerb: ["POST"]
+            action: allow
+          # Named projection rebuild family — granted as one unit.
+          - name: /project/rebuild/v1
+            httpVerb: ["POST"]
+            action: allow
+          - name: /project/rebuild/stage/v1
+            httpVerb: ["POST"]
+            action: allow
+          - name: /project/rebuild/commit/v1
+            httpVerb: ["POST"]
+            action: allow
+          - name: /project/rebuild/abort/v1
+            httpVerb: ["POST"]
+            action: allow
+          - name: /project/rebuild/verify/v1
+            httpVerb: ["POST"]
+            action: allow
+          - name: /project/rebuild/shared/v1
+            httpVerb: ["POST"]
+            action: allow
+          # Operational index metadata for the admin surface.
+          - name: /admin/operational-index-metadata
             httpVerb: ["POST"]
             action: allow
       - appId: chatbot

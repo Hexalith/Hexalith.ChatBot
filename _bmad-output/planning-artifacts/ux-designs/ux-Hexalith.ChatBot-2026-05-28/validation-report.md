@@ -2,194 +2,130 @@
 
 - **DESIGN.md:** `/home/administrator/projects/hexalith/chatbot/_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/DESIGN.md`
 - **EXPERIENCE.md:** `/home/administrator/projects/hexalith/chatbot/_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/EXPERIENCE.md`
-- **Run at:** 2026-09-13T13:48:18+02:00
+- **Run at:** 2026-09-14T10:06:15+02:00
 
 ## Overall verdict
 
-The spine pair is broken as a current downstream contract despite strong structure and substantial behavioral detail. Its nine flows semantically cover the nine source journeys, all four frontmatter sources resolve, all 17 locally declared components pair across the spines, and visual-reference handling is explicit; however, the contract cannot be source-extracted deterministically because source names and S1–S10 mappings are not preserved, the DESIGN color map violates the required token type, and current safety requirements for expired evidence and correction propagation are absent.
+The updated spine pair is not ready to finalize as a downstream contract. It now has strong structural coverage—nine source journeys, explicit S1–S10 closure, 34 paired product components, a schema-valid DESIGN.md, and an explicit spine-only visual posture—but threshold wording, canonical state vocabulary, and classifier fallback remain ambiguous.
 
-The specialist reviews reinforce that the original June accessibility and governance foundation is unusually strong, but later source changes did not reach the peer spines. Accessibility is thin for current governed-chat semantics, while governance and safety are broken by an unresolved approval-boundary contradiction and missing evidence-freshness, correction, bounded-admin, and informed-approval contracts.
+Accessibility is otherwise implementation-ready, and governance has a strong fail-closed foundation. Residual high-severity issues affect responsive reflow, batch approval, admin authority, suppressed-candidate confidentiality, and correction commit timing. The approved six-class mandatory-human-approval rule remains intact.
 
 ## Category verdicts
 
-- Flow coverage — thin
-- Token completeness — broken
-- Component coverage — thin
-- State coverage — broken
+- Flow coverage — adequate
+- Token completeness — adequate
+- Component coverage — strong
+- State coverage — thin
 - Visual reference coverage — strong
 - Bloat & overspecification — adequate
 - Inheritance discipline — broken
-- Shape fit — adequate
+- Shape fit — strong
 
 ## Findings by severity
 
-### Critical (3)
+### Critical (0)
 
-**[Rubric / Token completeness] — Color tokens violate the DESIGN.md schema (§ `DESIGN.md:12-27`)**
+No critical findings.
 
-All 15 `colors` values are Fluent CSS-variable strings rather than the hex strings required by the DESIGN.md schema. The inherited Fluent posture is correct, but placing those references in a hex-valued machine contract is not.
-Fix: remove unchanged inherited Fluent roles from local `colors` and explain inheritance in prose, or establish a repository-approved schema translation before retaining local color tokens.
+### High (8)
 
-**[Rubric / State coverage] — Evidence freshness and approval blocking are absent (§ `prd.md:1441`; `EXPERIENCE.md:89-140`)**
+**[Rubric / Flow coverage] — Association threshold disposition is incomplete (§ `EXPERIENCE.md:34,174,295`; `addendum.md:22-23`)**
 
-No `fresh`, `stale`, or `expired` evidence states exist, and no `evidence-expired` path blocks approval. A downstream implementation can therefore approve against expired evidence.
-Fix: define freshness chips, timestamps, announcements, stale/expired treatments, and the disabled-with-reason approval path on every evidence-bearing surface.
+The UX sends only scores below `T_low` to `NeedsReview`, leaving `[T_low, T_high)` ambiguous. The normative rule sends every score below `T_high` to review; `T_low` controls reviewer presentation only.
 
-**[Governance & Safety] — The authoritative sources contradict each other on approval boundaries (§ `prd.md:1215-1237`; `addendum.md:25-33,65-74`)**
+Fix: use `score < T_high` for disposition everywhere and describe `T_low` only as presentation filtering or ordering.
 
-Six boundary-crossing action classes are described both as necessarily approval-required and as tenant-downgradable to low-risk; the PRD also exposes denied/unsupported while the addendum defines a two-output classifier. Backend and UI teams can implement different safety boundaries while following different authoritative passages.
-Fix: approve one canonical evaluation order and user-visible disposition taxonomy. Until reconciled, require human approval for all six boundary-crossing effect classes and align the PRD, addendum, policy schema, and both spines.
+**[Rubric / State coverage] — Canonical domain state names are not preserved (§ `EXPERIENCE.md:136-148`; `prd.md:483-545`)**
 
-### High (16)
+The state-family table introduces presentation labels and omits several authoritative families, allowing UI copy to be mistaken for domain state.
 
-**[Rubric / Flow coverage] — Source journey names are not preserved (§ `prd.md:319-427`; `EXPERIENCE.md:256-355`)**
+Fix: reproduce or directly reference every authoritative family and exact enum; keep user-facing labels in a separate mapping column.
 
-All nine UX flows are structurally complete, but none keeps the exact source journey heading or a stable UJ/System Journey identifier.
-Fix: use the exact source headings and add a compact mapping from each flow to its UJ, FR/NFR ranges, and S-surface identifiers.
+**[Rubric / Inheritance discipline] — Indeterminate classifier write behavior conflicts (§ `EXPERIENCE.md:33,126,175,378`; `addendum.md:46`; `prd.md:1356`)**
 
-**[Rubric / Flow coverage] — S1–S10 do not map deterministically to the nine IA surfaces (§ `prd.md:519-539`; `EXPERIENCE.md:32-46`)**
+The addendum normalizes indeterminate classification to approval-required, while NFR15a says no proposal record is written. The UX silently chooses a reviewable proposal when other preconditions are safe.
 
-Correction Surface, Outbound Approval, Cross-surface Attribution View, and Admin Queue Operations are implicit or merged, leaving surface closure unprovable.
-Fix: add an explicit S1–S10 crosswalk and ensure each source surface's load-bearing action and failure path appears in a flow.
+Fix: record an explicit approved reconciliation and align the durable-write behavior across sources and spines.
 
-**[Rubric / Component coverage] — Current product-specific affordances are missing (§ `prd.md:1194-1201,1441`; `DESIGN.md:211-229`; `EXPERIENCE.md:63-85`)**
+**[Accessibility] — Larger-screen handoff conflicts with WCAG Reflow (§ `DESIGN.md:149-155`; `EXPERIENCE.md:21-23,255-263`)**
 
-The spines lack paired visual and behavioral contracts for informational/actionable classification, AI-summary provenance, “why this project,” and evidence freshness.
-Fix: add identically named components in both spines, including non-color distinctions, disclosure behavior, provenance, freshness, and approval blocking.
+Dense administration and investigation may require a larger screen, which can remove functionality at 320 CSS pixels or 400% zoom.
 
-**[Rubric / State coverage] — Canonical correction states are missing (§ `prd.md:450-451,1324-1325`; `EXPERIENCE.md:98,114`)**
+Fix: make handoff optional; keep every in-scope task readable and operable at 320 CSS pixels without page-level horizontal scrolling, except bounded essential two-dimensional content.
 
-The UX jumps to corrected/completed and omits `Correcting` and `Correction-delayed`, propagation progress, AI-context blocking, p95 breach handling, owner, and escalation.
-Fix: add both states across conversation, association/correction, files/context, queues, and audit, with feedback, focus, recovery, and AI-action gating.
+**[Governance & Safety] — Batch approval is broader than the current source permits (§ `EXPERIENCE.md:203`; `prd.md:1535-1540`)**
 
-**[Rubric / Bloat & overspecification] — Local pixel scales duplicate Fluent inheritance (§ `DESIGN.md:39-52,180-209`)**
+The comparison set omits frozen recipients, files, content digest, sender authority, tool target, approval revision, and expected resource revision, and it does not exclude prohibited effect classes.
 
-The local radius and spacing scales compete with the stated FrontComposer/Fluent defaults and can lead to raw CSS or theme recreation.
-Fix: remove inherited scales or retain only justified product deltas expressed through Fluent component parameters or Fluent 2 tokens.
+Fix: require the complete frozen-field comparison and prohibit one-click batching for irreversible, external-send, file-exposing, external-tool, and on-behalf actions; audit each item atomically.
 
-**[Rubric / Inheritance discipline] — Risk taxonomy is not reconciled in the UX (§ `prd.md:1215-1224`; `addendum.md:25-33`; `EXPERIENCE.md:77,334-343`)**
+**[Governance & Safety] — Admin queue operations exceed the latest Project-authority boundary (§ `EXPERIENCE.md:53,179,205,325-330`; `prd.md:1391-1397`)**
 
-The Risk chip and approval flow do not distinguish classifier output from user-visible dispositions such as denied and unsupported.
-Fix: define the displayed vocabulary and map each source outcome to review, refusal, and execution behavior.
+The UX permits per-item queue actions at aggregate scope. Current requirements allow only opaque partition controls without Project authority; per-item mutation requires current Project authority and full revalidation.
 
-**[Accessibility] — Current accessibility rules are split across unreferenced peer artifacts (§ `DESIGN.md:4-11`; `EXPERIENCE.md:3-10`; `index.md:8-18`)**
+Fix: separate aggregate partition controls from per-item controls and gate each per-item action on Project authority, requester authority, revision, policy, and audit readiness.
 
-The spines predate the first-class chat, current ten-surface inventory, and later binding UX addenda, so required accessibility behavior depends on discovery order.
-Fix: run an Update pass that distills all binding accessibility deltas into the peer spines and records supplemental inputs as provenance.
+**[Governance & Safety] — Candidate parity can reveal suppressed resources (§ `EXPERIENCE.md:95,111,214`)**
 
-**[Accessibility] — AI summaries are not programmatically distinguished from source evidence (§ `prd.md:1198-1201,1469-1472`; `DESIGN.md:217-223`; `EXPERIENCE.md:73-81`)**
+The parity matrix promises the same “suppressed unsafe set,” contradicting the rule that no surface may confirm a forbidden candidate exists.
 
-Screen-reader users can encounter generated interpretation without first hearing its label, provenance, or source relationship.
-Fix: add paired Source evidence and AI summary components with semantic headings, provenance before content, source evidence open by default, a keyboard disclosure, and non-color distinction.
+Fix: require equivalent omission/redaction semantics; never expose suppressed identity, evidence, ordering, or cardinality outside separately authorized audit evidence.
 
-**[Accessibility] — Evidence-expiry behavior is not accessible (§ `prd.md:1441`; `EXPERIENCE.md:76,101,115-139`)**
+**[Governance & Safety] — Correction commit timing is ambiguous (§ `EXPERIENCE.md:176,313-319`; `prd.md:1478-1494`)**
 
-The contract lacks accessible timestamp/state associations, transition announcements, focus preservation, and an explained disabled approval control.
-Fix: add a freshness pattern with text, timestamp, accessible name/description, forced-colors treatment, one-time expiry announcement, and `aria-disabled` approval reason.
+The flow can imply a committed correction when the invalidation queue or canonical audit path is unavailable.
 
-**[Accessibility] — Correction progress and delay lack accessible states (§ `prd.md:450-451,1324-1325`; `EXPERIENCE.md:98,103,107,114-120`)**
+Fix: define a pre-commit failure that leaves the predecessor authoritative. Reserve `Correcting` and `Correction-delayed` for committed corrections awaiting downstream acknowledgement, with affected AI context blocked.
 
-Assistive-technology behavior is undefined while derived stores invalidate and AI use remains unsafe.
-Fix: define programmatic state labels, meaningful progress semantics, deduplicated announcements, estimated completion, owner/next action, and focus-preserving updates.
+### Medium (10)
 
-**[Accessibility] — Incremental AI output lacks a bounded announcement policy (§ `EXPERIENCE.md:127-139,181,194-200`; `epic10-chat-surface-elaboration.md:37-47`)**
+**[Rubric / Flow coverage] — UJ1 omits current suffix and surface identifiers (§ `EXPERIENCE.md:273`; `prd.md:313,568,1084,1117,1166`)**
 
-Nothing prevents streaming chunks from being placed in a live region and repeatedly interrupting screen-reader reading.
-Fix: keep streamed content outside live regions and announce only deduplicated start, complete, stopped, and failure transitions from a separate status region.
+Fix: map UJ1 through `FR28f` and name `S1a` explicitly in both the crosswalk and journey mapping.
 
-**[Governance & Safety] — Evidence freshness is visual but not fail-closed (§ `DESIGN.md:147,218-224`; `EXPERIENCE.md:75-81,89-121`)**
+**[Rubric / Token completeness] — Component frontmatter extensions are ignored by generic DESIGN.md consumers (§ `DESIGN.md:16-118`)**
 
-Warning color may imply staleness, but no evidence timestamp, freshness state, expiry block, refresh path, or audit outcome is required.
-Fix: make freshness explicit on every evidence-bearing surface and block approval/association on expired evidence with reason `evidence-expired`.
+The document is schema-valid, but `base`, `emphasis`, `distinction`, and `default` produce 68 linter warnings.
 
-**[Governance & Safety] — Correction may appear complete before derived context is safe (§ `EXPERIENCE.md:98,114,293-301`; `prd.md:435-451,1322-1325`)**
+Fix: version these as a project extension or move the inheritance/anatomy metadata into Components prose and omit frontmatter component entries without local visual tokens.
 
-The contract can expose contaminated derived context because it lacks acknowledgement from every store and a visible delayed-correction path.
-Fix: add correcting/delayed states, store-progress or safe summary, owner/estimate/escalation, and block affected AI actions until all invalidations acknowledge.
+**[Rubric / Inheritance discipline] — Display vocabulary and detector ownership drift (§ `EXPERIENCE.md:93,97,124,377`; `addendum.md:29-46`)**
 
-**[Governance & Safety] — Bounded administration and two-person control are absent (§ `EXPERIENCE.md:43,120,303-311`; `prd.md:1288-1300`)**
+Fix: map canonical internal values to user-facing labels explicitly and use the exact independently owned detector/artifact version.
 
-Nora's flow lets one admin activate security-sensitive settings and does not separate aggregate queue visibility from project-detail authority.
-Fix: add proposal, distinct second-admin approval, conflict, rejection, expiry/cancel, activation, justification, policy-version, scope, and audit-link states.
+**[Accessibility] — Operational auto-refresh lacks pause/apply behavior (§ `EXPERIENCE.md:105-106,179,182-205,240,250`)**
 
-**[Governance & Safety] — Denial copy can disclose resource existence (§ `EXPERIENCE.md:52-61,106,111-116`)**
+Fix: accumulate changes behind a keyboard-reachable update action while context is active, or provide pause/manual refresh; preserve the active item and announce one concise change summary.
 
-“You do not have access to this project” and a visible “unauthorized candidate suppressed” state reveal that a forbidden resource exists.
-Fix: use existence-neutral copy and collapse unauthorized candidates into an indistinguishable no-safe-result state; retain precise causes only in authorized audit evidence.
+**[Governance & Safety] — Mandatory approval is described as temporary and actor scope is broad (§ `DESIGN.md:215`; `EXPERIENCE.md:32,86,130`)**
 
-**[Governance & Safety] — Approval review lacks authority and effect detail (§ `DESIGN.md:222-224`; `EXPERIENCE.md:79-81,334-343`; `addendum.md:124-149`)**
+Fix: make the six-class invariant permanent for AI-mediated actions and clarify that direct authorized human writes remain governed but do not automatically enter the AI-proposal flow.
 
-The reviewer cannot see sender-authority/delegation, classifier input/version, policy snapshot, expected post-state, side effects, and audit events needed for informed approval.
-Fix: add all mandatory proposal fields and revalidate authority, policy, and effect set immediately before execution; changes require a refreshed proposal.
+**[Governance & Safety] — Task-intent detector failure and version contract drift (§ `EXPERIENCE.md:93,142,173`; `addendum.md:18-20,28-43`)**
 
-### Medium (11)
+Fix: use `detector_version`, add `detector-unavailable` to authorized review, and do not invoke the action-risk classifier before authorized task intent exists.
 
-**[Rubric / Token completeness] — Typography uses an unsupported semantic exception (§ `DESIGN.md:28-38`; `design-md-spec.md:15-18,45-49`)**
+**[Governance & Safety] — Universal admin audit obligation is missing (§ `EXPERIENCE.md:102-103,177,205,321-332`)**
 
-Every web typography role uses only `note`, although that semantic exception is documented for native platform conventions.
-Fix: omit unchanged Fluent roles and document inheritance in prose, or encode genuine brand deltas using supported typography fields.
+Fix: audit every allowed or rejected admin action, including qualifying reads; prohibit service clients and AI actors from assigning admins or changing policy.
 
-**[Rubric / Component coverage] — Inherited primitives with behavioral deltas are unnamed (§ `EXPERIENCE.md:123-172`)**
+**[Governance & Safety] — Identity evolution and human annotation evidence are underspecified (§ `EXPERIENCE.md:107,180,313-317,350-356`)**
 
-Busy replacement, error-summary focus, dialog/sheet containment, and queue filtering add product behavior but lack exact inherited-component mappings.
-Fix: add rows only for primitives with behavioral deltas and name the exact FrontComposer/Fluent component inherited.
+Fix: show original identity plus unresolved-current-identity status and authorized review; label appended notes as non-authoritative and distinct from canonical evidence.
 
-**[Rubric / Inheritance discipline] — Historical PRD validation is presented as binding (§ frontmatter `sources`; `prd-validation-report.md:1-21`)**
+**[Governance & Safety] — Operational diagnostics are not runbook-complete (§ `EXPERIENCE.md:104-106,179`; `prd.md:1533`)**
 
-The fourth source validates an older PRD revision and can mislead consumers with a stale Critical verdict and obsolete requirement counts.
-Fix: remove it from binding sources or mark it explicitly as historical/context-only with its target revision.
+Fix: add an authorized disclosure containing tenant, mailbox, workflow item, current state, last transition with actor/from-state, retry count, reason, correlation, and next action.
 
-**[Rubric / Inheritance discipline] — FrontComposer implementation reference is broken (§ `DESIGN.md:142`)**
+**[Governance & Safety] — Parity does not separate exposure from AI allowlisting (§ `EXPERIENCE.md:207-224`)**
 
-The cited path omits the root `references/` segment.
-Fix: link to `references/Hexalith.FrontComposer/docs/fluent-ui-v5-contingency.md` and declare it as inherited UI-system evidence if consumers must load it.
+Fix: show product operation catalog, per-surface exposure, and deny-by-default AI allowlist as separate memberships; parity applies only after actor/surface authorization succeeds.
 
-**[Accessibility] — Classification and “why” disclosure lack accessible component behavior (§ `prd.md:1194-1201`; `EXPERIENCE.md:73-78`)**
+### Low (1)
 
-Badge/message association, disclosure reading order, labelled facts, expanded state, focus return, and update-announcement rules are unspecified.
-Fix: define accessible classification and association-explanation patterns in both spines.
+**[Governance & Safety] — Pre-A11 SLO view is named as a published dashboard (§ `DESIGN.md:196`; `EXPERIENCE.md:51,106,179,328`)**
 
-**[Accessibility] — Mixed-language content lacks language metadata (§ `EXPERIENCE.md:224-230`)**
-
-English/French translation rules do not set the page language or identify email, AI, and quoted content in a different language.
-Fix: bind root `lang` to the UI locale, apply language-of-parts metadata when known, persist locale across navigation, and test EN/FR screen-reader output.
-
-**[Accessibility] — Focus may be obscured by sticky chrome or panels (§ `DESIGN.md:164,180-190`; `EXPERIENCE.md:167-172,232-244`)**
-
-Focus order and contrast are covered, but WCAG 2.2 Focus Not Obscured is not.
-Fix: require focused controls to remain at least partially visible, define scroll margins, and test programmatic focus at 200% and 400% zoom.
-
-**[Accessibility] — Association candidate radiogroup behavior is undefined (§ `implementation-conformance-addendum-2026-07-17.md:34-44`; `EXPERIENCE.md:75,95-96,115,199`)**
-
-Selection, arrow-key movement, announced position/count, validation, focus recovery, and refresh behavior are left to inference.
-Fix: define one named radiogroup and decision bar; selection must not commit, and invalid confirmation must focus the existing error summary.
-
-**[Governance & Safety] — AI-summary provenance is missing (§ `DESIGN.md:214-217`; `EXPERIENCE.md:70-73,174-180`)**
-
-Generated interpretation can be mistaken for authoritative mail, file, or command evidence.
-Fix: add an AI-summary component with model/version/time/source IDs, non-color distinction, source-first default, audit linkage, and redaction-safe exported representations.
-
-**[Governance & Safety] — Replay and conflict outcomes are underspecified (§ `EXPERIENCE.md:58-59,103-105,207-213`; `addendum.md:87-102`)**
-
-Retry counts and duplicate-safety notes exist, but operation identity, prior-outcome reuse, already-decided/sent/corrected conflicts, attempt ceilings, and replay windows do not.
-Fix: define a shared operation-status pattern with idempotency identity, original-outcome link, eligibility, ceiling, and stable status/reason codes.
-
-**[Governance & Safety] — UI/CLI/MCP parity lacks a complete outcome map (§ `EXPERIENCE.md:44,121,240,313-321,345-355`; `prd.md:1307-1315`)**
-
-The UX asserts parity, but only a CLI subset is exercised and MCP lacks explicit failure/recovery behavior.
-Fix: link to the canonical parity set and add a UI/API–CLI–MCP outcome matrix covering normalized input, authorization, transition, redaction/reason, operation identity, audit origin, and long-running status.
-
-### Low (2)
-
-**[Rubric / Bloat & overspecification] — Touch-target rules are duplicated (§ `EXPERIENCE.md:201,244`)**
-
-The same target-size contract appears in Accessibility Floor and Responsive & Platform.
-Fix: keep the normative rule in Accessibility Floor and reference it from Responsive & Platform.
-
-**[Rubric / Shape fit] — Product-Specific Concerns does not earn a separate section (§ `EXPERIENCE.md:224-230,250-254`)**
-
-Its only row restates the fuller localization contract immediately above it.
-Fix: remove it or expand it only for a distinct concern that cannot fit an existing section.
+Fix: call it the “SLO qualification backlog” until every target, error budget, live signal, route, and burn test is present; only then expose the published catalog.
 
 ## Reviewer files
 

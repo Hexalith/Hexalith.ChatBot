@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Security.Claims;
 using System.Text.Json;
 
 using Aspire.Hosting;
@@ -12,7 +13,11 @@ using Hexalith.ChatBot.AppHost.Aspire;
 
 using Microsoft.Extensions.Configuration;
 
+using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Projections;
 
 using Shouldly;
@@ -28,6 +33,16 @@ public sealed class RecoveryValidationTopologyContractTests
     private static readonly string[] MailboxSecretArgs =
     [
         $"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={new string('a', 32)}",
+    ];
+
+    // The AppHost also fails closed without the authorization-filtered Projects endpoint/token, which it validates
+    // AFTER PrepareKeycloakRealmImport. Tests that only need the realm-prep throw can stop at MailboxSecretArgs;
+    // a test that needs CreateAsync to SUCCEED must satisfy the later gate too.
+    private static readonly string[] RenderedRealmArgs =
+    [
+        $"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={new string('a', 32)}",
+        "--ChatBot:Projects:Endpoint=http://localhost:65535",
+        $"--ChatBot:Projects:ApiToken={new string('b', 32)}",
     ];
 
     [Fact]
@@ -572,6 +587,196 @@ public sealed class RecoveryValidationTopologyContractTests
         })!;
         probe.WaitForExit();
         return probe.Id;
+    }
+
+    /// <summary>
+    /// Renders the realm through the AppHost and reads EVERY substituted
+    /// <c>chatbot:service-client-grant-expiry</c> claim back out through the real consumer,
+    /// <c>ClaimsServiceClientGrantResolver</c>, asserting it does not collapse to
+    /// <c>service_client_grant_missing</c>.
+    /// </summary>
+    /// <remarks>
+    /// This is the gap that let the <c>+00:00</c> rendering bug ship. <c>DateTimeOffset.ToString("O")</c> on a
+    /// non-UTC-kind value renders a <c>+</c> offset, which <c>AuditMetadata.IsSafeStableIdentifier</c> rejects
+    /// (<c>+</c> is outside its charset), so every service client would have been denied. Nothing caught it: every
+    /// resolver unit test hand-writes a <c>...Z</c> literal, the AppHost guard asserted only that the placeholder
+    /// was present, and the Tier-3 lane mints a <b>user</b> token (<c>grant_type=password</c>) so it can never
+    /// exercise a service client. Only reading the actually-rendered value through the actual consumer closes it.
+    /// </remarks>
+    [Fact]
+    public async Task RenderedRealmServiceClientGrantExpiryIsAcceptedByTheClaimsGrantResolver()
+    {
+        string tempPath = Path.GetTempPath();
+        HashSet<string> before = Directory
+            .EnumerateDirectories(tempPath, "hexalith-chatbot-keycloak-*")
+            .ToHashSet(StringComparer.Ordinal);
+
+        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(RenderedRealmArgs, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        string? generatedDirectory = null;
+        try
+        {
+            string ownerPrefix = Environment.ProcessId.ToString(CultureInfo.InvariantCulture) + ":";
+            generatedDirectory = Directory
+                .EnumerateDirectories(tempPath, "hexalith-chatbot-keycloak-*")
+                .Except(before, StringComparer.Ordinal)
+                .FirstOrDefault(directory => OwnerMarkerStartsWith(directory, ownerPrefix));
+            generatedDirectory.ShouldNotBeNull("PrepareKeycloakRealmImport must render this run's realm.");
+
+            using JsonDocument rendered = JsonDocument.Parse(
+                await File.ReadAllTextAsync(
+                    Path.Combine(generatedDirectory, "hexalith-realm.json"),
+                    TestContext.Current.CancellationToken).ConfigureAwait(true));
+
+            (string ClientId, string Expiry)[] grants =
+            [
+                .. rendered.RootElement.GetProperty("clients").EnumerateArray()
+                    .SelectMany(client => (client.TryGetProperty("protocolMappers", out JsonElement mappers)
+                            ? mappers.EnumerateArray()
+                            : Enumerable.Empty<JsonElement>())
+                        .Where(mapper => mapper.TryGetProperty("name", out JsonElement name)
+                            && string.Equals(name.GetString(), "chatbot-service-client-grant-expiry", StringComparison.Ordinal))
+                        .Select(mapper => (
+                            ClientId: client.GetProperty("clientId").GetString()!,
+                            Expiry: mapper.GetProperty("config").GetProperty("claim.value").GetString()!))),
+            ];
+
+            grants.Length.ShouldBeGreaterThan(
+                0,
+                "The rendered realm must carry at least one substituted service-client grant expiry, or this test "
+                + "proves nothing about the rendering.");
+
+            ClaimsServiceClientGrantResolver resolver = new();
+            foreach ((string clientId, string expiry) in grants)
+            {
+                expiry.ShouldNotContain(
+                    "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__",
+                    customMessage: $"Client '{clientId}' kept the unsubstituted placeholder.");
+
+                // The two gates the resolver actually applies, in order, asserted individually so a failure names
+                // which one rejected the rendering rather than only that the grant went missing.
+                AuditMetadata.IsSafeStableIdentifier(expiry).ShouldBeTrue(
+                    $"Client '{clientId}' rendered the grant expiry as '{expiry}', which AuditMetadata rejects. "
+                    + "A DateTimeOffset with a non-UTC Kind renders a '+00:00' offset, and '+' is outside the safe "
+                    + "charset; render expiresAt.UtcDateTime so the canonical 'O' form ends in 'Z'.");
+                DateTimeOffset.TryParse(
+                    expiry,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                    out DateTimeOffset parsed).ShouldBeTrue(
+                    $"Client '{clientId}' rendered a grant expiry the resolver cannot parse: '{expiry}'.");
+                parsed.ShouldBeGreaterThan(
+                    DateTimeOffset.UtcNow,
+                    $"Client '{clientId}' rendered an already-expired grant expiry.");
+
+                // ... and through the real consumer, end to end.
+                ServiceClientGrantResolution resolution = await resolver
+                    .ResolveAsync(
+                        ServiceClientSubmission(),
+                        ServiceClientActor(clientId, expiry),
+                        new ChatBotTenantBinding("tenant-alpha"),
+                        TestContext.Current.CancellationToken)
+                    .ConfigureAwait(true);
+
+                resolution.ReasonCode.ShouldNotBe(
+                    ChatBotAuthorizationReasonCodes.ServiceClientGrantMissing,
+                    $"ClaimsServiceClientGrantResolver denied client '{clientId}' with service_client_grant_missing "
+                    + $"for the realm-rendered expiry '{expiry}'.");
+                resolution.IsResolved.ShouldBeTrue(
+                    $"Client '{clientId}' must resolve a grant from the realm-rendered expiry '{expiry}'.");
+                resolution.Grant.ShouldNotBeNull().ExpiresAt.ShouldBe(parsed);
+            }
+        }
+        finally
+        {
+            await builder.DisposeAsync().ConfigureAwait(true);
+            if (generatedDirectory is not null && Directory.Exists(generatedDirectory))
+            {
+                Directory.Delete(generatedDirectory, recursive: true);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A realm client whose grant-expiry mapper lost its substitution placeholder must fail AppHost startup naming
+    /// that client, rather than reporting a placeholder count the operator then has to trace back to a client.
+    /// </summary>
+    [Fact]
+    public async Task PrepareKeycloakRealmImportNamesTheClientWhoseGrantExpiryMapperLostItsPlaceholder()
+    {
+        string appHostDirectory = Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost");
+        string realmPath = Path.Combine(appHostDirectory, "KeycloakRealms", "hexalith-realm.json");
+        string original = await File.ReadAllTextAsync(realmPath, TestContext.Current.CancellationToken).ConfigureAwait(true);
+
+        // Blank one client's placeholder, exactly as a hand-edit or a partial rotation would.
+        const string offendingClientId = "mcp-tool-client";
+        int clientIndex = original.IndexOf($"\"clientId\": \"{offendingClientId}\"", StringComparison.Ordinal);
+        clientIndex.ShouldBeGreaterThan(-1, $"The realm must declare '{offendingClientId}'.");
+        int placeholderIndex = original.IndexOf(
+            "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__",
+            clientIndex,
+            StringComparison.Ordinal);
+        placeholderIndex.ShouldBeGreaterThan(-1);
+        string mutated = string.Concat(
+            original.AsSpan(0, placeholderIndex),
+            "2099-01-01T00:00:00.0000000Z",
+            original.AsSpan(placeholderIndex + "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__".Length));
+
+        try
+        {
+            await File.WriteAllTextAsync(realmPath, mutated, TestContext.Current.CancellationToken).ConfigureAwait(true);
+
+            InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(
+                () => DistributedApplicationTestingBuilder
+                    .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, TestContext.Current.CancellationToken));
+
+            exception.Message.ShouldContain(offendingClientId);
+            exception.Message.ShouldContain("chatbot-service-client-grant-expiry");
+        }
+        finally
+        {
+            await File.WriteAllTextAsync(realmPath, original, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>A service-client submission shaped like the CLI automation client's.</summary>
+    private static ChatBotCommandSubmission ServiceClientSubmission()
+        => new(
+            new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "service-account")], "test")),
+            new CommandSubmissionRequest
+            {
+                CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                CommandType = "RecordGovernedNote",
+                Command = new { noteId = "01ARZ3NDEKTSV4RRFFQ69G5FAX" },
+                RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
+            },
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            null,
+            ChatBotSurfaceOrigin.Cli);
+
+    /// <summary>
+    /// The claims a service client's Keycloak token carries, with the grant expiry taken VERBATIM from the rendered
+    /// realm. Every other claim is a well-formed constant, so the only thing under test is the rendered expiry.
+    /// </summary>
+    private static ChatBotAuthenticatedActor ServiceClientActor(string clientId, string renderedExpiry)
+    {
+        ClaimsPrincipal principal = new(new ClaimsIdentity(
+            [
+                new Claim("sub", "service-account"),
+                new Claim(ClaimsServiceClientGrantResolver.ServiceClientIdClaim, clientId),
+                new Claim(ClaimsServiceClientGrantResolver.ServiceClientClassClaim, "cli-automation"),
+                new Claim(ClaimsServiceClientGrantResolver.GrantIdClaim, "01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+                new Claim(ClaimsServiceClientGrantResolver.GrantTenantClaim, "tenant-alpha"),
+                new Claim(ClaimsServiceClientGrantResolver.GrantExpiryClaim, renderedExpiry),
+                new Claim(ClaimsServiceClientGrantResolver.GrantScopeClaim, "notes.write"),
+                new Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, "RecordGovernedNote"),
+                new Claim(ClaimsServiceClientGrantResolver.GrantSurfaceClaim, "cli"),
+                new Claim(ClaimsServiceClientGrantResolver.CommandSetVersionClaim, "command-set-v1"),
+            ],
+            "test"));
+
+        return new ChatBotAuthenticatedActor("service-account", principal, "service", clientId);
     }
 
     private static bool OwnerMarkerStartsWith(string directory, string ownerPrefix)

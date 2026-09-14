@@ -1,351 +1,119 @@
 <!DOCTYPE html>
-<!-- UX Design Validation Report generated from the bmad-ux validation template. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <title>UX Design Validation: Hexalith.ChatBot</title>
 <style>
   :root {
-    --bg: #fafaf9;
-    --surface: #ffffff;
-    --border: #e7e5e4;
-    --text: #1c1917;
-    --muted: #78716c;
-
-    --verdict-strong: #16a34a;
-    --verdict-adequate: #65a30d;
-    --verdict-thin: #d97706;
-    --verdict-broken: #dc2626;
-
-    --sev-low: #64748b;
-    --sev-medium: #ca8a04;
-    --sev-high: #ea580c;
-    --sev-critical: #dc2626;
+    --bg: #fafaf9; --surface: #ffffff; --border: #e7e5e4; --text: #1c1917; --muted: #78716c;
+    --verdict-strong: #16a34a; --verdict-adequate: #65a30d; --verdict-thin: #d97706; --verdict-broken: #dc2626;
+    --sev-low: #64748b; --sev-medium: #ca8a04; --sev-high: #ea580c; --sev-critical: #dc2626;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-    font-size: 15px;
-  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; font-size: 15px; }
   .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
-
-  header.report-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 24px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 24px;
-  }
+  .report-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
   .title h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
-  .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
-
-  .synthesis {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--muted);
-    border-radius: 8px;
-    padding: 18px 22px;
-    margin-bottom: 24px;
-    font-size: 15.5px;
-  }
-  .synthesis p { margin: 0 0 10px; }
-  .synthesis p:last-child { margin-bottom: 0; }
-
-  .dimension-summary {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 10px;
-    margin-bottom: 24px;
-  }
-  .dim-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 14px;
-  }
-  .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-  .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
-
-  section.dimension, section.reviewer-section { margin-bottom: 14px; }
-  section.dimension details, section.reviewer-section details {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  section summary {
-    padding: 14px 20px;
-    cursor: pointer;
-    user-select: none;
-    list-style: none;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  section summary::-webkit-details-marker { display: none; }
-  section summary::before {
-    content: "▸";
-    display: inline-block;
-    color: var(--muted);
-    transition: transform 0.15s ease;
-  }
-  section details[open] summary::before { transform: rotate(90deg); }
-  section summary h2 {
-    display: inline;
-    margin: 0;
-    font-size: 16px;
-    font-weight: 600;
-    letter-spacing: -0.005em;
-    flex: 1;
-  }
-  .verdict-pill {
-    font-size: 11px;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: white;
-  }
-  .verdict-strong { background: var(--verdict-strong); }
-  .verdict-adequate { background: var(--verdict-adequate); }
-  .verdict-thin { background: var(--verdict-thin); }
-  .verdict-broken { background: var(--verdict-broken); }
-
-  .dim-body { padding: 4px 20px 18px; }
-  .dim-judgment { color: var(--text); font-size: 14.5px; }
-  .dim-judgment p { margin: 0 0 10px; }
-
-  .findings-list { padding: 0 20px 4px; }
-  article.finding {
-    padding: 14px 0;
-    border-top: 1px solid var(--border);
-  }
-  article.finding:first-child { border-top: none; }
-  article.finding header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 6px;
-  }
-  .badge {
-    font-size: 10.5px;
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    line-height: 1.4;
-  }
-  .badge-sev-low { background: rgba(100, 116, 139, 0.12); color: var(--sev-low); }
-  .badge-sev-medium { background: rgba(202, 138, 4, 0.14); color: var(--sev-medium); }
-  .badge-sev-high { background: rgba(234, 88, 12, 0.14); color: var(--sev-high); }
-  .badge-sev-critical { background: rgba(220, 38, 38, 0.14); color: var(--sev-critical); }
+  .subtitle, .reviewer-source, .finding-location, footer { color: var(--muted); font-size: 12.5px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .synthesis, .mechanical { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px 22px; margin-bottom: 24px; }
+  .synthesis { border-left: 3px solid var(--muted); font-size: 15.5px; }
+  .synthesis p { margin: 0 0 10px; } .synthesis p:last-child { margin-bottom: 0; }
+  .dimension-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 24px; }
+  .dim-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; } .dim-verdict { font-size: 14px; font-weight: 600; }
+  section { margin-bottom: 14px; } details { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  summary { padding: 14px 20px; cursor: pointer; user-select: none; list-style: none; display: flex; align-items: center; gap: 12px; }
+  summary::-webkit-details-marker { display: none; } summary::before { content: "▸"; color: var(--muted); } details[open] summary::before { transform: rotate(90deg); }
+  summary h2 { display: inline; margin: 0; font-size: 16px; font-weight: 600; flex: 1; }
+  .verdict-pill, .badge { color: white; font-size: 10.5px; padding: 3px 9px; border-radius: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .verdict-pill { border-radius: 999px; }
+  .verdict-strong { background: var(--verdict-strong); } .verdict-adequate { background: var(--verdict-adequate); } .verdict-thin { background: var(--verdict-thin); } .verdict-broken { background: var(--verdict-broken); }
+  .badge-sev-low { background: var(--sev-low); } .badge-sev-medium { background: var(--sev-medium); } .badge-sev-high { background: var(--sev-high); } .badge-sev-critical { background: var(--sev-critical); }
+  .dim-body { padding: 4px 20px 14px; } .dim-body p { margin: 0 0 8px; }
+  .findings-list { padding: 0 20px 4px; } .finding { padding: 14px 0; border-top: 1px solid var(--border); }
+  .finding header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
   .finding-title { margin: 0; font-size: 15px; font-weight: 500; flex: 1; min-width: 200px; }
-  .finding-location { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--muted); }
-  .finding-note, .finding-fix { margin-top: 6px; font-size: 14px; }
-  .finding-fix strong { color: var(--muted); font-weight: 500; }
-
-  .reviewer-source {
-    font-size: 12px;
-    color: var(--muted);
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  }
-
-  .mechanical {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 16px 20px;
-    margin-top: 24px;
-    font-size: 14px;
-  }
-  .mechanical h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .finding-note, .finding-fix { margin-top: 6px; font-size: 14px; } .finding-fix strong { color: var(--muted); font-weight: 500; }
+  .mechanical { margin-top: 24px; font-size: 14px; } .mechanical h3 { margin: 0 0 10px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
   .mechanical ul { margin: 0; padding-left: 20px; }
-  .mechanical li { margin-bottom: 4px; color: var(--text); }
-
-  footer.report-footer {
-    margin-top: 40px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-    font-size: 12px;
-    color: var(--muted);
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  }
-  footer .meta { display: flex; gap: 24px; flex-wrap: wrap; }
+  footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; gap: 24px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
-  <div class="container">
-    <header class="report-header">
-      <div class="title">
-        <h1>Hexalith.ChatBot — UX Design Validation Report</h1>
-        <div class="subtitle">_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28</div>
-      </div>
-    </header>
+<div class="container">
+  <header class="report-header"><div class="title"><h1>Hexalith.ChatBot — UX Design Validation Report</h1><div class="subtitle">_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28</div></div></header>
 
-    <div class="synthesis">
-      <p>The spine pair is broken as a current downstream contract despite strong structure and substantial behavioral detail. Its nine flows semantically cover the nine source journeys, all four frontmatter sources resolve, all 17 locally declared components pair across the spines, and visual-reference handling is explicit; however, source names and S1–S10 mappings are not preserved, the DESIGN color map violates the required token type, and current safety requirements for expired evidence and correction propagation are absent.</p>
-      <p>The specialist reviews reinforce that the original June accessibility and governance foundation is unusually strong, but later source changes did not reach the peer spines. Accessibility is thin for current governed-chat semantics, while governance and safety are broken by an unresolved approval-boundary contradiction and missing evidence-freshness, correction, bounded-admin, and informed-approval contracts.</p>
-    </div>
-
-    <div class="dimension-summary">
-      <div class="dim-card"><div class="dim-name">Flow coverage</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
-      <div class="dim-card"><div class="dim-name">Token completeness</div><div class="dim-verdict" style="color: var(--verdict-broken)">broken</div></div>
-      <div class="dim-card"><div class="dim-name">Component coverage</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
-      <div class="dim-card"><div class="dim-name">State coverage</div><div class="dim-verdict" style="color: var(--verdict-broken)">broken</div></div>
-      <div class="dim-card"><div class="dim-name">Visual reference coverage</div><div class="dim-verdict" style="color: var(--verdict-strong)">strong</div></div>
-      <div class="dim-card"><div class="dim-name">Bloat &amp; overspecification</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
-      <div class="dim-card"><div class="dim-name">Inheritance discipline</div><div class="dim-verdict" style="color: var(--verdict-broken)">broken</div></div>
-      <div class="dim-card"><div class="dim-name">Shape fit</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
-    </div>
-
-    <section class="dimension">
-      <details open>
-        <summary><h2>1. Flow coverage</h2><span class="verdict-pill verdict-thin">thin</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p>All nine source journeys have semantically matching, structurally complete Key Flows, but the contract lacks deterministic source and surface mappings.</p></div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Source journey names are not preserved</h3><span class="finding-location">prd.md:319-427; EXPERIENCE.md:256-355</span></header><div class="finding-note">None of the flow headings keeps the exact source name or a stable UJ/System Journey identifier.</div><div class="finding-fix"><strong>Fix:</strong> Use exact headings and map every flow to UJ, FR/NFR ranges, and S-surface identifiers.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">S1–S10 do not map to the nine IA surfaces</h3><span class="finding-location">prd.md:519-539; EXPERIENCE.md:32-46</span></header><div class="finding-note">Correction, Outbound Approval, Cross-surface Attribution, and Admin Queue Operations remain implicit or merged.</div><div class="finding-fix"><strong>Fix:</strong> Add an S1–S10 crosswalk and exercise each load-bearing surface action and failure path.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <section class="dimension">
-      <details open>
-        <summary><h2>2. Token completeness</h2><span class="verdict-pill verdict-broken">broken</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p>Brace references resolve and contrast targets are explicit, but machine-readable color values violate the schema and typography inheritance uses an unsupported form.</p></div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">Color tokens violate the DESIGN.md schema</h3><span class="finding-location">DESIGN.md:12-27</span></header><div class="finding-note">All 15 values are Fluent CSS variables rather than the required hex strings.</div><div class="finding-fix"><strong>Fix:</strong> Remove unchanged inherited roles from local colors or approve a schema-safe translation.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Typography uses an unsupported semantic exception</h3><span class="finding-location">DESIGN.md:28-38</span></header><div class="finding-note">Web typography roles use only note fields, an exception documented for native conventions.</div><div class="finding-fix"><strong>Fix:</strong> State unchanged Fluent inheritance in prose or encode only supported brand deltas.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <section class="dimension">
-      <details open>
-        <summary><h2>3. Component coverage</h2><span class="verdict-pill verdict-thin">thin</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p>All 17 declared local components pair across the spines, but newer product semantics and inherited primitives with local behavior are not contracted.</p></div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Current product-specific affordances are missing</h3><span class="finding-location">prd.md:1194-1201,1441</span></header><div class="finding-note">Classification, AI-summary provenance, “why this project,” and evidence freshness lack paired visual and behavioral specs.</div><div class="finding-fix"><strong>Fix:</strong> Add identically named components with non-color, provenance, disclosure, freshness, and blocking rules.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Inherited primitives with behavioral deltas are unnamed</h3><span class="finding-location">EXPERIENCE.md:123-172</span></header><div class="finding-note">Busy replacement, error focus, dialog/sheet containment, and queue filtering lack exact inherited-component mappings.</div><div class="finding-fix"><strong>Fix:</strong> Add rows only for inherited primitives that carry a product delta.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <section class="dimension">
-      <details open>
-        <summary><h2>4. State coverage</h2><span class="verdict-pill verdict-broken">broken</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p>The original surface states are detailed, but two current fail-closed state families are absent.</p></div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">Evidence freshness and approval blocking are absent</h3><span class="finding-location">prd.md:1441; EXPERIENCE.md:89-140</span></header><div class="finding-note">No fresh/stale/expired state or evidence-expired approval block is defined.</div><div class="finding-fix"><strong>Fix:</strong> Add freshness states, timestamps, announcements, and disabled-with-reason approval behavior.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Canonical correction states are missing</h3><span class="finding-location">prd.md:450-451,1324-1325</span></header><div class="finding-note">Correcting and Correction-delayed, propagation progress, context blocking, ownership, and escalation are absent.</div><div class="finding-fix"><strong>Fix:</strong> Add both states across affected surfaces with feedback, focus, recovery, and AI gating.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <section class="dimension">
-      <details>
-        <summary><h2>5. Visual reference coverage</h2><span class="verdict-pill verdict-strong">strong</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p>No imports, mockups, or wireframes exist, so there are no orphans. The intentional spine-only decision names all surfaces and states that the spines win on conflict.</p></div></div>
-      </details>
-    </section>
-
-    <section class="dimension">
-      <details>
-        <summary><h2>6. Bloat &amp; overspecification</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p>Most detail is proportionate to governance risk; one local visual scale duplicates inherited Fluent/FrontComposer behavior.</p></div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Local pixel scales duplicate Fluent inheritance</h3><span class="finding-location">DESIGN.md:39-52,180-209</span></header><div class="finding-note">Local spacing/radius values compete with the stated UI-system defaults.</div><div class="finding-fix"><strong>Fix:</strong> Remove inherited scales or retain only justified Fluent-token/component-parameter deltas.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Touch-target rules are duplicated</h3><span class="finding-location">EXPERIENCE.md:201,244</span></header><div class="finding-note">The same thresholds appear in two sections.</div><div class="finding-fix"><strong>Fix:</strong> Keep the normative rule in Accessibility Floor and reference it elsewhere.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <section class="dimension">
-      <details open>
-        <summary><h2>7. Inheritance discipline</h2><span class="verdict-pill verdict-broken">broken</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p>All frontmatter sources and token references resolve, but a safety taxonomy conflict, a stale validation source, and a broken implementation reference prevent reliable inheritance.</p></div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Risk taxonomy is not reconciled in the UX</h3><span class="finding-location">prd.md:1215-1224; addendum.md:25-33</span></header><div class="finding-note">Classifier results and user-visible dispositions are conflated.</div><div class="finding-fix"><strong>Fix:</strong> Define the displayed vocabulary and map every outcome to review, refusal, and execution behavior.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Historical PRD validation is presented as binding</h3><span class="finding-location">frontmatter sources; prd-validation-report.md:1-21</span></header><div class="finding-note">The source evaluates an older PRD and carries obsolete counts and a stale Critical verdict.</div><div class="finding-fix"><strong>Fix:</strong> Remove it from binding sources or label it historical/context-only with its target revision.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">FrontComposer implementation reference is broken</h3><span class="finding-location">DESIGN.md:142</span></header><div class="finding-note">The path omits the repository's references segment.</div><div class="finding-fix"><strong>Fix:</strong> Link to references/Hexalith.FrontComposer/docs/fluent-ui-v5-contingency.md.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <section class="dimension">
-      <details>
-        <summary><h2>8. Shape fit</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p>Both spines follow their canonical section shapes and include the applicable responsive and inspiration sections.</p></div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Product-Specific Concerns does not earn a separate section</h3><span class="finding-location">EXPERIENCE.md:224-230,250-254</span></header><div class="finding-note">Its single row repeats the adjacent localization contract.</div><div class="finding-fix"><strong>Fix:</strong> Remove it or reserve it for a genuinely distinct concern.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <section class="reviewer-section">
-      <details>
-        <summary><h2>Accessibility review</h2><span class="reviewer-source">review-accessibility.md</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p><strong>Thin.</strong> The June accessibility foundation is concrete, but current governed-chat semantics require behavior that inheritance cannot supply. Findings: 0 critical, 5 high, 4 medium, 0 low.</p></div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Accessibility rules are split across unreferenced peers</h3><span class="finding-location">DESIGN.md:4-11; EXPERIENCE.md:3-10; index.md:8-18</span></header><div class="finding-note">The spines predate the governed chat and later binding addenda, making behavior depend on discovery order.</div><div class="finding-fix"><strong>Fix:</strong> Distill every binding accessibility delta into the peer spines.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">AI summaries are not programmatically distinguished</h3><span class="finding-location">prd.md:1198-1201,1469-1472</span></header><div class="finding-note">Generated interpretation may be heard as authoritative evidence.</div><div class="finding-fix"><strong>Fix:</strong> Add semantic Source evidence and AI summary components with provenance-first reading order and keyboard disclosure.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Evidence-expiry behavior is not accessible</h3><span class="finding-location">prd.md:1441</span></header><div class="finding-note">No accessible freshness state, transition announcement, focus preservation, or explained disabled approval exists.</div><div class="finding-fix"><strong>Fix:</strong> Add timestamp/state association, forced-colors treatment, one-time announcements, and an aria-disabled reason.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Correction progress and delay lack accessible states</h3><span class="finding-location">prd.md:450-451,1324-1325</span></header><div class="finding-note">Assistive-technology behavior is undefined during derived-store invalidation.</div><div class="finding-fix"><strong>Fix:</strong> Define labels, progress semantics, deduplicated announcements, owner/next action, and focus preservation.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Incremental AI output lacks bounded announcements</h3><span class="finding-location">EXPERIENCE.md:127-139,181,194-200</span></header><div class="finding-note">Streaming chunks could repeatedly interrupt screen-reader reading.</div><div class="finding-fix"><strong>Fix:</strong> Keep streamed content outside live regions and announce only start/completion/stop/failure once.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Classification and “why” disclosure lack accessible behavior</h3><span class="finding-location">prd.md:1194-1201</span></header><div class="finding-note">Message association, labelled facts, reading order, expanded state, and focus return are unspecified.</div><div class="finding-fix"><strong>Fix:</strong> Define both patterns in the peer spines.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Mixed-language content lacks metadata</h3><span class="finding-location">EXPERIENCE.md:224-230</span></header><div class="finding-note">English/French rules do not define page language or language of email, AI, and quoted content.</div><div class="finding-fix"><strong>Fix:</strong> Bind root lang to locale, tag known language-of-parts, and test EN/FR screen readers.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Focus can be obscured by authored chrome</h3><span class="finding-location">DESIGN.md:164,180-190; EXPERIENCE.md:167-172</span></header><div class="finding-note">Focus order and contrast do not guarantee WCAG 2.2 Focus Not Obscured.</div><div class="finding-fix"><strong>Fix:</strong> Require visible focused targets, scroll margins, and 200%/400% zoom tests.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Association radiogroup behavior is undefined</h3><span class="finding-location">implementation-conformance-addendum-2026-07-17.md:34-44</span></header><div class="finding-note">Selection, arrow navigation, validation, focus recovery, and refresh behavior remain inferred.</div><div class="finding-fix"><strong>Fix:</strong> Define one named radiogroup plus a non-committing selection and explicit decision bar.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <section class="reviewer-section">
-      <details>
-        <summary><h2>Governance &amp; safety review</h2><span class="reviewer-source">review-governance-safety.md</span></summary>
-        <div class="dim-body"><div class="dim-judgment"><p><strong>Broken.</strong> The pair is strongly fail-closed in its original scope, but one source contradiction can change whether boundary-crossing AI actions execute without approval, and later controls never reached the spines. Findings: 1 critical, 5 high, 3 medium, 0 low.</p></div></div>
-        <div class="findings-list">
-          <article class="finding"><header><span class="badge badge-sev-critical">critical</span><h3 class="finding-title">Approval-boundary sources contradict each other</h3><span class="finding-location">prd.md:1215-1237; addendum.md:25-33,65-74</span></header><div class="finding-note">The same six effect classes are both necessarily approval-required and tenant-downgradable to low-risk.</div><div class="finding-fix"><strong>Fix:</strong> Approve one evaluation order and outcome taxonomy; require approval for all six until resolved.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Evidence freshness is not fail-closed</h3><span class="finding-location">DESIGN.md:147,218-224; EXPERIENCE.md:75-81</span></header><div class="finding-note">Warning color exists without freshness data, expiry blocks, refresh, or audit behavior.</div><div class="finding-fix"><strong>Fix:</strong> Require freshness everywhere evidence appears and block expired decisions with evidence-expired.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Correction may finish before derived context is safe</h3><span class="finding-location">EXPERIENCE.md:98,114,293-301</span></header><div class="finding-note">The contract lacks store acknowledgement, delay handling, and AI-context blocking until invalidation completes.</div><div class="finding-fix"><strong>Fix:</strong> Add correcting/delayed progress, owner/estimate/escalation, and a hard AI-action gate.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Bounded administration and two-person control are absent</h3><span class="finding-location">EXPERIENCE.md:43,120,303-311</span></header><div class="finding-note">One admin can appear to activate sensitive policy, and queue visibility is not separated from project authority.</div><div class="finding-fix"><strong>Fix:</strong> Add two-admin proposal/approval, conflict/rejection/expiry, activation, scope, justification, and audit states.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Denial copy can disclose resource existence</h3><span class="finding-location">EXPERIENCE.md:52-61,106,111-116</span></header><div class="finding-note">The recommended copy and visible suppression state distinguish forbidden resources from nonexistent ones.</div><div class="finding-fix"><strong>Fix:</strong> Use existence-neutral language and reserve precise reasons for authorized audit evidence.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Approval review lacks authority and effect detail</h3><span class="finding-location">DESIGN.md:222-224; EXPERIENCE.md:79-81,334-343</span></header><div class="finding-note">Required authority, classifier, policy snapshot, post-state, side-effect, and audit data are absent.</div><div class="finding-fix"><strong>Fix:</strong> Add the fields and revalidate immediately before execution; changes require a new proposal.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">AI-summary provenance is missing</h3><span class="finding-location">DESIGN.md:214-217; EXPERIENCE.md:70-73</span></header><div class="finding-note">Generated interpretation can be mistaken for authoritative source evidence.</div><div class="finding-fix"><strong>Fix:</strong> Add model/version/time/source IDs, source-first display, audit linkage, and redaction-safe exports.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Replay and conflict outcomes are underspecified</h3><span class="finding-location">EXPERIENCE.md:58-59,103-105,207-213</span></header><div class="finding-note">The UX lacks stable identity, prior-outcome reuse, conflict types, ceilings, and replay windows.</div><div class="finding-fix"><strong>Fix:</strong> Define a shared operation-status pattern and stable status/reason codes.</div></article>
-          <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">UI/CLI/MCP parity lacks a complete outcome map</h3><span class="finding-location">EXPERIENCE.md:44,121,240,313-321,345-355</span></header><div class="finding-note">Only a CLI subset is exercised; MCP failure and recovery are not mapped.</div><div class="finding-fix"><strong>Fix:</strong> Add a canonical cross-surface outcome matrix and one MCP failure/recovery example.</div></article>
-        </div>
-      </details>
-    </section>
-
-    <div class="mechanical">
-      <h3>Mechanical notes</h3>
-      <ul>
-        <li>Both YAML frontmatter blocks parse structurally; all four relative source paths resolve.</li>
-        <li>All 35 unique DESIGN.md brace references resolve, and all 17 local component names pair across the spines.</li>
-        <li>The current source catalog contains 111 FR identifiers and 77 NFR identifiers; the historical validation report's lower counts are stale.</li>
-        <li>No imports, mockups, wireframes, or Mermaid blocks exist; spine-only precedence is explicit.</li>
-        <li>Raw reviewer findings: 3 critical, 16 high, 11 medium, 2 low. Overlapping findings are retained to preserve each reviewer's lens.</li>
-      </ul>
-    </div>
-
-    <footer class="report-footer">
-      <div class="meta">
-        <span>Rubric: .agents/skills/bmad-ux/references/validate.md</span>
-        <span>DESIGN: _bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/DESIGN.md</span>
-        <span>EXPERIENCE: _bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/EXPERIENCE.md</span>
-        <span>Generated: 2026-09-13T13:48:18+02:00</span>
-      </div>
-    </footer>
+  <div class="synthesis">
+    <p>The updated spine pair is not ready to finalize as a downstream contract. It now has strong structural coverage—nine source journeys, explicit S1–S10 closure, 34 paired product components, a schema-valid DESIGN.md, and an explicit spine-only visual posture—but threshold wording, canonical state vocabulary, and classifier fallback remain ambiguous.</p>
+    <p>Accessibility is otherwise implementation-ready, and governance has a strong fail-closed foundation. Residual high-severity issues affect responsive reflow, batch approval, admin authority, suppressed-candidate confidentiality, and correction commit timing. The approved six-class mandatory-human-approval rule remains intact. Combined findings: 0 critical, 8 high, 10 medium, 1 low.</p>
   </div>
+
+  <div class="dimension-summary">
+    <div class="dim-card"><div class="dim-name">Flow coverage</div><div class="dim-verdict" style="color:var(--verdict-adequate)">adequate</div></div>
+    <div class="dim-card"><div class="dim-name">Token completeness</div><div class="dim-verdict" style="color:var(--verdict-adequate)">adequate</div></div>
+    <div class="dim-card"><div class="dim-name">Component coverage</div><div class="dim-verdict" style="color:var(--verdict-strong)">strong</div></div>
+    <div class="dim-card"><div class="dim-name">State coverage</div><div class="dim-verdict" style="color:var(--verdict-thin)">thin</div></div>
+    <div class="dim-card"><div class="dim-name">Visual references</div><div class="dim-verdict" style="color:var(--verdict-strong)">strong</div></div>
+    <div class="dim-card"><div class="dim-name">Bloat &amp; overspecification</div><div class="dim-verdict" style="color:var(--verdict-adequate)">adequate</div></div>
+    <div class="dim-card"><div class="dim-name">Inheritance discipline</div><div class="dim-verdict" style="color:var(--verdict-broken)">broken</div></div>
+    <div class="dim-card"><div class="dim-name">Shape fit</div><div class="dim-verdict" style="color:var(--verdict-strong)">strong</div></div>
+  </div>
+
+  <section class="dimension"><details><summary><h2>Flow coverage</h2><span class="verdict-pill verdict-adequate">adequate</span></summary><div class="dim-body"><p>All nine source journeys have named protagonists, numbered steps, climax beats, and failure paths. Two exact-extraction gaps remain.</p></div><div class="findings-list">
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Association threshold disposition is incomplete</h3><span class="finding-location">EXPERIENCE.md:34,174,295</span></header><div class="finding-note">Scores in [T_low, T_high) have no explicit disposition.</div><div class="finding-fix"><strong>Fix:</strong> Route every score below T_high to NeedsReview; use T_low only for presentation.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">UJ1 omits current suffix and surface identifiers</h3><span class="finding-location">EXPERIENCE.md:273</span></header><div class="finding-note">FR28f and S1a are not extractable from the mapping.</div><div class="finding-fix"><strong>Fix:</strong> Map UJ1 through FR28f and add S1a to the crosswalk.</div></article>
+  </div></details></section>
+
+  <section class="dimension"><details><summary><h2>Token completeness</h2><span class="verdict-pill verdict-adequate">adequate</span></summary><div class="dim-body"><p>No unresolved token reference or schema error was found. Inherited Fluent/FrontComposer visual values are intentionally omitted.</p></div><div class="findings-list">
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Component extension metadata is ignored by generic consumers</h3><span class="finding-location">DESIGN.md:16-118</span></header><div class="finding-note">The linter reports 68 warnings for base, emphasis, distinction, and default fields.</div><div class="finding-fix"><strong>Fix:</strong> Version the extension or move metadata into Components prose.</div></article>
+  </div></details></section>
+
+  <section class="dimension"><details><summary><h2>Component coverage</h2><span class="verdict-pill verdict-strong">strong</span></summary><div class="dim-body"><p>All 34 component identifiers pair across frontmatter, DESIGN visual contracts, and EXPERIENCE behavioral contracts.</p></div></details></section>
+
+  <section class="dimension"><details open><summary><h2>State coverage</h2><span class="verdict-pill verdict-thin">thin</span></summary><div class="dim-body"><p>Per-surface loading, empty, focus, validation, permission, freshness, degradation, success, retry, conflict, and terminal behavior is broad. Canonical implementation vocabulary is not yet safe.</p></div><div class="findings-list">
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Canonical domain state names are not preserved</h3><span class="finding-location">EXPERIENCE.md:136-148</span></header><div class="finding-note">Presentation labels replace or omit authoritative state families.</div><div class="finding-fix"><strong>Fix:</strong> Preserve exact domain enums and map user-facing labels separately.</div></article>
+  </div></details></section>
+
+  <section class="dimension"><details><summary><h2>Visual reference coverage</h2><span class="verdict-pill verdict-strong">strong</span></summary><div class="dim-body"><p>No imports, mockups, or wireframes exist. The intentional spine-only posture and spine precedence are explicit.</p></div></details></section>
+
+  <section class="dimension"><details><summary><h2>Bloat &amp; overspecification</h2><span class="verdict-pill verdict-adequate">adequate</span></summary><div class="dim-body"><p>Detail is proportionate to the product's authorization, audit, accessibility, recovery, and parity risks. Inherited scales are not duplicated.</p></div></details></section>
+
+  <section class="dimension"><details open><summary><h2>Inheritance discipline</h2><span class="verdict-pill verdict-broken">broken</span></summary><div class="dim-body"><p>All source paths and component references resolve, but classifier fallback and some vocabulary remain unsafe to inherit.</p></div><div class="findings-list">
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Indeterminate classifier write behavior conflicts</h3><span class="finding-location">EXPERIENCE.md:33,126,175,378</span></header><div class="finding-note">The addendum permits normalization to approval-required while NFR15a blocks proposal persistence.</div><div class="finding-fix"><strong>Fix:</strong> Record an approved reconciliation and align durable-write behavior.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Display vocabulary and detector ownership drift</h3><span class="finding-location">EXPERIENCE.md:93,97,124,377</span></header><div class="finding-note">User-visible labels and detector/kernel terminology are not mapped to canonical source ownership.</div><div class="finding-fix"><strong>Fix:</strong> Add explicit mappings and exact detector/artifact version names.</div></article>
+  </div></details></section>
+
+  <section class="dimension"><details><summary><h2>Shape fit</h2><span class="verdict-pill verdict-strong">strong</span></summary><div class="dim-body"><p>DESIGN follows canonical section order; EXPERIENCE contains all required and triggered sections.</p></div></details></section>
+
+  <section class="reviewer-section"><details><summary><h2>Accessibility review</h2><span class="reviewer-source">review-accessibility.md</span></summary><div class="dim-body"><p>Verdict: adequate. The previous nine accessibility findings are closed.</p></div><div class="findings-list">
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Larger-screen handoff conflicts with WCAG Reflow</h3><span class="finding-location">DESIGN.md:149-155; EXPERIENCE.md:21-23,255-263</span></header><div class="finding-note">Narrow layouts may lose administration or investigation functionality.</div><div class="finding-fix"><strong>Fix:</strong> Make handoff optional and require operability at 320 CSS pixels and 400% zoom.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Operational auto-refresh lacks pause/apply behavior</h3><span class="finding-location">EXPERIENCE.md:105-106,179,182-205</span></header><div class="finding-note">Queue/dashboard rows may change underneath assistive-technology reading context.</div><div class="finding-fix"><strong>Fix:</strong> Queue updates behind an explicit action or provide pause/manual refresh.</div></article>
+  </div></details></section>
+
+  <section class="reviewer-section"><details><summary><h2>Governance &amp; safety review</h2><span class="reviewer-source">review-governance-safety.md</span></summary><div class="dim-body"><p>Verdict: needs revision, with a strong safety foundation. The mandatory six-class human-approval invariant remains preserved.</p></div><div class="findings-list">
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Batch approval is broader than the source permits</h3><span class="finding-location">EXPERIENCE.md:203</span></header><div class="finding-note">Frozen comparison criteria and prohibited effect classes are incomplete.</div><div class="finding-fix"><strong>Fix:</strong> Require every frozen field and exclude irreversible, external-send, file-exposing, tool, and on-behalf actions.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Admin queue operations exceed Project authority</h3><span class="finding-location">EXPERIENCE.md:53,179,205,325-330</span></header><div class="finding-note">Aggregate scope currently implies per-item mutation authority.</div><div class="finding-fix"><strong>Fix:</strong> Separate opaque partition controls and fully revalidated Project-authorized item actions.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Candidate parity can disclose suppressed resources</h3><span class="finding-location">EXPERIENCE.md:95,111,214</span></header><div class="finding-note">A shared suppressed set can leak identity, ordering, or cardinality.</div><div class="finding-fix"><strong>Fix:</strong> Share equivalent omission/redaction semantics only.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Correction commit timing is ambiguous</h3><span class="finding-location">EXPERIENCE.md:176,313-319</span></header><div class="finding-note">A failed pre-commit invalidation/audit dependency can appear committed.</div><div class="finding-fix"><strong>Fix:</strong> Keep the predecessor authoritative on pre-commit failure; use Correcting only after a valid commit.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Approval invariant is temporary and actor scope is broad</h3><span class="finding-location">DESIGN.md:215; EXPERIENCE.md:32,86,130</span></header><div class="finding-fix"><strong>Fix:</strong> Make it permanent for AI-mediated actions and distinguish direct governed human writes.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Task-intent detector contract drifts</h3><span class="finding-location">EXPERIENCE.md:93,142,173</span></header><div class="finding-fix"><strong>Fix:</strong> Use detector_version, add detector-unavailable review, and delay risk classification.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Universal admin audit obligation is missing</h3><span class="finding-location">EXPERIENCE.md:102-103,177,205,321-332</span></header><div class="finding-fix"><strong>Fix:</strong> Audit every allowed or rejected admin action and prohibit non-human admin assignment/policy mutation.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Identity evolution and human annotations are underspecified</h3><span class="finding-location">EXPERIENCE.md:107,180,313-317,350-356</span></header><div class="finding-fix"><strong>Fix:</strong> Preserve original identity, show unresolved-current status, and mark annotations non-authoritative.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Diagnostics are not runbook-complete</h3><span class="finding-location">EXPERIENCE.md:104-106,179</span></header><div class="finding-fix"><strong>Fix:</strong> Add the complete authorized NFR44 field set.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-medium">medium</span><h3 class="finding-title">Parity does not separate exposure from AI allowlisting</h3><span class="finding-location">EXPERIENCE.md:207-224</span></header><div class="finding-fix"><strong>Fix:</strong> Show catalog, surface exposure, and deny-by-default AI allowlist separately.</div></article>
+    <article class="finding"><header><span class="badge badge-sev-low">low</span><h3 class="finding-title">Pre-A11 SLO view is named as published</h3><span class="finding-location">DESIGN.md:196; EXPERIENCE.md:51,106,179,328</span></header><div class="finding-fix"><strong>Fix:</strong> Call it SLO qualification backlog until publication gates pass.</div></article>
+  </div></details></section>
+
+  <div class="mechanical"><h3>Mechanical notes</h3><ul>
+    <li>0 critical, 8 high, 10 medium, and 1 low finding across three reviewers.</li>
+    <li>All direct and supplemental source paths resolve.</li>
+    <li>34 frontmatter component objects, 34 visual rows, 34 behavioral rows, and 34 resolving references pair exactly.</li>
+    <li>Nine journeys and S1–S10 are represented; no visual-reference artifacts exist.</li>
+    <li>Google DESIGN.md lint: 0 errors, 68 extension-field warnings, 1 informational result.</li>
+  </ul></div>
+
+  <footer><span>Rubric: .agents/skills/bmad-ux/references/validate.md</span><span>Generated: 2026-09-14T10:06:15+02:00</span></footer>
+</div>
 </body>
 </html>

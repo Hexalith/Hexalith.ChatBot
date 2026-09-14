@@ -1,355 +1,382 @@
 ---
 name: Hexalith.ChatBot
-status: final
+status: in-review
 created: 2026-05-28
-updated: 2026-06-05T12:12:05+02:00
+updated: 2026-09-14
 sources:
   - ../../prds/prd-Hexalith.ChatBot-2026-05-28/prd.md
   - ../../prds/prd-Hexalith.ChatBot-2026-05-28/addendum.md
   - ../../product-brief-Hexalith.ChatBot.md
-  - ../../prds/prd-Hexalith.ChatBot-2026-05-28/prd-validation-report.md
+supplementalSources:
+  - m1-m2-surface-elaboration.md
+  - epic10-chat-surface-elaboration.md
+  - implementation-conformance-addendum-2026-07-17.md
+decisionLog: .memlog.md
 ---
 
-# Hexalith.ChatBot - Experience Spine
+# Hexalith.ChatBot — Experience Spine
 
 ## Foundation
 
-Responsive enterprise web application. The UI foundation is Hexalith.FrontComposer, integrated as a submodule of the main project, with Microsoft Blazor Fluent UI v5 as the component system. Visual inheritance chain: Fluent UI v5 → Hexalith.FrontComposer (theme and component integration) → `DESIGN.md` (semantic narrowing) → this document (behavioral spec). `DESIGN.md` is the visual identity reference; this document owns information architecture, behavior, states, interactions, accessibility, and journeys.
+Hexalith.ChatBot is a responsive enterprise web application. Microsoft Blazor Fluent UI v5 → Hexalith.FrontComposer → `DESIGN.md` is the visual inheritance chain; this document owns information architecture, behavior, states, interactions, accessibility, and journeys. Every routable page uses the single FrontComposer shell with `FcPageLayout` and `FcPageHeader`.
 
-Primary MVP context: governed email-to-project collaboration where conversations, attachments, project association, AI actions, approvals, and audit history stay tied to tenant, project, party, folder, memory, and command boundaries.
+Primary use is desktop/laptop for contributors, project owners, tenant administrators, operators, developers, support, and compliance reviewers. Tablet and phone support reading, triage, governed AI requests, and safe decisions; dense administration and investigation provide a state-preserving larger-screen handoff.
 
-Decision: primary use is desktop/laptop for project managers, contributors, tenant admins, developers, support, and compliance reviewers. Mobile/responsive use supports triage, reading, simple decisions, and status lookup, but not full admin configuration.
+The current MVP is governed email-to-project collaboration plus the governed project conversation/composer. Its safe scope is explicit:
 
-UX scope boundary:
-
-| Source tension | UX decision |
+| Source tension | Binding UX decision |
 |---|---|
-| Product brief names generic email integration; PRD narrows MVP to controlled mailbox collaboration. | Generic email provider differences inherit the same intake, association, authorization, attachment, and audit surfaces. Provider-specific authoring is not a separate UX surface unless the PRD changes. |
-| Product brief names scheduled-time and file-addition automated triggers; PRD narrows first UX contract to mailbox-driven collaboration and approved commands. | Scheduled-time and file-addition triggers appear as command/event origins in Operational Queues, Conversation Detail, AI Action Review, and Audit Investigation. Trigger-authoring UI beyond tenant policy/configuration is later workflow scope unless the PRD changes. |
+| Product brief includes scheduled-time and file-addition automation. | These triggers and their authoring surfaces are future-only. MVP flows and origin lists do not imply that they execute. Conversation-triggered work is the only current automation trigger. |
+| Product brief includes general user upload. | General user upload is post-MVP. MVP file intake is governed mailbox attachment capture only. |
+| Product brief names generic email; current PRD centers controlled Microsoft 365/Exchange-style intake. | Any provider must satisfy the same controlled mailbox, identity, authenticity, attachment, idempotency, audit, and fail-closed contract. Provider-specific authoring is not a separate MVP surface. |
+| PRD/addendum text has historically conflicted on boundary-effect downgrade. | Interim decision approved 2026-09-14: all six boundary-crossing effect classes require human approval. No tenant policy can downgrade them until upstream reconciliation is formally complete. |
+| Risk classifier can be indeterminate. | Create a reviewable `approval-required` proposal only when its inputs, project, actor, command, and evidence are otherwise authorized and supported. Otherwise show an existence-neutral `denied` or `unsupported` outcome and disclose no unsafe candidate. |
+| Association score is below `T_low`, empty, conflicted, non-finite, stale, or unsafe. | Enter `NeedsReview`. `T_low` affects ranking/presentation only. Show only candidates safe for the actor; an empty safe set remains reviewable without revealing suppressed candidates. |
 
-Visual reference decision: this update intentionally keeps the UX contract spine-only. No mockups, wireframes, or imports are required for MVP handoff; downstream builders should implement Project Workspace, Conversation Detail, Association Review, AI Action Review, Files and Context, Operational Queues, Audit Investigation, Tenant Configuration, and Command Surface Reference from the IA, component, state, interaction, and accessibility tables in this file. Future visual mockups may extend the handoff, but the spines win on conflict.
+This package is intentionally spine-only: there are no `imports/`, `mockups/`, or `wireframes/`. The IA and component/state tables are the implementation reference. Future visuals may illustrate them; these spines win on conflict.
 
 ## Information Architecture
 
-| Surface | Reached from | Purpose |
-|---|---|---|
-| Project Workspace | App open, project switcher, deep link | Project-centered conversation, context, files, AI interaction, and current work state. |
-| Conversation Detail | Project workspace, search, audit link | Multi-actor conversation stream with messages, parties, attachments, task intent, AI proposals, approvals, and outcomes. |
-| Association Review | Workspace alert, queue, mailbox status | Resolve ambiguous or failed email-to-project association with candidate evidence. |
-| AI Action Review | Conversation proposal, approval queue, notification | Approve, reject, revise, or cancel proposed risky AI actions before execution. |
-| Files and Context | Project workspace, conversation attachment, AI proposal | Show governed folders, stored attachments, memory/index status, and context eligibility. |
-| Operational Queues | Navigation, admin dashboard, notification | Ambiguous associations, unresolved parties, pending approvals, failed ingestion, retryable work, quarantine. |
-| Audit Investigation | Conversation event, project audit, support search | Reconstruct association decisions, approval history, command execution, correction, retry, and AI outcomes. |
-| Tenant Configuration | Admin navigation | Mailbox patterns, party resolution rules, confidence thresholds, approval policies, service clients, notifications. |
-| Command Surface Reference | Developer navigation or docs link | Explain UI/CLI/MCP parity, stable command names, status codes, reason codes, and audit attribution. |
+### Source-surface crosswalk and closure
 
-IA closure: every stated need maps to a surface. Conversation work lands in Project Workspace and Conversation Detail; ambiguous association lands in Association Review; AI risk lands in AI Action Review; files and memory land in Files and Context; operations land in Operational Queues; traceability lands in Audit Investigation; tenant governance lands in Tenant Configuration; CLI/MCP parity lands in Command Surface Reference and shared backend behavior.
+| PRD surface | UX surface | Reached from | Journey coverage | Load-bearing purpose |
+|---|---|---|---|---|
+| S1 — Project conversation view | Project Workspace / Conversation Detail, including Files and Context | `/`, project switcher, deep link, search | UJ1, UJ3, System Journey | Email-derived events, parties, attachments, classification, task intent, governed composer, AI results, approvals, and status. |
+| S2 — Ambiguous association review | Association Review | Workspace alert, queue, mailbox status | UJ2, UJ3 | Compare authorized candidates/evidence and confirm, reject all, defer, or escalate without auto-attachment. |
+| S3 — AI action approval | AI Action Review | Conversation proposal, approval queue, notification | UJ1, UJ8, System Journey | Review classification, authority, effects, evidence freshness, and approve/reject/revise/cancel. |
+| S4 — Correction surface | Correction Surface within Association Review and Conversation Detail | Association details, audit link | UJ4 | Supersede an association, track derived-store acknowledgements, and block contaminated AI context. |
+| S5 — Tenant admin configuration | Tenant Administration | Admin navigation | UJ5 | Govern mailbox, policy, approval routing, service clients, notifications, and bounded admin roles. |
+| S6 — Outbound approval | Outbound Approval within AI Action Review | Outbound proposal | UJ8 | Freeze and review content, recipients, sender authority/delegation, files, and effects before send. |
+| S7 — Cross-surface attribution view | Cross-surface Attribution / Command Surface Reference | Operation or audit link, developer reference | UJ6, UJ7, System Journey | Show normalized UI/CLI/MCP outcomes, immutable origin, operation identity, and parity version. |
+| S8 — Operational dashboards | Operational Dashboards | Admin/operator navigation | UJ5, UJ7 | Health, queues, SLOs, budgets, freshness, ownership, and escalation. |
+| S9 — Compliance investigation | Compliance Investigation | Audit link, support search | UJ7 | Reconstruct authorized evidence, policy, approval, command, correction, replay, and outcome history. |
+| S10 — Admin queue operations | Admin Queue Operations | Dashboard or queue row | UJ5, UJ6 | Claim/assign, retry, requeue, quarantine, or dismiss at queue scope without mutating project records. |
+
+The crosswalk is the IA closure proof. Files and Context is an S1 panel; approval queues feed S3/S6; correction queues feed S4; aggregate operational queues feed S8/S10. Every surface has a named journey and every stated MVP need lands on a surface.
+
+Page composition follows the binding implementation addendum. A page with two or more sibling titled sections uses one `FluentAccordion`, primary item expanded, except for a single primary grid/form/workflow. On Association Review, `Association candidate group` and `Association decision bar` form one visible primary workflow outside the accordion; evidence comparison and source metadata are complementary accordion content.
+
+Each surface story owns live-route acceptance for primary success, loading/empty, validation, unauthorized/redacted, degraded, retryable, terminal, keyboard/focus, responsive, light/dark/forced-colors, reduced-motion, English/French, and governed-command behavior. Static fixtures do not replace live-route evidence.
 
 ## Voice and Tone
 
-Microcopy is factual, specific, and safe. Brand posture lives in `DESIGN.md`.
+Microcopy is factual, specific, existence-neutral, and action-oriented. Brand posture lives in `DESIGN.md`.
 
 | Do | Don't |
 |---|---|
-| "This message needs project review." | "We found a possible project!" |
-| "3 candidate projects. Confidence is close." | "AI is unsure." |
-| "Approval required: external reply may include project files." | "This seems risky." |
-| "Association blocked. You do not have access to this project." | "Project exists but permission denied." |
-| "Retry queued. No duplicate files were created." | "Retrying..." without consequence. |
-| "Audit projection is pending. Command accepted." | "Done." when only part of the workflow completed. |
+| “This message needs project review.” | “We found a possible project!” |
+| “No project is available for this decision. Escalate for authorized review.” | “You do not have access to Project Atlas.” |
+| “Approval required: external communication.” | “This seems risky.” |
+| “Approval unavailable (`evidence-expired`). Refresh evidence to continue.” | “Try again.” without cause or consequence. |
+| “Correction delayed. Operations owns the next step.” | “Still working…” without owner or escalation. |
+| “Prior outcome returned. No duplicate action occurred.” | “Done.” for a replay, conflict, or partial success. |
+| “AI service unavailable. Manual review remains available.” | “The system is unavailable.” when only generation is affected. |
 
-Error and denial language must not reveal unauthorized project names, file metadata, candidate evidence, or sensitive audit details.
+Every blocked/degraded/failed/denied state uses a versioned stable code, a headline no longer than 80 characters, one safe sentence, and a safe next action. User-facing copy never names an unauthorized project, file, party, candidate, or audit detail. Precise causes remain in authorized audit evidence.
 
 ## Component Patterns
 
-Behavioral specs. Visual specs live in `DESIGN.md.Components` and inherited Fluent UI/FrontComposer components.
+Behavioral specs below pair exactly with `DESIGN.md.Components`; the visual reference column resolves to DESIGN frontmatter.
 
-| Component | Use | Behavioral rules |
+| Component | Visual reference | Behavioral rules |
 |---|---|---|
-| Project context header | Workspace, conversation, approval, audit | Always shows authorized project identity, tenant context when relevant, current conversation/state, and safe status. |
-| Conversation shell | Project workspace, conversation detail | Owns the two-part relationship between project context and active conversation. It keeps workflow state visible while panels, evidence, and approvals open. |
-| Conversation stream | Conversation detail | Orders human, external party, mailbox, AI, CLI/MCP, background, trigger, and system events with actor attribution. System decisions are not hidden as chat messages. |
-| Composer/action entry | Conversation detail | Supports user messages and AI requests. When a request implies risky action, create a proposal instead of executing. |
-| Actor badge | Conversation, audit, approvals | Identifies actor type and resolved party/user/client. Must distinguish all eight categories named in `DESIGN.md.Components` (human user, external party, service client, AI actor, background worker, CLI, MCP, mailbox event) with a stable label and icon affordance; the same visual token applies across categories — differentiation is by accessible label and icon, not color. Unresolved actors show an unresolved state and safe actions. |
-| Attachment row | Conversation, files, approval | Shows storage status, scan status, folder link, duplicate/retry state, and whether the file is eligible for AI context. |
-| Association candidate row | Association review | Shows project candidate, confidence band, evidence chips, unavailable/unauthorized suppression, and actions: confirm, reject all, defer, escalate/manual review. |
-| Evidence chip | Association, approval, audit | Summarizes one evidence reason with text and semantic status. Chip click or keyboard activation opens the supporting evidence when permitted. |
-| Risk chip | AI proposal, approval, audit, queue | Names the risk class in plain language and exposes the policy reason that caused review. |
-| Evidence drawer | Association, approval, audit | Expands source evidence without forcing users to read the full email thread. Redacts inaccessible details. |
-| AI proposal panel | Conversation, approval queue | Shows requester, project scope, input files, intended command, risk class, destination, policy reason, and expected result. |
-| Approval controls | AI action review | Approve, reject, request revision, or cancel. Disabled approval, association, and correction controls must either remain focusable with `aria-disabled="true"` and an announced reason, or be paired with an adjacent focusable "Why unavailable?" affordance. Tooltip-only or default-non-focusable disabled state is insufficient. |
-| Approval panel | AI action review | Presents proposed action details and controls as one review unit. It remains pending until the required authorization path succeeds. |
-| Queue row | Operational queues | Displays state, age, risk, confidence, assignee, next required action, retry count, and terminal/non-terminal status. |
-| Audit timeline | Audit investigation | Chronological, filterable reconstruction of source message, association, corrections, approvals, commands, AI actions, and outcomes. |
-| Blocked state | Any secured surface | Explains denial, unresolved association, quarantine, failed dependency, or unsafe context with safe next action and redacted details. |
-| Status toast/banner | Global, queues, detail | Used for transition feedback only. Long-lived operational states belong on the relevant surface. |
+| Project context header | `{components.project-context-header}` | Shows only authorized project identity, tenant context when relevant, current surface/state, and safe status. Project switch updates context and announces once. |
+| Conversation shell | `{components.conversation-shell}` | Keeps project context, stream, composer, and complementary panels related while preserving selection, focus, and scroll. |
+| Conversation stream | `{components.conversation-stream}` | Orders attributed human, external-party, mailbox, AI, UI/CLI/MCP, worker, and system events. System decisions are distinct events, not anonymous messages. |
+| Composer/action entry | `{components.composer-action-entry}` | Separates user message from AI request; submits through the shared command spine; shows optimistic state only after admission; boundary effects create proposals. |
+| Actor badge | `{components.actor-badge}` | Identifies actor type and permitted identity before content. Unresolved actors show a safe unresolved state without inferred identity. |
+| Message classification | `{components.message-classification}` | Associates `informational` or `actionable` with the message in visible and accessible descriptions. Actionable items expose detected intent plus review/capture/dismiss. |
+| Source evidence | `{components.source-evidence}` | Expanded by default. Each reference exposes source identity, permitted content, redaction, timestamp, and Evidence freshness; it remains authoritative over AI interpretation. |
+| AI summary | `{components.ai-summary}` | Collapsed by default and labelled `AI summary`. Provenance (`model+version`, generated time, source-evidence IDs) precedes content; disclosure is keyboard-operable and preserves focus. |
+| Why this project | `{components.why-this-project}` | Keyboard disclosure announces expanded state and returns focus. Labelled facts include signal class, matched value, confidence/band, actor, timestamp, and superseding correction links. |
+| Evidence freshness | `{components.evidence-freshness}` | One chip per evidence reference; exposes timestamp and `fresh`/`stale`/`expired`. Expiry transitions announce once on the current review and block the affected decision with `evidence-expired`. |
+| Task intent review | `{components.task-intent-review}` | Shows source message, ≤280-character intent summary, action kind, evidence offsets/excerpts, detector/kernel version, confidence, detected time, and state. Convert creates a governed proposal; dismiss dispositions remain auditable. |
+| Attachment row | `{components.attachment-row}` | Shows capture/storage, scan/quarantine, folder, duplicate/retry, retention, and AI-context eligibility. Mailbox attachments only in MVP; no user-upload affordance. |
+| Association candidate group | `{components.association-candidate-group}` | One named radiogroup and one Tab stop; arrows move selection and announce position/count. Selection never commits. Each option references confidence/evidence; unsafe candidates never render. |
+| Association decision bar | `{components.association-decision-bar}` | Repeats the selected project in its accessible description and offers confirm, reject all, defer, or escalate. Confirm without selection focuses Error summary. |
+| Action classification | `{components.action-classification}` | Keeps internal `low-risk`/`approval-required` classifier output distinct from user-visible `allowed-read-only`/`approval-required`/`denied`/`unsupported`. Shows classifier version and input tuple when reviewable. |
+| AI proposal panel | `{components.ai-proposal-panel}` | Programmatically links the source request, project/context package, classification, and Approval authority and effects. It remains pending until a valid human decision and execution revalidation succeed. |
+| Approval authority and effects | `{components.approval-authority-and-effects}` | Shows requester/origin, project, command/allowlist version, files/redaction/freshness, recipients, sender authority/delegation, classifier input/output/version, policy snapshot, reversibility, expected resource changes, side effects, audit events, and operation/proposal identity. |
+| Approval controls | `{components.approval-controls}` | Approve, reject, request revision, cancel. Approve is focusable `aria-disabled` with an associated reason or has an adjacent focusable explanation. Submission revalidates authority, policy, evidence, allowlist, and effects. |
+| Correction progress | `{components.correction-progress}` | Shows predecessor/successor, `Correcting`/`Correction-delayed`, acknowledged and remaining stores, estimate, owner, next action, and P2 escalation. Blocks affected AI context until all required stores acknowledge. |
+| Bounded admin scope | `{components.bounded-admin-scope}` | Distinguishes aggregate see-only, queue-operate, mailbox, policy, and compliance scopes. Aggregate visibility never grants per-project detail or mutation authority. |
+| Two-person approval | `{components.two-person-approval}` | Security-sensitive changes require a proposer, a distinct authorized second admin, justification, changed values, effective scope/time, policy version, and audit link. Self-approval is unavailable with a reason. |
+| Shared operation status | `{components.shared-operation-status}` | Shows stable operation/idempotency identity, canonical state/reason, origin, retry count/ceiling, next attempt/eligibility, partial output, original-outcome link, and correlation. Prevents duplicate submit while pending. |
+| Queue row | `{components.queue-row}` | Shows state, age, owner/assignee, risk/confidence, freshness, next action, retry count, and terminality. Per-item detail is redacted unless project authority succeeds. |
+| Operational SLO dashboard | `{components.operational-slo-dashboard}` | Shows metric, numeric target or missing-support reason, window, error budget, alert threshold, calibration source, tenant scope, freshness, owner, and disposition. `unsupported` blocks the related M2 readiness claim. |
+| Audit timeline | `{components.audit-timeline}` | Reconstructs source, actors, candidates/decisions, policy, approval, command, correction, replay, redaction, and outcome. Replay entries are labelled and excluded from production-completeness views by default. |
+| Inbound authenticity and sender authority | `{components.inbound-authenticity-and-sender-authority}` | Shows provider-supplied DMARC/DKIM/SPF, header discrepancies, external-sender posture, delegate and `principal_for`, outbound authority class, membership/delegation evidence, and revalidation state. |
+| Retention and export request | `{components.retention-and-export-request}` | Shows requested data classes, authorized scope, retention/legal-hold constraints, redaction, owner, operation status, and completed/partial/blocked outcome. Export or other exposure requires explicit authorized human confirmation; AI-mediated exposure is `approval-required`. Does not promise deletion where immutable audit handling requires tombstone/key-shred behavior. |
+| Redacted support bundle | `{components.redacted-support-bundle}` | Exports correlation, state, reason, and next-action context only after redaction checks and explicit authorized human confirmation; never includes restricted project/party/file/message/evidence or secrets. External sharing is `approval-required`. Shows included/excluded summary before creation. |
+| Blocked state | `{components.blocked-state}` | Uses existence-neutral copy, stable safe code, owner when applicable, and one safe action. Never exposes a suppressed candidate or confirms a resource exists. |
+| Status toast/banner | `{components.status-toast-banner}` | Announces transitions; persistent state stays inline. Scope degradation narrowly and deduplicate repeated poll/update announcements. |
+| Busy region | `{components.busy-region}` | Sets `aria-busy=true` on the replacing region, clears it on the same node, preserves/relands focus, and does not announce historical content. Reduced motion removes shimmer. |
+| Error summary | `{components.error-summary}` | Appears before the affected form/review, receives focus on invalid submission, links to errors, and preserves valid selection/draft state. |
+| Review dialog/sheet | `{components.review-dialog-sheet}` | One modal layer; traps and returns focus; Escape closes only non-destructively and never discards edits without confirmation. |
+| Queue filter bar | `{components.queue-filter-bar}` | Server-side filters, pagination ≤100, visible active-filter summary/result count, stable focus/selection on refresh, and labelled small-screen reflow. |
+
+## Governed Action Boundary
+
+### Classifier output versus user-visible disposition
+
+| Evaluation result | Internal classifier output | User-visible disposition | UX behavior |
+|---|---|---|---|
+| Authorized, supported, versioned read-only/no-external-effect subtype and policy allows | `low-risk` | `allowed-read-only` | Execute through the governed path; show source/provenance and audit outcome. |
+| Any project-state mutation, file exposure, external communication, task creation/assignment, external-tool invocation, or acting on behalf | `approval-required` | `approval-required` | Create proposal and require authorized human approval. Policy cannot downgrade any of the six. Mixed requests inherit this or a stricter disposition. |
+| Classifier indeterminate, but inputs, project, actor, command, evidence, and policy context are otherwise authorized and supported | normalized fail-closed to `approval-required` | `approval-required` | Create a reviewable proposal explaining indeterminate classification; no execution before approval and revalidation. |
+| Authorization, tenant/project/actor scope, sender authority, evidence safety, audit readiness, or allowlist fails | not invoked or ignored | `denied` | Refuse safely, audit when security-sensitive, and expose no restricted candidate/detail. Human approval cannot override denial. |
+| Product/allowlist does not support the requested operation | not invoked | `unsupported` | Decline or allow separate task-intent capture; no mutation or external effect. |
+
+All six boundary-crossing effects remain mandatory-approval while upstream text is being reconciled. Tenant Administration must not expose any control that weakens that invariant.
+
+Immediately before execution, revalidate actor and reviewer authority, project/tenant scope, file access/redaction/freshness, recipient and sender/delegation authority, command/allowlist version, policy snapshot, effect set, proposal revision, idempotency identity, and audit readiness. Any change blocks execution and creates a refreshed proposal requiring a new decision; approval is never silently carried forward.
 
 ## State Patterns
 
-| State | Surface | Treatment |
-|---|---|---|
-| Cold app load | Workspace | Skeleton matching project navigation, conversation list, and detail pane. |
-| No project selected | Workspace | Project picker or recent authorized projects. No marketing hero. |
-| Empty project conversation | Conversation detail | Show project context and a simple start action; include mailbox setup/status if relevant. |
-| Email received | Conversation/queue | Show intake item with source, party state, attachment count, and association status. |
-| Candidate generated | Association review | Show ranked authorized candidates with evidence and confidence. |
-| Ambiguous association | Association review | No auto-attach. Require confirm, reject, defer, or manual review. |
-| Associated | Conversation detail | Message appears in project context with evidence available from details. |
-| Corrected association | Conversation/audit | Preserve original audit event, update linkage, show correction rationale and derived-context invalidation where relevant. |
-| Unresolved party | Queue/conversation | Show safe identity evidence and actions to link, create pending party, reject, or quarantine. |
-| Attachment pending scan | Files/context | Block AI/file exposure until policy permits; show scan state and next action. |
-| AI proposal ready | Conversation/approval | Pause before execution; show risk reason and approval controls. |
-| Approval rejected | Conversation/audit | Keep rejection reason visible and prevent execution. |
-| Command accepted, projection pending | Conversation/status | Show partial success with operation identity and audit projection status. |
-| Retryable failure | Queue/detail | Show retry action, retry count, reason, and duplicate-safety note. |
-| Terminal failure | Queue/detail | Show reason, escalation/manual resolution path, and audit availability. |
-| Unauthorized | Any surface | Fail closed with redacted explanation; do not confirm resource existence. |
-| Dependency degraded | Workspace/admin | Scope impact to tenant, mailbox, project, service, or operation; show current safe actions. |
+### Canonical state families
 
-Surface state coverage:
+| Family | States and treatment |
+|---|---|
+| Association | `Received` → `Proposed` → `Associated` / `NeedsReview` / `Deferred` / `Rejected` / `Failed` / `Skipped`; `Associated` may be superseded through `Correcting` → `Correction-delayed` or `Corrected`. `Rejected`, `Failed`, and `Skipped` stay terminal; authorized reprocess creates a linked new workflow instance. |
+| Evidence | `fresh` is usable; `stale` is visibly warned, never auto-associates, and remains reviewable only where policy allows; `expired` makes confirm/approve unavailable with `evidence-expired` until refresh/re-evaluation. |
+| Task intent | `detected` → `under-review` → `converted`; terminal dispositions are `not-actionable`, `duplicate`, `already-handled`, and `out-of-scope`, preserving the source link and rationale. |
+| AI action | `proposal-ready`, `approval-required`, `approved`, `rejected`, `revision-requested`, `cancelled`, `execution-pending`, `succeeded`, `retryable-failure`, `terminal-failure`, `denied`, `unsupported`. Approval never changes `denied` into executable. |
+| Two-person policy change | `draft` → `proposed` → `pending-second-admin` → `active`; alternatives are `rejected`, `expired`, `cancelled`, or `conflicted`. Activation requires a distinct approver and current-version revalidation. |
+| Operation | `pending`, `accepted/projection-pending`, `succeeded`, `retryable`, `retry-exhausted`, `terminal`, `prior-outcome-returned`, `identity-conflict`, `operation-conflict`, `decision-conflict`, `revision-conflict`. |
+| Inbound authenticity | `verified-as-supplied`, `anomaly-needs-review`, `external-sender`, `delegated`, `blocked`; provider verdict is labelled as provider-supplied, never as ChatBot re-verification. |
+| Retention/export | `requested`, `authorized`, `in-progress`, `partial`, `completed`, `blocked`, `cancelled`; each state names data classes, owner, next action, and redaction/legal-hold limit. |
+| AI availability | `available`, `degraded`, `unavailable`. During AI outage, manual association/correction, existing-proposal approval/rejection, mailbox retry, deterministic classification, operation status, and audit remain available when their non-AI dependencies are healthy; new generation is blocked with scope and recovery. |
+
+### Correction propagation
+
+After correction, show acknowledgements for candidate ranking, evidence snapshot, every AI proposal that consumed the old context, operational queue projections, and M2 vector/index material when applicable. `Correcting` blocks affected AI actions. M0/M1 target p95 is 10 minutes; M2 target p95 is 60 minutes. Crossing the applicable target produces `Correction-delayed`, names the responsible owner and next safe action, and triggers P2 escalation. Completion announces once and preserves current focus/selection.
+
+### Replay, idempotency, and conflict outcomes
+
+| Operation class | Repeated equivalent input | Changed/conflicting input |
+|---|---|---|
+| Message intake | Return prior outcome; no duplicate message/file/task/audit decision. | `identity-conflict`. |
+| Durable command/mutation | Return prior outcome by stable `operation_id`. | `operation-conflict`. |
+| Association decision | Return prior decision for the workflow `decision_slot_id`. | `decision-conflict`. |
+| Approval decision | Return prior decision for the proposal `decision_slot_id`. | `decision-conflict`. |
+| Outbound send | Return prior send outcome for frozen draft/recipients/authority/approval. | `operation-conflict`; never resend. |
+| AI action proposal | Return prior proposal inside the bounded suppression window. | Create a new proposal with a new identity. |
+| Correction | Return prior correction for predecessor revision. | `revision-conflict`. |
+| Retry | Return prior attempt result for the same failed step/revision. | Reject stale revision. |
+
+Replay/simulation additionally shows `replay_run_id`, test-tenant scope, intercepted effects, and production-store invariance. Production audit views exclude replay by default. Replay safety failure is terminal and never offers a production-effect retry.
+
+### Per-surface coverage
 
 | Surface | Required states |
 |---|---|
-| Project Workspace | Cold load; no project selected; empty project conversation; active conversation selected; dependency degraded; unauthorized/redacted; project switch success. |
-| Conversation Detail | Loading history; empty conversation; streaming/update pending; attachment scan pending; AI proposal ready; command accepted/projection pending; correction applied; retryable failure; terminal failure; unauthorized/redacted. |
-| Association Review | Candidate loading; no authorized candidates; ambiguous candidates; candidate selected; validation error; confirm success; reject/defer/escalate success; unauthorized candidate suppressed; retryable intake failure; quarantined/terminal failure. |
-| AI Action Review | Proposal loading; ready for review; missing context; approval blocked by permission; approve/reject/revise/cancel success; policy denied; execution pending; execution success; retryable execution failure; terminal execution failure. |
-| Files and Context | Folder/context loading; no files; file selected; upload/intake pending; scan pending; duplicate suppressed; memory/index pending; AI-context eligible; unauthorized/redacted file; storage retryable failure; terminal storage failure. |
-| Operational Queues | Queue loading; empty filtered queue; row selected; stale filters; retry queued; batch action validation error; dependency degraded; unauthorized row redacted; terminal queue item; completed item removed or archived. |
-| Audit Investigation | Audit loading; no matching events; event selected; filters active; projection pending; redacted detail; export/copy unavailable; retry/correction trace present; terminal command outcome; investigation handoff/escalation logged. |
-| Tenant Configuration | Settings loading; first-run empty; field editing; validation summary; save pending; save success; policy conflict; mailbox permission degraded; unauthorized admin action; rollback/cancel available; terminal configuration failure. |
-| Command Surface Reference | Loading; no commands available; command selected; permission redacted; stale schema; example copied; version mismatch/degraded; parity test failure linked; successful parity state. |
+| Project Workspace / Conversation Detail | Cold load; no project; empty/active conversation; message classification; task intent; generating/complete/stopped/failed AI output; attachment scan; AI outage; proposal; operation pending; correction; degraded; unauthorized/redacted. |
+| Association Review | Candidate loading; no safe candidates; below-`T_low`/conflict/scorer failure `NeedsReview`; radiogroup selection; stale/expired evidence; validation; confirm/reject/defer/escalate; retryable; quarantined/terminal. |
+| AI Action Review / Outbound Approval | Loading; approval-required; indeterminate-but-reviewable; missing context; fresh/stale/expired evidence; insufficient authority; revalidation drift; approved/rejected/revised/cancelled; execution pending/success/retryable/terminal; denied/unsupported. |
+| Correction Surface | Eligible; rationale editing; stale revision; Correcting; Correction-delayed; completed; permission denied; invalidation dependency failed; retry/escalation. |
+| Tenant Administration | Loading/empty; bounded scope; draft/edit/validation; proposed/pending second admin/rejected/expired/cancelled/conflicted/active; mailbox permission degraded; unauthorized; rollback-capable non-destructive change; terminal failure. |
+| Cross-surface Attribution / Command Surface Reference | Loading; parity version current/stale; normalized operation selected; allowed/approval-required/denied/unsupported; operation pending/prior outcome/conflict; redacted; adapter parity failure; MCP/CLI recovery. |
+| Operational Dashboards / Admin Queue Operations | Loading/empty; fresh/stale data; within-budget/approaching/exhausted/unsupported SLO; owner/alert/escalation; row selection; bounded detail; claim/assign; retry/requeue/quarantine/dismiss; conflict; degraded; terminal. |
+| Compliance Investigation | Loading/no results; filters; selected event; projection pending; source/AI distinction; redacted detail; replay excluded/included; correction trace; retention/export/support-bundle status; terminal outcome; escalation. |
 
-State-to-feedback matrix:
+### Feedback and focus
 
-| State family | Feedback primitive |
+| State | Feedback rule |
 |---|---|
-| Loading/cold load | Skeleton matching final layout with `aria-busy="true"` on the busy region. Clear `aria-busy` on the same node when content swaps in; preserve focus inside the region or move it to a labelled landing point. Newly loaded historical content does not announce. |
-| User-triggered success | Inline status on the affected row/panel plus optional polite toast. Keep audit link when relevant. |
-| AI proposal ready (current user's request) | One polite announcement on the user's own request; do not re-announce on view re-entry. |
-| Command accepted / projection pending | One polite announcement with operation identity; do not repeat on each poll. Persistent inline status carries ongoing detail. |
-| Approval rejected (current user's submitted action) | Assertive announcement plus inline rejection reason with focus reachable. |
-| Approval rejected (observed in a queue for someone else) | No live announcement; row-level inline status only. |
-| Projection pending / partial success | Persistent inline status or banner with operation identity and audit/projection status; polite live region. |
-| Validation error | Error summary before the affected form/review panel, field-level errors where fields exist (each invalid input carries `aria-invalid="true"` and an `aria-describedby` link to its message), focus moved to summary. |
-| Approval/association blocked | Persistent inline blocked state with reachable explanation and safe next action; do not rely on disabled control tooltip alone. |
-| Retryable failure | Persistent row/panel status with retry action, retry count, duplicate-safety note, and polite announcement. |
-| Terminal failure / policy denial | Persistent alert or blocked state with escalation/manual path; assertive announcement only when caused by the user's current action. |
-| Dependency degraded | Scoped banner on affected surface, not global alarm unless the whole tenant/app is impacted. |
-| Background update while reading history | Non-interrupting "new updates" affordance; no forced scroll. |
+| Loading | Busy region replaces in place; clear `aria-busy`; no historical-content announcement. |
+| User-triggered success | Inline status plus optional polite Status toast/banner; keep audit/operation link. |
+| Evidence becomes expired | One polite announcement on the current review; preserve focus; approval/confirm becomes explained-unavailable; attempted submit focuses Error summary. |
+| Generating AI output | Separate status region announces `Generating`, `Response complete`, `Response stopped`, or failure once each; never announce tokens/chunks/polls. |
+| Correction progress | Deduplicated polite state changes; meaningful determinate progress only when a real value exists, otherwise textual indeterminate status. |
+| Validation/conflict | Focus Error summary; preserve valid fields, selected candidate, draft, and filter state. |
+| Retry/prior outcome | Focus Shared operation status; state whether a new attempt occurred and whether duplicate effects were prevented. |
+| Denied/terminal | Persistent Blocked state; assertive only when caused by the current user's action; existence-neutral safe next step. |
+| Observed/background change | Inline update or keyboard-reachable “new updates”; no live announcement for off-screen items and no forced scroll. |
 
 ## Interaction Primitives
 
-Primary interactions:
+### Core interaction rules
 
-- Select a project, conversation, queue item, candidate, file, approval, or audit event.
-- Expand evidence inline or in a side panel.
-- Confirm, reject, defer, correct, retry, quarantine, approve, request revision, cancel, or escalate.
-- Ask AI for help from a project conversation, with proposals generated for risky actions.
-- Filter queues and audit views by state, age, risk, confidence, project, mailbox, actor, reason, correlation, and time.
-- Open command palette/search where FrontComposer supports it. Keyboard-first shortcuts are valuable for developers and operators; equivalent labelled controls remain available for business contributors.
-- Interrupt a streaming AI response or AI proposal generation: a Stop/Cancel control is always keyboard-reachable while streaming, occupies a stable focusable position (no inline appear/disappear that steals focus), announces "Response stopped" politely on activation, and returns focus to the composer or the AI proposal panel.
+- Select authorized projects, conversations, candidates, files, approvals, queue items, and audit events; expand permitted evidence; confirm, reject, defer, correct, retry, quarantine, approve, revise, cancel, or escalate.
+- State-mutating operations from UI, CLI, MCP, service clients, AI actors, workers, and mailbox events use one shared command spine. No surface offers an authorization, approval, audit, or idempotency bypass.
+- `Association candidate group` uses radiogroup semantics: one Tab stop, arrow-key movement, announced position/count, option evidence via programmatic description, and no commit on selection. Refresh preserves group focus/selection unless the option becomes unsafe or expired; then clear it, announce once, and keep safe next actions available.
+- Approval shows all `Approval authority and effects` fields before a decision and performs immediate pre-execution revalidation. Batch approval is available only for items sharing requester, command, project, authority, input shape, policy, effect set, and freshness; each item receives its own audit event.
+- Approval queues prioritize by risk, affected-party authority, and age; group only the safely batchable shape above. A reviewer with more than 25 open items receives a load alert. Notification ceilings roll excess notices into a digest but never hide the persistent queue item or bypass approval.
+- Queue operations use stable filters and pagination, never infinite scroll. Queue-level retry/requeue/quarantine/dismiss cannot mutate project records and always records admin identity, queue, affected items, and reason.
 
-Keyboard shortcuts conform to WCAG 2.1.4 Character Key Shortcuts: any single-character or modifier-free shortcut is disabled by default inside text-entry controls (composer, search field, filter inputs, configuration forms) and is globally remappable or disable-able from a "Keyboard shortcuts" entry in user preferences.
+### UI / CLI / MCP outcome parity
 
-Banned or constrained interactions:
+Every parity-set operation uses the same normalized input, authorization decision, lifecycle transition, redaction/reason code, operation identity, immutable origin attribution, audit envelope, and long-running status. Presentation may differ.
 
-- No hidden auto-association when confidence is ambiguous.
-- No AI execution of risky actions from a plain message send.
-- No hover-only critical actions.
-- No modal stacks beyond one active dialog/sheet.
-- No infinite scroll for operational queues; use pagination or virtualized list behavior with stable filters.
-- No direct UI affordance that suggests CLI/MCP/admin bypass of authorization.
+| Parity-set operation | UI | CLI | MCP | Shared outcome contract |
+|---|---|---|---|---|
+| Intake-status inspection | Labelled status panel | Structured status record | Typed tool result | Same state, freshness, reason, safe action, and redaction. |
+| Candidate review | Radiogroup/evidence panels | Ordered structured candidates | Ordered typed candidates | Same safe ordered candidates, evidence IDs, confidence/band, and suppressed unsafe set. |
+| Confirm/reject/defer/correct | Decision controls | Named command | Typed operation | Same normalized decision, expected revision, state transition, conflict, and audit result. |
+| Attachment storage/status | Attachment row | Structured file status | Typed file status | Same scan/storage/context eligibility, redaction, retry, and identity. |
+| Task-intent capture/status | Task intent review | Structured capture/status | Typed capture/status | Same detector data, source evidence, disposition, and linked proposal identity. |
+| AI approval decision | Approval controls | Named decision command | Typed decision tool | Same authority/freshness/revalidation gate, decision conflict, and audit record. |
+| Approved-command execution | Proposal/operation status | Named execute command | Typed execute tool | Same allowlist/effect gate, operation ID, transition, partial/terminal result, and origin. |
+| Retry | Queue/operation control | Named retry command | Typed retry tool | Same eligibility, attempt ID/ceiling, stale-revision result, and prior-outcome behavior. |
+| Operation status | Shared operation status | Structured status record | Typed status result | Same canonical state/reason, partial output, correlation, next action, and terminality. |
+| Audit lookup | Audit timeline | Structured events | Typed event results | Same authorized evidence, redaction, origin, replay distinction, and reconstruction links. |
 
-Keyboard and focus model:
+An MCP timeout, revoked scope, malformed argument, or attempted validation bypass returns the same safe denial/retry semantics as UI/CLI, including operation identity when one was accepted. Recovery is re-authentication or a status query, not adapter-specific execution.
 
-- Keyboard operation is required for all workflows. Advanced shortcuts are optional enhancements for developers/operators, not the only accessible path.
-- Page navigation exposes landmarks for navigation, project context, main conversation/detail, complementary evidence/review panel, queue filters, and status region. Repeated landmark roles within a single surface (for example a Conversation Detail with both an Evidence drawer and an AI proposal panel mapped to `complementary`) must carry a unique `aria-label` so screen-reader users can distinguish them.
-- Initial focus lands on the surface heading or first actionable review item after navigation; dialogs/sheets trap focus and return focus to the invoking control on close.
-- Conversation stream focus is stable: Tab reaches message/event groups and their actions; arrow-key or roving-focus behavior may be used inside timelines/lists only when labels announce position and count.
-- Approval, association, retry, correction, and tenant-configuration submissions move focus to success status or error summary. Rejected/blocked actions keep focus in the review panel with the reason reachable.
-- Escape closes the topmost non-destructive popover/sheet/dialog. It must not discard unsaved edits without an explicit confirmation path.
-- Disabled or unavailable actions must have a reachable explanation through helper text, inline status, or an enabled "Why unavailable?" affordance; tooltip-only explanation is insufficient.
+### Inbound authenticity and outbound authority
 
-Conversation and audit semantics:
+- Inbound review exposes provider-supplied DMARC/DKIM/SPF verdicts, relevant header disagreements, `external_sender`, delegated identity, and `principal_for` without claiming ChatBot re-verification.
+- MVP authenticity modes are `strict` and `paranoid`; anomaly routes to `NeedsReview` or blocks. No permissive mode or broad fallback.
+- Outbound authority is one of `draft-only`, `authenticated-user send`, `shared-mailbox send`, `send-on-behalf`, or `approved service-send`. Show the evidence and requester for the chosen class.
+- Immediately before send, revalidate mailbox membership, delegation, tenant policy, recipients, frozen content, file exposure, proposal revision, and approval. Drift returns `policy-blocked`, `delegation-mismatch`, `membership-revoked`, or `approval-missing`; content is not sent.
 
-- The conversation stream is a chronological event list grouped by day or source thread where useful. Each group has an accessible heading.
-- Every message/event exposes actor type, permitted identity label, timestamp, source surface, and state label. System events are labelled as system decisions, not anonymous messages. The actor-type label (for example "AI actor", "Service client", "External party") precedes message content in the accessible name and description so screen-reader users hear the actor before the content.
-- Attachments render as labelled lists or tables with filename display, storage/scan/context state, and allowed actions. Restricted metadata is redacted consistently.
-- AI proposal panels are programmatically related to the source request/message and name the risk class, policy reason, files, destination, and expected command.
-- Audit timeline entries expose event type, actor, timestamp, correlation ID, command surface, policy snapshot, outcome, and links to permitted source evidence.
-- Historical messages and audit events do not announce on initial load. Only new user-relevant changes use live regions, with politeness matching the state-to-feedback matrix.
+### Streaming, keyboard, and focus
 
-Reduced motion and auto-scroll:
-
-- Do not force-scroll when the user is reading earlier conversation or audit history; show a keyboard-reachable "new updates" control.
-- For `prefers-reduced-motion`, suppress shimmer skeletons, row movement animation, streaming text animation, and non-essential panel transitions.
-- Queue row insertion/reordering must preserve focus and selection; use status text rather than movement as the only cue.
-- Progress must have non-motion text such as "Scanning attachment" or "Projection pending."
+- Incremental AI content is regular document content with `aria-live=off`. A separate deduplicated status region announces only generating, complete, stopped, and failure transitions for the current user's request.
+- Stop/Cancel stays keyboard-reachable in a stable location while generation is active, does not steal focus, announces “Response stopped” once, and returns focus to the composer or proposal.
+- Single-character/modifier-free shortcuts are disabled inside text entry and can be globally remapped or disabled. Equivalent labelled controls are always available.
+- Initial focus lands on the surface heading or first actionable review item. Dialogs/sheets contain and return focus. Escape never discards unsaved work without confirmation.
+- Focused content remains at least partially unobscured by sticky headers, navigation, drawers, or panels at every breakpoint and after programmatic moves. Apply scroll margins for persistent chrome; at 200% and 400% zoom, scroll only enough to reveal focus and never force the reader away from conversation/audit history.
+- New stream/audit content never forces scroll while the reader is in history; a keyboard-reachable “new updates” affordance moves on request.
 
 ## Accessibility Floor
 
-Behavioral floor; visual contrast lives in `DESIGN.md`.
-
-- WCAG 2.2 AA for core UI workflows: project conversation, association review, AI approval, queues, audit, and tenant configuration.
-- All action controls expose role, label, state, disabled reason, and keyboard operation.
-- Focus order follows visible reading/action order.
-- Status updates for association, approval, command, retry, and projection changes use appropriate live-region behavior without noisy repeated announcements.
-- Evidence chips and risk chips must not rely on color alone; text labels are required.
-- Queue filtering, candidate selection, approval actions, and audit timeline navigation must be fully keyboard-operable.
-- Reduced motion suppresses non-essential transitions in conversation updates, queue row movement, and panel open/close behavior.
-- Touch targets on responsive layouts meet Fluent UI/platform guidance and are testable: touch-primary controls use at least 44 by 44 CSS pixels where layout allows; compact table/list controls must meet WCAG 2.2 AA target size with at least 24 by 24 CSS pixels or equivalent spacing from adjacent targets. Destructive and approval controls must not rely on compact-only sizing on phone or tablet.
-- Redacted/unauthorized states must remain understandable to screen reader users without leaking hidden content.
-- Export, copy-to-clipboard, download-transcript, "read aloud", and any other off-surface affordance must apply the same redaction as the visual surface. The exported artifact's accessible name and description must not contain redacted source text, and the surface must expose a screen-reader-equivalent message that the export is redacted and full detail requires escalation.
-
-Error recovery patterns:
-
-| Flow | Recovery requirement |
-|---|---|
-| Association review | Error summary names the safe failure category, preserves candidate selection when allowed, focuses the summary, and offers confirm/reject/defer/escalate only when still valid. |
-| AI action review | Externally visible, file-exposing, project-mutating, tool-invoking, or participant-representing actions require explicit confirmation copy before execution. Rejection/revision/cancel outcomes remain audit-visible. |
-| Queue retry | Retry controls state duplicate-safety and retry count. A failed retry returns focus to the row status and keeps the next safe action visible. |
-| Correction | Correction requires a rationale where policy demands it, previews affected attachments/derived AI context, and reports success, partial success, or blocked target without leaking unauthorized project details. |
-| Tenant configuration | Validation summary appears before fields, field-level errors stay near controls, and save conflicts explain whether the current policy, mailbox permission, or stale data caused the failure. |
-
-Cognitive-load guardrails:
-
-- Each workflow item has one primary next action; secondary and destructive actions are grouped after the primary decision.
-- Evidence, risk, status, actor, and timestamp appear in consistent order across candidate rows, proposals, queues, and audit entries.
-- Plain-language summaries precede raw IDs; IDs remain available in metadata or expandable detail.
-- Filters show a visible summary of active filters and result count.
-- Prefer one consolidated banner/panel per surface state over stacked alerts.
-- Dense tables reflow to labelled rows on small screens without dropping labels, state, reason, or safe actions.
-
-Localization:
-
-- English and French are supported UX languages unless product scope changes.
-- Stable machine codes, status codes, reason codes, command names, and correlation IDs remain untranslated; display labels and explanations are translated.
-- Dates, times, numbers, confidence bands, pluralization, and actor labels use locale-aware formatting.
-- Avoid concatenated strings for accessible names and state descriptions.
-- Buttons, chips, rows, and table columns allow text expansion for French without truncating critical state or action words. Critical state and action words wrap, use an approved short label, or move into labelled row detail before truncation. Columns allowed to collapse first: raw IDs, secondary timestamps, low-priority metadata, and repeated project/tenant context already visible in the surface header. Columns that must remain visible or move into labelled row detail: actor, risk, state, confidence, next action, and safe recovery reason.
+- WCAG 2.2 AA applies per PRD increment to every shipped UI surface; each surface receives automated, keyboard-only, and screen-reader acceptance. CLI/MCP are outside WCAG scope but preserve equivalent safety semantics.
+- Landmarks identify navigation, project context, main content, complementary evidence/review, filters, and status. Repeated roles have unique accessible names.
+- Every control exposes role, label, state, keyboard operation, and reachable unavailable reason. Tooltip-only explanations are prohibited.
+- Focus order follows visible order; Focus Not Obscured behavior follows §Interaction Primitives. Error recovery focuses Error summary without losing safe state.
+- Classification, source/AI distinction, freshness, risk/disposition, correction, SLO, and redaction use text and structure, not color alone, and survive forced colors.
+- Touch-primary actions meet 44×44 CSS pixels where layout permits; compact controls meet at least 24×24 CSS pixels or equivalent spacing. Destructive/approval controls are never compact-only on phone/tablet.
+- Reduced motion suppresses shimmer, row movement, streaming animation, and non-essential transitions. Every progress state has non-motion text.
+- The root/page `lang` follows the selected UI locale. Known-language message bodies, AI summaries, and quoted source passages use language-of-parts metadata when they differ. The selected locale persists across navigation and authenticated sessions. Stable codes/IDs remain untranslated and are not misleadingly tagged as prose.
+- English and French share feature, state, action, disabled-reason, and screen-reader parity. Locale-aware dates/numbers/plurals apply; concatenated accessible strings are prohibited; French expansion cannot remove critical labels.
+- Copy, export, transcript download, read-aloud, retention results, and support bundles use the same redaction as the visual surface. Accessible names/descriptions contain no hidden source text and announce when output is redacted.
 
 ## Responsive & Platform
 
-| Breakpoint | Behavior |
+| Form factor | Behavior |
 |---|---|
-| Desktop/laptop | Persistent navigation, project list/queue, conversation detail, and side panel can coexist. Best surface for full workflow. |
-| Tablet | Navigation collapses; conversation and detail panel may stack. Association and approval remain complete. |
-| Phone | Reading, approval, defer/reject/confirm, status lookup, and simple AI request. Full tenant configuration and dense audit analysis use the small-screen fallback pattern below. |
+| Desktop/laptop | Persistent navigation plus conversation/grid and complementary panel may coexist; full administration and investigation. |
+| Tablet | Navigation collapses; primary workflow and complementary panel stack; association and approval remain complete. |
+| Phone | Reading, governed AI request, status, confirm/reject/defer/approve, and escalation remain available. Dense configuration/investigation uses a state-preserving handoff link and reachable explanation. |
 
-The product is responsive web through Blazor/FrontComposer, not a native mobile application. CLI and MCP are separate command surfaces with equivalent backend state transitions, not visual breakpoints of the UI.
-
-Small-screen fallback pattern: when a workflow is too dense for phone, keep read-only summary, status, safe approve/reject/defer/confirm actions, copy/share handoff link, and "open on larger screen" guidance available. Disable dense editing or admin-only controls with reachable explanation and no tooltip-only dependency. Preserve draft or filter state when routing to a larger screen. Screen reader users hear the same limitation, remaining actions, and recovery path from the surface heading or first blocked-state panel.
-
-Touch targets for phone/tablet approval, association, filters, attachment actions, timeline filters, search, drawer close, and destructive actions must use at least 44 by 44 CSS pixels where layout allows. Compact controls in dense rows must meet WCAG 2.2 AA target size with at least 24 by 24 CSS pixels or equivalent spacing. When dense tables collapse, each row must retain visible labels for project, actor, risk, state, confidence, time, and next action.
+The UI is responsive Blazor/FrontComposer. CLI and MCP are command surfaces, not visual breakpoints. When dense grids reflow, labelled rows retain actor, authority, disposition/risk, state, freshness, time, next action, and safe reason; raw IDs and repeated context may collapse into metadata.
 
 ## Inspiration & Anti-patterns
 
-Inspiration: Claude Code / OpenAI Codex (conversation as a work surface where AI proposes actions and reports outcomes) and ChatGPT (familiar conversational entry). Posture and rejected patterns are enforced by §Foundation, §Voice and Tone, §Component Patterns (`AI proposal panel`, `Blocked state`), and §Interaction Primitives (banned interactions) — see those sections rather than restating here.
-
-## Product-Specific Concerns
-
-| Concern | UX requirement |
-|---|---|
-| Internationalization | Product must support English and French UI text because stakeholder discovery is in French and project config outputs English. |
+The conversation-as-work-surface inspiration comes from developer AI tools and familiar chat entry, but this product rejects consumer-chat behaviors. No ungoverned freeform action execution, hidden auto-association, hover-only critical action, modal stack beyond one, infinite operational list, decorative assistant persona, or UI/CLI/MCP bypass affordance is permitted.
 
 ## Key Flows
 
-### Flow 1 - Project contributor asks AI for help (Amira, delivery contributor, after receiving a customer email)
+### Journey 1: Business Contributor Requests AI Help From a Project Conversation
 
-1. Amira opens the authorized project workspace.
-2. The latest email-derived conversation item is visible with resolved external party, attachments, and association evidence.
-3. She asks the AI to compare the attachment with current project folder content and draft a response.
-4. The system creates an AI proposal instead of sending or mutating anything.
-5. Amira opens the proposal and sees project scope, requester, input files, recipient, intended command, and risk reason.
-6. **Climax:** Amira approves the proposed action with confidence that the system will use authorized project context and record the result.
-7. The executed command outcome appears in the conversation with audit history available.
+**Source ID and mapping:** UJ1 · FR21–FR28, FR33, FR35–FR46 · NFR1–NFR11, NFR16, NFR49–NFR55, NFR60–NFR64 · S1, S3.
 
-Failure: if context is insufficient, the AI asks for files or clarification. If approval is rejected, the proposal remains visible with rejection reason.
+1. Amira opens the authorized Project Workspace; source email and attachments show Message classification, Source evidence, and Evidence freshness.
+2. She reviews Task intent and asks AI to compare a governed mailbox attachment with current authorized project files.
+3. Source evidence stays expanded; any AI summary stays collapsed and carries provenance.
+4. Because drafting can expose files or communicate externally, the system creates an `approval-required` proposal instead of acting.
+5. Amira reviews authority, effects, recipients, files, policy, classifier metadata, expected post-state, and audit events.
+6. **Climax:** with fresh evidence and current authority, Amira approves a fully bounded proposal and sees the governed operation identity.
+7. The outcome returns to the conversation with source/proposal/approval/audit links.
 
-Source journey mapping: Journey 8 covers the review step in more detail as Flow 8.
+Failure: missing context asks for clarification; expired evidence blocks approval with `evidence-expired`; AI outage leaves manual review and existing-proposal decisions available.
 
-### Flow 2 - Ambiguous association resolution (Marc, project contributor, morning triage)
+### Journey 2: Business Contributor Resolves an Ambiguous Project Association
 
-1. Marc opens Association Review from the unresolved queue.
-2. A message from a known external party has multiple authorized candidate projects.
-3. Each row shows confidence and evidence: sender match, thread reference, project alias, attachment metadata, prior association, or prior correction.
-4. Marc expands evidence for the top candidates without opening multiple systems.
-5. He confirms the correct project, rejects all, defers, or escalates if evidence is insufficient.
-6. **Climax:** The message becomes project context only after Marc's explicit decision, and the decision is audited.
+**Source ID and mapping:** UJ2 · FR3–FR12, FR64–FR69, FR76–FR80 · NFR13–NFR18, NFR23–NFR30, NFR37–NFR48 · S2, S4.
 
-Failure: if no candidate is viable, the item remains unresolved or quarantined with next action, not silently attached.
+1. Marc opens Association Review for a `NeedsReview` item.
+2. One named candidate radiogroup exposes only authorized candidates; arrow keys move without committing.
+3. He opens Why this project and compares source evidence, confidence/band, actor/time, and freshness.
+4. The decision bar repeats his selected candidate and offers confirm, reject all, defer, or escalate.
+5. **Climax:** Marc confirms only after fresh or policy-permitted stale evidence, and the audited association enters the project once.
 
-### Flow 3 - External party sends project context (Elena, supplier, using ordinary email)
+Failure: below-`T_low`, no match, conflict, scorer failure, expired evidence, or only unsafe candidates remains `NeedsReview`; the safe candidate list may be empty and never reveals what was suppressed.
 
-1. Elena sends an email with a request and attachment to the controlled project mailbox pattern.
-2. The system ingests the message, preserves source identifiers, and resolves Elena through Hexalith.Parties when possible.
-3. Authorization and project association run before project context is exposed.
-4. If deterministic evidence is safe, the message is associated; if not, it goes to review.
-5. **Climax:** Elena keeps using email while the internal team receives governed project conversation context, stored attachments, and auditable follow-up.
+### Journey 3: External Party Sends Project Context Into Hexalith
 
-Failure: unresolved or unauthorized sender states fail closed and expose only safe review actions.
+**Source ID and mapping:** UJ3 · FR1–FR4, FR13–FR20, FR29–FR34 · NFR1–NFR12, NFR31–NFR36, NFR49–NFR55 · S1, S2.
 
-### Flow 4 - Project owner repairs a wrong association (Priya, project owner, sensitive delivery project)
+1. Elena sends an email and attachment through a controlled mailbox pattern.
+2. Intake preserves source identity and provider-supplied authenticity/header evidence; Elena is resolved as a tenant-scoped party when possible.
+3. Authorization and safe project association occur before project/file exposure.
+4. The attachment enters governed mailbox capture, scan, storage, and retention states; there is no general-upload route.
+5. **Climax:** Elena continues using ordinary email while the authorized internal team receives governed, attributable project context.
 
-1. Priya notices an email-derived item that does not belong in her project.
-2. She opens association details and sees original evidence, actor, timestamp, confidence, candidates shown, and downstream artifacts.
-3. She corrects the association or marks the item misfiled.
-4. The system preserves original audit history, updates project linkage, relinks or blocks attachments according to policy, and invalidates derived AI context where needed.
-5. **Climax:** Priya repairs contaminated context without erasing the record of what happened.
+Failure: unresolved identity, authenticity anomaly, unauthorized scope, or scanner/audit failure routes to existence-neutral review, block, or quarantine with no broad fallback.
 
-Failure: if Priya lacks authority for the target project, the correction flow suppresses restricted details and routes to authorized review.
+### Journey 4: Project Owner Corrects a Wrong Association
 
-### Flow 5 - Tenant admin configures governed collaboration (Nora, tenant admin, rollout week)
+**Source ID and mapping:** UJ4 · FR7–FR8, FR23–FR28, FR60–FR63, FR87–FR96 · NFR13–NFR22, NFR49–NFR59 · S4, S1, S9.
 
-1. Nora opens Tenant Configuration.
-2. She configures monitored mailbox patterns, party resolution rules, confidence thresholds, low-risk AI policy, approval requirements, and audit visibility.
-3. She reviews operational queues for unresolved parties, ambiguous matches, duplicate suppression, rejected associations, approval aging, and failed command execution.
-4. She verifies that unauthorized projects never appear in candidate or evidence views.
-5. **Climax:** Nora sees that the workflow fails closed and remains operable under messy mailbox conditions.
+1. Priya opens the Correction Surface from a misassociated conversation item.
+2. She reviews predecessor evidence, downstream attachments/proposals, authority, and freshness, then supplies rationale.
+3. The correction commits once and enters `Correcting`; affected AI use becomes unavailable with a reason.
+4. Correction progress reports acknowledgements from every affected derived store, estimate, owner, and audit linkage.
+5. **Climax:** only after all acknowledgements does the item become `Corrected`, with contaminated context removed and history preserved.
 
-Failure: if Microsoft 365 permissions are revoked or throttled, the affected mailbox shows degraded state and safe recovery steps without broad fallback access.
+Failure: a stale revision returns `revision-conflict`; propagation beyond 10 minutes in M0/M1 or 60 minutes in M2 becomes `Correction-delayed`, triggers P2, and keeps AI blocked.
 
-### Flow 6 - Developer uses CLI parity (Leo, automation builder, incident support)
+### Journey 5: Tenant Admin Configures Governed Email Collaboration
 
-1. Leo uses the CLI to list unresolved associations.
-2. The CLI returns the same ordered candidates, evidence fields, status codes, and redaction semantics as the UI.
-3. He confirms an association, checks attachment status, and queries the audit record.
-4. If projection is delayed, the CLI returns operation identity and partial-success status.
-5. **Climax:** Leo can script governed operations without bypassing the same authorization, approval, and audit model.
+**Source ID and mapping:** UJ5 · FR9, FR18–FR20, FR51–FR53, FR67–FR75 · NFR23–NFR48, NFR65–NFR70 · S5, S8, S10.
 
-Failure: stale credentials, tenant switch, or revoked service-client scope fail closed without revealing restricted project existence.
+1. Nora enters Tenant Administration with her bounded scope displayed.
+2. She proposes a security-sensitive threshold or policy change with values, scope, justification, and version; no control can downgrade the six approval effects.
+3. A distinct authorized admin reviews it; self-approval and insufficient scope are explained-unavailable.
+4. Nora reviews Operational Dashboards for health, queue depth/age, freshness, SLO/error-budget status, owner, and alert route.
+5. She uses aggregate queue operations without seeing project detail she is not separately authorized to access.
+6. **Climax:** the second-admin-approved version activates with an audit link while the product remains fail-closed and operable.
 
-### Flow 7 - Compliance or support reviewer investigates a risky action (Sofia, support reviewer, after a reported concern)
+Failure: conflict, expiry, rejection, revoked mailbox permission, `unsupported` SLO evidence, or missing second approver leaves the prior policy active and shows owner/next action.
 
-1. Sofia opens Audit Investigation from a reported conversation event or support search.
-2. She searches by source message ID, correlation ID, project, requester, command surface, actor, time range, or policy reason.
-3. The audit timeline shows permitted details: source message, tenant, project, requester, party identities, candidate evidence, selected association, rejected alternatives, input files, approval policy, approval decision, command surface, model/agent identity, executed command, destination, and outcome.
-4. Sofia filters for retries, corrections, rejections, deferrals, duplicate suppression, and projection-pending states.
-5. If evidence is redacted by permission, the row explains that detail is restricted and offers an escalation path without revealing the hidden resource.
-6. **Climax:** Sofia reconstructs who initiated the action, which project context and files influenced it, what policy applied, what output was produced, and where it went.
+### Journey 6: Developer Uses CLI To Inspect and Resolve Project Email Workflow
 
-Failure: if Sofia lacks authority to mutate project state, investigation remains read/escalate only. If audit projection is delayed, the surface shows partial status and operation identity.
+**Source ID and mapping:** UJ6 · FR80–FR86, FR90–FR95 · NFR24–NFR36, NFR67–NFR70 · S7, S10.
 
-### Flow 8 - User reviews an AI action before it leaves the project boundary (Amira, delivery contributor, before an external reply)
+1. Leo opens the Cross-surface Attribution / Command Surface Reference and notes the parity-set version.
+2. Through CLI he lists unresolved items and receives the same safe ordered candidates/evidence as UI and MCP.
+3. He confirms an association and receives operation identity, immutable CLI origin, transition, and audit result.
+4. Repeating the equivalent command returns the prior outcome; a changed decision returns `decision-conflict`.
+5. **Climax:** Leo verifies the same status/audit outcome through an authorized MCP status lookup without bypassing governance.
 
-1. Amira asks the AI to prepare a response that may include project file content and be sent externally.
-2. The AI draft is ready, but execution pauses before email send, file exposure, project mutation, tool invocation, or participant representation.
-3. Amira opens AI Action Review and sees context used, files referenced, proposed action, destination, policy rule, risk class, and expected command.
-4. She expands evidence and confirms that the authorized project context is correct.
-5. She approves, rejects, requests revision, or cancels.
-6. **Climax:** Nothing leaves the project boundary until Amira's permitted decision succeeds, and the decision is audited with reason and policy rule.
+Failure: revoked MCP scope or malformed bypass argument yields the same existence-neutral denial; accepted long-running work remains recoverable through operation status rather than blind resubmission.
 
-Failure: if the request violates boundary or policy, the AI refuses or routes to approval. If authorization fails, denial is audited without leaking restricted resource details.
+### Journey 7: Compliance or Support Reviewer Investigates a Risky Action
 
-### Flow 9 - Governed AI execution (Ari, project-aware AI agent, handling a conversation request)
+**Source ID and mapping:** UJ7 · FR54–FR63, FR85–FR86, FR90–FR91 · NFR49–NFR59 · S8, S9.
 
-1. Ari receives a request from a conversation actor, UI, CLI, MCP, scheduled trigger, or file-addition trigger.
-2. The system supplies scoped context: tenant, project, requester, authorized files, policy, permitted action types, approval requirement, and source traceability.
-3. Ari performs low-risk read-only assistance when policy allows.
-4. For risky operations, Ari creates a proposed action with expected command, risk class, destination, files, and policy reason instead of executing.
-5. If association is unresolved, context is missing, or authorization fails, Ari refuses, asks for clarification, or routes to association/approval as appropriate.
-6. **Climax:** Ari can move work forward without silently crossing tenant, project, file, tool, or external-communication boundaries.
-7. Execution result is recorded through the same command/event/audit model as human, CLI, and MCP actions.
+1. Sofia opens Compliance Investigation from a reported operation.
+2. She searches authorized audit by source, correlation, actor, origin, policy, decision, and time.
+3. The timeline distinguishes source evidence, AI summaries, policy/approval, correction acknowledgements, replay events, redaction, and outcome.
+4. She creates a redacted support bundle or scoped retention/export request when authorized, previewing included/excluded data classes.
+5. **Climax:** Sofia reconstructs who acted, under which authority/policy/evidence, what crossed a boundary, and what outcome occurred without relying on screenshots.
 
-Failure: denied, rejected, retryable, terminal, and projection-pending outcomes remain visible on Conversation Detail, Operational Queues, AI Action Review, and Audit Investigation.
+Failure: restricted detail stays existence-neutral with escalation; stale projection shows operation identity; replay is excluded by default; unsupported recovery/SLO evidence is labelled, never inferred.
+
+### Journey 8: User Reviews an AI Action Before It Leaves the Project Boundary
+
+**Source ID and mapping:** UJ8 · FR39–FR50 · NFR16, NFR46–NFR48, NFR60–NFR64 · S3, S6.
+
+1. Amira asks AI to prepare an external response using governed files.
+2. The system marks the internal classification and user-visible `approval-required` disposition because file exposure and external communication are boundary effects.
+3. Outbound Approval shows frozen content, recipients, sender authority/delegation, requester/origin, files/redaction/freshness, command/version, policy, effects, reversibility, expected post-state, and audit events.
+4. Amira approves, rejects, requests revision, or cancels.
+5. Immediately before send, the system revalidates every authority, evidence, policy, effect, revision, idempotency, and audit precondition.
+6. **Climax:** the exact approved content is sent once under current authority, and the conversation shows the operation and audit outcome.
+
+Failure: evidence expiry, membership/delegation drift, policy/allowlist/effect change, or approval mismatch blocks send and requires a refreshed proposal; denied/unsupported work cannot be approved.
+
+### System Journey: Governed AI Execution
+
+**Source ID and mapping:** System Journey · FR33, FR39–FR46, FR81–FR89 · NFR1–NFR22, NFR31–NFR36, NFR49–NFR55 · S1, S3, S6, S7, S9.
+
+1. Ari receives an authorized conversation or UI/CLI/MCP command-surface request; scheduled-time and file-addition triggers are not MVP origins.
+2. Admission validates tenant, project, actor, context package, files, policy, allowlist, evidence, intended effects, idempotency, and audit readiness.
+3. A supported read-only/no-external-effect subtype may become `allowed-read-only`; any of the six boundary effects becomes `approval-required` without downgrade.
+4. An indeterminate classification creates a reviewable proposal only when all other inputs and authorities are safe; otherwise Ari returns `denied` or `unsupported` without unsafe detail.
+5. Approved work executes once through the shared command spine; status and audit preserve immutable origin across UI, CLI, and MCP.
+6. **Climax:** Ari advances authorized work while every boundary crossing remains human-approved, attributable, idempotent, and reconstructable.
+
+Failure: unresolved association/actor, unauthorized input, expired evidence, unavailable audit, or disallowed command fails closed. During AI outage, deterministic/manual workflows and existing-proposal decisions continue while new generation remains visibly unavailable.

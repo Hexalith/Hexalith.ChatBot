@@ -36,8 +36,12 @@
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
   <!-- Project resources can transitively consume Conversations. Pass the root-declared Commons location as a
-       global MSBuild property so no sibling falls back to its forbidden nested submodule. -->
-  <ItemGroup>
+       global MSBuild property so no sibling falls back to its forbidden nested submodule.
+       Conditioned on a NON-EMPTY value: AdditionalProperties pins the property globally for the referenced build,
+       and a referenced project's own Condition="'$(HexalithCommonsRoot)' == ''" fallback cannot override a global
+       property. Forwarding an empty value therefore turns an undetected Commons root into a hard break instead of
+       letting each sibling fall back. When the value is empty, forward nothing and let those fallbacks run. -->
+  <ItemGroup Condition="'$(HexalithCommonsRoot)' != ''">
     <ProjectReference Update="@(ProjectReference)"
                       AdditionalProperties="%(ProjectReference.AdditionalProperties);HexalithCommonsRoot=$(HexalithCommonsRoot)" />
   </ItemGroup>

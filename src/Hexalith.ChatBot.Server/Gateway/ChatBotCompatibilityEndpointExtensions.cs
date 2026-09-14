@@ -120,9 +120,13 @@ internal static class ChatBotCompatibilityEndpointExtensions
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        string pubSubName = app.Configuration["ChatBot:Projection:PubSubName"] ?? "chatbot-pubsub";
-        string topic = app.Configuration["ChatBot:Projection:Topic"] ?? "chatbot.events";
-        string deadLetterTopic = app.Configuration["ChatBot:Projection:DeadLetterTopic"] ?? "deadletter.chatbot.events";
+        // The pubsub/topic/dead-letter literals live in ChatBotProjectionSubscriptionDefaults, not as unshared
+        // fallbacks here: this call site previously re-hardcoded the same strings the Aspire module declares as
+        // constants, so the two copies could drift with nothing failing.
+        ChatBotProjectionSubscriptionBinding binding = ChatBotProjectionSubscriptionDefaults.Resolve(app.Configuration);
+        string pubSubName = binding.PubSubName;
+        string topic = binding.Topic;
+        string deadLetterTopic = binding.DeadLetterTopic;
         _ = app.MapSubscribeHandler();
         _ = app.MapGovernedOperationProjectionEndpoints(pubSubName, topic, deadLetterTopic);
         _ = app.MapMailboxIntakeProjectionEndpoints(pubSubName, topic, deadLetterTopic);
@@ -131,6 +135,10 @@ internal static class ChatBotCompatibilityEndpointExtensions
         _ = app.MapAiOutcomeProjectionEndpoints(pubSubName, topic, deadLetterTopic);
         _ = app.MapTaskIntentProjectionEndpoints(pubSubName, topic, deadLetterTopic);
         _ = app.MapApprovalProjectionEndpoints(pubSubName, topic, deadLetterTopic);
+
+        // The seven subscriptions above all route poison messages to deadLetterTopic. Drain it: without a
+        // subscriber those messages accumulate in Redis with nothing observing or alerting on them.
+        _ = app.MapChatBotDeadLetterProjectionEndpoints(pubSubName, deadLetterTopic);
 
         return app;
     }

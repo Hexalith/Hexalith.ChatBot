@@ -93,13 +93,38 @@ public static class AppHostTopologyTests
         realm.ShouldContain("\"clientId\": \"hexalith-tenants\"");
     }
 
+    /// <summary>
+    /// The service-grant expiry rendering is verified BEHAVIORALLY, not by source text: this project has no
+    /// ProjectReference and cannot run the AppHost. <c>RecoveryValidationTopologyContractTests
+    /// .RenderedRealmServiceClientGrantExpiryIsAcceptedByTheClaimsGrantResolver</c> in the integration suite renders
+    /// the realm through the AppHost, reads every substituted <c>chatbot:service-client-grant-expiry</c> claim back
+    /// out, and asserts <c>ClaimsServiceClientGrantResolver</c> accepts it. That is what the previous source-text
+    /// guard here could not do — the <c>+00:00</c> rendering bug shipped past a green suite because every resolver
+    /// test hand-writes <c>...Z</c> literals and this guard only matched a source expression.
+    /// </summary>
+    /// <remarks>
+    /// What remains asserted here is the AppHost-side policy shape that the consumer test cannot see: the grant
+    /// count is derived from the realm rather than hand-maintained, the persistent-container caveat is surfaced,
+    /// and the non-production seed-credential policy is recorded next to the gate it justifies.
+    /// </remarks>
     [Fact]
-    public static void AppHostShouldEmitSafeCanonicalUtcServiceGrantExpiryTokens()
+    public static void AppHostShouldDeriveServiceGrantPolicyFromTheRealmAndWarnOnReusedKeycloak()
     {
         string source = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
 
-        source.ShouldContain("expiresAt.UtcDateTime.ToString(\"O\", CultureInfo.InvariantCulture)");
-        source.ShouldNotContain("expiresAt.ToUniversalTime().ToString(\"O\", CultureInfo.InvariantCulture)");
+        // The expected placeholder count comes from the realm's own grant-expiry mappers, and a mapper that lost its
+        // placeholder fails naming the client rather than reporting a count mismatch.
+        source.ShouldContain("CountRealmServiceGrantExpiryMappers(realm, grantExpiryMapperName, expiryPlaceholder)");
+        source.ShouldNotContain("const int expectedServiceGrantCount");
+        source.ShouldContain("Realm client '{clientId}' declares a '{mapperName}' protocol mapper");
+
+        // A reused Keycloak container never re-imports the realm, so the pre-expiry gate can pass against a value
+        // Keycloak never received. That must be surfaced, with the documented remedy.
+        source.ShouldContain("HexalithEventStoreSecurityOptions.DefaultPersistentConfigurationKey");
+        source.ShouldContain("docker rm -f");
+
+        // The recorded local-development seed-credential policy lives next to the gate that enforces it.
+        source.ShouldContain("NON-PRODUCTION SEED-CREDENTIAL POLICY");
     }
 
     [Fact]
@@ -300,29 +325,64 @@ public static class AppHostTopologyTests
         mcpMapperText.ShouldNotContain("\"claim.value\": \"hexalith-chatbot\"");
     }
 
+    /// <summary>
+    /// The dead-letter topic name the Server's shared subscription defaults declare. Mirrored here rather than
+    /// referenced because this project has no ProjectReference; the load-bearing equality between this value and
+    /// <c>ChatBotAspireModule.DeadLetterTopicName</c> is asserted behaviorally by
+    /// <c>ChatBotDeadLetterSubscriptionTopologyTests</c> in the integration suite.
+    /// </summary>
+    private const string SharedDeadLetterTopicDefault = "deadletter.chatbot.events";
+
     [Fact]
     public static void AppHostShouldWireSubscriberDeadLetterRoutingIntoDaprDiscovery()
     {
         string root = RepositoryRoot();
         string appHost = File.ReadAllText(Path.Combine(root, "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
+        string projectionsDirectory = Path.Combine(root, "src", "Hexalith.ChatBot.Server", "Projections");
         string endpoints = File.ReadAllText(Path.Combine(
             root,
             "src",
             "Hexalith.ChatBot.Server",
             "Gateway",
             "ChatBotCompatibilityEndpointExtensions.cs"));
-        string governedSubscription = File.ReadAllText(Path.Combine(
-            root,
-            "src",
-            "Hexalith.ChatBot.Server",
-            "Projections",
-            "GovernedOperationProjectionEndpoints.cs"));
+        string defaults = File.ReadAllText(Path.Combine(projectionsDirectory, "ChatBotProjectionSubscriptionDefaults.cs"));
 
         appHost.ShouldContain("ChatBot__Projection__DeadLetterTopic");
         appHost.ShouldContain("GetTenantDeadLetterTopic(\"tenant-alpha\")");
-        endpoints.ShouldContain("ChatBot:Projection:DeadLetterTopic");
-        endpoints.ShouldContain("deadLetterTopic");
-        governedSubscription.ShouldContain("DeadLetterTopic = deadLetterTopic");
+
+        // The topic literals and their override keys live in one shared place; the call site consumes them.
+        defaults.ShouldContain("ChatBot:Projection:DeadLetterTopic");
+        defaults.ShouldContain($"DeadLetterTopic = \"{SharedDeadLetterTopicDefault}\"");
+        endpoints.ShouldContain("ChatBotProjectionSubscriptionDefaults.Resolve(app.Configuration)");
+        endpoints.ShouldNotContain(
+            $"?? \"{SharedDeadLetterTopicDefault}\"",
+            customMessage: "The dead-letter topic default must not be re-hardcoded as an unshared fallback at the call site.");
+
+        // EVERY subscriber, not just the governed-operation one: six subscribers previously could drop
+        // DeadLetterTopic with nothing failing. Discovered from disk so an eighth subscriber is covered the day
+        // it is added.
+        string[] subscriberFiles = [.. Directory
+            .EnumerateFiles(projectionsDirectory, "*ProjectionEndpoints.cs")
+            .Where(static path => !Path.GetFileName(path).StartsWith("ChatBotDeadLetter", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)];
+        subscriberFiles.Length.ShouldBe(
+            7,
+            "The ChatBot projection subscriber set changed; confirm the new subscriber routes to the dead-letter "
+            + "topic and update this count deliberately.");
+        foreach (string subscriberFile in subscriberFiles)
+        {
+            File.ReadAllText(subscriberFile).ShouldContain(
+                "DeadLetterTopic = deadLetterTopic",
+                customMessage: $"{Path.GetFileName(subscriberFile)} must route poison messages to the configured dead-letter topic.");
+        }
+
+        // ... and the dead-letter topic is actually drained, on its own subscription with no dead-letter topic of
+        // its own (a DLQ subscription that dead-letters on failure can loop).
+        string deadLetterSubscriber = File.ReadAllText(
+            Path.Combine(projectionsDirectory, "ChatBotDeadLetterProjectionEndpoints.cs"));
+        deadLetterSubscriber.ShouldContain("Name = deadLetterTopic");
+        deadLetterSubscriber.ShouldNotContain("DeadLetterTopic =");
+        endpoints.ShouldContain("MapChatBotDeadLetterProjectionEndpoints(pubSubName, deadLetterTopic)");
     }
 
     [Fact]

@@ -94,3 +94,12 @@ The AppHost renders the Keycloak realm on every run — including ordinary local
 ```bash
 dotnet user-secrets set ChatBot:LiveRecoveryValidation:MailboxClientSecret "REPLACE-THIS-WITH-32+-RANDOM-CHARS" --project src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj
 ```
+
+### Local-development seed-credential policy
+
+Every client, user, and secret the AppHost renders into `KeycloakRealms/hexalith-realm.json` is a **local-development seed**, not a provisioned credential. The AppHost is `IsPublishable=false` and is never a production hosting path, so:
+
+- **The service-client grants deliberately share one expiry.** They are seeds re-minted on every non-persistent run, not credentials with independent lifecycles, so staggering them would model a rotation story this host does not own. Configure the expiry with `ChatBotServiceGrants:ExpiresAtUtc`, or its lifetime with `ChatBotServiceGrants:LifetimeDays` (default 90 days).
+- **The pre-expiry gate is the guardrail.** `PrepareKeycloakRealmImport` refuses to start the topology when the grant expiry is less than `ChatBotServiceGrants:MinimumRemainingDays` (default 30) in the future — the failure mode a stale checked-in realm actually produces. The expected placeholder count is derived from the realm's own `chatbot-service-client-grant-expiry` protocol mappers, so adding a realm client cannot silently opt that client out of the gate, and a mapper that lost its placeholder fails naming the offending client id.
+- **`KeycloakPersistent=true` weakens that gate.** A reused Keycloak container does not re-import the realm, so the expiry validated at startup may not be the one Keycloak is serving. The AppHost warns on stderr in this mode; remove the Keycloak container (`docker rm -f`) to force a re-import after changing the realm or the configured expiry.
+- **Production provisioning and rotation live outside the AppHost**, in deployment configuration. Do not add provisioning, rotation, or a deployment manifest to `Hexalith.ChatBot.AppHost`.

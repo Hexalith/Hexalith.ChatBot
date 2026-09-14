@@ -90,7 +90,26 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     private static readonly TimeSpan ProjectionTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan ProjectionStabilityWindow = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(3);
+
+    /// <summary>
+    /// Deadline for <c>ValidateTopologyAttemptAsync</c>'s per-attempt selected-port log validation. Distinct from
+    /// <see cref="TopologyReadinessBudget"/>, which bounds the resource-health wait.
+    /// </summary>
     private static readonly TimeSpan SelectedResourceValidationTimeout = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// The TOTAL wall-clock budget for bringing every required topology resource to healthy, shared across the
+    /// whole wait rather than granted per resource.
+    /// </summary>
+    /// <remarks>
+    /// Each resource previously got its own <c>WaitAsync(TimeSpan.FromMinutes(5))</c>, so seven sequential waits
+    /// could consume 35 minutes inside a required job with <c>timeout-minutes: 30</c> that also runs a browser E2E.
+    /// A partial-startup hang was then killed by the runner, skipping the <c>if: always()</c> artifact upload and
+    /// losing the evidence this lane exists to produce. One budget for the whole wait keeps the worst case inside
+    /// the job with room for the command/projection/audit legs that follow.
+    /// </remarks>
+    private static readonly TimeSpan TopologyReadinessBudget = TimeSpan.FromMinutes(10);
+
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
 
     private readonly ITestOutputHelper _output;
@@ -171,6 +190,15 @@ public sealed class TrivialGovernedCommandAspireE2eTests
 
             string accessToken = await AcquireTenantBoundAccessTokenAsync(app, cancellationToken).ConfigureAwait(true);
 
+            // The chatbot's command dispatch and projection read both go THROUGH its DAPR sidecar; if the sidecar
+            // failed to start (e.g. a bad access-control spec) the chatbot app still serves /health but every
+            // sidecar-backed call hangs. Verify the sidecar's state-store path is live BEFORE submitting so that
+            // failure surfaces here with a clear message instead of as an opaque submit timeout.
+            await WaitForChatBotDaprSidecarAsync(client, accessToken, correlationId, cancellationToken).ConfigureAwait(true);
+
+            // Ordered AFTER the sidecar guard on purpose: this probe issues sidecar-backed reads, and it previously
+            // ran above the very guard whose comment says the state-store path must be verified first — so a dead
+            // sidecar made the "no durable state" proof pass for the wrong reason.
             await AssertNoDurableStateWasCreatedAsync(
                 client,
                 accessToken,
@@ -178,12 +206,6 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 unauthenticatedTaskId,
                 unauthenticatedCorrelationId,
                 cancellationToken).ConfigureAwait(true);
-
-            // The chatbot's command dispatch and projection read both go THROUGH its DAPR sidecar; if the sidecar
-            // failed to start (e.g. a bad access-control spec) the chatbot app still serves /health but every
-            // sidecar-backed call hangs. Verify the sidecar's state-store path is live BEFORE submitting so that
-            // failure surfaces here with a clear message instead of as an opaque submit timeout.
-            await WaitForChatBotDaprSidecarAsync(client, accessToken, correlationId, cancellationToken).ConfigureAwait(true);
 
             // 1) Authenticated submit of the allowlisted trivial command declaring origin=ui → 202 Accepted. The
             //    durable spine (EventStore actor host + chatbot domain processor) finishes starting after the
@@ -253,7 +275,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 accessToken,
                 noteId,
                 correlationId,
-                viewAfterReplay.GetRawText(),
+                DerivedRecordShape(viewAfterReplay, "replay"),
                 cancellationToken).ConfigureAwait(true);
 
             // No restricted evidence leaks across the durable surfaces.
@@ -375,13 +397,11 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 app,
                 Recovery.RecoveryRepositoryCommitResolver.Resolve(),
                 cancellationToken).ConfigureAwait(true);
-            foreach (string resource in new[] { EventStoreResourceName, TenantsResourceName, ChatBotResourceName })
-            {
-                await app.ResourceNotifications
-                    .WaitForResourceHealthyAsync(resource, cancellationToken)
-                    .WaitAsync(TimeSpan.FromMinutes(5), cancellationToken)
-                    .ConfigureAwait(true);
-            }
+            // One shared readiness budget across the three resources, not three independent 5-minute waits.
+            await WaitForResourcesHealthyWithinBudgetAsync(
+                app,
+                [EventStoreResourceName, TenantsResourceName, ChatBotResourceName],
+                cancellationToken).ConfigureAwait(true);
 
             using HttpClient client = app.CreateHttpClient(ChatBotResourceName);
             client.Timeout = TimeSpan.FromSeconds(30);
@@ -417,7 +437,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
 
                 // The derived-record shape excluding the per-note id (and per-run timestamps), so the only thing
                 // compared across origins is the surface-invariant projection shape.
-                shapes.Add((origin, DerivedRecordShape(view)));
+                shapes.Add((origin, DerivedRecordShape(view, origin)));
             }
 
             // The projected end-state shape is identical regardless of the declared surface origin.
@@ -444,13 +464,11 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 app,
                 Recovery.RecoveryRepositoryCommitResolver.Resolve(),
                 cancellationToken).ConfigureAwait(true);
-            foreach (string resource in new[] { EventStoreResourceName, TenantsResourceName, ChatBotResourceName })
-            {
-                await app.ResourceNotifications
-                    .WaitForResourceHealthyAsync(resource, cancellationToken)
-                    .WaitAsync(TimeSpan.FromMinutes(5), cancellationToken)
-                    .ConfigureAwait(true);
-            }
+            // One shared readiness budget across the three resources, not three independent 5-minute waits.
+            await WaitForResourcesHealthyWithinBudgetAsync(
+                app,
+                [EventStoreResourceName, TenantsResourceName, ChatBotResourceName],
+                cancellationToken).ConfigureAwait(true);
 
             using HttpClient client = app.CreateHttpClient(ChatBotResourceName);
             client.Timeout = TimeSpan.FromSeconds(30);
@@ -2028,17 +2046,28 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     // The origin-free derived-record fields of a projected view (provenance/derivation/redaction/retention/
     // schema + source version), excluding the per-note id and per-run timestamps, rendered for cross-origin
     // equality.
-    private static string DerivedRecordShape(JsonElement view)
+    private static string DerivedRecordShape(JsonElement view, string origin)
     {
         return string.Join(
             "|",
-            view.GetProperty("schemaVersion").ToString(),
-            view.GetProperty("sourceProvenance").ToString(),
-            view.GetProperty("derivationKernelVersion").ToString(),
-            view.GetProperty("redactionState").ToString(),
-            view.GetProperty("retentionClass").ToString(),
-            view.GetProperty("sourceVersion").ToString());
+            RequiredDerivedField(view, "schemaVersion", origin),
+            RequiredDerivedField(view, "sourceProvenance", origin),
+            RequiredDerivedField(view, "derivationKernelVersion", origin),
+            RequiredDerivedField(view, "redactionState", origin),
+            RequiredDerivedField(view, "retentionClass", origin),
+            RequiredDerivedField(view, "sourceVersion", origin));
     }
+
+    // A bare GetProperty on a missing field throws KeyNotFoundException naming neither the field nor where the view
+    // came from — inside a required release gate. Name both. Only field NAMES are reported, never values, so the
+    // diagnostic itself stays metadata-only.
+    private static string RequiredDerivedField(JsonElement view, string propertyName, string origin)
+        => view.TryGetProperty(propertyName, out JsonElement value)
+            ? value.ToString()
+            : throw new InvalidOperationException(
+                $"The projected GovernedOperationView for origin '{origin}' is missing the required derived-record "
+                + $"field '{propertyName}'. Present fields: "
+                + string.Join(", ", view.EnumerateObject().Select(static property => property.Name)) + ".");
 
     internal async Task WaitForAndRecordRequiredTopologyAsync(DistributedApplication app, CancellationToken cancellationToken)
     {
@@ -2047,12 +2076,14 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             Recovery.RecoveryRepositoryCommitResolver.Resolve(),
             cancellationToken).ConfigureAwait(true);
         Dictionary<string, int> isolatedHttpPorts = new(StringComparer.Ordinal);
+        Stopwatch readinessClock = Stopwatch.StartNew();
         foreach (string resource in RequiredTopologyResources)
         {
-            ResourceEvent resourceEvent = await app.ResourceNotifications
-                .WaitForResourceHealthyAsync(resource, cancellationToken)
-                .WaitAsync(TimeSpan.FromMinutes(5), cancellationToken)
-                .ConfigureAwait(true);
+            ResourceEvent resourceEvent = await WaitForResourceHealthyWithinBudgetAsync(
+                app,
+                resource,
+                readinessClock,
+                cancellationToken).ConfigureAwait(true);
 
             string[] endpoints = resourceEvent.Snapshot.Urls
                 .Where(static url => !url.IsInactive)
@@ -2068,11 +2099,18 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                     endpoints,
                 }));
 
+            // The OBSERVED state text, for every required resource — not merely "the snapshot carried some state".
+            // WaitForResourceHealthyAsync completes on HealthStatus == Healthy, and Aspire only computes a health
+            // status for a resource whose state is Running, so Running is the contract this wait already implies;
+            // asserting it turns the recorded evidence into a gate instead of a log line.
             resourceEvent.Snapshot.State.ShouldNotBeNull($"{resource} must expose its actual runtime state.");
-            if (string.Equals(resource, ChatBotResourceName, StringComparison.Ordinal))
-            {
-                endpoints.ShouldNotBeEmpty("The chatbot must expose an externally reachable runtime endpoint.");
-            }
+            resourceEvent.Snapshot.State!.Text.ShouldBe(
+                KnownResourceStates.Running,
+                $"{resource} must be observed in the Running state, not merely report some state.");
+
+            // Every required resource must have resolved at least one active endpoint. Previously gated to the
+            // chatbot alone, leaving security, chatbot-ui and eventstore-admin-ui recorded but unasserted.
+            endpoints.ShouldNotBeEmpty($"{resource} must expose at least one resolved, active runtime endpoint.");
 
             if (IsolatedDaprHttpResourceNames.Contains(resource, StringComparer.Ordinal))
             {
@@ -2102,6 +2140,60 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         => new TrivialGovernedCommandAspireE2eTests(output)
             .WaitForAndRecordRequiredTopologyAsync(app, cancellationToken);
 
+    /// <summary>
+    /// Waits for one resource to report healthy, drawing from the SHARED <see cref="TopologyReadinessBudget"/>
+    /// rather than being granted its own independent timeout.
+    /// </summary>
+    /// <remarks>
+    /// Per-resource timeouts multiply: N slow resources cost N x timeout, which is how seven 5-minute waits came to
+    /// exceed a 30-minute job budget. Passing the REMAINING budget makes the worst case the budget itself,
+    /// regardless of how many resources are waited on, and fails with a message naming the resource that ran the
+    /// clock out instead of letting the runner kill the job.
+    /// </remarks>
+    private static async Task<ResourceEvent> WaitForResourceHealthyWithinBudgetAsync(
+        DistributedApplication app,
+        string resource,
+        Stopwatch budgetClock,
+        CancellationToken cancellationToken)
+    {
+        TimeSpan remaining = TopologyReadinessBudget - budgetClock.Elapsed;
+        if (remaining <= TimeSpan.Zero)
+        {
+            throw new TimeoutException(
+                $"The shared {TopologyReadinessBudget} topology readiness budget was exhausted before '{resource}' "
+                + "was waited on. Earlier resources consumed the whole budget.");
+        }
+
+        try
+        {
+            return await app.ResourceNotifications
+                .WaitForResourceHealthyAsync(resource, cancellationToken)
+                .WaitAsync(remaining, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (TimeoutException exception)
+        {
+            throw new TimeoutException(
+                $"'{resource}' did not report healthy within the remaining {remaining} of the shared "
+                + $"{TopologyReadinessBudget} topology readiness budget.",
+                exception);
+        }
+    }
+
+    /// <summary>Waits for a resource set to report healthy under one shared budget, recording nothing.</summary>
+    private static async Task WaitForResourcesHealthyWithinBudgetAsync(
+        DistributedApplication app,
+        IEnumerable<string> resources,
+        CancellationToken cancellationToken)
+    {
+        Stopwatch readinessClock = Stopwatch.StartNew();
+        foreach (string resource in resources)
+        {
+            _ = await WaitForResourceHealthyWithinBudgetAsync(app, resource, readinessClock, cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
     private static async Task<HttpResponseMessage> SubmitUnauthenticatedGovernedNoteAsync(
         HttpClient client,
         string noteId,
@@ -2127,6 +2219,12 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         string correlationId,
         CancellationToken cancellationToken)
     {
+        // Forbidden, not "not OK". ShouldNotBe(OK) is satisfied by 500, 503 or a sidecar timeout, so the fail-closed
+        // proof was greenest exactly when the read path was broken. The spine deliberately does not reveal resource
+        // existence: ChatBotProblemDetailsFactory maps SafeNotFound to 403 (only AuthenticationDenied maps to 401),
+        // so 403 is the read-path answer for a note that was never created — and it excludes the transport and
+        // server-fault results that made the old assertion vacuous. WaitForChatBotDaprSidecarAsync already treats
+        // Forbidden as proof of a live sidecar on the same surface.
         Stopwatch stopwatch = Stopwatch.StartNew();
         while (stopwatch.Elapsed < ProjectionStabilityWindow)
         {
@@ -2136,7 +2234,10 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 $"/api/v1/governed-operations/{noteId}",
                 correlationId,
                 cancellationToken).ConfigureAwait(false);
-            view.StatusCode.ShouldNotBe(HttpStatusCode.OK, "An unauthenticated command must not create a durable projection.");
+            view.StatusCode.ShouldBe(
+                HttpStatusCode.Forbidden,
+                "An unauthenticated command must not create a durable projection, and the read of the never-created "
+                + "note must answer with the safe-not-found 403 rather than a transport or server fault.");
 
             using HttpResponseMessage status = await GetAuthorizedAsync(
                 client,
@@ -2144,17 +2245,31 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 $"/api/v1/operations/{taskId}",
                 correlationId,
                 cancellationToken).ConfigureAwait(false);
-            status.StatusCode.ShouldNotBe(HttpStatusCode.OK, "An unauthenticated command must not create durable operation status.");
+            status.StatusCode.ShouldBe(
+                HttpStatusCode.Forbidden,
+                "An unauthenticated command must not create durable operation status, and the read of the "
+                + "never-created operation must answer with the safe-not-found 403.");
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
         }
     }
 
+    /// <summary>
+    /// Polls the projected view across the stability window and asserts a delayed duplicate delivery does not
+    /// mutate it.
+    /// </summary>
+    /// <remarks>
+    /// Compares the DERIVED-RECORD SHAPE, not the raw JSON. <c>GetRawText().ShouldBe(expectedBody)</c> made this
+    /// required release gate flake on any volatile field (a re-stamped <c>lastUpdatedAt</c>) or a serializer
+    /// property reorder — neither of which is the duplicate-delivery mutation the assertion exists to catch. The
+    /// durable-effect fields (source version, provenance, derivation, redaction, retention, schema) plus the note
+    /// identity are exactly what a duplicate delivery would move.
+    /// </remarks>
     private static async Task AssertGovernedOperationViewRemainsStableAsync(
         HttpClient client,
         string accessToken,
         string noteId,
         string correlationId,
-        string expectedBody,
+        string expectedShape,
         CancellationToken cancellationToken)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
@@ -2167,7 +2282,12 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 correlationId,
                 cancellationToken).ConfigureAwait(false);
             current.GetProperty("sourceVersion").GetInt64().ShouldBe(1);
-            current.GetRawText().ShouldBe(expectedBody, "A delayed duplicate delivery must not mutate the durable projection.");
+            RequiredDerivedField(current, "noteId", "replay").ShouldBe(
+                noteId,
+                "A delayed duplicate delivery must not repoint the durable projection at another note.");
+            DerivedRecordShape(current, "replay").ShouldBe(
+                expectedShape,
+                "A delayed duplicate delivery must not mutate the durable projection's derived-record shape.");
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
         }
     }
@@ -2581,13 +2701,15 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         Assert.SkipUnless(available, skipReason);
     }
 
+    // Transient == worth retrying while the spine finishes starting. The enumerated 502/503/504 were dead branches
+    // under the blanket `>= 500` sweep, which in turn kept retrying 501 Not Implemented and 505 HTTP Version Not
+    // Supported for the full window — deterministic refusals, and the opposite of the fail-fast this guard exists
+    // for. Those two are now permanent; every other 5xx stays retryable because the durable spine legitimately
+    // answers 500/503 while EventStore's actor host is still coming up.
     private static bool IsTransientStatusCode(HttpStatusCode statusCode)
-        => statusCode is HttpStatusCode.RequestTimeout
-            or HttpStatusCode.TooManyRequests
-            or HttpStatusCode.BadGateway
-            or HttpStatusCode.ServiceUnavailable
-            or HttpStatusCode.GatewayTimeout
-        || (int)statusCode >= 500;
+        => statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
+        || ((int)statusCode >= 500
+            && statusCode is not (HttpStatusCode.NotImplemented or HttpStatusCode.HttpVersionNotSupported));
 
     private static bool CommandSucceeds(string fileName, string arguments)
     {

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
+using System.Text.Json;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using CommunityToolkit.Aspire.Hosting.Dapr;
@@ -182,11 +183,19 @@ static string ResolveDaprConfigPath(string appHostDirectory, string fileName)
         configPath);
 }
 
+// NON-PRODUCTION SEED-CREDENTIAL POLICY (Story 1.1c). Every client, user, and secret this function renders into
+// the realm is a LOCAL-DEVELOPMENT SEED for the Aspire umbrella topology, which is IsPublishable=false and never a
+// production hosting path. The service-client grants deliberately share one expiry: they are seeds re-minted on
+// every non-persistent run, not credentials with an independent lifecycle, so staggering them would model a
+// rotation story this host does not own. The guardrail that matters here is the PRE-EXPIRY GATE below — it refuses
+// to start the topology against a grant that is already expired or close to it, which is the failure mode a stale
+// checked-in realm actually produces. Production provisioning and rotation of service-client grants live outside
+// this AppHost, in deployment configuration; do not add them here. See README.md#Aspire-and-DAPR.
 static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration configuration)
 {
     const string expiryPlaceholder = "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__";
+    const string grantExpiryMapperName = "chatbot-service-client-grant-expiry";
     const string recoveryClientSecretPlaceholder = "__HEXALITH_CHATBOT_RECOVERY_CLIENT_SECRET__";
-    const int expectedServiceGrantCount = 7;
     const int defaultLifetimeDays = 90;
     const int defaultMinimumRemainingDays = 30;
 
@@ -242,14 +251,41 @@ static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration
     }
 
     string realm = File.ReadAllText(sourcePath);
+
+    // Derived from the realm, never hand-maintained. The literal this replaced had already drifted once (6 -> 7):
+    // adding a realm client made the AppHost refuse to start with a message naming a COUNT rather than the client
+    // whose grant expiry was missing. Reading the mappers names the offender instead.
+    int expectedServiceGrantCount = CountRealmServiceGrantExpiryMappers(realm, grantExpiryMapperName, expiryPlaceholder);
     int placeholderCount = realm.Split(expiryPlaceholder, StringSplitOptions.None).Length - 1;
     if (placeholderCount != expectedServiceGrantCount)
     {
         throw new InvalidOperationException(
-            $"Expected {expectedServiceGrantCount} service-grant expiry placeholders but found {placeholderCount}.");
+            $"Expected {expectedServiceGrantCount} service-grant expiry placeholders (one per realm client declaring a "
+            + $"'{grantExpiryMapperName}' protocol mapper) but found {placeholderCount} in the realm template. A "
+            + "placeholder outside a grant-expiry mapper would never be validated by the pre-expiry gate.");
     }
 
-    realm = realm.Replace(expiryPlaceholder, expiresAt.UtcDateTime.ToString("O", CultureInfo.InvariantCulture), StringComparison.Ordinal);
+    string renderedExpiry = expiresAt.UtcDateTime.ToString("O", CultureInfo.InvariantCulture);
+    realm = realm.Replace(expiryPlaceholder, renderedExpiry, StringComparison.Ordinal);
+
+    // A reused Keycloak container does NOT re-import the realm — HexalithEventStoreSecurityExtensions documents
+    // this and names `docker rm -f` as the remedy. In persistent mode the expiry validated above is therefore not
+    // necessarily the one Keycloak is serving: the pre-expiry gate can pass against a value that was never applied.
+    // Warn rather than hard-fail; persistence is an explicit dev fast-start opt-in and failing it would make the
+    // documented remedy unreachable.
+    if (bool.TryParse(
+            configuration[HexalithEventStoreSecurityOptions.DefaultPersistentConfigurationKey]?.Trim(),
+            out bool keycloakPersistent)
+        && keycloakPersistent)
+    {
+        Console.Error.WriteLine(
+            $"WARNING: {HexalithEventStoreSecurityOptions.DefaultPersistentConfigurationKey}=true reuses the existing "
+            + "Keycloak container, which does NOT re-import the realm. The service-client grant expiry validated here "
+            + $"({renderedExpiry}) may not be the one Keycloak is serving, so the pre-expiry gate may be passing "
+            + "against a value that was never applied. Remove the Keycloak container (`docker rm -f`) to force a "
+            + "re-import after changing KeycloakRealms/hexalith-realm.json or the configured grant expiry.");
+    }
+
     int recoverySecretPlaceholderCount = realm.Split(recoveryClientSecretPlaceholder, StringSplitOptions.None).Length - 1;
     if (recoverySecretPlaceholderCount != 1)
     {
@@ -366,6 +402,68 @@ static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration
     };
 
     return generatedDirectory;
+}
+
+// Counts the realm clients that declare a service-client grant-expiry protocol mapper, and fails NAMING the client
+// whose mapper carries something other than the substitution placeholder. The count this returns is the expected
+// placeholder occurrence count for the pre-expiry gate, so adding a realm client can never silently opt that client
+// out of the gate, and can never force an unrelated literal to be edited before the topology will start.
+static int CountRealmServiceGrantExpiryMappers(string realm, string mapperName, string expiryPlaceholder)
+{
+    using JsonDocument document = JsonDocument.Parse(realm);
+    if (!document.RootElement.TryGetProperty("clients", out JsonElement clients)
+        || clients.ValueKind != JsonValueKind.Array)
+    {
+        throw new InvalidOperationException(
+            "The Keycloak realm template declares no 'clients' array, so the service-client grant-expiry gate "
+            + "cannot be derived from it.");
+    }
+
+    int count = 0;
+    foreach (JsonElement client in clients.EnumerateArray())
+    {
+        string clientId = client.TryGetProperty("clientId", out JsonElement clientIdElement)
+            ? clientIdElement.GetString() ?? "<unnamed client>"
+            : "<unnamed client>";
+        if (!client.TryGetProperty("protocolMappers", out JsonElement mappers)
+            || mappers.ValueKind != JsonValueKind.Array)
+        {
+            continue;
+        }
+
+        foreach (JsonElement mapper in mappers.EnumerateArray())
+        {
+            if (!mapper.TryGetProperty("name", out JsonElement name)
+                || !string.Equals(name.GetString(), mapperName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            string? claimValue = mapper.TryGetProperty("config", out JsonElement config)
+                && config.TryGetProperty("claim.value", out JsonElement claimValueElement)
+                    ? claimValueElement.GetString()
+                    : null;
+            if (!string.Equals(claimValue, expiryPlaceholder, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Realm client '{clientId}' declares a '{mapperName}' protocol mapper whose 'claim.value' is not "
+                    + $"the '{expiryPlaceholder}' substitution placeholder, so its service-client grant expiry would "
+                    + "never be provisioned and the pre-expiry gate would not cover it. Restore the placeholder in "
+                    + "KeycloakRealms/hexalith-realm.json.");
+            }
+
+            count++;
+        }
+    }
+
+    if (count == 0)
+    {
+        throw new InvalidOperationException(
+            $"The Keycloak realm template declares no '{mapperName}' protocol mapper, so the service-client "
+            + "pre-expiry gate would validate nothing.");
+    }
+
+    return count;
 }
 
 // Windows has no UnixFileMode equivalent, so a file created on Windows inherits its parent directory's ACL instead

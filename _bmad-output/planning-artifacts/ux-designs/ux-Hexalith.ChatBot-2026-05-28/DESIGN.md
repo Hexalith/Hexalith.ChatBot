@@ -1,240 +1,218 @@
 ---
 name: Hexalith.ChatBot
-description: Enterprise project conversation workspace for governed AI, email, files, approvals, and multi-actor collaboration. Inherits Hexalith.FrontComposer and Microsoft Blazor Fluent UI v5.
-status: final
+description: Enterprise project conversation workspace for governed email, files, AI assistance, approvals, and multi-actor collaboration. Inherits Hexalith.FrontComposer and Microsoft Blazor Fluent UI v5.
+status: in-review
 created: 2026-05-28
-updated: 2026-06-05T12:12:05+02:00
+updated: 2026-09-14
 sources:
   - ../../prds/prd-Hexalith.ChatBot-2026-05-28/prd.md
   - ../../prds/prd-Hexalith.ChatBot-2026-05-28/addendum.md
   - ../../product-brief-Hexalith.ChatBot.md
-  - ../../prds/prd-Hexalith.ChatBot-2026-05-28/prd-validation-report.md
-colors:
-  fluent-neutral-background: 'var(--colorNeutralBackground1)'
-  fluent-neutral-background-raised: 'var(--colorNeutralBackground2)'
-  fluent-neutral-foreground: 'var(--colorNeutralForeground1)'
-  fluent-neutral-foreground-muted: 'var(--colorNeutralForeground3)'
-  fluent-neutral-stroke: 'var(--colorNeutralStroke1)'
-  fluent-brand: 'var(--colorBrandBackground)'
-  fluent-brand-foreground: 'var(--colorNeutralForegroundOnBrand)'
-  status-success: 'var(--colorStatusSuccessBackground1)'
-  status-success-foreground: 'var(--colorStatusSuccessForeground1)'
-  status-warning: 'var(--colorStatusWarningBackground1)'
-  status-warning-foreground: 'var(--colorStatusWarningForeground1)'
-  status-danger: 'var(--colorStatusDangerBackground1)'
-  status-danger-foreground: 'var(--colorStatusDangerForeground1)'
-  status-info: 'var(--colorStatusInformationBackground1)'
-  status-info-foreground: 'var(--colorStatusInformationForeground1)'
-typography:
-  page-title:
-    note: 'Inherited from Fluent UI type ramp; use FrontComposer page/header convention.'
-  section-title:
-    note: 'Inherited from Fluent UI type ramp; compact enterprise surface heading.'
-  body:
-    note: 'Inherited from Fluent UI body token.'
-  metadata:
-    note: 'Inherited from Fluent UI caption/metadata token.'
-  code:
-    note: 'Use platform monospace for IDs, command names, correlation IDs, and CLI/MCP examples.'
-rounded:
-  sm: '4px'
-  md: '8px'
-  lg: '12px'
-spacing:
-  '1': '4px'
-  '2': '8px'
-  '3': '12px'
-  '4': '16px'
-  '6': '24px'
-  density-compact: '8px'
-  density-comfortable: '12px'
-  panel-gap: '16px'
-  row-gap: '8px'
+supplementalSources:
+  - m1-m2-surface-elaboration.md
+  - epic10-chat-surface-elaboration.md
+  - implementation-conformance-addendum-2026-07-17.md
+decisionLog: .memlog.md
 components:
   project-context-header:
-    background: '{colors.fluent-neutral-background-raised}'
-    foreground: '{colors.fluent-neutral-foreground}'
-    border: '{colors.fluent-neutral-stroke}'
-    radius: '{rounded.md}'
+    base: 'FcPageHeader'
+    emphasis: 'authorized project and tenant context'
   conversation-shell:
-    background: '{colors.fluent-neutral-background}'
-    foreground: '{colors.fluent-neutral-foreground}'
-    radius: '{rounded.md}'
+    base: 'FcPageLayout with FluentStack and FluentGrid'
+    emphasis: 'stable operational workspace'
   conversation-stream:
-    background: '{colors.fluent-neutral-background}'
-    foreground: '{colors.fluent-neutral-foreground}'
-    radius: '{rounded.md}'
+    base: 'FluentCard and FluentText groups'
+    emphasis: 'chronological attributed events'
   composer-action-entry:
-    background: '{colors.fluent-neutral-background-raised}'
-    foreground: '{colors.fluent-neutral-foreground}'
-    border: '{colors.fluent-neutral-stroke}'
-    radius: '{rounded.sm}'
+    base: 'FluentTextArea and FluentButton'
+    emphasis: 'governed message and AI request'
   actor-badge:
-    background: '{colors.fluent-neutral-background-raised}'
-    foreground: '{colors.fluent-neutral-foreground}'
-    border: '{colors.fluent-neutral-stroke}'
-    radius: '{rounded.sm}'
-  evidence-chip:
-    background: '{colors.status-info}'
-    foreground: '{colors.status-info-foreground}'
-    radius: '{rounded.sm}'
-  risk-chip:
-    background: '{colors.status-warning}'
-    foreground: '{colors.status-warning-foreground}'
-    radius: '{rounded.sm}'
+    base: 'FluentBadge'
+    distinction: 'text and icon'
+  message-classification:
+    base: 'FluentBadge'
+    distinction: 'text, icon, and message association'
+  source-evidence:
+    base: 'FluentAccordion and FluentCard'
+    default: 'expanded'
+  ai-summary:
+    base: 'FluentAccordion and FluentCard'
+    default: 'collapsed'
+  why-this-project:
+    base: 'FluentAccordion and labelled facts'
+    emphasis: 'decision provenance'
+  evidence-freshness:
+    base: 'FluentBadge and FluentText'
+    distinction: 'state label and timestamp'
+  task-intent-review:
+    base: 'FluentCard and FluentButton group'
+    emphasis: 'source-linked intent decision'
   attachment-row:
-    background: '{colors.fluent-neutral-background}'
-    foreground: '{colors.fluent-neutral-foreground}'
-    border: '{colors.fluent-neutral-stroke}'
-    radius: '{rounded.sm}'
-  evidence-drawer:
-    background: '{colors.fluent-neutral-background-raised}'
-    foreground: '{colors.fluent-neutral-foreground}'
-    radius: '{rounded.lg}'
+    base: 'FluentDataGrid row'
+    emphasis: 'storage, scan, and context status'
+  association-candidate-group:
+    base: 'FluentRadioGroup and FluentRadio'
+    emphasis: 'single governed candidate choice'
+  association-decision-bar:
+    base: 'FluentStack and FluentButton group'
+    emphasis: 'safe next actions'
+  action-classification:
+    base: 'FluentBadge and labelled metadata'
+    distinction: 'classifier output and user-visible disposition'
   ai-proposal-panel:
-    background: '{colors.fluent-neutral-background-raised}'
-    foreground: '{colors.fluent-neutral-foreground}'
-    border: '{colors.status-warning}'
-    radius: '{rounded.md}'
+    base: 'FluentCard and FluentAccordion'
+    emphasis: 'pending action preview'
+  approval-authority-and-effects:
+    base: 'FluentCard and labelled facts'
+    emphasis: 'authority, effect, and expected post-state'
   approval-controls:
-    primary-background: '{colors.fluent-brand}'
-    primary-foreground: '{colors.fluent-brand-foreground}'
-    radius: '{rounded.sm}'
-  blocked-state:
-    background: '{colors.status-danger}'
-    foreground: '{colors.status-danger-foreground}'
-    radius: '{rounded.md}'
-  approval-panel:
-    background: '{colors.fluent-neutral-background}'
-    foreground: '{colors.fluent-neutral-foreground}'
-    radius: '{rounded.md}'
-  association-candidate-row:
-    background: '{colors.fluent-neutral-background}'
-    foreground: '{colors.fluent-neutral-foreground}'
-    border: '{colors.fluent-neutral-stroke}'
-    radius: '{rounded.sm}'
+    base: 'FluentButton group'
+    emphasis: 'approve, reject, revise, and cancel'
+  correction-progress:
+    base: 'FluentProgress and FluentMessageBar'
+    distinction: 'state, acknowledgements, owner, and estimate'
+  bounded-admin-scope:
+    base: 'FluentBadge and FluentDataGrid'
+    emphasis: 'scope without project-detail elevation'
+  two-person-approval:
+    base: 'FluentCard and FluentStack sequence'
+    emphasis: 'distinct proposer and approver'
+  shared-operation-status:
+    base: 'FluentCard and FluentBadge'
+    emphasis: 'stable identity, state, and replay outcome'
   queue-row:
-    background: '{colors.fluent-neutral-background}'
-    foreground: '{colors.fluent-neutral-foreground}'
-    border: '{colors.fluent-neutral-stroke}'
-    radius: '{rounded.sm}'
+    base: 'FluentDataGrid row'
+    emphasis: 'owner, age, state, and next action'
+  operational-slo-dashboard:
+    base: 'FluentDataGrid and FluentCard'
+    emphasis: 'target, budget, freshness, and support state'
   audit-timeline:
-    background: '{colors.fluent-neutral-background}'
-    foreground: '{colors.fluent-neutral-foreground}'
-    radius: '{rounded.md}'
+    base: 'FluentAccordion and FluentDataGrid'
+    emphasis: 'reconstructable attributed sequence'
+  inbound-authenticity-and-sender-authority:
+    base: 'FluentCard and FluentBadge'
+    emphasis: 'provider evidence and authority class'
+  retention-and-export-request:
+    base: 'FluentCard and FluentProgress'
+    emphasis: 'data-class scope and request status'
+  redacted-support-bundle:
+    base: 'FluentCard and FluentButton'
+    emphasis: 'safe diagnostic handoff'
+  blocked-state:
+    base: 'FluentMessageBar and FluentButton'
+    emphasis: 'existence-neutral reason and safe next action'
   status-toast-banner:
-    background: '{colors.fluent-neutral-background-raised}'
-    foreground: '{colors.fluent-neutral-foreground}'
-    border: '{colors.fluent-neutral-stroke}'
-    radius: '{rounded.sm}'
+    base: 'FluentMessageBar or FluentToast'
+    emphasis: 'transition feedback only'
+  busy-region:
+    base: 'FluentSkeleton'
+    emphasis: 'layout-matched replacement'
+  error-summary:
+    base: 'FluentMessageBar'
+    emphasis: 'focusable validation landing point'
+  review-dialog-sheet:
+    base: 'FluentDialog or FrontComposer sheet'
+    emphasis: 'single contained review layer'
+  queue-filter-bar:
+    base: 'FluentToolbar and Fluent input controls'
+    emphasis: 'active filters and result count'
 ---
 
 ## Brand & Style
 
-Hexalith.ChatBot is an enterprise work surface for project-centered conversations where people, external parties, service clients, and governed AI actors operate in the same traceable context.
+Hexalith.ChatBot is a quiet enterprise command workspace for project-centered collaboration. It keeps authorized project context, source evidence, human authority, intended effects, and audit outcomes visually close to the work. It must not resemble a playful assistant, social chat feed, or marketing surface.
 
-The visual posture is inherited rather than invented: Hexalith.FrontComposer and Microsoft Blazor Fluent UI v5 define the component grammar, density, accessibility affordances, focus rings, and baseline color behavior. This DESIGN.md specifies product-level emphasis only: project context first, evidence visible, risk legible, and audit history close to the action.
+The supported inheritance chain is Microsoft Blazor Fluent UI v5 → Hexalith.FrontComposer → this DESIGN.md → `EXPERIENCE.md`. FrontComposer and Fluent own the palette, typography ramp, spacing, radii, elevation, focus rings, density, and base controls. This spine adds product semantics and component anatomy only. The implementation reference is `references/Hexalith.FrontComposer/docs/fluent-ui-v5-contingency.md`.
 
-Decision: the product should read as a quiet operational SaaS tool, not as a playful assistant, marketing chatbot, or consumer messaging app. The interface should feel closer to an enterprise command workspace than to a social chat feed.
+No local color, typography, radius, or spacing tokens are declared because the product has no approved visual delta from the inherited system. Downstream implementations must use Fluent component parameters or Fluent 2 tokens and must not recreate inherited styling in raw CSS.
 
 ## Colors
 
-The palette inherits Fluent UI v5 tokens through FrontComposer. The authoritative implementation source is FrontComposer's Fluent UI v5 integration and theme CSS custom properties in `Hexalith.FrontComposer`, currently pinned through `Microsoft.FluentUI.AspNetCore.Components` and documented in `Hexalith.FrontComposer/docs/fluent-ui-v5-contingency.md`. Product-specific color meaning is semantic:
+All colors inherit from the active FrontComposer/Fluent UI v5 theme. Use the inherited neutral roles for work surfaces, brand roles for the single primary action, information roles for evidence and non-terminal status, warning roles for ambiguity or review, danger/error roles for blocked or failed outcomes, and success roles for completed outcomes.
 
-- **Neutral background and foreground** provide the default project workspace, conversation panes, queues, and audit surfaces.
-- **Brand** identifies primary actions and selected navigation only.
-- **Information** marks evidence, context, candidate rationale, and non-terminal status.
-- **Warning** marks ambiguity, approval-required actions, stale evidence, degraded dependencies, and manual review.
-- **Danger/Error** marks blocked, unauthorized, failed, quarantined, rejected, and terminal states.
-- **Success** marks completed association, approved action, stored attachment, command success, and completed audit projection.
+Color never carries meaning alone. Classification, freshness, approval disposition, correction, replay/conflict, SLO, and denial states always include visible text plus an icon or border that survives dark mode and forced colors. The same status meaning applies across UI examples, CLI documentation, and MCP descriptions.
 
-Do not create a separate chatbot color language. The same status semantics must hold across project conversations, association queues, approval panels, admin views, audit views, CLI documentation snippets, and MCP tool descriptions.
-
-Contrast requirements:
-
-| Pair | Required token pair | Minimum |
-|---|---|---|
-| Default text on page/workspace surface | `{colors.fluent-neutral-foreground}` on `{colors.fluent-neutral-background}` | WCAG 2.2 AA normal text, 4.5:1 minimum. |
-| Metadata, muted helper text, disabled explanation | `{colors.fluent-neutral-foreground-muted}` on `{colors.fluent-neutral-background}` or `{colors.fluent-neutral-background-raised}` | 4.5:1 when text communicates status or recovery. Purely decorative muted text follows Fluent's non-essential-text guidance. |
-| Primary action and selected navigation | `{colors.fluent-brand-foreground}` on `{colors.fluent-brand}` | 4.5:1 text, 3:1 non-text UI. |
-| Evidence/info chip or banner | `{colors.status-info-foreground}` on `{colors.status-info}` | 4.5:1 text, 3:1 chip boundary/focus affordance. |
-| Warning/risk chip or banner | `{colors.status-warning-foreground}` on `{colors.status-warning}` | 4.5:1 text, 3:1 chip boundary/focus affordance. |
-| Danger/blocked/error state | `{colors.status-danger-foreground}` on `{colors.status-danger}` | 4.5:1 text, 3:1 non-text UI. |
-| Success/completed state | `{colors.status-success-foreground}` on `{colors.status-success}` | 4.5:1 text, 3:1 non-text UI. |
-| Inline code, identifiers, links, focus ring | Inherited Fluent/FrontComposer code, link, and focus-ring tokens | 4.5:1 text; focus indicator area and contrast must satisfy WCAG 2.2 Focus Appearance. |
-
-High-contrast and dark-mode variants are inherited from Fluent UI and FrontComposer. The same minima (4.5:1 text, 3:1 non-text) apply to both light and dark themes. Under Windows High Contrast / forced-colors, status meaning for evidence, risk, danger, and success chips and banners must survive via icon, text label, or border — not background fill alone. Product-specific wrappers must not override these pairs with raw CSS colors unless the replacement is tested against the same ratios.
+Load-bearing combinations must meet WCAG 2.2 AA: 4.5:1 for normal text and 3:1 for non-text UI and focus indicators. Focus appearance must remain visible in light, dark, and forced-colors modes. Muted text that communicates status, authority, provenance, or recovery is still functional text and must meet the normal-text contrast target.
 
 ## Typography
 
-Typography inherits Fluent UI and FrontComposer defaults.
+Typography inherits the Fluent UI v5 ramp through FrontComposer. `FcPageHeader` owns page titles; Fluent heading, body, label, caption, and code conventions own the remaining hierarchy.
 
-- Page titles identify the current project, queue, policy area, or audit investigation.
-- Section titles stay compact and scannable; this product has operational density.
-- Body text explains evidence, proposed actions, approval reasons, and recovery paths.
-- Metadata typography is used for source message IDs, timestamps, confidence, policy snapshots, actor type, correlation ID, and command surface.
-- Monospace appears only for stable identifiers, command names, state names, and technical evidence.
+- Page titles identify the current authorized project, review queue, policy area, or investigation.
+- Compact section titles organize operational content without hero-scale typography.
+- Body text explains evidence, intended effects, approval reasons, and recovery.
+- Metadata text carries timestamps, provenance, authority class, policy/classifier version, stable state and reason codes, operation identity, and correlation identity.
+- Monospace is reserved for stable identifiers and command/state codes, never for primary business data.
 
-Avoid oversized hero type inside authenticated product surfaces. Users are returning to resolve work, not reading a landing page.
+Source evidence and AI-generated interpretation use distinct inherited text roles and explicit headings. The visible label `AI summary` and its provenance precede generated content; typography reinforces but never substitutes for that text distinction.
 
 ## Layout & Spacing
 
-The layout should favor stable, scan-friendly work surfaces:
+Every routable page uses `FcPageLayout` and `FcPageHeader` inside the single FrontComposer shell. Compose content with `FluentStack`, `FluentCard`, `FluentGrid`, and `FluentDataGrid` according to semantics. The scoped `Hexalith.ChatBot.UI.styles.css` bundle may add layout that Fluent/FrontComposer does not own, but must not recreate controls or theme tokens; live acceptance verifies `.fluent-layout { display: grid; }`.
 
-- Desktop/laptop is the primary surface for MVP workflows.
-- Responsive web remains usable on tablet and phone for reading, simple approval, and status lookup.
-- Dense lists and queues use FrontComposer list/table conventions.
-- Conversation surfaces should preserve a clear project context header and avoid hiding workflow state behind decorative chat bubbles.
-- Details appear in side panels, drawers, or inline expanders depending on available width and FrontComposer conventions.
+Desktop/laptop is primary. Tablet stacks navigation and complementary panels. Phone retains reading, status, and safe decision actions while dense administration and investigation use the documented larger-screen handoff. Layout changes must preserve labels, authority, state, reason, and safe next action.
 
-Decision: the default authenticated layout uses persistent navigation on desktop and collapses navigation to a drawer/sheet on small screens, following FrontComposer and Fluent UI responsive patterns.
+A page-like surface with two or more sibling titled sections uses one `FluentAccordion`, with the primary item expanded, unless it contains one primary grid, form, detail view, or workflow. Association Review is the sole documented carve-out: its `Association candidate group` and `Association decision bar` stay visible together outside the accordion; complementary evidence and source metadata use an accordion.
 
 ## Elevation & Depth
 
-Depth is functional. Use elevation to separate:
+Elevation separates active conversation, complementary evidence/review, dialogs or sheets, and transient feedback. It is never decorative hierarchy. Persistent workflow state remains inline on its owning surface even when a toast announces the transition.
 
-- Active conversation from surrounding project navigation.
-- Open review or approval panel from underlying conversation.
-- Dialogs and sheets from the base workflow.
-- Toasts and alerts from page content.
-
-Do not use decorative cards to create visual richness. When a surface is important, importance comes from placement, state, and action availability, not extra shadow.
+Source evidence and AI summaries must read as different nested regions without suggesting that the generated summary has equal authority. A blocked state must remain part of the relevant review unit rather than floating as an unrelated alert.
 
 ## Shapes
 
-Shapes inherit Fluent UI and FrontComposer radius tokens.
-
-- Buttons, inputs, menus, tabs, drawers, dialogs, cards, and panels use library defaults.
-- Evidence chips, status tags, actor badges, and risk labels use compact tokenized shapes.
-- Avoid large pill-heavy layouts. Status chips are acceptable; whole sections should not become pill-shaped.
+Shapes inherit Fluent UI and FrontComposer defaults. Compact badges are appropriate for actor type, classification, freshness, risk, state, and SLO disposition; entire panels must not become pill-shaped. Product wrappers follow the inherited radius of their base component.
 
 ## Components
 
-- **Project context header**: Compact persistent anchor for authorized project identity, tenant context when relevant, current conversation/state, and safe status. Use `{components.project-context-header}`.
-- **Conversation shell**: The main work surface. Shows project context, conversation stream, composer/action entry, actor identity, attached files, and current workflow state. Use `{components.conversation-shell}`.
-- **Conversation stream**: Ordered event surface for messages, mailbox events, AI proposals, approvals, commands, retries, corrections, and system events. Use `{components.conversation-stream}`.
-- **Composer/action entry**: Message and AI-request entry point. It inherits Fluent input/button styling and uses `{components.composer-action-entry}` for containing surface and border.
-- **Actor badge**: Identifies human user, external party, service client, AI actor, background worker, CLI, MCP, or mailbox event. Visual treatment must remain compact and accessible. Use `{components.actor-badge}`.
-- **Evidence chip**: Marks candidate association signals such as project alias, sender match, thread ID, attachment metadata, prior correction, or mailbox rule. Use `{components.evidence-chip}`.
-- **Risk chip**: Marks why an AI action requires review: externally visible, file-exposing, project-mutating, tool-invoking, task-creating, or participant-representing. Use `{components.risk-chip}`.
-- **Attachment row**: File/status row for stored, scanned, duplicate, retrying, blocked, or AI-context-eligible attachments. Use `{components.attachment-row}`.
-- **Evidence drawer**: Side panel or drawer for source evidence. Use `{components.evidence-drawer}`; it must visually separate evidence from the active decision without appearing as a second conversation.
-- **AI proposal panel**: Reviewable AI action preview. Use `{components.ai-proposal-panel}` and warning semantics until approved or rejected.
-- **Approval panel**: Presents proposed action, requester, project, files, recipient/destination, policy reason, expected command, and approve/reject/revise/cancel actions. Use `{components.approval-panel}`.
-- **Approval controls**: Action group for approve, reject, request revision, cancel, retry, or escalation. Primary approval uses `{components.approval-controls.primary-background}` only when all preconditions are satisfied.
-- **Association candidate row**: Shows candidate project, confidence, evidence, authorization-safe status, and decision actions. Use `{components.association-candidate-row}`.
-- **Queue row**: Shows workflow item age, state, next action, assignee, confidence/risk, and terminal/non-terminal status. Use `{components.queue-row}`.
-- **Audit timeline**: Shows ordered events with actor, command surface, decision, policy snapshot, correlation ID, and outcome. Use `{components.audit-timeline}`.
-- **Blocked state**: Explains denial, quarantine, unresolved party, missing authorization, failed dependency, or unsafe project context without leaking restricted detail. Use `{components.blocked-state}`.
-- **Status toast/banner**: Transition feedback for accepted commands, background updates, retry queued, degraded dependencies, or validation failures. Use `{components.status-toast-banner}`; persistent states must also live on the relevant surface.
+All components below inherit their base visual implementation from the frontmatter `components` map. Their names are the canonical names shared with `EXPERIENCE.md.Component Patterns`.
+
+| Component | Visual contract |
+|---|---|
+| Project context header | Compact persistent header for the authorized project and tenant context, current surface, and safe status. |
+| Conversation shell | Stable operational frame; project context, stream, composer, and complementary context remain visibly related. |
+| Conversation stream | Chronological event groups with actor, origin, timestamp, and state before content; system decisions never masquerade as chat. |
+| Composer/action entry | Fluent input and actions with a stable Stop/Cancel position; user message and AI request affordances are visibly distinct. |
+| Actor badge | Text-and-icon badge for human, external party, service client, AI actor, background worker, CLI, MCP, or mailbox event; never color-only. |
+| Message classification | Text-and-icon `informational` or `actionable` badge visibly associated with its message; actionable treatment includes task-intent status. |
+| Source evidence | Authoritative evidence region, expanded by default, with heading, source identity, redaction, and freshness attached to each reference. |
+| AI summary | Collapsed-by-default region labelled `AI summary`; provenance appears before content and the surface is structurally distinct from source evidence. |
+| Why this project | Labelled-facts disclosure for signal class, matched value, confidence/band, decision actor/time, and correction links. |
+| Evidence freshness | Compact text-and-icon state `fresh`, `stale`, or `expired` paired with its snapshot timestamp; forced colors preserve the boundary and label. |
+| Task intent review | Source-linked card showing intent summary, action kind, confidence, detector version, evidence excerpts, state, and one primary disposition. |
+| Attachment row | Labelled grid row for storage, scan, quarantine, duplicate/retry, governed-folder link, retention, and AI-context eligibility. |
+| Association candidate group | One named Fluent radiogroup; each option presents only authorized project identity, confidence, and evidence references. |
+| Association decision bar | Persistent decision unit repeating the selected safe candidate and presenting confirm, reject-all, defer, or escalate. |
+| Action classification | Shows the user-visible disposition prominently and the internal classifier output/version/input tuple as subordinate labelled metadata. |
+| AI proposal panel | Clearly pending proposal, never styled as completed work; links the source request, project scope, and approval unit. |
+| Approval authority and effects | Labelled facts for requester/origin, approver authority, sender/delegation, command/version, files, recipients, effects, reversibility, expected post-state, and audit events. |
+| Approval controls | One primary permitted decision and grouped reject/revise/cancel actions; unavailable approval remains visually explained. |
+| Correction progress | `Correcting` or `Correction-delayed` label, acknowledged/remaining stores, estimate, owner, next action, and AI-use block. |
+| Bounded admin scope | Scope badges and aggregate data distinguish see-only, queue-operate, mailbox, policy, and compliance powers from project-detail authority. |
+| Two-person approval | Ordered proposal and distinct-approver steps with changed values, scope, justification, policy version, expiry/conflict, and audit link. |
+| Shared operation status | Persistent status card with operation/idempotency identity, canonical state/reason, attempt count/ceiling, retry eligibility, origin, and prior-outcome link. |
+| Queue row | Dense labelled row showing state, age, owner, risk/confidence, freshness, next action, and terminal/non-terminal status. |
+| Operational SLO dashboard | Grid/cards showing metric, target, window, error budget, alert threshold, freshness, owner, and `within-budget`/`approaching`/`exhausted`/`unsupported`. |
+| Audit timeline | Filterable attributed sequence with source, policy, approval, command, replay, redaction, correction, and outcome relationships. |
+| Inbound authenticity and sender authority | Provider-evidence and authority-class card; discrepancies and delegation are text-labelled and visually tied to the affected message/action. |
+| Retention and export request | Data-class scoped request card with authorized scope, redaction, legal-hold limits, progress, owner, explicit human confirmation for exposure, and completion/blocked status. |
+| Redacted support bundle | Handoff card naming included correlation/state/reason material, explicitly excluded restricted content, and the approval-required boundary for external exposure. |
+| Blocked state | Persistent, existence-neutral message with stable safe code, short reason, owner when applicable, and one safe next action. |
+| Status toast/banner | Transient transition feedback only; persistent status remains inline. Scope global banners to the whole app only when the whole app is affected. |
+| Busy region | Layout-matched Fluent skeleton; the eventual content replaces it in place without layout shift or decorative loading narrative. |
+| Error summary | Visually prominent, focusable summary before the affected form/review unit, with links to field or decision errors. |
+| Review dialog/sheet | One modal layer using inherited containment and return-focus treatment; never hides the only primary content by default. |
+| Queue filter bar | Compact Fluent toolbar with active-filter summary and result count; filters retain labels when the grid reflows. |
 
 ## Do's and Don'ts
 
 | Do | Don't |
 |---|---|
-| Inherit Fluent UI v5 and FrontComposer defaults wherever possible. | Invent a custom visual design system for the chatbot. |
-| Keep project, party, file, approval, and audit context visible near the conversation. | Treat the interface as a generic message feed. |
-| Use semantic status color consistently for evidence, warning, failure, and success. | Use color decoratively or vary meanings by surface. |
-| Make risky AI actions visually distinct before execution. | Let AI output look equivalent to completed work before approval. |
-| Keep operational lists dense but readable. | Use oversized cards or marketing-style empty sections in workflow surfaces. |
-| Show stable identifiers in metadata style or monospace when useful. | Make users copy IDs from paragraphs or hidden diagnostics. |
+| Inherit Fluent UI v5 and FrontComposer visual defaults. | Declare local theme colors, type ramps, radius scales, or spacing scales without an approved product delta. |
+| Keep source, authority, intended effects, freshness, and audit status near each decision. | Make reviewers infer safety from a badge color or a hidden drawer. |
+| Label AI summaries and classifier metadata as generated/derived. | Make AI interpretation look like source evidence or completed work. |
+| Show `approval-required` for every boundary-crossing effect until upstream reconciliation is formally complete. | Offer a visual tenant-policy control that downgrades project mutation, file exposure, external send, task creation/assignment, tool invocation, or acting on behalf. |
+| Use existence-neutral blocked copy and suppress unsafe candidates. | Reveal that a forbidden project, file, party, or audit record exists. |
+| Keep operational lists dense, labelled, and responsive. | Use oversized cards, raw monospace data dumps, infinite lists, or hover-only critical actions. |
+| Preserve text/icon/border meaning in dark and forced-colors modes. | Depend on fill color, motion, toast-only feedback, or tooltip-only disabled reasons. |

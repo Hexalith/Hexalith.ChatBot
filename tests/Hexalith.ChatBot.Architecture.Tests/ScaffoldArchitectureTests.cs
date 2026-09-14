@@ -1020,7 +1020,12 @@ public static class ScaffoldArchitectureTests
             + "AuthenticatedProductionClientShouldMessageAskAndStopAcrossRequiredChromeMatrix");
         workflow.ShouldContain("trx;LogFileName=topology-acceptance.trx");
         workflow.ShouldContain("trx;LogFileName=story132-topology-acceptance.trx");
+        // `dotnet test --filter` exits 0 when the filter matches nothing, so both required TRX files need their own
+        // counter guard: without it a renamed or moved test turns this required gate green while proving nothing.
+        workflow.ShouldContain("Require one executed topology acceptance test and zero skips");
+        workflow.ShouldContain("E.parse('TestResults/topology-acceptance.trx')");
         workflow.ShouldContain("Require one executed Story 13.2 test and zero skips");
+        workflow.ShouldContain("E.parse('TestResults/story132-topology-acceptance.trx')");
         workflow.ShouldContain("c.get('notExecuted') == '0'");
         releaseWorkflow.ShouldContain(
             "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests."
@@ -1030,7 +1035,10 @@ public static class ScaffoldArchitectureTests
             + "AuthenticatedProductionClientShouldMessageAskAndStopAcrossRequiredChromeMatrix");
         releaseWorkflow.ShouldContain("trx;LogFileName=topology-acceptance.trx");
         releaseWorkflow.ShouldContain("trx;LogFileName=story132-topology-acceptance.trx");
+        releaseWorkflow.ShouldContain("Require one executed topology acceptance test and zero skips");
+        releaseWorkflow.ShouldContain("E.parse('TestResults/topology-acceptance.trx')");
         releaseWorkflow.ShouldContain("Require one executed Story 13.2 test and zero skips");
+        releaseWorkflow.ShouldContain("E.parse('TestResults/story132-topology-acceptance.trx')");
         releaseWorkflow.ShouldContain("c.get('notExecuted') == '0'");
         releaseWorkflow.ShouldContain(
             "semantic-release:\n"
