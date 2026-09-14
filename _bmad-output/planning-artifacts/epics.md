@@ -3097,6 +3097,8 @@ So that external participant, retained content, attachment, and AI-processing re
 **When** a governed action (e.g., AI processing or retention) is attempted
 **Then** the action fails closed pending the metadata (NFR7, FR68).
 
+> **Binding recovery-evidence context for Stories 12.11-12.15 (2026-09-14):** AD-1 through AD-9 in the final Epic 12 recovery-provenance architecture are authoritative. Stories 12.11-12.13 retain their operational scenario/report obligations, but scheduled/release bundles serve only the independent recovery/A10 gate. Story 12.15 alone owns the exact-candidate current-run `recovery-primary` completion path, its aggregate cleanup receipt, metadata-only evidence split, fixed deadline/isolation envelope, and activation record. Neither evidence purpose can substitute for the other. See `_bmad-output/specs/spec-epic-12-recovery-provenance/SPEC.md` and its companions.
+
 ### Story 12.11: Continuity drill and RPO/RTO validation
 
 As an operations owner,
@@ -3209,6 +3211,26 @@ So that RPO/RTO/rebuild/scope-recording targets are proven against a real enviro
 **Given** a scenario cannot run against a full production-equivalent topology in the sandbox
 **When** the story closes
 **Then** the residual gap to full production-scale fault injection is explicitly recorded as a follow-up in Completion Notes — never silently assumed closed.
+
+**Given** Story 12.15 is proposed for completion on a pull request targeting protected `main`
+**When** the repository-owned planner evaluates the exact base/head transition
+**Then** it authorizes at most one current-run `recovery-primary` consumer at the AD-1 canonical paths and locator before Dapr starts; retained, alternate-path, second-consumer, invalid-contract, or no-test evidence fails closed (AD-1, AD-2, NFR65a).
+
+**Given** the destructive producer finishes, times out, or fails
+**When** faults and run-owned state are closed
+**Then** policy-declared identity-bound cleanup observations cover every scenario/mutation class plus Aspire disposal, Dapr uninstall, and ephemeral-store teardown; one finalizer alone emits the aggregate receipt, and sanitization/attestation cannot proceed unless `RecoveryCleanupTrxBinding` proves its complete exact-byte digest in the canonical TRX (AD-5, AD-7, NFR65a).
+
+**Given** current-run outputs are retained
+**When** the fixed closeout and publication windows execute
+**Then** `recovery-primary-diagnostics` contains only its closed metadata-only diagnostics schema and has no TE-2/A10 authority, while `story-evidence-integrity-reports` alone carries post-validation completion authority; raw producer TRX is never uploaded, and scheduled/release operational evidence remains separate (AD-3, AD-4, NFR54a).
+
+**Given** the completion job executes
+**When** its environment, toolchain, deadlines, or event identity are inspected
+**Then** it uses the AD-5 producer-relative and absolute deadline ordering, AD-8 repository-owned version/immutable-action authorities, and an AD-9 fresh GitHub-hosted job-local ephemeral topology with `Testing` guards, generated secrets, no production endpoints, and no GitHub concurrency group.
+
+**Given** the AD-1 through AD-9 design is final but activation evidence is incomplete
+**When** Story 12.15 or TE-2 status is evaluated
+**Then** both remain in review until protected `main` requires the globally unique always-run `story-transition-evidence-integrity (pull_request)` check from GitHub Actions and TE-2 records the rule/source, owners, and verification run; no-transition and every other event/base identity have no completion authority (AD-6). A10 remains separately provisional pending fresh qualifying operational evidence.
 
 ### Story 12.16: Bind the live Hexalith.Memories derived-store backing
 
