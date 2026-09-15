@@ -1,45 +1,56 @@
 # Accessibility Review — Hexalith.ChatBot
 
-## Overall assessment
+## Overall verdict
 
-**Adequate, with one high-impact conformance contradiction.** The two spines are substantially implementation-ready for WCAG 2.2 AA: they make keyboard/focus behavior, non-color status, generated-content provenance, streaming announcements, target size, forced colors, reduced motion, English/French parity, redaction, stale evidence, and explained permission denial explicit. No critical issue was found. The larger-screen handoff can, however, remove required M1/M2 information or actions at the narrow viewport used to assess Reflow. Two additional operational gaps leave auto-refresh and disconnected submissions underspecified for assistive-technology users.
+**PASS at the UX-contract level.** No reproducible accessibility finding remains in the current `DESIGN.md` and `EXPERIENCE.md`. All ten concerns from the preceding review remain resolved, and the landing, shortcut, live-route, deterministic sorting, structure, and prose edits introduce no S1, S1a, S8, or S10 regression.
 
-## Findings
+Finding counts: **critical 0 · high 0 · medium 0 · low 0**.
 
-### High — Larger-screen handoff contradicts the WCAG 2.2 AA Reflow promise
+This review validates the UX contract, not an implementation. Each delivered surface still needs the specified running-application, server-verified, automated, keyboard-only, screen-reader, responsive, localization, forced-colors, and reduced-motion evidence (`EXPERIENCE.md:322-340`).
 
-- **Location:** `DESIGN.md` §Layout & Spacing, lines 149–155; `EXPERIENCE.md` §Foundation, lines 21–23; §Information Architecture, lines 42–59; §Responsive & Platform, lines 255–263; source `prd.md` §Accessibility and Usability Quality, lines 1522–1526.
-- **Note:** The contracts require WCAG 2.2 AA for every shipped UI surface, including M1 administration and M2 dashboards, compliance investigation, and queue operations, while allowing dense administration and investigation to require a larger-screen handoff. A handoff is useful continuity, but it is not a substitute for SC 1.4.10 Reflow when a user at 320 CSS pixels wide, including a desktop user at 400% zoom, loses information or functionality. The two-dimensional-content exception can cover a bounded grid, not an entire workflow.
-- **Fix:** Make handoff optional. Require every in-scope task to remain readable and operable at 320 CSS pixels without horizontal page scrolling or loss of content/actions. Linearize grids into labelled rows/details/steps where possible; allow two-dimensional scrolling only inside content whose two-dimensional layout is essential. Add 320-CSS-pixel and 400%-zoom acceptance to every M1/M2 surface.
+## Findings by severity
 
-### Medium — Operational auto-refresh lacks pause or explicit apply-update behavior
+### Critical (0)
 
-- **Location:** `EXPERIENCE.md` §Component Patterns, lines 104–116; §Per-surface coverage, lines 169–180; §Feedback and focus, lines 182–194; §Interaction Primitives, lines 202–205 and 240; source `prd.md` FR67, lines 1321–1322, and NFR42, line 1486.
-- **Note:** Conversation/audit history is protected by a keyboard-reachable “new updates” affordance, and component refresh promises stable focus/selection. The queue and dashboard contracts do not say whether automatic insertions, removals, re-sorts, or metric updates pause while someone reads or operates a row. Because the source requires bounded-freshness refresh, an implementation could satisfy the spine while repeatedly changing content beside the user's current context, contrary to the control expected for non-essential automatically updating information under SC 2.2.2.
-- **Fix:** Define a shared queue/dashboard update policy: accumulate changes behind a keyboard-reachable “new updates” action while a row, filter, or detail is active, or provide pause/manual refresh. Applying updates must preserve the active item and focus when safe, announce one concise change/result-count summary, and never silently remove or reorder the active row. Document any narrowly essential live-monitoring exception per surface.
+None.
 
-### Medium — Browser disconnection and response-loss recovery are absent from the UI state contract
+### High (0)
 
-- **Location:** `EXPERIENCE.md` §Component Patterns, lines 83–116; §Canonical state families, lines 138–148; §Per-surface coverage, lines 169–180; §Feedback and focus, lines 182–194; source `prd.md` §Dependency Failure Handling, lines 1001–1007, FR81a, line 1355, and NFR70, line 1540.
-- **Note:** The spines cover AI outage, server-side degraded states, stale evidence, revoked permissions, retries, and prior outcomes, but never name browser offline/disconnected or “submission accepted, response lost.” For a governed mutation or approval, downstream teams therefore lack a binding accessible status, focus behavior, draft/selection preservation rule, and reconciliation path. A generic retry can mislead users about whether the first request committed, even when backend idempotency prevents a duplicate effect.
-- **Fix:** Add a client-connectivity state family and per-surface cases for disconnected-before-submit, disconnected-while-pending, and response-lost-after-admission. Preserve drafts, selections, filters, and focus; announce connection loss/recovery once in the scoped status region; issue and retain the stable operation identity before submission; reconcile through status lookup on reconnect before offering retry; state plainly whether an action was not sent, is pending/unknown, or returned a prior outcome.
+None.
 
-## Strong commitments
+### Medium (0)
 
-- `DESIGN.md` lines 129–135 and 208–218 bind text/non-text contrast, visible focus, non-color meaning, dark mode, and forced-colors survival without redefining the inherited Fluent theme.
-- `EXPERIENCE.md` lines 89–100, 141, and 188 make evidence freshness per-reference, text-labelled, announced once on expiry, and decision-blocking with an accessible reason.
-- `EXPERIENCE.md` lines 95–96 and 202 define a proper single-tab-stop radiogroup with arrow navigation, announced position/count, programmatic evidence description, no commit on selection, and safe refresh invalidation.
-- `EXPERIENCE.md` lines 113–115 and 233–240 provide strong busy-region, streaming/live-region, Stop/Cancel, dialog/sheet, scroll, and focus-return behavior.
-- `EXPERIENCE.md` lines 244–250 set a real behavioral floor for landmarks, roles/names/states, reachable unavailable reasons, focus order, 24 CSS pixel minimum targets or spacing, 44 CSS pixel primary touch actions, and reduced motion.
-- `EXPERIENCE.md` lines 251–253 require page and language-of-parts metadata, English/French visible and screen-reader parity, locale-aware formatting, expansion tolerance, and identical redaction across visual, copied, downloaded, and spoken output.
-- `EXPERIENCE.md` lines 75, 100–112, 127–132, and 224–231 keep permission and authorization failures existence-neutral, visibly explained, non-overridable, and tied to a safe next action without leaking restricted resources.
+None.
 
-## Finding counts
+### Low (0)
 
-| Severity | Count |
-|---|---:|
-| Critical | 0 |
-| High | 1 |
-| Medium | 2 |
-| Low | 0 |
-| **Total** | **3** |
+None.
+
+## Prior-finding regression check
+
+| Prior concern | Current disposition | Evidence |
+|---|---|---|
+| Phased S2a/O1 coverage | Resolved | S2a and O1 remain in scope, IA, composition, per-surface acceptance, and journeys. Their blocked/authorized behavior is available nonvisually without Project-data leakage (`EXPERIENCE.md:39-80,84-100,326-340,376-388,425-437`). |
+| Per-surface acceptance evidence | Resolved | Every delivered surface requires a real live route through the running application, server-verified primary success, direct functional assertions, automated checks, keyboard-only review, screen-reader review, and its full exposed state set. Fixtures and handler-only tests cannot substitute (`EXPERIENCE.md:322-340`). |
+| English/French and language metadata | Resolved | Feature/state/action/reason/screen-reader parity, locale persistence, root/page and language-of-parts metadata, locale-aware formatting, untranslated stable codes, complete messages, and French expansion are explicit (`EXPERIENCE.md:318-320`). |
+| Focus, live regions, Project switch, proposal, and composer shortcuts | Resolved | Current-attempt announcements are scoped/deduplicated, streamed chunks stay outside live output, Stop/Cancel has stable focus behavior, Project switch targets the new-context heading, proposals link to their origin, and modifier-free shortcuts are suppressed during entry without interfering with text or assistive-technology commands (`DESIGN.md:127`; `EXPERIENCE.md:123,235,308-315,328-329,354-364`). |
+| Accessibility-tree redaction | Resolved | Authorization/redaction runs before DOM or accessibility-tree exposure and covers names, descriptions, status regions, hidden content, grid metadata, clipboard, transcript/download, export, and read-aloud output (`EXPERIENCE.md:280-284`). |
+| Reflow, focus visibility, target size, and text spacing | Resolved | Tasks remain complete at 320 CSS pixels/400% zoom without page-level horizontal scrolling; focus remains visible above chrome/overlays; the AA target floor and touch-primary target apply; text-spacing overrides cannot hide or clip content/actions (`DESIGN.md:98-104,174-178`; `EXPERIENCE.md:308-315,342-346`). |
+| Reduced motion | Resolved | Skeleton shimmer, streaming cursor/typing animation, row movement, and nonessential dialog/toast transitions are removed while state text and real determinate values remain (`EXPERIENCE.md:312-315`). |
+| Controlled updates and sorting | Resolved | Decision updates wait behind an accessible apply action, one concise summary is announced, active identity/focus is preserved when safe, and removed items are explained. Queue filtering adds explicit server-side sort with deterministic tie-break while preserving omission-safe count/order, selection, focus, pagination, and narrow-screen reflow (`DESIGN.md:159,164`; `EXPERIENCE.md:155-160,252-254,337-339`). |
+| Unavailable-action reasons | Resolved | High-consequence unavailable actions use `aria-disabled` plus a programmatically associated reason or adjacent focusable explanation; forbidden actions remain absent when presence would leak capability. Invalid activation lands on the error summary without losing valid input (`EXPERIENCE.md:138,256-263`). |
+| Connectivity and recovery | Resolved | Before-submit disconnect, pending-unknown, response-loss reconciliation, and restored status remain distinct; duplicate submission is prevented and focus/selection is preserved (`EXPERIENCE.md:233-244`). |
+
+## New-text regression check
+
+- **S1 landing:** `/` now has an existence-neutral authorized Project picker/recents, distinct no-project-selected and empty-conversation states, gated composer availability with an accessible M1 reason, and non-forcing chronology/new-update behavior (`EXPERIENCE.md:62,88,328`).
+- **S1a composer:** text entry suppresses single-character/modifier-free application shortcuts without suppressing text or assistive-technology commands; draft preservation, attempt announcements, Stop/Cancel return focus, and proposal-link focus remain deterministic (`DESIGN.md:127`; `EXPERIENCE.md:123,235,329`).
+- **S8 dashboard:** qualification, freshness, informational approval-load/quality observations, audited reads, controlled updates, aggregation-only scope, and no-approval-bypass semantics remain explicit and non-color-dependent (`DESIGN.md:82,152`; `EXPERIENCE.md:144,250-254,304,337`).
+- **S10 queue:** filters, deterministic server sort, pagination, partition/item authority, diagnostics, retry/terminal states, and active-context preservation remain keyboard/screen-reader compatible under refresh and reflow (`DESIGN.md:149,159,164`; `EXPERIENCE.md:147,155,160,254,339`).
+
+## Strengths
+
+- The pair uses semantic inherited Fluent UI/FrontComposer controls, exact per-surface composition, one safe Association Review carve-out, one radiogroup decision model, focusable error recovery, and modal focus return (`DESIGN.md:116-164`; `EXPERIENCE.md:82-100,119-160`).
+- Meaning survives light, dark, and forced-colors modes through text plus icon/border; functional muted text, controls, and focus indicators retain WCAG 2.2 AA contrast (`DESIGN.md:78-84`).
+- Source evidence, AI interpretation, canonical records, projections, partial output, qualification, authority, and restricted content remain explicitly labeled rather than communicated through layout or color alone (`DESIGN.md:90-96`; `EXPERIENCE.md:27-31,308-316`).
+- Upstream-blocked transitions retain accessible unavailable states and acceptance tests without inventing missing authority or presenting a larger-screen handoff as required (`EXPERIENCE.md:47-54,322-346`).
