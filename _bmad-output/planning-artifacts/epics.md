@@ -2,6 +2,8 @@
 stepsCompleted:
   - step-01-validate-prerequisites
   - step-02-design-epics
+  - step-03-create-stories
+  - step-04-final-validation
 requirementsExtractionStatus: confirmed
 epicDesignStatus: approved
 epicCount: 13

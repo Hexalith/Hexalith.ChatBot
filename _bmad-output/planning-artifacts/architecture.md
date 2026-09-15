@@ -14,6 +14,7 @@ inputDocuments:
   - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-18.md"
   - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-20.md"
   - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-08-03.md"
+  - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-09-15.md"
   - "references/Hexalith.EventStore/_bmad-output/project-context.md"
   - "references/Hexalith.Conversations/_bmad-output/project-context.md"
   - "references/Hexalith.Projects/_bmad-output/project-context.md"
@@ -27,7 +28,7 @@ workflowType: 'architecture'
 project_name: 'Hexalith.ChatBot'
 user_name: 'Jerome'
 date: '2026-05-28'
-updated: '2026-09-14'
+updated: '2026-09-15'
 lastStep: 8
 status: 'final'
 completedAt: '2026-05-28'
@@ -35,17 +36,20 @@ implementationReadinessRebaselinedAt: '2026-07-17'
 packageVersionAuthorityCorrectedAt: '2026-07-18'
 independentValidationCorrectedAt: '2026-07-20'
 productAuthorityReconciledAt: '2026-09-14'
+planningBaselineReconciledAt: '2026-09-15'
 releaseReadiness: 'blocked-open-gates'
-openReleaseGates: [A5, A6, A10, A11, A13]
+openReleaseGates: [A5, A6, A9a, A10, A11-M1, A11-M2, A13]
 ---
 
 # Architecture Decision Document
 
-_Reconciled on 2026-09-14 to the finalized PRD and its normative appendices. Architectural design completeness is not implementation, qualification, pilot, or production readiness._
+_Reconciled on 2026-09-15 to the finalized PRD, its normative appendices, and the approved planning-baseline change. Architectural design completeness is not implementation, qualification, pilot, or production readiness._
 
 ## Normative Authority and Release-Gate Posture
 
-The product authority is the finalized PRD plus `addendum.md`. `source-manifest.md` fixes the reviewed
+The product authority is the finalized PRD plus `addendum.md`; the approved
+`sprint-change-proposal-2026-09-15.md` governs this downstream correction without changing those sources.
+`source-manifest.md` fixes the reviewed
 brownfield revisions and consumed-contract hashes; it does not prove producer acceptance.
 `qualification-evidence.md` owns mutable evidence state, and
 `reconcile-full-sibling-a13-2026-09-14.md` is the single current A13 gate result across all nine contexts. If explanatory
@@ -63,11 +67,15 @@ The release posture is deliberately blocked:
 |---|---|---|
 | A5 — live AI provider | **OPEN** | Live AI is disabled; M0/M1 onboarding is blocked until the candidate/provider contract and negative evidence are accepted. |
 | A6 — data protection | **OPEN** | Pilot data/PII persistence, onboarding, and compliance claims are blocked until the data-class contract and independently witnessed owner-runtime evidence are accepted. |
+| A9a — detector/classifier qualification | **OPEN** | No `approved-current` exact-artifact record exists; the affected TaskIntentDetector or ActionRiskClassifier remains disabled, and M0 first use plus M1/M2 revalidation are blocked. |
 | A13 — owner execution, authority, audit, and fencing | **OPEN** | The indivisible exact-candidate owner bundle is unaccepted; Conversations append/assignment, onboarding, M0/M1, and tamper-evidence claims are blocked. |
+| A11-M1 — mandatory M1 metric qualification | **OPEN** | No `approved-current` record freezes and evidences the mandatory M1 measurement contract; the governed cross-surface pilot claim is blocked. |
 | A10 — recovery qualification | **OPEN / provisional** | No qualifying current hosted four-job controlled-loss/full-window evidence exists; M2 production and release-candidate claims are blocked. |
-| A11 — SLO qualification | **OPEN / unsupported** | Every SLO row is unsupported without a candidate-bound evidence bundle; M2 production and release-candidate claims are blocked. |
+| A11-M2 — exact-candidate SLO qualification | **OPEN / unsupported** | Every SLO row is unsupported without its exact-candidate evidence bundle; M2 production and release-candidate claims are blocked. |
 
-M0 and M1 require current A5/A6/A13 approvals. M2 revalidates those three and additionally requires A10/A11.
+M0 requires current A5/A6/A13 approvals, with exact A9a M0 detector/classifier records gating first use. M1
+revalidates A5/A6/A13 and exact deployed A9a records and additionally requires A11-M1. M2 revalidates
+A5/A6/A13/A9a/A11-M1 against the changed exact candidate and additionally requires A10 and A11-M2.
 These gate approvals are necessary but not sufficient because the PRD's sole increment table owns all release evidence,
 disable conditions, sequencing, and permitted claims. The presence of code, interfaces, historical artifacts,
 architecture reviews, or planning status does not close any gate.
@@ -76,6 +84,14 @@ responsible producer, test runner, time, result, independent verification, and e
 Security + Architecture; A6 by Compliance/Data Protection + Architecture with Parties/EventStore owner evidence;
 A13 by the System Architect and Conversations/Projects/Tenants/EventStore owners with Security validating authority
 and fencing. Missing, expired, changed, mismatched, or partially accepted evidence leaves the gate open.
+
+Release Governance owns one immutable gate-record registry conforming to the addendum Increment Gate Record Contract.
+For each candidate/increment it publishes one immutable `gate_set_id` referencing every required record ID and binding
+their exact candidate, dependencies, environment, expiry, and reopen data. Consumers recompute current status from those
+immutable records and the current candidate/environment at use time. Publication and consumption are all-or-nothing: an
+incomplete, mixed-candidate, expired, invalidated, or superseded set fails closed. CI/release decisions
+and runtime artifact/store/surface enablement consume that same `gate_set_id`; local booleans, copied status, prose, or a
+different record set cannot grant authority. Drift requires a new immutable set.
 
 ## Architecture at a Glance — Decision Map
 
@@ -101,7 +117,8 @@ and fencing. Missing, expired, changed, mismatched, or partially accepted eviden
   trust-bearing authority.
 - **D11 — M0 governance bootstrap:** stable commands and two distinct current Tenants owners create governance;
   direct seeding is prohibited.
-- **D12 — Evidence-gated release:** A5/A6/A13 block M0/M1; A10/A11 additionally block M2.
+- **D12 — Evidence-gated release:** A5/A6/A13 block M0; A9a gates detector/classifier first use and is revalidated at
+  M1/M2; A11-M1 additionally blocks M1; A10 and A11-M2 additionally block M2, with changed lower gates revalidated.
 - **D13 — Runtime control and work isolation:** one durable control/rate-limit view, fail-closed consumers,
   tenant-partitioned fair scheduling, and one operational owner govern workload execution.
 
@@ -157,7 +174,7 @@ architectural implications:
 - **Integration (NFR31–NFR36):** M365/Graph tolerance for throttle/revoke/replay; contract-verifiable
   responses with stable identifiers/codes; versioned contracts; correlation context everywhere;
   server-side UTC time.
-- **Operability (NFR37–NFR48, NFR42a):** health/queue observability; A11-gated SLO qualification backlog; message-catalog-driven
+- **Operability (NFR37–NFR48, NFR42a):** health/queue observability; A11-M1 metric and A11-M2 SLO qualification; message-catalog-driven
   user-safe states; approval-fatigue mechanisms (prioritization, grouping, rate ceiling, rubber-stamp
   observable); evidence-freshness chips.
 - **Audit/compliance (NFR49–NFR55, NFR49a/50a):** `100%` of durable mutations atomically co-commit a
@@ -258,9 +275,9 @@ consumer lane is green, the unchanged ChatBot umbrella is validated separately a
    complete, or repair a mutation.
 7. **Redaction & data governance** — retention classes, redaction-aware audit, consistent redaction across
    UI/CLI/MCP/export; isolate redaction as a swappable policy stage (trim-safe to a coarse default).
-8. **Observability & SLOs** — OpenTelemetry signal emission is mandatory; `unsupported` is mandatory until each
-   A11 row has candidate-bound targets, budgets, signals, routes, and burn tests. Dashboards are later presentation,
-   not evidence by themselves.
+8. **Observability & SLOs** — OpenTelemetry signal emission is mandatory. A11-M1 must freeze and evidence the M1
+   measurement contract; A11-M2 rows remain `unsupported` until they have exact-candidate targets, budgets, signals,
+   routes, and burn tests. Dashboards are later presentation, not evidence by themselves.
 9. **Governed AI mediation** — scoped context packaging, risk classification, approval gates, allowlisted commands,
    refusal behavior, AI-outage resilience for non-AI workflows.
 10. **Correlation & lifecycle-state consistency** — canonical state machine shared across surfaces; correlation
@@ -272,15 +289,18 @@ consumer lane is green, the unchanged ChatBot umbrella is validated separately a
     in replay traces, *as-of* upstream resolution (don't re-query *current* Party/Folder data during rebuild), and
     cross-context consumer-driven contract testing against the exact nine-context baseline in the source manifest.
 12. **Evidence & confidence capture** *(added — product-thesis finding)* — the product exists for *reliable
-    association*. Every AI proposal must structurally carry its confidence, evidence basis, and human-correction
-    outcome as a first-class invariant because these data form the pilot's success measurement (A11 evidence
-    resolution) and the model-improvement loop. A fully governed, fully audited system can pass every other concern
-    while still failing the product if it proposes the wrong project.
+    association*. Every association candidate and task-intent result structurally carries its confidence, evidence basis,
+    and human-correction outcome because these data form the pilot's A11-M1 measurement and model-improvement loop.
+    AI-action proposals carry the categorical ActionRiskClassifier class, version, and input tuple; no numeric confidence
+    may soften or override that class. A fully governed, fully audited system can pass every other concern while still
+    failing the product if it proposes the wrong project.
 13. **WORM-vs-erasure tension (GDPR)** *(added)* — immutable canonical envelopes and signed checkpoints do not
     waive A6. Retention, legal-hold precedence, key granularity/custody, backup propagation, crypto-erasure, and
     surviving metadata require the approved A6 contract and runtime proof before persistence or pilot claims.
 14. **Qualification authority** — planning and code reality can establish design fit, not release readiness.
-    A5/A6/A13 gate M0/M1; A10/A11 additionally gate M2; missing evidence is blocking or `unsupported`, never inferred.
+    A5/A6/A13 gate M0; exact A9a records gate detector/classifier use and are revalidated later; A11-M1 additionally
+    gates M1; A10 and A11-M2 additionally gate M2 after lower-gate revalidation. Missing evidence is blocking or
+    `unsupported`, never inferred.
 
 **Watch list (monitor and merge into the concerns above when applicable):** reversibility or undo as the
 approval-fatigue antidote rather than more friction; AI cost and resource governance (B2B unit economics); and an
@@ -291,7 +311,7 @@ explicit ordering source (source version, not wall-clock time).
 The multi-perspective reconciliation ratified D1–D13 without granting release qualification. Unique qualifiers now
 live with their owning decisions: lifecycle seams under D5, correction under D9, command-created M0 governance under
 D11, runtime controls under D13, A9a under governed AI mediation, and the non-trimmable safety floor in the
-implementation sequence. A5, A6, A10, A11, and A13 remain evidence and approval gates, not design alternatives.
+implementation sequence. A5, A6, A9a, A10, A11-M1, A11-M2, and A13 remain evidence and approval gates, not design alternatives.
 
 ## Starter Template Evaluation
 
@@ -508,12 +528,15 @@ interfaces, or platform packages are evidence inputs only and do not waive the r
 ### API & Communication Patterns
 
 - **FR81a CommandGateway (D3) — the keystone:** every state-mutating UI, CLI, MCP, service-client, AI-actor,
-  worker, and mailbox operation enters one `CommandGateway`/EventStore spine:
-  `authenticate → tenant-bind → apply the applicable authorization row → perform action-risk classification →
-  validate approval → validate stable operation identity → validate expected revision or an A13-approved owner guard →
-  construct canonical envelope → atomically commit
-  event + terminal idempotency + policy/approval refs + envelope → publish/project`. It is not a second EventStore
-  pipeline, no origin may omit or duplicate a stage, and a failure before the atomic commit writes nothing.
+  worker, and mailbox operation enters one `CommandGateway`/EventStore spine. Authentication, tenant binding, the
+  applicable authorization row, stable operation identity, expected revision or an A13-approved owner guard, and
+  canonical-envelope construction are universal. The gateway—not an adapter or handler—selects exactly one profile from
+  the closed addendum command-to-profile map; unknown, absent, or duplicate mappings reject. Only profile-mandated stages
+  run: `ai-read-v1` classifies without proposal approval, `ai-effect-v1` requires determinate risk plus human-only
+  approval, and `projection-delivery-v1` performs neither AI risk classification nor AI proposal approval. It is not a
+  second EventStore pipeline; no origin may select, switch, omit, reorder, or duplicate a stage. The owning aggregate then
+  atomically commits its event, terminal idempotency record, policy/approval references, and canonical envelope before
+  publish/project; a pre-commit failure writes none of those authoritative records.
 - **Parity by construction:** surface adapters (UI/CLI/MCP) depend only on `Hexalith.ChatBot.Client` and
   construct only a typed `IChatBotCommand`; equivalent input produces the same canonical semantic command payload and
   identity tuple. Origin is attached immutably at the adapter boundary as the sole surface-specific envelope field;
@@ -564,7 +587,7 @@ interfaces, or platform packages are evidence inputs only and do not waive the r
 
 - The PRD `Shared Workflow Contract` is the sole state/transition authority. The association family uses
   `Received`, `Associated`, `Rejected`, `Deferred`, `NeedsReview`, `Failed`, `Skipped`, `Correcting`,
-  `Correction-delayed`, and `Corrected` exactly as defined there. Other workflow-specific states—participant,
+  `CorrectionDelayed`, and `Corrected` exactly as defined there. Other workflow-specific states—participant,
   attachment, task intent, AI action, chat, command, projection, governance, data-subject, and notification—remain
   in their own closed families and must not be collapsed into the association enum.
 - The normative family row—not the verb in a command name—decides whether recovery is an in-place transition,
@@ -592,7 +615,8 @@ interfaces, or platform packages are evidence inputs only and do not waive the r
 - **Governed chat surface (canonical Epic 13; originally delivered through legacy Epic 10):** the interactive composer is now in
   scope as that governed write surface. Every message is **admitted through CommandGateway**; a risky request
   becomes an Epic 4 AI-action proposal (approval-required), never a direct execution. This is **not an ungoverned
-  free-form text box**. It preserves the original rule: no ungoverned write path. The composer reuses the M0
+  free-form text box**. An indeterminate request instead returns `classifier-indeterminate`, exposes no proposal or
+  approval action, and produces no effect. It preserves the original rule: no ungoverned write path. The composer reuses the M0
   allowlisted `Project.AppendConversationMessage`.
 - **FrontComposer Shell adoption (canonical Story 13.1; legacy Story 10.1):** `Hexalith.ChatBot.UI` composes through the
   `FrontComposerShell` (`AddHexalithFrontComposerQuickstart()` → `AddHexalithDomain<TMarker>()`), consuming the
@@ -646,19 +670,24 @@ interfaces, or platform packages are evidence inputs only and do not waive the r
   items enter the tenant-partitioned Retry Profile dead letter without starving other partitions. One
   `OperationsControlWorker`, owned by `operations-admin`, performs periodic enforcement/notification/escalation and
   publishes tenant-safe dependency health, control freshness, retry/dead-letter, queue-age, and audit-lag state. Missing
-  live sources report `unmeasurable|unsupported`; numeric thresholds remain A11-qualified and protected state A6-qualified.
+  live sources report `unmeasurable|unsupported`; numeric thresholds remain qualified by the applicable A11-M1 or
+  A11-M2 record, and protected state remains A6-qualified.
 - **Canonical audit topology:** hash-linked envelopes live in the same aggregate command stream and atomic batch as
   the mutation/idempotency/policy/approval facts. A separate signed per-tenant checkpoint anchors aggregate heads;
   investigation projections or archival stores remain rebuildable derivatives. Key custody, retention, erasure,
   backup propagation, and surviving metadata are target concerns under open A6, not proven implementation choices.
-- **Correction propagation (FR91a):** the aggregate owns the `correcting`/`current` lifecycle
-  (`Apply(CorrectionStarted)`/`Apply(CorrectionCompleted)`). Hosted Dapr Workflow coordinates start,
-  acknowledge, complete, delay, and vector-reindex activities through existing EventStore writer/activity seams.
-  Reads during correction check the aggregate flag and block or serve `stale=true`;
-  `ReindexVectors(tenantId, correctionId, sourceVersion)` remains an M2 activity and must be idempotent +
-  version-guarded. Required acknowledgements cover candidate ranking, evidence snapshot, consumed AI proposals,
-  operational queues, and M2 vector entries. Propagation p95 is `<=10 minutes` in M0/M1 and `<=60 minutes` in M2;
-  a missed store SLO emits `Correction-delayed`, exposes owner/next safe action, and triggers P2.
+- **Correction propagation (FR91a):** the aggregate owns the exact `Correcting | CorrectionDelayed | Corrected`
+  lifecycle (`Apply(AssociationCorrectionStarted/AssociationCorrectionDelayed/AssociationCorrected)`). Hosted Dapr
+  Workflow coordinates start, acknowledge, complete, delay, and vector-reindex activities through existing EventStore
+  writer/activity seams. Correction start atomically freezes the complete impact manifest: every ChatBot-derived store;
+  every affected Conversations/Folders record and index; approved/executed AI actions; appended messages; task-intent
+  conversions; sent mail; external/tool effects; file disclosures; and every required irreversible-effect disposition.
+  Each item records an authenticated owner repair/rebuild acknowledgement or explicit `contained`,
+  `compensation-required`, or `cannot-repair` disposition. Reads block every affected source/destination AI context until
+  all items complete and the workflow reaches `Corrected`. `ReindexVectors(tenantId, correctionId, sourceVersion)` remains
+  an M2 activity and must be idempotent and version-guarded. Propagation p95 is `<=10 minutes` in M0/M1 and `<=60 minutes`
+  in M2; a missed SLO transitions to `CorrectionDelayed`, exposes owner/next safe action, and triggers P2. `Proposed` is
+  not an association state.
 - **Deploy / recovery:** SDK-container images; Aspire K8s/AKS + Helm is M2 target scope. A10 remains provisional:
   the accepted Epic 12 contract is `activation: pending`; its diagnostic and completion artifacts have no A10
   authority. Provisional targets are RPO `<=15 minutes` and RTO `<=4 hours` for source email records, attachments,
@@ -676,14 +705,19 @@ interfaces, or platform packages are evidence inputs only and do not waive the r
   canonical metadata/state digest. Volatile timestamp/telemetry/lease fields form an explicit versioned exclusion list.
   Replay starts only after a complete pre-manifest and passes only on exact inventory/row equality; missing, unreadable,
   added, or changed resources fail. A composition, egress, verifier, or invariance failure is a stop-ship condition.
-- **Observability and A11:** OpenTelemetry emission is always on. The addendum's metric targets are normative
-  planning values and drift-tested against the code catalog, but are not supported/publishable SLOs until each exact
-  M2 candidate has stable metric name, numeric target/unit, window, error budget, alert threshold, timestamped
-  calibration source, tenant scope, live signal/provenance, accountable route/receiver, and passing burn-test result/
-  date/immutable locator. The qualification table pairs one-to-one by metric name. Missing, stale, failing,
-  unverifiable, or mismatched data yields `unsupported`; dashboards expose
-  `within-budget|approaching|exhausted|unsupported`. A11 also requires the 2–4 week pilot baseline, SM8-SM14/SM16
-  recalibration, and the frozen SM-C5 supported-request mix; all current rows remain unsupported with no candidate.
+- **Observability and A11-M1:** OpenTelemetry emission is always on. Before M1 exit, one independently machine-readable
+  record freezes and evidences the definitions, denominators, supported-request mix, provisional targets, minimum
+  samples/windows, evidence sources, owners, and pass/fail rules for SM8, SM16, SM-C3, and SM-C5, and records SM12 and
+  SM15 in the same bundle. Missing, stale, partial, mismatched, historical, unverifiable, or failed evidence blocks M1.
+- **Observability and A11-M2:** The addendum's metric targets are normative planning values and drift-tested against the
+  code catalog, but are not supported/publishable SLOs until each exact M2 candidate has stable metric name, numeric
+  target/unit, window, error budget, alert threshold, timestamped calibration source, tenant scope, live
+  signal/provenance, accountable route/receiver, and passing burn-test result/date/immutable locator. The qualification
+  table pairs one-to-one by metric name. Missing, stale, partial, failing, unverifiable, historical, or mismatched data
+  yields `unsupported`; dashboards expose `within-budget|approaching|exhausted|unsupported`. A11-M2 also requires the
+  2–4 week pilot baseline, SM8-SM14/SM16 recalibration, and the frozen SM-C5 supported-request mix; all current SLO rows
+  remain unsupported with no candidate. A11-M1 and A11-M2 are independent machine-readable decisions; neither
+  substitutes for the other.
 
 ### Host-Layer Reuse (D8 — Technical Enabler TE-1)
 
@@ -722,13 +756,20 @@ Seam test: *owns an aggregate with its own invariants, or just a folder?*
   authorized review, and do not invoke the risk classifier. Its separate A9a partitions must reach precision/recall
   `>=80%/75%` at M0 and `>=90%/85%` at M1.
 - **Risk classifier:** `ActionRiskClassifier` is a versioned categorical tag/heuristic contract with
-  `low-risk|approval-required`; `denied|unsupported` occur before classification. State mutation, file exposure,
+  only two successful determinate classes, `low-risk|approval-required`; `denied|unsupported` occur before classification. State mutation, file disclosure,
   outbound send, task creation/assignment, external-tool invocation, and acting on behalf of a participant are
   structurally non-downgradable. Only product-declared read-only/no-external-effect subtypes can be low risk.
-  With a valid artifact, missing tags, unknown effect surface, or undeclared authority deterministically produces the
-  valid `approval-required` class. A missing, invalid, unqualified, failed, or non-contract artifact/output returns
-  `classifier-unavailable`, writes no proposal/domain/idempotency state, and uses the mandatory auditable-attempt path.
-  Optional M1 explanations cannot alter the result. Each reviewer disagreement or reclassification records the
+  A missing, invalid, unqualified, failed, or non-contract artifact/output, missing tag, unknown effect surface, or
+  undeclared authority class returns the typed product result `classifier-indeterminate`. It creates no proposal,
+  durable domain state, durable idempotency state, approval action, or effect; only a separately typed redacted, non-mutating
+  auditable attempt with safe remediation/escalation is retained. `classifier-unavailable` may appear only as a
+  non-canonical availability reason attached to that result. Remediation creates a new linked operation that must classify
+  determinately; the former attempt cannot be resumed, reinterpreted, or approved. The CommandGateway/auditable-attempt
+  seam owns the attempt and successor link: the attempt records original `operation_id`, correlation, classifier
+  version/input tuple, redacted reason, and remediation; the successor uses a fresh `operation_id` and immutable
+  predecessor reference. The attempt ledger is the only durable record and can deny reuse of the original identity but
+  never authorize continuation or serve as domain idempotency state. Optional M1 explanations cannot alter
+  the result. Each reviewer disagreement or reclassification records the
   classifier version, input tuple, original class, reviewer or product decision, and resolution; quality limits are
   `<=1%` evaluation misclassification and `<=2%` sampled-production disagreement, independent of audit completeness.
 - **Execution:** approved actions execute only through allowlisted EventStore commands (M0 allowlist =
@@ -745,7 +786,7 @@ Seam test: *owns an aggregate with its own invariants, or just a folder?*
   command-coverage run.
 - **A9a qualification:** separate versioned partitions cover association, task intent, and action risk, with at
   least 500 messages at M0, 2,000 at M1, and 20 new adversarial examples per cycle. Association release evidence
-  targets 95% precision, 90% recall, and zero critical unauthorized false positives. A9a does not close A11.
+  targets 95% precision, 90% recall, and zero critical unauthorized false positives. A9a does not close A11-M1 or A11-M2.
 
 ### Implementation Sequence and Integration Flow
 
@@ -761,8 +802,9 @@ Seam test: *owns an aggregate with its own invariants, or just a folder?*
    M0 vertical loop and first-store isolation without inferring readiness from local metadata preparation.
 6. Extend the singular parity set and full M1 governance only after M0 passes; run exact lifecycle/retry/authorization/
    audit conformance across all surface origins.
-7. Activate and independently verify the recovery-evidence architecture, then close A10/A11 with fresh exact-
-   candidate operational evidence before any M2 production/release-candidate claim.
+7. Close A11-M1 with the frozen, evidenced M1 measurement bundle before M1 exit. After M1 passes, activate and
+   independently verify the recovery-evidence architecture, then close A10 and A11-M2 with fresh exact-candidate
+   operational evidence before any M2 production/release-candidate claim.
 
 **Cross-component dependencies:** the CommandGateway is the spine everything routes through; the Contract
 Spine constrains all three surfaces; event-driven projections depend on sibling event contracts (Pact tests);
@@ -780,7 +822,8 @@ AI providers, sibling contexts, and the M2 Memories capability remain behind Cha
 gateway command → Folders attachment reference → project-conversation projection → governed S3 AI-action approval →
 `Project.AppendConversationMessage` mapping → A13-approved Conversations execution → atomic commit → projection →
 SignalR nudge → authorized UI re-query. Metadata-only command preparation is not owner execution; A5, A6, and A13
-must close before this path supports the M0 permitted claim.
+must close, and the exact A9a M0 detector/classifier artifacts must be `approved-current` before their first use, before
+this path supports the M0 permitted claim.
 
 ## Implementation Patterns & Consistency Rules
 
@@ -812,7 +855,7 @@ convention-derived resource names.
 
 **[ChatBot] Lifecycle vocabulary:** state enums are family-specific and come from the PRD Shared Workflow
 Contract. Association uses exactly `Received | Associated | Rejected | Deferred | NeedsReview | Failed | Skipped |
-Corrected`, with `Correcting | Correction-delayed` sub-states. Other families retain their own closed enums;
+Correcting | CorrectionDelayed | Corrected`; `Proposed` is not an association state. Other families retain their own closed enums;
 builders must not create a universal workflow enum or synonyms. Health and evidence states are separate vocabularies.
 
 ### Structure Patterns
@@ -840,15 +883,23 @@ correlationId, taskId?, retryable, clientAction, details.visibility }`. User-saf
 message catalog** (FR77): stable code + headline ≤80 chars + one-sentence reason that names no unauthorized
 project/file/party/audit detail. **Raw error text leaking to a user = release-blocking defect (NFR40).**
 
+**[ChatBot] Classifier result contract:** `classifier-indeterminate` is the canonical product result for every
+indeterminate risk-classifier case. Its response carries no proposal/approval identity, durable domain state, or durable
+idempotency state; it may carry a redacted safe reason such as `classifier-unavailable`, remediation guidance, and the predecessor
+operation identity needed to submit a new linked operation. The ChatBot CommandGateway/auditable-attempt seam owns the
+original attempt identity and successor link. The original operation is terminal and never approvable; a successor uses a
+fresh `operation_id` plus an immutable predecessor reference and is independently classified.
+
 **[ChatBot] Derived-record shape (every derived class):** carries `tenantId`, `sourceProvenance`,
 `derivationContractVersion`, `redactionState`, `retentionClass`, `schemaVersion`; scorer/detector/classifier or
 model version is added where applicable. Decision snapshots are
 append-only + superseded (never mutated); live mirrors are version-stamped projections.
 
-**[ChatBot] Evidence & confidence capture (cross-cutting #12 — every proposal/candidate):** `confidenceScore`
-∈ `[0,1]`, `thresholdBand` (`auto|ambiguous|fail-closed`), `evidenceRefs[]` (typed signal class + matched
-value), `kernelVersion`, `detectedAt`, and (after human action) `correctionOutcome`. Treat this as a first-class
-shape, not as a later analytics addition.
+**[ChatBot] Evidence & confidence capture (cross-cutting #12 — association/task-intent only):** Association candidates
+and task-intent results carry `confidenceScore` ∈ `[0,1]`, `thresholdBand` (`auto|ambiguous|fail-closed`),
+`evidenceRefs[]` (typed signal class + matched value), `kernelVersion`, `detectedAt`, and (after human action)
+`correctionOutcome`. ActionRiskClassifier results are categorical and carry class, classifier version, and input tuple;
+they never use a numeric confidence value to authorize, downgrade, or recover a result.
 
 **[inherited] Data formats:** JSON camelCase; `System.Text.Json` only (shared options factory, never inline
 `new JsonSerializerOptions()`); `DateTimeOffset` UTC server-side, `{Action}At` naming, tenant-local only at
@@ -861,6 +912,7 @@ The detailed rules remain authoritative under D3, D4, and D9. Builders apply the
 | Decision | Implementation-facing requirement |
 |---|---|
 | D3 — one command spine | Every UI, CLI, MCP, service-client, AI-actor, worker, and mailbox mutation builds a typed `IChatBotCommand` and calls `IChatBotClient.SubmitAsync`; adapters never duplicate a gateway stage. |
+| D3 — classifier containment | Only determinate `low-risk` or `approval-required` results may continue. `classifier-indeterminate` terminates before proposal, durable domain state, durable idempotency state, approval action, or effect; remediation submits a new linked operation. |
 | D4 — atomic durability | Construct the canonical envelope with tenant, actor, command, stable operation/decision identity, revision, origin, transition, policy, evidence, redaction, outcome, and chain fields. Co-commit it with the event, lifetime terminal idempotency result, and policy/approval references. |
 | D4 — auditable attempts | Security-sensitive non-mutating denials, restricted reads, service-client failures, and every tenant-admin dashboard read use the separately measured auditable-attempt path. It never repairs missing mutation audit. |
 | D9 — lifecycle and retry | Validate the exact family row and Retry Profile v1. The row selects in-place change, immutable successor, linked workflow/attempt, or stored-outcome replay; projections and dead letters cannot authorize command re-execution. |
@@ -872,11 +924,18 @@ SignalR remains an advisory re-query nudge. Unresolved tenant or current-owner a
 classifier, identity, or revision, an unsupported owner contract, or unavailable canonical-audit durability fails
 closed with the normative typed result and no authoritative domain or idempotency write.
 
-**[ChatBot] Correction propagation (FR91a):** aggregate owns `correcting`/`current` lifecycle via
-`Apply(AssociationCorrectionStarted/AssociationCorrected)`; the coordinator records per-store
-`AssociationCorrectionStoreAcknowledged` events and `AssociationCorrectionDelayed` when the SLO is exceeded.
-Reads block AI use of corrected context until every required store acknowledges. Runtime implementation status is
-evidence input, not an architecture readiness claim.
+**[ChatBot] Correction propagation (FR91a):** the ChatBot correction aggregate solely owns immutable manifest membership
+and `Correcting | CorrectionDelayed | Corrected` lifecycle; owner contexts retain sole authority over their records and
+effects. Each frozen item is stably identified by correction ID, owner context, owner resource/effect ID, source version or
+effect digest, and required outcome. Each A13 mapping names the only owner adapter/actor authorized to submit the item's
+acknowledgement or disposition; the coordinator and projections cannot self-acknowledge, add, replace, or omit an item.
+The aggregate applies lifecycle changes via
+`Apply(AssociationCorrectionStarted/AssociationCorrectionDelayed/AssociationCorrected)`. The coordinator records an
+authenticated `AssociationCorrectionImpactAcknowledged` for every frozen manifest item, including ChatBot stores,
+affected Conversations/Folders records and indexes, actions, appended messages, task-intent conversions, sent mail,
+external/tool effects, file disclosures, and irreversible-effect dispositions. Reads block all affected
+source/destination AI context until every item completes and the workflow reaches `Corrected`. Runtime implementation
+status is evidence input, not an architecture readiness claim.
 
 **[inherited] Domain correctness:** never throw for business-rule violations (return
 `DomainResult.Rejection([...])` — exceptions bypass the idempotency cache); aggregate `Handle` is pure
@@ -1151,12 +1210,13 @@ incompatible semantics.
 All 117 FR and 79 NFR identifiers map to the capability and physical locations above. The PRD remains sole authority
 for the operation/query catalog, workflow matrices, policy schema, retry registry, increments, and gate evidence.
 Canonical audit completeness remains a `100%` mutation invariant, not a current qualification claim or error budget;
-A6/A13 still block tamper-evidence claims, A11 remains `unsupported`, and A10 targets remain provisional.
+A6/A13 still block tamper-evidence claims, A11-M1 remains open, every A11-M2 SLO row remains `unsupported`, and A10
+targets remain provisional.
 
 ### Release-Gate Validation — BLOCKED
 
 Architecture-document completeness is final, but implementation and release readiness are not established. The
-opening gate table remains the scan anchor: A5, A6, A10, A11, and A13 are all open. The PRD's increment table owns
+opening gate table remains the scan anchor: A5, A6, A9a, A10, A11-M1, A11-M2, and A13 are all open. The PRD's increment table owns
 the complete evidence and permitted claims. The current nine-context reconciliation, compatible interfaces, local
 tests, historical artifacts, and this review cannot close a gate.
 
@@ -1164,9 +1224,11 @@ tests, historical artifacts, and this review cannot close a gate.
 
 A13 needs the indivisible owner-approved atomic-write, authority, Conversations, ACL, concurrency, fencing, and
 recovery bundle on one candidate. A6 needs the approved data-class contract and independently witnessed production
-protection/erasure evidence; A5 needs the candidate-bound provider contract and negative tests. A10 needs independent
-activation plus fresh controlled-loss and RTO-capable evidence. A11 needs every numeric SLO row, live provenance,
-calibration, route, burn test, baseline, and exact-candidate binding. Partial evidence closes none of them.
+protection/erasure evidence; A5 needs the candidate-bound provider contract and negative tests. A9a needs independently
+approved exact-artifact detector/classifier evidence. A11-M1 needs the frozen M1 measurement contract and qualifying
+bundle. A10 needs independent activation plus fresh controlled-loss and RTO-capable evidence. A11-M2 needs every numeric
+SLO row, live provenance, calibration, route, burn test, baseline, and exact-candidate binding. Partial evidence closes
+none of them.
 
 ### Architecture Completeness Checklist
 
@@ -1175,11 +1237,12 @@ calibration, route, burn test, baseline, and exact-candidate binding. Partial ev
 - [x] Family lifecycle, stable identity, concurrency, and retry ownership fixed.
 - [x] Authorization, M0 bootstrap, tenant policy, and cross-context ownership fixed.
 - [x] Deployment, replay, observability, and recovery evidence envelopes fixed.
-- [x] A5, A6, A10, A11, and A13 preserved as open release gates.
+- [x] A5, A6, A9a, A10, A11-M1, A11-M2, and A13 preserved as open release gates.
 - [ ] Implementation/release readiness — intentionally not asserted; requires the gate evidence above.
 
 ### Start Here
 
 Use the enforcement checklist above. First establish the A13 atomic write, authority, and Conversations boundary for
 one exact candidate while live AI and pilot persistence remain disabled behind A5/A6. Only then can the M0 vertical
-loop be qualified; A10/A11 remain separate M2 gates.
+loop and exact A9a first-use records be qualified. A11-M1 then blocks M1 exit; A10 and A11-M2 remain separate M2 gates
+after lower-gate revalidation.
