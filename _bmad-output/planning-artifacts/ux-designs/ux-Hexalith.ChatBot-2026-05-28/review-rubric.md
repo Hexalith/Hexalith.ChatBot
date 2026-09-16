@@ -2,11 +2,11 @@
 
 ## Overall verdict
 
-The current spine pair is mechanically complete and internally coherent: the exact source surface set is present in IA, composition, and acceptance; all source journeys and state families are covered; component/token parity is exact; and the canonical document shape fits. It is still **not ready for unqualified downstream extraction** because the current product package is draft with an older STOP validation and the finalized architecture conflicts with that candidate contract; the spines and all three reconciliations now disclose this correctly and keep the disputed paths fail-closed. That upstream authority mismatch is the only remaining rubric finding and is not a UX behavior defect.
+The spine pair is mechanically complete and safe for downstream UX extraction: all source journeys and functional requirements map to flows, all declared tokens and components resolve, every IA interface has composition and state acceptance, and the inherited FrontComposer/Fluent UI v5 boundary is explicit. The prior O1 surface-label inconsistency is closed, and no rubric finding remains.
 
 ## 1. Flow coverage — strong
 
-The three declared product sources were checked for named journeys and required interfaces. All eight User Journeys plus the System Journey have verbatim Key Flow headings, a named protagonist, numbered steps, a climax, and failure/recovery; mappings include S2a in Journey 3 and O1 in Journey 7 (`EXPERIENCE.md:352-459`).
+The final PRD defines eight named user journeys plus the governed-AI System Journey (`../../prds/prd-Hexalith.ChatBot-2026-05-28/prd.md:366-466`). EXPERIENCE preserves all nine source headings verbatim, gives each flow a named protagonist, numbered steps, a marked climax, and an applicable failure/recovery path; the source mappings collectively cover all 117 defined FR identifiers, including every lettered extension (`EXPERIENCE.md:411-518`).
 
 ### Findings
 
@@ -14,7 +14,7 @@ None.
 
 ## 2. Token completeness — strong
 
-DESIGN declares 41 component objects using the recognized semantic `size` sub-token. Palette, typography, spacing, radius, elevation, and focus values are intentionally inherited from FrontComposer/Fluent UI v5 rather than duplicated (`DESIGN.md:66-84`). All 41 `{components.*}` references resolve, and the 4.5:1 normal-text and 3:1 non-text/focus contrast targets are explicit (`DESIGN.md:82-84`; `EXPERIENCE.md:306-316`).
+DESIGN intentionally declares no local color, typography, radius, or spacing delta because FrontComposer and Fluent UI v5 own those systems, and it states contrast requirements for the load-bearing inherited roles (`DESIGN.md:76-92`). Its frontmatter declares 43 component token objects with scalar inherited-system values (`DESIGN.md:26-69`); all 48 token-reference occurrences in EXPERIENCE resolve to 43 distinct `{components.*}` keys.
 
 ### Findings
 
@@ -22,7 +22,7 @@ None.
 
 ## 3. Component coverage — strong
 
-All 41 frontmatter component keys have one-for-one, name-identical, same-order rows with substantive visual rules in DESIGN Components (`DESIGN.md:116-164`) and behavioral rules in EXPERIENCE Component Patterns (`EXPERIENCE.md:114-160`). Fluent UI and FrontComposer names are inherited base controls, not undeclared product components.
+All 43 frontmatter component keys have one-for-one, name-identical, same-order rows with substantive visual anatomy in DESIGN and behavioral contracts in EXPERIENCE (`DESIGN.md:124-178`; `EXPERIENCE.md:123-173`). Fluent UI v5 and FrontComposer primitives used in those rows are explicitly inherited bases rather than undeclared product components.
 
 ### Findings
 
@@ -30,7 +30,7 @@ None.
 
 ## 4. State coverage — strong
 
-The canonical table covers inbound authenticity, association, participant, attachment, task-intent, AI-action, chat, outbound, command/projection, administration, queue, data-right, retention, and notification families with source spellings (`EXPERIENCE.md:182-210`). The universal acceptance rule covers applicable cold-load/loading, empty, validation, unauthorized/redacted, degraded, offline/pending-unknown, retryable, terminal, focus, responsive, localization, forced-color, and reduced-motion behavior; all 13 exact interfaces—S1, S1a, S2, S2a, S3-S10, and O1—also have specific acceptance rows (`EXPERIENCE.md:322-340`).
+The IA and composition tables define 13 interfaces: S1, S1a, S2, S2a, S3-S10, and O1 (`EXPERIENCE.md:69-107`). Canonical and local state rules cover authenticity, association, participants, attachments, task intent, AI actions and attempts, outbound delivery, command/projection outcomes, administration, queues, data rights, retention, connectivity, loading, validation, retry, and terminal behavior; the universal live-route rule and per-interface acceptance rows apply the relevant cold-load/loading, empty, focus, error, authorization/redaction, degraded, offline/pending-unknown, retryable, and terminal states (`EXPERIENCE.md:206-300`; `EXPERIENCE.md:381-399`).
 
 ### Findings
 
@@ -38,7 +38,7 @@ None.
 
 ## 5. Visual reference coverage — strong
 
-No files or directories exist under `mockups/`, `wireframes/`, or `imports/`, so there are no orphans or unspecific links. Both spines state that DESIGN/EXPERIENCE take precedence over any future conflicting visual reference (`DESIGN.md:72-76`; `EXPERIENCE.md:31`).
+No `imports/`, `mockups/`, or `wireframes/` directory or file exists in the workspace, so there are no visual-reference orphans or unspecific links. Both spines record the intentional spine-only posture and state that the maintained spine pair wins over future conflicting visual references (`DESIGN.md:80-84`; `EXPERIENCE.md:35-37`).
 
 ### Findings
 
@@ -46,23 +46,23 @@ None.
 
 ## 6. Bloat & overspecification — adequate
 
-The pair is dense, but its detail is predominantly load-bearing for authority, state, redaction, audit, retry, accessibility, responsive continuity, qualification, or implementation acceptance. Tables carry the repeated mappings efficiently, and the extra Governed Action Boundary prevents unsafe inference from the conflicting upstream package. No reproducible section is merely decorative or safe to remove wholesale.
+The pair is dense, especially EXPERIENCE, but the additional material is load-bearing for authority, redaction, state, correction ownership, retry, accessibility, qualification, and executable acceptance. Repeated structures are predominantly tables, and the product-specific Governed Action Boundary concentrates a cross-cutting safety contract that downstream consumers could otherwise infer incorrectly (`EXPERIENCE.md:175-204`). No section is merely decorative or safely removable wholesale.
 
 ### Findings
 
 None.
 
-## 7. Inheritance discipline — broken
+## 7. Inheritance discipline — strong
 
-The spine pair itself uses verbatim journey titles, exact surface identifiers, consistent terminology, name-identical components, and resolving token references. Its Foundation accurately distinguishes candidate product intent from downstream architecture and keeps both documents `in-review` (`EXPERIENCE.md:25-60`).
+All 14 distinct source, supplement, implementation-reference, and reconciliation paths resolve and are declared identically by both spines (`DESIGN.md:7-25`; `EXPERIENCE.md:6-24`). Journey headings match the PRD; all 13 canonical IA surface labels now match exactly across IA, composition, and per-surface acceptance; component names match across frontmatter and both catalogs; all EXPERIENCE token references resolve by exact key; and source-owned terminology such as `classifier-indeterminate`, `CorrectionDelayed`, A9a, A11-M1, and A11-M2 remains consistent (`EXPERIENCE.md:69-107`; `EXPERIENCE.md:381-399`).
 
 ### Findings
 
-- **high** The declared current product contract is still a draft and its latest validation remains STOP for an earlier snapshot, while the declared finalized architecture contains four direct contract conflicts and two coverage gaps against that candidate text. The current UX and reconciliations accurately disclose the divergence and use the conservative fail-closed posture, so this is an upstream inheritance blocker—not a UX behavior defect—but a consumer still cannot extract one approved implementation contract (`reconcile-product-contracts-2026-09-14.md:17-29`, `:54-66`; `reconcile-architecture-2026-09-14.md:27-71`; `reconcile-existing-ux-inputs-2026-09-14.md:67-69`; `EXPERIENCE.md:51-58`). *Fix:* revalidate and approve the exact current product revision, then revise and revalidate architecture against it before finalizing the UX pair.
+None.
 
 ## 8. Shape fit — strong
 
-DESIGN follows the canonical order exactly: Brand & Style → Colors → Typography → Layout & Spacing → Elevation & Depth → Shapes → Components → Do's and Don'ts (`DESIGN.md:66-178`). EXPERIENCE includes every required default with the exact `Voice and Tone` heading, plus the triggered Responsive and Inspiration sections; Governed Action Boundary earns its place as the compact contract for a safety-critical cross-cutting decision (`EXPERIENCE.md:25-459`).
+DESIGN follows the locked canonical order: Brand & Style, Colors, Typography, Layout & Spacing, Elevation & Depth, Shapes, Components, then Do's and Don'ts (`DESIGN.md:72-180`). EXPERIENCE contains every required default section, includes Responsive & Platform for the responsive multi-form-factor contract, includes Inspiration & Anti-patterns for the recorded reference posture, and gives the product-specific Governed Action Boundary a justified place (`EXPERIENCE.md:29-411`).
 
 ### Findings
 
@@ -70,13 +70,11 @@ None.
 
 ## Mechanical notes
 
-- Finding count: **0 critical, 1 high, 0 medium, 0 low**.
-- Direct references: 11 distinct paths are declared identically by both spines; all 11 resolve.
-- Journeys: 8 User Journeys plus 1 System Journey; all 9 have verbatim headings, named protagonists, numbered steps, a climax, and failure/recovery.
-- Surfaces: 13 exact required interfaces are represented in IA, composition, and per-surface acceptance: S1, S1a, S2, S2a, S3-S10, and O1.
-- Components/tokens: 41 frontmatter component keys, 41 DESIGN rows, 41 EXPERIENCE rows, and 41 resolving `{components.*}` references.
-- Required headings and canonical DESIGN order are present; the extra EXPERIENCE section is justified.
-- Reconciliation artifacts: product and architecture divergence is current and accurately disclosed; the supplemental reconciliation reports PASS with zero substantive gaps and current spine citations.
-- Visual artifacts: no `mockups/`, `wireframes/`, or `imports/` directories or files; no orphans.
-- No Mermaid blocks are present.
-- Both spine statuses remain `in-review`, matching the disclosed product-approval and architecture-alignment blocker.
+- Finding count: **0 critical, 0 high, 0 medium, 0 low**.
+- Direct references: 14 distinct frontmatter paths are declared identically by both spines; all resolve.
+- Journeys: 8 User Journeys plus 1 System Journey; all 9 retain the source heading, a named protagonist, numbered steps, a climax, and failure/recovery.
+- Requirements: 117 functional-requirement identifiers are defined in the PRD; the nine flow mappings collectively cover all 117, including lettered extensions.
+- Interfaces: all 13 IA interface IDs and canonical labels match exactly across IA, surface composition, and per-surface acceptance; the prior O1 mismatch is closed.
+- Components/tokens: 43 frontmatter component keys, 43 DESIGN rows, 43 EXPERIENCE rows, and 43 distinct resolving `{components.*}` references; catalog names and order are identical.
+- Frontmatter is complete for an inherited UI-system delta: DESIGN has required `name` and `description`; local visual token families are intentionally omitted; component sub-tokens use scalar values.
+- Visual artifact inventory is empty, and neither spine contains a Mermaid block.

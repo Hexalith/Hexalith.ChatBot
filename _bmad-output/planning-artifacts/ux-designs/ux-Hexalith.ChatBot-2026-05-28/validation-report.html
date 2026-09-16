@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>UX Design Validation: Hexalith.ChatBot</title>
 <style>
   :root {
@@ -10,125 +11,116 @@
     --border: #e7e5e4;
     --text: #1c1917;
     --muted: #78716c;
-    --verdict-strong: #16a34a;
-    --verdict-adequate: #65a30d;
-    --verdict-thin: #d97706;
-    --verdict-broken: #dc2626;
-    --sev-low: #64748b;
-    --sev-medium: #ca8a04;
-    --sev-high: #ea580c;
-    --sev-critical: #dc2626;
+    --strong: #166534;
+    --adequate: #4d7c0f;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; font-size: 15px; }
   .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
-  header.report-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
-  .title h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
-  .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; overflow-wrap: anywhere; }
-  .synthesis { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--muted); border-radius: 8px; padding: 18px 22px; margin-bottom: 24px; font-size: 15.5px; }
+  header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+  h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+  .subtitle, .source { color: var(--muted); font-size: 12px; font-family: ui-monospace, "SF Mono", Menlo, monospace; overflow-wrap: anywhere; }
+  .subtitle { margin-top: 4px; }
+  .synthesis, .mechanical { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px 22px; margin-bottom: 24px; }
+  .synthesis { border-left: 4px solid var(--strong); font-size: 15.5px; }
   .synthesis p { margin: 0 0 10px; }
   .synthesis p:last-child { margin-bottom: 0; }
-  .dimension-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 24px; }
-  .dim-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
-  .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-  .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
-  section.dimension, section.reviewer-section { margin-bottom: 14px; }
-  section.dimension details, section.reviewer-section details { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-  section summary { padding: 14px 20px; cursor: pointer; user-select: none; list-style: none; display: flex; align-items: center; gap: 12px; }
-  section summary::-webkit-details-marker { display: none; }
-  section summary::before { content: "▸"; display: inline-block; color: var(--muted); transition: transform 0.15s ease; }
-  section details[open] summary::before { transform: rotate(90deg); }
-  section summary h2 { display: inline; margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.005em; flex: 1; }
-  .verdict-pill { font-size: 11px; padding: 3px 10px; border-radius: 999px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: white; }
-  .verdict-strong { background: var(--verdict-strong); }
-  .verdict-adequate { background: var(--verdict-adequate); }
-  .verdict-thin { background: var(--verdict-thin); }
-  .verdict-broken { background: var(--verdict-broken); }
-  .dim-body { padding: 4px 20px 18px; }
-  .dim-judgment { color: var(--text); font-size: 14.5px; }
-  .dim-judgment p { margin: 0 0 10px; }
-  .findings-list { padding: 0 20px 4px; }
-  article.finding { padding: 14px 0; border-top: 1px solid var(--border); }
-  article.finding:first-child { border-top: none; }
-  article.finding header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
-  .badge { font-size: 10.5px; padding: 3px 8px; border-radius: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.4; }
-  .badge-sev-low { background: rgba(100, 116, 139, 0.12); color: var(--sev-low); }
-  .badge-sev-medium { background: rgba(202, 138, 4, 0.14); color: var(--sev-medium); }
-  .badge-sev-high { background: rgba(234, 88, 12, 0.14); color: var(--sev-high); }
-  .badge-sev-critical { background: rgba(220, 38, 38, 0.14); color: var(--sev-critical); }
-  .finding-title { margin: 0; font-size: 15px; font-weight: 500; flex: 1; min-width: 200px; }
-  .finding-location { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
-  .finding-note, .finding-fix { margin-top: 6px; font-size: 14px; }
-  .finding-fix strong { color: var(--muted); font-weight: 500; }
-  .reviewer-source { font-size: 12px; color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
-  .mechanical { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-top: 24px; font-size: 14px; }
-  .mechanical h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 24px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .card .name { color: var(--muted); font-size: 13px; }
+  .card .verdict { color: var(--strong); font-size: 14px; font-weight: 650; }
+  .card .verdict.adequate { color: var(--adequate); }
+  section { margin-bottom: 12px; }
+  details { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  summary { padding: 14px 20px; cursor: pointer; display: flex; align-items: center; gap: 12px; }
+  summary h2 { display: inline; margin: 0; font-size: 16px; font-weight: 650; flex: 1; }
+  .pill { background: var(--strong); color: white; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; }
+  .pill.adequate { background: var(--adequate); }
+  .body { padding: 0 20px 18px; font-size: 14.5px; }
+  .body p { margin: 0 0 10px; }
+  .body p:last-child { margin-bottom: 0; }
+  .mechanical { margin-top: 24px; font-size: 14px; }
+  .mechanical h2 { margin: 0 0 10px; font-size: 15px; }
   .mechanical ul { margin: 0; padding-left: 20px; }
-  .mechanical li { margin-bottom: 4px; color: var(--text); }
-  footer.report-footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
-  footer .meta { display: flex; gap: 24px; flex-wrap: wrap; }
+  footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font: 12px/1.6 ui-monospace, "SF Mono", Menlo, monospace; overflow-wrap: anywhere; }
+  footer span { display: block; }
   code { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 </style>
 </head>
 <body>
-  <div class="container">
-    <header class="report-header">
-      <div class="title">
+  <main class="container">
+    <header>
+      <div>
         <h1>Hexalith.ChatBot — UX Design Validation Report</h1>
         <div class="subtitle">_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28</div>
       </div>
+      <span class="pill">pass</span>
     </header>
 
     <div class="synthesis">
-      <p>The UX spine pair is mechanically complete and internally coherent. It covers the exact source surface set, all source journeys and state families, 41 aligned component contracts, per-surface acceptance, responsive behavior, localization, accessibility, and fail-closed governance. Accessibility and governance/safety both pass with zero findings.</p>
-      <p>The pair remains <strong>in-review and not ready for unqualified downstream extraction</strong> because the current PRD/addendum are draft with an older STOP validation, while the finalized architecture implements an earlier contract. The UX and reconciliations disclose that mismatch and keep disputed paths fail-closed. This upstream authority mismatch is the only current finding; it is not a UX behavior defect.</p>
+      <p><strong>Pass at the UX-contract level with no current findings.</strong> All nine source journeys and 117 functional-requirement identifiers map to named flows; all 13 interfaces have composition and state acceptance; all 43 product components and token references resolve one-for-one; and the inherited FrontComposer/Fluent UI V5 boundary is explicit.</p>
+      <p>The prior accessibility and Fluent/FrontComposer findings are closed in the maintained contract. Known platform mismatches and live-route evidence remain explicit qualification blockers, so the package correctly remains <code>in-review</code>; this result does not prove implementation, accessibility, localization, or release conformance.</p>
     </div>
 
-    <div class="dimension-summary">
-      <div class="dim-card"><div class="dim-name">Flow coverage</div><div class="dim-verdict" style="color: var(--verdict-strong)">strong</div></div>
-      <div class="dim-card"><div class="dim-name">Token completeness</div><div class="dim-verdict" style="color: var(--verdict-strong)">strong</div></div>
-      <div class="dim-card"><div class="dim-name">Component coverage</div><div class="dim-verdict" style="color: var(--verdict-strong)">strong</div></div>
-      <div class="dim-card"><div class="dim-name">State coverage</div><div class="dim-verdict" style="color: var(--verdict-strong)">strong</div></div>
-      <div class="dim-card"><div class="dim-name">Visual reference coverage</div><div class="dim-verdict" style="color: var(--verdict-strong)">strong</div></div>
-      <div class="dim-card"><div class="dim-name">Bloat &amp; overspecification</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
-      <div class="dim-card"><div class="dim-name">Inheritance discipline</div><div class="dim-verdict" style="color: var(--verdict-broken)">broken</div></div>
-      <div class="dim-card"><div class="dim-name">Shape fit</div><div class="dim-verdict" style="color: var(--verdict-strong)">strong</div></div>
+    <div class="summary-grid">
+      <div class="card"><div class="name">Flow coverage</div><div class="verdict">strong</div></div>
+      <div class="card"><div class="name">Token completeness</div><div class="verdict">strong</div></div>
+      <div class="card"><div class="name">Component coverage</div><div class="verdict">strong</div></div>
+      <div class="card"><div class="name">State coverage</div><div class="verdict">strong</div></div>
+      <div class="card"><div class="name">Visual reference coverage</div><div class="verdict">strong</div></div>
+      <div class="card"><div class="name">Bloat &amp; overspecification</div><div class="verdict adequate">adequate</div></div>
+      <div class="card"><div class="name">Inheritance discipline</div><div class="verdict">strong</div></div>
+      <div class="card"><div class="name">Shape fit</div><div class="verdict">strong</div></div>
     </div>
 
-    <section class="dimension"><details><summary><h2>Flow coverage</h2><span class="verdict-pill verdict-strong">strong</span></summary><div class="dim-body"><div class="dim-judgment"><p>All eight User Journeys plus the System Journey have verbatim headings, named protagonists, numbered steps, a climax, and failure/recovery. Journey 3 includes S2a; Journey 7 includes O1.</p></div></div></details></section>
-    <section class="dimension"><details><summary><h2>Token completeness</h2><span class="verdict-pill verdict-strong">strong</span></summary><div class="dim-body"><div class="dim-judgment"><p>DESIGN declares 41 component objects using only the recognized <code>size</code> sub-token. Inherited visual foundations are not duplicated, and all 41 component references resolve.</p></div></div></details></section>
-    <section class="dimension"><details><summary><h2>Component coverage</h2><span class="verdict-pill verdict-strong">strong</span></summary><div class="dim-body"><div class="dim-judgment"><p>All 41 component keys have name-identical, same-order visual and behavioral rows. Pinned Fluent UI and FrontComposer component identities are exact.</p></div></div></details></section>
-    <section class="dimension"><details><summary><h2>State coverage</h2><span class="verdict-pill verdict-strong">strong</span></summary><div class="dim-body"><div class="dim-judgment"><p>Canonical presentation covers every source-owned state family. All 13 interfaces—S1, S1a, S2, S2a, S3–S10, and O1—have surface-specific acceptance.</p></div></div></details></section>
-    <section class="dimension"><details><summary><h2>Visual reference coverage</h2><span class="verdict-pill verdict-strong">strong</span></summary><div class="dim-body"><div class="dim-judgment"><p>No mockups, wireframes, or imports exist. The spines take precedence over future conflicting visual references; mocks remain intentionally deferred while the upstream behavior contract is unresolved.</p></div></div></details></section>
-    <section class="dimension"><details><summary><h2>Bloat &amp; overspecification</h2><span class="verdict-pill verdict-adequate">adequate</span></summary><div class="dim-body"><div class="dim-judgment"><p>The detail supports authority, safety, state, audit, retry, accessibility, responsive continuity, qualification, or implementation acceptance. Tables avoid unnecessary repetition.</p></div></div></details></section>
+    <section><details><summary><h2>Flow coverage</h2><span class="pill">strong</span></summary><div class="body"><p>Eight User Journeys plus the governed-AI System Journey preserve source names and each provides a named protagonist, numbered steps, a climax, and failure or recovery. Their mappings cover all 117 functional-requirement identifiers, including lettered extensions.</p></div></details></section>
+    <section><details><summary><h2>Token completeness</h2><span class="pill">strong</span></summary><div class="body"><p>All 43 component tokens and <code>{components.*}</code> references resolve. Visual foundations intentionally inherit FrontComposer and Fluent UI V5; load-bearing contrast targets are explicit.</p></div></details></section>
+    <section><details><summary><h2>Component coverage</h2><span class="pill">strong</span></summary><div class="body"><p>All 43 components have name-identical, substantive visual and behavioral rows in the same order across both spines.</p></div></details></section>
+    <section><details><summary><h2>State coverage</h2><span class="pill">strong</span></summary><div class="body"><p>Canonical and local state rules cover every applicable loading, empty, validation, authorization, degraded, offline or pending-unknown, retryable, and terminal state across all 13 IA interfaces.</p></div></details></section>
+    <section><details><summary><h2>Visual reference coverage</h2><span class="pill">strong</span></summary><div class="body"><p>No imports, mockups, or wireframes exist, so there are no visual-reference orphans. Both spines record the intentional spine-only posture.</p></div></details></section>
+    <section><details><summary><h2>Bloat &amp; overspecification</h2><span class="pill adequate">adequate</span></summary><div class="body"><p>The pair is dense, but its additional material is load-bearing for authority, redaction, state, correction, retry, accessibility, qualification, and executable acceptance. Optional editorial consolidation remains separate from validation.</p></div></details></section>
+    <section><details><summary><h2>Inheritance discipline</h2><span class="pill">strong</span></summary><div class="body"><p>All 14 distinct source and reference paths resolve and are declared identically by both spines. Authority roles, journey names, terminology, component names, surface labels, and token references remain consistent.</p></div></details></section>
+    <section><details><summary><h2>Shape fit</h2><span class="pill">strong</span></summary><div class="body"><p>DESIGN follows canonical section order. EXPERIENCE contains every required default section, the triggered Responsive and Inspiration sections, and a justified product-specific Governed Action Boundary.</p></div></details></section>
 
-    <section class="dimension"><details open><summary><h2>Inheritance discipline</h2><span class="verdict-pill verdict-broken">broken</span></summary><div class="dim-body"><div class="dim-judgment"><p>The UX pair and reconciliations are internally consistent, but the upstream authority chain is not: candidate product text is unapproved and finalized architecture is older.</p></div></div><div class="findings-list">
-      <article class="finding"><header><span class="badge badge-sev-high">high</span><h3 class="finding-title">Product draft and finalized architecture do not define one approved contract</h3><span class="finding-location">reconcile-product-contracts-2026-09-14.md · reconcile-architecture-2026-09-14.md</span></header><div class="finding-note">The latest product validation applies to an earlier snapshot, while finalized architecture contains four direct conflicts and two coverage gaps against the candidate product text. UX safely keeps every disputed path fail-closed, but downstream extraction remains blocked.</div><div class="finding-fix"><strong>Fix:</strong> Revalidate and approve the exact current product revision, then revise and revalidate architecture against it before finalizing the UX pair.</div></article>
-    </div></details></section>
+    <section>
+      <details open>
+        <summary><h2>Rubric review</h2><span class="pill">pass</span><span class="source">review-rubric.md</span></summary>
+        <div class="body"><p>No current finding. The spine pair is mechanically complete and safe for downstream extraction. Seven rubric dimensions are strong; bloat and overspecification is adequate.</p></div>
+      </details>
+    </section>
+    <section>
+      <details open>
+        <summary><h2>Accessibility review</h2><span class="pill">pass</span><span class="source">review-accessibility.md</span></summary>
+        <div class="body"><p>No current accessibility-contract finding. Prior gaps in transcript navigation, nonvisual loading, field-error association, and session recovery are closed. Rendered conformance still requires the specified real-route accessibility evidence.</p></div>
+      </details>
+    </section>
+    <section>
+      <details open>
+        <summary><h2>Fluent UI V5 / FrontComposer review</h2><span class="pill">pass</span><span class="source">review-fluent-conformance.md</span></summary>
+        <div class="body"><p>No current conformance-contract finding. The spines distinguish required behavior from known platform gaps, assign FrontComposer ownership, prohibit ChatBot-local forks, and keep affected paths qualification-blocked until live evidence passes.</p></div>
+      </details>
+    </section>
 
-    <section class="dimension"><details><summary><h2>Shape fit</h2><span class="verdict-pill verdict-strong">strong</span></summary><div class="dim-body"><div class="dim-judgment"><p>DESIGN follows canonical section order. EXPERIENCE includes every required section, the exact Voice and Tone heading, the triggered Responsive and Inspiration sections, and a justified Governed Action Boundary.</p></div></div></details></section>
+    <div class="mechanical">
+      <h2>Qualification and mechanical notes</h2>
+      <ul>
+        <li>Findings: 0 critical, 0 high, 0 medium, 0 low.</li>
+        <li>14 distinct source and reference paths resolve and are declared identically by both spines.</li>
+        <li>Nine journeys cover all 117 functional-requirement identifiers.</li>
+        <li>All 13 IA interfaces match across IA, composition, and per-surface acceptance.</li>
+        <li>43 frontmatter keys, 43 DESIGN rows, 43 EXPERIENCE rows, and 43 resolving references align.</li>
+        <li>No visual artifacts, Mermaid blocks, or open drafting placeholders are present.</li>
+        <li>The UX package remains <code>in-review</code> pending source-defined release, ownership, platform, and live-evidence gates.</li>
+      </ul>
+    </div>
 
-    <section class="reviewer-section"><details><summary><h2>Accessibility review — PASS</h2><span class="reviewer-source">review-accessibility.md</span></summary><div class="dim-body"><div class="dim-judgment"><p>Zero findings. The contract covers live-route and server verification, keyboard and screen-reader use, reflow, focus visibility, accessible redaction, target sizing, text spacing, reduced motion, English/French parity, controlled updates, sorting, and connectivity recovery.</p></div></div></details></section>
-
-    <section class="reviewer-section"><details><summary><h2>Governance and safety review — PASS</h2><span class="reviewer-source">review-governance-safety.md</span></summary><div class="dim-body"><div class="dim-judgment"><p>Zero findings. The contract is fail-closed for permanent six-effect approval, classifier indeterminacy, S2a separation of duty, authorization/omission, batch limits, admin audit, correction, retry, outbound uncertainty, identity, diagnostics, qualification, and O1 data rights.</p></div></div></details></section>
-
-    <section class="reviewer-section"><details><summary><h2>Historical Fluent review — excluded</h2><span class="reviewer-source">review-fluent-conformance.md</span></summary><div class="dim-body"><div class="dim-judgment"><p>This pre-update review was not part of the selected gate. Its former component-name and composition findings no longer reproduce: DESIGN lint passes with zero warnings, pinned .NET APIs were verified, and 41 exact component contracts plus a complete surface composition map now align.</p></div></div></details></section>
-
-    <div class="mechanical"><h3>Mechanical notes</h3><ul>
-      <li>Current findings: 0 critical, 1 high, 0 medium, 0 low.</li>
-      <li>11 distinct direct references are declared identically by both spines; all resolve.</li>
-      <li>41 declarations, 41 DESIGN rows, 41 EXPERIENCE rows, and 41 resolving references align.</li>
-      <li>Supplemental reconciliation passes with zero gaps.</li>
-      <li>No visual artifacts exist; mock creation is deferred.</li>
-      <li>Both spines remain <code>status: in-review</code>.</li>
-    </ul></div>
-
-    <footer class="report-footer"><div class="meta">
+    <footer>
       <span>Rubric: .agents/skills/bmad-ux/references/validate.md</span>
-      <span>Generated: 2026-09-14T22:09:59+02:00</span>
-      <span>Markdown twin: validation-report.md</span>
-    </div></footer>
-  </div>
+      <span>DESIGN: /home/administrator/projects/hexalith/chatbot/_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/DESIGN.md</span>
+      <span>EXPERIENCE: /home/administrator/projects/hexalith/chatbot/_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/EXPERIENCE.md</span>
+      <span>Generated: 2026-09-16T20:32:09+02:00</span>
+    </footer>
+  </main>
 </body>
 </html>

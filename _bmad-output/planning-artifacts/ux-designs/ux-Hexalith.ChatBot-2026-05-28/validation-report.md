@@ -2,15 +2,15 @@
 
 - **DESIGN.md:** `/home/administrator/projects/hexalith/chatbot/_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/DESIGN.md`
 - **EXPERIENCE.md:** `/home/administrator/projects/hexalith/chatbot/_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/EXPERIENCE.md`
-- **Run at:** 2026-09-14T22:09:59+02:00
-- **Selected gate:** rubric, accessibility, governance/safety
-- **Current findings:** 1 total — 0 critical, 1 high, 0 medium, 0 low
+- **Run at:** 2026-09-16T20:32:09+02:00
+- **Selected gate:** rubric walker, accessibility, Fluent UI V5/FrontComposer conformance
+- **Current findings:** 0 total — 0 critical, 0 high, 0 medium, 0 low
 
 ## Overall verdict
 
-The UX spine pair is mechanically complete and internally coherent. It covers the exact source surface set, all source journeys and state families, 41 aligned component contracts, per-surface acceptance, responsive behavior, localization, accessibility, and fail-closed governance. Accessibility and governance/safety both pass with zero findings.
+**Pass at the UX-contract level.** The maintained spine pair is mechanically complete and safe for downstream UX extraction. All source journeys and 117 functional-requirement identifiers map to the nine named flows; all 13 interfaces have composition and state acceptance; all 43 product components and token references resolve one-for-one; and the inherited FrontComposer/Fluent UI V5 boundary is explicit.
 
-The pair remains **in-review and not ready for unqualified downstream extraction** because the current PRD/addendum are draft with an older STOP validation, while the finalized architecture implements an earlier contract. The UX and reconciliation artifacts disclose that mismatch and keep disputed paths fail-closed. This upstream authority mismatch is the only current finding; it is not a UX behavior defect.
+The accessibility and Fluent/FrontComposer reviewers found no current contract defect. Prior gaps in transcript semantics, nonvisual loading, field errors, session recovery, bounded collections, status primitives, modal arbitration, and destructive-dialog localization are closed in the maintained contract. Platform mismatches and live-route evidence remain explicit qualification blockers, so this pass does not make the package final or prove implementation, accessibility, localization, or release conformance.
 
 ## Category verdicts
 
@@ -22,88 +22,85 @@ The pair remains **in-review and not ready for unqualified downstream extraction
 | State coverage | Strong |
 | Visual reference coverage | Strong |
 | Bloat & overspecification | Adequate |
-| Inheritance discipline | Broken — upstream blocker |
+| Inheritance discipline | Strong |
 | Shape fit | Strong |
 
 ## Findings by severity
 
-### Critical (0)
+| Severity | Count |
+|---|---:|
+| Critical | 0 |
+| High | 0 |
+| Medium | 0 |
+| Low | 0 |
+| **Total** | **0** |
 
-None.
-
-### High (1)
-
-#### [Rubric · Inheritance discipline] Product draft and finalized architecture do not define one approved contract
-
-The current product contract is still a draft, and its latest validation remains STOP for an earlier snapshot. The finalized architecture contains four direct conflicts and two coverage gaps against the candidate product text. The current UX safely discloses the divergence and uses conservative, fail-closed behavior, but a downstream consumer still cannot extract one approved implementation contract.
-
-**Fix:** Revalidate and approve the exact current product revision, then revise and revalidate architecture against it before finalizing the UX pair.
-
-**Evidence:** `reconcile-product-contracts-2026-09-14.md`, `reconcile-architecture-2026-09-14.md`, and `EXPERIENCE.md` §Upstream blockers and open contracts.
-
-### Medium (0)
-
-None.
-
-### Low (0)
-
-None.
+No current finding remains in the selected validation gate.
 
 ## Rubric dimensions
 
 ### Flow coverage — strong
 
-All eight User Journeys plus the System Journey have verbatim headings, named protagonists, numbered steps, a climax, and failure/recovery. Journey 3 includes S2a; Journey 7 includes O1.
+Eight User Journeys plus the governed-AI System Journey preserve source names and each provides a named protagonist, numbered steps, a climax, and failure or recovery. Their mappings collectively cover all 117 functional-requirement identifiers, including lettered extensions.
 
 ### Token completeness — strong
 
-DESIGN declares 41 component objects using only the recognized `size` sub-token. Palette, typography, spacing, radius, elevation, and focus values inherit from FrontComposer and Fluent UI v5. All 41 EXPERIENCE component references resolve.
+All 43 component tokens and `{components.*}` references resolve. Visual foundations intentionally inherit FrontComposer and Fluent UI V5; load-bearing contrast targets are explicit.
 
 ### Component coverage — strong
 
-All 41 component keys have name-identical, same-order visual and behavioral rows. The pinned component APIs and FrontComposer controls are exact; the DESIGN.md linter reports zero errors and zero warnings.
+All 43 components have name-identical, substantive visual and behavioral rows in the same order across both spines.
 
 ### State coverage — strong
 
-Canonical presentation covers inbound authenticity, association, participant, attachment, task intent, AI action, chat, outbound, command/projection, administration, queue, data rights, retention, and notification. All 13 interfaces—S1, S1a, S2, S2a, S3–S10, and O1—have surface-specific acceptance.
+Canonical and local state rules cover every applicable loading, empty, validation, authorization, degraded, offline or pending-unknown, retryable, and terminal state across all 13 IA interfaces.
 
 ### Visual reference coverage — strong
 
-No mockups, wireframes, or imports exist. Both spines state that they take precedence over future conflicting visual references. Screen mocks remain intentionally deferred while the upstream behavior contract is unresolved.
+No `imports/`, `mockups/`, or `wireframes/` artifacts exist, so there are no visual-reference orphans. Both spines record the intentional spine-only posture and take precedence over future conflicting visual references.
 
 ### Bloat & overspecification — adequate
 
-The pair is dense, but its detail supports authority, safety, state, audit, retry, accessibility, responsive continuity, qualification, or implementation acceptance. Tables avoid unnecessary repetition.
+The pair is dense, but its additional material is load-bearing for authority, redaction, state, correction, retry, accessibility, qualification, and executable acceptance. Optional editorial consolidation remains separate from validation.
 
-### Inheritance discipline — broken
+### Inheritance discipline — strong
 
-The UX pair and all reconciliation records are internally consistent, but the source-authority chain is not: candidate product text is unapproved and finalized architecture is older. See the High finding above.
+All 14 distinct source and reference paths resolve and are declared identically by both spines. Authority roles, source journey names, glossary terms, component names, surface labels, and token references remain consistent.
 
 ### Shape fit — strong
 
-DESIGN uses the canonical section order. EXPERIENCE includes every required section, the exact `Voice and Tone` heading, the triggered Responsive and Inspiration sections, and a justified Governed Action Boundary.
+DESIGN follows canonical section order. EXPERIENCE contains every required default section, the triggered Responsive and Inspiration sections, and a justified product-specific Governed Action Boundary.
 
-## Accessibility review
+## Specialist reviewer summaries
 
-**PASS — 0 findings.** The contract covers real live routes, server-verified primary success, keyboard-only and screen-reader review, 320 CSS pixel/400% reflow, focus visibility, accessible redaction, target sizing, text spacing, reduced motion, English/French parity, controlled updates, deterministic sorting, and connectivity recovery.
+### Accessibility — pass
 
-Source: `review-accessibility.md`.
+No current accessibility-contract finding remains. The maintained spines define transcript navigation semantics, deterministic nonvisual busy behavior, programmatic field-error association, owned session recovery, keyboard and screen-reader behavior, reflow, forced colors, reduced motion, English/French parity, focus, announcements, and redaction. Actual rendered conformance still requires the live-route evidence specified in EXPERIENCE.
 
-## Governance and safety review
+### Fluent UI V5 / FrontComposer conformance — pass at contract level
 
-**PASS — 0 findings.** The contract is fail-closed for permanent six-effect human approval, classifier indeterminacy, S2a separation of duty, authorization/omission, batch limits, admin audit, correction, retry, outbound uncertainty, identity, diagnostics, qualification, and O1 data rights.
+No current conformance-contract finding remains. The spines distinguish required behavior from known FrontComposer implementation gaps, assign shared-platform ownership, prohibit ChatBot-local forks, and keep affected routes qualification-blocked until live evidence passes. This verdict is not evidence that the pinned generator, dialog infrastructure, or localized destructive flows already conform at runtime.
 
-Source: `review-governance-safety.md`.
+## Qualification and release posture
 
-## Historical reviewer note
-
-`review-fluent-conformance.md` is a pre-update historical review and was not part of this selected gate. Its former component-name and surface-composition findings no longer reproduce: DESIGN lint passes with zero warnings, pinned .NET APIs were verified, and the current pair has 41 exact aligned component contracts plus a complete surface composition map.
+- The maintained UX spines remain `in-review` because source-defined release, ownership, platform, and live-evidence gates remain open.
+- The generated-grid first-mount latch and shared modal opener arbiter remain FrontComposer qualification dependencies.
+- French destructive flows remain qualification-blocked until all inherited and generated dialog copy is localizable.
+- FrontComposer, Fluent UI V5, and the configured identity provider must be verified on real routes for focus, accessibility-tree, localization, state, reflow, forced-colors, and reduced-motion behavior.
+- This validation does not imply product approval, architecture approval, implementation completion, qualification, or release readiness beyond the statuses recorded by their owning sources.
 
 ## Mechanical notes
 
-- Direct references: 11 distinct paths are declared identically by both spines; all resolve.
-- Components: 41 declarations, 41 DESIGN rows, 41 EXPERIENCE rows, and 41 resolving references.
+- Direct references: 14 distinct paths are declared identically by both spines; all resolve.
 - Journeys: eight User Journeys plus one System Journey; all are complete.
-- Supplemental reconciliation: PASS with zero gaps.
-- Visual artifacts: none; mock creation is deferred.
-- Both spines remain `status: in-review`.
+- Requirements: all 117 identifiers defined by the PRD are covered by the flow mappings.
+- Surfaces: all 13 IA interfaces match across IA, composition, and per-surface acceptance.
+- Components: 43 frontmatter keys, 43 DESIGN rows, 43 EXPERIENCE rows, and 43 resolving references align.
+- Visual artifacts and Mermaid blocks: none.
+- Open drafting or implementation-placeholder markers: none.
+
+## Reviewer files
+
+- `review-rubric.md`
+- `review-accessibility.md`
+- `review-fluent-conformance.md`

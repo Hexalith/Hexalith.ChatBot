@@ -7,6 +7,10 @@ stepsCompleted:
 requirementsExtractionStatus: confirmed
 epicDesignStatus: approved
 epicCount: 13
+storyGenerationStatus: approved
+storyCount: 146
+finalValidationStatus: passed
+workflowStatus: complete
 functionalRequirementCount: 117
 nonFunctionalRequirementCount: 79
 architectureRequirementCount: 41
@@ -18,6 +22,7 @@ inputDocuments:
   - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/DESIGN.md"
   - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/EXPERIENCE.md"
   - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/implementation-conformance-addendum-2026-07-17.md"
+  - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-09-15.md"
 ---
 
 # chatbot - Epic Breakdown
@@ -35,7 +40,7 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - FR3: The system can associate incoming email with an existing project using deterministic evidence.
 - FR4: The system can detect ambiguous project association and route it to human review.
 - FR5: Authorized users can review candidate projects with visible evidence, confidence state, reason codes, and the consequences of each available decision.
-- FR6: Authorized users can choose a candidate project, reject all candidates, defer association, mark an item as needing review, and provide an optional decision note.
+- FR6: From `NeedsReview`, authorized users can confirm one visible candidate with current evidence, reject all candidates with a required reason, or defer with an owner and revisit condition; a deferred item must first be resumed to `NeedsReview`, and users cannot invoke worker-only `MarkEmailAssociationNeedsReview`.
 - FR7: Authorized users can correct a previously selected project association.
 - FR8: The system can record association decisions, corrections, rejections, deferrals, retries, and skipped items.
 - FR9: Tenant administrators can configure association rules, evidence requirements, and security-sensitive `T_high`/`T_low` thresholds within the closed policy schema, with authorization, independent approval where required, calibration guardrails, and audit.
@@ -56,7 +61,7 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - FR24: Authorized users can see association, attachment, task, approval, command, failure, retry, and next-action status for a project conversation.
 - FR25: The system can keep project conversation context separate across tenants and projects.
 - FR26: The system can distinguish informational context from actionable `request-information`, `request-action`, or `request-decision` intent and expose detector version, evidence offsets, confidence, and review actions without implying action risk.
-- FR27: The system can distinguish AI-generated summaries from source evidence using a visible `AI summary` label, provenance, collapsed-by-default generated content, expanded-by-default sources, and non-color WCAG 2.2 AA treatment.
+- FR27: The system must distinguish AI summaries from source evidence, preserve immutable origin/trust labels on external and retrieved fragments, and return `untrusted-instruction-detected` without model/tool invocation when untrusted content attempts to define policy, authority, approval, or instructions; remediation excludes or quarantines the source and creates a new request.
 - FR28: The system can preserve visible human-review history for each email, attachment, approval, AI action, and command.
 - FR28a: Authorized users can submit a Project-scoped message through the FrontComposer S1a composer; every submission enters CommandGateway with actor, tenant, Project, conversation, stable `operation_id`, expected revision, and source attribution.
 - FR28b: The composer shows `accepted`, `needs-review`, `approval-required`, `denied`, `unsupported`, or typed failure before implying that AI work has started.
@@ -69,15 +74,15 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - FR31: Authorized users can inspect attachment capture and storage status.
 - FR32: The system can prevent unauthorized actors from viewing attachment metadata or content.
 - FR33: The system can make authorized project files available as scoped AI context only through explicit authorization, policy checks, and auditable context packaging.
-- FR34: The system can represent attachment states including captured, pending, unavailable, rejected, unsafe, failed, and retryable.
+- FR34: The system must represent attachment workflow state as exactly `PendingScan`, `Stored`, `Unsafe`, or `Failed`; capture and retry are audited commands/events that create or transition attempts rather than additional attachment states.
 - FR35: The system can detect candidate task/action intent from authorized conversation actors and preserve the source evidence, tenant/project/requester fields, ≤280-character summary, action kind, evidence offsets, detector version, confidence, time, and state.
 - FR36: Authorized users can review captured task intent, its full source message and data contract, and the available governed dispositions before action.
 - FR37: Authorized users can convert captured task intent into an audited governed proposal linked to its source task-intent record.
 - FR38: Authorized users can terminally mark captured task intent as not actionable, duplicate, already handled, or out of scope, retaining evaluation evidence and predecessor linkage for duplicates.
-- FR39: The system can classify AI action requests through an independently versioned categorical `ActionRiskClassifier` that shares no score or runtime artifact with association or task-intent detection.
+- FR39: The independently versioned categorical `ActionRiskClassifier` must share no score or runtime artifact with association or task-intent detection; missing, invalid, unqualified, failed, or indeterminate classification returns `classifier-indeterminate`, creates no proposal or durable idempotency state, and cannot be overridden by approval.
 - FR40: The system can allow only product-declared read-only/no-external-effect subtypes when tenant policy and Project authorization permit them.
-- FR41: The system must require approval for Project mutation, file exposure, external communication, task creation/assignment, tool invocation, and acting on behalf; tenant policy cannot downgrade these six effect classes.
-- FR42: Authorized users can approve, reject, request revision, or cancel after reviewing command/allowlist version, resources/files and redaction, recipients, sender authority, classifier inputs/version, policy snapshot, expected post-state/audit events, and their own authority.
+- FR41: A currently authenticated, authorized human with recorded presence and `actorType=human`, distinct from every originating AI/tool/service principal, must approve AI-mediated Project mutation, file exposure, external communication, task creation/assignment, tool invocation, or action on behalf; policy cannot approve, co-sign, or downgrade these six effect classes.
+- FR42: Authorized humans can approve, reject, request revision, or cancel only after reviewing the frozen command/allowlist version, files/redaction, recipients, sender authority, classifier inputs/version, policy snapshot, expected post-state/audit events, approval lifetime, and their current independent authority; unavailable approval is disabled with a stable reason.
 - FR43: The system can execute approved AI actions only through allowlisted governed commands.
 - FR44: Authorized users can inspect AI action proposals, approvals, denials, executions, failures, and outcomes.
 - FR45: Authorized users can preview outbound communication, file access, command execution, and AI-generated changes before approval or execution.
@@ -87,9 +92,9 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - FR48a: Every inbound event records provider-supplied M365/Exchange DMARC, DKIM, and SPF verdicts.
 - FR48b: The mailbox adapter parses required authenticity/sender headers and records discrepancies as intake metadata and review reason codes without broadening trust.
 - FR48c: Delegated-send evidence records the delegate as sender authority and the principal as `principal_for`, applying the same identity rule outbound.
-- FR48d: Unresolved external senders carry `external_sender=true`; only `strict` or `paranoid` authenticity modes are allowed, routing anomalies to review or block.
+- FR48d: Unresolved external senders carry `external_sender=true`; `strict` anomalies require authenticity review and `paranoid` anomalies are terminally blocked. Accept/reject and successor reprocessing require a current `mailbox-admin` initiator, an independent current `policy-admin` approver, fresh changed evidence where applicable, expected revision, and stable operation identity.
 - FR49: The system must require authorized human approval before outbound Project communication leaves the Project boundary.
-- FR50: The system can preserve proposed and approved content, recipients, sender authority, Project context, requester, approver, and decision outcome in approval records.
+- FR50: Approval records must preserve proposed and approved content/resource digests, recipients, the complete sender-authority evidence tuple, Project context, requester, human approver and independence evidence, approval/expiry times, policy/classifier versions, decision, and expiry or material-drift reason.
 - FR51: Tenant administrators can configure mailbox integration settings and monitored mailbox patterns.
 - FR52: Tenant administrators can enable product-declared low-risk read-only subtypes and configure approval routing but cannot downgrade FR41 effects or extend the AI allowlist.
 - FR53: Tenant administrators can review mailbox permission status and degraded mailbox processing states.
@@ -98,7 +103,7 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - FR55a: Every tenant-material derived store must enforce isolation by construction and pass native-store/API negative tests in its first increment; no multi-tenant or machine-surface use is allowed before proof, and M2 adds vector/cache proofs plus recurring probes.
 - FR56: Authorized users can query audit records by tenant, actor, command, resource, decision, reason, correlation, and time context.
 - FR57: The system can hide unauthorized project names, candidate evidence, file metadata, audit details, CLI output, MCP payloads, and error details.
-- FR58: Authorized administrators or reviewers can access operational support for tenant data retention, export, and deletion workflows.
+- FR58: Through restricted pre-pilot O1 operations, a validated-request `compliance-admin` and an independent current TenantOwner with `compliance-admin` grant can initiate, review, and track export, erasure, legal-hold, and retention workflows with owner-by-owner completion, hold precedence, redaction, appeal/retry guidance, and 24-hour recipient-bound results; ChatBot orchestrates but never directly mutates owner data, and A6 must prove the path before pilot persistence.
 - FR59: The system can propagate correlation context across mailbox intake, association, file handling, approval, AI mediation, command execution, audit, UI, CLI, and MCP.
 - FR60: The system can preserve source evidence used for association, authorization, approval, rejection, refusal, correction, retry, and investigation with retention and redaction boundaries.
 - FR61: The system can maintain immutable versioned policy snapshots used for association, authorization, approval, AI classification, and command execution decisions.
@@ -121,7 +126,7 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - FR75c: Admins without Project authority may pause/resume mailboxes, clients, or opaque queue partitions and request content-free investigation, but cannot mutate individual Project workflow items.
 - FR75d: A `policy-admin` can initiate only schema-authorized policy knobs; every security-sensitive knob requires an independent authorized admin, separation of duty, justification, and canonical audit.
 - FR75e: A `mailbox-admin` can configure patterns, routing, and provider credentials; authenticity changes need independent policy approval, and the role grants neither mailbox-content read nor association-decision authority.
-- FR75f: A `compliance-admin` can read redacted tenant audit, trigger investigations, and initiate A6/NFR49a-bounded retention changes with independent approval, but cannot operate workflow items.
+- FR75f: A `compliance-admin` can read redacted tenant audit, trigger investigations, and operate only the A6/NFR49a-bounded export, erasure, legal-hold, and retention workflow family with independent current TenantOwner approval and source-owner guards; it cannot operate association, conversation, Project, attachment, task-intent, AI-action, approval, outbound, or other collaboration items.
 - FR75g: Every admin operation, including qualifying read-only dashboard access, is audited with identity, scope, affected items, and timestamp; no admin role bypasses fail-closed or audit invariants.
 - FR76: Review actions visibly resolve to `enabled`, `disabled-with-reason`, or `not-applicable-hidden`, using finite safe reason codes and next guidance naming a responsible role or available action.
 - FR77: Every refusal/blocked/degraded/failed/denied state uses a versioned safe message code, ≤80-character headline, existence-neutral reason, and safe retry/escalate/dismiss/request-access action.
@@ -129,9 +134,9 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - FR79: The system can show stale, waiting, blocked, and escalation-needed states for review queues and long-running operations.
 - FR80: UI, CLI, and MCP users can retrieve long-running status with operation identity, state, retry count, partial outputs, safe next actions, terminal reason, and correlation.
 - FR81: Authorized UI users can perform the core governed email-to-project workflow operations.
-- FR81a: Every mutation from every origin passes through one command spine that authenticates, tenant-binds, authorizes, classifies risk, validates approval/identity/revision, constructs the canonical envelope, and atomically commits event, idempotency, policy/approval references, and audit—or commits nothing.
+- FR81a: Every mutation from every origin passes through one command spine with universal authentication, tenant binding, authorization, stable operation identity, expected revision or accepted owner guard, and canonical-envelope construction; the gateway selects a closed effect-specific admission profile, adapters cannot select or duplicate stages, and event, idempotency, policy/approval references, and canonical audit commit atomically or not at all.
 - FR82: Authorized CLI users can perform the singular M1 parity set for intake/candidates/association, attachments, task intent, AI approval/execution, retry, status, and audit.
-- FR83: Authorized MCP clients can access the same M1 parity set subject to exposure policy and actor scope; MCP exposure does not extend the AI allowlist.
+- FR83: A current human-delegated MCP client may access the delegating human’s authorized M1 parity set only with current presence and `actorType=human` for human decisions; an AI/tool MCP client is restricted to its closed query/proposal/eligible-low-risk set and is structurally denied association, approval/revision, execution, outbound, policy, permission, and admin mutations. MCP exposure never extends the AI allowlist.
 - FR84: UI, CLI, and MCP must return equivalent authorization outcomes and state transitions as a verification consequence of FR81a.
 - FR85: The system can immutably identify UI/API, CLI, MCP, worker, mailbox-event, or AI origin from the adapter boundary through audit.
 - FR86: Contract tests must prove equivalent inputs from every surface produce the same canonically normalized Command record; any divergence is an FR81a invariant violation.
@@ -140,7 +145,7 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - FR89: The system can reject invalid transitions and record the transition, actor, reason, and correlation context.
 - FR90: The system can expose lifetime-stable operation IDs, one decision slot per human-decision subject, expected revisions, and stable resource identifiers across workflows.
 - FR91: The system can separate immutable source records from derived Project projections and rebuild projections from sources when needed.
-- FR91a: Correction must invalidate/rebuild every affected derived store, remain visibly `correcting` until all acknowledgements, block affected AI context, surface `correction-delayed` on SLO breach, and audit predecessor, correction, and store outcomes.
+- FR91a: Correction freezes a complete versioned impact manifest spanning every affected ChatBot store, Conversations/Folders record, approved or executed action, appended message, converted intent, sent mail, external/tool effect, and file disclosure; it follows `Associated -> Correcting -> CorrectionDelayed | Corrected`, blocks affected source/destination AI context, and reaches `Corrected` only after every owner acknowledgement or explicit irreversible-effect disposition is recorded with predecessor and outcomes.
 - FR92: Authorized product or QA users can maintain consented, redacted, or synthetic evaluation datasets with expected outcomes, redaction expectations, and regression history.
 - FR93: The system can provide tenant-scoped fixtures/sandbox data for mailbox, association, authorization, attachment, approval, AI, command, and audit validation.
 - FR94: The system can expose measurable ingestion, association, approval, command, retry-exhaustion, duplicate-suppression, and audit-lag outcomes through increment-appropriate operational surfaces.
@@ -157,8 +162,8 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - NFR5: M365, service-client, CLI, MCP, and AI-tool credentials must be least-privilege and revocable without broader fallback access.
 - NFR6: Authorization/policy/identity caches must cap ordinary staleness at five minutes and explicit-revocation staleness at 60 seconds, verified by automated revocation tests.
 - NFR7: Security-sensitive operations must fail closed when identity, tenant, authorization, audit readiness, policy, or command validation is unavailable.
-- NFR8: AI actors must operate only through explicitly authorized Project scope, files, tools, commands, and policy authority.
-- NFR9: Every AI context package must be tenant/Project scoped, policy-redacted and retention-governed, prevent unauthorized training/telemetry/reuse, and include tenant, Project, evidence, policy, redaction, retention, and provider-reuse facts before invocation.
+- NFR8: AI actors operate only within explicit Project, file, tool, command, and policy authority; external/retrieved content and model/tool output remain untrusted data and cannot create authority, alter system/tool instructions, approve proposals, or expand command scope.
+- NFR9: Every AI context package must be tenant/Project scoped, policy-redacted and retention-governed, blocked from unauthorized training/telemetry/reuse, preserve immutable origin/trust and instruction/data-boundary labels for every fragment, and contain tenant, Project, evidence, policy, redaction, retention, and provider-reuse facts before model/tool invocation; A5 adversarial fixtures must prove these boundaries.
 - NFR9a: Every derived store must be tenant-partitioned below the application and pass native-store/API negative isolation tests in its first increment; unproven stores block their increment and multi-tenant use, with M2 vector/cache proofs and nightly probes.
 - NFR10: Logs, metrics, traces, support bundles, and test artifacts must pass secret and sensitive-data redaction checks before export or external sharing.
 - NFR11: Cross-tenant isolation tests have zero tolerance for leakage through candidates, evidence, files, summaries, prompts, machine surfaces, telemetry, or audit.
@@ -168,9 +173,9 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - NFR14: Duplicate mailbox delivery must not duplicate Project messages, attachments, task intents, approvals, commands, notifications, outbound sends, or audit decisions.
 - NFR15: Invalid transitions must reject deterministically before mutation and be audited; unavailable audit storage makes every mutation fail closed.
 - NFR15a: Every durable write atomically commits domain event, idempotency state, policy/approval references, and canonical audit envelope or commits nothing; all enumerated mutation paths return typed `AuditUnavailable` without authoritative state when the boundary is unavailable.
-- NFR16: Risky AI actions, sends, command execution, and file-context packaging must not execute without valid approval, policy, authority, input validation, and audit readiness.
+- NFR16: Risky AI actions, external sends, command execution, and Project-file context packaging must not execute unless approval lifetime and digests, policy, requester/independent human approver authority, sender evidence, input validation, target revision, and audit readiness are current; expiry or material drift requires a new linked proposal.
 - NFR17: Partial failures must leave visible recoverable pending, retryable, failed, quarantined, or review states.
-- NFR17a: Correction propagation must meet p95 ≤10 minutes in M0/M1 and ≤60 minutes in M2; breach produces `correction-delayed`, names owner/next action, keeps AI blocked, and triggers P2.
+- NFR17a: Correction propagation must meet p95 ≤10 minutes in M0/M1 and ≤60 minutes in M2; a breach produces `CorrectionDelayed`, names the responsible owner and next safe action, prevents `Corrected`, keeps affected AI context blocked, and triggers a P2 incident.
 - NFR18: Every workflow must use approved Retry Profile v1 or a stricter profile, with tested retryability, ceilings, jittered backoff, exhaustion/dead-letter behavior, manual recovery, immutable links, and no repeated committed effect.
 - NFR19: Background and async processing must safely support at-least-once delivery using idempotency, concurrency control, lease expiry, and poison-message handling.
 - NFR20: Queue processing must prevent starvation across tenants, mailboxes, Projects, and workflow types while honoring priority, limits, and breakers.
@@ -196,7 +201,7 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - NFR40: Every user-visible degraded/blocked/failed/waiting state must use the versioned safe message catalog; raw error leakage count must remain zero and any violation blocks release.
 - NFR41: Degradation must be isolated to the narrowest identifiable scope, and monitored incidents must name affected scope/dependency within five minutes.
 - NFR42: Each degraded surface must display state, affected scope, responsible owner, and next safe action within cache-staleness bounds, enforced by synthetic checks.
-- NFR42a: The M2 tenant view and operating baseline must publish every declared SLO with target, window, error budget, alert threshold, and A11-calibrated evidence.
+- NFR42a: After A11-M2 passes, the M2 tenant view must publish every declared SLO with numeric target, unit, window, error budget, alert threshold, live-signal provenance, accountable route, calibration, and exact-candidate burn evidence; unsupported rows block the associated M2 claim.
 - NFR43: Non-invasive tenant-safe alerts/synthetics must cover declared dependencies and thresholds, including subscription expiry ≤7 days, retry exhaustion, audit lag >5 minutes, approval age >2 business days, and authorization spikes.
 - NFR44: Weekly sampling of 100 workflow items must prove complete runbook diagnostics: correlation, tenant, mailbox, item, state, last transition/actor/time, retry count, catalog reason, and next action.
 - NFR45: Redacted support bundles must preserve correlation/state/reason while excluding restricted tenant, Project, participant, file, message, and audit evidence.
@@ -225,7 +230,7 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - NFR65: Increment/release gates must prove isolation, authorization/redaction, idempotency, executable transitions, non-downgradable approval, authenticity, duplicate suppression, atomic audit, accessibility, evidence ownership, and disable conditions; only M2 may claim production/release-candidate readiness.
 - NFR65a: Recovery completion accepts one exact-candidate current-run producer under approved policy and fails on any planning, execution, restoration, cleanup, projection, attestation, independent-validation, or publication gap; inactive/pre-activation and retained operational evidence cannot claim completion authority.
 - NFR66: Performance validation must prove mailbox backlog, queue usability, retry, audit lag, and throttled Graph behavior against the approved baseline.
-- NFR67: Security validation must include negative authorization for UI/API, CLI, MCP, workers, mailbox events, service clients, and AI actors.
+- NFR67: Security validation must include negative authorization for UI/API, CLI, human-delegated MCP, AI/tool MCP, workers, mailbox events, service clients, and AI actors, including proof that AI/tool/service credentials cannot approve, reject, request revision, or self-approve an AI-originated proposal.
 - NFR68: Evaluation data/fixtures must be consented, redacted, or synthetic and versioned/reproducible with redaction checks, expected outcomes, and regression history across association, authorization, duplicate, retry, approval, refusal, and audit.
 - NFR69: Replay/simulation must exclude production resources by construction, replace every effectful adapter, deny egress, label and tenant-scope artifacts, and prove production-store/external-ledger invariance.
 - NFR70: Every externally visible operation must define transition, audit event, user response, redaction, and retry/idempotency outcome.
@@ -260,7 +265,7 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - ARCH-26 — SignalR is advisory metadata-only projection/progress notification. The tenant-grouped ChatBot hub emits bounded `ProjectionChangedDetail`-compatible nudges and the UI always re-queries the typed authoritative read model; payloads never carry trusted content/state.
 - ARCH-27 — Runtime safety controls and limits use one durable versioned admission view consumed by gateway and workers; unavailable/stale/unknown controls fail closed. Fair scheduling partitions by tenant then work source, uses bounded renewable leases, and prevents poison/dead-letter work from starving other partitions.
 - ARCH-28 — One operations-owned control worker enforces controls, notifications, escalation, and tenant-safe health/freshness/retry/queue/audit status; missing live evidence is reported `unmeasurable` or `unsupported`, never inferred.
-- ARCH-29 — OpenTelemetry emission is mandatory. M2 SLO publication remains unsupported until every metric has an exact-candidate numeric target, window, budget, live provenance, accountable route, calibration, and passing burn test.
+- ARCH-29 — OpenTelemetry emission is mandatory. A11-M1 must freeze and evidence the mandatory M1 metric contract before M1 exit; A11-M2 SLO publication remains unsupported until every exact-candidate metric has a numeric target/unit, window, budget, live provenance, accountable route, calibration, and passing burn test.
 - ARCH-30 — `TaskIntentDetector`, `AssociationScorer`, and `ActionRiskClassifier` are independent versioned kernels. M0 association/risk behavior is deterministic; optional LLM explanations cannot change classification, and non-AI workflows survive provider outage.
 - ARCH-31 — AI catalog membership, per-surface exposure, MCP tags, product allowlist, and owner executable targets are separate deny-by-default artifacts. The two product allowlist IDs remain exact, and `Project.AppendConversationMessage` stays A13-blocked until Conversations accepts an executable mapping.
 - ARCH-32 — NetArchTest must mechanically prevent dependency/stage/host-wiring regrowth; differential conformance must compare normalized commands, event sequences, and state-store end state across production UI/API, CLI, and MCP adapters, including rejection and retry.
@@ -270,7 +275,7 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - ARCH-36 — DataProtection admission/cursor keys use application name `Hexalith.ChatBot`; production config must supply `ChatBot:DataProtection:KeyRingPath` or explicitly set `ChatBot:DataProtection:SingleReplicaOnly=true`.
 - ARCH-37 — CI/release must build Release with warnings as errors, central package authority, enabled audit, individually executed test projects, non-vacuous topology/browser gates, exact source/evidence provenance, story-evidence integrity, and checkout-root-only non-recursive submodule initialization.
 - ARCH-38 — Release inventory includes Contracts, Client, and Testing packages plus `hexalith-chatbot-server` and `hexalith-chatbot-ui` containers; semantic-release and Conventional Commits govern releases.
-- ARCH-39 — M0→M1→M2 dependency order is mandatory. A5/A6/A13 block M0/M1; M2 revalidates them and additionally requires A10/A11. Missing, stale, mismatched, partial, or historical evidence cannot support pilot, compliance, tamper-evidence, or production claims.
+- ARCH-39 — M0→M1→M2 dependency order is mandatory. M0 requires approved-current A5/A6/A13 and exact A9a records before detector/classifier use; M1 revalidates A5/A6/A13/A9a and additionally requires A11-M1; M2 revalidates changed lower gates and additionally requires A10 and A11-M2. Missing, stale, mismatched, partial, or historical evidence authorizes no pilot, compliance, tamper-evidence, or production claim.
 - ARCH-40 — A material sibling contract/authority/identifier/topology/RBAC change triggers an architect-owned source re-check within five business days, recorded in the manifest/memlog with required downstream updates; inaccessible sources are blockers.
 - ARCH-41 — JSON uses camelCase through shared `System.Text.Json` options, time uses UTC `DateTimeOffset` with tenant-local conversion only in presentation, and list queries use opaque cursor pagination rather than offset/limit.
 
@@ -285,7 +290,7 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - UX-DR7: Use inherited semantic color roles with visible text plus icon/border for every state. Functional text must meet 4.5:1, non-text UI/focus indicators 3:1, and all meaning must survive light, dark, and forced-colors modes.
 - UX-DR8: Use inherited Fluent typography: `FcPageHeader` for page titles, compact section hierarchy, metadata for time/provenance/authority/policy/state/identity, and monospace only for stable IDs/codes.
 - UX-DR9: Elevation and containment must separate active work, complementary evidence, one dialog/sheet layer, and transient feedback without turning generated output into an authority peer or detaching blocked state from its workflow.
-- UX-DR10: Desktop supports persistent navigation and complementary panels; tablet stacks them; phone retains reading, governed request, status, safe confirm/reject/defer/approve/escalate actions and provides state-preserving handoff for dense administration/investigation.
+- UX-DR10: Desktop supports persistent context and complementary panels, tablet stacks them, and every in-scope task remains complete and operable at 320 CSS pixels and 400% zoom without page-level horizontal scrolling or loss of content/actions; any larger-screen handoff is optional continuity only.
 - UX-DR11: Every surface must receive live-route acceptance for success, loading/empty, validation, unauthorized/redacted, degraded, retryable, terminal, keyboard/focus, responsive, light/dark/forced-colors, reduced-motion, English/French, and governed-command behavior.
 - UX-DR12: WCAG 2.2 AA acceptance is per increment and combines automated, keyboard-only, and screen-reader checks; controls expose role, name, state, operation, and reachable unavailable reason, never tooltip-only explanation.
 - UX-DR13: Focus follows visible order, is never obscured by persistent chrome at normal/200%/400% zoom, uses scroll margins, lands on a surface heading/first action, and returns correctly from dialogs/sheets without silently discarding work.
@@ -304,12 +309,12 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - UX-DR26: Implement `Task intent review` with the full source, ≤280-character summary, action kind, evidence offsets/excerpts, detector version, confidence, time/state, and governed convert/dismiss dispositions.
 - UX-DR27: Implement `Attachment row` as a labelled data-grid row for capture/storage, scan/quarantine, folder, duplicate/retry, retention, and AI-context eligibility; MVP exposes no general upload affordance.
 - UX-DR28: Implement `Association candidate group` as one named Fluent radiogroup/Tab stop; arrows change selection and announce position/count without committing, each option describes safe evidence/confidence, and unsafe candidates never render.
-- UX-DR29: Implement `Association decision bar` as a persistent unit repeating the selected safe Project in its accessible description with confirm, reject-all, defer, and escalate; invalid confirm focuses the error summary.
-- UX-DR30: Implement `Action classification` with prominent user disposition `allowed-read-only|approval-required|denied|unsupported` and subordinate labelled internal classifier output/version/input tuple; do not conflate disposition and classifier result.
+- UX-DR29: Implement `Association decision bar` as a persistent unit that repeats the selected safe Project and exposes Confirm, Reject all, or Defer only from `NeedsReview`; `Deferred` exposes Resume before any decision, escalation remains guidance/routing rather than a lifecycle transition, and invalid activation focuses the error summary.
+- UX-DR30: Implement `Action classification` so determinate `low-risk` and `approval-required`, pre-classification `denied`/`unsupported`, and product outcome `classifier-indeterminate` are distinct; the component shows classifier version/input only when safe and never disguises an indeterminate result as reviewable approval.
 - UX-DR31: Implement `AI proposal panel` as visibly pending, programmatically linking source request, Project/context package, classification, and approval details; it cannot resemble completed work.
 - UX-DR32: Implement `Approval authority and effects` with requester/origin, Project, command/allowlist version, files/redaction/freshness, recipients, sender/delegation, classifier tuple, policy snapshot, reversibility, post-state, audit events, and proposal/operation identity.
 - UX-DR33: Implement `Approval controls` for approve/reject/revise/cancel. Unavailable approval remains focusable with an associated safe explanation, and submission revalidates authority, policy, evidence, allowlist, and effects.
-- UX-DR34: Implement `Correction progress` with predecessor/successor, `Correcting|Correction-delayed`, acknowledged/remaining stores, estimate, owner, next action, P2 escalation, and visible AI-context block until completion.
+- UX-DR34: Implement `Correction progress` with predecessor/successor, exact `Correcting|CorrectionDelayed|Corrected` states, every frozen ChatBot and owner-context manifest item, acknowledgements or irreversible dispositions, owner/next action/P2 escalation, and a visible source/destination AI-context block until all items complete.
 - UX-DR35: Implement `Bounded admin scope` with badges/data grids distinguishing aggregate see-only, queue-operate, mailbox, policy, compliance, and per-Project powers; aggregate visibility never grants detail or mutation.
 - UX-DR36: Implement `Two-person approval` as ordered proposer/distinct-approver steps showing changed values, scope, justification, policy version, expiry/conflict, and audit link; self-approval is visibly unavailable with a reason.
 - UX-DR37: Implement `Shared operation status` with operation/idempotency identity, canonical state/reason, origin, attempt count/ceiling, retry eligibility, partial output, prior outcome, correlation, and pending duplicate-submit prevention.
@@ -325,15 +330,15 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - UX-DR47: Implement `Error summary` before its form/review unit, focus it on invalid submission, link it to field/decision errors, and preserve valid input, selection, draft, and filters.
 - UX-DR48: Implement `Review dialog/sheet` as one modal layer using inherited containment, focus trap/return, and non-destructive Escape; unsaved edits require confirmation.
 - UX-DR49: Implement `Queue filter bar` as a compact Fluent toolbar with server-side filters, pagination ≤100, active-filter summary/count, stable focus/selection on refresh, and labelled small-screen reflow.
-- UX-DR50: Enforce the governed-action disposition table: eligible safe subtype → `allowed-read-only`; any boundary effect or otherwise-safe indeterminate classification → reviewable `approval-required`; authorization/evidence/audit/allowlist failure → existence-neutral `denied`; unsupported product operation → `unsupported` with no effect.
+- UX-DR50: Enforce the governed-action outcome table: eligible qualified no-effect subtype follows the governed low-risk path; a determinate declared boundary effect becomes `approval-required`; missing/invalid/unqualified/failed or unknown classifier input returns `classifier-indeterminate` with no proposal, approval action, durable idempotency state, or effect and requires a new linked request after remediation; admission failure is safely `denied`, and unsupported work performs no effect.
 - UX-DR51: Immediately before approved execution/send, revalidate actor/reviewer authority, tenant/Project, files/redaction/freshness, recipients/sender/delegation, command/allowlist, policy, effects, proposal revision, idempotency, and audit; drift blocks and requires a fresh proposal/decision.
 - UX-DR52: Approval queues prioritize risk × affected authority × age, group only items with identical frozen security fields and separate decisions/audit, exclude irreversible/external/file/tool/on-behalf one-click batching, alert at >25 open items, and digest excess notifications without hiding work.
 - UX-DR53: UI/CLI/MCP parity presentation may differ, but every parity operation must display/return the same safe ordered candidates, normalized decision, authorization/redaction, lifecycle state, operation identity, retry/conflict semantics, immutable origin, and audit result.
 - UX-DR54: Progressive AI output is document content with `aria-live=off`; a separate deduplicated status region announces only generating/complete/stopped/failure. Stop/Cancel never steals focus, partial output is uncommitted, and retry links a new immutable attempt.
 - UX-DR55: New conversation/audit updates must not force scroll while a user reads history; provide a keyboard-reachable “new updates” action. Single-character shortcuts remain disabled/remappable and never intercept text entry.
 - UX-DR56: S1 Project Workspace/Conversation must cover cold/no-project/empty/active states; classification, intent, generation, attachments, proposal/operation, correction, AI outage, degradation, and unauthorized/redacted states on live routes.
-- UX-DR57: S2 Association Review must cover loading/no-safe-candidate/below-threshold/conflict/scorer-error review, selection, stale/expired evidence, validation, confirm/reject/defer/escalate, retry/quarantine/terminal, and suppressed-candidate safety.
-- UX-DR58: S3 AI Action Review and S6 Outbound Approval must cover complete authority/effect/freshness context, insufficient authority, revalidation drift, every human decision, execution progress/outcome, denied/unsupported states, and exact-once send.
+- UX-DR57: S2 Association Review must cover loading, no-safe-candidate, below-threshold, conflict/scorer error, selection, stale/expired evidence, controlled refresh, Confirm/Reject/Defer from `NeedsReview`, Resume from `Deferred`, safe escalation guidance, terminal/reprocess behavior, and suppressed-candidate omission parity.
+- UX-DR58: S3 AI Action Review and S6 Outbound Approval must cover complete authority/effect/freshness context, insufficient authority, `classifier-indeterminate` without approval, revalidation drift, every permitted human decision, execution progress/outcome, denied/unsupported states, exact-once send, and unknown-send reconciliation without blind retry.
 - UX-DR59: S4 Correction Surface must cover eligibility/rationale, stale revision, progress/acknowledgements, delayed/failed invalidation, permission denial, retry/escalation, completion, and continued AI block until safe.
 - UX-DR60: S5 Tenant Administration must cover bounded scopes, loading/empty, policy/mailbox validation, proposal and distinct approval lifecycle, conflict/expiry/rejection/cancellation, active version, degraded permissions, rollback-safe non-destructive change, and terminal failure.
 - UX-DR61: S7 Cross-surface Attribution must show current/stale parity version, normalized operation, disposition, pending/prior/conflict status, immutable origin, safe redaction, adapter-parity failure, and CLI/MCP recovery guidance.
@@ -359,13 +364,13 @@ FR4: Epic 2 — Route ambiguous association to human review.
 
 FR5: Epic 2 — Review safe candidates with evidence, confidence, reasons, and consequences.
 
-FR6: Epic 2 — Confirm, reject, defer, or mark association for review.
+FR6: Epic 2 — From `NeedsReview`, support Confirm, Reject all, or Defer; require Resume from `Deferred`; keep worker-only `MarkEmailAssociationNeedsReview` unavailable to users.
 
 FR7: Epic 2 — Correct a prior Project association.
 
 FR8: Epic 2 — Record association, correction, rejection, defer, retry, and skip decisions.
 
-FR9: Epic 2 — Configure and govern association rules and thresholds needed by the complete association outcome; Epic 7 supplies the bounded policy-administration surface.
+FR9: Epic 2 — Apply governed association rules and thresholds needed by the complete association outcome; Epic 7 supplies their bounded administration.
 
 FR10: Epic 2 — Retain original email context in every unresolved or terminal association outcome.
 
@@ -381,17 +386,17 @@ FR15: Epic 2 — Accept external-party email context without an MVP portal.
 
 FR16: Epic 2 — Authorize before exposing Project workflow resources.
 
-FR17: Epic 2 — Block unresolved/unauthorized actors from Project effects.
+FR17: Epic 2 — Block unresolved or unauthorized actors from Project effects.
 
 FR18: Epic 2 — Apply governed mailbox participation rules; Epic 7 supplies their bounded administration.
 
 FR19: Epic 2 — Apply scoped service-client access needed by intake; Epic 7 supplies the full grant administration.
 
-FR20: Epic 2 — Record consent/lawful-basis metadata before applicable intake and processing.
+FR20: Epic 2 — Record consent or lawful-basis metadata before applicable intake and processing.
 
 FR21: Epic 3 — View email-derived Project conversation messages.
 
-FR22: Epic 3 — Render associated email, participants, attachments, decisions, approvals, failures, and AI outcomes.
+FR22: Epic 3 — Render associated email, participants, attachments, decisions, approvals, failures, and AI outcomes as seven independently testable concerns.
 
 FR23: Epic 3 — Inspect Project-association evidence and correction provenance.
 
@@ -401,7 +406,7 @@ FR25: Epic 3 — Keep conversation context isolated by tenant and Project.
 
 FR26: Epic 3 — Distinguish informational and actionable intent without implying action risk.
 
-FR27: Epic 3 — Distinguish source evidence from AI summaries.
+FR27: Epic 3 — Distinguish source evidence from AI summaries, preserve immutable origin/trust labels, and contain untrusted instructions before model or tool invocation.
 
 FR28: Epic 3 — Preserve visible human-review history.
 
@@ -421,13 +426,13 @@ FR29: Epic 3 — Capture mailbox attachments.
 
 FR30: Epic 3 — Store attachments in governed Project folders.
 
-FR31: Epic 3 — Inspect attachment capture/storage status.
+FR31: Epic 3 — Inspect attachment capture and storage status.
 
-FR32: Epic 3 — Prevent unauthorized attachment metadata/content access.
+FR32: Epic 3 — Prevent unauthorized attachment metadata or content access.
 
 FR33: Epic 3 — Build explicitly authorized, auditable AI context packages.
 
-FR34: Epic 3 — Represent the full attachment state family.
+FR34: Epic 3 — Represent attachment workflow state as exactly `PendingScan`, `Stored`, `Unsafe`, or `Failed`, with capture/retry modeled as audited attempt transitions.
 
 FR35: Epic 4 — Detect versioned task/action intent with complete source evidence.
 
@@ -435,19 +440,19 @@ FR36: Epic 4 — Review task intent before governed action.
 
 FR37: Epic 4 — Convert intent into a linked governed proposal.
 
-FR38: Epic 4 — Record terminal non-actionable/duplicate/handled/out-of-scope dispositions.
+FR38: Epic 4 — Record terminal non-actionable, duplicate, already-handled, or out-of-scope dispositions.
 
-FR39: Epic 4 — Classify requests with an independent versioned risk classifier.
+FR39: Epic 4 — Use an independent versioned risk classifier and return `classifier-indeterminate` without proposal or durable idempotency state whenever classification is unresolved.
 
-FR40: Epic 4 — Allow only declared authorized low-risk assistance.
+FR40: Epic 4 — Allow only declared, authorized read-only/no-external-effect assistance.
 
-FR41: Epic 4 — Enforce non-downgradable approval for all six boundary effects.
+FR41: Epic 4 — Require a currently present, independently authorized human—never policy, AI, tool, or service principals—to approve all six boundary-effect classes.
 
-FR42: Epic 4 — Review complete proposal authority/effect context and decide safely.
+FR42: Epic 4 — Let authorized humans decide only after reviewing frozen command, authority, resource, classifier, policy, expected-effect, audit, lifetime, and independence evidence.
 
 FR43: Epic 4 — Execute only current allowlisted commands; Epic 10 governs later allowlist versions.
 
-FR44: Epic 4 — Inspect every AI proposal/decision/execution outcome.
+FR44: Epic 4 — Inspect every AI proposal, decision, execution, failure, and outcome.
 
 FR45: Epic 4 — Preview outbound, file, command, and AI changes before effect.
 
@@ -457,27 +462,27 @@ FR47: Epic 6 — Create an authorized outbound Project-email draft.
 
 FR48: Epic 6 — Enforce the five sender-authority classes.
 
-FR48a: Epic 6 — Record provider-supplied DMARC/DKIM/SPF verdicts.
+FR48a: Epic 6 — Record provider-supplied DMARC, DKIM, and SPF verdicts.
 
 FR48b: Epic 6 — Inspect authenticity headers and record discrepancies safely.
 
 FR48c: Epic 6 — Preserve delegate and principal authority evidence.
 
-FR48d: Epic 6 — Apply strict/paranoid external-sender posture.
+FR48d: Epic 6 — Require review for `strict` anomalies, terminally block `paranoid` anomalies, and separate current mailbox-admin initiation from independent policy-admin approval for acceptance or successor reprocessing.
 
 FR49: Epic 6 — Require human approval before outbound boundary crossing.
 
-FR50: Epic 6 — Preserve frozen proposal/approval/send evidence.
+FR50: Epic 6 — Preserve frozen content/resource digests, recipients, complete sender authority, Project/requester/independent approver, policy/classifier, decision, timing, expiry, and drift evidence.
 
 FR51: Epic 7 — Configure mailbox integration and monitored patterns.
 
-FR52: Epic 7 — Govern low-risk subtype enablement and approval routing without allowlist/approval weakening; Epic 10 governs the command catalog itself.
+FR52: Epic 7 — Govern low-risk subtype enablement and approval routing without weakening allowlists or approval; Epic 10 governs the command catalog itself.
 
 FR53: Epic 7 — Review mailbox permission and degradation status.
 
 FR54: Epic 12 — Investigate association, approval, command, and risky-AI history.
 
-FR55: Epic 1 — Atomically audit every durable mutation and separately audit sensitive attempts; Epic 12 adds investigation/retention hardening.
+FR55: Epic 1 — Atomically audit every durable mutation and separately audit sensitive attempts; Epic 12 adds investigation and retention hardening.
 
 FR55a: Epic 1 — Enforce first-use store isolation as a cross-product foundation.
 
@@ -485,11 +490,11 @@ FR56: Epic 12 — Query authorized audit by all declared axes.
 
 FR57: Epic 1 — Apply cross-surface, existence-neutral redaction.
 
-FR58: Epic 12 — Operate tenant retention, export, and deletion workflows.
+FR58: Epic 12 — Operate independently approved O1 export, erasure, legal-hold, and retention workflows through source-owner guards, owner acknowledgements, hold precedence, redaction, retries/appeals, and recipient-bound results without direct owner-data mutation.
 
 FR59: Epic 1 — Propagate correlation through every boundary.
 
-FR60: Epic 2 — Preserve association/correction source evidence with retention and redaction; Epic 12 consumes it for investigation.
+FR60: Epic 2 — Preserve association and correction source evidence with retention and redaction; Epic 12 consumes it for investigation.
 
 FR61: Epic 1 — Preserve immutable policy snapshots with governed decisions; Epics 7 and 10 administer their versions.
 
@@ -499,9 +504,9 @@ FR63: Epic 2 — Supersede reversible association decisions while preserving his
 
 FR64: Epic 2 — Suppress duplicate mailbox delivery and Project artifacts.
 
-FR65: Epic 2 — Recover intake/association/correction through exact family retry/successor rules.
+FR65: Epic 2 — Recover intake, association, and correction through exact family retry/successor rules.
 
-FR66: Epic 2 — Surface terminal and non-terminal intake/association failure states.
+FR66: Epic 2 — Surface terminal and non-terminal intake and association failure states.
 
 FR67: Epic 11 — Expose complete health, queue, failure, and audit-projection status; earlier epics expose the minimum status required to operate their own workflows.
 
@@ -517,7 +522,7 @@ FR72: Epic 8 — Notify authorized users about actionable workflow states.
 
 FR73: Epic 8 — Configure bounded notification routing and escalation.
 
-FR74: Epic 9 — Enforce disable/quarantine/rate-limit for the four closed subject classes.
+FR74: Epic 9 — Enforce disable, quarantine, and rate-limit controls for the four closed subject classes.
 
 FR75: Epic 9 — Enforce per-tenant rate limits, quotas, and circuit breakers.
 
@@ -531,11 +536,11 @@ FR75d: Epic 7 — Enforce policy-admin row scope and two-person approval.
 
 FR75e: Epic 7 — Enforce mailbox-admin configuration-only authority.
 
-FR75f: Epic 7 — Enforce redacted compliance scope and independent retention approval.
+FR75f: Epic 7 — Restrict compliance admins to redacted tenant audit/investigation and independently approved A6/NFR49a-b export, erasure, legal-hold, and retention operations with source-owner guards and no collaboration-item authority.
 
 FR75g: Epic 7 — Audit every administrative action without bypass.
 
-FR76: Epic 8 — Present safe enabled/disabled/hidden review actions and guidance.
+FR76: Epic 8 — Present safe enabled, disabled, or hidden review actions and guidance.
 
 FR77: Epic 1 — Establish the versioned existence-neutral message catalog used by every epic.
 
@@ -543,19 +548,19 @@ FR78: Epic 8 — Filter, sort, and prioritize queues safely.
 
 FR79: Epic 8 — Expose stale, waiting, blocked, and escalation states.
 
-FR80: Epic 1 — Establish retrievable long-running operation status; Epic 5 exposes it through CLI/MCP.
+FR80: Epic 1 — Establish retrievable long-running operation status; Epic 5 exposes it through CLI and MCP.
 
 FR81: Epic 1 — Deliver the first governed UI operation.
 
-FR81a: Epic 1 — Establish the one atomic shared command spine.
+FR81a: Epic 1 — Establish one atomic command spine whose closed effect-specific profiles are gateway-selected and cannot be selected or duplicated by adapters.
 
 FR82: Epic 5 — Deliver CLI parity for the singular M1 set.
 
-FR83: Epic 5 — Deliver governed MCP parity without allowlist expansion.
+FR83: Epic 5 — Distinguish human-delegated MCP with current human presence from structurally restricted AI/tool MCP, without extending the AI allowlist.
 
 FR84: Epic 5 — Prove equivalent cross-surface authorization and transitions.
 
-FR85: Epic 5 — Preserve immutable origin for every production surface/actor.
+FR85: Epic 5 — Preserve immutable origin for every production surface and actor.
 
 FR86: Epic 5 — Verify canonically normalized adapter parity through contracts.
 
@@ -565,19 +570,19 @@ FR88: Epic 10 — Validate every governed transition against its family model.
 
 FR89: Epic 10 — Reject and audit invalid transitions consistently.
 
-FR90: Epic 1 — Establish stable operation/decision/resource identities and concurrency guards.
+FR90: Epic 1 — Establish stable operation, decision, and resource identities plus concurrency guards.
 
 FR91: Epic 2 — Separate immutable sources from rebuildable association projections.
 
-FR91a: Epic 2 — Propagate correction through every affected store and production workflow.
+FR91a: Epic 2 — Freeze the complete affected-store/effect manifest, progress through `Associated -> Correcting -> CorrectionDelayed | Corrected`, block affected source/destination AI context, and complete only after every acknowledgement or irreversible-effect disposition.
 
-FR92: Epic 1 — Establish versioned consented/redacted/synthetic evaluation datasets; later qualification consumes them.
+FR92: Epic 1 — Establish versioned consented, redacted, and synthetic evaluation datasets; later qualification consumes them.
 
 FR93: Epic 1 — Establish tenant-scoped sandbox fixtures for governed workflow validation.
 
 FR94: Epic 11 — Publish measurable operational outcomes through supported observability surfaces.
 
-FR95: Epic 12 — Simulate/replay safely without production effect.
+FR95: Epic 12 — Simulate and replay safely without production effect.
 
 FR95a: Epic 12 — Prove credential, adapter, egress, audit, and production-store replay isolation.
 
@@ -585,21 +590,23 @@ FR96: Epic 2 — Reuse correction evidence only when policy allows and influence
 
 ## Epic List
 
+**Core-file overlap assessment:** Epic 1 owns the shared command, contract, audit, idempotency, redaction, and operation-status spine once. Epic 2 keeps intake, association, and correction coordination together; Epic 3 owns the shared conversation/attachment projection; Epic 10 completes governance without retrofitting incomplete lifecycles into prior epics; and Epic 13 adds governed chat plus cross-surface UI regression coverage while each earlier epic retains ownership of its first live functional surface. This minimizes repeated churn in gateway, contract, projection, and shared UI files while preserving independently valuable epics.
+
 ### Epic 1: First Safe Governed Action & Command Spine
 
 A user can complete one tenant-bound, policy-aware, fail-closed, idempotent, and atomically audited action through a runnable foundation that safely enables every later workflow.
 
 **FRs covered:** FR55, FR55a, FR57, FR59, FR61, FR68, FR77, FR80, FR81, FR81a, FR90, FR92, FR93.
 
-**Implementation notes:** Begin with the architecture-mandated canonical sibling-module scaffold and runnable local topology. Establish the OpenAPI contract spine, typed Client, shared CommandGateway, canonical audit/idempotency boundary, safe message catalog, tenant isolation, operation status, and initial qualification fixtures. Technical Enabler TE-1 remains outside the product-epic count.
+**Implementation notes:** Begin with the architecture-mandated canonical sibling-module scaffold and runnable local topology. Establish the OpenAPI contract spine, typed Client, one gateway-selected profile-specific CommandGateway spine, canonical audit/idempotency boundary, safe message catalog, tenant isolation, operation status, and initial qualification fixtures. Technical Enabler TE-1 remains outside the product-epic count.
 
 ### Epic 2: Email Intake, Association & Production Correction
 
-Contributors can ingest authorized project email, resolve participants and Project association from safe evidence, handle ambiguity and duplicates, correct mistakes, and recover correction propagation in production.
+Contributors can ingest authorized Project email, resolve participants and Project association from safe evidence, handle ambiguity and duplicates, correct mistakes, and recover correction propagation in production.
 
 **FRs covered:** FR1–FR20, FR60, FR62–FR66, FR91, FR91a, FR96.
 
-**Implementation notes:** Deliver one controlled M365/Exchange mailbox path, deterministic scoring, complete family lifecycle/retry semantics, safe candidate review, source evidence, participant resolution, projection rebuild, and hosted Dapr Workflow correction coordination without depending on later observability work.
+**Implementation notes:** Deliver one controlled M365/Exchange mailbox path, deterministic scoring, complete family lifecycle/retry semantics, safe candidate review, source evidence, participant resolution, projection rebuild, and hosted Dapr Workflow correction coordination. Freeze the full cross-owner impact manifest, use exact `CorrectionDelayed` semantics, block affected AI context, and require every owner acknowledgement or explicit irreversible-effect disposition before completion.
 
 ### Epic 3: Project Conversation Context, Files & Attachments
 
@@ -607,7 +614,7 @@ Contributors can see email-derived Project conversation context, participants, d
 
 **FRs covered:** FR21–FR28, FR29–FR34.
 
-**Implementation notes:** Build the ChatBot-owned conversation projection and attachment/Folders adapter end to end. Decompose FR22 into seven independently testable rendering outcomes while consolidating shared projection/component work to avoid repeated file churn.
+**Implementation notes:** Build the ChatBot-owned conversation projection and attachment/Folders adapter end to end. Decompose FR22 into seven independently testable rendering outcomes, use exactly `PendingScan|Stored|Unsafe|Failed` for attachment state, and preserve immutable origin/trust labels with pre-model/tool containment of untrusted instructions.
 
 ### Epic 4: Governed AI Action Mediation
 
@@ -615,7 +622,7 @@ Users can detect and review actionable intent, request AI help, safely receive a
 
 **FRs covered:** FR35–FR46.
 
-**Implementation notes:** Keep task-intent, association, and risk kernels independently versioned; enforce the six non-downgradable approval effects; package scoped context; qualify the exact allowlist target; and cover proposal invalidation after corrected association.
+**Implementation notes:** Keep task-intent, association, and risk kernels independently versioned; treat any missing, invalid, unqualified, failed, or indeterminate risk result as terminal `classifier-indeterminate` for that attempt with no proposal or durable idempotency state; enforce the six non-downgradable approval effects; package scoped context; qualify the exact allowlist target; and cover proposal invalidation after corrected association.
 
 ### Epic 5: Cross-Surface Parity — CLI & MCP
 
@@ -623,7 +630,7 @@ Developers and AI/automation clients can perform the singular governed workflow 
 
 **FRs covered:** FR82–FR86.
 
-**Implementation notes:** Production CLI and MCP adapters wrap only the generated typed Client. Differential conformance compares normalized commands, event sequences, and state-store end state; it replaces M0 shims and treats any adapter-stage bypass as an invariant violation.
+**Implementation notes:** Production CLI and MCP adapters wrap only the generated typed Client. Model current human-delegated MCP and AI/tool MCP as distinct identities and authority sets. Differential conformance compares normalized commands, event sequences, and state-store end state; it replaces M0 shims and treats any adapter-stage bypass as an invariant violation.
 
 ### Epic 6: Outbound Communication & Inbound Authenticity
 
@@ -631,7 +638,7 @@ Authorized users can understand inbound authenticity and safely draft and send e
 
 **FRs covered:** FR47, FR48, FR48a–FR48d, FR49, FR50.
 
-**Implementation notes:** M0 delivers the provider verdict/header/delegation/external-sender floor; M1 adds all five outbound authority classes, frozen content, execution-time revalidation, mandatory approval, exact-once send, and typed fail-closed mismatch behavior.
+**Implementation notes:** M0 delivers the provider verdict/header/delegation/external-sender floor, including strict/paranoid handling with separate mailbox-admin initiation and independent policy-admin approval where review or successor processing is allowed. M1 adds all five outbound authority classes, frozen content and complete authority evidence, execution-time revalidation, mandatory approval, exact-once send, and typed fail-closed mismatch behavior.
 
 ### Epic 7: Tenant Policy & Bounded Administration
 
@@ -639,7 +646,7 @@ Tenant, policy, mailbox, and compliance administrators can configure only their 
 
 **FRs covered:** FR51–FR53, FR75a–FR75g.
 
-**Implementation notes:** Implement the closed Tenant Policy Schema, command-created governance/bootstrap, bounded aggregate versus per-item visibility, distinct-admin approval, mailbox scope, service-client grants, and no admin/debug bypass.
+**Implementation notes:** Implement the closed Tenant Policy Schema, command-created governance/bootstrap, bounded aggregate versus per-item visibility, distinct-admin approval, mailbox scope, service-client grants, compliance operations bounded by A6 and NFR49a–b with source-owner guards, and no admin/debug bypass.
 
 ### Epic 8: Review Operations, Notifications & Escalation
 
@@ -647,7 +654,7 @@ Reviewers can find, prioritize, claim, and resolve work queues and receive bound
 
 **FRs covered:** FR69–FR73, FR76, FR78, FR79.
 
-**Implementation notes:** Deliver persistent queue state, safe actions/disabled reasons, stable filters/pagination, assignment conflicts, owner/next-action guidance, notification routing/ceilings/digests, and safe grouping while leaving actual runtime subject control to Epic 9.
+**Implementation notes:** Deliver persistent queue state, safe actions and disabled reasons, stable filters/pagination, assignment conflicts, owner/next-action guidance, notification routing/ceilings/digests, and safe grouping while leaving actual runtime subject control to Epic 9.
 
 ### Epic 9: Runtime Governance Control Plane
 
@@ -663,7 +670,7 @@ Policy and security administrators can govern the immutable command allowlist an
 
 **FRs covered:** FR87–FR89; governance extension of FR43, FR52, and FR61.
 
-**Implementation notes:** Keep product catalog, surface exposure, MCP tags, AI allowlist, and owner mappings distinct and deny-by-default. Earlier epics deliver complete lifecycle subsets; this epic completes administrative allowlist and cross-family governance rather than repairing them retroactively.
+**Implementation notes:** Keep product catalog, surface exposure, MCP tags, AI allowlist, and owner mappings distinct and deny by default. Earlier epics deliver complete lifecycle subsets; this epic completes administrative allowlist and cross-family governance rather than repairing them retroactively.
 
 ### Epic 11: Operational Dashboards & Observability
 
@@ -671,7 +678,7 @@ Operators can see tenant-safe health, queue, latency, saturation, SLO/error-budg
 
 **FRs covered:** FR67, FR94.
 
-**Implementation notes:** Deliver OpenTelemetry-backed M2 operational views, freshness and `unsupported` states, candidate-bound A11 evidence, non-invasive synthetics, alert routing/burn tests, and cross-tenant/noisy-neighbor validation without becoming the activation mechanism for earlier workflows.
+**Implementation notes:** Deliver OpenTelemetry-backed M2 operational views, freshness and `unsupported` states, distinct A11-M1 diagnostic evidence and A11-M2 story-completion evidence, non-invasive synthetics, alert routing/burn tests, and cross-tenant/noisy-neighbor validation without becoming the activation mechanism for earlier workflows.
 
 ### Epic 12: Audit, Compliance Investigation & Recovery
 
@@ -679,7 +686,7 @@ Compliance and operations users can reconstruct governed activity, safely query/
 
 **FRs covered:** FR54, FR56, FR58, FR95, FR95a.
 
-**Implementation notes:** Extend the already-atomic canonical audit into authorized investigation, A6-governed data-subject workflows, WORM/checkpoint verification, replay-only composition/invariance, and A10 recovery qualification. Diagnostic, story-completion, and retained operational evidence remain disjoint.
+**Implementation notes:** Extend the already-atomic canonical audit into authorized investigation; restricted pre-pilot O1 export, erasure, legal-hold, and retention workflows with independent TenantOwner approval, source-owner guards, owner-by-owner completion, hold precedence, redaction, and recipient-bound results; WORM/checkpoint verification; replay-only composition/invariance; and A10 recovery qualification. Diagnostic, story-completion, and retained operational evidence remain disjoint.
 
 ### Epic 13: Governed Interactive Workspace & UI Conformance
 
@@ -743,7 +750,7 @@ So that governed capabilities can be implemented and verified on a consistent fo
 **Given** release metadata
 **When** the package and container inventory is inspected
 **Then** it identifies Contracts, Client, and Testing packages plus Server and UI container targets
-**And** it records A5, A6, and A13 as open blockers without claiming M0/M1, pilot, compliance, or production readiness.
+**And** it records A5, A6, A13, and exact A9a evidence as open blockers without claiming M0/M1, pilot, compliance, or production readiness.
 
 **Requirements:** ARCH-1, ARCH-2, ARCH-5, ARCH-6, ARCH-8, ARCH-24, ARCH-33, ARCH-37, ARCH-38, ARCH-39.
 
@@ -983,39 +990,49 @@ So that unsafe or incomplete commands fail closed regardless of their origin.
 **Given** a typed `IChatBotCommand` from any surface or machine origin
 **When** it enters the Server boundary
 **Then** it can reach mutation handling only through the single `CommandGateway`
-**And** adapters can translate input and attach immutable origin but cannot authorize, classify, approve, deduplicate, or audit independently.
+**And** adapters can translate input and attach immutable origin but cannot authorize, select admission profiles, classify, approve, deduplicate, construct canonical envelopes, or audit independently.
 
-**Given** a command entering the gateway
-**When** admission executes
-**Then** the stages run in the canonical order: authenticate, tenant-bind, apply authorization, classify action risk, validate approval, validate stable operation identity, validate expected revision or approved owner guard, construct the canonical envelope, and request atomic commit
-**And** no origin can omit, reorder, or duplicate a stage.
+**Given** any mutating command entering the gateway
+**When** universal admission executes
+**Then** authentication, trusted tenant binding, authorization, stable operation identity, expected revision or accepted owner guard, canonical-envelope construction, and atomic commit participation occur in their declared order
+**And** no origin or profile can omit, reorder, or duplicate a universal stage.
 
-**Given** a command whose action classification is read-only and has no external effect
+**Given** an authenticated, tenant-bound, authorized command
+**When** effect-specific admission is required
+**Then** the gateway selects one closed admission profile from normalized product-declared command and effect metadata
+**And** caller input, adapters, policy, or model output cannot select a weaker profile or broaden its allowed effects.
+
+**Given** a command eligible for a qualified read-only/no-external-effect profile
 **When** current tenant policy and Project authorization explicitly permit its product-declared subtype
 **Then** admission can return `accepted` without inventing mutation authority
-**And** an unknown or indeterminate subtype is never silently treated as low risk.
+**And** an unknown, unsupported, or undeclared subtype is denied before model, tool, or effect invocation.
 
-**Given** a command that mutates Project state, exposes files, sends externally, creates or assigns tasks, invokes tools, or acts on behalf
-**When** approval validation runs
-**Then** a valid current approval is mandatory and tenant policy cannot downgrade the requirement
-**And** missing, stale, mismatched, or incomplete approval returns a typed non-mutating outcome.
+**Given** a profile requires action-risk classification
+**When** classification is missing, invalid, unqualified, failed, or indeterminate
+**Then** the attempt returns `classifier-indeterminate` and creates no proposal, approval action, durable idempotency state, or effect
+**And** approval or policy cannot override the outcome; remediation requires a new linked request.
 
-**Given** any required identity, tenant, authorization, policy, approval, operation, revision, audit, or dependency input is unavailable or invalid
-**When** its admission stage runs
+**Given** a command would mutate Project state, expose files, send externally, create or assign tasks, invoke tools, or act on behalf
+**When** its admission profile validates approval
+**Then** a current, independent, authorized human approval is mandatory
+**And** missing, stale, mismatched, expired, or incomplete approval returns a typed non-mutating outcome.
+
+**Given** any required identity, tenant, authorization, policy, classification, approval, operation, revision, audit, or dependency input is unavailable or invalid
+**When** its applicable admission stage runs
 **Then** processing stops with the appropriate safe catalog code
-**And** no later stage, domain event, idempotency record, projection, notification, or external effect occurs.
+**And** no later stage, domain event, idempotency record, projection, notification, model/tool call, or external effect occurs.
 
-**Given** the A13 atomic target is not accepted and available
-**When** an otherwise valid mutating command reaches the commit stage
-**Then** the command returns the declared A13-blocked or audit-unavailable result and writes nothing
+**Given** the A13 atomic target or the EventStore SDK pre-commit hook is not accepted and available
+**When** an otherwise valid mutating command reaches commit admission
+**Then** the command returns the declared blocked or audit-unavailable result and writes nothing
 **And** command preparation or metadata generation is never reported as owner execution.
 
 **Given** architecture and gateway-stage tests
-**When** a second write pipeline, public internal stage, direct aggregate dispatch, or adapter-stage replica is introduced
+**When** a second write pipeline, public internal stage, direct aggregate dispatch, adapter-stage replica, or caller-selected profile is introduced
 **Then** the build fails non-vacuously
-**And** the supported EventStore pre-commit hook is the only permitted mounting point for the gateway admission stages.
+**And** the supported EventStore pre-commit hook is the only permitted mounting point for gateway admission.
 
-**Requirements:** FR61, FR68, FR81a, ARCH-3, ARCH-4, ARCH-8, ARCH-12, ARCH-16, ARCH-30, ARCH-31, ARCH-32, NFR1, NFR7, NFR8, NFR15, NFR16, NFR32, NFR65, NFR70, UX-DR50.
+**Requirements:** FR61, FR68, FR81a, ARCH-3, ARCH-4, ARCH-8, ARCH-12, ARCH-13, ARCH-16, ARCH-30, ARCH-31, ARCH-32, NFR1, NFR7, NFR8, NFR15, NFR16, NFR32, NFR65, NFR70, UX-DR50.
 
 ### Story 1.8: Commit a Governed Mutation and Canonical Audit Atomically
 
@@ -1090,7 +1107,7 @@ So that retries cannot duplicate effects and attempted boundary violations remai
 **Then** committed work replays the stored outcome and uncommitted work follows its family-specific retry contract
 **And** no repeated committed domain or external effect occurs.
 
-**Given** a denial, restricted read, service-client authentication/authorization failure, invalid transition, or other declared security-sensitive non-mutating attempt
+**Given** a denial, restricted read, service-client authentication or authorization failure, invalid transition, or other declared security-sensitive non-mutating attempt
 **When** it is handled
 **Then** a separate canonical attempt record captures the authorized metadata required for actor, scope, reason, correlation, policy, redaction, and outcome
 **And** it is not misrepresented as a committed domain mutation.
@@ -1117,7 +1134,7 @@ So that I can take a safe recovery action and follow its authoritative outcome.
 
 **Given** an authenticated user opens the operation route with an operation ID
 **When** the UI calls `GetWorkflowOperationStatus` through the generated typed Client
-**Then** it renders the authorized operation identity, canonical state/reason, immutable origin, attempts and ceiling, retry eligibility, partial-output status, prior outcome, terminal reason, correlation, and safe next action
+**Then** it renders the authorized operation identity, canonical state and reason, immutable origin, attempts and ceiling, retry eligibility, partial-output status, prior outcome, terminal reason, correlation, and safe next action
 **And** it never reads a store, actor, queue, projection, or internal gateway service directly.
 
 **Given** a failed operation is explicitly retryable and the user has current authority
@@ -1147,12 +1164,12 @@ So that I can take a safe recovery action and follow its authoritative outcome.
 
 **Given** keyboard-only, screen-reader, 200/400-percent zoom, phone, tablet, light/dark/forced-colors, and reduced-motion validation
 **When** the operation route and retry interaction are tested in English and French
-**Then** focus order and return are correct, state and errors are not color/motion-only, touch targets meet the declared floor, and both locales expose identical capabilities and safe reasons
+**Then** focus order and return are correct, state and errors are not color or motion only, touch targets meet the declared floor, and both locales expose identical capabilities and safe reasons
 **And** the enumerated live-route checks pass without a static-fixture substitute.
 
 **Given** a baseline performance run with healthy dependencies
 **When** the operation route retrieves user-facing status
-**Then** the read meets the default p95 of two seconds or displays a retrievable pending/degraded state
+**Then** the read meets the default p95 of two seconds or displays a retrievable pending or degraded state
 **And** correlation traverses UI, typed Client, API, gateway, EventStore, audit, publication, projection, and status retrieval.
 
 **Requirements:** FR59, FR80, FR81, FR81a, FR90, ARCH-12, ARCH-15, ARCH-16, ARCH-26, NFR18, NFR24, NFR32, NFR34, NFR39, NFR60, NFR62, NFR70, UX-DR1, UX-DR2, UX-DR3, UX-DR4, UX-DR7, UX-DR10, UX-DR11, UX-DR12, UX-DR13, UX-DR14, UX-DR15, UX-DR37, UX-DR44, UX-DR45, UX-DR46, UX-DR47, UX-DR65, UX-DR66, UX-DR69.
@@ -1198,7 +1215,7 @@ So that governed behavior can be reproduced without exposing production data or 
 **Given** an increment evidence manifest
 **When** evaluation results are referenced
 **Then** it records exact dataset, fixture, contract, implementation, runner, time, result, and independent-verification provenance
-**And** synthetic preparation, stale results, or incomplete evidence cannot close A5, A6, A13, or support pilot, compliance, tamper-evidence, or production claims.
+**And** synthetic preparation, stale results, or incomplete evidence cannot close A5, A6, A13, exact A9a evidence, or support pilot, compliance, tamper-evidence, or production claims.
 
 **Requirements:** FR92, FR93, ARCH-19, ARCH-33, ARCH-37, ARCH-39, NFR3, NFR4, NFR9a, NFR10, NFR11, NFR32, NFR50, NFR59, NFR65, NFR68.
 
@@ -1529,8 +1546,8 @@ So that the outcome is explainable, immutable, and safe to reconstruct.
 
 **Acceptance Criteria:**
 
-**Given** an association item in a state that permits human review
-**When** an authorized reviewer submits `ConfirmEmailProjectAssociation`, `RejectEmailProjectAssociation`, `DeferEmailProjectAssociation`, `MarkEmailAssociationNeedsReview`, or `SkipEmailAssociation`
+**Given** an association item in `NeedsReview`
+**When** an authorized reviewer submits `ConfirmEmailProjectAssociation`, `RejectEmailProjectAssociation`, or `DeferEmailProjectAssociation`
 **Then** the command uses the item's stable decision slot, expected revision, current tenant/Project authority, immutable source, evidence, scorer, and policy versions
 **And** it passes through the single CommandGateway and atomic canonical commit.
 
@@ -1539,10 +1556,25 @@ So that the outcome is explainable, immutable, and safe to reconstruct.
 **Then** the item transitions to `Associated` with the selected Project and records the decision consequence
 **And** only the authorized selected candidate identifier—not suppressed alternatives—is included in the authoritative outcome.
 
-**Given** a reviewer rejects all, defers, marks for review, or skips the item
-**When** that decision is valid for the current state
-**Then** the exact disposition, actor, time, reason, note reference, next-action state, and preserved original-email reference are committed
+**Given** a reviewer rejects all candidates or defers the item from `NeedsReview`
+**When** the required reason and, for defer, owner and revisit condition are valid
+**Then** the exact `Rejected` or `Deferred` disposition, actor, time, reason, note reference, next-action state, and preserved original-email reference are committed
 **And** the message is not attached to any Project unless a later authorized successor decision does so.
+
+**Given** an association item in `Deferred`
+**When** the assigned authorized reviewer submits `ResumeEmailAssociationReview` after the revisit condition is met, evidence is refreshed, and the expected revision is current
+**Then** the item returns to `NeedsReview` without confirming, rejecting, or re-deferring it in the same decision
+**And** the reviewer must use a later current-revision command for any association decision.
+
+**Given** a user-origin request for worker-only `MarkEmailAssociationNeedsReview`
+**When** CommandGateway validates actor type and command exposure
+**Then** the request is denied and the command is absent from user UI, CLI, and human-delegated MCP actions
+**And** an authorized worker may invoke it only from `Received` through its declared lifecycle transition with canonical audit.
+
+**Given** an item in `Received` is a duplicate or matches a declared out-of-scope mailbox rule
+**When** an association worker or authorized reviewer submits `SkipEmailAssociation`
+**Then** the item transitions terminally to `Skipped` with its reason, actor, evidence, and original-email reference preserved
+**And** any later reprocessing creates an audit-linked successor workflow rather than mutating the skipped decision.
 
 **Given** source evidence supporting a decision
 **When** the decision commits
@@ -1591,8 +1623,13 @@ So that I can resolve ambiguity without exposing or contaminating another Projec
 
 **Given** a selected candidate
 **When** the decision bar is announced or reviewed
-**Then** its accessible description repeats the selected safe Project and exposes Confirm, Reject all, Defer, and Escalate/needs-review according to the canonical action availability
+**Then** its accessible description repeats the selected safe Project and exposes Confirm, Reject all, or Defer only while the item is in `NeedsReview`
 **And** the reviewer can add an optional non-authoritative note without obscuring the decision consequence.
+
+**Given** the association item is `Deferred`
+**When** the decision bar renders
+**Then** it exposes Resume before any association decision and does not expose Confirm, Reject all, or Defer
+**And** escalation remains safe guidance or routing rather than a lifecycle transition.
 
 **Given** the reviewer submits a permitted decision
 **When** the command is admitted
@@ -1671,27 +1708,27 @@ So that stale Project context cannot be treated as current.
 
 **Given** an association has entered `Correcting`
 **When** its propagation plan is created
-**Then** the aggregate records the corrected source version and the complete required-store set for the active increment, including candidate ranking, evidence snapshot, and operational queue projections
-**And** each later derived store class must register its correction contract before architecture tests allow that store to persist association-derived data.
+**Then** the aggregate freezes a complete versioned impact manifest covering every affected ChatBot store, Conversations/Folders record, approved or executed action, appended message, converted intent, sent mail, external or tool effect, and file disclosure
+**And** each manifest item records owner, predecessor/source version, required acknowledgement or explicit irreversible-effect disposition, current state, operation identity, and correlation before propagation begins.
 
 **Given** a required store receives a correction activity
 **When** it invalidates and rebuilds its records
 **Then** the work is tenant-scoped, idempotent, source-version guarded, and records acknowledged store, old/new source versions, time, result, operation, and correlation
 **And** an older or duplicate activity cannot overwrite newer corrected data or produce a second acknowledgement outcome.
 
-**Given** `AcknowledgeAssociationCorrectionStore` for one required store
-**When** the acknowledgement commits at the expected revision
-**Then** the aggregate updates acknowledged and remaining store sets while retaining `Correcting`
-**And** only the final valid required acknowledgement transitions the item to `Corrected` and emits `AssociationCorrected`.
+**Given** a required manifest owner returns an acknowledgement or explicit irreversible-effect disposition
+**When** it commits at the expected correction revision
+**Then** the aggregate updates completed and remaining manifest items while retaining `Correcting` or `CorrectionDelayed`
+**And** only completion of every frozen manifest item transitions the item to `Corrected` and emits `AssociationCorrected`.
 
 **Given** an item remains `Correcting`
 **When** an authorized user views its status
-**Then** the response shows predecessor/successor association, acknowledged and remaining stores, measured progress, current estimate, owner, next action, and safe correlation
-**And** Project-context reads remain stale/blocked and AI context remains unavailable until completion.
+**Then** the response shows predecessor/successor association, every completed and remaining manifest item, acknowledgements or irreversible dispositions, measured progress, current estimate, owner, next action, and safe correlation
+**And** affected source and destination Project-context reads remain stale or blocked and AI context remains unavailable until `Corrected`.
 
 **Given** propagation exceeds p95 ten minutes in M0/M1 or the applicable p95 sixty-minute M2 target
 **When** acknowledgements remain outstanding
-**Then** `MarkAssociationCorrectionDelayed` moves the item to `Correction-delayed`, identifies the responsible owner and safe next action, and triggers a P2 incident
+**Then** `MarkAssociationCorrectionDelayed` moves the item to `CorrectionDelayed`, identifies the responsible owner and safe next action, and triggers a P2 incident
 **And** later valid acknowledgements can still complete the same immutable correction without clearing its incident history.
 
 **Given** a store failure, unavailable dependency, invalid acknowledgement, stale revision, poison activity, or exhausted retry
@@ -1741,7 +1778,7 @@ So that the corrected association becomes trustworthy despite retries, restarts,
 
 **Given** the workflow exceeds its correction SLO or exhausts retry
 **When** the operations-owned monitor invokes the declared transition
-**Then** the aggregate records `Correction-delayed` or the appropriate terminal/recovery state through CommandGateway
+**Then** the aggregate records `CorrectionDelayed` or the appropriate terminal/recovery state through CommandGateway
 **And** P2 escalation, owner, next action, and recovery command are visible without requiring Epic 11 dashboards.
 
 **Given** production-path acceptance is evaluated
@@ -1966,7 +2003,7 @@ So that I can understand its placement and follow any correction history.
 **Given** a human-confirmed or corrected association
 **When** its explanation is inspected
 **Then** the current decision links to immutable predecessor/successor decisions and permitted rationale without overwriting the original explanation
-**And** `Correcting` or `Correction-delayed` state shows acknowledged/remaining propagation and continued AI-context block.
+**And** `Correcting` or `CorrectionDelayed` state shows acknowledged/remaining propagation and continued AI-context block.
 
 **Given** the viewer lacks authority for a candidate, participant field, source fragment, or audit fact
 **When** the explanation is assembled
@@ -2103,6 +2140,16 @@ So that I can use them as assistance without confusing them with the source reco
 **Then** that condition is explicit, partial content is not treated as a committed Project message, and unavailable source authority is not replaced by the summary
 **And** copy/export/transcript/read-aloud output retains the AI label, provenance, state, and applicable redaction.
 
+**Given** external or retrieved source fragments enter a projection or candidate AI context
+**When** their provenance is recorded or rendered
+**Then** each fragment preserves immutable origin, trust, and instruction-versus-data boundary labels that generated content cannot alter
+**And** source authority always remains distinct from any summary, explanation, or model/tool output.
+
+**Given** an untrusted fragment attempts to define policy, authority, approval, system or tool instructions, or executable scope
+**When** AI packaging or mediation evaluates the fragment
+**Then** the request returns `untrusted-instruction-detected` without model or tool invocation
+**And** remediation excludes or quarantines the source and requires a new linked request rather than resuming the contaminated attempt.
+
 **Given** the viewer lacks authority for a source, model detail, Project context, or generated field
 **When** the response is assembled
 **Then** the field is omitted or safely redacted before rendering and no hidden text, count, citation, or error confirms it
@@ -2145,7 +2192,7 @@ So that their provenance and safety can be established before Project storage or
 
 **Given** missing attachment data, declared type/size outside the closed limits, provider access failure, malformed metadata, or source-version mismatch
 **When** capture admission runs
-**Then** the attachment enters the applicable pending, unavailable, rejected, failed, or retryable state with a safe reason and next action
+**Then** no attachment record is created when admission fails before capture, or the existing attempt transitions to `Failed` with retry eligibility recorded separately
 **And** no unvalidated content is exposed to Project or AI consumers.
 
 **Given** the actor can view the email but lacks attachment authority
@@ -2185,13 +2232,13 @@ So that unsafe or unsupported content cannot enter Project context.
 
 **Given** malware, unsafe active content, a blocked type, excessive size, declared/actual mismatch, corrupted content, or prohibited archive behavior
 **When** scanning completes
-**Then** the attachment transitions to terminal `Unsafe` or `Rejected` with a stable safe reason and quarantine/retention disposition
+**Then** the attachment transitions to terminal `Unsafe` with a stable safe reason and quarantine/retention disposition
 **And** bytes and sensitive scanner details never reach Project storage, conversation content, AI packaging, public errors, or telemetry.
 
 **Given** scanner timeout, dependency outage, unavailable signature set, malformed scanner response, or transient retrieval failure
 **When** the scan cannot be trusted
-**Then** the attachment remains unavailable or transitions to typed `Failed`/retryable state without exposure
-**And** status includes retry eligibility, attempt count/ceiling, owner, and safe next action.
+**Then** the attachment transitions to `Failed` without exposure
+**And** orthogonal status fields include retry eligibility, attempt count/ceiling, owner, and safe next action without inventing another attachment state.
 
 **Given** a duplicate, delayed, or out-of-order scan result
 **When** its attachment attempt and expected revision are validated
@@ -2250,7 +2297,7 @@ So that it becomes a Project file without bypassing owner authority or duplicati
 
 **Given** Folders, audit, policy, authorization, or workflow dependency is unavailable
 **When** storage is attempted
-**Then** the item remains safely pending, unavailable, failed, or retryable with owner and next action and no false `Stored` state
+**Then** the attachment remains `PendingScan` only while a current clean result is awaiting owner storage, or transitions to `Failed`; retry eligibility, owner, and next action remain orthogonal status fields
 **And** unrelated tenant/folder partitions remain usable where isolation permits.
 
 **Requirements:** FR30, FR31, FR32, FR34, FR55, FR59, FR64, FR68, FR91a, ARCH-10, ARCH-11, ARCH-13, ARCH-14, ARCH-17, ARCH-18, NFR1, NFR7, NFR13, NFR14, NFR15a, NFR17, NFR18, NFR21, NFR34, NFR50, NFR58, NFR70.
@@ -2268,14 +2315,14 @@ So that I know whether it is safe, stored, recoverable, or eligible for later AI
 **Then** each row links the immutable email/source identity to its current capture attempt, scan outcome, owner file/folder outcome, source version, operation, and correlation
 **And** duplicate or out-of-order events cannot create duplicate rows or regress current state.
 
-**Given** an attachment in captured, `PendingScan`, unavailable, rejected, `Unsafe`, failed, retryable, `Stored`, correcting, or terminal state
+**Given** an attachment in exactly `PendingScan`, `Stored`, `Unsafe`, or `Failed`
 **When** its shared attachment row renders
 **Then** labelled data shows permitted filename/type/size, capture/storage state, scan/quarantine, folder, duplicate/retry status, retention, freshness, and AI-context eligibility
-**And** state uses visible text plus semantic icon/border and never relies on color alone.
+**And** unavailable, retryable, correcting, duplicate, or terminal conditions are represented as orthogonal status/reason fields rather than additional attachment states, using visible text plus semantic icon/border and never color alone.
 
 **Given** a retryable failed attachment
 **When** an authorized actor submits `RetryAttachmentCapture`
-**Then** a single linked immutable successor attempt is created or the existing successor returned, with expected revision, retry profile, operation identity, and prior-outcome link
+**Then** a single linked immutable successor attempt in `PendingScan` is created or the existing successor returned, with expected revision, retry profile, operation identity, and prior-outcome link
 **And** unscanned content remains unavailable and no duplicate Project file is created.
 
 **Given** the actor lacks attachment metadata, content, folder, retry, or AI-context authority
@@ -2540,7 +2587,7 @@ So that low-risk eligibility and mandatory approval are decided consistently rat
 **Given** an authorized supported action request and a valid deployed `ActionRiskClassifier`
 **When** classification runs
 **Then** the versioned categorical kernel reads the pinned AI allowlist entry, effect surface, tenant policy snapshot, requester authority, and Project/file/recipient/tool scopes
-**And** its only classifier outputs are `low-risk` or `approval-required`, with classifier version and complete labelled input tuple.
+**And** its closed outcomes are `low-risk`, `approval-required`, or `classifier-indeterminate`, with classifier version and complete labelled input tuple whenever classification is determinate.
 
 **Given** the request modifies state, exposes files, sends externally, creates or assigns tasks, invokes an external tool, or acts on behalf of a participant
 **When** the effect surface is classified
@@ -2554,13 +2601,13 @@ So that low-risk eligibility and mandatory approval are decided consistently rat
 
 **Given** valid classifier machinery but missing tags, unknown effect surface, or undeclared authority class
 **When** classification runs
-**Then** the deterministic class is `approval-required`
-**And** the indeterminate input is retained for review without performing an effect.
+**Then** the product outcome is `classifier-indeterminate`
+**And** no proposal, approval action, durable idempotency state, model/tool invocation, or effect is created; remediation requires a new linked request.
 
 **Given** a missing, invalid, unqualified, failed, or non-contract classifier artifact/output
 **When** classification is requested
-**Then** it returns `classifier-unavailable`, writes no proposal/domain/idempotency success, and records the required auditable attempt
-**And** it cannot silently substitute `approval-required`, `low-risk`, or an AI-generated classification.
+**Then** it returns `classifier-indeterminate`, writes no proposal, approval action, domain mutation, or durable idempotency state, and records only the separately authorized auditable attempt
+**And** approval cannot override it and the system cannot silently substitute `approval-required`, `low-risk`, or an AI-generated classification.
 
 **Given** authorization, evidence, audit, or product support fails before classification
 **When** the request is evaluated
@@ -2597,6 +2644,11 @@ So that any possible effect can be reviewed without losing its source or executi
 **Then** authorization/evidence/audit/allowlist failure yields `denied`, unsupported product operation yields `unsupported`, and supported input records the exact `low-risk|approval-required` classifier result/version/input tuple
 **And** task-intent confidence or label is never reused as action risk.
 
+**Given** classification is missing, invalid, unqualified, failed, unknown, or indeterminate
+**When** proposal conversion is attempted
+**Then** the outcome is `classifier-indeterminate` with no proposal, approval action, durable idempotency state, or effect
+**And** remediation requires a new linked request with fresh classification inputs.
+
 **Given** a supported proposal is created
 **When** its immutable record commits
 **Then** it freezes requester/origin, tenant/Project, source intent/request, target product command and allowlist version, effect classes, resources/files and proposed redaction manifest, recipients/sender/delegation where applicable, tools, classifier tuple, policy snapshot, reversibility, expected post-state/events, required authority, approval requirement, proposal revision, expiry, operation, and correlation
@@ -2609,7 +2661,7 @@ So that any possible effect can be reviewed without losing its source or executi
 
 **Given** a product-declared low-risk request
 **When** proposal conversion is attempted
-**Then** the user is directed to the separate `ExecuteLowRiskAssistance` path unless an indeterminate or boundary effect requires `AwaitingApproval`
+**Then** the user is directed to the separate `ExecuteLowRiskAssistance` path, while a determinate boundary effect alone may create an `AwaitingApproval` proposal
 **And** no low-risk record can conceal a boundary-crossing effect.
 
 **Given** repeated or concurrent conversion attempts
@@ -2652,10 +2704,15 @@ So that I can receive useful help without creating an unreviewed Project or exte
 **Then** it is attributed with AI actor, model/version, source/evidence provenance, completion state, operation, policy, redaction, canonical audit, and correlation
 **And** it may persist only its request/result bookkeeping and never a Project message, file, task, outbound communication, tool effect, acted-on-behalf result, or AI-action proposal.
 
-**Given** processing discovers state mutation, file exposure, external communication, task creation/assignment, tool invocation, acting on behalf, unknown effect, or indeterminate authority
+**Given** processing discovers a determinate state mutation, file exposure, external communication, task creation/assignment, tool invocation, or acting-on-behalf effect
 **When** the request is evaluated before or during invocation
 **Then** no effect or partial result is committed and the outcome is `approval-required`
 **And** the user must create a separate immutable proposal through `ProposeAIAction`; this command cannot materialize one implicitly.
+
+**Given** processing encounters an unknown effect or missing, invalid, unqualified, failed, or indeterminate classifier input
+**When** the request is evaluated before invocation
+**Then** the outcome is `classifier-indeterminate` with no provider call, proposal, approval action, durable idempotency state, partial result, or effect
+**And** remediation creates a new linked request rather than resuming or approving this attempt.
 
 **Given** repeated equivalent requests or a transport retry
 **When** the stable operation ID and canonical request hash are checked
@@ -2784,8 +2841,13 @@ So that I understand the authority, data, recipients, command, and expected outc
 
 **Given** action classification is shown
 **When** the reviewer inspects it
-**Then** the prominent user disposition is `allowed-read-only`, `approval-required`, `denied`, or `unsupported`, with the subordinate internal `low-risk|approval-required` classifier output/version/input labelled separately where applicable
+**Then** the prominent user disposition is `allowed-read-only`, `approval-required`, `classifier-indeterminate`, `denied`, or `unsupported`, with the subordinate determinate `low-risk|approval-required` classifier output/version/input labelled separately where applicable
 **And** task-intent confidence and action risk are never conflated.
+
+**Given** the outcome is `classifier-indeterminate`
+**When** the review route renders
+**Then** no proposal or approval controls are shown and the safe remediation/new-request action is identified
+**And** the surface never disguises the outcome as reviewable `approval-required` work.
 
 **Given** Approve, Reject, Request revision, or Cancel is available
 **When** controls render
@@ -2907,7 +2969,7 @@ So that stale approval cannot execute against corrected or unauthorized evidence
 **Then** each registers its source-version-guarded invalidation/rebuild and acknowledgement contract with the Story 2.11 correction registry
 **And** missing registration fails architecture tests before the store can activate.
 
-**Given** an association enters `Correcting` or `Correction-delayed`
+**Given** an association enters `Correcting` or `CorrectionDelayed`
 **When** any referenced AI request, context package, proposal, approval, or execution is queried or used
 **Then** current Project-context use and execution are blocked immediately and the item shows correcting state, source-version mismatch, owner, and next action
 **And** no cached projection, prior approval, or service-client grant can override the block.
@@ -2955,7 +3017,12 @@ So that I can understand and control AI assistance without bypassing authority o
 **Given** an eligible read-only/no-external-effect subtype
 **When** A5, authority, context, policy, classifier, and allowlist prerequisites pass
 **Then** the user receives an attributed result with model/source provenance and completion state through `ExecuteLowRiskAssistance`
-**And** any discovered boundary effect returns `approval-required` without an effect or implicit proposal.
+**And** any discovered determinate boundary effect returns `approval-required` without an effect or implicit proposal.
+
+**Given** classifier input or output is missing, invalid, unqualified, failed, unknown, or indeterminate
+**When** the live journey evaluates the request
+**Then** it returns `classifier-indeterminate` with no proposal, approval action, durable idempotency state, provider/tool call, or effect
+**And** the user receives safe remediation guidance for a new linked request.
 
 **Given** each of state mutation, file exposure, external communication, task creation/assignment, external-tool invocation, and acting on behalf
 **When** its end-to-end fixture is submitted
@@ -2967,7 +3034,7 @@ So that I can understand and control AI assistance without bypassing authority o
 **Then** the route shows the owner-authoritative state, exact-once outcome, operation/attempt lineage, safe reason, audit result, and next action
 **And** only `Project.AppendConversationMessage` and `ChatBot.ExecuteLowRiskAssistance` can be AI-invocable in M1, with their distinct risk and execution contracts.
 
-**Given** denied, unsupported, classifier-unavailable, provider-outage, approval-missing, evidence-expired, authority/policy/allowlist drift, correcting, invalidated, cancelled, failed, retryable, or terminal state
+**Given** denied, unsupported, `classifier-indeterminate`, provider-outage, approval-missing, evidence-expired, authority/policy/allowlist drift, correcting, invalidated, cancelled, failed, retryable, or terminal state
 **When** the journey renders
 **Then** the user sees the versioned disposition, state, owner, and one safe action without raw diagnostics or protected-resource confirmation
 **And** human review, existing-proposal decisions, retry, and audit remain available during AI-provider outage where no live call is required.
@@ -2985,7 +3052,7 @@ So that I can understand and control AI assistance without bypassing authority o
 **Given** increment qualification evidence
 **When** the journey is assessed for M0 or M1
 **Then** it binds exact runtime, source, provider, detector/classifier, policy, allowlist, owner mapping, dataset, topology, test, runner, time, and independent-verification provenance
-**And** open A5, A6, or A13 evidence blocks the claim even when synthetic end-to-end tests pass.
+**And** open A5, A6, A13, or exact A9a evidence blocks the claim even when synthetic end-to-end tests pass.
 
 **Requirements:** FR35, FR36, FR37, FR38, FR39, FR40, FR41, FR42, FR43, FR44, FR45, FR46, ARCH-15, ARCH-31, ARCH-33, ARCH-37, ARCH-39, NFR1, NFR2, NFR7, NFR8, NFR9, NFR10, NFR13, NFR15a, NFR16, NFR17, NFR22, NFR24, NFR32, NFR34, NFR39, NFR40, NFR47, NFR48, NFR50, NFR60, NFR61, NFR62, NFR63, NFR65, NFR68, NFR70, UX-DR3, UX-DR6, UX-DR7, UX-DR11, UX-DR12, UX-DR13, UX-DR15, UX-DR20, UX-DR22, UX-DR23, UX-DR25, UX-DR26, UX-DR30, UX-DR31, UX-DR32, UX-DR33, UX-DR37, UX-DR44, UX-DR45, UX-DR47, UX-DR48, UX-DR50, UX-DR51, UX-DR54, UX-DR58, UX-DR65, UX-DR67, UX-DR68, UX-DR69.
 
@@ -3505,15 +3572,20 @@ So that suspicious inbound messages cannot silently enter Project association.
 **Then** the message enters terminal `AuthenticityBlocked`
 **And** no reviewer, service client, AI actor, or automatic retry can reopen it in place or start association.
 
-**Given** an authorized `mailbox-admin` with current mailbox scope and fresh evidence
-**When** `ResolveInboundAuthenticityReview` is submitted for a strict-mode review item
-**Then** it can transition once to `AuthenticityAccepted` or terminal `AuthenticityRejected` with expected revision, decision slot, rationale, evidence/policy, actor/time, operation, correlation, and atomic audit
-**And** mailbox-admin scope grants neither message-content read beyond the review contract nor Project association-decision authority.
+**Given** a strict-mode item in `AuthenticityReviewRequired`
+**When** a current `mailbox-admin` with exact mailbox scope initiates `ResolveInboundAuthenticityReview`
+**Then** it creates a frozen accept-or-reject resolution proposal with current evidence, rationale, expected revision, stable operation identity, policy version, initiator, expiry, and canonical audit
+**And** no authenticity transition occurs until an independent current `policy-admin` approves that exact proposal.
+
+**Given** a current frozen authenticity-resolution proposal
+**When** an independent current `policy-admin` with applicable policy scope approves it
+**Then** separation of duty, evidence freshness, policy, expected revision, operation identity, expiry, and unchanged proposed disposition are revalidated before one transition to `AuthenticityAccepted` or terminal `AuthenticityRejected`
+**And** the mailbox-admin initiator cannot approve, the policy-admin gains no mailbox-content or Project association authority, and the complete two-person decision is atomically audited.
 
 **Given** an `AuthenticityBlocked` or `AuthenticityRejected` record and materially changed provider evidence or policy
-**When** `ReprocessInboundAuthenticity` is authorized
-**Then** one new immutable intake successor is created with predecessor link, new operation/revision/evidence/policy, and current strict/paranoid evaluation
-**And** the terminal predecessor remains unchanged and candidate Project data remains unavailable before new acceptance.
+**When** a current `mailbox-admin` initiates `ReprocessInboundAuthenticity` and an independent current `policy-admin` approves the frozen successor request
+**Then** one new immutable intake successor is created with predecessor link, fresh materially changed evidence where applicable, new stable operation identity, expected revision, policy, initiator/approver independence, and current strict/paranoid evaluation
+**And** the terminal predecessor remains unchanged, self-approval is denied, and candidate Project data remains unavailable before new acceptance.
 
 **Given** an unknown, unset, permissive, malformed, stale, or contradictory authenticity-policy value
 **When** intake is evaluated
@@ -3642,7 +3714,7 @@ So that no communication can leave the Project with changed content, recipients,
 
 **Given** the outbound proposal commits
 **When** its frozen context is inspected
-**Then** it includes requester/origin, tenant/Project, draft/version/hash, exact subject/body, To/Cc/Bcc recipients, sender/mailbox/authority class and complete evidence tuple, delegate/`principal_for` where applicable, source/files/redaction/freshness, policy, reversibility, approval expiry, expected provider effect/post-state/audit events, proposal/operation identity, and correlation
+**Then** it includes requester/origin, tenant/Project, proposed content and resource digests, draft/version/hash, exact subject/body, To/Cc/Bcc recipients, sender/mailbox/authority class and complete evidence tuple, delegate/`principal_for` where applicable, source/files/redaction/freshness, policy/classifier or action-disposition versions, reversibility, approval expiry, expected provider effect/post-state/audit events, proposal/operation identity, and correlation
 **And** changed or non-applicable values cannot be hidden by omission.
 
 **Given** content, recipients, sender authority, mailbox, files, Project/source context, policy, or redaction changes after proposal creation
@@ -3687,12 +3759,12 @@ So that my decision cannot be reused for different communication or sender autho
 
 **Given** Approve is selected and every frozen field remains valid
 **When** the decision commits
-**Then** the proposal becomes `Approved` with reviewer, approved/expires times, authority, draft/hash, sender tuple, recipients, policy/evidence versions, operation, and canonical audit
+**Then** the proposal becomes `Approved` with proposed and approved content/resource digests, recipients, complete sender-authority evidence tuple, Project context, requester, current human approver and independence evidence, approval and expiry times, policy/classifier or action-disposition versions, decision, authority, operation, and canonical audit
 **And** approval does not call the provider, mark the draft sent, or authorize any changed field.
 
 **Given** Reject, Request revision, or Cancel is selected
 **When** the decision commits
-**Then** the proposal enters the corresponding immutable terminal state with rationale and no send eligibility
+**Then** the proposal enters the corresponding immutable terminal state with rationale, decision evidence, and no send eligibility
 **And** revision requires a new draft/proposal/decision chain while cancellation cannot erase a previously committed provider effect.
 
 **Given** the requester is an AI/tool/service principal or a machine client attempts to decide
@@ -3703,7 +3775,7 @@ So that my decision cannot be reused for different communication or sender autho
 **Given** membership/delegation revoked, sender/recipient/file/Project drift, evidence expired, policy changed, proposal expired, audit unavailable, or state/revision stale
 **When** a decision is attempted
 **Then** no decision or send eligibility commits and the exact safe unavailable reason and refresh/revision action are returned
-**And** the prior valid state remains authoritative.
+**And** the approval history preserves the exact expiry or material-drift reason while the prior valid state remains authoritative.
 
 **Given** concurrent or repeated decisions
 **When** they target the authoritative decision slot
@@ -3767,7 +3839,7 @@ So that communication leaves the Project once and only as reviewed.
 
 **Given** a current immutable `Approved` outbound proposal
 **When** `SendApprovedProjectEmail` reaches execution admission
-**Then** it revalidates requester/reviewer, human approval lifetime, tenant/Project, exact draft/hash, recipients, source files/redaction/freshness, mailbox/sender/authority tuple, current membership/delegation/application restriction, policy, proposal/draft revisions, idempotency, rate/control admission, provider readiness, and audit readiness
+**Then** it revalidates requester/reviewer and their independence evidence, human approval lifetime, tenant/Project, exact approved content/resource digests and draft/hash, recipients, source files/redaction/freshness, complete mailbox/sender/authority tuple, current membership/delegation/application restriction, policy/classifier or action-disposition versions, proposal/draft revisions, idempotency, rate/control admission, provider readiness, and audit readiness
 **And** any drift blocks send and requires a new draft/proposal/decision rather than changing the approved record.
 
 **Given** all checks pass for one of the five sender-authority classes
@@ -4224,14 +4296,24 @@ So that I can fulfill compliance duties without operating Project workflows or d
 **Then** the response is tenant-scoped and redacts Project names/IDs, participants, message/file content, evidence detail, proposal content, and precise workflow reasons according to policy
 **And** current Project authority is required separately for unredacted per-item evidence.
 
+**Given** a validated data-subject or compliance request within the approved A6 and NFR49a–b operating contract
+**When** a current `compliance-admin` initiates an export, erasure, legal-hold, or retention workflow
+**Then** the request is restricted to that closed workflow family and records the validated request, declared data classes, tenant scope, source-owner guards, expected revision, stable operation identity, policy, redaction, recipient binding where applicable, and canonical audit
+**And** execution remains unavailable until an independent current TenantOwner who also holds the `compliance-admin` grant approves the exact frozen request.
+
+**Given** the independently approved compliance request
+**When** ChatBot coordinates it
+**Then** each authoritative source owner validates its current guard and performs or refuses its bounded operation while ChatBot tracks acknowledgements and outcomes
+**And** ChatBot never directly mutates owner data or treats orchestration intent as owner completion.
+
 **Given** a compliance admin triggers an investigation
 **When** the request commits
 **Then** it records tenant scope, content-free subject/filter identifiers, lawful purpose, requester, policy, evidence window, operation, and correlation and routes it to the authorized investigation workflow
 **And** it grants no ability to retry, requeue, quarantine, dismiss, approve, correct, or otherwise mutate an individual Project item.
 
-**Given** a retention-window change within the closed A6/NFR49a policy bounds
+**Given** a retention-window change within the closed A6/NFR49a–b policy bounds
 **When** a compliance admin proposes it
-**Then** the exact schema row requires a distinct current authorized admin/TenantOwner co-approval, justification, affected data classes/scope, legal-hold precedence, expected revision, and current A6 evidence
+**Then** the exact schema row requires an independent current TenantOwner with the `compliance-admin` grant, justification, affected data classes/scope, legal-hold precedence, source-owner guards, expected revision, and current A6 evidence
 **And** missing/invalid bounds, self-approval, stale evidence, or authority expansion blocks the change.
 
 **Given** a valid approved retention change
@@ -4246,7 +4328,7 @@ So that I can fulfill compliance duties without operating Project workflows or d
 
 **Given** a compliance admin attempts a Project workflow action or unredacted detail query without Project authority
 **When** authorization runs
-**Then** it is denied before data access/mutation with no resource-existence leak
+**Then** association, conversation, Project, attachment, task-intent, AI-action, approval, outbound, file, and every other collaboration-item mutation/read is denied before data access with no resource-existence leak
 **And** the separate auditable-attempt path records the bounded denial metadata.
 
 **Given** every compliance read, investigation, proposal, approval, denial, and policy activation
@@ -5987,7 +6069,7 @@ So that dashboards and alerts use accountable definitions that cannot drift sile
 
 **Given** a declared SLO
 **When** its definition is published
-**Then** it contains exact service indicator, numeric target, rolling/calendar window, error budget, alert threshold, eligible/excluded events, supported dimensions, source metric, freshness bound, accountable route, and required A11 calibration/burn evidence
+**Then** it contains exact service indicator, numeric target, unit, rolling/calendar window, error budget, alert threshold, eligible/excluded events, supported dimensions, source metric, freshness bound, accountable route, and required A11-M2 calibration/burn evidence
 **And** prose-only objectives or targets without measurable sources are rejected.
 
 **Given** an SLO source metric, owner, route, scope, or calibration is missing, stale, contradictory, inaccessible, or bound to a different candidate
@@ -6012,43 +6094,53 @@ So that dashboards and alerts use accountable definitions that cannot drift sile
 
 **Requirements:** FR67, FR94, FR75d, FR75f, ARCH-17, ARCH-28, ARCH-29, ARCH-39, NFR7, NFR23, NFR32, NFR35, NFR36, NFR38, NFR42a, NFR50, NFR65, NFR70, UX-DR62, UX-DR65.
 
-### Story 11.5: Qualify Candidate-Bound A11 Observability Evidence
+### Story 11.5: Qualify A11-M1 Metrics and A11-M2 Candidate-Bound Observability Evidence
 
 As a release governor,
-I want A11 observability evidence evaluated against the exact candidate and every declared SLO,
-So that M2 support cannot be inferred from incomplete or historical monitoring.
+I want A11-M1 measurement evidence and A11-M2 SLO evidence evaluated as independent exact-candidate decisions,
+So that neither M1 nor M2 support can be inferred from incomplete, historical, or wrong-increment monitoring.
 
 **Acceptance Criteria:**
 
-**Given** an exact release candidate and active operating-baseline version
-**When** A11 qualification begins
-**Then** the evidence manifest binds runtime digest, deployment/topology, telemetry schema, baseline/SLO versions, source metrics, tenant-safe scopes, timestamps, owners, alert routes, calibration runs, and burn-test results
-**And** evidence from another image, topology, environment, schema, or baseline is ineligible.
+**Given** an exact M1 candidate and active measurement-contract version
+**When** A11-M1 qualification begins
+**Then** one independently machine-readable record binds runtime digest, deployment/topology, telemetry schema, definitions, denominators, supported-request mix, provisional targets, minimum samples/windows, evidence sources, owners, and pass/fail rules for SM8, SM16, SM-C3, and SM-C5
+**And** SM12 and SM15 are recorded in the same candidate-bound evidence bundle without being substituted for the mandatory metrics.
 
-**Given** every declared SLO
-**When** qualification evaluates its target, window, budget, threshold, live provenance, accountable route, calibration, and passing burn test
-**Then** only a complete current set can be marked `supported`
-**And** any missing, stale, partial, unverifiable, or contradictory element yields `unsupported` or `unmeasurable` with the exact owner/action.
+**Given** the A11-M1 evidence bundle
+**When** its current result is calculated
+**Then** every required definition, sample/window, source, owner, candidate binding, provenance, and pass/fail result must be complete, supported, and measurable for A11-M1 to pass
+**And** missing, stale, partial, mismatched, historical, unverifiable, failed, `unsupported`, or `unmeasurable` evidence blocks M1.
 
-**Given** sufficient healthy samples have not accumulated for a full SLO window
+**Given** an exact M2 release candidate and active operating-baseline/SLO versions
+**When** A11-M2 qualification begins
+**Then** every declared SLO binds its stable metric name, numeric target and unit, window, error budget, alert threshold, timestamped calibration source, tenant scope, live signal/provenance, accountable route/receiver, and passing burn-test result/date/immutable locator
+**And** the result also binds the required 2–4 week pilot baseline, SM8–SM14/SM16 recalibration, and frozen SM-C5 supported-request mix.
+
+**Given** sufficient healthy samples have not accumulated for a complete required A11-M1 minimum window or A11-M2 SLO window
 **When** evidence is requested
-**Then** the result states the measured interval and remains unsupported for the absent interval
+**Then** the affected decision states the measured interval and remains blocked or `unsupported` for the absent interval
 **And** synthetic or extrapolated data is labelled and cannot be represented as live-window proof.
 
-**Given** A5, A6, A10, A13, an earlier increment, or another M2 gate remains open
-**When** A11 evidence passes
-**Then** only the observability gate result is recorded and the broader pilot/compliance/recovery/tamper-evidence/production claim remains blocked
-**And** the qualifier cannot activate workflows, controls, tenants, or releases.
+**Given** one of A11-M1 or A11-M2 passes
+**When** release authority is evaluated
+**Then** the other decision remains independently evaluated and neither result substitutes for the other
+**And** A11-M1 alone authorizes no M2 SLO claim while A11-M2 alone cannot repair a missing M1 metric qualification.
 
-**Given** evidence expires, its route stops resolving, the candidate changes, or a source becomes inaccessible
+**Given** A5, A6, A9a, A10, A13, an earlier increment, or another applicable gate remains open
+**When** either the A11-M1 or A11-M2 decision passes
+**Then** only that observability decision is recorded and broader pilot, compliance, recovery, tamper-evidence, production, or release claims remain blocked as applicable
+**And** qualification cannot activate workflows, controls, tenants, or releases.
+
+**Given** the candidate, metric definition, topology, telemetry schema, policy, route, baseline, or evidence source changes or expires
 **When** freshness is recalculated
-**Then** support is revoked prospectively and the prior result remains immutable historical evidence
-**And** dashboards report the current unsupported state rather than the last passing badge.
+**Then** only the affected current qualification is invalidated while its prior result remains immutable historical evidence
+**And** dashboards report the current blocked, `unsupported`, or `unmeasurable` state rather than the last passing badge.
 
 **Given** qualification tests
-**When** candidate mismatch, missing SLO, fake zero, partial window, stale calibration, failed burn, inaccessible source, and fully supported cases run
-**Then** only the complete exact-candidate case passes A11
-**And** every failure is machine-readable, safely displayable, and audit-linked.
+**When** candidate mismatch, missing metric/SLO, fake zero, partial window, stale source, failed rule/burn, inaccessible route, cross-substitution, and fully supported cases run
+**Then** only the complete current exact-candidate case passes its respective A11-M1 or A11-M2 decision
+**And** every failure is machine-readable, safely displayable, owner-attributed, and audit-linked.
 
 **Requirements:** FR67, FR94, ARCH-29, ARCH-33, ARCH-37, ARCH-39, NFR23, NFR28, NFR32, NFR42a, NFR43, NFR50, NFR65, NFR66, NFR70, UX-DR62, UX-DR65, UX-DR68.
 
@@ -6088,7 +6180,7 @@ So that missing or unsafe operating behavior is detected before users must repor
 **Given** deterministic scheduler tests
 **When** success, threshold breach, overdue execution, duplicate schedule, stale result, cleanup failure, and cross-tenant cases run
 **Then** exactly one current result and the expected alert input are produced per scheduled identity
-**And** missing/non-invasive proof keeps the corresponding check unsupported.
+**And** missing or non-invasive proof keeps the corresponding A11-M1 measurement or A11-M2 SLO check blocked or `unsupported`.
 
 **Requirements:** FR67, FR94, ARCH-12, ARCH-19, ARCH-28, ARCH-29, NFR7, NFR10, NFR11, NFR13, NFR14, NFR32, NFR34, NFR41, NFR42, NFR43, NFR58, NFR59, NFR68, NFR70, UX-DR62, UX-DR65.
 
@@ -6122,7 +6214,7 @@ So that incidents name the affected scope promptly without alert storms or false
 
 **Given** the route is missing, inaccessible, stale, rejects delivery, or never acknowledges
 **When** alert health is evaluated
-**Then** the associated SLO/A11 result becomes unsupported and escalates through a separately declared fallback owner
+**Then** the associated SLO and A11-M2 result become `unsupported` and escalate through a separately declared fallback owner
 **And** no successful metric alone masks the broken response path.
 
 **Given** alert tests
@@ -6168,7 +6260,7 @@ So that one backlog or dependency failure cannot hide or degrade unrelated servi
 **Given** results are published
 **When** compared with the candidate's operating baseline
 **Then** dataset/version, topology, runtime digest, sample size, duration, thresholds, exclusions, raw evidence locations, and reproducible outcome are recorded
-**And** mismatched or statistically vacuous runs cannot support A11 or M2.
+**And** mismatched or statistically vacuous runs cannot support the applicable A11-M1 metric decision, A11-M2 SLO decision, or M2 claim.
 
 **Requirements:** FR67, FR94, ARCH-19, ARCH-27, ARCH-28, ARCH-29, ARCH-33, ARCH-39, NFR9a, NFR10, NFR11, NFR19, NFR20, NFR23, NFR28, NFR29, NFR30, NFR31, NFR37, NFR41, NFR58, NFR59, NFR65, NFR66, NFR67, NFR68, NFR70.
 
@@ -6190,7 +6282,7 @@ So that I can understand supported and unsupported operations without opening ra
 **Then** server-side filtering/sorting and opaque cursor pagination keep URL-safe state, announce result changes, and preserve authorization
 **And** no filter, cursor, count, chart, export, or empty state reveals an unauthorized scope's existence.
 
-**Given** a measure, SLO, synthetic, alert route, or A11 result lacks current support
+**Given** a measure, SLO, synthetic, alert route, A11-M1 result, or A11-M2 result lacks current support
 **When** its UI region renders
 **Then** it displays the timestamp, stable reason, responsible owner, and safe next action with no green/pass treatment
 **And** privileged diagnostics are absent unless separately authorized.
@@ -6215,8 +6307,8 @@ So that I can understand supported and unsupported operations without opening ra
 ### Story 11.10: Prove Operational Observability for the Exact Candidate
 
 As a release owner,
-I want one reproducible observability conformance pack for the exact deployment candidate,
-So that M2 can rely on complete operational evidence without observability becoming an activation mechanism.
+I want one reproducible observability conformance pack for each exact M1 or M2 deployment candidate,
+So that each increment can rely only on its applicable complete operational evidence without observability becoming an activation mechanism.
 
 **Acceptance Criteria:**
 
@@ -6236,13 +6328,13 @@ So that M2 can rely on complete operational evidence without observability becom
 **And** missing or unauthorized fields are distinguished from empty values and any incomplete eligible sample fails the result.
 
 **Given** missing, stale, mismatched, partial, historical, synthetic-only, inaccessible, or contradictory evidence
-**When** A11 and dashboard support are calculated
-**Then** the result remains `unsupported` or `unmeasurable` and cannot claim an SLO window, error budget, pilot, production, compliance, or release readiness
-**And** only a complete exact-candidate current evidence set may pass the observability gate.
+**When** A11-M1, A11-M2, and dashboard support are calculated
+**Then** the affected result remains blocked, `unsupported`, or `unmeasurable` and cannot claim M1 metric qualification, an SLO window/error budget, pilot, production, compliance, or release readiness
+**And** only a complete exact-candidate current evidence set may pass its independently applicable observability gate.
 
 **Given** all Epic 11 checks pass
 **When** the signed evidence manifest is published
-**Then** it records candidate/baseline identity, source provenance, timestamps, scopes, datasets, results, exclusions, owners, open gates, and artifact digests
+**Then** it records separate A11-M1 and A11-M2 decisions with candidate/baseline identity, source provenance, timestamps, scopes, datasets, results, exclusions, owners, authorized and prohibited claims, open gates, and artifact digests
 **And** publishing the manifest does not enable a tenant, command, AI path, workflow, control, or deployment.
 
 **Given** the candidate, topology, baseline, metric source, or alert route changes
@@ -6799,7 +6891,7 @@ So that I can investigate history and safely track export, erasure, hold, retent
 **Then** requested data classes, authorized scope, owner-by-owner progress, policy/hold/redaction/backup constraints, operation identity, attempts/retry eligibility, predecessor/successor, and completed/partial/blocked/rejected/failed outcome are visible
 **And** Project/item detail remains redacted without separate current authority.
 
-**Given** an authorized human initiates or retries a data-rights command, places/releases a hold, or confirms export-result exposure
+**Given** a current `compliance-admin` with a validated request initiates or retries a data-rights command, places or releases a hold, or confirms export-result exposure under the required independent current TenantOwner approval
 **When** its form/review sheet is submitted
 **Then** exact scope, basis/justification, changed state, current A6 evidence, independent approver, expected revision, recipient/expiry where applicable, owner effects, and expected audit are shown and revalidated
 **And** self-approval, stale evidence, active hold conflict, unauthorized scope, or unavailable audit keeps the action focusable-disabled or returns the safe error summary without optimistic state.
@@ -6862,7 +6954,7 @@ So that M2 is blocked unless the exact candidate proves bounded loss, timely res
 **Given** A10 qualification is assessed
 **When** the fresh exact-candidate operational bundle, independent gate, freshness, controlled-loss, RTO-capable evidence, projection result, scoped-outage result, and cleanup all pass
 **Then** A10 alone may become supported under its governing decision while immutable provenance and claim limits are recorded
-**And** open A5, A6, A11, A13, increment ordering, or any other mandatory gate still blocks M2 production/release-candidate readiness.
+**And** open A5, A6, A9a, A11-M1, A11-M2, A13, increment ordering, or any other mandatory gate still blocks M2 production/release-candidate readiness.
 
 **Given** candidate, policy, topology, tool/runtime, protected-store inventory, owner contract, or freshness changes
 **When** prior evidence is reconsidered
@@ -6935,7 +7027,7 @@ So that AI assistance remains attributable, reviewable, and incapable of bypassi
 
 **Given** a submitted request
 **When** admission completes
-**Then** the composer displays exactly `accepted`, `needs-review`, `approval-required`, `denied`, `unsupported`, or a typed failure with immutable origin, operation/correlation, safe reason, and next action before implying AI work has started
+**Then** the composer displays exactly `accepted`, `needs-review`, `approval-required`, `classifier-indeterminate`, `denied`, `unsupported`, or a typed failure with immutable origin, operation/correlation, safe reason, and next action before implying AI work has started
 **And** tenant/Project/actor authority, instruction boundary, context/evidence/redaction, policy, classification, allowlist, controls, revision, idempotency, and audit readiness fail closed.
 
 **Given** classification finds an eligible low-risk read-only/no-external-effect request and A5 plus all required evidence is current
@@ -6944,9 +7036,14 @@ So that AI assistance remains attributable, reviewable, and incapable of bypassi
 **And** partial output is visibly uncommitted, uses `aria-live=off`, and never becomes a committed Project message unless the terminal completion transition wins.
 
 **Given** a request modifies state, exposes a file, sends externally, creates or assigns work, invokes a tool, or acts on behalf of someone
-**When** admission classifies any boundary effect
+**When** admission determinately classifies the declared boundary effect
 **Then** it creates the appropriate frozen `ProposeAIAction` successor in `approval-required`/`AwaitingApproval` with all six mandatory effect classes preserved
 **And** no boundary-crossing content streams, executes, or appears completed before a current independent human approval and later canonical execution.
+
+**Given** classification input or output is missing, invalid, unqualified, failed, unknown, or indeterminate
+**When** governed chat admission evaluates the attempt
+**Then** it returns `classifier-indeterminate` with no proposal, approval action, durable idempotency state, model/tool call, partial output, or effect
+**And** remediation requires a new linked request rather than approving or resuming the indeterminate attempt.
 
 **Given** an attempt is `Admitted`, `Streaming`, or its linked proposal is `AwaitingApproval`
 **When** the authorized user chooses cancellation or stop
@@ -6993,17 +7090,22 @@ So that I can resolve ambiguity confidently without seeing suppressed or unautho
 **Then** aligned labelled evidence rows, confidence/reason differences, source provenance, correction/history context, and single current selection remain perceivable without color or horizontal page scrolling
 **And** AI explanation is optional, subordinate, labelled, and unable to alter deterministic ordering/disposition.
 
-**Given** a candidate is selected or no safe candidate is acceptable
+**Given** an item in `NeedsReview` has a candidate selected or no safe candidate is acceptable
 **When** the persistent association decision bar renders
-**Then** its accessible description repeats the selected safe Project and exposes confirm, reject-all, defer, and escalate/needs-review actions plus an optional non-authoritative note
+**Then** its accessible description repeats the selected safe Project and exposes Confirm, Reject all, or Defer plus an optional non-authoritative note; Reject all requires a reason and Defer requires owner and revisit condition
 **And** unavailable actions remain focusable with associated safe reasons or are not-applicable-hidden according to the disposition table.
 
-**Given** confirm, reject, defer, or escalate is submitted
+**Given** an item is `Deferred`
+**When** the persistent association decision bar renders
+**Then** it exposes `ResumeEmailAssociationReview` only after the revisit condition and evidence refresh, before any later Confirm, Reject all, or Defer decision
+**And** escalation remains guidance/routing rather than a lifecycle transition, while worker-only `MarkEmailAssociationNeedsReview` is not exposed.
+
+**Given** Confirm, Reject all, Defer, or Resume is submitted from its permitted source state
 **When** CommandGateway revalidates tenant/Project/actor, candidate/evidence freshness, policy/scorer, item state, expected revision/decision slot, idempotency, and audit
 **Then** the UI shows the canonical decision, reviewer/time, operation, origin, audit result, and next action without optimistic mutation
 **And** conflict, permission loss, expired evidence, changed ranking, or audit unavailability preserves input/selection and focuses the linked error summary.
 
-**Given** loading, no-safe-candidate, below-threshold, conflict, scorer-error, stale/expired evidence, validation, confirmed/rejected/deferred/escalated, retryable, quarantined, terminal, unauthorized, and degraded cases
+**Given** loading, no-safe-candidate, below-threshold, conflict, scorer-error, stale/expired evidence, validation, confirmed/rejected/deferred/resumed, escalation-guidance, retryable, quarantined, terminal, unauthorized, and degraded cases
 **When** the live route renders or refreshes from a bounded projection nudge
 **Then** focus/selection/filters remain stable, authoritative data is re-queried, persistent safe state and owner/next action remain inline, and suppressed-candidate safety is preserved
 **And** a toast, count, tooltip, raw audit record, or nudge payload is never the sole state source.
@@ -7025,8 +7127,13 @@ So that approval or refusal is informed and cannot be mistaken for completed exe
 
 **Given** a governed request has been classified
 **When** S3 renders its disposition
-**Then** the prominent user state is exactly `allowed-read-only`, `approval-required`, `denied`, or `unsupported`, while the internal classifier output/version/input tuple is subordinate and separately labelled
-**And** indeterminate classification or any of the six boundary effects can never appear low-risk or execute without review.
+**Then** the prominent user state is exactly `allowed-read-only`, `approval-required`, `classifier-indeterminate`, `denied`, or `unsupported`, while the determinate internal classifier output/version/input tuple is subordinate and separately labelled
+**And** none of the six boundary effects can appear low risk or execute without review.
+
+**Given** the state is `classifier-indeterminate`
+**When** S3 renders the request
+**Then** no proposal or approval action exists and the safe remediation/new-linked-request action is displayed
+**And** the surface never disguises the state as reviewable `approval-required` work.
 
 **Given** an `AwaitingApproval` AI proposal
 **When** its composed proposal panel loads
@@ -7070,8 +7177,13 @@ So that correction, governance, and queue actions expose their exact scope and s
 
 **Given** an eligible association correction on S4
 **When** the authorized Project actor reviews and submits it through the generated typed Client
-**Then** rationale, predecessor/successor, expected revision, source evidence, affected-store manifest, `Correcting`/`Correction-delayed` progress, acknowledged/remaining stores, estimate, owner, next action, P2 escalation, and visible AI-context block remain in the composed route until `Corrected`
-**And** stale revision, permission loss, failed acknowledgement, or delayed invalidation never hides or prematurely completes the correction.
+**Then** rationale, predecessor/successor, expected revision, source evidence, the full frozen manifest of affected ChatBot stores, Conversations/Folders records, approved or executed actions, appended messages, converted intents, sent mail, external/tool effects, and file disclosures, exact `Correcting|CorrectionDelayed|Corrected` progress, acknowledgements or irreversible-effect dispositions, remaining items, estimate, owner, next action, and P2 escalation remain visible
+**And** affected source and destination AI context stays visibly blocked until every manifest item completes and the state becomes `Corrected`.
+
+**Given** stale revision, permission loss, failed acknowledgement, or delayed invalidation
+**When** correction status renders
+**Then** the exact safe state and recovery action remain visible and correction cannot complete prematurely
+**And** a delayed item uses the exact durable state `CorrectionDelayed`.
 
 **Given** an authorized administrator opens S5
 **When** mailbox, policy, service-client, role, allowlist, notification, operational-limit, or safety-control configuration is viewed
@@ -7123,10 +7235,10 @@ So that I can distinguish origin and operational state without treating a dashbo
 **Then** Fluent summary cards and paged grids show tenant-safe scope, stable status, depth/oldest age, owner/assignee, current value, target/window/budget/threshold, freshness/calibration, alert/escalation, and safe next action
 **And** every measure is visibly `within-budget`, `approaching`, `exhausted`, `unsupported`, `unmeasurable`, stale, or degraded as supported by current evidence.
 
-**Given** a signal, route, calibration, burn test, owner, full window, or A11 candidate binding is missing/stale
+**Given** an applicable A11-M1 metric definition/source/owner/result or A11-M2 signal, route, calibration, burn test, owner, full window, or candidate binding is missing or stale
 **When** the relevant dashboard region renders
 **Then** it shows the exact missing-support reason and cannot display healthy/pass/readiness treatment
-**And** synthetic, local, historical, partial, zero-filled, or inaccessible evidence is never inferred as live support.
+**And** synthetic, local, historical, partial, zero-filled, inaccessible, or cross-substituted A11-M1/A11-M2 evidence is never inferred as live support.
 
 **Given** an operational item has an authorized safe action
 **When** the user follows it
@@ -7206,7 +7318,7 @@ So that the final UI is composed, accessible, responsive, localized, and faithfu
 **Given** the route-specific state matrices
 **When** normal, loading, empty, pending, stale, conflict, retryable, blocked, degraded, failed, terminal, unauthorized, redacted, unsupported, and unmeasurable fixtures run as applicable
 **Then** each state uses its canonical stable code/status, concise existence-neutral message, owner/next safe action, operation/correlation, evidence freshness, and permitted controls
-**And** no UI state fabricates readiness, hides a terminal result, trusts a notification payload, or bypasses CommandGateway.
+**And** `classifier-indeterminate` and `CorrectionDelayed` use their exact non-reviewable/delayed contracts; no UI state fabricates readiness, hides a terminal result, trusts a notification payload, or bypasses CommandGateway.
 
 **Given** governed chat acceptance
 **When** submission/admission, low-risk stream, boundary-effect proposal, stop, three distinct cancellations, retry, duplicate, stale revision, and stop/completion race cases run
@@ -7226,6 +7338,6 @@ So that the final UI is composed, accessible, responsive, localized, and faithfu
 **Given** release evidence is assembled for the exact candidate
 **When** the full UI matrix passes
 **Then** it records runtime/source/asset/component versions, route/state inventory, fixtures, browser/assistive configuration, locale/theme/viewport, test runner, results, offender lists, backend correlations, timestamps, provenance, and independent validation
-**And** open A5, A6, A10, A11, A13, increment ordering, or another product gate still blocks its own pilot/compliance/production claim independently of UI conformance.
+**And** open A5, A6, A9a, A10, A11-M1, A11-M2, A13, increment ordering, or another product gate still blocks its own pilot/compliance/production claim independently of UI conformance.
 
 **Requirements:** FR16, FR21, FR23, FR24, FR28, FR28a, FR28b, FR28c, FR28d, FR28e, FR28f, FR57, FR59, FR68, FR76, FR77, FR79, FR80, FR81, FR81a, FR84, FR85, FR86, FR87, FR88, FR89, FR90, ARCH-6, ARCH-8, ARCH-11, ARCH-12, ARCH-15, ARCH-16, ARCH-17, ARCH-26, ARCH-31, ARCH-32, ARCH-33, ARCH-37, ARCH-39, NFR1, NFR2, NFR6, NFR7, NFR10, NFR11, NFR13, NFR13a, NFR15, NFR15a, NFR16, NFR17, NFR18, NFR24, NFR27, NFR32, NFR34, NFR36, NFR38, NFR39, NFR40, NFR48, NFR49, NFR50, NFR51, NFR60, NFR61, NFR62, NFR63, NFR64, NFR65, NFR67, NFR68, NFR70, UX-DR1, UX-DR2, UX-DR3, UX-DR4, UX-DR5, UX-DR6, UX-DR7, UX-DR8, UX-DR9, UX-DR10, UX-DR11, UX-DR12, UX-DR13, UX-DR14, UX-DR15, UX-DR16, UX-DR17, UX-DR18, UX-DR19, UX-DR20, UX-DR21, UX-DR22, UX-DR23, UX-DR24, UX-DR25, UX-DR26, UX-DR27, UX-DR28, UX-DR29, UX-DR30, UX-DR31, UX-DR32, UX-DR33, UX-DR34, UX-DR35, UX-DR36, UX-DR37, UX-DR38, UX-DR39, UX-DR40, UX-DR41, UX-DR42, UX-DR43, UX-DR44, UX-DR45, UX-DR46, UX-DR47, UX-DR48, UX-DR49, UX-DR50, UX-DR51, UX-DR52, UX-DR53, UX-DR54, UX-DR55, UX-DR56, UX-DR57, UX-DR58, UX-DR59, UX-DR60, UX-DR61, UX-DR62, UX-DR63, UX-DR64, UX-DR65, UX-DR66, UX-DR67, UX-DR68, UX-DR69, UX-DR70.
