@@ -14,15 +14,3 @@ public sealed record AdminQueueSummary(
     AdminOperationReference AuditRef,
     string SchemaVersion,
     string CorrelationId);
-
-public sealed record AdminQueueSummaryBucket(
-    string Status,
-    string OwnerClass,
-    int Count,
-    int OldestAgeSeconds);
-
-public sealed record AdminQueueSummaryItemRef(
-    string ItemRef,
-    string Status,
-    string OwnerClass,
-    IReadOnlyList<string> DisabledActionReasonCodes);

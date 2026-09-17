@@ -7,15 +7,6 @@ using Hexalith.ChatBot.Server.Projections;
 namespace Hexalith.ChatBot.Server.Notifications;
 
 /// <summary>
-/// A tenant-bound unresolved queue item paired with its safe per-resource authority key (or <see langword="null"/>
-/// for an aggregate item with no item-specific context). The authority key comes from the tenant-bound queue
-/// snapshot, never from restricted content.
-/// </summary>
-internal sealed record EscalationQueueItem(
-    AdminQueueSummaryProjectionItem Item,
-    string? ItemProjectRef = null);
-
-/// <summary>
 /// Deterministic, clock-injected escalation evaluation engine (FR73, FR59, NFR2). Given the unresolved queue-item
 /// snapshot, the active escalation-policy map, the candidate recipient set, and an injected "now", it determines
 /// which items breach <c>age &gt; threshold OR severity &gt;= threshold</c> for their <c>(state-class × scope)</c>

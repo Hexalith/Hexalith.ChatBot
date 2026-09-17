@@ -3,8 +3,11 @@
 set -euo pipefail
 
 readonly test_root="${MERGE_TEST_ROOT:-tests}"
-readonly dotnet_command="${MERGE_TEST_DOTNET:-dotnet}"
 readonly expected_lanes="${MERGE_TEST_EXPECTED_LANES:-13}"
+readonly results_root="${MERGE_TEST_RESULTS_ROOT:-TestResults/merge-test-lanes}"
+readonly runner_override="${MERGE_TEST_RUNNER_OVERRIDE:-}"
+readonly script_directory="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly runner_boundary="${script_directory}/run-xunit-v4.sh"
 
 if [[ ! -d "$test_root" ]]; then
     printf 'Merge test root %s does not exist.\n' "$test_root" >&2
@@ -16,8 +19,8 @@ if [[ ! "$expected_lanes" =~ ^[1-9][0-9]*$ ]]; then
     exit 1
 fi
 
-if ! command -v "$dotnet_command" >/dev/null 2>&1; then
-    printf 'Merge test command %s is unavailable.\n' "$dotnet_command" >&2
+if [[ ! -x "$runner_boundary" ]]; then
+    printf 'xUnit v4 runner boundary %s is unavailable.\n' "$runner_boundary" >&2
     exit 1
 fi
 
@@ -68,14 +71,18 @@ if (( ${#projects[@]} != expected_lanes )); then
     exit 1
 fi
 
-# The ordinary lanes run on the VSTest bridge (Microsoft.NET.Test.Sdk + xunit.runner.visualstudio), not on
-# Microsoft.Testing.Platform, so a Microsoft.Testing.Platform switch such as --minimum-expected-tests is parsed
-# as a run-settings argument, silently ignored, and a lane that discovers zero tests still exits 0. The
-# RunConfiguration.TreatNoTestsAsError run-settings override is the form this toolchain honors; it is the same
-# setting live-recovery.runsettings applies to the required recovery lanes.
+mkdir -p "$results_root"
 for project in "${projects[@]}"; do
-    "$dotnet_command" test "$project" -m:1 --no-build --configuration Release \
-        -- RunConfiguration.TreatNoTestsAsError=true
+    lane="$(basename "${project%.csproj}")"
+    runner="${project%/*}/bin/Release/net10.0/${lane}"
+    if [[ -n "$runner_override" ]]; then
+        runner="$runner_override"
+    fi
+
+    XUNIT_TEST_LANE="$lane" bash "$runner_boundary" \
+        "$runner" \
+        "${results_root}/${lane}.ctrf.json" \
+        > "${results_root}/${lane}.runner.jsonl"
 done
 
 printf 'Executed %s ordinary merge test lanes successfully.\n' "${#projects[@]}"

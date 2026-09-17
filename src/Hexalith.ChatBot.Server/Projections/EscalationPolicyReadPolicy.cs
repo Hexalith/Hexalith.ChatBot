@@ -8,18 +8,6 @@ using Hexalith.ChatBot.Server.Governance.Admin;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
-internal sealed record EscalationPolicyReadDecision(
-    bool IsAllowed,
-    string ReasonCode,
-    EscalationPolicySummary? Summary)
-{
-    public static EscalationPolicyReadDecision Denied(string reasonCode)
-        => new(false, reasonCode, null);
-
-    public static EscalationPolicyReadDecision Allowed(EscalationPolicySummary summary)
-        => new(true, "authorized", summary);
-}
-
 /// <summary>
 /// Gates escalation-policy read-back to human admins holding the policy scope (<see cref="AdminScope.Policy"/>, held
 /// by <c>policy-admin</c> and <c>tenant-admin</c>), reusing the existing read-policy pattern. Denials carry a safe

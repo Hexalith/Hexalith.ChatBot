@@ -23,12 +23,3 @@ internal sealed record ChatBotApprovalResult(
     public static ChatBotApprovalResult Blocked(string reasonCode)
         => new(ChatBotApprovalResultKind.Blocked, reasonCode, "none");
 }
-
-internal enum ChatBotApprovalResultKind
-{
-    Approved,
-    AllowedLowRiskExecution,
-    RoutedToApproval,
-    ApprovalDecisionAllowed,
-    Blocked,
-}

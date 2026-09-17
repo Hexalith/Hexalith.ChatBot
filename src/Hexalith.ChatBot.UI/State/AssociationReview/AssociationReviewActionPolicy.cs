@@ -1,16 +1,5 @@
 namespace Hexalith.ChatBot.UI.State.AssociationReview;
 
-/// <summary>Outcome of the correction panel's status resolution.</summary>
-public enum AssociationCorrectionStatus
-{
-    Blocked,
-    Delayed,
-    Pending,
-    Partial,
-    ProjectionPending,
-    Success,
-}
-
 /// <summary>
 /// Decides which association actions an operator may take and which reason is shown when they may not.
 /// This is a governance-visible gate, so it lives outside the Razor <c>@code</c> block where unit tests can

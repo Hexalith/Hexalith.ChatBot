@@ -8,18 +8,6 @@ using Hexalith.ChatBot.Server.Governance.Admin;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
-internal sealed record NotificationRoutingReadDecision(
-    bool IsAllowed,
-    string ReasonCode,
-    NotificationRoutingSummary? Summary)
-{
-    public static NotificationRoutingReadDecision Denied(string reasonCode)
-        => new(false, reasonCode, null);
-
-    public static NotificationRoutingReadDecision Allowed(NotificationRoutingSummary summary)
-        => new(true, "authorized", summary);
-}
-
 /// <summary>
 /// Gates notification routing-config read-back to human admins holding the routing scope
 /// (<see cref="AdminScope.Policy"/>, held by <c>policy-admin</c> and <c>tenant-admin</c>), reusing the existing

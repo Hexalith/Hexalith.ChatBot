@@ -1,19 +1,6 @@
 namespace Hexalith.ChatBot.UI.Design;
 
 /// <summary>
-/// A single bounded escalation-matrix row: the <c>(state-class × scope)</c> key plus the bounded age threshold and
-/// the declared severity, escalation-target role, and channel tokens. All values are declared enum tokens or bounded
-/// integers, never recipient PII.
-/// </summary>
-public sealed record ChatBotEscalationPolicyMatrixRow(
-    string StateClass,
-    string Scope,
-    int AgeThresholdSeconds,
-    string SeverityThreshold,
-    string EscalationTargetRole,
-    string EscalationChannel);
-
-/// <summary>
 /// Contract bundle for the escalation-policy matrix editor (Story 7.7). Mirrors
 /// <see cref="ChatBotNotificationRoutingEditorContract"/>: a bounded <c>(state-class × scope)</c> grid with a numeric
 /// (bounded) age-threshold input plus severity/target-role/channel selectors drawn from declared enums, validation

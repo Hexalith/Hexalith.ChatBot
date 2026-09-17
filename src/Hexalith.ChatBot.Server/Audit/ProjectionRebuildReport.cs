@@ -97,37 +97,3 @@ internal sealed record ProjectionRebuildReport(
             PreRebuildDigests: [],
             RebuiltDigests: []);
 }
-
-/// <summary>
-/// The measured result the <see cref="IProjectionRebuildDriver"/> seam returns to the coordinator: the wall-clock bounds,
-/// the measured rebuild duration, the pre-rebuild + rebuilt structural snapshots, and the two stamped projection schema
-/// versions. The pure <see cref="ProjectionRebuildEquivalenceEvaluator"/> folds the snapshots + schema versions into a
-/// verdict; the coordinator compares <see cref="MeasuredDuration"/> against <see cref="RecoveryTargets.MaxRto"/>.
-/// </summary>
-internal sealed record ProjectionRebuildMeasurement(
-    DateTimeOffset StartedAtUtc,
-    DateTimeOffset EndedAtUtc,
-    TimeSpan MeasuredDuration,
-    IReadOnlyList<ProjectionResourceDigest> PreRebuildSnapshot,
-    IReadOnlyList<ProjectionResourceDigest> RebuiltSnapshot,
-    string PreRebuildSchemaVersion,
-    string RebuiltSchemaVersion,
-    RecoveryValidationExecutionAssertions? ExecutionAssertions = null,
-    int SourceResourceCount = 0,
-    int GovernedResourceCount = 0,
-    int WormRecordCount = 0,
-    int WormOperationCount = 0);
-
-/// <summary>
-/// The structured result of a projection-rebuild validation sweep across every baseline dataset (Story 9.12, AC4). A
-/// CI/release gate asserts against the dimension it cares about — e.g. <c>Divergent == 0 &amp;&amp; Unmeasurable == 0</c>
-/// ⇒ the rebuilds are deterministic and produced evidence — while a <see cref="DurationExceeded"/> is a recovery-time
-/// recalibration signal kept distinct from a determinism failure. Mirrors <see cref="ContinuityDrillOutcome"/>.
-/// </summary>
-internal sealed record ProjectionRebuildOutcome(
-    int TenantsValidated,
-    int Equivalent,
-    int Divergent,
-    int DurationExceeded,
-    int Unmeasurable,
-    int Alerted);

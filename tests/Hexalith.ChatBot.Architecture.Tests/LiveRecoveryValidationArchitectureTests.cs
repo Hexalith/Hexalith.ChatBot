@@ -407,7 +407,7 @@ public static class LiveRecoveryValidationArchitectureTests
             source.ShouldContain("live-recovery-validation:");
             source.ShouldContain("timeout-minutes: 330");
             source.ShouldContain("cancel-in-progress: false");
-            source.ShouldContain("-m:1");
+            source.ShouldContain("bash .github/scripts/run-xunit-v4.sh");
             source.ShouldContain("LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate");
             uploadStep.Value.ShouldContain("if: always()");
             uploadStep.Value.ShouldContain("path: TestResults");
@@ -416,8 +416,8 @@ public static class LiveRecoveryValidationArchitectureTests
                 "ATTEMPT_PATH: ${{ runner.temp }}/workflow-attempt/producer-attempt.json");
             producerJob.Value.ShouldContain(
                 "cp \"$ATTEMPT_PATH\" TestResults/workflow-attempt/producer-attempt.json");
-            producerJob.Value.ShouldContain("console;verbosity=minimal");
-            producerJob.Value.ShouldNotContain("console;verbosity=detailed");
+            producerJob.Value.ShouldContain("bash .github/scripts/run-xunit-v4.sh");
+            producerJob.Value.ShouldContain("XUNIT_REQUIRE_ZERO_SKIPS=1");
             source.ShouldContain("Initialize metadata-only live recovery attempt envelope");
             source.ShouldContain("Finalize metadata-only live recovery attempt envelope");
             source.ShouldContain("live-recovery-producer-attempt");
@@ -475,11 +475,13 @@ public static class LiveRecoveryValidationArchitectureTests
             source.ShouldContain("RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess");
             source.ShouldContain("HEXALITH_CHATBOT_RECOVERY_EVIDENCE_REQUIRED");
 
-            // `dotnet test --filter` EXITS 0 when the filter matches nothing, so renaming or moving either lane's test
-            // turned a required job into a silent no-op that still reported success. Count per producer+gate invocation
-            // rather than a single whole-file Contains (which stays green if only one job keeps the flag).
-            int settingsUses = CountOccurrences(source, "--settings live-recovery.runsettings");
-            settingsUses.ShouldBeGreaterThanOrEqualTo(2);
+            // Every producer and replay gate runs through the same direct xUnit v4 boundary. Its CTRF check rejects
+            // zero execution and required skips, closing the silent-success behavior of the former VSTest filter.
+            source.ShouldNotContain("dotnet test ");
+            CountOccurrences(source, "bash .github/scripts/run-xunit-v4.sh")
+                .ShouldBeGreaterThanOrEqualTo(2);
+            CountOccurrences(source, "XUNIT_REQUIRE_ZERO_SKIPS=1")
+                .ShouldBeGreaterThanOrEqualTo(2);
 
             // The release path anchors what the run may claim about itself; without these the run still declared its
             // own dataset size and which tree its evidence came from.
@@ -676,7 +678,7 @@ public static class LiveRecoveryValidationArchitectureTests
         string repositoryRoot = RepositoryRoot();
         using Process process = new()
         {
-            StartInfo = new ProcessStartInfo("dotnet")
+            StartInfo = new ProcessStartInfo("bash")
             {
                 WorkingDirectory = repositoryRoot,
                 RedirectStandardOutput = true,
@@ -686,21 +688,17 @@ public static class LiveRecoveryValidationArchitectureTests
         };
         foreach (string argument in new[]
         {
-            "test",
-            Path.Combine("tests", "Hexalith.ChatBot.Architecture.Tests", "Hexalith.ChatBot.Architecture.Tests.csproj"),
-            "--no-build",
-
-            // Release, matching the configuration CI builds and runs. Without it this defaulted to Debug, so on a
-            // hosted runner the child died on a missing assembly, the rejection message never appeared, and the
-            // assertion passed -- guard-green/lane-dead, the very class this test exists to close.
-            "--configuration",
-            "Release",
-            "--filter",
-            "FullyQualifiedName=Hexalith.ChatBot.Architecture.Tests.LiveRecoveryValidationArchitectureTests.RunSettingsPlatformAcceptanceProbe",
-            "--settings",
-            "live-recovery.runsettings",
-            "--logger",
-            "console;verbosity=detailed",
+            Path.Combine(".github", "scripts", "run-xunit-v4.sh"),
+            Path.Combine(
+                "tests",
+                "Hexalith.ChatBot.Architecture.Tests",
+                "bin",
+                "Release",
+                "net10.0",
+                "Hexalith.ChatBot.Architecture.Tests"),
+            Path.Combine("TestResults", "architecture", "direct-runner-acceptance.ctrf.json"),
+            "-method",
+            "Hexalith.ChatBot.Architecture.Tests.LiveRecoveryValidationArchitectureTests.RunSettingsPlatformAcceptanceProbe",
         })
         {
             process.StartInfo.ArgumentList.Add(argument);

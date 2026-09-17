@@ -1,7 +1,12 @@
 using System.Text.RegularExpressions;
+using System.Text.Json;
 using System.Xml.Linq;
 
 using Hexalith.ChatBot.Tests;
+
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 using Shouldly;
 
@@ -30,6 +35,7 @@ public static class ScaffoldArchitectureTests
             "src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
             "src/Hexalith.ChatBot.Testing/Hexalith.ChatBot.Testing.csproj",
             "src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj",
+            "src/Hexalith.ChatBot.Workers/Hexalith.ChatBot.Workers.csproj",
             "tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj",
             "tests/Hexalith.ChatBot.Client.Tests/Hexalith.ChatBot.Client.Tests.csproj",
             "tests/Hexalith.ChatBot.Cli.Tests/Hexalith.ChatBot.Cli.Tests.csproj",
@@ -40,8 +46,12 @@ public static class ScaffoldArchitectureTests
             "tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj",
             "tests/Hexalith.ChatBot.Conformance.Tests/Hexalith.ChatBot.Conformance.Tests.csproj",
             "tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj",
+            "tests/Hexalith.ChatBot.RecoverySandbox/Hexalith.ChatBot.RecoverySandbox.csproj",
             "tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj",
             "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj",
+            "tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj",
+            "tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj",
+            "tests/Hexalith.ChatBot.Workers.Tests/Hexalith.ChatBot.Workers.Tests.csproj",
         ];
 
         foreach (string project in expected)
@@ -53,6 +63,104 @@ public static class ScaffoldArchitectureTests
         projects.ShouldNotContain("src/Hexalith.ChatBot.ServiceDefaults/Hexalith.ChatBot.ServiceDefaults.csproj");
         projects.ShouldNotContain("tests/Hexalith.ChatBot.Aspire.Tests/Hexalith.ChatBot.Aspire.Tests.csproj");
         projects.ShouldNotContain("tests/Hexalith.ChatBot.ServiceDefaults.Tests/Hexalith.ChatBot.ServiceDefaults.Tests.csproj");
+
+        projects.Where(static path => path.StartsWith("src/", StringComparison.Ordinal)).ShouldBe(
+            expected.Where(static path => path.StartsWith("src/", StringComparison.Ordinal)),
+            ignoreOrder: true,
+            customMessage: "the canonical module contains exactly nine source projects");
+        projects.Where(static path => path.StartsWith("tests/", StringComparison.Ordinal)).ShouldBe(
+            expected.Where(static path => path.StartsWith("tests/", StringComparison.Ordinal)),
+            ignoreOrder: true,
+            customMessage: "every independent test lane must remain in the solution inventory");
+        projects.ShouldNotContain(
+            static path => path.StartsWith("references/", StringComparison.Ordinal),
+            "sibling library projects enter through conditional project/package references, not as explicit solution projects");
+    }
+
+    [Fact]
+    public static void EveryNonGeneratedProductionSourceShouldContainExactlyOneNamedTopLevelDeclaration()
+    {
+        string root = RepositoryRoot();
+        string sourceRoot = Path.Combine(root, "src");
+        string[] sourceFiles = Directory
+            .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(static path => !path.EndsWith(".g.cs", StringComparison.OrdinalIgnoreCase))
+            .Where(static path => !path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                && !path.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        sourceFiles.Length.ShouldBeGreaterThan(
+            1_000,
+            "the one-type guard must prove it scanned the real production tree rather than pass over an empty path");
+
+        List<string> violations = [];
+        foreach (string sourceFile in sourceFiles)
+        {
+            SyntaxTree tree = CSharpSyntaxTree.ParseText(
+                File.ReadAllText(sourceFile),
+                new CSharpParseOptions(LanguageVersion.CSharp14),
+                sourceFile,
+                cancellationToken: TestContext.Current.CancellationToken);
+            Diagnostic[] parseErrors = tree.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                .ToArray();
+            if (parseErrors.Length > 0)
+            {
+                violations.Add(
+                    $"{Path.GetRelativePath(root, sourceFile)}: parse errors: "
+                    + string.Join(" | ", parseErrors.Select(static diagnostic => diagnostic.ToString())));
+                continue;
+            }
+
+            CompilationUnitSyntax compilationUnit = tree.GetCompilationUnitRoot(TestContext.Current.CancellationToken);
+            SyntaxList<MemberDeclarationSyntax> members = compilationUnit.Members.Count == 1
+                && compilationUnit.Members[0] is BaseNamespaceDeclarationSyntax namespaceDeclaration
+                    ? namespaceDeclaration.Members
+                    : compilationUnit.Members;
+            MemberDeclarationSyntax[] declarations = members
+                .Where(static member => member is BaseTypeDeclarationSyntax or DelegateDeclarationSyntax)
+                .ToArray();
+            bool hasTopLevelStatements = compilationUnit.Members.OfType<GlobalStatementSyntax>().Any();
+            bool hasExplicitTopLevelProgramDeclaration = declarations.Length == 1
+                && declarations[0] is TypeDeclarationSyntax typeDeclaration
+                && typeDeclaration.Identifier.ValueText == "Program"
+                && typeDeclaration.Modifiers.Any(SyntaxKind.PartialKeyword);
+            bool isTopLevelProgram = hasTopLevelStatements
+                && (declarations.Length == 0 || hasExplicitTopLevelProgramDeclaration);
+            int logicalObjectCount = isTopLevelProgram
+                ? 1
+                : declarations.Length + (hasTopLevelStatements ? 1 : 0);
+
+            if (logicalObjectCount != 1)
+            {
+                violations.Add(
+                    $"{Path.GetRelativePath(root, sourceFile)}: expected exactly one top-level declaration/object, "
+                    + $"found {logicalObjectCount}");
+                continue;
+            }
+
+            if (isTopLevelProgram)
+            {
+                Path.GetFileName(sourceFile).ShouldBe("Program.cs");
+                continue;
+            }
+
+            string declarationName = declarations[0] switch
+            {
+                BaseTypeDeclarationSyntax type => type.Identifier.ValueText,
+                DelegateDeclarationSyntax type => type.Identifier.ValueText,
+                _ => throw new InvalidOperationException("Unsupported top-level declaration."),
+            };
+            string fileOwnerName = Path.GetFileName(sourceFile).Split('.', 2)[0];
+            if (!string.Equals(fileOwnerName, declarationName, StringComparison.Ordinal))
+            {
+                violations.Add(
+                    $"{Path.GetRelativePath(root, sourceFile)}: declaration '{declarationName}' must live in its named file");
+            }
+        }
+
+        violations.ShouldBeEmpty();
     }
 
     [Fact]
@@ -100,6 +208,9 @@ public static class ScaffoldArchitectureTests
         string appHostSource = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
         appHostSource.ShouldContain("Hexalith_EventStore");
         appHostSource.ShouldContain("Hexalith_Tenants");
+
+        ProjectReferences("src/Hexalith.ChatBot.Workers/Hexalith.ChatBot.Workers.csproj")
+            .ShouldBe(["..\\Hexalith.ChatBot.Client\\Hexalith.ChatBot.Client.csproj"]);
     }
 
     [Fact]
@@ -592,11 +703,11 @@ public static class ScaffoldArchitectureTests
             // Story 9.8: TenantExportClassStatuses is a bounded, AC3-mandated export-status token set (succeeded /
             // failed-retryable / failed-terminal) — a distinct compliance domain, not the legacy lifecycle enum. It
             // legitimately owns the "succeeded" token exactly like the status enums above.
-            .Where(static file => !file.EndsWith(Path.Combine("Commands", "TenantExportContracts.cs"), StringComparison.Ordinal))
+            .Where(static file => !file.EndsWith(Path.Combine("Commands", "TenantExportClassStatuses.cs"), StringComparison.Ordinal))
             // Story 9.9: DeletionErasureClassStatuses is a bounded, AC4-mandated deletion-status token set (succeeded /
             // failed-retryable / failed-terminal) — the same compliance domain as TenantExportContracts, not the legacy
             // lifecycle enum. It legitimately owns the "succeeded" token exactly like the status enums above.
-            .Where(static file => !file.EndsWith(Path.Combine("Commands", "DeletionErasureContracts.cs"), StringComparison.Ordinal))
+            .Where(static file => !file.EndsWith(Path.Combine("Commands", "DeletionErasureClassStatuses.cs"), StringComparison.Ordinal))
             .Where(static file => !file.EndsWith(Path.Combine("Localization", "ChatBotUiTextLocalizer.cs"), StringComparison.Ordinal))
             .Where(file => stringLiteral.Matches(File.ReadAllText(file))
                 .Select(static match => match.Groups["value"].Value)
@@ -734,8 +845,107 @@ public static class ScaffoldArchitectureTests
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<Nullable>enable</Nullable>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<ImplicitUsings>enable</ImplicitUsings>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<TreatWarningsAsErrors>true</TreatWarningsAsErrors>");
+        File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<LangVersion>14.0</LangVersion>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<Deterministic>true</Deterministic>");
+        File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<NuGetAudit>true</NuGetAudit>");
+        File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<NuGetAuditMode>all</NuGetAuditMode>");
+        File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain(
+            "<UseHexalithProjectReferences Condition=\"'$(UseHexalithProjectReferences)' == ''\">false</UseHexalithProjectReferences>");
+        File.ReadAllText(Path.Combine(root, "src", "Hexalith.ChatBot.AppHost", "Hexalith.ChatBot.AppHost.csproj"))
+            .ShouldContain("<IsPublishable>false</IsPublishable>");
         PackageCatalogTestHelper.AssertExclusiveAuthority();
+    }
+
+    [Fact]
+    public static void ReleaseMetadataShouldBindExactInventoryAndRemainBlockedOnOpenEvidenceGates()
+    {
+        string root = RepositoryRoot();
+        using JsonDocument document = JsonDocument.Parse(
+            File.ReadAllText(Path.Combine(root, "release-metadata.json")));
+        JsonElement metadata = document.RootElement;
+
+        metadata.GetProperty("schemaVersion").GetInt32().ShouldBe(1);
+        metadata.GetProperty("releasePosture").GetString().ShouldBe("blocked-open-gates");
+
+        Dictionary<string, string> packages = metadata.GetProperty("inventory").GetProperty("packages")
+            .EnumerateArray()
+            .ToDictionary(
+                static artifact => artifact.GetProperty("id").GetString()!,
+                static artifact => artifact.GetProperty("project").GetString()!,
+                StringComparer.Ordinal);
+        packages.ShouldBe(
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["Hexalith.ChatBot.Contracts"] = "src/Hexalith.ChatBot.Contracts/Hexalith.ChatBot.Contracts.csproj",
+                ["Hexalith.ChatBot.Client"] = "src/Hexalith.ChatBot.Client/Hexalith.ChatBot.Client.csproj",
+                ["Hexalith.ChatBot.Testing"] = "src/Hexalith.ChatBot.Testing/Hexalith.ChatBot.Testing.csproj",
+            },
+            ignoreOrder: true);
+        foreach (string projectPath in packages.Values)
+        {
+            XDocument.Load(Path.Combine(root, projectPath))
+                .Descendants("IsPackable")
+                .Single()
+                .Value
+                .ShouldBe("true");
+        }
+
+        Dictionary<string, string> containers = metadata.GetProperty("inventory").GetProperty("containers")
+            .EnumerateArray()
+            .ToDictionary(
+                static artifact => artifact.GetProperty("id").GetString()!,
+                static artifact => artifact.GetProperty("project").GetString()!,
+                StringComparer.Ordinal);
+        containers.ShouldBe(
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["hexalith-chatbot-server"] = "src/Hexalith.ChatBot.Server/Hexalith.ChatBot.Server.csproj",
+                ["hexalith-chatbot-ui"] = "src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj",
+            },
+            ignoreOrder: true);
+        foreach ((string containerId, string projectPath) in containers)
+        {
+            XDocument project = XDocument.Load(Path.Combine(root, projectPath));
+            project.Descendants("IsPublishable").Single().Value.ShouldBe("true");
+            project.Descendants("EnableContainer").Single().Value.ShouldBe("true");
+            project.Descendants("ContainerRepository").Single().Value.ShouldBe(containerId);
+        }
+
+        JsonElement[] blockers = metadata.GetProperty("openBlockers").EnumerateArray().ToArray();
+        blockers.Select(static blocker => blocker.GetProperty("gate").GetString()).ShouldBe(
+            ["A5", "A6", "A9a", "A13"],
+            ignoreOrder: true);
+        blockers.ShouldAllBe(static blocker => blocker.GetProperty("state").GetString() == "open");
+
+        JsonElement a9aEvidence = blockers
+            .Single(static blocker => blocker.GetProperty("gate").GetString() == "A9a")
+            .GetProperty("requiredEvidence");
+        string[] exactA9aArtifacts = a9aEvidence.EnumerateArray()
+            .Select(static artifact => string.Join(
+                ':',
+                artifact.GetProperty("kernel").GetString(),
+                artifact.GetProperty("runtimeArtifact").GetString(),
+                artifact.GetProperty("state").GetString()))
+            .ToArray();
+        exactA9aArtifacts.ShouldBe(
+            [
+                "association:AssociationScorer:open-exact-evidence-required",
+                "task-intent:TaskIntentDetector:open-exact-evidence-required",
+                "action-risk:ActionRiskClassifier:open-exact-evidence-required",
+            ],
+            ignoreOrder: true);
+
+        metadata.GetProperty("authorizedReadinessClaims").GetArrayLength().ShouldBe(0);
+        string[] prohibitedClaims = metadata.GetProperty("prohibitedClaims")
+            .EnumerateArray()
+            .Select(static claim => claim.GetString()!)
+            .ToArray();
+        prohibitedClaims.ShouldContain("M0 readiness");
+        prohibitedClaims.ShouldContain("M1 readiness");
+        prohibitedClaims.ShouldContain("pilot readiness");
+        prohibitedClaims.ShouldContain("compliance readiness");
+        prohibitedClaims.ShouldContain("production readiness");
+        prohibitedClaims.ShouldContain("gate readiness");
     }
 
     [Fact]
@@ -747,6 +957,13 @@ public static class ScaffoldArchitectureTests
         modules.ShouldContain("path = references/Hexalith.Tenants");
         modules.ShouldContain("path = references/Hexalith.FrontComposer");
         modules.ShouldNotContain("path = Hexalith.EventStore");
+
+        string[] paths = Regex.Matches(modules, @"(?m)^\s*path\s*=\s*(\S+)\s*$")
+            .Select(static match => match.Groups[1].Value)
+            .ToArray();
+        paths.ShouldNotBeEmpty("the root-declared sibling scan must be non-vacuous");
+        paths.Distinct(StringComparer.Ordinal).Count().ShouldBe(paths.Length);
+        paths.ShouldAllBe(static path => path.StartsWith("references/", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -783,7 +1000,7 @@ public static class ScaffoldArchitectureTests
         mergeJob.ShouldNotContain("--recursive");
         mergeJob.ShouldContain("dotnet restore Hexalith.ChatBot.slnx");
         mergeJob.ShouldContain(
-            "dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -m:1");
+            "dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -p:UseHexalithProjectReferences=false -m:1 /nr:false");
         mergeJob.ShouldContain("bash .github/scripts/run-merge-test-lanes.sh");
         mergeJob.ShouldNotContain("actions/upload-artifact");
         mergeJob.ShouldNotContain("machine-test-results");
@@ -940,12 +1157,13 @@ public static class ScaffoldArchitectureTests
         Regex.Matches(workflow, "ref: \\$\\{\\{ github\\.event\\.pull_request\\.head\\.sha \\|\\| github\\.sha \\}\\}")
             .Count.ShouldBeGreaterThanOrEqualTo(3);
         workflow.ShouldContain("actions: read");
-        workflow.ShouldContain("declare -A seen_lanes=()");
-        workflow.ShouldContain("find tests -type f -name '*.csproj'");
-        workflow.ShouldContain("expected_projects=15");
-        workflow.ShouldContain("expected_lanes=13");
-        workflow.ShouldContain("refusing a partial green job");
-        workflow.ShouldContain("Colliding test lane");
+        workflow.ShouldContain("bash .github/scripts/run-merge-test-lanes.sh");
+        string mergeLaneScript = File.ReadAllText(Path.Combine(root, ".github", "scripts", "run-merge-test-lanes.sh"));
+        mergeLaneScript.ShouldContain("declare -A seen_lanes=()");
+        mergeLaneScript.ShouldContain("expected_lanes=\"${MERGE_TEST_EXPECTED_LANES:-13}\"");
+        mergeLaneScript.ShouldContain("the merge lane set must match the build job exactly");
+        mergeLaneScript.ShouldContain("Colliding merge test lane");
+        mergeLaneScript.ShouldContain("run-xunit-v4.sh");
         workflow.ShouldContain("Non-zero push base %s is unavailable; refusing a one-commit fallback.");
         workflow.ShouldContain("base_sha=\"$head_sha\"");
         workflow.ShouldContain("Plan proposed completion production");
@@ -970,7 +1188,7 @@ public static class ScaffoldArchitectureTests
             + "        id: recovery\n"
             + "        if: steps.artifacts.outputs.requires_recovery == 'true'");
         workflow.ShouldContain(
-            "--results-directory \"${{ runner.temp }}/raw-recovery-results\"");
+            "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.ctrf.json");
         workflow.ShouldContain(
             "- name: Stop DAPR runtime for transition-declared current recovery primary\n"
             + "        if: always() && steps.artifacts.outputs.requires_recovery == 'true'");
@@ -978,8 +1196,8 @@ public static class ScaffoldArchitectureTests
         completionProducer.ShouldContain("timeout-minutes: 285");
         completionProducer.ShouldContain("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: \"250\"");
         completionProducer.ShouldContain("HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT: completion-recovery-evidence");
-        completionProducer.ShouldContain("console;verbosity=minimal");
-        completionProducer.ShouldNotContain("console;verbosity=detailed");
+        completionProducer.ShouldContain("bash .github/scripts/run-xunit-v4.sh");
+        completionProducer.ShouldContain("XUNIT_REQUIRE_ZERO_SKIPS=1");
         completionSummary.ShouldContain("if: always() && steps.artifacts.outputs.requires_recovery == 'true'");
         completionSummary.ShouldContain("summarize-recovery-attempt");
         completionUpload.ShouldContain("if: always() && steps.artifacts.outputs.requires_recovery == 'true'");
@@ -994,8 +1212,8 @@ public static class ScaffoldArchitectureTests
                     .Groups["name"].Value);
         scheduledRecoveryProducer.ShouldContain("timeout-minutes: 300");
         scheduledRecoveryProducer.ShouldContain("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: \"265\"");
-        scheduledRecoveryProducer.ShouldContain("console;verbosity=minimal");
-        scheduledRecoveryProducer.ShouldNotContain("console;verbosity=detailed");
+        scheduledRecoveryProducer.ShouldContain("bash .github/scripts/run-xunit-v4.sh");
+        scheduledRecoveryProducer.ShouldContain("XUNIT_REQUIRE_ZERO_SKIPS=1");
         workflow.ShouldContain("elapsed_seconds >= 2400");
         workflow.ShouldContain("job_start_epoch + (330 * 60)");
         workflow.ShouldContain("remaining_seconds - 900");
@@ -1013,28 +1231,27 @@ public static class ScaffoldArchitectureTests
         workflow.ShouldContain(
             "--output \"${{ runner.temp }}/machine-results/recovery-primary/live-recovery-validation.trx\"");
         workflow.ShouldContain(
-            "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests."
+            "-method \"Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests."
             + "TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology");
         workflow.ShouldContain(
-            "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests."
+            "-method \"Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests."
             + "AuthenticatedProductionClientShouldMessageAskAndStopAcrossRequiredChromeMatrix");
-        workflow.ShouldContain("trx;LogFileName=topology-acceptance.trx");
-        workflow.ShouldContain("trx;LogFileName=story132-topology-acceptance.trx");
-        // `dotnet test --filter` exits 0 when the filter matches nothing, so both required TRX files need their own
-        // counter guard: without it a renamed or moved test turns this required gate green while proving nothing.
+        workflow.ShouldContain("TestResults/topology-acceptance.ctrf.json");
+        workflow.ShouldContain("TestResults/story132-topology-acceptance.ctrf.json");
+        // Retain the consumer-facing TRX counter guard in addition to the xUnit v4 boundary's CTRF validation.
         workflow.ShouldContain("Require one executed topology acceptance test and zero skips");
         workflow.ShouldContain("E.parse('TestResults/topology-acceptance.trx')");
         workflow.ShouldContain("Require one executed Story 13.2 test and zero skips");
         workflow.ShouldContain("E.parse('TestResults/story132-topology-acceptance.trx')");
         workflow.ShouldContain("c.get('notExecuted') == '0'");
         releaseWorkflow.ShouldContain(
-            "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests."
+            "-method \"Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests."
             + "TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology");
         releaseWorkflow.ShouldContain(
-            "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests."
+            "-method \"Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests."
             + "AuthenticatedProductionClientShouldMessageAskAndStopAcrossRequiredChromeMatrix");
-        releaseWorkflow.ShouldContain("trx;LogFileName=topology-acceptance.trx");
-        releaseWorkflow.ShouldContain("trx;LogFileName=story132-topology-acceptance.trx");
+        releaseWorkflow.ShouldContain("TestResults/topology-acceptance.ctrf.json");
+        releaseWorkflow.ShouldContain("TestResults/story132-topology-acceptance.ctrf.json");
         releaseWorkflow.ShouldContain("Require one executed topology acceptance test and zero skips");
         releaseWorkflow.ShouldContain("E.parse('TestResults/topology-acceptance.trx')");
         releaseWorkflow.ShouldContain("Require one executed Story 13.2 test and zero skips");
@@ -1046,13 +1263,13 @@ public static class ScaffoldArchitectureTests
             + "      - topology-acceptance\n"
             + "      - live-recovery-evidence-gate");
         workflow.ShouldContain(
-            "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests."
+            "-method \"Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests."
             + "LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate");
-        workflow.ShouldContain("trx;LogFileName=live-recovery-validation.trx");
+        workflow.ShouldContain("live-recovery-validation.ctrf.json");
         releaseWorkflow.ShouldContain(
-            "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests."
+            "-method \"Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests."
             + "LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate");
-        releaseWorkflow.ShouldContain("trx;LogFileName=live-recovery-validation.trx");
+        releaseWorkflow.ShouldContain("live-recovery-validation.ctrf.json");
         workflow.ShouldContain("Collect transition-declared retained exact-run artifacts");
         workflow.ShouldContain("done < \"$RETAINED_LOCATORS_PATH\"");
         workflow.ShouldNotContain("_bmad-output/implementation-artifacts/evidence/*.json | sort -u");

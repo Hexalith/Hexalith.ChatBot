@@ -7,12 +7,6 @@ using Hexalith.ChatBot.Server.Governance.Admin;
 namespace Hexalith.ChatBot.Server.Notifications;
 
 /// <summary>
-/// A candidate recipient for routing resolution: a metadata-safe reference plus the principal carrying the
-/// authority claims used to resolve scope and per-resource authority.
-/// </summary>
-internal sealed record NotificationRecipientCandidate(string RecipientRef, ClaimsPrincipal Principal);
-
-/// <summary>
 /// Server-side routing/recipient-resolution engine (FR72, NFR2). Given a notify-worthy state event and the
 /// configured <c>(state-class × scope)</c> routing map, it produces the metadata-only delivery set, reusing the
 /// existing authority path (<see cref="AdminAuthorityEvaluator"/> for scope-based recipients and the per-project

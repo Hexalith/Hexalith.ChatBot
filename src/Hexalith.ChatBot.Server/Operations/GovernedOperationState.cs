@@ -975,17 +975,3 @@ public sealed class GovernedOperationState
             _ => 0,
         };
 }
-
-public sealed record CorrectionPropagationStoreAcknowledgement(
-    string StoreKey,
-    long SourceVersion,
-    DateTimeOffset StartedAtUtc,
-    DateTimeOffset CompletedAtUtc,
-    string Outcome,
-    string? FailureReasonCode,
-    string RedactionState,
-    string RetentionClass,
-    string SchemaVersion)
-{
-    public bool IsSuccessful => string.Equals(Outcome, "success", StringComparison.Ordinal);
-}

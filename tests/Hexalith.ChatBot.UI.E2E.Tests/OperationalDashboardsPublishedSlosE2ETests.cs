@@ -92,7 +92,7 @@ public sealed class OperationalDashboardsPublishedSlosE2ETests
     private static void AssertPublishedSloContractWithoutBrowser()
     {
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/OperationalDashboards.razor");
-        string catalog = ReadProjectFile("src/Hexalith.ChatBot.Contracts/Queries/OperatingBaselineContracts.cs");
+        string catalog = ReadProjectFile("src/Hexalith.ChatBot.Contracts/Queries/OperatingBaselineCatalog.cs");
         string english = ReadProjectFile("src/Hexalith.ChatBot.UI/Localization/SharedResource.resx");
         string french = ReadProjectFile("src/Hexalith.ChatBot.UI/Localization/SharedResource.fr.resx");
 

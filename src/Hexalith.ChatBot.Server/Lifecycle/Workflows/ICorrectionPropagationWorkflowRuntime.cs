@@ -8,9 +8,3 @@ internal interface ICorrectionPropagationWorkflowRuntime
 
     ValueTask<CorrectionPropagationWorkflowRuntimeStatus> CheckAsync(CancellationToken cancellationToken);
 }
-
-internal sealed record CorrectionPropagationWorkflowRuntimeStatus(
-    bool IsAvailable,
-    string Status,
-    string ReasonCode,
-    DateTimeOffset CheckedAtUtc);

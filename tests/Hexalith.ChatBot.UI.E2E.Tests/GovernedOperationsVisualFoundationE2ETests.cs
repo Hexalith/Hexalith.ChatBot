@@ -4673,7 +4673,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         string fixture = BuildAssociationReviewFixture(AssociationReviewFixtureScenario.AmbiguousRouting);
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor");
         string service = ReadProjectFile("src/Hexalith.ChatBot.UI/Services/AssociationReviewService.cs");
-        string model = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewModels.cs");
+        string model = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewModel.cs");
 
         page.ShouldContain("ChatBotAssociationEvidenceComparison");
         service.ShouldContain("status.LifecycleState");
@@ -4705,7 +4705,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     {
         string fixture = BuildAssociationReviewFixture(AssociationReviewFixtureScenario.FailClosedRouting);
         string service = ReadProjectFile("src/Hexalith.ChatBot.UI/Services/AssociationReviewService.cs");
-        string model = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewModels.cs");
+        string model = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewModel.cs");
         string messageCodes = ReadProjectFile("src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCodes.cs");
 
         service.ShouldContain("status.SourceMailboxId");
@@ -4817,7 +4817,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         string complete = BuildAssociationCorrectionPropagationFixture(CorrectionPropagationFixtureScenario.Complete);
         string actions = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor");
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor");
-        string model = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewModels.cs");
+        string model = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewModel.cs");
         string service = ReadProjectFile("src/Hexalith.ChatBot.UI/Services/AssociationReviewService.cs");
         string messageCodes = ReadProjectFile("src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCodes.cs");
 

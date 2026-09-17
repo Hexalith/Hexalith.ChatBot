@@ -85,24 +85,3 @@ internal sealed record ContinuityDrillReport(
             correlationId,
             DrillUnmeasurableReasonCode);
 }
-
-/// <summary>
-/// The structured result of a continuity-drill sweep across every <see cref="ContinuityDrillScenarios"/> scenario
-/// (Story 9.11, AC4). A CI/release gate asserts against the dimension it cares about — e.g.
-/// <c>Unmeasurable == 0</c> ⇒ the drills ran and produced evidence (the fail-safe breach is an unmeasurable drill),
-/// distinct from <c>Missed == 0</c> ⇒ every target met. Mirrors <c>DerivedStoreIsolationProbeOutcome</c>.
-/// </summary>
-internal sealed record ContinuityDrillOutcome(int ScenariosRun, int Met, int Missed, int Unmeasurable, int Alerted);
-
-/// <summary>
-/// The measured result the <see cref="IContinuityDrillScenarioRunner"/> seam returns from running one recovery scenario:
-/// the wall-clock bounds and the measured RPO/RTO plus the data-loss check. The pure
-/// <see cref="ContinuityDrillEvaluator"/> folds these into a verdict.
-/// </summary>
-internal sealed record ContinuityDrillMeasurement(
-    DateTimeOffset StartedAtUtc,
-    DateTimeOffset EndedAtUtc,
-    TimeSpan MeasuredRpo,
-    TimeSpan MeasuredRto,
-    bool DataLossDetected,
-    RecoveryValidationExecutionAssertions? ExecutionAssertions = null);

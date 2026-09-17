@@ -101,7 +101,7 @@ public static class AiResponseStreamingTransportAdrTests
     [Fact]
     public static void StoryTenSixBImplementation_ShouldUseMetadataOnlyNudgeAndTypedRequery()
     {
-        string actions = ReadProjectFile("src/Hexalith.ChatBot.UI/State/ProjectConversation/ProjectConversationActions.cs");
+        string actions = ReadProjectFile("src/Hexalith.ChatBot.UI/State/ProjectConversation/ProjectConversationAiResponseNudgeReceivedAction.cs");
         string effects = ReadProjectFile("src/Hexalith.ChatBot.UI/State/ProjectConversation/ProjectConversationEffects.cs");
         string contract = ReadProjectFile("src/Hexalith.ChatBot.Contracts/Queries/AiResponseProgressNudge.cs");
 

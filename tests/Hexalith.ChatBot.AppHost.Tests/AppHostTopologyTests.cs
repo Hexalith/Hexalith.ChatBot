@@ -69,6 +69,27 @@ public static class AppHostTopologyTests
     }
 
     [Fact]
+    public static void TierThreeEvidenceShouldRequireCanonicalComponentsSidecarsHealthAndEndpoints()
+    {
+        string evidenceTest = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "tests",
+            "Hexalith.ChatBot.IntegrationTests",
+            "TrivialGovernedCommandAspireE2eTests.cs"));
+
+        evidenceTest.ShouldContain("RequiredDaprComponentResources");
+        evidenceTest.ShouldContain("\"statestore\"");
+        evidenceTest.ShouldContain("\"chatbot-statestore\"");
+        evidenceTest.ShouldContain("\"chatbot-workflow-statestore\"");
+        evidenceTest.ShouldContain("\"chatbot-pubsub\"");
+        evidenceTest.ShouldContain("RequiredDaprSidecarResources");
+        evidenceTest.ShouldContain("ValidateCanonicalDaprResourceModel(builder)");
+        evidenceTest.ShouldContain("WaitForResourceHealthyWithinBudgetAsync");
+        evidenceTest.ShouldContain("endpoints.ShouldNotBeEmpty");
+        evidenceTest.ShouldContain("ASPIRE_DAPR_TOPOLOGY_EVIDENCE");
+    }
+
+    [Fact]
     public static void AppHostShouldInitializeSecurityThroughEventStoreAspireHelpers()
     {
         string source = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));

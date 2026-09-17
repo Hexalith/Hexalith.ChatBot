@@ -3,9 +3,6 @@ using Hexalith.ChatBot.Server.Gateway.Stages;
 
 namespace Hexalith.ChatBot.Server.Audit;
 
-/// <summary>The result of a replay-isolation sweep: how many production tenants were swept, breached, and alerted.</summary>
-internal sealed record ReplayIsolationProbeOutcome(int TenantsSwept, int Breaches, int Alerted);
-
 /// <summary>
 /// Injectable nightly replay-isolation probe coordinator (Story 9.4, AC3, FR95a, addendum §Replay Isolation) following
 /// the <see cref="AuditChainVerificationCoordinator"/> discipline <b>exactly</b>: a pure evaluator

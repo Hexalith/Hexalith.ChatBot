@@ -3,10 +3,6 @@ using Hexalith.ChatBot.Server.Gateway.Stages;
 
 namespace Hexalith.ChatBot.Server.Notifications;
 
-/// <summary>The result of a rubber-stamp-rate evaluation pass: how many tenant snapshots were evaluated, how many fired
-/// the FR41 tuning revisit (and were durably recorded), and how many fired but were suppressed fail-closed.</summary>
-internal sealed record ApprovalRubberStampRateOutcome(int Evaluated, int Triggered, int AuditUnavailable);
-
 /// <summary>
 /// Injectable rubber-stamp-rate coordinator (Story 7.11, NFR46/FR41/NFR15a) following the Story 7.7
 /// <see cref="EscalationEvaluationCoordinator"/> / Story 7.10 <see cref="ReviewerBacklogAlertCoordinator"/> discipline

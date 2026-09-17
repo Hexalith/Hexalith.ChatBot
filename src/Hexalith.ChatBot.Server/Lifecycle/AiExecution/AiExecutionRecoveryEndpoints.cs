@@ -97,24 +97,3 @@ internal static class AiExecutionRecoveryEndpoints
             item.FailureReason ?? "attempts-exhausted",
             item.UpdatedAtUtc);
 }
-
-internal sealed record AiExecutionRecoveryRequest(string Key);
-
-internal sealed record AiExecutionExhaustedPage(
-    IReadOnlyList<AiExecutionExhaustedRow> Items,
-    string? NextCursor,
-    bool HasMore,
-    int PageSize);
-
-internal sealed record AiExecutionExhaustedRow(
-    string Key,
-    string TenantId,
-    string ProjectId,
-    string StateOwnerAggregateId,
-    string ResponseId,
-    string GenerationId,
-    long StartedSourceVersion,
-    int AttemptCount,
-    int TerminalSubmissionAttemptCount,
-    string FailureReason,
-    DateTimeOffset UpdatedAtUtc);

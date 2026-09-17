@@ -1,25 +1,5 @@
 namespace Hexalith.ChatBot.Server.Observability;
 
-internal sealed record AuditProjectionCheckpoint(
-    string TenantId,
-    long? LastProjectedPosition,
-    long? LatestCommittedPosition,
-    DateTimeOffset SnapshotUtc);
-
-internal interface IAuditProjectionCheckpointSource
-{
-    ValueTask<IReadOnlyList<AuditProjectionCheckpoint>> ReadCheckpointsAsync(CancellationToken cancellationToken);
-}
-
-internal sealed class UnavailableAuditProjectionCheckpointSource : IAuditProjectionCheckpointSource
-{
-    public ValueTask<IReadOnlyList<AuditProjectionCheckpoint>> ReadCheckpointsAsync(CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return ValueTask.FromResult<IReadOnlyList<AuditProjectionCheckpoint>>([]);
-    }
-}
-
 internal sealed class CheckpointBackedAuditProjectionLagSource : IAuditProjectionLagSource
 {
     private readonly Lock _gate = new();

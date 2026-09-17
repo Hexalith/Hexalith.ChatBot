@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -133,11 +132,12 @@ public static class ReleaseWorkflowSafetyTests
             exitCode.ShouldBe(0, standardError);
             standardOutput.ShouldContain("Executed 2 ordinary merge test lanes successfully");
             string[] invocations = File.ReadAllLines(logPath);
-            string requiredArguments =
-                "-m:1 --no-build --configuration Release -- RunConfiguration.TreatNoTestsAsError=true";
             invocations.Length.ShouldBe(2);
-            invocations.Count(invocation => invocation == $"test {alphaProject} {requiredArguments}").ShouldBe(1);
-            invocations.Count(invocation => invocation == $"test {betaProject} {requiredArguments}").ShouldBe(1);
+            invocations.Count(static invocation => invocation.StartsWith("Alpha.Tests -automated sync", StringComparison.Ordinal)).ShouldBe(1);
+            invocations.Count(static invocation => invocation.StartsWith("Beta.Tests -automated sync", StringComparison.Ordinal)).ShouldBe(1);
+            invocations.ShouldAllBe(static invocation => invocation.Contains("-result-ctrf", StringComparison.Ordinal));
+            File.Exists(Path.Combine(temporaryRoot, "machine-results", "Alpha.Tests.ctrf.json")).ShouldBeTrue();
+            File.Exists(Path.Combine(temporaryRoot, "machine-results", "Beta.Tests.ctrf.json")).ShouldBeTrue();
         }
         finally
         {
@@ -159,7 +159,7 @@ public static class ReleaseWorkflowSafetyTests
             File.WriteAllText(Path.Combine(testsRoot, "Failing", "Failing.Tests.csproj"), "<Project />\n");
             (string stubPath, string logPath) = CreateDotnetStub(temporaryRoot);
             Dictionary<string, string> environment = MergeTestEnvironment(testsRoot, stubPath, logPath, "1");
-            environment["MERGE_TEST_FAIL_PATTERN"] = "Failing.Tests.csproj";
+            environment["MERGE_TEST_FAIL_PATTERN"] = "Failing.Tests";
 
             (int exitCode, _, _) = RunScript(
                 "run-merge-test-lanes.sh",
@@ -167,6 +167,37 @@ public static class ReleaseWorkflowSafetyTests
                 environment);
 
             exitCode.ShouldBe(23);
+            File.ReadAllLines(logPath).Length.ShouldBe(1);
+        }
+        finally
+        {
+            DeleteTemporaryRoot(temporaryRoot);
+        }
+    }
+
+    /// <summary>
+    /// Verifies that a runner which discovers a lane but executes no tests cannot produce a green boundary.
+    /// </summary>
+    [Fact]
+    public static void ZeroExecutedMergeTestLaneShouldFailClosed()
+    {
+        string temporaryRoot = CreateTemporaryRoot("merge-test-zero-executed");
+        try
+        {
+            string testsRoot = Path.Combine(temporaryRoot, "tests");
+            Directory.CreateDirectory(Path.Combine(testsRoot, "Empty"));
+            File.WriteAllText(Path.Combine(testsRoot, "Empty", "Empty.Tests.csproj"), "<Project />\n");
+            (string stubPath, string logPath) = CreateDotnetStub(temporaryRoot);
+            Dictionary<string, string> environment = MergeTestEnvironment(testsRoot, stubPath, logPath, "1");
+            environment["MERGE_TEST_ZERO_PATTERN"] = "Empty.Tests";
+
+            (int exitCode, _, string standardError) = RunScript(
+                "run-merge-test-lanes.sh",
+                temporaryRoot,
+                environment);
+
+            exitCode.ShouldNotBe(0);
+            standardError.ShouldContain("xUnit lane executed zero tests");
             File.ReadAllLines(logPath).Length.ShouldBe(1);
         }
         finally
@@ -493,57 +524,47 @@ public static class ReleaseWorkflowSafetyTests
     }
 
     /// <summary>
-    /// Verifies that the run-settings override the merge lanes ship is what makes a zero-test lane fail.
+    /// Verifies that the repository-owned xUnit v4 boundary rejects a real runner invocation that executes no tests.
     /// </summary>
     /// <remarks>
-    /// The ordinary lanes execute on the VSTest bridge, where a Microsoft.Testing.Platform switch such as
-    /// <c>--minimum-expected-tests</c> is accepted and ignored, so a lane that discovers no tests exits zero and the
-    /// required merge check goes green on a suite that ran nothing. This runs the real toolchain twice against this
-    /// already-built assembly with a filter that matches nothing: once with the shipped override and once without.
+    /// The in-process xUnit runner exits zero for a filter that matches nothing. The boundary therefore validates
+    /// its CTRF summary and requires a positive executed count independently of the runner's process exit code.
     /// </remarks>
     [Fact]
-    public static void MergeTestLaneRunSettingsShouldFailAZeroTestLane()
+    public static void XUnitV4BoundaryShouldFailAZeroTestLane()
     {
-        const string impossibleFilter =
-            "FullyQualifiedName=Hexalith.ChatBot.Architecture.Tests.NoSuchClass.NoSuchTest";
         string repositoryRoot = RepositoryRoot();
-        string assemblyPath = Assembly.GetExecutingAssembly().Location;
-        assemblyPath.ShouldNotBeNullOrWhiteSpace();
+        string runner = Path.Combine(AppContext.BaseDirectory, "Hexalith.ChatBot.Architecture.Tests");
+        File.Exists(runner).ShouldBeTrue("the xUnit 4 package must produce an executable in-process runner");
+        string evidence = Path.Combine(Path.GetTempPath(), $"xunit-zero-{Guid.NewGuid():N}.ctrf.json");
+        try
+        {
+            (int exitCode, _, string standardError) = RunScript(
+                "run-xunit-v4.sh",
+                repositoryRoot,
+                null,
+                runner,
+                evidence,
+                "-method",
+                "Hexalith.ChatBot.Architecture.Tests.NoSuchClass.NoSuchTest");
 
-        string laneScript = File.ReadAllText(
-            Path.Combine(repositoryRoot, ".github", "scripts", "run-merge-test-lanes.sh"));
-        laneScript.ShouldContain("-- RunConfiguration.TreatNoTestsAsError=true");
+            exitCode.ShouldNotBe(0);
+            standardError.ShouldContain("xUnit lane executed zero tests");
+            using JsonDocument report = JsonDocument.Parse(File.ReadAllText(evidence));
+            report.RootElement.GetProperty("results").GetProperty("summary").GetProperty("tests").GetInt32().ShouldBe(0);
+        }
+        finally
+        {
+            if (File.Exists(evidence))
+            {
+                File.Delete(evidence);
+            }
 
-        (int guardedExitCode, string guardedOutput, string guardedError) = RunProcess(
-            repositoryRoot,
-            "dotnet",
-            null,
-            TestRunnerTimeoutMilliseconds,
-            "test",
-            assemblyPath,
-            "--filter",
-            impossibleFilter,
-            "--",
-            "RunConfiguration.TreatNoTestsAsError=true");
-        string guardedLog = guardedOutput + guardedError;
-        guardedLog.ShouldContain("No test matches the given testcase filter", customMessage: guardedLog);
-        guardedExitCode.ShouldNotBe(0, guardedLog);
-
-        (int unguardedExitCode, string unguardedOutput, string unguardedError) = RunProcess(
-            repositoryRoot,
-            "dotnet",
-            null,
-            TestRunnerTimeoutMilliseconds,
-            "test",
-            assemblyPath,
-            "--filter",
-            impossibleFilter);
-        string unguardedLog = unguardedOutput + unguardedError;
-        unguardedLog.ShouldContain("No test matches the given testcase filter", customMessage: unguardedLog);
-        unguardedExitCode.ShouldBe(
-            0,
-            "the zero-test run must be green without the override, otherwise this scenario proves nothing about it: "
-            + unguardedLog);
+            if (File.Exists(evidence + ".sha256"))
+            {
+                File.Delete(evidence + ".sha256");
+            }
+        }
     }
 
     /// <summary>
@@ -731,8 +752,18 @@ public static class ReleaseWorkflowSafetyTests
             stubPath,
             "#!/usr/bin/env bash\n"
             + "set -euo pipefail\n"
-            + "printf '%s\\n' \"$*\" >> \"${MERGE_TEST_STUB_LOG:?}\"\n"
-            + "if [[ \"$*\" == *\"${MERGE_TEST_FAIL_PATTERN:-__never__}\"* ]]; then exit 23; fi\n");
+            + "printf '%s %s\\n' \"${XUNIT_TEST_LANE:?}\" \"$*\" >> \"${MERGE_TEST_STUB_LOG:?}\"\n"
+            + "if [[ \"$XUNIT_TEST_LANE\" == *\"${MERGE_TEST_FAIL_PATTERN:-__never__}\"* ]]; then exit 23; fi\n"
+            + "evidence=''\n"
+            + "previous=''\n"
+            + "for argument in \"$@\"; do\n"
+            + "  if [[ \"$previous\" == '-result-ctrf' ]]; then evidence=\"$argument\"; break; fi\n"
+            + "  previous=\"$argument\"\n"
+            + "done\n"
+            + "[[ -n \"$evidence\" ]]\n"
+            + "executed=1\n"
+            + "if [[ \"$XUNIT_TEST_LANE\" == *\"${MERGE_TEST_ZERO_PATTERN:-__never__}\"* ]]; then executed=0; fi\n"
+            + "printf '{\"results\":{\"tool\":{\"name\":\"xUnit.net v3\",\"version\":\"4.0.0-test\"},\"summary\":{\"tests\":%s,\"passed\":%s,\"failed\":0,\"skipped\":0}}}\\n' \"$executed\" \"$executed\" > \"$evidence\"\n");
         MakeExecutable(root, stubPath);
         return (stubPath, logPath);
     }
@@ -751,9 +782,10 @@ public static class ReleaseWorkflowSafetyTests
         => new(StringComparer.Ordinal)
         {
             ["MERGE_TEST_ROOT"] = testsRoot,
-            ["MERGE_TEST_DOTNET"] = stubPath,
+            ["MERGE_TEST_RUNNER_OVERRIDE"] = stubPath,
             ["MERGE_TEST_STUB_LOG"] = logPath,
             ["MERGE_TEST_EXPECTED_LANES"] = expectedLanes,
+            ["MERGE_TEST_RESULTS_ROOT"] = Path.Combine(Path.GetDirectoryName(testsRoot)!, "machine-results"),
         };
 
     private static (int ExitCode, string StandardOutput, string StandardError, string Decision, string ShouldPublish)

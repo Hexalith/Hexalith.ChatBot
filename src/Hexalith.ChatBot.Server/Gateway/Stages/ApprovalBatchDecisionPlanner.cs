@@ -3,64 +3,6 @@ using Hexalith.ChatBot.Contracts.Enums;
 
 namespace Hexalith.ChatBot.Server.Gateway.Stages;
 
-/// <summary>The underlying decision-command family a grouped approval item fans out to.</summary>
-internal enum BatchDecisionItemKind
-{
-    AiAction,
-    Outbound,
-}
-
-/// <summary>
-/// A single underlying approval item in a batch approve/reject request, paired with the upstream per-item authority
-/// resolution (<see cref="ReviewerHasAuthority"/>) drawn from the same scope/gate signal the per-item
-/// <see cref="AiActionApprovalGate"/> enforces. All fields are safe refs/metadata — never approval content.
-/// </summary>
-internal sealed record BatchDecisionItem(
-    BatchDecisionItemKind Kind,
-    string ApprovalId,
-    string ProjectId,
-    long ExpectedApprovalSourceVersion,
-    bool ReviewerHasAuthority,
-    string CorrelationId,
-    string DecisionId,
-    string? ProposalId = null,
-    string? SourceMessageId = null,
-    string? DraftId = null);
-
-/// <summary>The per-item result of fanning out a batch decision: either a dispatchable command or a safe denial.</summary>
-/// <param name="ApprovalId">The underlying approval id (safe ref).</param>
-/// <param name="Accepted">Whether the item will be dispatched as its own governed decision command.</param>
-/// <param name="Command">The single-item decision command to dispatch, or <see langword="null"/> when denied.</param>
-/// <param name="ReasonCode">The safe per-item reason code (no existence leakage).</param>
-internal sealed record BatchDecisionOutcome(
-    string ApprovalId,
-    bool Accepted,
-    IChatBotCommand? Command,
-    string ReasonCode);
-
-/// <summary>The plan produced for a batch approve/reject request.</summary>
-/// <param name="Authorized">
-/// <see langword="false"/> when the actor is denied batch approval before state load (non-human actor); then
-/// <see cref="Outcomes"/> is empty and no item is acted on.
-/// </param>
-/// <param name="ReasonCode">The batch-level reason code.</param>
-/// <param name="GroupKeyFingerprint">The safe <c>sha256:</c> group fingerprint carried into each per-item audit envelope.</param>
-/// <param name="Outcomes">The per-item outcomes (empty when the batch is denied before state load).</param>
-internal sealed record BatchDecisionPlan(
-    bool Authorized,
-    string ReasonCode,
-    string GroupKeyFingerprint,
-    IReadOnlyList<BatchDecisionOutcome> Outcomes)
-{
-    public int AcceptedCount => Outcomes.Count(static outcome => outcome.Accepted);
-
-    public int DeniedCount => Outcomes.Count(static outcome => !outcome.Accepted);
-
-    public IEnumerable<IChatBotCommand> Commands => Outcomes
-        .Where(static outcome => outcome is { Accepted: true, Command: not null })
-        .Select(static outcome => outcome.Command!);
-}
-
 /// <summary>
 /// Pure planner that fans a grouped batch approve/reject out into <b>one governed single-item decision command per
 /// underlying approval item</b> (Story 7.8, NFR46/FR75c/FR75g). It does NOT introduce a batch command or a collapsed

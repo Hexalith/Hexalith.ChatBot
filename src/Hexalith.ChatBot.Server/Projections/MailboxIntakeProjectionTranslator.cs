@@ -61,9 +61,3 @@ internal static class MailboxIntakeProjectionTranslator
             published.CorrelationId ?? string.Empty);
     }
 }
-
-internal sealed record MailboxIntakeProjectionNotification(
-    string TenantId,
-    MailboxMessageIntakeCaptured Captured,
-    long SourceVersion,
-    string CorrelationId);

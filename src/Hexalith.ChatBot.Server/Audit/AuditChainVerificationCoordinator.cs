@@ -2,9 +2,6 @@ using Hexalith.ChatBot.Server.Gateway.Stages;
 
 namespace Hexalith.ChatBot.Server.Audit;
 
-/// <summary>The result of a chain-verification pass: how many tenant chains were checked, breached, and alerted.</summary>
-internal sealed record AuditChainVerificationOutcome(int TenantsChecked, int Breaches, int Alerted);
-
 /// <summary>
 /// Injectable nightly WORM-chain verification coordinator (Story 9.1, AC2/NFR49a) following the
 /// <see cref="Notifications.ReviewerBacklogAlertCoordinator"/> / <see cref="Notifications.OperationalAlertWiringCoordinator"/>

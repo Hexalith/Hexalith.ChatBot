@@ -9,7 +9,3 @@ internal interface IParticipantDisplayDirectory
         string partyId,
         CancellationToken cancellationToken = default);
 }
-
-internal sealed record ParticipantDisplaySnapshot(
-    ProjectConversationParticipantDisplayKind DisplayKind,
-    string? SafeDisplayLabel);

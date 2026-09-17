@@ -16,23 +16,7 @@ on:
 
 env:
   HexalithCommonsRoot: ${{ github.workspace }}/references/Hexalith.Commons
-  # Build the Hexalith dependencies from the references/ source submodules rather than from published NuGet packages.
-  #
-  # Required, not preferred: Hexalith.Tenants references Hexalith.EventStore.Gateway, first published at 3.82.0, while
-  # the shared Hexalith.Builds catalog still pins the EventStore package family at 3.78.0 and carries no PackageVersion
-  # entry for Gateway at all. In package mode that fails Central Package Management with NU1010, breaking the whole
-  # solution restore and everything downstream of Tenants (including Hexalith.ChatBot.IntegrationTests). With this set,
-  # each affected csproj takes its ProjectReference branch (gated on HexalithEventStoreFromSource) against
-  # references/Hexalith.EventStore, which is checked out at v3.86.0 and does contain the Gateway project.
-  #
-  # It is set here as an environment variable on purpose: every submodule ships its own Directory.Build.props and
-  # Directory.Packages.props that shadow this repository's root files, so the property cannot be set from them. An
-  # environment variable reaches MSBuild as a global property; Directory.Build.rsp does not work because the dotnet CLI
-  # does not read auto-response files.
-  #
-  # The durable fix belongs in the Hexalith.Builds repository: add Hexalith.EventStore.Gateway to its catalog and align
-  # HexalithEventStoreVersion with the checked-out submodule. Remove this once that lands, if package mode is preferred.
-  UseHexalithProjectReferences: true
+  UseHexalithProjectReferences: "false"
 
 jobs:
   pull-request-merge-ref:
@@ -61,13 +45,18 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.302
+          dotnet-version: 10.0.400
       - name: Restore synthetic merge
-        run: dotnet restore Hexalith.ChatBot.slnx
+        run: dotnet restore Hexalith.ChatBot.slnx -p:Configuration=Release -p:UseHexalithProjectReferences=false -m:1 /nr:false
       - name: Build synthetic merge
-        run: dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -m:1
+        run: dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -p:UseHexalithProjectReferences=false -m:1 /nr:false
       - name: Test synthetic merge ordinary lanes
         run: bash .github/scripts/run-merge-test-lanes.sh
+      - name: Test synthetic merge story-evidence gate lane
+        run: >-
+          XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
+          tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
+          TestResults/story-evidence-gate.ctrf.json
 
   build:
     runs-on: ubuntu-latest
@@ -89,56 +78,26 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.302
+          dotnet-version: 10.0.400
       - name: Restore
-        run: dotnet restore Hexalith.ChatBot.slnx
+        run: dotnet restore Hexalith.ChatBot.slnx -p:Configuration=Release -p:UseHexalithProjectReferences=false -m:1 /nr:false
       - name: Build
         # -m:1 serializes project builds. Several referenced submodule projects
         # (Hexalith.Projects.Client.Generation, Hexalith.FrontComposer.Shell) are reached by more
         # than one path in the graph, and parallel nodes intermittently raced writing their
         # obj/ outputs, failing this required step with MSB4018 GenerateDepsFile /
         # GetAssemblyAttributes "used by another process" errors.
-        run: dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -m:1
-      - name: Test
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t projects < <(find tests -type f -name '*.csproj' -print | sort)
-          expected_projects=15
-          if (( ${#projects[@]} != expected_projects )); then
-            printf 'Expected %s test projects under tests/, discovered %s.\n' \
-              "$expected_projects" "${#projects[@]}" >&2
-            exit 1
-          fi
-          declare -A seen_lanes=()
-          for project in "${projects[@]}"; do
-            lane="$(basename "${project%.csproj}")"
-            if [[ -n "${seen_lanes[$lane]+present}" ]]; then
-              printf 'Colliding test lane %s: %s and %s\n' "$lane" "${seen_lanes[$lane]}" "$project" >&2
-              exit 1
-            fi
-            seen_lanes[$lane]="$project"
-          done
-          executed=0
-          for project in "${projects[@]}"; do
-            if [[ "$project" == *"Hexalith.ChatBot.RecoverySandbox.csproj" \
-              || "$project" == *"Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj" ]]; then
-              continue
-            fi
-            lane="$(basename "${project%.csproj}")"
-            output="TestResults/${lane}"
-            dotnet test "$project" --no-build --configuration Release \
-              --logger "trx;LogFileName=${lane}.trx" --results-directory "$output"
-            sha256sum "${output}/${lane}.trx" > "${output}/${lane}.trx.sha256"
-            executed=$((executed + 1))
-          done
-          expected_lanes=13
-          if (( executed != expected_lanes )); then
-            printf 'Expected %s general test lanes, executed %s; refusing a partial green job.\n' \
-              "$expected_lanes" "$executed" >&2
-            exit 1
-          fi
-          printf '%s\n' "$(git rev-parse HEAD)" > TestResults/producer-head.sha
+        run: dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -p:UseHexalithProjectReferences=false -m:1 /nr:false
+      - name: Test every xUnit project independently through its v4 runner
+        run: bash .github/scripts/run-merge-test-lanes.sh
+      - name: Test story-evidence gate independently through its v4 runner
+        run: >-
+          XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
+          tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
+          TestResults/story-evidence-gate.ctrf.json
+          -result-trx TestResults/story-evidence-gate.trx
+      - name: Record test producer head
+        run: printf '%s\n' "$(git rev-parse HEAD)" > TestResults/producer-head.sha
       - name: Upload collision-safe machine results
         if: always()
         uses: actions/upload-artifact@v7
@@ -173,7 +132,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.302
+          dotnet-version: 10.0.400
       - name: Require successful general machine-result producer
         if: needs.build.result != 'success'
         run: exit 1
@@ -309,15 +268,12 @@ jobs:
           if (( interrupt_after_seconds > 15900 )); then
             interrupt_after_seconds=15900
           fi
-          timeout --signal=INT --kill-after=15m "${interrupt_after_seconds}s" \
-            dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj \
-            -m:1 \
-            --configuration Release \
-            --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" \
-            --logger "console;verbosity=minimal" \
-            --settings live-recovery.runsettings \
-            --logger "trx;LogFileName=live-recovery-validation.trx" \
-            --results-directory "${{ runner.temp }}/raw-recovery-results"
+          XUNIT_REQUIRE_ZERO_SKIPS=1 timeout --signal=INT --kill-after=15m "${interrupt_after_seconds}s" \
+            bash .github/scripts/run-xunit-v4.sh \
+            tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests \
+            "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.ctrf.json" \
+            -method "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" \
+            -result-trx "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.trx"
       - name: Stop DAPR runtime for transition-declared current recovery primary
         if: always() && steps.artifacts.outputs.requires_recovery == 'true'
         run: dapr uninstall --all
@@ -341,11 +297,10 @@ jobs:
         # -- the whole point of which is to survive a failed drill -- has no assembly to run.
         if: always()
         run: >-
-          dotnet test tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj
-          -m:1
-          --configuration Release
-          --logger "trx;LogFileName=story-evidence-gate.trx"
-          --results-directory "${{ runner.temp }}/machine-results/story-evidence-gate"
+          XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
+          tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
+          "${{ runner.temp }}/machine-results/story-evidence-gate/story-evidence-gate.ctrf.json"
+          -result-trx "${{ runner.temp }}/machine-results/story-evidence-gate/story-evidence-gate.trx"
       - name: Summarize recovery attempt into metadata-only failure record
         if: always() && steps.artifacts.outputs.requires_recovery == 'true'
         run: >-
@@ -482,7 +437,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.302
+          dotnet-version: 10.0.400
       - name: Setup checksum-pinned DAPR CLI
         run: bash .github/scripts/install-dapr-cli.sh
       - name: Initialize DAPR runtime
@@ -491,27 +446,21 @@ jobs:
         run: docker ps --format '{{.Names}}\t{{.Status}}\t{{.Ports}}' --filter name=dapr_
       - name: Run required tenant-bound topology smoke
         run: >-
-          dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
-          -m:1
-          --configuration Release
-          --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
-          --settings live-recovery.runsettings
-          --logger "console;verbosity=detailed"
-          --logger "trx;LogFileName=topology-acceptance.trx"
-          --results-directory TestResults
+          XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
+          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests
+          TestResults/topology-acceptance.ctrf.json
+          -method "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
+          -result-trx TestResults/topology-acceptance.trx
       - name: Require one executed topology acceptance test and zero skips
         run: >-
           python3 -c "import xml.etree.ElementTree as E; r=E.parse('TestResults/topology-acceptance.trx').getroot(); c=next(x for x in r.iter() if x.tag.endswith('Counters')).attrib; assert c.get('executed') == '1' and c.get('passed') == '1' and c.get('notExecuted') == '0', c"
       - name: Run exact Story 13.2 authenticated production-client matrix
         run: >-
-          dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
-          -m:1
-          --configuration Release
-          --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests.AuthenticatedProductionClientShouldMessageAskAndStopAcrossRequiredChromeMatrix"
-          --settings live-recovery.runsettings
-          --logger "console;verbosity=detailed"
-          --logger "trx;LogFileName=story132-topology-acceptance.trx"
-          --results-directory TestResults
+          XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
+          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests
+          TestResults/story132-topology-acceptance.ctrf.json
+          -method "Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests.AuthenticatedProductionClientShouldMessageAskAndStopAcrossRequiredChromeMatrix"
+          -result-trx TestResults/story132-topology-acceptance.trx
       - name: Require one executed Story 13.2 test and zero skips
         run: >-
           python3 -c "import xml.etree.ElementTree as E; r=E.parse('TestResults/story132-topology-acceptance.trx').getroot(); c=next(x for x in r.iter() if x.tag.endswith('Counters')).attrib; assert c.get('executed') == '1' and c.get('passed') == '1' and c.get('notExecuted') == '0', c"
@@ -582,7 +531,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.302
+          dotnet-version: 10.0.400
       - name: Setup checksum-pinned DAPR CLI
         run: bash .github/scripts/install-dapr-cli.sh
       - name: Initialize DAPR runtime
@@ -598,15 +547,12 @@ jobs:
           HEXALITH_CHATBOT_RECOVERY_RETENTION_FAILURE_DIR: ${{ runner.temp }}/live-recovery-retention-failures
         run: |
           set -euo pipefail
-          timeout --signal=INT --kill-after=15m 16800s \
-            dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj \
-            -m:1 \
-            --configuration Release \
-            --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" \
-            --logger "console;verbosity=minimal" \
-            --settings live-recovery.runsettings \
-            --logger "trx;LogFileName=live-recovery-validation.trx" \
-            --results-directory TestResults
+          XUNIT_REQUIRE_ZERO_SKIPS=1 timeout --signal=INT --kill-after=15m 16800s \
+            bash .github/scripts/run-xunit-v4.sh \
+            tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests \
+            TestResults/live-recovery-validation.ctrf.json \
+            -method "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2ETests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" \
+            -result-trx TestResults/live-recovery-validation.trx
       - name: Finalize metadata-only live recovery attempt envelope
         if: always()
         env:
@@ -677,7 +623,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.302
+          dotnet-version: 10.0.400
       - name: Download retained live recovery evidence
         uses: actions/download-artifact@v8
         with:
@@ -685,14 +631,11 @@ jobs:
           path: RetainedEvidence
       - name: Evaluate the release evidence gate out of process
         run: >-
-          dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
-          -m:1
-          --configuration Release
-          --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveRecoveryEvidenceGateReplayTests.RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess"
-          --logger "console;verbosity=detailed"
-          --settings live-recovery.runsettings
-          --logger "trx;LogFileName=live-recovery-evidence-gate.trx"
-          --results-directory GateResults
+          XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
+          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests
+          GateResults/live-recovery-evidence-gate.ctrf.json
+          -method "Hexalith.ChatBot.IntegrationTests.Recovery.LiveRecoveryEvidenceGateReplayTests.RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess"
+          -result-trx GateResults/live-recovery-evidence-gate.trx
       - name: Upload the gate decision
         if: always()
         uses: actions/upload-artifact@v7

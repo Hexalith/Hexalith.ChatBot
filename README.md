@@ -10,33 +10,22 @@ Initialize only root-declared submodules under `references/`:
 git submodule update --init
 ```
 
-Restore and build. `UseHexalithProjectReferences=true` is currently **required** — without it the restore fails with
-`NU1010` (see below):
+Restore and build in the same package-mode Release configuration used by CI:
 
 ```bash
-export UseHexalithProjectReferences=true
-dotnet restore Hexalith.ChatBot.slnx -m:1 /nr:false
-dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false
+dotnet restore Hexalith.ChatBot.slnx -p:Configuration=Release -p:UseHexalithProjectReferences=false -m:1 /nr:false
+dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -p:UseHexalithProjectReferences=false -m:1 /nr:false
 ```
 
-Why: `Hexalith.Tenants` references `Hexalith.EventStore.Gateway`, which was first published at 3.82.0, while the shared
-`Hexalith.Builds` catalog still pins the EventStore package family at 3.78.0 and carries no `PackageVersion` entry for
-Gateway at all. Central Package Management therefore cannot resolve it in package mode, which breaks the solution
-restore and everything downstream of Tenants (including `Hexalith.ChatBot.IntegrationTests`). The variable makes each
-affected project take its `ProjectReference` branch against `references/Hexalith.EventStore`, checked out at v3.86.0,
-which does contain the Gateway project.
+Package versions come exclusively from `references/Hexalith.Builds/Props/Directory.Packages.props`; the repository
+wrapper adds no local versions. Debug builds may opt into sibling project references for local development, but Release
+restore/build and release automation deliberately use published package dependencies.
 
-It must be an environment variable (or `-p:` on the command line): each submodule ships its own
-`Directory.Build.props`/`Directory.Packages.props` that shadow this repository's root files, so the property cannot be
-set from them, and the `dotnet` CLI does not read `Directory.Build.rsp`. CI sets it via a workflow-level `env:` block.
-
-The durable fix belongs in the `Hexalith.Builds` repository — add `Hexalith.EventStore.Gateway` to its catalog and
-align `HexalithEventStoreVersion` with the checked-out submodule. This variable can be dropped once that lands.
-
-In this sandbox, `dotnet test` can fail because the VSTest runner opens a denied socket. Story validation uses the compiled xUnit v3 binaries directly, for example:
+The test projects are xUnit v3 assemblies hosted by the xUnit 4.0.0 in-process runner. Run the repository boundary to
+execute every independent lane and retain non-vacuous CTRF evidence:
 
 ```bash
-tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -noLogo -noColor
+bash .github/scripts/run-merge-test-lanes.sh
 ```
 
 Before proposing a story as `done`, run the repository-owned [story-evidence integrity preflight](docs/story-evidence-integrity.md). Attest current-run provenance first, then validate (see that doc for the full sequence, including the gate self-test):

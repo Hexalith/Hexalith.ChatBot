@@ -2,22 +2,6 @@ using Hexalith.ChatBot.Contracts.Enums;
 
 namespace Hexalith.ChatBot.Workers.Mailbox;
 
-public interface IMailboxSourceControlProjection
-{
-    ValueTask<MailboxSourceControlState?> GetControlStateAsync(
-        string tenantId,
-        string mailboxSourceRef,
-        CancellationToken cancellationToken);
-}
-
-public interface IMailboxSourceRateLimitProjection
-{
-    ValueTask<MailboxRateLimitState?> GetRateLimitAsync(
-        string tenantId,
-        string mailboxSourceRef,
-        CancellationToken cancellationToken);
-}
-
 public sealed class ProjectionBackedMailboxConfigurationProvider(
     IMailboxConfigurationProvider configuredProvider,
     IMailboxSourceControlProjection controlProjection,
@@ -54,22 +38,4 @@ public sealed class ProjectionBackedMailboxConfigurationProvider(
             RateLimit = rateLimit,
         };
     }
-}
-
-public sealed class StaticMailboxSourceControlProjection(MailboxSourceControlState? state = null) : IMailboxSourceControlProjection
-{
-    public ValueTask<MailboxSourceControlState?> GetControlStateAsync(
-        string tenantId,
-        string mailboxSourceRef,
-        CancellationToken cancellationToken)
-        => ValueTask.FromResult(state);
-}
-
-public sealed class StaticMailboxSourceRateLimitProjection(MailboxRateLimitState? state = null) : IMailboxSourceRateLimitProjection
-{
-    public ValueTask<MailboxRateLimitState?> GetRateLimitAsync(
-        string tenantId,
-        string mailboxSourceRef,
-        CancellationToken cancellationToken)
-        => ValueTask.FromResult(state);
 }

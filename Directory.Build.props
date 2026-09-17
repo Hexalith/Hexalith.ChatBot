@@ -22,10 +22,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <LangVersion>latest</LangVersion>
+    <LangVersion>14.0</LangVersion>
     <Deterministic>true</Deterministic>
     <UseSharedCompilation>false</UseSharedCompilation>
-    <NuGetAudit>false</NuGetAudit>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <IsPackable>false</IsPackable>
     <IsPublishable>false</IsPublishable>

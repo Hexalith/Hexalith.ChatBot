@@ -18,10 +18,3 @@ public sealed record AiActionProposalInvalidatedByCorrection(
     string RedactionState,
     string RetentionClass,
     string SchemaVersion = "chatbot.ai-action-proposal-invalidated-by-correction.v1") : IEventPayload;
-
-public sealed record AiActionProposalInvalidationRejected(
-    string ProposalId,
-    string? ApprovalId,
-    string ReasonCode,
-    long? EvidenceSnapshotSourceVersion,
-    string CorrelationId) : IRejectionEvent;

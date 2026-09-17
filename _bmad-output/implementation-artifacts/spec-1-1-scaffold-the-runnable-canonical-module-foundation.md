@@ -2,9 +2,10 @@
 title: 'Story 1.1: Scaffold the Runnable Canonical Module Foundation'
 type: 'refactor'
 created: '2026-09-17'
-status: 'ready-for-dev'
+status: 'in-progress'
 route: 'dispatch'
 review_loop_iteration: 0
+baseline_commit: '1047ef38d3845406227891639aaeb853e5d4f116'
 context:
   - '_bmad-output/implementation-artifacts/epic-1-context.md'
   - '_bmad-output/planning-artifacts/architecture.md'
@@ -41,12 +42,12 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/**/*.cs` and scaffold architecture tests -- split every non-generated top-level declaration into its named file and add a non-vacuous zero-tolerance guard.
+- [x] `src/**/*.cs` and scaffold architecture tests -- split every non-generated top-level declaration into its named file and add a non-vacuous zero-tolerance guard.
 - [ ] `Hexalith.ChatBot.slnx`, `src/*/*.csproj`, `Directory.Build.props`, `Directory.Packages.props`, `global.json`, `.gitmodules` -- assert all required projects, typed-client-only surfaces, root-only submodules, C# 14/.NET 10, NuGet audit, exclusive central versions, and package-mode Release dependencies.
-- [ ] `.github/workflows/{ci,release}.yml`, `.github/scripts/run-merge-test-lanes.sh`, `tests/Hexalith.ChatBot.Architecture.Tests/ReleaseWorkflowSafetyTests.cs` -- install the pinned SDK, invoke each real xUnit project independently through its v4 runner, emit machine evidence, and fail when discovery/execution is zero.
+- [x] `.github/workflows/{ci,release}.yml`, `.github/scripts/run-merge-test-lanes.sh`, `tests/Hexalith.ChatBot.Architecture.Tests/ReleaseWorkflowSafetyTests.cs` -- install the pinned SDK, invoke each real xUnit project independently through its v4 runner, emit machine evidence, and fail when discovery/execution is zero.
 - [ ] `src/Hexalith.ChatBot.AppHost/**`, `tests/Hexalith.ChatBot.AppHost.Tests/AppHostTopologyTests.cs`, `tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs` -- prove canonical stores, pub/sub, sidecars, service health, and endpoint availability while preserving the non-publishable host boundary.
-- [ ] `release-metadata.json` plus architecture tests -- bind exact packages/containers and open A5/A6/A9a/A13 blockers without readiness claims.
-- [ ] `README.md` -- update only operational setup/release facts invalidated by the implementation.
+- [x] `release-metadata.json` plus architecture tests -- bind exact packages/containers and open A5/A6/A9a/A13 blockers without readiness claims.
+- [x] `README.md` -- update only operational setup/release facts invalidated by the implementation.
 
 **Acceptance Criteria:**
 - Given a root-only checkout, when the project graph is inspected, then required projects/tests exist, surfaces use the typed Client, and forbidden edges fail tests.
@@ -57,6 +58,13 @@ context:
 - Given release metadata, when conformance runs, then exact inventory/open blockers exist and no readiness claim is authorized.
 
 ## Implementation Notes
+
+- 2026-09-17: Package-mode Release restore passed under SDK 10.0.400. All nine ChatBot source projects and all fourteen real test projects compiled independently with zero warnings; the focused scaffold lane passed 32/32 through the xUnit 4.0.0 direct runner, and the separate story-evidence gate passed 219/219.
+- 2026-09-17: The exact solution build remains externally blocked in the clean root-declared `references/Hexalith.Folders` submodule: `HexalithFoldersIdempotencyHelpers.g.cs` lines 375, 389, and 402 report CS0037 for null checks/conditional access against non-nullable `PathMetadataPathPolicyClass`. No `references/**` source was changed.
+- 2026-09-17: Live `aspire run`/`aspire describe`/Tier-3 execution was not attempted after the exact build blocker; static AppHost topology guards and the focused scaffold guards pass.
+- 2026-09-17: The ordinary-lane script proves positive discovery and stops closed at the Architecture lane. Its current fallback-built binary reports 104/108 passing: two pre-existing guard failures (`DaprWorkflowTypesStayInsideServerWorkflowRuntimeLayer`, Architecture D8 mapping) plus two reflection-load failures because the blocked solution build could not populate the transitive `Hexalith.Memories.Contracts` runtime dependency. The runner correctly returns non-zero and retains CTRF evidence.
+- 2026-09-17: Independent diff audit passed after removing three split-file blank lines detected by `git diff --check`; the scaffold and release-workflow safety classes then passed 55/55 with zero skips through the direct xUnit 4.0.0 boundary.
+- 2026-09-17: Package-only Release dependency conversion is incomplete. `UseHexalithProjectReferences=false` still traverses unconditional sibling project references, while the shared Builds catalog has no `Hexalith.Folders.*` or `Hexalith.Projects.*` package entries. The frozen constraints prohibit editing `references/**` or introducing a local version authority, so the dependency graph and live topology require an external catalog/sibling correction before this story can complete.
 
 ## Spec Change Log
 

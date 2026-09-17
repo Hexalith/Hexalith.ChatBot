@@ -79,6 +79,23 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         "eventstore-admin-ui",
     ];
 
+    private static readonly string[] RequiredDaprComponentResources =
+    [
+        "statestore",
+        "chatbot-statestore",
+        "chatbot-workflow-statestore",
+        "chatbot-pubsub",
+    ];
+
+    private static readonly string[] RequiredDaprSidecarResources =
+    [
+        EventStoreResourceName,
+        TenantsResourceName,
+        ChatBotResourceName,
+        "eventstore-admin",
+        "eventstore-admin-ui",
+    ];
+
     // Program.cs fails closed without a configured recovery mailbox secret; this suite never exercises the
     // recovery mailbox client, so a fixed, well-formed placeholder satisfies PrepareKeycloakRealmImport without
     // any of these tests needing to know about the live-recovery validation lane.
@@ -1525,6 +1542,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         {
             ConfigureReservedDaprHttpEndpoints(builder, reservations.Ports);
             ConfigureAcceptanceM2SweepCadence(builder);
+            ValidateCanonicalDaprResourceModel(builder);
             configureBuilder?.Invoke(builder);
             IReadOnlyDictionary<string, int> selectedPorts = selected
                 .Select((endpoint, index) => new KeyValuePair<string, int>(endpoint.Resource.Name, reservations.Ports[index]))
@@ -1977,6 +1995,29 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         return selected;
     }
 
+    private static void ValidateCanonicalDaprResourceModel(IDistributedApplicationTestingBuilder builder)
+    {
+        string[] componentNames = builder.Resources
+            .OfType<IDaprComponentResource>()
+            .Select(static resource => resource.Name)
+            .ToArray();
+        foreach (string componentName in RequiredDaprComponentResources)
+        {
+            componentNames.Count(name => string.Equals(name, componentName, StringComparison.Ordinal)).ShouldBe(
+                1,
+                $"The runnable topology must contain exactly one canonical DAPR component '{componentName}'.");
+        }
+
+        foreach (string resourceName in RequiredDaprSidecarResources)
+        {
+            IResource resource = builder.Resources.Single(resource =>
+                string.Equals(resource.Name, resourceName, StringComparison.Ordinal));
+            resource.Annotations.OfType<DaprSidecarAnnotation>().Count().ShouldBe(
+                1,
+                $"The runnable topology must attach exactly one DAPR sidecar to '{resourceName}'.");
+        }
+    }
+
     private static IReadOnlySet<int> GetUnselectedConcreteEndpointPorts(
         IDistributedApplicationTestingBuilder builder,
         IReadOnlyList<ReservedEndpoint> selectedEndpoints)
@@ -2134,6 +2175,21 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             IsolatedDaprHttpResourceNames.Length,
             "Every selected sidecar-backed project must run on its own concrete HTTP port.");
         _output.WriteLine("ASPIRE_RESERVED_HTTP_PORT_EVIDENCE {0}", JsonSerializer.Serialize(isolatedHttpPorts));
+        _output.WriteLine(
+            "ASPIRE_DAPR_TOPOLOGY_EVIDENCE {0}",
+            JsonSerializer.Serialize(new
+            {
+                components = RequiredDaprComponentResources,
+                sidecars = RequiredDaprSidecarResources,
+                liveProof = new[]
+                {
+                    "chatbot-state-read",
+                    "eventstore-actor-command",
+                    "redis-pubsub-projection",
+                    "service-health",
+                    "resolved-http-endpoints",
+                },
+            }));
     }
 
     internal static Task WaitForAndRecordRequiredTopologyAsync(

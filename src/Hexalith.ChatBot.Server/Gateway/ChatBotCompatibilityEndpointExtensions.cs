@@ -520,5 +520,3 @@ internal static class ChatBotCompatibilityEndpointExtensions
         return null;
     }
 }
-
-public sealed record ChatBotHealth(string ModuleName, string DaprAppId, string Status);

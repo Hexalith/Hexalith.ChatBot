@@ -4,9 +4,6 @@ using Hexalith.ChatBot.Server.Gateway.Stages;
 
 namespace Hexalith.ChatBot.Server.Notifications;
 
-/// <summary>The result of an escalation evaluation pass: how many escalations fired, were delivered, or were suppressed fail-closed.</summary>
-internal sealed record EscalationEvaluationOutcome(int Fired, int Delivered, int AuditUnavailable);
-
 /// <summary>
 /// Injectable escalation coordinator following the project's established firing-source pattern. It drives evaluate →
 /// per-event fail-closed audit → deliver. Story 8.7b's periodic enforcement runtime owns the hosted trigger and calls

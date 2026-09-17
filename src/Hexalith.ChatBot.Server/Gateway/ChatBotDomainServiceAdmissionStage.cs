@@ -191,16 +191,3 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
                     AuditMetadata.SafeOptionalToken(command.CorrelationId)),
             ]);
 }
-
-/// <summary>
-/// Metadata-only rejection emitted when ChatBot command admission denies an SDK <c>/process</c> request.
-/// </summary>
-/// <param name="CommandId">The safe command identifier when available.</param>
-/// <param name="CommandType">The safe command type name.</param>
-/// <param name="ReasonCode">The finite admission reason code.</param>
-/// <param name="CorrelationId">The safe correlation identifier when available.</param>
-public sealed record ChatBotDomainServiceAdmissionRejected(
-    string? CommandId,
-    string CommandType,
-    string ReasonCode,
-    string? CorrelationId) : IRejectionEvent;

@@ -1,16 +1,6 @@
 namespace Hexalith.ChatBot.UI.Design;
 
 /// <summary>
-/// A single bounded routing-matrix row: the <c>(state-class × scope)</c> key plus the declared recipient role and
-/// channel tokens. All values are declared enum tokens, never recipient PII.
-/// </summary>
-public sealed record ChatBotNotificationRoutingMatrixRow(
-    string StateClass,
-    string Scope,
-    string RecipientRole,
-    string Channel);
-
-/// <summary>
 /// Contract bundle for the notification routing matrix editor (Story 7.6). Mirrors the Tenant Configuration S5
 /// editor surface: a bounded <c>(state-class × scope)</c> grid with role/channel selectors drawn from declared
 /// enums, validation summary, reason-code entry, a governed submit with old→new diff, and a phone fallback.

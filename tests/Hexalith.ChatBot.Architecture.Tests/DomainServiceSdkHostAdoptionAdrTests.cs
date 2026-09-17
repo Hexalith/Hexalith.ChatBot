@@ -95,7 +95,9 @@ public static class DomainServiceSdkHostAdoptionAdrTests
     {
         string program = ReadProjectFile("src/Hexalith.ChatBot.Server/Program.cs");
         string projectFile = ReadProjectFile("src/Hexalith.ChatBot.Server/Hexalith.ChatBot.Server.csproj");
-        string handlers = ReadProjectFile("src/Hexalith.ChatBot.Server/Queries/ChatBotReadQueryHandlers.cs");
+        string handlers = string.Concat(
+            ReadProjectFile("src/Hexalith.ChatBot.Server/Queries/ChatBotReadQueryHandler.cs"),
+            ReadProjectFile("src/Hexalith.ChatBot.Server/Queries/ProjectConversationQueryHandler.cs"));
 
         projectFile.ShouldContain("Hexalith.EventStore.DomainService.csproj");
         program.ShouldContain("AddEventStoreDomainService");

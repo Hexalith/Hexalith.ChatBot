@@ -5,24 +5,6 @@ using Hexalith.ChatBot.Server.Projections;
 
 namespace Hexalith.ChatBot.Server.Lifecycle.Attachments;
 
-internal interface IAttachmentCaptureCoordinator
-{
-    Task<AttachmentCaptureCoordinatorResult> CaptureAsync(
-        AttachmentCaptureCoordinatorRequest request,
-        CancellationToken cancellationToken = default);
-}
-
-internal sealed record AttachmentCaptureCoordinatorRequest(
-    string TenantId,
-    string IntakeId,
-    long SourceVersion,
-    string CorrelationId);
-
-internal sealed record AttachmentCaptureCoordinatorResult(
-    int EvaluatedCount,
-    int StoredCount,
-    int DegradedCount);
-
 internal sealed class AttachmentCaptureCoordinator(
     IProjectConversationProjectionStore projectionStore,
     IMailboxAttachmentContentSource contentSource,

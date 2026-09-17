@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "releasePosture": "blocked-open-gates",
+  "inventory": {
+    "packages": [
+      {
+        "id": "Hexalith.ChatBot.Contracts",
+        "project": "src/Hexalith.ChatBot.Contracts/Hexalith.ChatBot.Contracts.csproj"
+      },
+      {
+        "id": "Hexalith.ChatBot.Client",
+        "project": "src/Hexalith.ChatBot.Client/Hexalith.ChatBot.Client.csproj"
+      },
+      {
+        "id": "Hexalith.ChatBot.Testing",
+        "project": "src/Hexalith.ChatBot.Testing/Hexalith.ChatBot.Testing.csproj"
+      }
+    ],
+    "containers": [
+      {
+        "id": "hexalith-chatbot-server",
+        "project": "src/Hexalith.ChatBot.Server/Hexalith.ChatBot.Server.csproj"
+      },
+      {
+        "id": "hexalith-chatbot-ui",
+        "project": "src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj"
+      }
+    ]
+  },
+  "openBlockers": [
+    {
+      "gate": "A5",
+      "state": "open",
+      "requiredEvidence": "accepted live AI provider evidence for the exact candidate"
+    },
+    {
+      "gate": "A6",
+      "state": "open",
+      "requiredEvidence": "accepted data-protection and owner-runtime evidence for the exact candidate"
+    },
+    {
+      "gate": "A9a",
+      "state": "open",
+      "requiredEvidence": [
+        {
+          "kernel": "association",
+          "runtimeArtifact": "AssociationScorer",
+          "state": "open-exact-evidence-required"
+        },
+        {
+          "kernel": "task-intent",
+          "runtimeArtifact": "TaskIntentDetector",
+          "state": "open-exact-evidence-required"
+        },
+        {
+          "kernel": "action-risk",
+          "runtimeArtifact": "ActionRiskClassifier",
+          "state": "open-exact-evidence-required"
+        }
+      ]
+    },
+    {
+      "gate": "A13",
+      "state": "open",
+      "requiredEvidence": "accepted exact-candidate owner execution, authority, audit, atomicity, and fencing bundle"
+    }
+  ],
+  "authorizedReadinessClaims": [],
+  "prohibitedClaims": [
+    "M0 readiness",
+    "M1 readiness",
+    "pilot readiness",
+    "compliance readiness",
+    "tamper-evidence readiness",
+    "production readiness",
+    "gate readiness"
+  ]
+}

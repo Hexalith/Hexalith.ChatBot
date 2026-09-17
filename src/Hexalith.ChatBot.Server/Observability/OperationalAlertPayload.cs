@@ -110,9 +110,3 @@ internal sealed record OperationalAlertPayload(
     public static bool IsValid(OperationalAlertPayload payload)
         => Validate(payload).Count == 0;
 }
-
-/// <summary>
-/// The result of one operational-alert evaluation pass: how many alerts fired, were delivered, or were suppressed
-/// fail-closed because the pre-commit audit was unavailable. Mirrors <c>ReviewerBacklogAlertOutcome</c>.
-/// </summary>
-internal sealed record OperationalAlertOutcome(int Fired, int Delivered, int AuditUnavailable);

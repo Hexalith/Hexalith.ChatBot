@@ -19,23 +19,3 @@ internal sealed record AiActionPolicyDecision(
     public static AiActionPolicyDecision Blocked(string policySnapshotId, string reasonCode)
         => new(AiActionPolicyDecisionKind.Blocked, policySnapshotId, reasonCode, "none");
 }
-
-internal enum AiActionPolicyDecisionKind
-{
-    LowRiskExecuteAllowed,
-    LowRiskRoutedToApproval,
-    Blocked,
-}
-
-internal sealed record AiActionPolicyEvaluationRequest(
-    string TenantId,
-    string ProjectId,
-    string ProposalId,
-    string ContextPackageId,
-    string ContextPackageVersion,
-    string? RequestedPolicySnapshotId,
-    AiActionRiskClass RiskClass,
-    IReadOnlyList<string> RiskActionClasses,
-    string EffectSurface,
-    string AssistanceKind,
-    bool HasProjectAuthorization);

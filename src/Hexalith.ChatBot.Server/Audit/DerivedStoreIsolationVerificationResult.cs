@@ -1,18 +1,5 @@
 namespace Hexalith.ChatBot.Server.Audit;
 
-/// <summary>The outcome of an active cross-tenant read attempt against a tenant pair's derived stores (Story 9.5, FR55a).</summary>
-internal enum DerivedStoreIsolationStatus
-{
-    /// <summary>The intruder tenant observed none of the owner tenant's seeded sentinels — isolation held.</summary>
-    Clean,
-
-    /// <summary>The intruder observed at least one of the owner's sentinels — a stop-ship / M2-gating isolation breach.</summary>
-    Breach,
-
-    /// <summary>The probe could not complete (the store seam threw during seed or read-back). A breach signal, never a silent pass.</summary>
-    Unknown,
-}
-
 /// <summary>
 /// The metadata-only result of one ordered-pair cross-tenant isolation probe (Story 9.5, AC2, FR55a). Carries the owner
 /// and intruder tenant refs, the status, a bounded reason code, and a safe first-offender locator token (the first

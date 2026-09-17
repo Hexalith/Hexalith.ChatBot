@@ -35,8 +35,8 @@ project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
 development_status:
-  epic-1: backlog
-  1-1-scaffold-the-runnable-canonical-module-foundation: backlog
+  epic-1: in-progress
+  1-1-scaffold-the-runnable-canonical-module-foundation: in-progress
   1-2-publish-the-openapi-contract-spine-and-typed-client: backlog
   1-3-bind-every-request-to-trusted-tenant-and-actor-context: backlog
   1-4-return-versioned-safe-outcomes: backlog

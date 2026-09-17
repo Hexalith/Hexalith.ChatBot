@@ -5,6 +5,8 @@
     <IsPackable>false</IsPackable>
     <!-- Local-development topology shim only. Deployable topology is owned by deployment manifests. -->
     <IsPublishable>false</IsPublishable>
+    <!-- This host is intentionally CLI-bundle-free and non-publishable; suppress the matching SDK advisory. -->
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
     <UserSecretsId>hexalith-chatbot</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>

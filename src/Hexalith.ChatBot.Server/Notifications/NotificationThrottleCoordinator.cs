@@ -4,9 +4,6 @@ using Hexalith.ChatBot.Server.Gateway.Stages;
 
 namespace Hexalith.ChatBot.Server.Notifications;
 
-/// <summary>The result of a throttle/digest pass: how many deliveries were evaluated, immediately delivered, rolled into a digest, or suppressed fail-closed.</summary>
-internal sealed record NotificationThrottleOutcome(int Evaluated, int Delivered, int Throttled, int AuditUnavailable);
-
 /// <summary>
 /// Injectable throttle/digest coordinator (Story 7.9, NFR46) following the Story 7.7
 /// <see cref="EscalationEvaluationCoordinator"/> discipline exactly: for each already-resolved

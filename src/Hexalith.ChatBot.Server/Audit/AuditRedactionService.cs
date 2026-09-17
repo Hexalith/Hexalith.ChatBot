@@ -2,14 +2,6 @@ using System.Text.Json;
 
 namespace Hexalith.ChatBot.Server.Audit;
 
-/// <summary>The registration produced when a record is redacted: the key handle, the subject, and the appended redaction record.</summary>
-internal sealed record AuditRedactionRegistration(
-    string TenantRef,
-    string SubjectRef,
-    string KeyHandle,
-    string RedactedRecordLocator,
-    WormAuditChainRecord RedactionRecord);
-
 /// <summary>
 /// Coordinates GDPR right-to-erasure over the immutable WORM chain (Story 9.1, AC3/NFR49a, cross-cutting #13). Erasure
 /// is resolved by <b>crypto-shredding + projection tombstone</b>, never by mutating or deleting the chain:

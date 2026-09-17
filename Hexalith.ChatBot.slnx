@@ -27,43 +27,6 @@
   <Folder Name="/tools/">
     <Project Path="tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj" />
   </Folder>
-  <Folder Name="/references/Hexalith.Commons/">
-    <Project Path="references/Hexalith.Commons/src/libraries/Hexalith.Commons.UniqueIds/Hexalith.Commons.UniqueIds.csproj" />
-  </Folder>
-  <Folder Name="/references/Hexalith.Conversations/">
-    <Project Path="references/Hexalith.Conversations/src/Hexalith.Conversations.Contracts/Hexalith.Conversations.Contracts.csproj" />
-  </Folder>
-  <Folder Name="/references/Hexalith.EventStore/">
-    <Project Path="references/Hexalith.EventStore/src/Hexalith.EventStore/Hexalith.EventStore.csproj" />
-    <Project Path="references/Hexalith.EventStore/src/Hexalith.EventStore.Admin.Abstractions/Hexalith.EventStore.Admin.Abstractions.csproj" />
-    <Project Path="references/Hexalith.EventStore/src/Hexalith.EventStore.Client/Hexalith.EventStore.Client.csproj" />
-    <Project Path="references/Hexalith.EventStore/src/Hexalith.EventStore.Contracts/Hexalith.EventStore.Contracts.csproj" />
-    <Project Path="references/Hexalith.EventStore/src/Hexalith.EventStore.DomainService/Hexalith.EventStore.DomainService.csproj" />
-    <Project Path="references/Hexalith.EventStore/src/Hexalith.EventStore.Server/Hexalith.EventStore.Server.csproj" />
-    <Project Path="references/Hexalith.EventStore/src/Hexalith.EventStore.ServiceDefaults/Hexalith.EventStore.ServiceDefaults.csproj" />
-  </Folder>
-  <Folder Name="/references/Hexalith.Folders/">
-    <Project Path="references/Hexalith.Folders/src/Hexalith.Folders.Client/Hexalith.Folders.Client.csproj" />
-    <Project Path="references/Hexalith.Folders/src/Hexalith.Folders.Contracts/Hexalith.Folders.Contracts.csproj" />
-  </Folder>
-  <Folder Name="/references/Hexalith.FrontComposer/">
-    <Project Path="references/Hexalith.FrontComposer/src/Hexalith.FrontComposer.Contracts/Hexalith.FrontComposer.Contracts.csproj" />
-    <Project Path="references/Hexalith.FrontComposer/src/Hexalith.FrontComposer.Shell/Hexalith.FrontComposer.Shell.csproj" />
-    <Project Path="references/Hexalith.FrontComposer/src/Hexalith.FrontComposer.SourceTools/Hexalith.FrontComposer.SourceTools.csproj" />
-  </Folder>
-  <Folder Name="/references/Hexalith.Parties/">
-    <Project Path="references/Hexalith.Parties/src/Hexalith.Parties.Client/Hexalith.Parties.Client.csproj" />
-    <Project Path="references/Hexalith.Parties/src/Hexalith.Parties.Contracts/Hexalith.Parties.Contracts.csproj" />
-  </Folder>
-  <Folder Name="/references/Hexalith.Projects/">
-    <Project Path="references/Hexalith.Projects/src/Hexalith.Projects.Client/Hexalith.Projects.Client.csproj" />
-    <Project Path="references/Hexalith.Projects/src/Hexalith.Projects.Contracts/Hexalith.Projects.Contracts.csproj" />
-  </Folder>
-  <Folder Name="/references/Hexalith.Tenants/">
-    <Project Path="references/Hexalith.Tenants/src/Hexalith.Tenants/Hexalith.Tenants.csproj" />
-    <Project Path="references/Hexalith.Tenants/src/Hexalith.Tenants.Contracts/Hexalith.Tenants.Contracts.csproj" />
-    <Project Path="references/Hexalith.Tenants/src/Hexalith.Tenants.Server/Hexalith.Tenants.Server.csproj" />
-  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Hexalith.ChatBot.AppHost.Tests/Hexalith.ChatBot.AppHost.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj" />

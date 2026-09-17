@@ -129,7 +129,7 @@ public sealed class DuplicateRetryFailureStatesE2ETests
         string retryCommand = ReadProjectFile("src/Hexalith.ChatBot.Contracts/Commands/RequestFailedWorkflowRetry.cs");
         string operationStatus = ReadProjectFile("src/Hexalith.ChatBot.Contracts/Queries/OperationStatus.cs");
         string compatibilityEndpoints = ReadProjectFile("src/Hexalith.ChatBot.Server/Gateway/ChatBotCompatibilityEndpointExtensions.cs");
-        string queryHandlers = ReadProjectFile("src/Hexalith.ChatBot.Server/Queries/ChatBotReadQueryHandlers.cs");
+        string queryHandlers = ReadProjectFile("src/Hexalith.ChatBot.Server/Queries/OperationStatusQueryHandler.cs");
 
         foreach (string required in new[]
         {

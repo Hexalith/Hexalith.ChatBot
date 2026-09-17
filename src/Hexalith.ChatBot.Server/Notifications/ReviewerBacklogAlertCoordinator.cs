@@ -5,9 +5,6 @@ using Hexalith.ChatBot.Server.Projections;
 
 namespace Hexalith.ChatBot.Server.Notifications;
 
-/// <summary>The result of a reviewer-backlog evaluation pass: how many alerts fired, were delivered, or were suppressed fail-closed.</summary>
-internal sealed record ReviewerBacklogAlertOutcome(int Fired, int Delivered, int AuditUnavailable);
-
 /// <summary>
 /// Injectable reviewer-backlog alert coordinator (Story 7.10, NFR46) following the Story 7.7
 /// <see cref="EscalationEvaluationCoordinator"/> discipline exactly: evaluate → per-event pre-commit audit → (on audit
