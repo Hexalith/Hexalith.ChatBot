@@ -349,7 +349,7 @@ The correction is complete only when all of the following are true:
 | 6.1 Checklist review | [x] Done | All applicable analysis items addressed; pending actions are explicit. |
 | 6.2 Proposal accuracy | [x] Done | Proposal cross-checked against cited maintained artifacts. |
 | 6.3 Explicit approval | [x] Done | User approved the complete proposal on 2026-09-15. |
-| 6.4 Sprint status update | [!] Deferred | Prohibited until explicit approval and upstream artifact convergence. |
+| 6.4 Sprint status update | [x] Done | Completed after approval and upstream convergence on 2026-09-17; the active ledger now contains the exact 13-epic/146-story hierarchy with no unsupported status carry-forward. |
 | 6.5 Confirm handoff | [x] Done | Major-change handoff and ordered implementation sequence approved. |
 
 ## 9. Decision and Workflow Execution Log
@@ -358,7 +358,16 @@ The correction is complete only when all of the following are true:
 
 - Issue addressed: finalized product contracts and the current 146-story hierarchy diverge from maintained architecture, epic semantics, UX review metadata, the planning index, and historical sprint tracking.
 - Change scope: **Major**.
-- Artifacts modified by the Correct Course workflow: this Sprint Change Proposal only.
+- Artifacts modified by the Correct Course workflow: this Sprint Change Proposal, `index.md`, `historical-story-evidence-crosswalk-2026-09-17.md`, and `implementation-artifacts/sprint-status.yaml`.
 - Routed to: **Product Manager and Solution Architect**, followed by Product Owner, UX Designer, Test Architect, Developer, Sprint Planner, and Release Governor according to Section 5.
-- Escalation: implementation assignment and sprint-ledger regeneration remain paused until the prerequisite artifact corrections and validations in Section 5.1 complete.
-- Tracking disposition: `sprint-status.yaml` remains untouched by this workflow. Its regeneration is an approved implementation task, sequenced after architecture, epics, UX, and index convergence.
+- Escalation: the planning-synchronization pause is cleared. Product qualification, implementation, runtime, and release gates remain independently governed by their owning artifacts.
+- Tracking disposition: `sprint-status.yaml` was regenerated on 2026-09-17 from the canonical hierarchy after architecture, epics, UX, and index convergence. All 146 current stories default to `backlog`; historical evidence is retained through the crosswalk rather than unsupported active statuses.
+
+### Post-approval execution evidence — 2026-09-17
+
+- The deterministic sprint parser generated 13 epics, 146 stories, and 13 retrospectives in exact epic order.
+- The historical evidence audit found no exact current-key/file match and no current product-story TE-2 evidence contract; status carry-forward count is zero.
+- `index.md` now reports 146 stories and removes Story 12.16 from the active inventory.
+- The evidence crosswalk classifies predecessor material as partial, superseded, or unmapped without deleting historical files.
+- The obsolete Epic 12 action depending on predecessor Stories 12.14–12.16 was removed; the six still-valid open actions were preserved unchanged.
+- Sprint validation reports valid YAML, legal statuses, no unrecognized keys, no new entries, no dropped orphans, and exact inventory synchronization.

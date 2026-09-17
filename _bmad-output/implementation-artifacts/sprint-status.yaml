@@ -1,226 +1,256 @@
-# generated: 07-20-2026 11:30
-# last_updated: 09-14-2026 08:55
-# project: chatbot
-# project_key: NOKEY
-# tracking_system: file-system
-# story_location: _bmad-output/implementation-artifacts
-
 # STATUS DEFINITIONS:
 # ==================
 # Epic Status:
 #   - backlog: Epic not yet started
 #   - in-progress: Epic actively being worked on
 #   - done: All stories in epic completed
-#
-# Epic Status Transitions:
-#   - backlog -> in-progress: Automatically when first story is created (via create-story)
-#   - in-progress -> done: Manually when all stories reach 'done' status
-#
+
 # Story Status:
 #   - backlog: Story only exists in epic file
-#   - ready-for-dev: Story file created in stories folder
+#   - ready-for-dev: Story file created, ready for development
 #   - in-progress: Developer actively working on implementation
-#   - review: Ready for code review (via Dev's code-review workflow)
+#   - review: Implementation complete, ready for review
 #   - done: Story completed
-#
+
 # Retrospective Status:
 #   - optional: Can be completed but not required
 #   - done: Retrospective has been completed
-#
+
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+
 # WORKFLOW NOTES:
 # ===============
-# - Epic transitions to 'in-progress' automatically when first story is created
+# - Epic transitions to 'in-progress' automatically when its first story starts (via build's sprint sync)
 # - Stories can be worked in parallel if team capacity allows
-# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Developer typically creates the next story after the previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
-# - A story moves from `review` to `done` only when the TE-2 `story-evidence-integrity` check passes for that exact proposed transition.
-# - Until TE-2 self-validates and the check is required, no subsequent story may move to `done`; stories remain in `review`/`in-progress` without implying product failure.
-
+# - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 07-20-2026 11:30
-last_updated: 09-14-2026 08:55
+last_updated: 09-17-2026 08:48
 project: chatbot
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
-
 development_status:
-  # Reopened for corrected primary-path evidence by sprint-change-proposal-2026-07-17.
-  epic-1: in-progress
-  # Canonical split of historical Story 1.1. Statuses preserve the approved rebaseline and recorded evidence.
-  1-1a-solution-scaffold-root-config-and-build-green-baseline: done
-  1-1b-references-eventstore-submodule-and-sibling-dependency-resolution: done
-  1-1c-aspire-dapr-topology-and-local-run-verification: in-progress
-  1-1d-ci-release-skeleton-and-scaffold-quality-gates: done
-  1-1e-centralize-nuget-package-reference-version-authority: in-progress
-  1-1f-standardize-reusable-domain-module-ci-cd-and-release-gates: backlog
-  1-2-establish-the-openapi-contract-spine-typed-client-and-ichatbotcommand: done
-  1-3-commandgateway-admission-spine-with-tenant-binding-and-authorization: done
-  1-4-fail-closed-audit-commit-seam-with-pre-and-post-commit-audit-emission: done
-  1-5-two-altitude-idempotency: done
-  1-6-canonical-lifecycle-state-model-and-transition-enforcement: done
-  1-7-versioned-user-safe-message-catalog-and-redaction-stage: done
-  1-8-correlation-propagation-and-long-running-operation-status: done
-  1-9-first-governed-command-end-to-end-with-surface-origin-attribution: done
-  1-10-architecture-dependency-fitness-tests: done
-  1-11-differential-conformance-harness: done
-  1-12-cross-tenant-isolation-harness: done
-  1-13-tenant-scoped-fixture-and-evaluation-scaffold: done
-  1-14-visual-inheritance-and-semantic-token-foundation: done
-  1-15-shared-governed-component-primitives: done
-  1-16-interaction-guardrails-and-keyboard-safety: done
-  1-17-responsive-and-touch-foundation: done
-  1-18-accessibility-and-focus-management-floor: done
-  1-19-live-region-and-reduced-motion-behavior: done
-  1-20-english-french-localization-infrastructure: done
-  1-21-redaction-safe-off-surface-affordances-and-recovery-patterns: done
-  epic-1-retrospective: done
-  # Reopened while legacy Story 8.6 evidence is reconciled to canonical Story 2.9.
-  epic-2: in-progress
-  2-1-microsoft-365-mailbox-intake-and-source-identity-capture: done
-  2-2-participant-resolution-and-unresolved-unauthorized-handling: done
-  2-3-deterministic-association-scorer-and-candidate-generation: done
-  2-4-ambiguous-association-detection-and-fail-closed-routing: done
-  2-5-ambiguous-association-review-surface-s2: done
-  2-6-association-decision-recording-evidence-preservation-and-notes: done
-  2-7-association-correction-and-supersession: done
-  2-8-correction-propagation-contract: done
-  2-9-execute-correction-propagation-reliably-in-production: in-progress
-  2-10-duplicate-detection-retry-and-failure-states: done
-  epic-2-retrospective: done
-  epic-3: done
-  3-1-render-email-derived-project-conversation-s1: done
-  3-2-associated-email-rendering-in-the-conversation-stream: done
-  3-3-participant-rendering-in-the-conversation-stream: done
-  3-4-attachment-rendering-in-the-conversation-stream: done
-  3-5-association-and-correction-decision-rendering: done
-  3-6-approval-event-rendering: done
-  3-7-failure-retry-and-blocked-state-rendering: done
-  3-8-ai-outcome-rendering: done
-  3-9-why-this-project-evidence-and-provenance-panel: done
-  3-10-conversation-item-status-and-next-action: done
-  3-11-informational-actionable-classification-ai-summary-distinction-and-review-history: done
-  3-12-attachment-capture-and-governed-folder-storage: done
-  3-13-attachment-status-states-and-authorization: done
-  3-14-scoped-ai-context-packaging-from-authorized-files: done
-  epic-3-retrospective: done
-  epic-4: done
-  4-1-task-intent-detection-and-data-contract: done
-  4-2-task-intent-review-conversion-and-disposition: done
-  4-3-ai-action-risk-classification: done
-  4-4-low-risk-ai-assistance-execution: done
-  4-5-approval-gate-and-ai-action-approval-surface-s3: done
-  4-6-ai-action-preview-and-inspection: done
-  4-7-allowlisted-command-execution: done
-  4-8-refusal-and-safe-block-behavior: done
-  4-9-correction-invalidates-ai-action-proposals: done
-  epic-4-retrospective: done
-  epic-5: done
-  5-1-service-client-identities-and-scoped-grants: done
-  5-2-cli-adapter-and-workflow-parity: done
-  5-3-mcp-adapter-and-governed-tool-surface: done
-  5-4-cross-surface-equivalence-verification: done
-  epic-5-retrospective: done
-  epic-6: done
-  6-1-sender-authority-classes-and-m365-mapping: done
-  6-2-outbound-draft-creation-within-authority: done
-  6-3-outbound-approval-gate-and-approval-record: done
-  6-4-inbound-authenticity-passthrough-and-header-inspection: done
-  6-5-on-behalf-of-disambiguation-and-external-sender-posture: done
-  epic-6-retrospective: done
-  # Canonical rebaseline approved by sprint-change-proposal-2026-07-17.
-  epic-7: done
-  7-1-tenant-admin-permission-model-and-bounded-scopes: done
-  7-2-policy-admin-scope-tenant-policy-schema-editor-and-ai-action-policy: done
-  7-3-mailbox-admin-scope-and-mailbox-configuration: done
-  7-4-compliance-admin-scope: done
-  epic-7-retrospective: done
-  epic-8: done
-  8-1-operational-queue-management: done
-  8-2-notification-routing-and-delivery: done
-  8-3-escalation-policy-for-unresolved-states: done
-  8-4-approval-queue-prioritization-and-grouping: done
-  8-5-notification-throttling-and-digest-rollup: done
-  8-6-reviewer-backlog-alerting: done
-  8-7-rubber-stamp-rate-observable: done
-  epic-8-retrospective: done
-  # Runtime controls return to review until legacy 7.12-7.26 and 8.7a/8.7b evidence is reconciled.
-  epic-9: in-progress
-  9-1-durable-runtime-control-foundation: review
-  9-2-control-mailbox-sources-at-runtime: review
-  9-3-control-service-clients-at-runtime: review
-  9-4-control-ai-actors-at-runtime: review
-  9-5-control-command-capabilities-at-runtime: review
-  9-6-control-outbound-channels-at-runtime: review
+  epic-1: backlog
+  1-1-scaffold-the-runnable-canonical-module-foundation: backlog
+  1-2-publish-the-openapi-contract-spine-and-typed-client: backlog
+  1-3-bind-every-request-to-trusted-tenant-and-actor-context: backlog
+  1-4-return-versioned-safe-outcomes: backlog
+  1-5-establish-stable-operation-identity-and-concurrency-contract: backlog
+  1-6-persist-the-first-isolated-policy-snapshot: backlog
+  1-7-admit-commands-through-the-single-commandgateway: backlog
+  1-8-commit-a-governed-mutation-and-canonical-audit-atomically: backlog
+  1-9-handle-duplicate-conflicting-and-sensitive-non-mutating-atte: backlog
+  1-10-complete-the-first-governed-ui-action: backlog
+  1-11-create-reproducible-safety-evaluation-assets: backlog
+  epic-1-retrospective: optional
+
+  epic-2: backlog
+  2-1-provision-a-governed-mailbox-source-and-ingestion-client: backlog
+  2-2-capture-an-immutable-mailbox-source-record: backlog
+  2-3-separate-immutable-mail-sources-from-rebuildable-projections: backlog
+  2-4-resolve-participants-and-contain-unresolved-actors: backlog
+  2-5-generate-deterministic-authorized-association-candidates: backlog
+  2-6-govern-association-rules-and-confidence-thresholds: backlog
+  2-7-route-association-outcomes-without-silent-contamination: backlog
+  2-8-record-association-decisions-evidence-and-human-rationale: backlog
+  2-9-resolve-ambiguous-association-in-the-live-review-surface: backlog
+  2-10-correct-and-supersede-a-project-association: backlog
+  2-11-coordinate-complete-correction-propagation: backlog
+  2-12-run-correction-propagation-in-the-supported-production-topol: backlog
+  2-13-recover-mailbox-and-association-work-without-duplicate-effec: backlog
+  epic-2-retrospective: optional
+
+  epic-3: backlog
+  3-1-establish-the-tenant-isolated-project-conversation: backlog
+  3-2-render-associated-email-as-authoritative-conversation-contex: backlog
+  3-3-show-authorized-participant-and-origin-attribution: backlog
+  3-4-explain-why-an-email-belongs-to-the-project: backlog
+  3-5-show-workflow-decisions-status-failures-and-review-history: backlog
+  3-6-distinguish-informational-and-actionable-conversation-intent: backlog
+  3-7-distinguish-ai-summaries-and-outcomes-from-source-evidence: backlog
+  3-8-capture-email-attachments-into-governed-quarantine: backlog
+  3-9-scan-and-quarantine-unsafe-attachments: backlog
+  3-10-store-a-clean-attachment-in-the-governed-project-folder: backlog
+  3-11-inspect-attachment-status-in-conversation-context: backlog
+  3-12-package-authorized-project-files-for-governed-ai-context: backlog
+  3-13-complete-the-live-project-conversation-experience: backlog
+  epic-3-retrospective: optional
+
+  epic-4: backlog
+  4-1-capture-complete-task-intent-from-authorized-evidence: backlog
+  4-2-record-terminal-task-intent-dispositions: backlog
+  4-3-review-captured-task-intent-and-source-evidence: backlog
+  4-4-classify-action-risk-with-an-independent-categorical-kernel: backlog
+  4-5-convert-reviewed-task-intent-into-a-governed-proposal: backlog
+  4-6-execute-eligible-read-only-assistance-without-external-effec: backlog
+  4-7-establish-mandatory-approval-for-every-boundary-effect: backlog
+  4-8-decide-an-ai-action-proposal-without-changing-its-scope: backlog
+  4-9-review-and-preview-the-frozen-ai-action: backlog
+  4-10-execute-the-exact-approved-allowlisted-command-once: backlog
+  4-11-inspect-and-recover-ai-mediation-outcomes-safely: backlog
+  4-12-invalidate-ai-work-when-association-or-authority-changes: backlog
+  4-13-complete-the-live-governed-ai-mediation-journey: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-pin-the-singular-m1-parity-contract: backlog
+  5-2-authenticate-and-tenant-bind-the-cli-user: backlog
+  5-3-inspect-the-full-parity-set-from-the-cli: backlog
+  5-4-perform-governed-parity-decisions-from-the-cli: backlog
+  5-5-separate-human-delegated-and-tool-scoped-mcp-identity: backlog
+  5-6-expose-the-restricted-mcp-tool-surface: backlog
+  5-7-perform-human-delegated-parity-decisions-through-mcp: backlog
+  5-8-preserve-immutable-origin-on-canonically-normalized-commands: backlog
+  5-9-prove-differential-conformance-across-production-surfaces: backlog
+  5-10-confirm-live-cross-surface-attribution-and-adoption: backlog
+  epic-5-retrospective: optional
+
+  epic-6: backlog
+  6-1-preserve-provider-authenticity-and-sender-evidence: backlog
+  6-2-enforce-strict-or-paranoid-inbound-authenticity: backlog
+  6-3-resolve-the-five-outbound-sender-authority-classes: backlog
+  6-4-create-an-immutable-outbound-project-email-draft: backlog
+  6-5-freeze-outbound-content-in-a-mandatory-approval-proposal: backlog
+  6-6-decide-the-frozen-outbound-proposal: backlog
+  6-7-review-outbound-communication-on-the-live-s6-surface: backlog
+  6-8-send-the-exact-approved-project-email-once: backlog
+  6-9-reconcile-an-unknown-outbound-send-outcome: backlog
+  6-10-reconstruct-and-qualify-the-complete-communication-history: backlog
+  epic-6-retrospective: optional
+
+  epic-7: backlog
+  7-1-govern-the-closed-chatbot-admin-role-hierarchy: backlog
+  7-2-separate-aggregate-admin-visibility-from-project-detail: backlog
+  7-3-operate-only-mailbox-client-or-opaque-queue-partitions: backlog
+  7-4-enforce-the-closed-versioned-tenant-policy-schema: backlog
+  7-5-configure-low-risk-eligibility-and-approval-routing-safely: backlog
+  7-6-configure-mailbox-patterns-and-provider-connections-within-s: backlog
+  7-7-inspect-mailbox-permission-and-processing-health: backlog
+  7-8-bound-compliance-administration-and-retention-changes: backlog
+  7-9-audit-every-administrative-operation-and-qualifying-read: backlog
+  7-10-administer-tenant-policy-and-mailboxes-on-the-live-s5-surfac: backlog
+  7-11-govern-service-client-grants-and-revocation: backlog
+  7-12-prove-the-bounded-administration-safety-matrix: backlog
+  epic-7-retrospective: optional
+
+  epic-8: backlog
+  8-1-build-persistent-tenant-safe-review-queues: backlog
+  8-2-filter-sort-and-prioritize-review-queues-server-side: backlog
+  8-3-resolve-safe-review-actions-and-disabled-reasons: backlog
+  8-4-claim-and-assign-review-items-without-granting-authority: backlog
+  8-5-show-the-next-human-action-for-each-review-item: backlog
+  8-6-detect-stale-waiting-blocked-and-escalation-needed-work: backlog
+  8-7-configure-bounded-notification-and-escalation-routing: backlog
+  8-8-dispatch-actionable-notifications-without-approval-fatigue: backlog
+  8-9-operate-review-queues-on-the-live-s10-surface: backlog
+  8-10-qualify-review-operations-and-notification-safety-end-to-end: backlog
+  epic-8-retrospective: optional
+
+  epic-9: backlog
+  9-1-establish-the-durable-closed-safety-control-view: backlog
+  9-2-apply-and-release-controls-through-independent-approval: backlog
+  9-3-enforce-current-controls-at-commandgateway-admission: backlog
+  9-4-enforce-controls-in-workers-with-fair-scheduling-and-leases: backlog
+  9-5-enforce-all-mailbox-source-control-modes-and-release: backlog
+  9-6-enforce-all-service-client-control-modes-and-release: backlog
+  9-7-enforce-all-ai-actor-control-modes-and-release: backlog
+  9-8-enforce-all-command-capability-control-modes-and-release: backlog
+  9-9-govern-tenant-limits-quotas-and-circuit-breakers: backlog
+  9-10-operate-runtime-safety-controls-on-the-live-admin-surface: backlog
+  9-11-qualify-every-safety-control-cell-and-release-flow: backlog
   epic-9-retrospective: optional
-  epic-10: done
-  10-1-command-allowlist-v1-governance-and-change-control: done
-  10-2-lifecycle-state-matrix-completion-and-cross-actor-isolation-proof: done
-  epic-10-retrospective: done
-  epic-11: done
-  11-1-operational-dashboards-s8-s10: done
-  11-2-operational-telemetry-emission: done
-  11-3-slo-publication-and-error-budgets: done
-  11-4-tenant-safe-alert-wiring: done
-  11-5-degraded-state-operability-and-runbook-diagnostics: done
-  epic-11-retrospective: done
-  # Reopened by sprint-change-proposal-2026-07-20-epic12-recovery-deferrals.md to add owned
-  # M2 runtime-scheduler / live-driver / Memories-binding stories (12.14-12.16).
-  epic-12: in-progress
-  12-1-tamper-evident-worm-audit-chain: done
-  12-2-audit-completeness-as-a-production-observable: done
-  12-3-audit-query-and-compliance-investigation-surface-s9: done
-  12-4-replay-and-simulation-isolation: done
-  12-5-derived-store-cross-tenant-isolation: done
-  12-6-correction-driven-vector-reindexing: done
-  12-7-data-class-inventory-and-retention-policy: done
-  12-8-tenant-export-workflow: done
-  12-9-deletion-and-erasure-workflow: done
-  12-10-consent-and-lawful-basis-metadata: done
-  12-11-continuity-drill-and-rpo-rto-validation: done
-  12-12-projection-rebuild-validation: done
-  12-13-scoped-outage-degradation-validation: done
-  12-14-wire-the-m2-audit-and-recovery-runtime-scheduler: done
-  12-15-stand-up-live-recovery-continuity-fault-injection-drivers-and-recalibrate-a10: review
-  12-16-bind-the-live-hexalith-memories-derived-store-backing: backlog
-  epic-12-retrospective: done
-  # Legacy Epics 10/12/13 are consolidated here; each surface returns to review under corrected live-route acceptance.
-  epic-13: in-progress
-  13-1-establish-one-working-fluent-frontcomposer-application-frame: done
-  13-2-work-converse-and-interrupt-ai-safely-in-project-context: review
-  13-3-resolve-ambiguous-association-from-a-safe-live-review-surface: review
-  13-4-review-risky-ai-actions-without-losing-evidence-or-authority: review
-  13-5-administer-tenant-policy-and-review-operations-within-bounded-authority: review
-  13-6-understand-live-operational-health-and-queues: review
-  13-7-investigate-permitted-audit-evidence-from-a-usable-live-route: review
-  13-8-confirm-live-cross-surface-release-conformance: review
+
+  epic-10: backlog
+  10-1-publish-the-canonical-workflow-family-lifecycle-catalog: backlog
+  10-2-validate-every-transition-against-its-family-model: backlog
+  10-3-reject-and-audit-invalid-transitions-consistently: backlog
+  10-4-separate-catalog-surface-mcp-ai-and-owner-mappings: backlog
+  10-5-govern-immutable-command-allowlist-versions: backlog
+  10-6-qualify-the-exact-m0-and-m1-ai-allowlist-members: backlog
+  10-7-detect-and-contain-owner-contract-or-identifier-drift: backlog
+  10-8-govern-family-specific-retry-and-successor-semantics: backlog
+  10-9-govern-command-allowlist-versions-on-the-live-admin-surface: backlog
+  10-10-prove-lifecycle-and-allowlist-conformance-end-to-end: backlog
+  epic-10-retrospective: optional
+
+  epic-11: backlog
+  11-1-establish-tenant-safe-opentelemetry-contracts: backlog
+  11-2-project-complete-tenant-safe-operational-health: backlog
+  11-3-measure-latency-failure-retry-saturation-and-audit-lag: backlog
+  11-4-publish-versioned-operating-baselines-and-slo-definitions: backlog
+  11-5-qualify-a11-m1-metrics-and-a11-m2-candidate-bound-observabil: backlog
+  11-6-run-non-invasive-tenant-safe-synthetics: backlog
+  11-7-route-alerts-and-prove-error-budget-burns: backlog
+  11-8-prove-fairness-and-noisy-neighbor-isolation: backlog
+  11-9-deliver-the-live-s8-operational-dashboard: backlog
+  11-10-prove-operational-observability-for-the-exact-candidate: backlog
+  epic-11-retrospective: optional
+
+  epic-12: backlog
+  12-1-build-the-reconstructable-investigation-projection: backlog
+  12-2-query-audit-by-every-authorized-investigation-axis: backlog
+  12-3-reconstruct-governed-decisions-and-outcomes: backlog
+  12-4-verify-hash-links-and-signed-tenant-checkpoints: backlog
+  12-5-orchestrate-recipient-bound-data-export: backlog
+  12-6-orchestrate-hold-aware-data-erasure: backlog
+  12-7-place-and-release-exact-scope-legal-holds: backlog
+  12-8-execute-retention-disposition-through-data-owners: backlog
+  12-9-produce-a-redacted-support-bundle: backlog
+  12-10-rebuild-the-audit-investigation-projection-safely: backlog
+  12-11-create-a-credential-free-replay-only-composition-root: backlog
+  12-12-replace-every-replay-effect-and-deny-undeclared-egress: backlog
+  12-13-prove-production-resource-invariance-around-replay: backlog
+  12-14-deliver-live-compliance-investigation-and-data-rights-operat: backlog
+  12-15-qualify-exact-candidate-recovery-without-evidence-substituti: backlog
+  epic-12-retrospective: optional
+
+  epic-13: backlog
+  13-1-adopt-the-frontcomposer-shell-and-enforce-ui-composition: backlog
+  13-2-deliver-governed-project-chat-with-safe-streaming-and-interr: backlog
+  13-3-conform-the-live-association-review-surface: backlog
+  13-4-conform-ai-action-and-outbound-approval-surfaces: backlog
+  13-5-conform-correction-tenant-administration-and-review-operatio: backlog
+  13-6-conform-attribution-and-operational-dashboard-routes: backlog
+  13-7-conform-compliance-investigation-and-data-rights-routes: backlog
+  13-8-confirm-live-cross-surface-ui-conformance: backlog
   epic-13-retrospective: optional
 
+# Action items committed during retrospectives (section created by the retrospective workflow)
 action_items:
   - epic: 13
-    action: "Add a mechanical story-evidence integrity gate that reconciles File Lists, scoped diffs, machine test results, primary-path execution, and checked tasks before a story moves to done."
+    action: "Add a mechanical story-evidence integrity gate that reconciles File Lists,
+      scoped diffs, machine test results, primary-path execution, and checked tasks
+      before a story moves to done."
     owner: "Amelia / Murat"
     status: open
   - epic: 13
-    action: "Make primary-path evidence mandatory for browser, SignalR, hosting, asset, and distributed-topology runtime claims; keep fallbacks diagnostic only."
+    action: "Make primary-path evidence mandatory for browser, SignalR, hosting, asset,
+      and distributed-topology runtime claims; keep fallbacks diagnostic only."
     owner: "Murat"
     status: open
   - epic: 13
-    action: "Require a runtime-seam handoff manifest and live-path regression matrix before the next architecture-changing epic begins."
+    action: "Require a runtime-seam handoff manifest and live-path regression matrix
+      before the next architecture-changing epic begins."
     owner: "Winston"
     status: open
   - epic: 13
-    action: "Introduce a server-owned generation-session lifecycle and fail-closed Stop/Cancel target validation before production asynchronous generation is enabled or claimed."
+    action: "Introduce a server-owned generation-session lifecycle and fail-closed
+      Stop/Cancel target validation before production asynchronous generation is enabled
+      or claimed."
     owner: "Winston / Amelia"
     status: open
   - epic: 13
-    action: "Preserve live-render and SignalR authorization, reconnect, and duplicate-handling gates in release-readiness verification."
+    action: "Preserve live-render and SignalR authorization, reconnect, and duplicate-handling
+      gates in release-readiness verification."
     owner: "Murat / Sally"
     status: open
   - epic: 13
-    action: "Keep TE-1 outside product sprint tracking and retire the legacy compliance-audit transport or correct its stale generated-client-lag documentation."
+    action: "Keep TE-1 outside product sprint tracking and retire the legacy compliance-audit
+      transport or correct its stale generated-client-lag documentation."
     owner: "Paige / Amelia"
-    status: open
-  - epic: 12
-    action: "Converted via sprint-change-proposal-2026-07-20-epic12-recovery-deferrals.md into owned Stories 12.14 (M2 audit/recovery runtime scheduler), 12.15 (live recovery/continuity fault-injection drivers + A10 recalibration, targeting the Aspire/DAPR sandbox), and 12.16 (live Hexalith.Memories derived-store binding). Item stays open until all three reach done."
-    owner: "John / Winston"
     status: open
