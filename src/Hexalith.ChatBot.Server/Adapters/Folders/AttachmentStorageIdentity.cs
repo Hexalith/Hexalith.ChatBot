@@ -8,7 +8,7 @@ namespace Hexalith.ChatBot.Server.Adapters.Folders;
 
 internal static class AttachmentStorageIdentity
 {
-    public const string PathPolicyClass = "governed-mailbox-attachment";
+    public const PathMetadataPathPolicyClass PathPolicyClass = PathMetadataPathPolicyClass.Metadata_only;
 
     public static string FolderIdFor(string tenantId, string projectId)
         => $"folder:{Hash($"{tenantId}|{projectId}")}";

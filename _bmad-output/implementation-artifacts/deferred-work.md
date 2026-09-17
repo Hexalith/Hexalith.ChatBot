@@ -1259,3 +1259,15 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: Two review patches need NEW test code and were not written because the solution cannot compile — a behavioral guard for the `KeycloakPersistent` stderr warning, and a test asserting the dead-letter drain's DAPR subscription metadata (`/dapr/subscribe` or `ITopicMetadata`).
   evidence: Both are verified-real medium findings routed to patch. Writing test code that cannot be compiled or run was judged worse than recording them, consistent with the same decision taken for the matrix row 8 gap. Close both in the pass that re-runs the blocked suites once `references/Hexalith.Folders` and the AppHost `WithEventStoreClientCredentials` break are resolved.
+
+## Deferred from: review of spec-fix-generated-idempotency-helper-non-nullable-enum (2026-09-17)
+
+- source_spec: `spec-fix-generated-idempotency-helper-non-nullable-enum.md`
+  summary: Remaining Hexalith.Folders sample and adapter consumers still assign strings to the generated `PathMetadataPathPolicyClass` enum.
+  evidence: `samples/Hexalith.Folders.Sample/FolderLifecycleSample.cs:172` still produces CS0029, and CLI/MCP inputs require a deliberate validated string-to-enum conversion rather than a literal substitution. This predates the scoped generator repair and should be completed with focused parsing and solution-build coverage once the nested dependency checkout is available.
+- source_spec: `spec-fix-generated-idempotency-helper-non-nullable-enum.md`
+  summary: Cross-version retries may derive a new idempotency key after the path-policy class migrates from the legacy free-form value to the closed enum.
+  evidence: Maybe-false, medium if confirmed. Both `path_metadata` and `path_policy_class` participate in the helper hash, but the repository does not establish whether a deployed version accepted `governed-mailbox-attachment` operations that can be retried after this contract transition. A replay test across the previous and current client/helper versions plus deployment-history evidence would settle it.
+- source_spec: `spec-fix-generated-idempotency-helper-non-nullable-enum.md`
+  summary: Mailbox attachments classified `metadata_only` may remain unavailable to later AI-context content reads unless an authoritative policy stage reclassifies them.
+  evidence: Maybe-false, medium if confirmed. `metadata_only` is the conservative valid class for arbitrary attachment bytes, while the Folders contract limits content reads to `content_allowed`; current static evidence does not show whether the server or post-scan workflow authoritatively reclassifies the stored path. An end-to-end capture, safe-scan, and authorized Folders content-read test would settle it.

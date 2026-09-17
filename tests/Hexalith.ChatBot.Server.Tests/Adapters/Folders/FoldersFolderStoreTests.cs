@@ -32,6 +32,7 @@ public sealed class FoldersFolderStoreTests
         client.Requests.ShouldAllBe(call => call.IdempotencyKey == stored.IdempotencyKey);
         client.Requests.ShouldAllBe(call => call.CorrelationId == "correlation-001");
         client.Requests.ShouldAllBe(call => call.Body.PathMetadata!.NormalizedPath.Contains("invoice.pdf", StringComparison.Ordinal));
+        client.Requests.ShouldAllBe(call => call.Body.PathMetadata!.PathPolicyClass == PathMetadataPathPolicyClass.Metadata_only);
     }
 
     [Fact]
