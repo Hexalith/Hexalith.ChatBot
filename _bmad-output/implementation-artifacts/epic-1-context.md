@@ -4,68 +4,48 @@
 
 ## Goal
 
-Stand up a deployable `Hexalith.ChatBot` module whose first user-visible UI action proves the complete safety spine end to end: every state-mutating operation is authenticated, tenant-bound, authorized, idempotent, fail-closed, audited before and after commit, lifecycle-validated, redaction-safe, and attributable to its originating surface. This is the architecture-mandated safety floor inherited unchanged by every later epic. It is delivered as a minimal surface over a complete spine — real from day one, never stubbed where safety is concerned. Story 1.9 is the value proof; every foundation story must either unblock that first governed command or add a mechanical guardrail that proves it is safe.
+Deliver a runnable ChatBot foundation and one real UI action that prove the shared safety spine end to end: an operation is bound to trusted tenant and actor authority, evaluated against immutable policy, admitted through one fail-closed command path, committed with its idempotency and audit evidence atomically, and exposed through safe status and retry behavior. This establishes the non-bypassable contracts and qualification assets that every later workflow and surface must reuse.
 
 ## Stories
 
-- Story 1.1a: Solution scaffold, root config, and build-green baseline
-- Story 1.1b: `references/` EventStore submodule and sibling dependency resolution
-- Story 1.1c: Aspire/DAPR topology and local run verification
-- Story 1.1d: CI/release skeleton and scaffold quality gates
-- Story 1.1e: Centralize NuGet package-reference version authority
-- Story 1.1f: Standardize reusable domain-module CI/CD and release gates
-- Story 1.2: Establish the OpenAPI Contract Spine, typed Client, and `IChatBotCommand`
-- Story 1.3: CommandGateway admission spine with tenant binding and authorization
-- Story 1.4: Fail-closed audit-commit seam with pre- and post-commit audit emission
-- Story 1.5: Two-altitude idempotency
-- Story 1.6: Canonical lifecycle state model and transition enforcement
-- Story 1.7: Versioned user-safe message catalog and redaction stage
-- Story 1.8: Correlation propagation and long-running operation status
-- Story 1.9: First governed command end-to-end with surface-origin attribution
-- Story 1.10: Architecture dependency fitness tests
-- Story 1.11: Differential-conformance harness
-- Story 1.12: Cross-tenant isolation harness
-- Story 1.13: Tenant-scoped fixture and evaluation scaffold
-- Story 1.14: Visual inheritance and semantic token foundation
-- Story 1.15: Shared governed component primitives
-- Story 1.16: Interaction guardrails and keyboard safety
-- Story 1.17: Responsive and touch foundation
-- Story 1.18: Accessibility and focus-management floor
-- Story 1.19: Live-region and reduced-motion behavior
-- Story 1.20: English/French localization infrastructure
-- Story 1.21: Redaction-safe off-surface affordances and recovery patterns
+- Story 1.1: Scaffold the Runnable Canonical Module Foundation
+- Story 1.2: Publish the OpenAPI Contract Spine and Typed Client
+- Story 1.3: Bind Every Request to Trusted Tenant and Actor Context
+- Story 1.4: Return Versioned Safe Outcomes
+- Story 1.5: Establish Stable Operation Identity and Concurrency Contracts
+- Story 1.6: Persist the First Isolated Policy Snapshot
+- Story 1.7: Admit Commands Through the Single CommandGateway
+- Story 1.8: Commit a Governed Mutation and Canonical Audit Atomically
+- Story 1.9: Handle Duplicate, Conflicting, and Sensitive Non-Mutating Attempts
+- Story 1.10: Complete the First Governed UI Action
+- Story 1.11: Create Reproducible Safety Evaluation Assets
 
 ## Requirements & Constraints
 
-- Every command and query enforces tenant, actor, role, project, and resource authorization. Tenant identity comes from authenticated claims, never client input; denials must not reveal restricted resource existence or metadata. M0 runs one tenant but must be tenant-partitioned by construction so a second tenant is purely additive.
-- State mutations pass through one ordered admission path before the EventStore write path. Audit unavailability, unresolved identity or tenant scope, failed authorization, invalid policy, or failed command validation returns a typed failure and writes no durable state.
-- Audit is two-phase: a fail-closed pre-commit gate records intent, risk, approval, evidence, policy, correlation, and idempotency context; a post-commit envelope records transition and outcome and reconciles from the event log. Completeness means reconstructability without relying on sensitive logs.
-- Idempotency operates at two altitudes — gateway request dedup and aggregate event dedup — and the two are never conflated. Equivalent retries preserve the same observable end state; conflicting reuse is rejected deterministically.
-- Lifecycle states, reason codes, command names, and correlation identifiers are contract data. Invalid transitions are rejected before mutation and audited; terminal items get a linked successor rather than rewritten history.
-- User-facing failures use a versioned, localized, redaction-safe catalog with an actionable next step. Raw exception text, payloads, PII, credentials, and restricted evidence must not leak through responses, logs, traces, exports, CLI, or MCP.
-- Verification is behavioral, not superficial: integration and end-to-end tiers assert state-store end state rather than HTTP status or exit codes. Cross-tenant isolation (nine actor types, including cursors and error bodies), differential conformance across surfaces, architecture fitness, idempotency, and audit tests are release gates.
-- Runtime-topology work completes only against an actually started supported topology: documented prerequisites, every required resource reaching its documented healthy or running state, one tenant-bound smoke path executed, and evidence recording the observed resource states and endpoints. Attempted runs, diagnostic substitutes, self-skipped, zero-test, or all-skipped results do not satisfy it; a genuinely unavailable external dependency requires a separately approved, time-bounded exception naming only the blocked lane and its owner.
+- Derive tenant, actor, role, Project, and resource authority only from trusted server and current owner evidence. Caller input cannot broaden scope, machine identities cannot inherit human authority, and unresolved or stale evidence fails closed.
+- Apply existence-neutral authorization and redaction across API, UI, telemetry, diagnostics, exports, and later machine surfaces. Missing and forbidden resources must not be distinguishable; restricted names, evidence, files, audit details, secrets, PII, and raw exceptions must not leak.
+- Give each logical operation a lifetime-stable identity, immutable origin, correlation, stable resource identities, and expected revision or accepted equivalent guard. First commit wins; equivalent duplicates return the stored outcome, while non-equivalent reuse returns a typed conflict without another effect.
+- Atomically persist each durable mutation with its event, terminal idempotency outcome, policy and approval references, and canonical audit envelope. Any missing element aborts the write. Sensitive denials, restricted reads, and service-client failures use a separate auditable-attempt record.
+- Resolve public failure and waiting states through a versioned English/French safe-message catalog: stable code, headline of at most 80 characters, one safe explanation, terminality, and an allowed next action. Unknown codes use a deny-safe fallback.
+- Return authoritative long-running status with identity, state, safe reason, origin, attempts, retry eligibility, partial-output marker, prior outcome, terminal reason, correlation, and safe next actions. Projection lag must never appear as completed work.
+- Enforce first-use tenant isolation by construction and prove it with native-store and API negative tests; filters alone are insufficient. Propagate correlation through UI, client, API, gateway, EventStore, audit, publication, projection, and status.
+- Accept only consented, verified-redacted, or synthetic evaluation data with provenance, version, expected result, fixture identity, and integrity hash. Sandbox resources and credentials must be tenant-scoped and production-isolated.
+- A5, A6, A9a, and A13 remain open evidence gates. Tenant-material persistence requires accepted data-protection evidence, and mutation requires an accepted owner-dispatched atomic target. Synthetic work cannot support pilot, compliance, tamper-evidence, or production-readiness claims.
 
 ## Technical Decisions
 
-- ChatBot is an EventStore domain module hosted on the `Hexalith.EventStore.DomainService` SDK. `CommandGateway` mounts as the SDK's pre-commit admission hook and must never become a second command pipeline; governance interfaces stay internal to Server and fitness tests reject replicated admission stages.
-- The OpenAPI 3.1 Contract Spine is the single public contract source, with metadata-only problem responses. UI and later CLI/MCP adapters depend only on the typed Client and construct `IChatBotCommand`; they touch no DAPR client, data plane, or gateway internals.
-- Solution shape is `.slnx` with strict `Contracts ← Client ← Server` direction, .NET 10 / C# 14, nullable and warnings as errors, and mirrored xUnit v3 test projects plus dedicated architecture and conformance suites. Testing is three-tier: unit, DAPR integration, Aspire end-to-end.
-- `Hexalith.Builds` is the sole owner of dependency package versions. Consumer package files are version-free imports; inline versions, overrides, and local package-version properties are governance failures.
-- Cross-repository development uses ChatBot root-declared submodules under `references/`, initialized non-recursively; no dependency-owned submodule beneath them is ever initialized. Independent consumer validation uses an isolated standalone checkout at the ChatBot-pinned gitlink, initializing only that root's declared dependencies.
-- Local composition uses the retained thin AppHost umbrella (an explicitly recorded exception to full platform composition, never a production hosting bypass). It brings up ChatBot plus DAPR sidecars, the required siblings and Keycloak with health gating, and the UI surface without its own sidecar. DAPR naming is convention-derived and must stay consistent: AppId `chatbot`, EventStore actor/status store `statestore`, ChatBot derived state store `chatbot-statestore`, the dedicated workflow state store, pub/sub `chatbot-pubsub`, topic `chatbot.events`, dead letter `deadletter.chatbot.events`.
-- Access control is environment-split by design: production keeps deny-by-default policy under mTLS, while the local self-hosted lane runs mTLS-off against its own separate policy file. Neither posture may be blurred into the other.
-- Standalone Aspire and ServiceDefaults projects were retired by host-layer reuse; scaffold references to them are historical. Deployment also requires explicit DataProtection key-ring configuration for the admission marker and query cursor key ring.
-- Immutable decision records are superseded, never mutated; live sibling mirrors are version-stamped projections for display only, while authorization gates consult authoritative current state. Correlation travels through commands, events, activities, logs, audit, and status, and long-running work returns an operation identity exposing pending or partial state instead of claiming early completion.
+- OpenAPI 3.1 is the sole public HTTP contract source. Generate the typed Client from it; surfaces use only that client and cannot define competing wire models or access Dapr, stores, aggregates, or gateway internals. Failures use metadata-only RFC 9457 problem details.
+- Every mutation enters one `CommandGateway` at the EventStore DomainService pre-commit seam. Authentication, tenant binding, authorization, operation identity, concurrency guard, envelope construction, and atomic-commit participation run once in order. The gateway alone selects a closed effect profile from product metadata.
+- Keep governance services internal to Server and preserve the Contracts-to-Client-to-Server/surface dependency direction. Use the canonical `.slnx` module shape, local-only AppHost, and independent architecture, conformance, integration, and browser tests.
+- Policy snapshots and historical decisions are immutable and superseded by new versions. Each decision retains the exact snapshot identity and version used; unresolved policy blocks admission.
+- Publish and project only committed outcomes. SignalR is advisory, so clients re-query typed status. Verify persisted stream/store end state; tests reject alternate write paths and cover partial failure, concurrency, duplicate/conflicting reuse, cross-tenant access, redaction, rebuild, and recovery.
 
 ## UX & Interaction Patterns
 
-- Build on FrontComposer and Fluent UI v5 with inherited semantic tokens; do not create a separate ChatBot design system. Status meaning must survive dark mode, forced colors, and non-color presentation.
-- Reuse shared project-context, actor, evidence, risk, blocked-state, and status primitives. Risky requests create a reviewable proposal rather than executing from a plain message action; no ungoverned free-text action path may exist.
-- Meet WCAG 2.2 AA: full keyboard operation, visible and restored focus, uniquely labelled landmarks, reachable disabled reasons, non-noisy live regions, reduced-motion behavior, and redaction-equivalent exported, copied, downloaded, and read-aloud output.
-- Desktop is the full-workflow surface; tablet may stack panels; phone retains safe triage and decision actions. Primary touch targets are at least 44×44 CSS pixels, with the permitted 24×24 floor only for dense controls with adequate spacing.
-- Support English and French display text and locale-aware formatting. Stable machine identifiers stay untranslated, and layouts must absorb French expansion without hiding state, risk, next action, or recovery reason.
+- The first governed route lets an authorized user inspect failure and retry only when current authority, state, revision, and retry policy permit it. Confirmation shows target and consequence; retry creates a new predecessor-linked operation rather than resuming the original effect.
+- Show admission before implying work began, keep status inline, and use banners or toasts only for deduplicated transition feedback. Re-query authoritative status and preserve state and focus through conflicts, denials, degradation, and terminal outcomes.
+- Use the single FrontComposer shell, `FcPageLayout`, `FcPageHeader`, and Fluent UI v5 controls for every live state. Meet WCAG 2.2 AA with keyboard/focus safety, non-color status, reduced motion, 320 CSS-pixel and 400% reflow, touch targets, and English/French parity.
 
 ## Cross-Story Dependencies
 
-Scaffold, dependency-version authority, runtime topology, and CI gates (1.1a–1.1f) enable the Contract Spine; the Contract Spine enables the gateway; authorization, audit, idempotency, lifecycle, redaction, and correlation together complete the path proven by Story 1.9. Within the scaffold split, the solution baseline precedes submodule resolution, which precedes topology wiring, which precedes the CI and release gates that lock the policy in place. Architecture, conformance, isolation, and tenant-fixture stories mechanically verify the same path rather than adding new behavior. UX foundation stories supply inherited behavior for the first governed surface and every later one. All later epics depend on this floor and may extend adapters or workflows only through the same contracts and the same gateway.
+The runnable foundation enables the contract spine. Trusted context, safe outcomes, operation identity, and policy feed the gateway; atomic mutation/audit then enables duplicate, conflict, and sensitive-attempt handling. The UI consumes those contracts without adding a path, and evaluation assets exercise the completed spine. Every later epic must extend workflows through the same gateway and durability boundary.
