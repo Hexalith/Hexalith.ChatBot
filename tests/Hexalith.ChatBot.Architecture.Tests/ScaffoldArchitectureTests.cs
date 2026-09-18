@@ -214,6 +214,95 @@ public static class ScaffoldArchitectureTests
     }
 
     [Fact]
+    public static void ReleaseDependencyGraphShouldUsePackagesOutsideAppHostCompositionResources()
+    {
+        const string SourceModeCondition = "'$(UseHexalithProjectReferences)' == 'true'";
+        const string PackageModeCondition = "'$(UseHexalithProjectReferences)' != 'true'";
+        string root = RepositoryRoot();
+        string appHostProject = Path.Combine(
+            root,
+            "src",
+            "Hexalith.ChatBot.AppHost",
+            "Hexalith.ChatBot.AppHost.csproj");
+        string[] projectFiles = Directory
+            .EnumerateFiles(Path.Combine(root, "src"), "*.csproj", SearchOption.AllDirectories)
+            .Concat(Directory.EnumerateFiles(Path.Combine(root, "tests"), "*.csproj", SearchOption.AllDirectories))
+            .Where(project => !string.Equals(project, appHostProject, StringComparison.Ordinal))
+            .ToArray();
+
+        List<string> violations = [];
+        int externalSourceReferenceCount = 0;
+        int packageCounterpartCount = 0;
+        foreach (string projectFile in projectFiles)
+        {
+            XDocument project = XDocument.Load(projectFile);
+            XElement[] externalProjectReferences = project
+                .Descendants("ProjectReference")
+                .Where(static reference =>
+                    reference.Attribute("Include")?.Value.StartsWith("$(Hexalith", StringComparison.Ordinal) == true)
+                .ToArray();
+            externalSourceReferenceCount += externalProjectReferences.Length;
+
+            foreach (XElement projectReference in externalProjectReferences)
+            {
+                string include = projectReference.Attribute("Include")!.Value;
+                string projectReferenceCondition = DependencyCondition(projectReference) ?? "<unconditional>";
+                if (!string.Equals(projectReferenceCondition, SourceModeCondition, StringComparison.Ordinal))
+                {
+                    violations.Add(
+                        $"{Path.GetRelativePath(root, projectFile)}:{include} must be source-mode-only; "
+                        + $"found {projectReferenceCondition}");
+                }
+
+                string packageId = include
+                    .Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries)
+                    .Last()
+                    .Replace(".csproj", string.Empty, StringComparison.Ordinal);
+                XElement? packageReference = project
+                    .Descendants("PackageReference")
+                    .SingleOrDefault(reference =>
+                        string.Equals(reference.Attribute("Include")?.Value, packageId, StringComparison.Ordinal));
+                if (packageReference is null)
+                {
+                    violations.Add(
+                        $"{Path.GetRelativePath(root, projectFile)}:{include} has no {packageId} package-mode counterpart");
+                    continue;
+                }
+
+                packageCounterpartCount++;
+                string packageReferenceCondition = DependencyCondition(packageReference) ?? "<unconditional>";
+                if (!string.Equals(packageReferenceCondition, PackageModeCondition, StringComparison.Ordinal))
+                {
+                    violations.Add(
+                        $"{Path.GetRelativePath(root, projectFile)}:{packageId} must be package-mode-only; "
+                        + $"found {packageReferenceCondition}");
+                }
+            }
+        }
+
+        externalSourceReferenceCount.ShouldBeGreaterThan(
+            10,
+            "the package-mode guard must inspect the real cross-repository dependency graph");
+        packageCounterpartCount.ShouldBe(
+            externalSourceReferenceCount,
+            "every external source dependency must have an exact package-mode counterpart");
+        violations.ShouldBeEmpty();
+
+        XDocument appHost = XDocument.Load(appHostProject);
+        XElement[] localCompositionResources = appHost
+            .Descendants("ProjectReference")
+            .Where(static reference =>
+                reference.Attribute("Include")?.Value.StartsWith("$(Hexalith", StringComparison.Ordinal) == true)
+            .ToArray();
+        localCompositionResources.Length.ShouldBeGreaterThan(
+            5,
+            "the sole exception must remain the real typed local-composition topology, not an empty AppHost");
+        localCompositionResources.ShouldAllBe(
+            static reference => DependencyCondition(reference) == null,
+            "AppHost executable references are unconditional local composition resources, not library dependency authority");
+    }
+
+    [Fact]
     public static void ChatBotUiAdapterMustDependOnlyOnClientFacadeAndNeverServerInternals()
     {
         const string UiProject = "src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj";
@@ -835,6 +924,47 @@ public static class ScaffoldArchitectureTests
     }
 
     [Fact]
+    public static void RootDeclaredSiblingPackageWrappersShouldDelegateVersionsToSharedBuildsCatalog()
+    {
+        string root = RepositoryRoot();
+        string gitmodules = File.ReadAllText(Path.Combine(root, ".gitmodules"));
+        string[] siblingRoots = Regex.Matches(
+                gitmodules,
+                "(?m)^\\s*path\\s*=\\s*(?<path>references/[^\\r\\n]+)\\s*$")
+            .Select(static match => Path.Combine(
+                RepositoryRoot(),
+                match.Groups["path"].Value.Replace('/', Path.DirectorySeparatorChar)))
+            .ToArray();
+        siblingRoots.Length.ShouldBeGreaterThan(
+            5,
+            "the shared-authority guard must inspect the actual root-declared sibling set");
+
+        string[] wrappers = siblingRoots
+            .Select(static sibling => Path.Combine(sibling, "Directory.Packages.props"))
+            .Where(File.Exists)
+            .ToArray();
+        wrappers.Length.ShouldBeGreaterThan(
+            5,
+            "root-declared package wrappers must remain present and centrally auditable");
+
+        string[] localVersionDeclarations = wrappers
+            .SelectMany(wrapper => XDocument.Load(wrapper)
+                .Descendants("PackageVersion")
+                .Select(version => Path.GetRelativePath(root, wrapper) + ":"
+                    + (version.Attribute("Include")?.Value ?? version.Attribute("Update")?.Value)))
+            .ToArray();
+        localVersionDeclarations.ShouldBeEmpty(
+            "root-declared sibling wrappers import the shared Builds catalog and must not become version authorities");
+
+        PackageCatalogTestHelper.Version("Hexalith.Folders.Client").ShouldBe("1.0.0");
+        PackageCatalogTestHelper.Version("Hexalith.Folders.Contracts").ShouldBe("1.0.0");
+        PackageCatalogTestHelper.Version("Hexalith.Projects.Client").ShouldBe("1.0.0");
+        PackageCatalogTestHelper.Version("Hexalith.Projects.Contracts").ShouldBe("1.0.0");
+        PackageCatalogTestHelper.Version("LibGit2Sharp").ShouldBe("0.32.0");
+        PackageCatalogTestHelper.AssertExclusiveAuthority();
+    }
+
+    [Fact]
     public static void RootConfigurationShouldPinSdkTargetFrameworkAndCentralPackages()
     {
         string root = RepositoryRoot();
@@ -1411,6 +1541,12 @@ public static class ScaffoldArchitectureTests
             .Where(static include => !string.IsNullOrWhiteSpace(include))
             .Select(static include => include!)
             .ToArray();
+    }
+
+    private static string? DependencyCondition(XElement dependency)
+    {
+        return dependency.Attribute("Condition")?.Value
+            ?? dependency.Ancestors("ItemGroup").FirstOrDefault()?.Attribute("Condition")?.Value;
     }
 
     private static string WorkflowJob(string source, string name)

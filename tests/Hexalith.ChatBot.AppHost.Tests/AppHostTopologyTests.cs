@@ -448,8 +448,10 @@ public static class AppHostTopologyTests
         appHost.ShouldContain("eventStoreAdmin.WithJwtBearerSecurity(security,");
         appHost.ShouldContain("WithEventStoreClientCredentials(");
         appHost.ShouldContain("security,");
-        appHost.ShouldContain("username: \"admin-user\"");
-        appHost.ShouldContain("password: \"admin-pass\"");
+        appHost.ShouldContain("eventStoreAdminUsername = builder.AddParameter(");
+        appHost.ShouldContain("eventStoreAdminPassword = builder.AddParameter(");
+        appHost.ShouldContain("username: eventStoreAdminUsername");
+        appHost.ShouldContain("password: eventStoreAdminPassword");
 
         JsonElement root = document.RootElement;
 

@@ -724,10 +724,10 @@ interfaces, or platform packages are evidence inputs only and do not waive the r
 - **Decision:** ChatBot is an EventStore **domain module** hosted on the `Hexalith.EventStore.DomainService` SDK. The
   target state uses an approximately two-line host: `AddEventStoreDomainService()` plus admission-chain registration,
   followed by `UseEventStoreDomainService()`. Use `IDomainQueryHandler` for queries, `IDomainProjectionHandler` for
-  projections, `IReadModelStore` with `ReadModelWritePolicy` for read models, and `IQueryCursorCodec` with
-  `QueryCursorScope` for cursors. Use `AddEventStoreDomainTelemetry` and
-  `AddEventStoreDomainStateStoreHealthCheck` for telemetry and health. Compose the module from the platform AppHost by
-  using `AddEventStoreDomainModule(...)`, as `tenants` and `sample` are composed today.
+  projections, `IReadModelStore` + `ReadModelWritePolicy` for read models, and
+  `IQueryCursorCodec`/`QueryCursorScope` for cursors. Use
+  `AddEventStoreDomainTelemetry`/`AddEventStoreDomainStateStoreHealthCheck` for telemetry and health. Compose the module
+  from the platform AppHost by using `AddEventStoreDomainModule(...)`, as `tenants` and `sample` are composed today.
 - **FR81a preserved:** the CommandGateway admission layer mounts as the SDK's **pre-commit admission hook** (EventStore platform prerequisite TE-1.2) — same stage order, same `internal` governance interfaces, same "NOT a second pipeline" invariant, now enforced at the platform seam.
 - **Implementation state after TE-1:** `Program.cs` uses the SDK host shape (`AddEventStoreDomainService(...)`, admission-stage registration, `UseEventStoreDomainService()`), public compatibility routes live outside `Program.cs`, custom `/process` plumbing is removed, queries/projections/read models/cursors/telemetry/health use SDK contracts, and standalone ChatBot `.Aspire`/`.ServiceDefaults` projects are retired.
 - **Retained exception:** `src/Hexalith.ChatBot.AppHost` remains as a thin local-development umbrella for EventStore, Tenants, ChatBot Server, ChatBot UI, Keycloak, and Dapr sidecars. Its internal Dapr wiring preserves `chatbot-statestore`, `chatbot-workflow-statestore`, and `chatbot-pubsub` because the current `AddEventStoreDomainModule(...)` API does not yet model those dedicated resources. This is not a production domain-hosting bypass.

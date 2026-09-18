@@ -1,10 +1,9 @@
 using Dapr.Workflow;
 
-using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.Memories.Client.Rest;
 using Hexalith.Memories.Contracts.V1.DerivedStores;
 
-namespace Hexalith.ChatBot.Server.Adapters.Memories;
+namespace Hexalith.ChatBot.Server.Lifecycle.Workflows;
 
 /// <summary>Publishes one complete ordered association/intake binding atomically in Memories.</summary>
 internal sealed class IngestionBindingFinalizeActivity(MemoriesClient memories)

@@ -6,10 +6,9 @@ using Dapr.Workflow;
 
 using Hexalith.ChatBot.Server.Adapters.Mailbox;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
-using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.Memories.Client.Rest;
 
-namespace Hexalith.ChatBot.Server.Adapters.Memories;
+namespace Hexalith.ChatBot.Server.Lifecycle.Workflows;
 
 /// <summary>Fetches one authorized source payload and starts or rejoins its deterministic Memories ingestion.</summary>
 internal sealed class IngestionBindingStartSourceActivity(

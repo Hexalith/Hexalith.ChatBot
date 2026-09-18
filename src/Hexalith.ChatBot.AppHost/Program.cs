@@ -69,6 +69,15 @@ IResourceBuilder<ParameterResource> projectsApiTokenParameter = builder.AddParam
     () => projectsApiToken,
     publishValueAsDefault: false,
     secret: true);
+IResourceBuilder<ParameterResource> eventStoreAdminUsername = builder.AddParameter(
+    "eventstore-admin-username",
+    () => "admin-user",
+    publishValueAsDefault: false);
+IResourceBuilder<ParameterResource> eventStoreAdminPassword = builder.AddParameter(
+    "eventstore-admin-password",
+    () => "admin-pass",
+    publishValueAsDefault: false,
+    secret: true);
 
 // Live durable read path: project the governed-operation read model into the DAPR chatbot-statestore, and
 // subscribe to the tenant-prefixed topic the EventStore publishes governed events on
@@ -150,8 +159,8 @@ if (security is not null)
         .WithEventStoreClientCredentials(
             security,
             clientId: "hexalith-eventstore",
-            username: "admin-user",
-            password: "admin-pass")
+            username: eventStoreAdminUsername,
+            password: eventStoreAdminPassword)
         .WithEnvironment("EventStore__AdminServer__SwaggerUrl", adminSwaggerUrl);
 }
 else

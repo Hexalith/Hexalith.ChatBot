@@ -4,6 +4,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Server\Hexalith.ChatBot.Server.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseHexalithProjectReferences)' == 'true'">
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Contracts\Hexalith.EventStore.Contracts.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.DomainService\Hexalith.EventStore.DomainService.csproj" />
     <ProjectReference Include="$(HexalithFoldersRoot)\src\Hexalith.Folders.Client\Hexalith.Folders.Client.csproj" />
@@ -21,5 +23,13 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
+    <PackageReference Include="Hexalith.EventStore.Contracts" />
+    <PackageReference Include="Hexalith.EventStore.DomainService" />
+    <PackageReference Include="Hexalith.Folders.Client" />
+    <PackageReference Include="Hexalith.Parties.Client" />
+    <PackageReference Include="Hexalith.Parties.Contracts" />
+    <PackageReference Include="Hexalith.Projects.Client" />
   </ItemGroup>
 </Project>

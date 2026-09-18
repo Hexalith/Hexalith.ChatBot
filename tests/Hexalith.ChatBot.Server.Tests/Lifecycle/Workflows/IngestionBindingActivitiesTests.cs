@@ -1,7 +1,6 @@
 using System.Text;
 
 using Hexalith.ChatBot.Server.Adapters.Mailbox;
-using Hexalith.ChatBot.Server.Adapters.Memories;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Projections;

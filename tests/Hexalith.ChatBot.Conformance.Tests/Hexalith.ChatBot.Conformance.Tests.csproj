@@ -35,6 +35,11 @@
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Server\Hexalith.ChatBot.Server.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Testing\Hexalith.ChatBot.Testing.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Workers\Hexalith.ChatBot.Workers.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseHexalithProjectReferences)' == 'true'">
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Contracts\Hexalith.EventStore.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
+    <PackageReference Include="Hexalith.EventStore.Contracts" />
   </ItemGroup>
 </Project>

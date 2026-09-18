@@ -3,7 +3,6 @@ using Hexalith.ChatBot.Server.Adapters.Conversations;
 using Hexalith.ChatBot.Server.Adapters.Folders;
 using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Adapters.Mailbox;
-using Hexalith.ChatBot.Server.Adapters.Memories;
 using Hexalith.ChatBot.Server.Adapters.Parties;
 using Hexalith.ChatBot.Server.Adapters.Projects;
 using Hexalith.ChatBot.Server.Association.Scoring;

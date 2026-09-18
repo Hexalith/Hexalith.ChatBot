@@ -25,6 +25,8 @@
          JwtBearer transitive assembly and emits unresolved 8.19.2/8.22.0 conflicts. -->
     <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" />
     <ProjectReference Include="..\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseHexalithProjectReferences)' == 'true'">
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Client\Hexalith.EventStore.Client.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Contracts\Hexalith.EventStore.Contracts.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.DomainService\Hexalith.EventStore.DomainService.csproj" />
@@ -34,8 +36,6 @@
     <ProjectReference Include="$(HexalithPartiesRoot)\src\Hexalith.Parties.Contracts\Hexalith.Parties.Contracts.csproj" />
     <ProjectReference Include="$(HexalithProjectsRoot)\src\Hexalith.Projects.Client\Hexalith.Projects.Client.csproj" />
     <ProjectReference Include="$(HexalithTenantsRoot)\src\Hexalith.Tenants.Contracts\Hexalith.Tenants.Contracts.csproj" />
-  </ItemGroup>
-  <ItemGroup Condition="'$(UseHexalithProjectReferences)' == 'true'">
     <!-- ChatBot source mode consumes the two owned Memories surfaces directly, but Memories must still obey its
          Release rule that external Hexalith dependencies are packages. Remove the outer graph-mode globals before
          setting the child build explicitly; otherwise a Release source build is rejected by Memories' policy. -->
@@ -47,7 +47,16 @@
                       GlobalPropertiesToRemove="UseHexalithProjectReferences;UseNuGetDeps" />
   </ItemGroup>
   <ItemGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
+    <PackageReference Include="Hexalith.EventStore.Client" />
+    <PackageReference Include="Hexalith.EventStore.Contracts" />
+    <PackageReference Include="Hexalith.EventStore.DomainService" />
+    <PackageReference Include="Hexalith.Folders.Client" />
+    <PackageReference Include="Hexalith.Folders.Contracts" />
     <PackageReference Include="Hexalith.Memories.Client.Rest" />
     <PackageReference Include="Hexalith.Memories.Contracts" />
+    <PackageReference Include="Hexalith.Parties.Client" />
+    <PackageReference Include="Hexalith.Parties.Contracts" />
+    <PackageReference Include="Hexalith.Projects.Client" />
+    <PackageReference Include="Hexalith.Tenants.Contracts" />
   </ItemGroup>
 </Project>

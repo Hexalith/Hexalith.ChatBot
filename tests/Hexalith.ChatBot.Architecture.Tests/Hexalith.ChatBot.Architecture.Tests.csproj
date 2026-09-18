@@ -18,6 +18,8 @@
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Mcp\Hexalith.ChatBot.Mcp.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.UI\Hexalith.ChatBot.UI.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Workers\Hexalith.ChatBot.Workers.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseHexalithProjectReferences)' == 'true'">
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Client\Hexalith.EventStore.Client.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.DomainService\Hexalith.EventStore.DomainService.csproj" />
   </ItemGroup>
@@ -32,5 +34,9 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
+    <PackageReference Include="Hexalith.EventStore.Client" />
+    <PackageReference Include="Hexalith.EventStore.DomainService" />
   </ItemGroup>
 </Project>

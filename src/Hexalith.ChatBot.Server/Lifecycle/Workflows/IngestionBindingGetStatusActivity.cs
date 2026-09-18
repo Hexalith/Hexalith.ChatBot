@@ -1,10 +1,9 @@
 using Dapr.Workflow;
 
-using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.Memories.Client.Rest;
 using Hexalith.Memories.Contracts.V1;
 
-namespace Hexalith.ChatBot.Server.Adapters.Memories;
+namespace Hexalith.ChatBot.Server.Lifecycle.Workflows;
 
 /// <summary>Reads one safe ingestion status from Memories and maps it to the ChatBot workflow boundary.</summary>
 internal sealed class IngestionBindingGetStatusActivity(MemoriesClient memories)
