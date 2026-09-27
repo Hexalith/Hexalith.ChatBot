@@ -32,6 +32,9 @@ companions:
 
 # Architecture Spine — Hexalith.ChatBot
 
+**Approved McpCli course correction (2026-09-27):** `Hexalith.McpCli` is the target for Hexalith-owned CLI/MCP access to eligible ChatBot operations. `Hexalith.ChatBot.Cli` and `.Mcp` are obsolete migration sources, not target adapters. ChatBot keeps domain governance, audit, and UI confirmation; McpCli must refuse UI-only or human-confirmation operations under Platform AD-14. Machine-parity claims below apply only to the approved replacement inventory and must not imply unsupported v1 McpCli capability.
+
+
 ## Design Paradigm
 
 Hexalith.ChatBot is an event-sourced modular monolith. Hexagonal adapters translate every origin to typed
@@ -509,8 +512,8 @@ src/
   Hexalith.ChatBot.Server/      # EventStore DomainService module; Gateway pre-commit hook + domain seams
   Hexalith.ChatBot.Workers/     # mailbox, retry, projection and recovery adapters through the command spine
   Hexalith.ChatBot.UI/          # FrontComposer/Fluent UI
-  Hexalith.ChatBot.Cli/         # Client-only CLI adapter
-  Hexalith.ChatBot.Mcp/         # Client-only MCP adapter
+  Hexalith.ChatBot.Cli/         # Obsolete compatibility adapter; Hexalith.McpCli is target CLI
+  Hexalith.ChatBot.Mcp/         # Obsolete compatibility adapter; Hexalith.McpCli is target MCP
   Hexalith.ChatBot.AppHost/     # local-development topology shim only
 tests/
   Hexalith.ChatBot.Architecture.Tests/

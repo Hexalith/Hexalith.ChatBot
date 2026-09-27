@@ -27,6 +27,9 @@ inputDocuments:
 
 # chatbot - Epic Breakdown
 
+**Approved McpCli course correction (2026-09-27).** Epic 5 Stories 5.1–5.10 are reconciled against `Hexalith.McpCli`: remaining machine-access work enrolls eligible ChatBot Contracts and proves both shared heads, attribution, authorization, and refusal. Human confirmation and UI-only decisions stay on confidential ChatBot UI under Platform AD-14. Existing `Hexalith.ChatBot.Cli`/`.Mcp` story results are historical compatibility evidence if done; they are not target adapters. McpCli Epic 5 owns inventory, parity, and retirement.
+
+
 ## Overview
 
 This document provides the complete epic and story breakdown for chatbot, decomposing the requirements from the PRD, UX Design if it exists, and Architecture requirements into implementable stories.

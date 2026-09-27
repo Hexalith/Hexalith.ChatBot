@@ -26,6 +26,9 @@ decisionLog: .memlog.md
 
 # Hexalith.ChatBot — Experience Spine
 
+**Approved McpCli experience correction (2026-09-27):** Machine-access journeys use `Hexalith.McpCli` CLI and stdio MCP heads for approved agent-eligible ChatBot operations. The old ChatBot CLI/MCP adapters are migration compatibility. Human association decisions, AI-action approvals, and other confirmation-required actions remain on confidential ChatBot UI; the shared heads show a safe refusal and UI handoff. Cross-surface parity applies only to eligible operations and their approved inventory.
+
+
 ## Foundation
 
 Hexalith.ChatBot is a responsive enterprise conversation workspace in which authorized people understand Project context, review ambiguous intake, govern AI assistance, perform bounded administration, and reconstruct outcomes. Microsoft Blazor Fluent UI v5 → Hexalith.FrontComposer → `DESIGN.md` is the visual inheritance chain; this document owns information architecture, behavior, states, responsive continuity, and accessibility.

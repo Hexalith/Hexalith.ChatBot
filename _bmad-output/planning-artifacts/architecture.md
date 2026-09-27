@@ -43,6 +43,9 @@ openReleaseGates: [A5, A6, A9a, A10, A11-M1, A11-M2, A13]
 
 # Architecture Decision Document
 
+**Approved McpCli course correction (2026-09-27):** `Hexalith.McpCli` is the target for Hexalith-owned CLI/MCP access to eligible ChatBot operations. `Hexalith.ChatBot.Cli` and `.Mcp` are obsolete migration sources, not target adapters. ChatBot keeps domain governance, audit, and UI confirmation; McpCli must refuse UI-only or human-confirmation operations under Platform AD-14. Machine-parity claims below apply only to the approved replacement inventory and must not imply unsupported v1 McpCli capability.
+
+
 _Reconciled on 2026-09-15 to the finalized PRD, its normative appendices, and the approved planning-baseline change. Architectural design completeness is not implementation, qualification, pilot, or production readiness._
 
 ## Normative Authority and Release-Gate Posture

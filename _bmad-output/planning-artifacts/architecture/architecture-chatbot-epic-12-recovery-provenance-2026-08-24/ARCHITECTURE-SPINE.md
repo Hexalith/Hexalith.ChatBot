@@ -26,6 +26,9 @@ companions:
 
 # Architecture Spine — Epic 12 recovery-primary provenance
 
+**Approved McpCli course correction (2026-09-27):** `Hexalith.McpCli` is the target Hexalith-owned CLI/MCP surface for eligible ChatBot operations. Any ChatBot-owned MCP/CLI adapter in this recovery architecture is obsolete migration compatibility; its recovery, provenance, security, and audit guarantees remain requirements for shared-surface replacement. UI-only and human-confirmation operations remain on confidential UI.
+
+
 ## Design Paradigm
 
 Pipes-and-filters with single-writer attestation. A transition-only check plans authorized work; the live producer emits raw results and closed cleanup observations outside the evidence surface; the cleanup finalizer alone emits the aggregate receipt; the recovery projector binds that receipt into the metadata-only canonical TRX; the attestor is the only provenance-sidecar writer; the validator consumes immutable inputs; distinct artifact channels retain diagnostic and authoritative outcomes for 30 days.
