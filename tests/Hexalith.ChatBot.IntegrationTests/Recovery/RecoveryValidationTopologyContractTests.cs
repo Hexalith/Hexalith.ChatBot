@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 using Aspire.Hosting;
@@ -374,22 +375,28 @@ public sealed class RecoveryValidationTopologyContractTests
             .EnumerateDirectories(tempPath, "hexalith-chatbot-keycloak-*")
             .ToHashSet(StringComparer.Ordinal);
 
+        // Other AppHost builders in this assembly share the test process, so their owner markers have the same
+        // process id. A unique realm value identifies only the directory produced by this test.
+        string mailboxSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        string[] args = [.. RenderedRealmArgs];
+        args[0] = $"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={mailboxSecret}";
+
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(RenderedRealmArgs, TestContext.Current.CancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(args, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         string? generatedDirectory = null;
         try
         {
-            // Identify this run's directory by its owner marker rather than by "the only new one". Nothing in this
+            // Identify this run's directory by its owner marker and unique realm value. Nothing in this
             // assembly disables xUnit collection parallelism, and several other classes build
-            // DistributedApplicationTestingBuilder topologies that call the same function, so a bare
-            // SingleOrDefault() would throw on a concurrent run's directory -- and the finally block below would
-            // then delete it.
+            // DistributedApplicationTestingBuilder topologies in the same process. A marker alone matches all of
+            // them; a bare SingleOrDefault() would throw on a concurrent run's directory.
             string ownerPrefix = Environment.ProcessId.ToString(CultureInfo.InvariantCulture) + ":";
             string[] candidates = [.. Directory
                 .EnumerateDirectories(tempPath, "hexalith-chatbot-keycloak-*")
                 .Except(before, StringComparer.Ordinal)
-                .Where(directory => OwnerMarkerStartsWith(directory, ownerPrefix))];
+                .Where(directory => OwnerMarkerStartsWith(directory, ownerPrefix))
+                .Where(directory => RenderedRealmContains(directory, mailboxSecret))];
             candidates.Length.ShouldBe(
                 1,
                 "PrepareKeycloakRealmImport must create exactly one new owner-marked hexalith-chatbot-keycloak-* temp subdirectory.");
@@ -793,6 +800,20 @@ public sealed class RecoveryValidationTopologyContractTests
         {
             return File.Exists(markerPath)
                 && File.ReadAllText(markerPath).StartsWith(ownerPrefix, StringComparison.Ordinal);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static bool RenderedRealmContains(string directory, string mailboxSecret)
+    {
+        string realmPath = Path.Combine(directory, "hexalith-realm.json");
+        try
+        {
+            return File.Exists(realmPath)
+                && File.ReadAllText(realmPath).Contains(mailboxSecret, StringComparison.Ordinal);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
