@@ -180,6 +180,26 @@ Historical design baseline: `3c787993213ccf33f8912e6ad5caac605586fa15`. The impl
 
 ## Verification
 
+**Current-checkout verification (2026-10-04, HEAD `5c807dfe7c4ac8eb37a91d5b232017006e4119d5`):**
+
+- All nine implementation tasks already have their recorded source changes; the completion-evidence task remains open. SDK `10.0.401`; `dotnet restore Hexalith.ChatBot.slnx -p:Configuration=Release -p:UseHexalithProjectReferences=false -m:1 /nr:false` and `dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -p:UseHexalithProjectReferences=false -m:1 /nr:false` both exit 0, with zero build warnings/errors. Logs: `/tmp/story-1-1-current-dispatch-restore.log` and `/tmp/story-1-1-current-dispatch-build.log`.
+- After that build, independent native xUnit 4 runner invocations pass the scaffold/release-workflow guard classes **64/64**, AppHost tests **17/17**, and StoryEvidenceGate self-tests **219/219**, each with `XUNIT_REQUIRE_ZERO_SKIPS=1` and zero skips. Current CTRF, native TRX, and runner checksum outputs are under `TestResults/story-1-1/current-dispatch/`; logs are `/tmp/story-1-1-current-dispatch-{foundation,apphost,gate-selftests}.log`. These focused checks do not replace the earlier ordinary/live execution or contract-bound primary evidence.
+- Actual workspace completion validation against the unchanged original implementation baseline and current HEAD exits 1: `scope_digest_mismatch`, subject `1-1-scaffold-the-runnable-canonical-module-foundation.json`, because the canonical completion contract is absent. Generated report: `_bmad-output/implementation-artifacts/evidence/reports/1-1-scaffold-the-runnable-canonical-module-foundation-dispatch-preflight.json`.
+- The actual gate against a byte-identical current story/sprint/policy snapshot and a system-temp prospective contract also exits 1: `status_mismatch`, subject `story-transition`. Generated report: `_bmad-output/implementation-artifacts/evidence/reports/1-1-scaffold-the-runnable-canonical-module-foundation-dispatch-current-status-preflight.json`. Scope, digest, results, mappings, primary paths, and provenance were not evaluated. The next lifecycle prerequisite is an independently committed base with this exact story and sprint entry both at `review`, before the policy-defined completion transition. That prerequisite does not remove the subsequent exact-scope and five current primary-evidence obligations. Story/sprint remain `in-progress`; no active contract, attestation, destructive recovery run, staging, or commit was produced.
+
+Exact workspace completion-preflight command (exit 1, missing canonical contract):
+
+```bash
+dotnet tools/Hexalith.ChatBot.StoryEvidenceGate/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.dll validate \
+  --story _bmad-output/implementation-artifacts/spec-1-1-scaffold-the-runnable-canonical-module-foundation.md \
+  --contract _bmad-output/implementation-artifacts/evidence/1-1-scaffold-the-runnable-canonical-module-foundation.json \
+  --target-status done \
+  --base 1047ef38d3845406227891639aaeb853e5d4f116 \
+  --head 5c807dfe7c4ac8eb37a91d5b232017006e4119d5 \
+  --results TestResults \
+  --report _bmad-output/implementation-artifacts/evidence/reports/1-1-scaffold-the-runnable-canonical-module-foundation-dispatch-preflight.json
+```
+
 **Final approved-follow-up verification (2026-10-04):**
 
 - SDK `10.0.401`; `dotnet restore Hexalith.ChatBot.slnx -p:Configuration=Release -p:UseHexalithProjectReferences=false -m:1 /nr:false` passes without feed/version overrides (`/tmp/story-1-1-new-restore.log`). After all final code/assertion edits, `dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -p:UseHexalithProjectReferences=false -m:1 /nr:false` passes with zero warnings/errors (`/tmp/story-1-1-final-build.log`). The earlier cold NuGet.org-only restore below remains the independent cold-cache observation.

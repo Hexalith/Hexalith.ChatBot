@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "2.0",
+  "storyKey": "1-1-scaffold-the-runnable-canonical-module-foundation",
+  "baseCommit": "1047ef38d3845406227891639aaeb853e5d4f116",
+  "headCommit": "5c807dfe7c4ac8eb37a91d5b232017006e4119d5",
+  "implementationDigest": "",
+  "policyVersion": "2.1",
+  "passed": false,
+  "fileListCount": 0,
+  "scopedDiffCount": 0,
+  "eventPathCount": 0,
+  "checkedItemCount": 0,
+  "mappedItemCount": 0,
+  "repositoryScopes": [],
+  "lanes": [],
+  "primaryPaths": [],
+  "issues": [
+    {
+      "reasonCode": "status_mismatch",
+      "subject": "story-transition"
+    }
+  ],
+  "evaluatedAtUtc": "2026-10-04T17:51:44.4971302+00:00"
+}
