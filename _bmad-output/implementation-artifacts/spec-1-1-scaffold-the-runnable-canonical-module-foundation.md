@@ -2,7 +2,7 @@
 title: 'Story 1.1: Scaffold the Runnable Canonical Module Foundation'
 type: 'refactor'
 created: '2026-09-17'
-status: 'review'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: '1047ef38d3845406227891639aaeb853e5d4f116'
@@ -49,6 +49,11 @@ or stale assertions; do not weaken safety gates, skip required tests, fabricate 
 Preserve unrelated user work and existing qualification artifacts. Nested submodule initialization, publication,
 staging, commits, pushes, and unrelated dependency updates remain outside this approval.
 
+## Human Authorization (2026-10-04, completion evidence)
+
+The user subsequently authorized a separate committed `review` base and the Story 1.1 evidence workflow. This
+completion proposal is isolated from `main` until the unchanged evidence gate passes. No push was authorized.
+
 ## Code Map
 
 - `Hexalith.ChatBot.slnx` -- canonical nine-project module and independent test-lane inventory; remove explicit sibling library projects and assert Workers/UI test coverage.
@@ -80,7 +85,7 @@ staging, commits, pushes, and unrelated dependency updates remain outside this a
 - [x] Builds catalog/validator/regression files and Folders package wrapper listed above -- centralize the stable Folders selection, prove per-consumer authority, and prove unauthorized consumer overrides still fail.
 - [x] The workflow, SLO mirror, projection-rebuild, and UI guard paths listed above -- resolve each recorded baseline failure with focused invariant verification, then execute every independent ordinary lane successfully.
 - [x] The M2 runtime/sweep and required live-test paths listed above -- diagnose safe failure reasons, fix the cause, and pass the complete required topology/command/state/audit/replay/M2 test with zero skips and task-owned cleanup.
-- [ ] Story 1.1 evidence contract and existing gate tool/policy -- produce the required current machine evidence and run the actual completion preflight without weakening status, scope, primary-path, or provenance rules.
+- [x] Story 1.1 evidence contract and existing gate tool/policy -- produce the required current machine evidence and run the actual completion preflight without weakening status, scope, primary-path, or provenance rules.
 
 **Acceptance Criteria:**
 - Given a root-only checkout, when the project graph is inspected, then required projects/tests exist, surfaces use the typed Client, and forbidden edges fail tests.
@@ -127,7 +132,7 @@ staging, commits, pushes, and unrelated dependency updates remain outside this a
 - 2026-10-04 native evidence compatibility: The ordinary-lane script now emits fresh native xUnit 4 TRX alongside CTRF and checksums, removing only each lane's stale TRX/checksum before invocation. Existing runner scenarios prove distinct per-project TRX paths and fail closed on missing fresh TRX, including stale-only output; positive execution, failure, skip, and collision checks remain. Operational gate documentation now describes the actual native runner and shared 13-lane script, without changing policy, lifecycle, primary-evidence, provenance, or recovery requirements.
 - 2026-10-04 completion policy remains unchanged: The actual workspace preflight rejects the absent canonical completion contract (`scope_digest_mismatch`); its generated report is `_bmad-output/implementation-artifacts/evidence/reports/1-1-scaffold-the-runnable-canonical-module-foundation-approved-preflight.json`. A separate actual-gate run against byte-identical current story/sprint/policy files and a system-temp prospective contract rejects `status_mismatch` at `story-transition`; report `_bmad-output/implementation-artifacts/evidence/reports/1-1-scaffold-the-runnable-canonical-module-foundation-current-status-preflight.json`. Subsequent scope/digest/primary/TRX/provenance checks were not evaluated. A valid future done event requires an independent committed base with this exact product story and sprint entry both at `review`, followed by the policy-defined completion transition. The original implementation baseline `1047ef38d3845406227891639aaeb853e5d4f116` is unchanged. Original-baseline mixed user history, source deletions, and the five primary evidence classes (browser, SignalR, hosting assets, Aspire/Dapr, recovery) remain to be reconciled; ordinary CTRF, focused tests, and self-tests cannot replace their current contract-bound primary evidence. No destructive recovery producer was run while the production plan's lifecycle prerequisite remains unsatisfied. Story/sprint stay in-progress and the completion evidence task stays unchecked.
 
-## File List
+## Implementation Path History
 
 Exact paths owned by the approved 2026-10-04 follow-up are listed below. Earlier committed foundation changes remain recorded in the Code Map and historical implementation notes; unrelated user history is not claimed as this follow-up scope.
 
@@ -167,6 +172,14 @@ Exact paths owned by the approved 2026-10-04 follow-up are listed below. Earlier
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs`
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/Story12CssRetirementE2ETests.cs`
 - `tests/PackageCatalogTestHelper.cs`
+
+## File List
+
+Exact paths in the completion proposal from the committed review base:
+
+- `_bmad-output/implementation-artifacts/spec-1-1-scaffold-the-runnable-canonical-module-foundation.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/evidence/1-1-scaffold-the-runnable-canonical-module-foundation.json`
 
 ## Spec Change Log
 

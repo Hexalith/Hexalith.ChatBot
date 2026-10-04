@@ -1,0 +1,458 @@
+{
+  "schemaVersion": "2.0",
+  "recordKind": "story",
+  "recordLedgerKey": "1-1-scaffold-the-runnable-canonical-module-foundation",
+  "storyKey": "1-1-scaffold-the-runnable-canonical-module-foundation",
+  "storyTitle": "Story 1.1: Scaffold the Runnable Canonical Module Foundation",
+  "storyPath": "_bmad-output/implementation-artifacts/spec-1-1-scaffold-the-runnable-canonical-module-foundation.md",
+  "targetStatus": "done",
+  "persistedStatus": "done",
+  "sprintStatusKey": "1-1-scaffold-the-runnable-canonical-module-foundation",
+  "bootstrap": false,
+  "scope": {
+    "mode": "diff",
+    "implementationDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "transitionPaths": [
+      "_bmad-output/implementation-artifacts/spec-1-1-scaffold-the-runnable-canonical-module-foundation.md",
+      "_bmad-output/implementation-artifacts/evidence/1-1-scaffold-the-runnable-canonical-module-foundation.json",
+      "_bmad-output/implementation-artifacts/sprint-status.yaml"
+    ],
+    "repositories": [
+      {
+        "name": "root",
+        "path": ".",
+        "baseCommit": "$BASE",
+        "headCommit": "$HEAD",
+        "includeWorkingTree": false,
+        "includePaths": [
+          "_bmad-output/implementation-artifacts/evidence/1-1-scaffold-the-runnable-canonical-module-foundation.json",
+          "_bmad-output/implementation-artifacts/spec-1-1-scaffold-the-runnable-canonical-module-foundation.md",
+          "_bmad-output/implementation-artifacts/sprint-status.yaml"
+        ]
+      }
+    ]
+  },
+  "results": [
+    {
+      "lane": "Hexalith.ChatBot.AppHost.Tests",
+      "trx": "story-1-1/ordinary/Hexalith.ChatBot.AppHost.Tests.trx",
+      "provenance": "story-1-1/ordinary/Hexalith.ChatBot.AppHost.Tests.provenance.json",
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.AppHost.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.AppHost.Tests.AppHostTopologyTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Architecture.Tests",
+      "trx": "story-1-1/ordinary/Hexalith.ChatBot.Architecture.Tests.trx",
+      "provenance": "story-1-1/ordinary/Hexalith.ChatBot.Architecture.Tests.provenance.json",
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Architecture.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Cli.Tests",
+      "trx": "story-1-1/ordinary/Hexalith.ChatBot.Cli.Tests.trx",
+      "provenance": "story-1-1/ordinary/Hexalith.ChatBot.Cli.Tests.provenance.json",
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Cli.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Cli.Tests.ChatBotCliCommandTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Client.Tests",
+      "trx": "story-1-1/ordinary/Hexalith.ChatBot.Client.Tests.trx",
+      "provenance": "story-1-1/ordinary/Hexalith.ChatBot.Client.Tests.provenance.json",
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Client.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Client.Tests.ChatBotClientDescriptorTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Conformance.Tests",
+      "trx": "story-1-1/ordinary/Hexalith.ChatBot.Conformance.Tests.trx",
+      "provenance": "story-1-1/ordinary/Hexalith.ChatBot.Conformance.Tests.provenance.json",
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Conformance.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Conformance.Tests.CorrectionPropagationWorkflowConformanceTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Contracts.Tests",
+      "trx": "story-1-1/ordinary/Hexalith.ChatBot.Contracts.Tests.trx",
+      "provenance": "story-1-1/ordinary/Hexalith.ChatBot.Contracts.Tests.provenance.json",
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Contracts.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Contracts.Tests.OperatingBaselineAddendumDriftTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.IntegrationTests",
+      "trx": "story-1-1/ordinary/Hexalith.ChatBot.IntegrationTests.trx",
+      "provenance": "story-1-1/ordinary/Hexalith.ChatBot.IntegrationTests.provenance.json",
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.IntegrationTests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.IntegrationTests.Recovery.LiveProjectionRebuildDriverTests"
+      ],
+      "allowSkipped": true,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Mcp.Tests",
+      "trx": "story-1-1/ordinary/Hexalith.ChatBot.Mcp.Tests.trx",
+      "provenance": "story-1-1/ordinary/Hexalith.ChatBot.Mcp.Tests.provenance.json",
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Mcp.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Mcp.Tests.ChatBotMcpServiceTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Server.Tests",
+      "trx": "story-1-1/ordinary/Hexalith.ChatBot.Server.Tests.trx",
+      "provenance": "story-1-1/ordinary/Hexalith.ChatBot.Server.Tests.provenance.json",
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Server.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Server.Tests.Lifecycle.Workflows.IngestionBindingActivitiesTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Testing.Tests",
+      "trx": "story-1-1/ordinary/Hexalith.ChatBot.Testing.Tests.trx",
+      "provenance": "story-1-1/ordinary/Hexalith.ChatBot.Testing.Tests.provenance.json",
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Testing.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Testing.Tests.ChatBotTestConstantsTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.UI.E2E.Tests",
+      "trx": "story-1-1/ordinary/Hexalith.ChatBot.UI.E2E.Tests.trx",
+      "provenance": "story-1-1/ordinary/Hexalith.ChatBot.UI.E2E.Tests.provenance.json",
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.UI.E2E.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.UI.E2E.Tests.RealRenderCrossSurfaceE2ETests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.UI.Tests",
+      "trx": "story-1-1/ordinary/Hexalith.ChatBot.UI.Tests.trx",
+      "provenance": "story-1-1/ordinary/Hexalith.ChatBot.UI.Tests.provenance.json",
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.UI.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.UI.Tests.Story13LayoutCssRetirementTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Workers.Tests",
+      "trx": "story-1-1/ordinary/Hexalith.ChatBot.Workers.Tests.trx",
+      "provenance": "story-1-1/ordinary/Hexalith.ChatBot.Workers.Tests.provenance.json",
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Workers.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Workers.Tests.Mailbox.GraphMailboxIntakeWorkerTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "story-evidence-gate",
+      "trx": "story-1-1/story-evidence-gate.trx",
+      "provenance": "story-1-1/story-evidence-gate.provenance.json",
+      "artifactLocator": "file:story-1-1/story-evidence-gate.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "browser-primary",
+      "trx": "story-1-1/primary/browser-primary.trx",
+      "provenance": "story-1-1/primary/browser-primary.provenance.json",
+      "artifactLocator": "file:story-1-1/primary/browser-primary.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.UI.E2E.Tests.RealRenderCrossSurfaceE2ETests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": "browser"
+    },
+    {
+      "lane": "signalr-primary",
+      "trx": "story-1-1/primary/signalr-primary.trx",
+      "provenance": "story-1-1/primary/signalr-primary.provenance.json",
+      "artifactLocator": "file:story-1-1/primary/signalr-primary.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Server.Tests.Projections.ChatBotProjectConversationHubE2ETests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": "signalr"
+    },
+    {
+      "lane": "hosting-assets-primary",
+      "trx": "story-1-1/primary/hosting-assets-primary.trx",
+      "provenance": "story-1-1/primary/hosting-assets-primary.provenance.json",
+      "artifactLocator": "file:story-1-1/primary/hosting-assets-primary.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.UI.E2E.Tests.FrontComposerShellIntegrationE2ETests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": "hosting-assets"
+    },
+    {
+      "lane": "aspire-dapr-primary",
+      "trx": "story-1-1/primary/aspire-dapr-primary.trx",
+      "provenance": "story-1-1/primary/aspire-dapr-primary.provenance.json",
+      "artifactLocator": "file:story-1-1/primary/aspire-dapr-primary.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": "aspire-dapr"
+    },
+    {
+      "lane": "recovery-primary",
+      "trx": "recovery-primary/live-recovery-validation.trx",
+      "provenance": "recovery-primary/live-recovery-validation.provenance.json",
+      "artifactLocator": "file:recovery-primary/live-recovery-validation.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": "recovery"
+    }
+  ],
+  "primaryPaths": [
+    {
+      "class": "browser",
+      "lane": "browser-primary"
+    },
+    {
+      "class": "signalr",
+      "lane": "signalr-primary"
+    },
+    {
+      "class": "hosting-assets",
+      "lane": "hosting-assets-primary"
+    },
+    {
+      "class": "aspire-dapr",
+      "lane": "aspire-dapr-primary"
+    },
+    {
+      "class": "recovery",
+      "lane": "recovery-primary"
+    }
+  ],
+  "mappings": [
+    {
+      "id": "task-1",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.EveryNonGeneratedProductionSourceShouldContainExactlyOneNamedTopLevelDeclaration"
+      ]
+    },
+    {
+      "id": "task-2",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.SolutionShouldContainRequiredSourceAndTestProjects",
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.ReleaseDependencyGraphShouldUsePackagesOutsideAppHostCompositionResources"
+      ]
+    },
+    {
+      "id": "task-3",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ReleaseWorkflowSafetyTests.SuccessfulMergeTestLanesShouldAllExecute",
+        "Hexalith.ChatBot.Architecture.Tests.ReleaseWorkflowSafetyTests.ZeroExecutedMergeTestLaneShouldFailClosed"
+      ]
+    },
+    {
+      "id": "task-4",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.AppHost.Tests.AppHostTopologyTests.TierThreeEvidenceShouldRequireCanonicalComponentsSidecarsHealthAndEndpoints",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
+      ]
+    },
+    {
+      "id": "task-5",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.ReleaseMetadataShouldBindExactInventoryAndRemainBlockedOnOpenEvidenceGates"
+      ]
+    },
+    {
+      "id": "task-6",
+      "kind": "task",
+      "paths": [
+        "_bmad-output/implementation-artifacts/spec-1-1-scaffold-the-runnable-canonical-module-foundation.md"
+      ],
+      "assertions": []
+    },
+    {
+      "id": "task-7",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.RootDeclaredSiblingPackageWrappersShouldDelegateVersionsToSharedBuildsCatalog"
+      ]
+    },
+    {
+      "id": "task-8",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Conformance.Tests.CorrectionPropagationWorkflowConformanceTests.WorkflowRuntimeMustNotDirectlyMutateSiblingBoundedContexts",
+        "Hexalith.ChatBot.Contracts.Tests.OperatingBaselineAddendumDriftTests.AddendumOperatingBaselinesRowsShouldMirrorEveryPublishedFieldNotJustTheMetricName",
+        "Hexalith.ChatBot.IntegrationTests.Recovery.LiveProjectionRebuildDriverTests.RebuildUsesOnlyTheSelectedTenantImmutableSourceAndWormChain",
+        "Hexalith.ChatBot.UI.E2E.Tests.Story12CssRetirementE2ETests.RetiredControlClassesShouldBeReplacedByFluentAndSemanticBehaviorContracts"
+      ]
+    },
+    {
+      "id": "task-9",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
+      ]
+    },
+    {
+      "id": "task-10",
+      "kind": "task",
+      "paths": [
+        "_bmad-output/implementation-artifacts/evidence/1-1-scaffold-the-runnable-canonical-module-foundation.json"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.ValidProductStoryCompletionShouldPass",
+        "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate"
+      ]
+    },
+    {
+      "id": "ac-1",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.SolutionShouldContainRequiredSourceAndTestProjects",
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.ChatBotUiAdapterMustDependOnlyOnClientFacadeAndNeverServerInternals"
+      ]
+    },
+    {
+      "id": "ac-2",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.EveryNonGeneratedProductionSourceShouldContainExactlyOneNamedTopLevelDeclaration"
+      ]
+    },
+    {
+      "id": "ac-3",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.RootConfigurationShouldPinSdkTargetFrameworkAndCentralPackages",
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.ReleaseDependencyGraphShouldUsePackagesOutsideAppHostCompositionResources"
+      ]
+    },
+    {
+      "id": "ac-4",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ReleaseWorkflowSafetyTests.SuccessfulMergeTestLanesShouldAllExecute",
+        "Hexalith.ChatBot.Architecture.Tests.ReleaseWorkflowSafetyTests.ZeroExecutedMergeTestLaneShouldFailClosed"
+      ]
+    },
+    {
+      "id": "ac-5",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.AppHost.Tests.AppHostTopologyTests.TierThreeEvidenceShouldRequireCanonicalComponentsSidecarsHealthAndEndpoints",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
+      ]
+    },
+    {
+      "id": "ac-6",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.ReleaseMetadataShouldBindExactInventoryAndRemainBlockedOnOpenEvidenceGates"
+      ]
+    },
+    {
+      "id": "ac-7",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.RootDeclaredSiblingPackageWrappersShouldDelegateVersionsToSharedBuildsCatalog"
+      ]
+    },
+    {
+      "id": "ac-8",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Conformance.Tests.CorrectionPropagationWorkflowConformanceTests.WorkflowRuntimeMustNotDirectlyMutateSiblingBoundedContexts",
+        "Hexalith.ChatBot.IntegrationTests.Recovery.LiveProjectionRebuildDriverTests.RebuildUsesOnlyTheSelectedTenantImmutableSourceAndWormChain",
+        "Hexalith.ChatBot.UI.E2E.Tests.Story12CssRetirementE2ETests.RetiredControlClassesShouldBeReplacedByFluentAndSemanticBehaviorContracts"
+      ]
+    },
+    {
+      "id": "ac-9",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
+      ]
+    }
+  ],
+  "outOfScopeDisclosures": [],
+  "reportPath": "_bmad-output/implementation-artifacts/evidence/reports/1-1-scaffold-the-runnable-canonical-module-foundation.json"
+}
