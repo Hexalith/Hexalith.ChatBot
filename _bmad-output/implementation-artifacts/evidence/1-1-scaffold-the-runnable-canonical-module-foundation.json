@@ -11,7 +11,7 @@
   "bootstrap": false,
   "scope": {
     "mode": "diff",
-    "implementationDigest": "dfb9648b486f10bdd35c40be650df36924a679adc865287dea6ca70b95638914",
+    "implementationDigest": "e7df6488bb7aacb7b0b42cfe12ab82925cb8bbcb5b92d64548c969c8dce08303",
     "transitionPaths": [
       "_bmad-output/implementation-artifacts/spec-1-1-scaffold-the-runnable-canonical-module-foundation.md",
       "_bmad-output/implementation-artifacts/evidence/1-1-scaffold-the-runnable-canonical-module-foundation.json",
