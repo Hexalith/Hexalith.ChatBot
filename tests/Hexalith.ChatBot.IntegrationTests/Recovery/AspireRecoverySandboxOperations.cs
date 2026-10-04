@@ -1328,24 +1328,29 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         }
 
         // The reconciled aggregate is append-only and must remain committed; only the fresh duplicate-probe identity
-        // is expected to remain absent in durable state.
+        // is expected to remain absent in durable state. These independent sustained-absence probes each consume the
+        // full confirmation window, so run them together inside the cleanup deadline rather than serially exhausting it.
+        List<Task<bool>> durableAbsenceChecks = [];
         foreach (string intakeRef in cleanupState.StorageDurableAbsenceRefs)
         {
-            complete &= await _durableState.RemainsAbsentAsync(
+            durableAbsenceChecks.Add(_durableState.RemainsAbsentAsync(
                 RecoveryValidationTopology.StorageTenantRef,
                 intakeRef,
                 _absenceConfirmationWindow,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken));
         }
 
         foreach (string intakeRef in cleanupState.ControlTenantAbsenceRefs)
         {
-            complete &= await _durableState.RemainsAbsentAsync(
+            durableAbsenceChecks.Add(_durableState.RemainsAbsentAsync(
                 RecoveryValidationTopology.ControlTenantRef,
                 intakeRef,
                 _absenceConfirmationWindow,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken));
         }
+
+        bool[] durableAbsenceOutcomes = await Task.WhenAll(durableAbsenceChecks).ConfigureAwait(false);
+        complete &= durableAbsenceOutcomes.All(static absent => absent);
 
         return complete;
     }
