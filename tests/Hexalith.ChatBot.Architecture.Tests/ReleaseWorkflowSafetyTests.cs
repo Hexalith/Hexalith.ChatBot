@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
+using Hexalith.ChatBot.Tests;
+
 using Shouldly;
 
 namespace Hexalith.ChatBot.Architecture.Tests;
@@ -199,6 +201,75 @@ public static class ReleaseWorkflowSafetyTests
             exitCode.ShouldNotBe(0);
             standardError.ShouldContain("xUnit lane executed zero tests");
             File.ReadAllLines(logPath).Length.ShouldBe(1);
+        }
+        finally
+        {
+            DeleteTemporaryRoot(temporaryRoot);
+        }
+    }
+
+    /// <summary>
+    /// Verifies that successful process exits cannot mask invalid, failed, skipped-required, or stale lane evidence.
+    /// </summary>
+    /// <param name="scenario">The invalid evidence scenario.</param>
+    /// <param name="expectedReason">The fail-closed diagnostic expected from the boundary.</param>
+    [Theory]
+    [InlineData("runner-version", "Expected the catalog-pinned xUnit")]
+    [InlineData("failed-result", "xUnit lane reported failed tests")]
+    [InlineData("required-skip", "Required xUnit lane reported skipped tests")]
+    [InlineData("invalid-count", "CTRF summary contains invalid counts")]
+    [InlineData("inconsistent-count", "CTRF summary test count does not match its outcomes")]
+    [InlineData("stale-evidence", "xUnit runner did not create CTRF evidence")]
+    public static void InvalidMergeTestEvidenceShouldFailClosed(string scenario, string expectedReason)
+    {
+        string temporaryRoot = CreateTemporaryRoot("merge-test-invalid-evidence");
+        try
+        {
+            string testsRoot = Path.Combine(temporaryRoot, "tests");
+            Directory.CreateDirectory(Path.Combine(testsRoot, "Invalid"));
+            File.WriteAllText(Path.Combine(testsRoot, "Invalid", "Invalid.Tests.csproj"), "<Project />\n");
+            (string stubPath, string logPath) = CreateDotnetStub(temporaryRoot);
+            Dictionary<string, string> environment = MergeTestEnvironment(testsRoot, stubPath, logPath, "1");
+            switch (scenario)
+            {
+                case "runner-version":
+                    environment["MERGE_TEST_RUNNER_VERSION"] = "4.0.0";
+                    break;
+                case "failed-result":
+                    environment["MERGE_TEST_SUMMARY_OVERRIDE"] = "{\"tests\":1,\"passed\":0,\"failed\":1,\"skipped\":0}";
+                    break;
+                case "required-skip":
+                    environment["XUNIT_REQUIRE_ZERO_SKIPS"] = "1";
+                    environment["MERGE_TEST_SUMMARY_OVERRIDE"] = "{\"tests\":2,\"passed\":1,\"failed\":0,\"skipped\":1}";
+                    break;
+                case "invalid-count":
+                    environment["MERGE_TEST_SUMMARY_OVERRIDE"] = "{\"tests\":1,\"passed\":true,\"failed\":0,\"skipped\":0}";
+                    break;
+                case "inconsistent-count":
+                    environment["MERGE_TEST_SUMMARY_OVERRIDE"] = "{\"tests\":0,\"passed\":1,\"failed\":0,\"skipped\":0}";
+                    break;
+                case "stale-evidence":
+                    environment["MERGE_TEST_WRITE_EVIDENCE"] = "0";
+                    string stalePath = Path.Combine(temporaryRoot, "machine-results", "Invalid.Tests.ctrf.json");
+                    Directory.CreateDirectory(Path.GetDirectoryName(stalePath)!);
+                    File.WriteAllText(stalePath, "{\"results\":{\"tool\":{\"name\":\"xUnit.net v3\",\"version\":\""
+                        + PackageCatalogTestHelper.Version("xunit.v3")
+                        + "\"},\"summary\":{\"tests\":1,\"passed\":1,\"failed\":0,\"skipped\":0}}}");
+                    File.WriteAllText(stalePath + ".sha256", "stale checksum");
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(scenario));
+            }
+
+            (int exitCode, _, string standardError) = RunScript(
+                "run-merge-test-lanes.sh",
+                temporaryRoot,
+                environment);
+
+            exitCode.ShouldNotBe(0);
+            standardError.ShouldContain(expectedReason);
+            File.ReadAllLines(logPath).Length.ShouldBe(1);
+            File.Exists(Path.Combine(temporaryRoot, "machine-results", "Invalid.Tests.ctrf.json.sha256")).ShouldBeFalse();
         }
         finally
         {
@@ -763,7 +834,13 @@ public static class ReleaseWorkflowSafetyTests
             + "[[ -n \"$evidence\" ]]\n"
             + "executed=1\n"
             + "if [[ \"$XUNIT_TEST_LANE\" == *\"${MERGE_TEST_ZERO_PATTERN:-__never__}\"* ]]; then executed=0; fi\n"
-            + "printf '{\"results\":{\"tool\":{\"name\":\"xUnit.net v3\",\"version\":\"4.0.0-test\"},\"summary\":{\"tests\":%s,\"passed\":%s,\"failed\":0,\"skipped\":0}}}\\n' \"$executed\" \"$executed\" > \"$evidence\"\n");
+            + "if [[ \"${MERGE_TEST_WRITE_EVIDENCE:-1}\" == '0' ]]; then exit 0; fi\n"
+            + "runner_version=\"${MERGE_TEST_RUNNER_VERSION:-" + PackageCatalogTestHelper.Version("xunit.v3") + "}\"\n"
+            + "summary=\"${MERGE_TEST_SUMMARY_OVERRIDE:-}\"\n"
+            + "if [[ -z \"$summary\" ]]; then\n"
+            + "  summary=\"$(printf '{\"tests\":%s,\"passed\":%s,\"failed\":0,\"skipped\":0}' \"$executed\" \"$executed\")\"\n"
+            + "fi\n"
+            + "printf '{\"results\":{\"tool\":{\"name\":\"xUnit.net v3\",\"version\":\"%s\"},\"summary\":%s}}\\n' \"$runner_version\" \"$summary\" > \"$evidence\"\n");
         MakeExecutable(root, stubPath);
         return (stubPath, logPath);
     }

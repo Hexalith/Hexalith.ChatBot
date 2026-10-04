@@ -23,8 +23,8 @@ internal static class PackageCatalogTestHelper
             ("Microsoft.FluentUI.AspNetCore.Components", "5.0.0-rc.5-26219.1"),
             ("Fluxor", "6.11.0"),
             ("Microsoft.Playwright", "1.62.0"),
-            ("xunit.v3", "4.0.0"),
-            ("bunit", "2.9.0"),
+            ("xunit.v3", "4.0.1"),
+            ("bunit", "2.11.3"),
         ];
 
         foreach ((string packageId, string expectedVersion) in expected)

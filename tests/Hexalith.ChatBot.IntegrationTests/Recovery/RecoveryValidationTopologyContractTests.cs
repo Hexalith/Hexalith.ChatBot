@@ -145,7 +145,7 @@ public sealed class RecoveryValidationTopologyContractTests
     public async Task RecoveryWorkerSimulatorIsAbsentByDefaultAndComposedOnlyWithExplicitCapabilityConfiguration()
     {
         IDistributedApplicationTestingBuilder ordinary = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, TestContext.Current.CancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(RenderedRealmArgs, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         try
         {
@@ -157,7 +157,7 @@ public sealed class RecoveryValidationTopologyContractTests
         }
 
         IDistributedApplicationTestingBuilder recovery = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, TestContext.Current.CancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(RenderedRealmArgs, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         try
         {
@@ -191,7 +191,7 @@ public sealed class RecoveryValidationTopologyContractTests
         string controllerCapability)
     {
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, TestContext.Current.CancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(RenderedRealmArgs, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         try
         {
@@ -214,7 +214,7 @@ public sealed class RecoveryValidationTopologyContractTests
     public async Task RecoverySandboxComposedEnvironmentKeepsLogicalAndPhysicalTenantsDistinct()
     {
         IDistributedApplicationTestingBuilder recovery = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, TestContext.Current.CancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(RenderedRealmArgs, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         try
         {
@@ -252,7 +252,7 @@ public sealed class RecoveryValidationTopologyContractTests
         };
         string[] args = expected
             .Select(pair => $"--Dapr:InternalGrpcPorts:{pair.Key}={pair.Value}")
-            .Concat(MailboxSecretArgs)
+            .Concat(RenderedRealmArgs)
             .ToArray();
 
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
@@ -374,7 +374,7 @@ public sealed class RecoveryValidationTopologyContractTests
             .ToHashSet(StringComparer.Ordinal);
 
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, TestContext.Current.CancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(RenderedRealmArgs, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         string? generatedDirectory = null;
         try
@@ -461,7 +461,7 @@ public sealed class RecoveryValidationTopologyContractTests
             .ToHashSet(StringComparer.Ordinal);
         string? generatedDirectory = null;
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, TestContext.Current.CancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(RenderedRealmArgs, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         try
         {
@@ -831,7 +831,7 @@ public sealed class RecoveryValidationTopologyContractTests
     public async Task RecoveryTier3LaneBoundsEventStoreGracefulShutdownInsideAspireCommandDeadline()
     {
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(MailboxSecretArgs, TestContext.Current.CancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(RenderedRealmArgs, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         try
         {

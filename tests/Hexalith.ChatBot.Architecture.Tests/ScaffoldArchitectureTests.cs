@@ -969,8 +969,22 @@ public static class ScaffoldArchitectureTests
     {
         string root = RepositoryRoot();
 
-        File.ReadAllText(Path.Combine(root, "global.json")).ShouldContain("\"version\": \"10.0.400\"");
-        File.ReadAllText(Path.Combine(root, "global.json")).ShouldContain("\"rollForward\": \"latestPatch\"");
+        using JsonDocument global = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "global.json")));
+        JsonElement sdk = global.RootElement.GetProperty("sdk");
+        Version sdkVersion = Version.Parse(sdk.GetProperty("version").GetString()!);
+        sdkVersion.Major.ShouldBe(10);
+        sdkVersion.Minor.ShouldBe(0);
+        (sdkVersion.Build / 100).ShouldBe(4, "the repository pins the .NET 10.0.4xx SDK feature band");
+        sdk.GetProperty("rollForward").GetString().ShouldBe("latestPatch");
+
+        foreach (string workflowName in new[] { "ci.yml", "release.yml" })
+        {
+            string workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", workflowName));
+            int setupSteps = Regex.Matches(workflow, @"uses: actions/setup-dotnet@").Count;
+            setupSteps.ShouldBeGreaterThan(0, "every build workflow must install the repository SDK");
+            Regex.Matches(workflow, @"global-json-file: global\.json").Count.ShouldBe(setupSteps);
+            workflow.ShouldNotContain("dotnet-version:", Case.Sensitive, "SDK versions come from global.json");
+        }
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<TargetFramework>net10.0</TargetFramework>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<Nullable>enable</Nullable>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<ImplicitUsings>enable</ImplicitUsings>");

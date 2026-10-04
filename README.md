@@ -21,7 +21,8 @@ Package versions come exclusively from `references/Hexalith.Builds/Props/Directo
 wrapper adds no local versions. Debug builds may opt into sibling project references for local development, but Release
 restore/build and release automation deliberately use published package dependencies.
 
-The test projects are xUnit v3 assemblies hosted by the xUnit 4.0.0 in-process runner. Run the repository boundary to
+The SDK version comes from `global.json` in both local and automated builds. The test projects are xUnit v3 assemblies
+hosted by the xUnit 4 in-process runner pinned in the shared Builds catalog. Run the repository boundary to
 execute every independent lane and retain non-vacuous CTRF evidence:
 
 ```bash
@@ -72,16 +73,21 @@ Epic 9 follows the same build-the-logic / defer-selected-live-drivers pattern. T
 
 Epic 10 adds the governed Project Workspace chat surface on the same command spine, plus FrontComposer Shell ownership for the UI. User messages use metadata-only `RecordProjectConversationMessage`; ask-AI requests route through the Epic 4 proposal path; Stop/Cancel uses `CancelAiResponseGeneration` through `IChatBotClient.SubmitAsync` and CommandGateway. AI response progress is exposed through typed project-conversation read models (`AiResponseProgress`) and nudged by a ChatBot-owned metadata-only SignalR hub at `/hubs/chatbot/project-conversation-changes`. The hub is enabled by `ChatBot:ProjectionChangeNotifications:Enabled=true`; the AppHost sets this for local runs. SignalR carries only a tenant-scoped "project conversation changed" signal, never response text, raw provider chunks, prompts, hidden policy detail, or exception content; the UI always re-queries typed server state before rendering progress or terminal Stop/Cancel results. Epic 10 also surfaced a UX-DR1/UX-DR2 component-conformance gap: Shell adoption landed correctly, but interior UI components still used raw controls and a custom `chatbot.tokens.css` layer. Epic 12 closed that gap by migrating ChatBot UI controls to Fluent v5 components, retiring the custom CSS primitive layer to Fluent-backed semantic aliases plus layout/accessibility hooks, and proving the empty guard through UI, E2E, conformance, CLI, MCP, and architecture lanes. Epic 13 then closed the page-level composition gap Epics 10 and 12 left open: pages had still hand-rolled chrome with `.chatbot-page-header`/`.chatbot-page`/`.chatbot-command-bar` CSS that overlapped the FrontComposer shell top bar, boxed content in a 1px border, and rendered primary data as monospace `<dl>` dumps. Each page was re-composed through `FcPageLayout` + `FcPageHeader` with Fluent layout/data components (`FluentDataGrid`, `FluentStack`, `FluentCard`, `FluentAccordion`), mirroring `Hexalith.Tenants.UI`; the retired layout CSS and the empty allowlists are enforced by the sibling `ChatBotLayoutCompositionConformanceTests` guard. Story 13.9 re-verified the six surfaces against the real rendered app (live Kestrel + Chromium), closing Story 12.9's static-fixture gap — and in doing so caught a production defect where `Components/App.razor` linked only `chatbot.tokens.css` and not the scoped `Hexalith.ChatBot.UI.styles.css` bundle, so the Fluent/FrontComposer layout grid never loaded; `App.razor` now links the scoped bundle and the real-render gate asserts `.fluent-layout` resolves to `display:grid`.
 
-Run the AppHost after local DAPR/Redis prerequisites are available:
-
-```bash
-dotnet run --project src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj
-```
-
 The AppHost renders the Keycloak realm on every run — including ordinary local development unrelated to Story 12.15's live-recovery lane — and fails closed if `ChatBot:LiveRecoveryValidation:MailboxClientSecret` is not configured. Supply a secret (ASCII letters/digits/`-`/`_` only, at least 32 characters) before running, e.g.:
 
 ```bash
 dotnet user-secrets set ChatBot:LiveRecoveryValidation:MailboxClientSecret "REPLACE-THIS-WITH-32+-RANDOM-CHARS" --project src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj
+```
+
+The Memories integration also requires `ChatBot:Projects:Endpoint` and `ChatBot:Projects:ApiToken`, configured through
+AppHost user secrets or environment variables, for the authorization-filtered Projects server. Missing either value
+stops startup.
+
+After configuring those values and the local DAPR/Redis prerequisites, run and inspect the AppHost through Aspire:
+
+```bash
+aspire run --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj
+aspire describe --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --non-interactive
 ```
 
 ### Local-development seed-credential policy
