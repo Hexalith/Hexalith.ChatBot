@@ -1,0 +1,262 @@
+{
+  "schemaVersion": "2.0",
+  "storyKey": "1-1-scaffold-the-runnable-canonical-module-foundation",
+  "baseCommit": "1635dfa5acdb355afb4ab9f9229cfddafbaeec12",
+  "headCommit": "e73e60c6622aa487badfac542cf4570c6530a6e4",
+  "implementationDigest": "f396d0d3efed05ce06688a0ddef38728b90a8cd2afc05af50dcb6dd80fe6a8bc",
+  "policyVersion": "2.1",
+  "passed": true,
+  "fileListCount": 6,
+  "scopedDiffCount": 6,
+  "eventPathCount": 6,
+  "checkedItemCount": 19,
+  "mappedItemCount": 19,
+  "repositoryScopes": [
+    "."
+  ],
+  "lanes": [
+    {
+      "lane": "Hexalith.ChatBot.AppHost.Tests",
+      "source": "current-run",
+      "total": 17,
+      "executed": 17,
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.AppHost.Tests.trx",
+      "checksumSha256": "ac2c686cfdfcd3f29c36afa5a530d9defcfaf8579790abe882f1ffeba9d80cb5"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Architecture.Tests",
+      "source": "current-run",
+      "total": 117,
+      "executed": 117,
+      "passed": 117,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Architecture.Tests.trx",
+      "checksumSha256": "18ad3c2dea66e75ef22bd70845cb94eb80ced261484f0a5ff1fb71b96e6b4595"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Cli.Tests",
+      "source": "current-run",
+      "total": 24,
+      "executed": 24,
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Cli.Tests.trx",
+      "checksumSha256": "0c68c9362a21dc20d67f651e102f7ecae0002d33fbcf3a1f176dcf02e8251145"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Client.Tests",
+      "source": "current-run",
+      "total": 47,
+      "executed": 47,
+      "passed": 47,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Client.Tests.trx",
+      "checksumSha256": "2bee8385b9a65445e37eccb2c22cbc3bae24d7e40bcd39030668e9ab34848b5f"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Conformance.Tests",
+      "source": "current-run",
+      "total": 100,
+      "executed": 100,
+      "passed": 100,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Conformance.Tests.trx",
+      "checksumSha256": "b362851c46fcf6cce60124dcc0f8de0f960c2c218edf88beb72046355029b726"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Contracts.Tests",
+      "source": "current-run",
+      "total": 484,
+      "executed": 484,
+      "passed": 484,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Contracts.Tests.trx",
+      "checksumSha256": "a7462d054621103de45a4c5d670b834eb2a4dbc927cc6e9123053ff4fab60839"
+    },
+    {
+      "lane": "Hexalith.ChatBot.IntegrationTests",
+      "source": "current-run",
+      "total": 342,
+      "executed": 336,
+      "passed": 336,
+      "failed": 0,
+      "skipped": 6,
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.IntegrationTests.trx",
+      "checksumSha256": "b1458fb68848796201b3008f5f593964e0326fcffa0c27c1c5092bf1ad189d5c"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Mcp.Tests",
+      "source": "current-run",
+      "total": 30,
+      "executed": 30,
+      "passed": 30,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Mcp.Tests.trx",
+      "checksumSha256": "4d36ad04f429b3aa498ee145527207d3824b17330e4fd5e5ddd96a354f2d7cb4"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Server.Tests",
+      "source": "current-run",
+      "total": 1917,
+      "executed": 1917,
+      "passed": 1917,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Server.Tests.trx",
+      "checksumSha256": "dd65b176f0aa6afdc5ae9f2fdf5aa564e7e39d8eb21c4462202cb813bd4ccf65"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Testing.Tests",
+      "source": "current-run",
+      "total": 41,
+      "executed": 41,
+      "passed": 41,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Testing.Tests.trx",
+      "checksumSha256": "f0d4b3f81882c63445c935731a35496303cde21eb3018247f911077d993b4fd5"
+    },
+    {
+      "lane": "Hexalith.ChatBot.UI.E2E.Tests",
+      "source": "current-run",
+      "total": 152,
+      "executed": 152,
+      "passed": 152,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.UI.E2E.Tests.trx",
+      "checksumSha256": "5c2afd12fca6ad4a00a2df568fc4551e5d263aba0ecbdaf15776b352f87c91ba"
+    },
+    {
+      "lane": "Hexalith.ChatBot.UI.Tests",
+      "source": "current-run",
+      "total": 304,
+      "executed": 304,
+      "passed": 304,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.UI.Tests.trx",
+      "checksumSha256": "50b70b8dc4dbc14e1b59f322b36c4edce0951f80d33fa8d791e22d28a6d4a35f"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Workers.Tests",
+      "source": "current-run",
+      "total": 32,
+      "executed": 32,
+      "passed": 32,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/ordinary/Hexalith.ChatBot.Workers.Tests.trx",
+      "checksumSha256": "f553baa4ab051c73437875978fac082b76142233d1c58f1397e03d88a503ef5a"
+    },
+    {
+      "lane": "story-evidence-gate",
+      "source": "current-run",
+      "total": 219,
+      "executed": 219,
+      "passed": 219,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/story-evidence-gate.trx",
+      "checksumSha256": "e4f866cf6aedba90383be97923a62676036285492465ce289d3a012e90f2964a"
+    },
+    {
+      "lane": "browser-primary",
+      "primaryPathClass": "browser",
+      "source": "current-run",
+      "total": 6,
+      "executed": 6,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/primary/browser-primary.trx",
+      "checksumSha256": "c93b90201ed781fe9ce14227e401b35f28c6aab071076ee48e0215e12c1302c0"
+    },
+    {
+      "lane": "signalr-primary",
+      "primaryPathClass": "signalr",
+      "source": "current-run",
+      "total": 4,
+      "executed": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/primary/signalr-primary.trx",
+      "checksumSha256": "bc004cd51efcfa0e3e49259ce29ba3f1d6098f689c8cd8acbcb6bdcfcdf6b296"
+    },
+    {
+      "lane": "hosting-assets-primary",
+      "primaryPathClass": "hosting-assets",
+      "source": "current-run",
+      "total": 4,
+      "executed": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/primary/hosting-assets-primary.trx",
+      "checksumSha256": "74218c34e344343ef59232647c3e75e7687a000f571c46938d17182f5ccdc268"
+    },
+    {
+      "lane": "aspire-dapr-primary",
+      "primaryPathClass": "aspire-dapr",
+      "source": "current-run",
+      "total": 44,
+      "executed": 44,
+      "passed": 44,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:story-1-1/primary/aspire-dapr-primary.trx",
+      "checksumSha256": "da0cba97cdaeb56b15e63c70f151e9ed24f0e2a467e4af72f5d28fd2633348ea"
+    },
+    {
+      "lane": "recovery-primary",
+      "primaryPathClass": "recovery",
+      "source": "current-run",
+      "total": 1,
+      "executed": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:recovery-primary/live-recovery-validation.trx",
+      "checksumSha256": "c40281668e9f33d347f83b3ae3505d97fc41617371dddab5506b181616afc054"
+    }
+  ],
+  "primaryPaths": [
+    {
+      "pathClass": "aspire-dapr",
+      "executed": true,
+      "lane": "aspire-dapr-primary"
+    },
+    {
+      "pathClass": "browser",
+      "executed": true,
+      "lane": "browser-primary"
+    },
+    {
+      "pathClass": "hosting-assets",
+      "executed": true,
+      "lane": "hosting-assets-primary"
+    },
+    {
+      "pathClass": "recovery",
+      "executed": true,
+      "lane": "recovery-primary"
+    },
+    {
+      "pathClass": "signalr",
+      "executed": true,
+      "lane": "signalr-primary"
+    }
+  ],
+  "issues": [],
+  "evaluatedAtUtc": "2026-10-04T21:21:23.1069269+00:00"
+}
