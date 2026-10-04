@@ -2,7 +2,7 @@
 title: 'Story 1.1: Scaffold the Runnable Canonical Module Foundation'
 type: 'refactor'
 created: '2026-09-17'
-status: 'in-progress'
+status: 'review'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: '1047ef38d3845406227891639aaeb853e5d4f116'

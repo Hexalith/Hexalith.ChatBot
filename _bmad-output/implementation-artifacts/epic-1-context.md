@@ -22,7 +22,7 @@ Deliver a runnable ChatBot foundation and one real UI action that prove the shar
 
 ## Requirements & Constraints
 
-- Derive tenant, actor, role, Project, and resource authority only from trusted server and current owner evidence. Caller input cannot broaden scope, machine identities cannot inherit human authority, and unresolved or stale evidence fails closed.
+- Derive tenant, actor, role, Project, and resource authority only from trusted server and current owner evidence. Caller input cannot broaden scope, machine identities cannot inherit human authority, and unresolved or stale evidence fails closed. Ordinary authorization cache age is at most five minutes; revocation must take effect within 60 seconds.
 - Apply existence-neutral authorization and redaction across API, UI, telemetry, diagnostics, exports, and later machine surfaces. Missing and forbidden resources must not be distinguishable; restricted names, evidence, files, audit details, secrets, PII, and raw exceptions must not leak.
 - Give each logical operation a lifetime-stable identity, immutable origin, correlation, stable resource identities, and expected revision or accepted equivalent guard. First commit wins; equivalent duplicates return the stored outcome, while non-equivalent reuse returns a typed conflict without another effect.
 - Atomically persist each durable mutation with its event, terminal idempotency outcome, policy and approval references, and canonical audit envelope. Any missing element aborts the write. Sensitive denials, restricted reads, and service-client failures use a separate auditable-attempt record.
@@ -30,12 +30,13 @@ Deliver a runnable ChatBot foundation and one real UI action that prove the shar
 - Return authoritative long-running status with identity, state, safe reason, origin, attempts, retry eligibility, partial-output marker, prior outcome, terminal reason, correlation, and safe next actions. Projection lag must never appear as completed work.
 - Enforce first-use tenant isolation by construction and prove it with native-store and API negative tests; filters alone are insufficient. Propagate correlation through UI, client, API, gateway, EventStore, audit, publication, projection, and status.
 - Accept only consented, verified-redacted, or synthetic evaluation data with provenance, version, expected result, fixture identity, and integrity hash. Sandbox resources and credentials must be tenant-scoped and production-isolated.
-- A5, A6, A9a, and A13 remain open evidence gates. Tenant-material persistence requires accepted data-protection evidence, and mutation requires an accepted owner-dispatched atomic target. Synthetic work cannot support pilot, compliance, tamper-evidence, or production-readiness claims.
+- A5, A6, and A13 remain open release gates; A9a blocks first use of affected detectors and classifiers. Tenant-material persistence requires accepted data-protection evidence, and mutation requires an accepted owner-dispatched atomic target. Synthetic work cannot support pilot, compliance, tamper-evidence, or production-readiness claims.
 
 ## Technical Decisions
 
 - OpenAPI 3.1 is the sole public HTTP contract source. Generate the typed Client from it; surfaces use only that client and cannot define competing wire models or access Dapr, stores, aggregates, or gateway internals. Failures use metadata-only RFC 9457 problem details.
 - Every mutation enters one `CommandGateway` at the EventStore DomainService pre-commit seam. Authentication, tenant binding, authorization, operation identity, concurrency guard, envelope construction, and atomic-commit participation run once in order. The gateway alone selects a closed effect profile from product metadata.
+- Cross-context effects go through accepted owner commands. The owner aggregate commits its effect and canonical envelope; ChatBot must not dual-write owner state or treat command preparation and projection as owner execution.
 - Keep governance services internal to Server and preserve the Contracts-to-Client-to-Server/surface dependency direction. Use the canonical `.slnx` module shape, local-only AppHost, and independent architecture, conformance, integration, and browser tests.
 - Policy snapshots and historical decisions are immutable and superseded by new versions. Each decision retains the exact snapshot identity and version used; unresolved policy blocks admission.
 - Publish and project only committed outcomes. SignalR is advisory, so clients re-query typed status. Verify persisted stream/store end state; tests reject alternate write paths and cover partial failure, concurrency, duplicate/conflicting reuse, cross-tenant access, redaction, rebuild, and recovery.
