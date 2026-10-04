@@ -180,6 +180,7 @@ Exact paths in the completion proposal from the committed review base:
 - `_bmad-output/implementation-artifacts/spec-1-1-scaffold-the-runnable-canonical-module-foundation.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `_bmad-output/implementation-artifacts/evidence/1-1-scaffold-the-runnable-canonical-module-foundation.json`
+- `tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs`
 
 ## Spec Change Log
 

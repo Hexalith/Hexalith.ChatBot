@@ -27,7 +27,8 @@
         "includePaths": [
           "_bmad-output/implementation-artifacts/evidence/1-1-scaffold-the-runnable-canonical-module-foundation.json",
           "_bmad-output/implementation-artifacts/spec-1-1-scaffold-the-runnable-canonical-module-foundation.md",
-          "_bmad-output/implementation-artifacts/sprint-status.yaml"
+          "_bmad-output/implementation-artifacts/sprint-status.yaml",
+          "tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs"
         ]
       }
     ]
@@ -358,7 +359,9 @@
     {
       "id": "task-9",
       "kind": "task",
-      "paths": [],
+      "paths": [
+        "tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs"
+      ],
       "assertions": [
         "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
       ]
@@ -367,7 +370,8 @@
       "id": "task-10",
       "kind": "task",
       "paths": [
-        "_bmad-output/implementation-artifacts/evidence/1-1-scaffold-the-runnable-canonical-module-foundation.json"
+        "_bmad-output/implementation-artifacts/evidence/1-1-scaffold-the-runnable-canonical-module-foundation.json",
+        "tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs"
       ],
       "assertions": [
         "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.ValidProductStoryCompletionShouldPass",
@@ -447,7 +451,9 @@
     {
       "id": "ac-9",
       "kind": "acceptanceCriterion",
-      "paths": [],
+      "paths": [
+        "tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs"
+      ],
       "assertions": [
         "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
       ]

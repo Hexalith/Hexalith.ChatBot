@@ -93,6 +93,13 @@ public sealed class LiveContinuityAspireE2eTests
             $"--LiveRecoveryValidation:ControllerCapability={LiveRecoveryValidationOptions.AspireControllerCapability}",
             $"--LiveRecoveryValidation:ControllerSecret={controllerSecret}",
 
+            // Recovery validates ChatBot's isolated stores, not Projects or Memories API reads. Supply the
+            // AppHost's required service configuration with unreachable/invalid values so an unexpected
+            // cross-context request still fails closed instead of silently using another local service.
+            "--ChatBot:Projects:Endpoint=http://localhost:65535",
+            $"--ChatBot:Projects:ApiToken={new string('b', 32)}",
+            $"--ChatBot:Memories:ApiToken={new string('c', 32)}",
+
             // ChatBot:LiveRecoveryValidation:MailboxClientSecret is the primary key (aligned with the Server
             // section binding); the legacy AppHost-only LiveRecoveryValidation:MailboxClientSecret key is also
             // supplied so both resolution paths stay exercised.
