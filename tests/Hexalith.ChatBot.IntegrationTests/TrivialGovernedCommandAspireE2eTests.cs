@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -54,6 +55,13 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     private const string ChatBotResourceName = "chatbot";
     private const string EventStoreResourceName = "eventstore";
     private const string TenantsResourceName = "tenants";
+    private const string MemoriesResourceName = "memories";
+    private const string MemoriesProbeIssuer = "chatbot-topology-probe";
+    private const string MemoriesProbeAudience = "memories-topology-probe";
+
+    // Fresh process-local signing material for the bounded two-tenant diagnostic service fixture. It is never
+    // written to evidence, and no human command credential is forwarded to Memories.
+    private static readonly string MemoriesProbeSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
     // Mirrors src/Hexalith.ChatBot.AppHost/Program.cs. The gate endpoint is not mapped at all without a token, so an
     // unmapped endpoint (404) is a topology misconfiguration rather than a "gate is clear" result.
@@ -77,6 +85,9 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         "chatbot-ui",
         "eventstore-admin",
         "eventstore-admin-ui",
+        MemoriesResourceName,
+        "memories-vectors",
+        "memories-graphs",
     ];
 
     private static readonly string[] RequiredDaprComponentResources =
@@ -94,6 +105,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         ChatBotResourceName,
         "eventstore-admin",
         "eventstore-admin-ui",
+        MemoriesResourceName,
     ];
 
     // Program.cs fails closed without the recovery mailbox secret and the authorization-filtered Projects client
@@ -104,6 +116,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         $"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={new string('a', 32)}",
         "--ChatBot:Projects:Endpoint=http://localhost:65535",
         $"--ChatBot:Projects:ApiToken={new string('b', 32)}",
+        $"--ChatBot:Memories:ApiToken={new string('c', 32)}",
     ];
 
     private static readonly TimeSpan ProjectionTimeout = TimeSpan.FromSeconds(60);
@@ -345,50 +358,68 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     /// therefore owes real ordered-pair coverage; zero coverage is never accepted as a substitute for verification.
     /// </para>
     /// </remarks>
-    private static async Task AssertM2ReleaseGateIsClearAsync(HttpClient client, CancellationToken cancellationToken)
+    private async Task AssertM2ReleaseGateIsClearAsync(HttpClient client, CancellationToken cancellationToken)
     {
         using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromMinutes(6));
 
         string? lastBody = null;
         HttpStatusCode? lastStatus = null;
-        while (!deadline.IsCancellationRequested)
+        string? lastReasons = null;
+        try
         {
-            using HttpRequestMessage request = new(HttpMethod.Get, "/health/chatbot/periodic-enforcement/m2");
-            request.Headers.TryAddWithoutValidation(M2ReleaseGateTokenHeader, M2ReleaseGateToken);
-            using HttpResponseMessage response = await client
-                .SendAsync(request, deadline.Token)
-                .ConfigureAwait(true);
-            lastStatus = response.StatusCode;
-            lastBody = await response.Content.ReadAsStringAsync(deadline.Token).ConfigureAwait(true);
-
-            // 404 would mean the endpoint was never mapped, i.e. the topology did not supply a gate token — that is a
-            // configuration failure, not a transient state, so fail immediately rather than burning the deadline.
-            response.StatusCode.ShouldNotBe(
-                HttpStatusCode.NotFound,
-                "The M2 release-gate endpoint is unmapped: the topology did not configure "
-                + "ChatBot__PeriodicEnforcement__M2ReleaseGateToken.");
-            response.StatusCode.ShouldNotBe(
-                HttpStatusCode.Unauthorized,
-                "The M2 release-gate token presented by the acceptance test does not match the topology's.");
-
-            if (response.StatusCode == HttpStatusCode.OK)
+            while (!deadline.IsCancellationRequested)
             {
-                using JsonDocument gate = JsonDocument.Parse(lastBody);
-                JsonElement root = gate.RootElement;
-                root.GetProperty("isStopShip").GetBoolean().ShouldBeFalse();
-                root.GetProperty("m2SweepsEnabled").GetBoolean().ShouldBeTrue();
+                using HttpRequestMessage request = new(HttpMethod.Get, "/health/chatbot/periodic-enforcement/m2");
+                request.Headers.TryAddWithoutValidation(M2ReleaseGateTokenHeader, M2ReleaseGateToken);
+                using HttpResponseMessage response = await client
+                    .SendAsync(request, deadline.Token)
+                    .ConfigureAwait(true);
+                lastStatus = response.StatusCode;
+                lastBody = await response.Content.ReadAsStringAsync(deadline.Token).ConfigureAwait(true);
+                // 404 would mean the endpoint was never mapped, i.e. the topology did not supply a gate token — that is a
+                // configuration failure, not a transient state, so fail immediately rather than burning the deadline.
+                response.StatusCode.ShouldNotBe(
+                    HttpStatusCode.NotFound,
+                    "The M2 release-gate endpoint is unmapped: the topology did not configure "
+                    + "ChatBot__PeriodicEnforcement__M2ReleaseGateToken.");
+                response.StatusCode.ShouldNotBe(
+                    HttpStatusCode.Unauthorized,
+                    "The M2 release-gate token presented by the acceptance test does not match the topology's.");
 
-                // Positive coverage on every release-gated sweep. Without this the assertion could pass on a topology
-                // where an empty or misbound store verified nothing.
-                JsonElement sweeps = root.GetProperty("m2SweepStatuses");
-                sweeps.GetProperty("worm-audit-chain").GetProperty("hasCoverage").GetBoolean().ShouldBeTrue();
-                sweeps.GetProperty("replay-isolation-probe").GetProperty("hasCoverage").GetBoolean().ShouldBeTrue();
-                sweeps.GetProperty("derived-store-isolation-probe").GetProperty("hasCoverage").GetBoolean().ShouldBeTrue();
-                return;
+                response.StatusCode.ShouldBeOneOf(HttpStatusCode.OK, HttpStatusCode.ServiceUnavailable);
+                using JsonDocument diagnostic = JsonDocument.Parse(lastBody);
+                string reasons = diagnostic.RootElement.GetProperty("stopShipReasons").GetRawText();
+                if (!string.Equals(reasons, lastReasons, StringComparison.Ordinal))
+                {
+                    // This token-gated payload contains only sweep times, counts, booleans, and stable job reason codes.
+                    // Retain it before any deadline cancellation so a transient/failing gate remains diagnosable.
+                    _output.WriteLine("M2_RELEASE_GATE_EVIDENCE {0}", lastBody);
+                    lastReasons = reasons;
+                }
+
+                if (response.StatusCode == HttpStatusCode.OK)
+                {
+                    using JsonDocument gate = JsonDocument.Parse(lastBody);
+                    JsonElement root = gate.RootElement;
+                    root.GetProperty("isStopShip").GetBoolean().ShouldBeFalse();
+                    root.GetProperty("m2SweepsEnabled").GetBoolean().ShouldBeTrue();
+
+                    // Positive coverage on every release-gated sweep. Without this the assertion could pass on a topology
+                    // where an empty or misbound store verified nothing.
+                    JsonElement sweeps = root.GetProperty("m2SweepStatuses");
+                    sweeps.GetProperty("worm-audit-chain").GetProperty("hasCoverage").GetBoolean().ShouldBeTrue();
+                    sweeps.GetProperty("replay-isolation-probe").GetProperty("hasCoverage").GetBoolean().ShouldBeTrue();
+                    sweeps.GetProperty("derived-store-isolation-probe").GetProperty("hasCoverage").GetBoolean().ShouldBeTrue();
+                    return;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(5), deadline.Token).ConfigureAwait(true);
             }
-
-            await Task.Delay(TimeSpan.FromSeconds(5), deadline.Token).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            // Preserve the bounded gate verdict below instead of losing it to TaskCanceledException.
         }
 
         throw new InvalidOperationException(
@@ -506,8 +537,9 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             // Primary-path schedule + inspect: start a deterministic correction-propagation instance through the
             // chatbot Dapr sidecar workflow HTTP API, then read its runtime status metadata.
             Uri daprHttp = ResolveChatBotDaprHttpEndpoint(app);
+            // Dapr's HTTP workflow API accepts only alphanumeric characters, underscores, and dashes in IDs.
             string instanceId =
-                $"tier3:correction-propagation:smoke:{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+                $"tier3-correction-propagation-smoke-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
             using HttpClient daprClient = new() { BaseAddress = daprHttp, Timeout = TimeSpan.FromSeconds(30) };
             using StringContent scheduleBody = new(
                 """
@@ -536,7 +568,9 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                     scheduleBody,
                     cancellationToken)
                 .ConfigureAwait(true);
-            scheduleResponse.StatusCode.ShouldBeOneOf(HttpStatusCode.Accepted, HttpStatusCode.OK);
+            string schedulePayload = await scheduleResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(true);
+            scheduleResponse.StatusCode.ShouldBeOneOf([HttpStatusCode.Accepted, HttpStatusCode.OK],
+                $"The task-owned workflow schedule failed: {schedulePayload}");
 
             using HttpResponseMessage statusResponse = await daprClient
                 .GetAsync(
@@ -1115,7 +1149,9 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                         allEntered.TrySetResult();
                     }
 
-                    await allEntered.Task.WaitAsync(token).ConfigureAwait(false);
+                    // All four intentional faults must commit independently of sibling cancellation; using the
+                    // coordinator token here can turn a scheduled concurrent fault into a cancellation race.
+                    await allEntered.Task.WaitAsync(TestContext.Current.CancellationToken).ConfigureAwait(false);
                     throw new InvalidOperationException($"{resourceName} failed concurrently.");
                 },
                 static (_, _, _) => Task.CompletedTask,
@@ -1538,21 +1574,32 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         PortReservationSet reservations = PortReservationSet.Reserve(
             IsolatedDaprHttpResourceNames.Length,
             unselectedConcretePorts);
+        MemoriesProbeCommandGateway? memoriesGateway = null;
         try
         {
+            memoriesGateway = await MemoriesProbeCommandGateway.StartAsync(cancellationToken).ConfigureAwait(false);
+            memoriesGateway.Configure(builder);
+            builder.Services.AddSingleton<MemoriesProbeCommandGateway>(_ => memoriesGateway);
             ConfigureReservedDaprHttpEndpoints(builder, reservations.Ports);
             ConfigureAcceptanceM2SweepCadence(builder);
+            ConfigureAcceptanceMemoriesProbeIdentity(builder);
             ValidateCanonicalDaprResourceModel(builder);
             configureBuilder?.Invoke(builder);
             IReadOnlyDictionary<string, int> selectedPorts = selected
                 .Select((endpoint, index) => new KeyValuePair<string, int>(endpoint.Resource.Name, reservations.Ports[index]))
                 .ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal);
             DistributedApplication application = await builder.BuildAsync(cancellationToken).ConfigureAwait(false);
+            _ = application.Services.GetRequiredService<MemoriesProbeCommandGateway>();
             return new TopologyStartupAttempt(application, reservations, selectedPorts);
         }
         catch
         {
             reservations.Dispose();
+            if (memoriesGateway is not null)
+            {
+                await memoriesGateway.DisposeAsync().ConfigureAwait(false);
+            }
+
             throw;
         }
     }
@@ -1914,6 +1961,139 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         }));
     }
 
+    private static void ConfigureAcceptanceMemoriesProbeIdentity(IDistributedApplicationTestingBuilder builder)
+    {
+        IResource memories = builder.Resources.Single(resource => resource.Name == MemoriesResourceName);
+        memories.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
+        {
+            context.EnvironmentVariables["Authentication__JwtBearer__Authority"] = string.Empty;
+            context.EnvironmentVariables["Authentication__JwtBearer__Issuer"] = MemoriesProbeIssuer;
+            context.EnvironmentVariables["Authentication__JwtBearer__Audience"] = MemoriesProbeAudience;
+            context.EnvironmentVariables["Authentication__JwtBearer__SigningKey"] = MemoriesProbeSigningKey;
+        }));
+        IResource chatBot = builder.Resources.Single(resource => resource.Name == ChatBotResourceName);
+        chatBot.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
+            context.EnvironmentVariables["ChatBot__Memories__ApiToken"] = CreateMemoriesProbeServiceToken()));
+    }
+
+    private static string CreateMemoriesProbeServiceToken()
+    {
+        static string Encode(byte[] value) => Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+        long issuedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        string header = Encode(JsonSerializer.SerializeToUtf8Bytes(new { alg = "HS256", typ = "JWT" }));
+        string payload = Encode(JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            iss = MemoriesProbeIssuer,
+            aud = MemoriesProbeAudience,
+            sub = "chatbot-local-isolation-probe",
+            // Both owners normalize the first source claim. A space-delimited scalar preserves both tenants
+            // through JWT validation; a JSON claim array is expanded into multiple claims before normalization.
+            tenants = "tenant-alpha tenant-beta",
+            iat = issuedAt,
+            nbf = issuedAt,
+            exp = issuedAt + 3600,
+        }));
+        string unsignedToken = $"{header}.{payload}";
+        byte[] signature = HMACSHA256.HashData(Encoding.UTF8.GetBytes(MemoriesProbeSigningKey), Encoding.UTF8.GetBytes(unsignedToken));
+        return $"{unsignedToken}.{Encode(signature)}";
+    }
+
+    private async Task ProvisionMemoriesProbeTenantsAsync(DistributedApplication app, CancellationToken cancellationToken)
+    {
+        MemoriesProbeCommandGateway gateway = app.Services.GetRequiredService<MemoriesProbeCommandGateway>();
+        await gateway.ConnectAsync(app, cancellationToken).ConfigureAwait(true);
+        using HttpClient client = app.CreateHttpClient(MemoriesResourceName, "http");
+        client.Timeout = TimeSpan.FromSeconds(30);
+        await WaitForListenerAsync(client, cancellationToken).ConfigureAwait(true);
+        using (HttpResponseMessage unauthenticated = await client.GetAsync(
+            "/api/v1/tenants/tenant-alpha", cancellationToken).ConfigureAwait(true))
+        {
+            unauthenticated.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        }
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateMemoriesProbeServiceToken());
+        using (HttpResponseMessage forbidden = await client.GetAsync(
+            "/api/v1/tenants/tenant-outside-probe", cancellationToken).ConfigureAwait(true))
+        {
+            forbidden.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        }
+
+        foreach (string tenant in new[] { "tenant-alpha", "tenant-beta" })
+        {
+            // Use the owner's supported provisioning workflow. A raw Redis registry seed would conceal the
+            // same owner guard that correctly rejected the previous incomplete isolation probe.
+            using HttpResponseMessage submitted = await client.PostAsJsonAsync(
+                "/api/v1/tenants",
+                new { tenantId = tenant, displayName = tenant, vectorDimensions = 3 },
+                cancellationToken).ConfigureAwait(true);
+            submitted.StatusCode.ShouldBe(HttpStatusCode.Accepted, "The Memories owner must accept the fixture provisioning workflow.");
+            using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            deadline.CancelAfter(StartupTimeout);
+            int lastGatewayStatus = -1;
+            while (true)
+            {
+                if (lastGatewayStatus != gateway.LastStatusCode)
+                {
+                    lastGatewayStatus = gateway.LastStatusCode;
+                    _output.WriteLine("MEMORIES_OWNER_GATEWAY_STATUS_EVIDENCE {0}", JsonSerializer.Serialize(new
+                    {
+                        statusCode = lastGatewayStatus,
+                        acceptedCommands = gateway.AcceptedCommands,
+                        domain = gateway.LastRequestDomain,
+                        commandType = gateway.LastRequestType,
+                    }));
+                }
+
+                using HttpResponseMessage response = await client.GetAsync($"/api/v1/tenants/{tenant}", deadline.Token).ConfigureAwait(true);
+                if (response.IsSuccessStatusCode)
+                {
+                    using JsonDocument body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(deadline.Token).ConfigureAwait(true));
+                    string? status = body.RootElement.GetProperty("status").GetString();
+                    status.ShouldNotBe("failed", "The owner provisioning workflow failed.");
+                    status.ShouldNotBe("compensationFailed", "The owner provisioning workflow could not compensate.");
+                    if (status == "active")
+                    {
+                        _output.WriteLine("MEMORIES_PROBE_TENANT_EVIDENCE {0}", JsonSerializer.Serialize(new
+                        {
+                            tenant,
+                            status,
+                            ownerApiProvisioned = true,
+                            unauthenticatedRejected = true,
+                            outsideTenantRejected = true,
+                        }));
+                        break;
+                    }
+                }
+                else
+                {
+                    response.StatusCode.ShouldBe(HttpStatusCode.NotFound, "Only owner registration in progress may be retried.");
+                }
+
+                await Task.Delay(PollInterval, deadline.Token).ConfigureAwait(true);
+            }
+        }
+
+        gateway.AcceptedCommands.ShouldBeGreaterThanOrEqualTo(4, "Both owner provisioning workflows must accept real EventStore registration and activation commands.");
+        gateway.ReplayedCommands.ShouldBeGreaterThanOrEqualTo(2, "Both activation commands must reconstruct the owner's persisted registration state using SDK replay and owner Apply methods.");
+        await gateway.AssertPersistedOwnerCommandsAsync(cancellationToken).ConfigureAwait(true);
+        _output.WriteLine("MEMORIES_OWNER_GATEWAY_EVIDENCE {0}", JsonSerializer.Serialize(new
+        {
+            acceptedCommands = gateway.AcceptedCommands,
+            realEventStoreForwarding = true,
+            outsideTenantDenied = true,
+            outsideDomainDenied = true,
+            internalCallerTrustExpanded = false,
+            sdkOwnerStateReplayCommands = gateway.ReplayedCommands,
+            persistedOwnerCommands = gateway.PersistedCommands,
+            ownerModuleSha256 = gateway.OwnerModuleSha256,
+            ownerModulePath = gateway.OwnerModulePath,
+            ownerModuleVersion = gateway.OwnerModuleVersion,
+            ownerLibraryVersion = gateway.OwnerLibraryVersion,
+            serverAssemblyPath = gateway.ServerAssemblyPath,
+        }));
+    }
+
     private static void ConfigureReservedDaprHttpEndpoints(
         IDistributedApplicationTestingBuilder builder,
         IReadOnlyList<int> ports)
@@ -1997,6 +2177,13 @@ public sealed class TrivialGovernedCommandAspireE2eTests
 
     private static void ValidateCanonicalDaprResourceModel(IDistributedApplicationTestingBuilder builder)
     {
+        foreach (string storeName in new[] { "memories-vectors", "memories-graphs" })
+        {
+            ContainerResource ownerStore = builder.Resources.OfType<ContainerResource>().Single(resource => resource.Name == storeName);
+            ownerStore.Annotations.OfType<ContainerMountAnnotation>().ShouldBeEmpty(
+                "The task-owned Memories backing stores must be fresh containers without persistent or shared storage mounts.");
+        }
+
         string[] componentNames = builder.Resources
             .OfType<IDaprComponentResource>()
             .Select(static resource => resource.Name)
@@ -2174,6 +2361,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         isolatedHttpPorts.Values.Distinct().Count().ShouldBe(
             IsolatedDaprHttpResourceNames.Length,
             "Every selected sidecar-backed project must run on its own concrete HTTP port.");
+        await ProvisionMemoriesProbeTenantsAsync(app, cancellationToken).ConfigureAwait(true);
         _output.WriteLine("ASPIRE_RESERVED_HTTP_PORT_EVIDENCE {0}", JsonSerializer.Serialize(isolatedHttpPorts));
         _output.WriteLine(
             "ASPIRE_DAPR_TOPOLOGY_EVIDENCE {0}",

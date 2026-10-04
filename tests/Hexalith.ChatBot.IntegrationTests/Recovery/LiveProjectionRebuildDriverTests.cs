@@ -25,6 +25,14 @@ public sealed class LiveProjectionRebuildDriverTests
             [Source(tenantRef)],
             worm.EnumerateChain(tenantRef),
             TestContext.Current.CancellationToken);
+        ProjectConversationSourceEmailView neighbor = Source("replay-test:neighbor");
+        await readModels.SaveAsync(ChatBotReadModelStoreNames.StateStoreName,
+            ProjectConversationSourceEmailView.KeyFor(neighbor.TenantId, neighbor.IntakeId), neighbor,
+            TestContext.Current.CancellationToken);
+        IReadOnlyList<string> keysBeforeRebuild = readModels.Keys(ChatBotReadModelStoreNames.StateStoreName);
+        ReadModelEntry<ProjectConversationSourceEmailView> neighborBefore = await readModels.GetAsync<ProjectConversationSourceEmailView>(
+            ChatBotReadModelStoreNames.StateStoreName,
+            ProjectConversationSourceEmailView.KeyFor(neighbor.TenantId, neighbor.IntakeId), TestContext.Current.CancellationToken);
         LiveProjectionRebuildDriver driver = new(
             [Source(tenantRef)],
             worm,
@@ -60,8 +68,15 @@ public sealed class LiveProjectionRebuildDriverTests
         measurement.ExecutionAssertions.IndependentControlSucceeded.ShouldBeFalse();
         measurement.ExecutionAssertions.StateReconstructable.ShouldBeTrue();
         measurement.PreRebuildSnapshot.ShouldNotContain(digest => digest.ResourceId.Contains("foreign", StringComparison.Ordinal));
-        readModels.Writes.ShouldBe(4);
-        readModels.Erases.ShouldBe(2);
+        // The production intake projection also creates an empty attachment set and its index.
+        // Cleanup must remove all four fresh rows and leave both the baseline and neighboring tenant intact.
+        readModels.Keys(ChatBotReadModelStoreNames.StateStoreName).ShouldBe(keysBeforeRebuild);
+        ReadModelEntry<ProjectConversationSourceEmailView> neighborAfter = await readModels.GetAsync<ProjectConversationSourceEmailView>(
+            ChatBotReadModelStoreNames.StateStoreName,
+            ProjectConversationSourceEmailView.KeyFor(neighbor.TenantId, neighbor.IntakeId), TestContext.Current.CancellationToken);
+        neighborAfter.Value.ShouldBe(neighborBefore.Value);
+        neighborAfter.ETag.ShouldBe(neighborBefore.ETag);
+        readModels.Erases.ShouldBe(4);
     }
 
     [Fact]
@@ -79,7 +94,7 @@ public sealed class LiveProjectionRebuildDriverTests
             worm.EnumerateChain(tenantRef),
             TestContext.Current.CancellationToken);
         // Seed wrote the baseline (2 writes: source + governed record). Let the rebuild's first fresh-partition
-        // write (the reconstructed source) land, then fail on its second (the governed record) — rejecting every
+        // write (the reconstructed source) land, then fail on its second (the attachment set) — rejecting every
         // write instead would leave zero fresh keys ever written, so a regression that erased them anyway would not
         // fail this test.
         int writesAfterSeed = readModels.Writes;

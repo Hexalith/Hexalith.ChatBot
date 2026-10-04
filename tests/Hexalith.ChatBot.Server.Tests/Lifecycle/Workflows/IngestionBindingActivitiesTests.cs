@@ -4,6 +4,7 @@ using Hexalith.ChatBot.Server.Adapters.Mailbox;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Projections;
+using Hexalith.ChatBot.Server.Projections.DerivedStores;
 using Hexalith.Memories.Client.Rest;
 using Hexalith.Memories.Contracts.V1;
 using Hexalith.Memories.Contracts.V1.DerivedStores;
@@ -24,7 +25,7 @@ public sealed class IngestionBindingActivitiesTests
         IngestionBindingStartSourceActivity activity = new(
             new FixedMessageSource(new MailboxMessageContentResult(false, "message_not_available")),
             new FixedAttachmentSource(MailboxAttachmentContentResult.Unavailable("attachment_not_available")),
-            memories);
+            new MemoriesIngestionBindingSourceAdapter(memories));
 
         InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(() =>
             activity.RunAsync(null!, Source(IngestionBindingRecordKind.Message, 0, providerAttachmentId: null)));
@@ -40,7 +41,7 @@ public sealed class IngestionBindingActivitiesTests
         IngestionBindingStartSourceActivity activity = new(
             new FixedMessageSource(new MailboxMessageContentResult(true, "available", "body", "text/plain")),
             new FixedAttachmentSource(MailboxAttachmentContentResult.Unauthorized()),
-            memories);
+            new MemoriesIngestionBindingSourceAdapter(memories));
 
         InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(() =>
             activity.RunAsync(null!, Source(IngestionBindingRecordKind.Attachment, 1, "attachment-1")));
@@ -57,7 +58,7 @@ public sealed class IngestionBindingActivitiesTests
         IngestionBindingStartSourceActivity activity = new(
             new FixedMessageSource(new MailboxMessageContentResult(false, "unused")),
             attachments,
-            memories);
+            new MemoriesIngestionBindingSourceAdapter(memories));
         IngestionBindingSourceRequest source = Source(IngestionBindingRecordKind.Attachment, 1, "attachment-1");
 
         IngestionBindingSourceOperation first = await activity.RunAsync(null!, source);
@@ -98,7 +99,7 @@ public sealed class IngestionBindingActivitiesTests
                 MemoryUnitStatus.Indexed,
                 null),
         };
-        IngestionBindingGetStatusActivity activity = new(memories);
+        IngestionBindingGetStatusActivity activity = new(new MemoriesIngestionBindingSourceAdapter(memories));
         IngestionBindingSourceOperation operation = new(
             Source(IngestionBindingRecordKind.Message, 0, providerAttachmentId: null),
             "instance-1");

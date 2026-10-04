@@ -107,7 +107,7 @@ internal sealed class LiveProjectionRebuildDriver(
         string preRebuildSchemaVersion = baselineEvidence.ProjectionSchemaVersion;
         string freshPartitionTenant = FreshPartitionTenant(testTenantRef, dataset.ValidationPartitionRef, correlationId);
         IReadOnlyList<string> freshKeys = ProjectionKeys(freshPartitionTenant, sources, auditRecords);
-        int expectedFreshKeyCount = sources.Length + rebuildOperations
+        int expectedFreshKeyCount = (sources.Length * 3) + rebuildOperations
             .Select(static operation => operation.ResourceId)
             .Distinct(StringComparer.Ordinal)
             .Count();
@@ -761,7 +761,12 @@ internal sealed class LiveProjectionRebuildDriver(
         IReadOnlyList<WormAuditChainRecord> auditRecords)
         =>
         [
-            .. sources.Select(source => ProjectConversationSourceEmailView.KeyFor(partitionTenant, source.IntakeId)),
+            .. sources.SelectMany(source => new[]
+            {
+                ProjectConversationSourceEmailView.KeyFor(partitionTenant, source.IntakeId),
+                ProjectConversationAttachmentSetView.KeyFor(partitionTenant, source.IntakeId),
+                $"{partitionTenant}:project-conversation:{source.IntakeId}:attachments",
+            }),
             .. auditRecords
                 .Select(static record => record.Envelope.ResourceId)
                 .Distinct(StringComparer.Ordinal)

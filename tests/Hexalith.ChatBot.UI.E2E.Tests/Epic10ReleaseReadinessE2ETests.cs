@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Text.Json;
 
 using Shouldly;
 
@@ -235,7 +236,7 @@ public sealed class Epic10ReleaseReadinessE2ETests
     }
 
     [Fact]
-    public void StreamingVerificationShouldTrackCanonicalStoryThirteenTwo()
+    public void StreamingSourceCoverageShouldTrackCanonicalBacklogStoryWithoutAuthorizingReadiness()
     {
         string sprint = ReadProjectFile("_bmad-output/implementation-artifacts/sprint-status.yaml");
         string stopControl = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStreamingStopControl.razor");
@@ -243,8 +244,13 @@ public sealed class Epic10ReleaseReadinessE2ETests
 
         string canonicalStoryStatus = ReadDevelopmentStatus(
             sprint,
-            "13-2-work-converse-and-interrupt-ai-safely-in-project-context");
-        canonicalStoryStatus.ShouldBeOneOf(["review", "done"]);
+            "13-2-deliver-governed-project-chat-with-safe-streaming-and-interr");
+        // The current planning baseline owns the identity and retains backlog. Source/component coverage
+        // cannot invent a review/done transition or establish product release readiness.
+        canonicalStoryStatus.ShouldBe("backlog", "The current canonical Story 13.2 is still planned, despite existing source coverage.");
+        using JsonDocument release = JsonDocument.Parse(ReadProjectFile("release-metadata.json"));
+        release.RootElement.GetProperty("releasePosture").GetString().ShouldBe("blocked-open-gates");
+        release.RootElement.GetProperty("authorizedReadinessClaims").GetArrayLength().ShouldBe(0);
         stopControl.ShouldContain("StopVerified");
         e2e.ShouldContain("ProjectConversationStreamingStopShouldRenderKeyboardReachableControlAndPoliteLocalizedStatus");
         e2e.ShouldContain("AssertStreamingStopWithoutBrowser");
@@ -258,14 +264,14 @@ public sealed class Epic10ReleaseReadinessE2ETests
         const string yaml = """
             development_status:   # release board
               # Canonical story status remains human-annotated.
-              13-2-work-converse-and-interrupt-ai-safely-in-project-context: review # ready for release review
+              13-2-deliver-governed-project-chat-with-safe-streaming-and-interr: review # ready for release review
             # A root-level comment does not close the mapping.
             unrelated_root: value
             """;
 
         ReadDevelopmentStatus(
             yaml,
-            "13-2-work-converse-and-interrupt-ai-safely-in-project-context").ShouldBe("review");
+            "13-2-deliver-governed-project-chat-with-safe-streaming-and-interr").ShouldBe("review");
     }
 
     private static string ReadProjectFile(string relativePath)

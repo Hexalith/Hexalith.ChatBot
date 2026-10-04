@@ -54,7 +54,16 @@ HexalithMemoriesSearchIndexServerResources memories = builder.AddHexalithMemorie
     resources.EventStore,
     memoriesPubSub,
     memoriesSecretStore,
-    ResolveDaprConfigPath(builder.AppHostDirectory, "llm.memories.yaml"));
+    ResolveDaprConfigPath(builder.AppHostDirectory, "llm.memories.yaml"),
+    daprPlacementHostAddress: builder.Configuration["Dapr:PlacementHostAddress"],
+    daprSchedulerHostAddress: builder.Configuration["Dapr:SchedulerHostAddress"]);
+// Every sidecar in this self-hosted umbrella uses the same local DAPR configuration, including its disabled
+// component hot reload. Memories' hosting extension owns its sidecar; configure that existing sidecar here rather
+// than attaching a second one or changing the independently owned Memories runtime.
+IDaprSidecarResource memoriesSidecar = memories.Server.Resource.Annotations.OfType<DaprSidecarAnnotation>().Single().Sidecar;
+DaprSidecarOptionsAnnotation memoriesSidecarOptions = memoriesSidecar.Annotations.OfType<DaprSidecarOptionsAnnotation>().Single();
+memoriesSidecar.Annotations.Remove(memoriesSidecarOptions);
+memoriesSidecar.Annotations.Add(new DaprSidecarOptionsAnnotation(memoriesSidecarOptions.Options with { Config = accessControlConfigPath }));
 EndpointReference memoriesHttp = memories.Server.GetEndpoint("http");
 ReferenceExpression memoriesEndpoint = ReferenceExpression.Create($"{memoriesHttp}");
 
@@ -64,6 +73,14 @@ string projectsEndpoint = builder.Configuration["ChatBot:Projects:Endpoint"]
 string projectsApiToken = builder.Configuration["ChatBot:Projects:ApiToken"]
     ?? throw new InvalidOperationException(
         "ChatBot:Projects:ApiToken must supply the service bearer token for authorization-filtered Project Context reads.");
+string memoriesApiToken = builder.Configuration["ChatBot:Memories:ApiToken"]
+    ?? throw new InvalidOperationException(
+        "ChatBot:Memories:ApiToken must supply the tenant-scoped service bearer token for the Memories owner API.");
+IResourceBuilder<ParameterResource> memoriesApiTokenParameter = builder.AddParameter(
+    "memories-api-token",
+    () => memoriesApiToken,
+    publishValueAsDefault: false,
+    secret: true);
 IResourceBuilder<ParameterResource> projectsApiTokenParameter = builder.AddParameter(
     "projects-api-token",
     () => projectsApiToken,
@@ -90,6 +107,7 @@ _ = chatBot
     .WaitFor(memories.Server)
     .WithEnvironment("ChatBot__Memories__UseLiveBacking", "true")
     .WithEnvironment("ChatBot__Memories__Endpoint", memoriesEndpoint)
+    .WithEnvironment("ChatBot__Memories__ApiToken", memoriesApiTokenParameter)
     .WithEnvironment("ChatBot__Projects__Endpoint", projectsEndpoint)
     .WithEnvironment("ChatBot__Projects__ApiToken", projectsApiTokenParameter)
     .WithEnvironment("ChatBot__UseDaprStateStores", "true")

@@ -90,6 +90,21 @@ public static class AppHostTopologyTests
     }
 
     [Fact]
+    public static void MemoriesOwnerTopologyShouldPreserveOneConfiguredSidecarAndSecretServiceAuthentication()
+    {
+        string source = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
+        source.ShouldContain("AddHexalithMemoriesSearchIndexServer(");
+        source.ShouldContain("daprPlacementHostAddress: builder.Configuration[\"Dapr:PlacementHostAddress\"]");
+        source.ShouldContain("daprSchedulerHostAddress: builder.Configuration[\"Dapr:SchedulerHostAddress\"]");
+        source.ShouldContain("memories.Server.Resource.Annotations.OfType<DaprSidecarAnnotation>().Single()");
+        source.ShouldContain("memoriesSidecarOptions.Options with { Config = accessControlConfigPath }");
+        source.ShouldNotContain("Authentication__DaprInternal__AllowedCallers__1");
+        source.ShouldContain("\"memories-api-token\"");
+        source.ShouldContain("ChatBot__Memories__ApiToken\", memoriesApiTokenParameter");
+        source.ShouldNotContain("Memories:Testing:UseInMemoryCommandStore");
+    }
+
+    [Fact]
     public static void AppHostShouldInitializeSecurityThroughEventStoreAspireHelpers()
     {
         string source = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));

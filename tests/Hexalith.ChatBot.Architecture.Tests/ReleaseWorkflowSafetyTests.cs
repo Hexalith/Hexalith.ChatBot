@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -138,8 +139,18 @@ public static class ReleaseWorkflowSafetyTests
             invocations.Count(static invocation => invocation.StartsWith("Alpha.Tests -automated sync", StringComparison.Ordinal)).ShouldBe(1);
             invocations.Count(static invocation => invocation.StartsWith("Beta.Tests -automated sync", StringComparison.Ordinal)).ShouldBe(1);
             invocations.ShouldAllBe(static invocation => invocation.Contains("-result-ctrf", StringComparison.Ordinal));
+            invocations.ShouldAllBe(static invocation => invocation.Contains("-result-trx", StringComparison.Ordinal));
             File.Exists(Path.Combine(temporaryRoot, "machine-results", "Alpha.Tests.ctrf.json")).ShouldBeTrue();
             File.Exists(Path.Combine(temporaryRoot, "machine-results", "Beta.Tests.ctrf.json")).ShouldBeTrue();
+            foreach (string lane in new[] { "Alpha.Tests", "Beta.Tests" })
+            {
+                string trx = Path.Combine(temporaryRoot, "machine-results", lane + ".trx");
+                File.ReadAllText(trx).ShouldContain($"testName=\"{lane}\"");
+                File.ReadAllText(trx + ".sha256").ShouldStartWith(
+                    Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(trx))).ToLowerInvariant());
+                invocations.Single(invocation => invocation.StartsWith(lane + " ", StringComparison.Ordinal))
+                    .ShouldContain("-result-trx " + trx);
+            }
         }
         finally
         {
@@ -220,6 +231,7 @@ public static class ReleaseWorkflowSafetyTests
     [InlineData("invalid-count", "CTRF summary contains invalid counts")]
     [InlineData("inconsistent-count", "CTRF summary test count does not match its outcomes")]
     [InlineData("stale-evidence", "xUnit runner did not create CTRF evidence")]
+    [InlineData("missing-trx", "xUnit runner did not create TRX evidence")]
     public static void InvalidMergeTestEvidenceShouldFailClosed(string scenario, string expectedReason)
     {
         string temporaryRoot = CreateTemporaryRoot("merge-test-invalid-evidence");
@@ -257,6 +269,13 @@ public static class ReleaseWorkflowSafetyTests
                         + "\"},\"summary\":{\"tests\":1,\"passed\":1,\"failed\":0,\"skipped\":0}}}");
                     File.WriteAllText(stalePath + ".sha256", "stale checksum");
                     break;
+                case "missing-trx":
+                    environment["MERGE_TEST_WRITE_TRX"] = "0";
+                    string staleTrx = Path.Combine(temporaryRoot, "machine-results", "Invalid.Tests.trx");
+                    Directory.CreateDirectory(Path.GetDirectoryName(staleTrx)!);
+                    File.WriteAllText(staleTrx, "<TestRun>stale successful result</TestRun>");
+                    File.WriteAllText(staleTrx + ".sha256", "stale checksum");
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(scenario));
             }
@@ -269,7 +288,15 @@ public static class ReleaseWorkflowSafetyTests
             exitCode.ShouldNotBe(0);
             standardError.ShouldContain(expectedReason);
             File.ReadAllLines(logPath).Length.ShouldBe(1);
-            File.Exists(Path.Combine(temporaryRoot, "machine-results", "Invalid.Tests.ctrf.json.sha256")).ShouldBeFalse();
+            if (scenario == "missing-trx")
+            {
+                File.Exists(Path.Combine(temporaryRoot, "machine-results", "Invalid.Tests.trx")).ShouldBeFalse();
+                File.Exists(Path.Combine(temporaryRoot, "machine-results", "Invalid.Tests.trx.sha256")).ShouldBeFalse();
+            }
+            else
+            {
+                File.Exists(Path.Combine(temporaryRoot, "machine-results", "Invalid.Tests.ctrf.json.sha256")).ShouldBeFalse();
+            }
         }
         finally
         {
@@ -826,15 +853,21 @@ public static class ReleaseWorkflowSafetyTests
             + "printf '%s %s\\n' \"${XUNIT_TEST_LANE:?}\" \"$*\" >> \"${MERGE_TEST_STUB_LOG:?}\"\n"
             + "if [[ \"$XUNIT_TEST_LANE\" == *\"${MERGE_TEST_FAIL_PATTERN:-__never__}\"* ]]; then exit 23; fi\n"
             + "evidence=''\n"
+            + "trx=''\n"
             + "previous=''\n"
             + "for argument in \"$@\"; do\n"
-            + "  if [[ \"$previous\" == '-result-ctrf' ]]; then evidence=\"$argument\"; break; fi\n"
+            + "  if [[ \"$previous\" == '-result-ctrf' ]]; then evidence=\"$argument\"; fi\n"
+            + "  if [[ \"$previous\" == '-result-trx' ]]; then trx=\"$argument\"; fi\n"
             + "  previous=\"$argument\"\n"
             + "done\n"
             + "[[ -n \"$evidence\" ]]\n"
+            + "[[ -n \"$trx\" ]]\n"
             + "executed=1\n"
             + "if [[ \"$XUNIT_TEST_LANE\" == *\"${MERGE_TEST_ZERO_PATTERN:-__never__}\"* ]]; then executed=0; fi\n"
             + "if [[ \"${MERGE_TEST_WRITE_EVIDENCE:-1}\" == '0' ]]; then exit 0; fi\n"
+            + "if [[ \"${MERGE_TEST_WRITE_TRX:-1}\" == '1' ]]; then\n"
+            + "  printf '<TestRun><Results><UnitTestResult testName=\"%s\"/></Results></TestRun>\\n' \"$XUNIT_TEST_LANE\" > \"$trx\"\n"
+            + "fi\n"
             + "runner_version=\"${MERGE_TEST_RUNNER_VERSION:-" + PackageCatalogTestHelper.Version("xunit.v3") + "}\"\n"
             + "summary=\"${MERGE_TEST_SUMMARY_OVERRIDE:-}\"\n"
             + "if [[ -z \"$summary\" ]]; then\n"

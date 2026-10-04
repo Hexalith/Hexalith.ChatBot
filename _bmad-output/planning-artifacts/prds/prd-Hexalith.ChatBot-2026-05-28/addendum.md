@@ -362,6 +362,26 @@ The SLO catalog covers, at minimum: ingestion latency, candidate generation late
 | `chatbot.mailbox.failure.rate` | `unsupported-pending-a11` | `rolling-24h` | `unsupported-pending-a11` | `budget-burn` | `a11-pending` | `platform-default` |
 | `chatbot.ai.mediation.latency` | `unsupported-pending-a11` | `rolling-24h` | `unsupported-pending-a11` | `budget-burn` | `a11-pending` | `platform-default` |
 
+### Runtime SLO contract mirror
+
+The following table mirrors `OperatingBaselineCatalog.Published` for the existing bounded dashboard contract. Its undimensioned compatibility tokens and starter values do not replace the normative M2 qualification rows above. `calibration-pending` and `a11-pending` remain unsupported; a catalog entry or this mirror grants no published SLO, M2, or release readiness. Exact-candidate live signals, alert routes, burn tests, and accepted A11-M2 evidence remain required.
+
+| Metric name | Target | Measurement window | Error budget | Alert threshold | Calibration source | Tenant scope |
+| --- | --- | --- | --- | --- | --- | --- |
+| `chatbot.command.execution.latency` | `p95-le-2000ms` | `rolling-24h` | `calibration-pending` | `budget-burn` | `nfr24` | `platform-default` |
+| `chatbot.association.latency` | `p95-le-10000ms` | `rolling-24h` | `calibration-pending` | `budget-burn` | `nfr25` | `platform-default` |
+| `chatbot.operation.identity.latency` | `p95-le-5000ms` | `rolling-24h` | `calibration-pending` | `budget-burn` | `nfr26` | `platform-default` |
+| `chatbot.correction.propagation.latency` | `p95-le-10m` | `rolling-24h` | `calibration-pending` | `budget-burn` | `nfr17a` | `platform-default` |
+| `chatbot.audit.projection.lag` | `p95-le-5m` | `rolling-24h` | `degraded-100ev-failed-1000ev` | `lag-gt-5m` | `nfr43` | `platform-default` |
+| `chatbot.retry.exhausted` | `on-exhaustion` | `rolling-24h` | `calibration-pending` | `any-exhaustion` | `nfr43` | `platform-default` |
+| `chatbot.approval.queue.age` | `p95-le-2-business-days` | `rolling-7d` | `calibration-pending` | `age-gt-2-business-days` | `nfr43` | `platform-default` |
+| `chatbot.mailbox.subscription.expiry` | `expiry-le-7d` | `rolling-7d` | `calibration-pending` | `expiry-le-7d` | `nfr43` | `platform-default` |
+| `chatbot.ingestion.latency` | `calibration-pending` | `rolling-24h` | `calibration-pending` | `budget-burn` | `a11-pending` | `platform-default` |
+| `chatbot.ambiguous.resolution.time` | `calibration-pending` | `rolling-7d` | `calibration-pending` | `budget-burn` | `a11-pending` | `platform-default` |
+| `chatbot.duplicate.suppressed` | `calibration-pending` | `rolling-24h` | `calibration-pending` | `spike-baseline` | `a11-pending` | `platform-default` |
+| `chatbot.mailbox.failure.rate` | `calibration-pending` | `rolling-24h` | `calibration-pending` | `budget-burn` | `a11-pending` | `platform-default` |
+| `chatbot.ai.mediation.latency` | `calibration-pending` | `rolling-24h` | `calibration-pending` | `budget-burn` | `a11-pending` | `platform-default` |
+
 ### Recovery Qualification
 
 #### Completion evidence boundary

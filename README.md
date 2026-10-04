@@ -81,7 +81,33 @@ dotnet user-secrets set ChatBot:LiveRecoveryValidation:MailboxClientSecret "REPL
 
 The Memories integration also requires `ChatBot:Projects:Endpoint` and `ChatBot:Projects:ApiToken`, configured through
 AppHost user secrets or environment variables, for the authorization-filtered Projects server. Missing either value
-stops startup.
+stops startup. Set `ChatBot:Memories:ApiToken` through the same secret configuration boundary; the AppHost passes it
+to ChatBot as a secret Aspire parameter. This service bearer must be accepted by Memories' configured issuer and
+audience and carry the tenant claims for the diagnostic and ingestion operations it performs. Memories continues
+to reject anonymous requests and tenants outside those claims. Register the target tenants through Memories'
+supported provisioning API before expecting derived-store probes to succeed; a ChatBot/Keycloak tenant claim does
+not create an owner tenant registry entry.
+
+The local umbrella gives Memories' existing sidecar the same `accesscontrol.local.yaml` configuration as the other
+sidecars, including disabled component hot reload, and forwards `Dapr:PlacementHostAddress` and
+`Dapr:SchedulerHostAddress` when configured. The required live test uses fresh task-owned control-plane/state
+resources, transient service credentials scoped to its two synthetic tenants, and the owner provisioning workflow.
+For this fixture, Memories' supported `EventStoreIntegration:CommandGateway:BaseAddress` points to a task-owned
+loopback relay that adds a real Keycloak service bearer and forwards requests and responses to the real EventStore
+API. That identity can submit only tenant lifecycle commands for the two fixture tenants; the test verifies that
+EventStore rejects other tenants and domains. Local/deployed Memories gateway authentication still needs its own
+configured service transport; the fixture does not expand EventStore's internal caller trust or replace the owner
+command store.
+
+The current local Memories composition does not host a `memories-tenants` domain processor. The test supplies a
+loopback SDK domain transport for only the same two tenant lifecycle commands. It executes the existing owner
+aggregate's `Handle` methods and reconstructs state with SDK replay and owner `Apply` methods; real EventStore
+admission, actor persistence, and the supported owner provisioning workflow remain in the path. The transport
+loads only the owner domain DLL beside the live Aspire Memories executable and records that exact path, version,
+and SHA-256, binding the module to the live Aspire project and its explicit Release launch arguments. This is
+bounded local test composition; the default AppHost and deployment still require
+an authenticated owner command gateway and a hosted tenant domain processor. Passing topology evidence does not
+authorize any release readiness claim.
 
 After configuring those values and the local DAPR/Redis prerequisites, run and inspect the AppHost through Aspire:
 

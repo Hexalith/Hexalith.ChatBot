@@ -1,32 +1,15 @@
 using Dapr.Workflow;
 
-using Hexalith.Memories.Client.Rest;
-using Hexalith.Memories.Contracts.V1;
+using Hexalith.ChatBot.Server.Projections.DerivedStores;
 
 namespace Hexalith.ChatBot.Server.Lifecycle.Workflows;
 
 /// <summary>Reads one safe ingestion status from Memories and maps it to the ChatBot workflow boundary.</summary>
-internal sealed class IngestionBindingGetStatusActivity(MemoriesClient memories)
+internal sealed class IngestionBindingGetStatusActivity(IIngestionBindingSourceAdapter sourceAdapter)
     : WorkflowActivity<IngestionBindingSourceOperation, IngestionBindingSourceStatus>
 {
-    public override async Task<IngestionBindingSourceStatus> RunAsync(
+    public override Task<IngestionBindingSourceStatus> RunAsync(
         WorkflowActivityContext context,
         IngestionBindingSourceOperation input)
-    {
-        ArgumentNullException.ThrowIfNull(input);
-        IngestionWorkflowStatus status = await memories
-            .GetIngestionWorkflowStatusAsync(input.InstanceId, CancellationToken.None)
-            .ConfigureAwait(false);
-        if (!string.Equals(status.InstanceId, input.InstanceId, StringComparison.Ordinal)
-            || !string.Equals(status.TenantId, input.Source.Request.TenantId, StringComparison.Ordinal)
-            || !string.Equals(status.CaseId, input.Source.Context.PriorCaseId, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException("ingestion_binding_status_identity_mismatch");
-        }
-
-        return new IngestionBindingSourceStatus(
-            status.RuntimeStatus,
-            status.MemoryUnitId,
-            status.MemoryUnitStatus is MemoryUnitStatus.Indexed);
-    }
+        => sourceAdapter.GetStatusAsync(input, CancellationToken.None);
 }

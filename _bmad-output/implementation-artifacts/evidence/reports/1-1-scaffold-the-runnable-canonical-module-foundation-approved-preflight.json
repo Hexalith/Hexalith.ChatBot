@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "2.0",
+  "storyKey": "",
+  "baseCommit": "1047ef38d3845406227891639aaeb853e5d4f116",
+  "headCommit": "97bf6063782d1a4af1b63bc0e4df6681dff98b42",
+  "implementationDigest": "",
+  "policyVersion": "",
+  "passed": false,
+  "fileListCount": 0,
+  "scopedDiffCount": 0,
+  "eventPathCount": 0,
+  "checkedItemCount": 0,
+  "mappedItemCount": 0,
+  "repositoryScopes": [],
+  "lanes": [],
+  "primaryPaths": [],
+  "issues": [
+    {
+      "reasonCode": "scope_digest_mismatch",
+      "subject": "1-1-scaffold-the-runnable-canonical-module-foundation.json"
+    }
+  ],
+  "evaluatedAtUtc": "2026-10-04T17:26:18.885445+00:00"
+}

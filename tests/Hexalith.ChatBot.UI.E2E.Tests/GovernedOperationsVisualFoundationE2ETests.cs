@@ -4610,7 +4610,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
         actions.ShouldContain("StableId=\"association-review-validation\"");
         actions.ShouldContain("StateFamily=\"@ChatBotFeedbackStateFamily.ValidationError\"");
-        actions.ShouldContain("aria-describedby=\"association-review-validation\"");
+        actions.ShouldContain("aria-describedby=\"@DecisionNoteDescribedBy\"");
         actions.ShouldContain("aria-invalid=\"@DecisionNoteInvalidText\"");
         actions.ShouldContain("aria-invalid=\"@CorrectionRationaleInvalidText\"");
         actions.ShouldContain("IsTerminal || DisabledReasons.Contains(\"terminal-state\", StringComparer.Ordinal)");

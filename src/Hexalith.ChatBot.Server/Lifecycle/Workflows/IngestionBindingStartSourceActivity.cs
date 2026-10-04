@@ -6,7 +6,7 @@ using Dapr.Workflow;
 
 using Hexalith.ChatBot.Server.Adapters.Mailbox;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
-using Hexalith.Memories.Client.Rest;
+using Hexalith.ChatBot.Server.Projections.DerivedStores;
 
 namespace Hexalith.ChatBot.Server.Lifecycle.Workflows;
 
@@ -14,7 +14,7 @@ namespace Hexalith.ChatBot.Server.Lifecycle.Workflows;
 internal sealed class IngestionBindingStartSourceActivity(
     IMailboxMessageContentSource messageContentSource,
     IMailboxAttachmentContentSource attachmentContentSource,
-    MemoriesClient memories)
+    IIngestionBindingSourceAdapter sourceAdapter)
     : WorkflowActivity<IngestionBindingSourceRequest, IngestionBindingSourceOperation>
 {
     public override async Task<IngestionBindingSourceOperation> RunAsync(
@@ -30,17 +30,8 @@ internal sealed class IngestionBindingStartSourceActivity(
         };
 
         string identity = IdentityFor(input);
-        string instanceId = await memories
-            .IngestAsync(
-                input.Request.TenantId,
-                input.Context.PriorCaseId,
-                SourceUriFor(input),
-                payload.Content,
-                payload.ContentType,
-                "hexalith-chatbot",
-                metadata: null,
-                idempotencyToken: identity,
-                CancellationToken.None)
+        string instanceId = await sourceAdapter
+            .StartAsync(input, SourceUriFor(input), payload.Content, payload.ContentType, identity, CancellationToken.None)
             .ConfigureAwait(false);
         return new IngestionBindingSourceOperation(input, instanceId);
     }

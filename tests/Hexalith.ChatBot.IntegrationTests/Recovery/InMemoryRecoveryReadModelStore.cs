@@ -54,6 +54,11 @@ internal sealed class InMemoryRecoveryReadModelStore : IReadModelStore, IReadMod
     /// <summary>Invoked with the exact read-model key after a successful erase.</summary>
     public Action<string>? OnEraseKey { get; set; }
 
+    /// <summary>Gets every persisted logical key in a store for end-state and partition-isolation assertions.</summary>
+    public IReadOnlyList<string> Keys(string storeName)
+        => [.. _entries.Keys.Where(key => key.StartsWith(storeName + "\u001f", StringComparison.Ordinal))
+            .Select(key => key[(storeName.Length + 1)..]).Order(StringComparer.Ordinal)];
+
     /// <summary>Gets the number of successful persisted writes.</summary>
     public int Writes => Volatile.Read(ref _writes);
 

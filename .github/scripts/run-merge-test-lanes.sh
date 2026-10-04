@@ -79,10 +79,18 @@ for project in "${projects[@]}"; do
         runner="$runner_override"
     fi
 
+    trx="${results_root}/${lane}.trx"
+    rm -f -- "$trx" "${trx}.sha256"
     XUNIT_TEST_LANE="$lane" bash "$runner_boundary" \
         "$runner" \
         "${results_root}/${lane}.ctrf.json" \
+        -result-trx "$trx" \
         > "${results_root}/${lane}.runner.jsonl"
+    if [[ ! -s "$trx" ]]; then
+        printf 'xUnit runner did not create TRX evidence: %s\n' "$trx" >&2
+        exit 1
+    fi
+    sha256sum "$trx" > "${trx}.sha256"
 done
 
 printf 'Executed %s ordinary merge test lanes successfully.\n' "${#projects[@]}"

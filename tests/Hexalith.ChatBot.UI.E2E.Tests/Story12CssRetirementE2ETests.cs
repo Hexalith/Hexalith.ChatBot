@@ -1,5 +1,16 @@
 using System.Text.RegularExpressions;
 
+using Hexalith.ChatBot.UI.Components.Governed;
+using Hexalith.ChatBot.UI.Localization;
+using Hexalith.ChatBot.UI.Services;
+
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.FluentUI.AspNetCore.Components;
+using Microsoft.JSInterop;
+
 using Shouldly;
 
 namespace Hexalith.ChatBot.UI.E2E.Tests;
@@ -103,7 +114,8 @@ public sealed class Story12CssRetirementE2ETests
         associationActions.ShouldContain("Id=\"association-decision-note\"", Case.Sensitive);
         associationActions.ShouldContain("Id=\"association-correction-rationale\"", Case.Sensitive);
         associationActions.ShouldContain("aria-invalid=\"@DecisionNoteInvalidText\"", Case.Sensitive);
-        associationActions.ShouldContain("aria-describedby=\"association-review-validation\"", Case.Sensitive);
+        associationActions.ShouldContain("aria-describedby=\"@DecisionNoteDescribedBy\"", Case.Sensitive);
+        associationActions.ShouldContain("aria-describedby=\"@CorrectionRationaleDescribedBy\"", Case.Sensitive);
         associationActions.ShouldNotContain("chatbot-association-actions__input", Case.Sensitive);
 
         actorBadge.ShouldContain("<FluentBadge", Case.Sensitive);
@@ -117,6 +129,66 @@ public sealed class Story12CssRetirementE2ETests
         whyPanel.ShouldContain("data-chatbot-why-project-panel=\"metadata-only\"", Case.Sensitive);
         whyPanel.ShouldNotContain("chatbot-why-project-panel__close", Case.Sensitive);
         whyPanel.ShouldNotContain("chatbot-why-project-panel__correction", Case.Sensitive);
+    }
+
+    [Theory]
+    [InlineData(null, "false", "false")]
+    [InlineData("candidate-required", "true", "false")]
+    [InlineData("correction-target-required", "false", "true")]
+    public async Task AssociationValidationShouldDescribeOnlyTheRenderedFieldThatCanCauseTheError(
+        string? validationCode, string decisionInvalid, string correctionInvalid)
+    {
+        ServiceCollection services = new();
+        services.AddLogging();
+        services.AddLocalization();
+        services.AddFluentUIComponents();
+        services.AddSingleton<IJSRuntime, StaticRenderJsRuntime>();
+        services.AddSingleton<ChatBotUiTextLocalizer>();
+        services.AddSingleton<ChatBotCultureFormatter>();
+        services.AddSingleton<ChatBotAnnouncementDeduplicationState>();
+        await using ServiceProvider provider = services.BuildServiceProvider();
+        using HtmlRenderer renderer = new(provider, provider.GetRequiredService<ILoggerFactory>());
+        string html = await renderer.Dispatcher.InvokeAsync(async () =>
+        {
+            var component = await renderer.RenderComponentAsync<ChatBotAssociationReviewActions>(
+                ParameterView.FromDictionary(new Dictionary<string, object?>
+                {
+                    [nameof(ChatBotAssociationReviewActions.CanCorrect)] = true,
+                    [nameof(ChatBotAssociationReviewActions.ValidationErrorCode)] = validationCode,
+                })).ConfigureAwait(true);
+            return component.ToHtmlString();
+        }).ConfigureAwait(true);
+
+        string decision = Regex.Match(html, "<fluent-textarea[^>]*id=\"association-decision-note\"[^>]*>").Value;
+        string correction = Regex.Match(html, "<fluent-textarea[^>]*id=\"association-correction-rationale\"[^>]*>").Value;
+        decision.ShouldNotBeEmpty(html);
+        correction.ShouldNotBeEmpty();
+        decision.ShouldContain($"aria-invalid=\"{decisionInvalid}\"");
+        correction.ShouldContain($"aria-invalid=\"{correctionInvalid}\"");
+        foreach ((string field, string invalid) in new[] { (decision, decisionInvalid), (correction, correctionInvalid) })
+        {
+            string description = Regex.Match(field, "aria-describedby=\"([^\"]+)\"").Groups[1].Value;
+            description.ShouldNotBeEmpty();
+            description.Split(' ').ShouldContain(invalid == "true" ? "association-review-validation"
+                : field == decision ? "association-decision-note-counter" : "association-correction-rationale-counter");
+            if (invalid == "false")
+            {
+                description.Split(' ').ShouldNotContain("association-review-validation");
+            }
+
+            foreach (string id in description.Split(' '))
+            {
+                html.ShouldContain($"id=\"{id}\"");
+            }
+        }
+    }
+
+    private sealed class StaticRenderJsRuntime : IJSRuntime
+    {
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args) => ValueTask.FromResult(default(TValue)!);
+
+        public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args)
+            => ValueTask.FromResult(default(TValue)!);
     }
 
     private static IEnumerable<string> EnumerateProjectFiles(string relativeRoot)

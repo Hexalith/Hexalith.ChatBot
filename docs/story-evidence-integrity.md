@@ -9,8 +9,8 @@ TE-2 and the Epic 13 action remain non-complete until repository branch protecti
 Build and run the gate tests first:
 
 ```bash
-dotnet build tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj --configuration Release -warnaserror
-dotnet test tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj --configuration Release --logger "trx;LogFileName=story-evidence-gate.trx" --results-directory TestResults/story-evidence-gate
+dotnet build tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj --configuration Release -p:UseHexalithProjectReferences=false -warnaserror
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests TestResults/story-evidence-gate.ctrf.json -result-trx TestResults/story-evidence-gate.trx
 ```
 
 Create provenance for the contract's `current-run` TRX lanes, then validate. Attestation never creates or rewrites a `retained` sidecar. A contract that declares `recovery-primary` must use `current-run`, the exact `recovery-primary/live-recovery-validation.trx` and `.provenance.json` paths, and the matching `file:` locator. The hosted completion workflow produces that destructive lane conditionally, while a local preflight must produce the same sanitized live TRX itself:
@@ -96,20 +96,21 @@ the advertised pull-request head SHA. The merge check only blocks a merge once b
 `pull-request synthetic merge build and test` as a required status check; that setting lives in repository
 configuration, not in this repository, and must be added there for the check to be enforcing.
 
-Each discovered ordinary lane runs with `RunConfiguration.TreatNoTestsAsError=true`. These projects execute on the
-VSTest bridge, where a Microsoft.Testing.Platform switch is accepted and ignored, so the run-settings override is
-what actually turns a zero-test lane into a failure.
+Each discovered ordinary lane runs through the catalog-pinned native xUnit 4 executable and
+`.github/scripts/run-xunit-v4.sh`. The boundary checks the runner identity/version and CTRF counters, requires a
+positive executed-test count, and rejects failed or inconsistent results and skips in a required zero-skip lane.
+It does not rely on a VSTest or Microsoft.Testing.Platform zero-discovery switch.
 
 The check is implemented by `.github/scripts/verify-pull-request-merge.sh` (parent binding) and
-`.github/scripts/run-merge-test-lanes.sh` (lane discovery and execution). The lane script deliberately mirrors the
-`build` job's inline loop: the same `tests/**/*.csproj` discovery, the same two excluded projects, and the same
-expected ordinary-lane count. That count is duplicated rather than shared, so adding or removing a test project
-must update the `build` job's `expected_projects`/`expected_lanes` and the lane script's
-`MERGE_TEST_EXPECTED_LANES` default together; a mismatch fails both jobs loudly rather than running a partial
-suite. `MERGE_TEST_ROOT`, `MERGE_TEST_DOTNET`, and `MERGE_TEST_EXPECTED_LANES` exist as seams for the executable
-scenario tests and are not set by the workflow.
+`.github/scripts/run-merge-test-lanes.sh` (lane discovery and execution). Both the synthetic merge and exact-head
+`build` jobs invoke that same script. It discovers `tests/**/*.csproj`, excludes RecoverySandbox and the separately
+executed StoryEvidenceGate tests, requires exactly 13 ordinary lanes by default, and rejects colliding lane names
+before executing anything. Adding or removing a test project must update the shared
+`MERGE_TEST_EXPECTED_LANES` default and project inventory guards; a mismatch fails both jobs rather than running a
+partial suite. `MERGE_TEST_ROOT`, `MERGE_TEST_RUNNER_OVERRIDE`, `MERGE_TEST_RESULTS_ROOT`, and
+`MERGE_TEST_EXPECTED_LANES` are seams for the executable scenario tests and are not set by the workflow.
 
-The build job rejects colliding project/lane names, emits collision-safe per-project TRX plus checksum sidecars, records its exact producer HEAD, and uploads them on success or failure. The topology producer independently checks out and records the same raw event head. The `story-evidence-integrity` job runs with `always()`, a 360-minute outer budget, and read-only contents/Actions access. It waits for both producers, always requires and verifies the general producer, checks out the exact event head with full history and no recursive submodules, reruns the gate's own tests, resolves the policy-bound event base/head, and detects candidates before consuming contracts.
+The ordinary script emits native CTRF and TRX plus checksum sidecars at collision-safe per-project paths under `TestResults/merge-test-lanes` by default. It removes only the current lane's stale output, requires fresh nonempty TRX, and preserves the strict CTRF checks; the gate validates canonical TRX grammar and bound provenance. The build job records its exact producer HEAD and uploads machine results on success or failure. The topology producer independently checks out and records the same raw event head. The `story-evidence-integrity` job runs with `always()`, a 360-minute outer budget, and read-only contents/Actions access. It waits for both producers, always requires and verifies the general producer, checks out the exact event head with full history and no recursive submodules, reruns the gate's own tests, resolves the policy-bound event base/head, and detects candidates before consuming contracts.
 
 The job requires, downloads, and verifies topology evidence only when the validated production plan declares current-run `aspire-dapr-primary`. That exact-head topology producer uses the same checksum-pinned Dapr CLI/runtime 1.18.0 pair and current artifact-action major as the consuming completion path. When the plan declares the single current-run `recovery-primary`, the completion job initializes runtime 1.18.0, runs the bound live class into raw staging, stops DAPR, and sanitizes the canonical completion TRX. A failed, skipped, zero-test, timed-out, cleanup-failed, or projection-failed recovery producer prevents attestation and fails the required check. With no declared recovery lane, none of those destructive steps run. Retained locators come from the validated plan and download without overwriting destinations.
 

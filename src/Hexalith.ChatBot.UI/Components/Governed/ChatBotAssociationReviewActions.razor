@@ -91,7 +91,7 @@
                                 ValueChanged="UpdateCorrectionRationale"
                                 Immediate="true"
                                 aria-label="@UiText[ChatBotUiTextKey.AssociationReviewCorrectionRationale]"
-                                aria-describedby="association-correction-status association-correction-rationale-counter"
+                                aria-describedby="@CorrectionRationaleDescribedBy"
                                 Maxlength="@AssociationReviewService.MaximumNoteLength"
                                 aria-invalid="@CorrectionRationaleInvalidText" />
                 <FluentText Id="association-correction-rationale-counter" Class="chatbot-field__counter">
@@ -258,6 +258,11 @@
             ? "association-decision-note-counter"
             : "association-review-validation association-decision-note-counter";
 
+    private string CorrectionRationaleDescribedBy
+        => IsCorrectionValidationError
+            ? "association-review-validation association-correction-status association-correction-rationale-counter"
+            : "association-correction-status association-correction-rationale-counter";
+
     private string CorrectionAffectedContext
         => string.IsNullOrWhiteSpace(CorrectedProjectId)
             ? UiText[ChatBotUiTextKey.AssociationReviewCorrectionPreviewPending]
@@ -312,7 +317,7 @@
     // ARIA state attributes require an explicit "true"/"false" string. A .NET bool would make Blazor drop the
     // attribute entirely when false instead of rendering aria-invalid="false", matching the aria-checked convention.
     private string DecisionNoteInvalidText
-        => string.IsNullOrWhiteSpace(ValidationErrorCode) ? "false" : "true";
+        => !string.IsNullOrWhiteSpace(ValidationErrorCode) && !IsCorrectionValidationError ? "true" : "false";
 
     private string CorrectionRationaleInvalidText
         => IsCorrectionValidationError ? "true" : "false";

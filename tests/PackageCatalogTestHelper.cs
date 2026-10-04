@@ -20,9 +20,10 @@ internal static class PackageCatalogTestHelper
     {
         (string PackageId, string ExpectedVersion)[] expected =
         [
-            ("Microsoft.FluentUI.AspNetCore.Components", "5.0.0-rc.5-26219.1"),
+            ("Microsoft.FluentUI.AspNetCore.Components", "5.0.0"),
+            ("Microsoft.FluentUI.AspNetCore.Components.Icons", "5.0.0"),
             ("Fluxor", "6.11.0"),
-            ("Microsoft.Playwright", "1.62.0"),
+            ("Microsoft.Playwright", "1.63.0"),
             ("xunit.v3", "4.0.1"),
             ("bunit", "2.11.3"),
         ];

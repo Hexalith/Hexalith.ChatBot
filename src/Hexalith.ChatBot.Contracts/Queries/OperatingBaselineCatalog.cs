@@ -3,8 +3,9 @@ using Hexalith.ChatBot.Contracts.Enums;
 namespace Hexalith.ChatBot.Contracts.Queries;
 
 /// <summary>
-/// The finite, bounded NFR42a published-SLO catalog (Story 8.3) — the single source of truth mirrored into
-/// addendum §Operating Baselines (AC6). One stable entry per required metric, each carrying the seven addendum
+/// The finite, bounded NFR42a runtime compatibility SLO catalog (Story 8.3), mirrored into the addendum's
+/// Runtime SLO contract mirror (AC6). These starter contracts do not replace normative M2 qualification targets.
+/// One stable entry per required metric, each carrying the seven compatibility
 /// fields as low-cardinality ASCII-safe tokens plus a default fail-safe <see cref="ErrorBudgetBurnState.Unknown"/>
 /// burn (the dashboard projector layers the live burn over wired SLOs).
 /// <para>

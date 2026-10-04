@@ -18,7 +18,7 @@ public sealed class OperatingBaselineAddendumDriftTests
     [Fact]
     public void AddendumOperatingBaselinesTableShouldMatchTheCodeCatalogMetricNameSet()
     {
-        string addendum = File.ReadAllText(ProjectPath(AddendumRelativePath));
+        string addendum = RuntimeCatalogMirror();
 
         foreach (PublishedSlo slo in OperatingBaselineCatalog.Published)
         {
@@ -42,7 +42,7 @@ public sealed class OperatingBaselineAddendumDriftTests
         // above catches added/removed SLOs; this guard catches silent VALUE drift (a target/window/budget/threshold/
         // calibration-source/tenant-scope edited in the doc but not the code, or vice-versa). Each SLO's row must
         // carry all seven fields as inline-code tokens on the same table line.
-        string[] lines = File.ReadAllText(ProjectPath(AddendumRelativePath)).Split('\n');
+        string[] lines = RuntimeCatalogMirror().Split('\n');
 
         foreach (PublishedSlo slo in OperatingBaselineCatalog.Published)
         {
@@ -55,6 +55,16 @@ public sealed class OperatingBaselineAddendumDriftTests
                 row.ShouldContain($"`{field}`", customMessage: $"addendum row for '{slo.MetricName}' drifted: missing field token '{field}'");
             }
         }
+    }
+
+    private static string RuntimeCatalogMirror()
+    {
+        string addendum = File.ReadAllText(ProjectPath(AddendumRelativePath));
+        const string heading = "### Runtime SLO contract mirror";
+        int start = addendum.IndexOf(heading, StringComparison.Ordinal);
+        start.ShouldBeGreaterThanOrEqualTo(0, "The runtime compatibility mirror must remain explicit and distinct from M2 qualification targets.");
+        int end = addendum.IndexOf("\n### ", start + heading.Length, StringComparison.Ordinal);
+        return end < 0 ? addendum[start..] : addendum[start..end];
     }
 
     private static IEnumerable<string> ExtractChatbotMetricTokens(string text)

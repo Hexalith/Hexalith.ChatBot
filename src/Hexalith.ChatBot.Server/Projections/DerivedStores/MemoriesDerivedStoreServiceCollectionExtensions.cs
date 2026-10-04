@@ -83,6 +83,7 @@ internal static class MemoriesDerivedStoreServiceCollectionExtensions
         services.RemoveAll<IVectorReindexer>();
         services.RemoveAll<IVectorReindexLedger>();
         services.RemoveAll<IMemoriesCaseResolver>();
+        services.AddSingleton<IIngestionBindingSourceAdapter, MemoriesIngestionBindingSourceAdapter>();
         services.AddSingleton<IDerivedStore, MemoriesDerivedStore>();
         services.AddSingleton<IVectorReindexer, MemoriesVectorReindexer>();
         services.AddSingleton<IMemoriesCaseResolver, ProjectsMemoriesCaseResolver>();

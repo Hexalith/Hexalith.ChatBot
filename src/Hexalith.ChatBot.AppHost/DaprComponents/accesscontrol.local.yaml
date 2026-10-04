@@ -17,7 +17,7 @@ spec:
     # loaded only by this local mTLS-off topology so the governed round-trip can run.
     #
     # SCOPE (Story 12.15): this config was previously attached to the chatbot sidecar ONLY. It is now attached to the
-    # eventstore, tenants, eventstore-admin, and eventstore-admin-ui sidecars as well, because Tier-3 composes several
+    # eventstore, tenants, eventstore-admin, eventstore-admin-ui, and Memories sidecars as well, because Tier-3 composes several
     # sidecars at once and needs the HotReload:false setting above on all of them.
     #
     # This is NOT an access-control widening, despite how an earlier version of this comment described it: those four
