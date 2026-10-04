@@ -48,6 +48,14 @@ public sealed class LiveContinuityAspireE2eTests
         "eventstore-admin-ui",
     ];
 
+    private static readonly string[] IsolatedHttpAppIds =
+    [
+        "eventstore",
+        "tenants",
+        "chatbot",
+        "eventstore-admin",
+    ];
+
     [Fact]
     public async Task LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate()
     {
@@ -111,6 +119,29 @@ public sealed class LiveContinuityAspireE2eTests
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
             .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(arguments.ToArray(), cancellationToken)
             .ConfigureAwait(true);
+        // The canonical projects declare fixed launch-profile HTTP ports. A concurrently running Aspire app can
+        // already own one (notably EventStore's :8080), so this validation topology must bind its own listeners.
+        // Hold the reservations through model construction, then release them immediately before startup.
+        IReadOnlySet<int> declaredPorts = builder.Resources
+            .SelectMany(static resource => resource.Annotations.OfType<EndpointAnnotation>())
+            .Where(static endpoint => endpoint.Port.HasValue)
+            .Select(static endpoint => endpoint.Port!.Value)
+            .ToHashSet();
+        using PortReservationSet httpReservations = PortReservationSet.Reserve(IsolatedHttpAppIds.Length, declaredPorts);
+        for (int index = 0; index < IsolatedHttpAppIds.Length; index++)
+        {
+            IResource resource = builder.Resources.Single(candidate =>
+                string.Equals(candidate.Name, IsolatedHttpAppIds[index], StringComparison.Ordinal));
+            EndpointAnnotation endpoint = resource.Annotations.OfType<EndpointAnnotation>()
+                .Single(candidate => string.Equals(candidate.Name, "http", StringComparison.Ordinal));
+            if (endpoint.IsProxied)
+            {
+                throw new InvalidOperationException($"The {resource.Name}/http recovery endpoint must be proxyless for DAPR.");
+            }
+
+            endpoint.Port = httpReservations.Ports[index];
+            endpoint.TargetPort = httpReservations.Ports[index];
+        }
         _ = builder.AddRecoverySandbox(
             "Testing",
             tenantRef,
@@ -143,6 +174,7 @@ public sealed class LiveContinuityAspireE2eTests
             // steps alone, so the lane could expire mid-provisioning and surface a bare OperationCanceledException.
             startup.CancelAfter(TimeSpan.FromMinutes(15));
             internalGrpcReservations.Release();
+            httpReservations.Release();
             await application.StartAsync(startup.Token).ConfigureAwait(true);
 
             // Started FIRST, before provisioning and before the readiness waits. Tails that begin after the health
