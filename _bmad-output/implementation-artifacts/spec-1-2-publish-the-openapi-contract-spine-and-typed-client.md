@@ -2,7 +2,7 @@
 title: 'Story 1.2: Publish the OpenAPI Contract Spine and Typed Client'
 type: 'feature'
 created: '2026-10-05'
-status: 'in-review'
+status: 'in-progress'
 route: 'dispatch'
 review_loop_iteration: 15
 baseline_commit: 097a45e53f7bb5320d50ac96c5aeddd871605ae8
@@ -115,6 +115,70 @@ context:
 - Given the canonical spec, when generation/exposure checks run, then generated output, client signatures, and separate exposure metadata match; drift fails.
 - Given a stable ULID and retry, when the facade submits, then both requests carry that ID with correlation/cancellation; invalid IDs fail before transport.
 - Given accepted, pending, replayed, or denied outcomes, when oracle tests run, then state/reason/retry/prior-outcome round-trip as camelCase, UTC, metadata-only versioned RFC 9457 data without restricted or existence-revealing detail.
+
+### Review Findings
+
+Code review 2026-10-05 (loop 16, `bmad-code-review`): diff `097a45e..3e8f550` excluding the generated `.g.cs`, `_bmad-output` docs and submodule gitlinks (10,177 lines). Layers: Blind Hunter, Edge Case Hunter, Verification Gap, Acceptance Auditor (none failed). 66 findings → 3 decision-needed, 12 patch, 4 defer, 38 rejected. Decisions resolved 2026-10-05: 1 → patch, 2 → defer → totals 13 patch, 6 defer, 38 rejected.
+
+- [ ] [Review][Patch] Definitive EventStore refusal strands the reservation in `Dispatching` forever (high; edge-case-hunter+acceptance-auditor; findings 29, 41; decision 2026-10-05: release on definitive refusal) — Classify a definitive EventStore refusal (domain rejection / back-pressure non-2xx returned by `SubmitCommandAsync`) as authoritative non-commit proof. Release the matching fenced `Dispatching` ownership and return the existing safe problem, so a retry may re-dispatch under EventStore message-ID dedupe. Keep genuinely uncertain failures (transport/sidecar/timeouts, conversation/mailbox writes) recovery-pending. Cover same-ID retry and specialized-equivalent unblocking [src/Hexalith.ChatBot.Server/Gateway/Stages/AcceptedCommandDispatcher.cs:99]
+- [ ] [Review][Patch] Live Tier-3 mailbox-bearer probes no longer prove admission: contract-valid probe bodies, drop the 400/422 success branch, and pin validation-vs-auth order in `ServerBootstrapApiTests` (high; verification-gap) [tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs:1001]
+- [ ] [Review][Patch] Healthy pending store poll is published as `association_correction_store_unavailable` (Retrying, retry-later, MaxAttempts 5): use `?? CorrectionPropagationWorkflowFailureCodes.None` so the sink reports `association_correction_propagation_pending`, and add a null-reason pending test (bridge fixture only covers explicit StoreUnavailable) (medium; acceptance-auditor+edge-case-hunter+blind-hunter) [src/Hexalith.ChatBot.Server/Lifecycle/Workflows/CorrectionPropagationWorkflowRunner.cs:46]
+- [ ] [Review][Patch] Dapr state persists generated `ChatBotMessageCode`/`LifecycleState` as System.Text.Json ordinals (this story shifted the ordinals by 10). Configure the DaprClient with an EnumMember-aware string-enum converter that still reads stored integers (medium; acceptance-auditor+edge-case-hunter) [src/Hexalith.ChatBot.Server/Gateway/CommandGatewayServiceCollectionExtensions.cs:47]
+- [ ] [Review][Patch] No test resolves `IIdempotencyStore` from `AddChatBotCommandGateway()`. Add a registration test asserting `DaprCoarseIdempotencyStore` with its EventStore/audit recovery inputs wired (medium; verification-gap) [src/Hexalith.ChatBot.Server/Gateway/CommandGatewayServiceCollectionExtensions.cs:190]
+- [ ] [Review][Patch] Request adapter hand-copies the OpenAPI request contract (property list, 160 limit, pattern, `v1`, actorType/riskClass/thresholdBand/origin enums) with no drift check. Add a test binding these lists to the YAML request schema, per AD-18 (medium; acceptance-auditor) [src/Hexalith.ChatBot.Server/Gateway/CommandSubmissionContractAdapter.cs:17]
+- [ ] [Review][Patch] Cancellation during `AbortUndispatchedAsync` after `CommandNotSubmittedException` escapes and leaves proven-undispatched ownership in `Dispatching`. Use the bounded independent cleanup token, as the OCE branch does (low; edge-case-hunter) [src/Hexalith.ChatBot.Server/Gateway/CommandGateway.cs:163]
+- [ ] [Review][Patch] `accepted-at:` evidence ref uses the `"O"` format (`+00:00`), which `IsSafeToken` drops from compliance detail. Emit a `Z`-suffixed UTC token; the recovery parser accepts both (low; edge-case-hunter) [src/Hexalith.ChatBot.Server/Audit/AuditEnvelopeFactory.cs:54]
+- [ ] [Review][Patch] `x-hexalith-command-submission.adapterContract` names only `SubmitAsync`. Add `SubmitWithCommandIdAsync` and update the oracle fixture (low; blind-hunter+acceptance-auditor) [src/Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml:65]
+- [ ] [Review][Patch] AC3 test asserts only `CommandId`. Assert correlation and capture/assert the cancellation token on the stable-ID path (low; acceptance-auditor) [tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs:123]
+- [ ] [Review][Patch] Remove the unused `OptionalString` helper (low; blind-hunter) [src/Hexalith.ChatBot.Server/Gateway/CommandSubmissionContractAdapter.cs:108]
+- [ ] [Review][Patch] `ReconcileOutcomeFromAuditAsync` summary claims "after a process restart", but the only registered `IAuditHistoryReader` is in-memory. Correct the comment (low; blind-hunter+verification-gap) [src/Hexalith.ChatBot.Server/Gateway/Idempotency/DaprCoarseIdempotencyStore.cs:546]
+- [ ] [Review][Patch] Style: add an XML summary for `ChatBotProblemTypes.ValidationFailure` and the missing blank lines around `CreateValidationProblem` (low; blind-hunter) [src/Hexalith.ChatBot.Server/Gateway/ChatBotProblemTypes.cs:13]
+- [x] [Review][Defer] Generic-command dedupe now keyed on caller `commandId`, but no production adapter supplies a stable ID (medium; sources: blind-hunter+edge-case-hunter; findings 2, 49) — Baseline deduplicated generic commands on a 60 s body-hash key. HEAD keys them on (tenant, op, commandId) (`CoarseIdempotencyComposer.cs:101-104`), as the spec task requires. Every production caller uses `SubmitAsync`, which mints a fresh ULID per call: UI services, `ChatBotCliService.cs:346`, `ChatBotMcpService.cs:202` and `GraphMailboxIntakeWorker.cs:125`. `SubmitWithCommandIdAsync` has no production caller. So CLI/MCP re-runs and deterministic `ComplianceAuditService` escalations now dispatch again; governed-note, project-conversation and specialized commands are unaffected, and transport retries are disabled for POST. Options: (1) accept as spec-intended and defer the caller migration to Stories 1.5/1.10; (2) keep the 60 s body-hash dedupe as an extra key for generic commands without a caller-supplied ID; (3) migrate CLI/MCP/compliance callers to stable IDs now, which adds CLI/MCP arguments. [src/Hexalith.ChatBot.Server/Gateway/Idempotency/CoarseIdempotencyComposer.cs:101] — deferred: decision 2026-10-05: commandId keying is spec-intended; migrating CLI/MCP/compliance callers to stable IDs belongs to Stories 1.5/1.10.
+- [x] [Review][Defer] Idempotency ownership state has no retention bound (medium; sources: blind-hunter+edge-case-hunter; findings 4, 56, 58) — Tombstones are required by the spec (`Released = true` at `DaprCoarseIdempotencyStore.cs:118,143,808`), but every save passes `metadata: null` with no `ttlInSeconds` (`DaprCoarseIdempotencyStateClient.cs:30,33`), and `TryDeleteAsync` has no caller. Each command ID leaves roughly 2 KB of identity/domain records in Redis permanently. Process-local `_pendingOutcomes` and `_unadmittedReservations` are never evicted on failure paths; `_unadmittedReservations` gains an entry for every uncertain-dispatch abort, including each domain rejection. Baseline deleted records on expiry/abort. Options: (1) add a TTL on released/expired and settled records with a horizon of at least the lease plus the longest replay window plus a margin, which keeps ETag fencing inside the horizon, and evict the process-local maps on terminal paths; (2) defer retention/compaction to a dedicated story. [src/Hexalith.ChatBot.Server/Gateway/Idempotency/DaprCoarseIdempotencyStateClient.cs:30] — deferred: decision 2026-10-05: a TTL horizon that is safe for ETag fencing needs its own retention/compaction design pass (pre-release).
+- [x] [Review][Defer] Genuinely uncertain external writes (conversation/mailbox/sidecar outage) stay `RecoveryPending` with no terminal state, operator tool or manual recovery command; the dispatch failure still raises `OperatorAlertKind.AuditUnavailable`; the comment "no durable state was written" (`ChatBotProblemDetailsFactory.cs:81`) is now stale (medium; finding 3) [src/Hexalith.ChatBot.Server/Gateway/CommandGateway.cs:181] — deferred: retention of uncertain ownership is spec-mandated; the alert classification is pre-existing; an AD-4 named manual recovery command belongs to a later Retry Profile story.
+- [x] [Review][Defer] Post-commit audit/status exceptions after a durable receipt escape as a raw 500 (medium; findings 12, 45) [src/Hexalith.ChatBot.Server/Gateway/CommandGateway.cs:229] — deferred: pre-existing (carried Loop 7 BH8 → Loop 15 BH6, code unchanged); first ledger entry.
+- [x] [Review][Defer] Valid enum-keyed dictionary maps pass the adapter but `JsonEnumMemberStringConverter` lacks dictionary-key support, so authorization denies with 403 (medium; finding 60) [src/Hexalith.ChatBot.Contracts/Serialization/JsonEnumMemberStringConverter.cs:12] — deferred: pre-existing (carried Loop 12 EH2 / Loop 14 BH1, code unchanged); first ledger entry.
+- [x] [Review][Defer] Post-commit receipt repair (`ReconcileOutcomeFromAuditAsync`, `RecoverPendingOutcomeAsync`) conflicts with ARCHITECTURE-SPINE AD-2 "post-commit repair … prohibited"; no ADR or interim exception is recorded (medium; finding 23) [src/Hexalith.ChatBot.Server/Gateway/Idempotency/DaprCoarseIdempotencyStore.cs:547] — deferred: the fix is an architecture-document decision (ADR or interim A13 exception), not a code change in this story.
+
+**Rejected (38):**
+- 1 low — Semantic contract validation precedes authentication, so an anonymous caller with an invalid body gets 400 without an audit fact. The spec keeps auth ordering only for valid bodies; malformed JSON already skipped auth at baseline. The concrete harm is tracked by the live-probe patch.
+- 64 low — The unauthenticated 400-vs-401 oracle only reveals command names already published in the Contracts package and the OpenAPI.
+- 14 low — Unknown `X-Hexalith-Surface-Origin` header collapses to `api`. Pre-existing and unchanged (carried Loop 5 BH3); no in-repo caller sends the header.
+- 61 low — Same as 14 (commit-message claim).
+- 31 low — Rejecting an unknown body origin reverses the Story 1.9 default. This is a recorded review-loop decision ("exact JSON media and origin rules"), and typed callers cannot send unknown values; renegotiation is a spec edit.
+- 30 low — Lowercase ULIDs are normalized. Pre-existing (`ChatBotIdentity` unchanged), and replay stays consistent.
+- 37 false — A probe under Kestrel returned 413 for oversized and chunked bodies; `BadHttpRequestException` keeps its status.
+- 38 false — The camelCase resolver ships in the same Client project as every in-repo caller; the package is not published.
+- 11 false — The default interface methods never run (one internal implementation overrides both); the output is identical.
+- 13 false — No `JsonConvert.DefaultSettings` exists anywhere; the mutated ProblemDetails are per-request; the live path uses `ISystemClock`.
+- 50 false — No writer can store an unknown status token or a null `SafeNextActions`.
+- 42 low — With EventStore wired, the in-process fallbacks are skipped. This costs liveness only after the 24 h status TTL, and is consistent with "unproven SDK status cannot authorize acceptance".
+- 9 low — The concrete-type check affects only test decorators; production registers the store directly.
+- 47 low — An expired pre-upgrade pending record stays fail-closed. Spec-mandated ("Historical records with unknown dispatch state stay fail-closed"); upgrade-time only.
+- 48 false — Legacy body-key replay for a new ID is spec-mandated, uses baseline's own dedupe rule, and lasts at most 60 s after upgrade.
+- 57 false — Nothing can remove the in-memory record between `PrepareDispatchAsync` and `RecordOutcomeAsync`; the Dapr store throws instead (already rejected in Loop 8 BH4).
+- 8 low — The typed HttpClient captured in a singleton is a pre-existing repo pattern with negligible loopback impact; the in-memory audit reader was deferred earlier (Loop 5 BH7).
+- 5 low — Comment-only catches have no logging; these classes have no `ILogger`, and adding one is beyond a direct correction.
+- 34 low — Same root as 5; production queue/alert sinks are in-memory and do not throw.
+- 10 low — Magic reason strings and the narrow SDK-stage abort throw: consistent today and reachable only on a lost-CAS redelivery.
+- 19 false — The mutated prior outcome is not observable: the status mapper applies the same fallback and the idempotency stores clone.
+- 44 false — The only production dispatcher marks the external effect before every write.
+- 46 false — No realistic deterministic pre-audit throw source exists; the HTTP boundary blocks the remaining one.
+- 65 low — Pre-existing; the production pre-commit writer never throws.
+- 6 low — Workflow replay non-determinism for in-flight instances. The product is pre-release (`blocked-open-gates`); revisit with `IsPatched` before the first persistent deployment.
+- 51 low — Same as 6.
+- 35 low — The fixed 30 s delay is pre-existing; the five-attempt budget is spec-mandated; AD-4 Retry Profile v1 arrives with Story 2.12.
+- 53 false — Preserving the failure reason during an active retry is the deliberate Loop 8 BH7 fix; the harm exists only through the pending-poll patch.
+- 54 low — Polling history grows about 2.5× per iteration but is bounded by Memories' terminal TimedOut (~120 polls).
+- 55 low — A clock-activity exhaustion fault is a new instance of a pre-existing non-terminal fault class; stale due times are suppressed.
+- 26 low — Strict required members are spec-mandated; a reflection probe found 0 missing or nullable required members across the real server responses.
+- 39 low — Throws only under new-client/old-server version skew; surfaces deploy together.
+- 16 false — The Audit `*WireModel`s are pre-existing, match the required lists, and the compliance client reads them through STJ.
+- 27 low — The guard scope matches the "touched server gateway source" task; the Audit DTOs are pre-existing and untouched.
+- 18 low — `operationId` `$ref CommandId` vs `oneOf`: identical ULID schemas, a semantic mislabel only; the overlap is already deferred (Loop 1 BH7).
+- 36 low — Same as 18. The retryEligible description matches behaviour ("False on acceptance").
+- 20 low — The two 161-character tests cover different entry points; the missing 160-character boundary test and NSwag-runner brittleness are test-hygiene only.
+- 28 rejected — The scope growth came from review-loop tasks under the recorded human override; any correction would be a spec edit.
 
 ## Implementation Notes
 
