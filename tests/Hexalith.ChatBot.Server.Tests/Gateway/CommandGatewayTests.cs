@@ -1142,6 +1142,158 @@ public sealed class CommandGatewayTests
         options.Concurrency.ShouldBe(Dapr.Client.ConcurrencyMode.FirstWrite);
     }
 
+    [Fact]
+    public async Task ProductionDaprIdentitySaveShouldAdmitOneStrongFirstWriteWinner()
+    {
+        using Barrier barrier = new(2);
+        ConditionalDaprStateClient dapr = new() { IdentityCreateBarrier = barrier };
+        DaprCoarseIdempotencyStore store = new(dapr, new FixedClock(), new RecordingAuditWriter());
+        RecordingDispatcher dispatcher = new();
+        CommandGateway gateway = Gateway(dispatcher, idempotencyStore: store, commandAllowlist: new ChatBotSpineCommandAllowlist());
+        ClaimsPrincipal principal = Principal(BoundTenant);
+        const string commandId = "01ARZ3NDEKTSV4RRFFQ69G5FBB";
+        ChatBotCommandSubmission first = Submission(principal, RetryCommand() with { FailedEventId = "01ARZ3NDEKTSV4RRFFQ69G5FC3" },
+            origin: ChatBotSurfaceOrigin.Ui, commandId: commandId);
+        ChatBotCommandSubmission second = Submission(principal, RetryCommand() with { FailedEventId = "01ARZ3NDEKTSV4RRFFQ69G5FC4" },
+            origin: ChatBotSurfaceOrigin.Ui, commandId: commandId);
+
+        ChatBotGatewayResult[] results = await Task.WhenAll(
+            Task.Run(() => gateway.SubmitAsync(first, TestContext.Current.CancellationToken).AsTask()),
+            Task.Run(() => gateway.SubmitAsync(second, TestContext.Current.CancellationToken).AsTask()));
+
+        results.Count(static result => result.IsAccepted).ShouldBe(1);
+        results.Count(static result => result.Problem?.Status == 409).ShouldBe(1);
+        dispatcher.DispatchCount.ShouldBe(1);
+        dapr.IdentitySaves.ShouldNotBeEmpty();
+        foreach (ConditionalDaprStateClient.IdentitySave save in dapr.IdentitySaves)
+        {
+            save.StoreName.ShouldBe("chatbot-statestore");
+            save.Options.ShouldNotBeNull();
+            save.Options.Consistency.ShouldBe(Dapr.Client.ConsistencyMode.Strong);
+            save.Options.Concurrency.ShouldBe(Dapr.Client.ConcurrencyMode.FirstWrite);
+        }
+
+        dapr.IdentitySaves.Count(static save => string.IsNullOrEmpty(save.Etag) && save.Saved).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task FailedAbortCleanupShouldAdmitTheCorrectedCommandAfterTheStoreRecovers()
+    {
+        FakeCoarseIdempotencyStateClient state = new();
+        DaprCoarseIdempotencyStore store = new(state, new FixedClock());
+        CoarseIdempotencyDecision admission = await store.RecordAdmissionAsync(
+            DirectContext(new TenantScopedCommand(BoundTenant, "before"), "01ARZ3NDEKTSV4RRFFQ69G5FAY"),
+            TestContext.Current.CancellationToken);
+        admission.Kind.ShouldBe(CoarseIdempotencyDecisionKind.Proceed);
+        string originalReservation = state.DomainRecords.ShouldHaveSingleItem().ReservationId.ShouldNotBeNull();
+
+        state.RejectDeletes = 3;
+        await Should.ThrowAsync<InvalidOperationException>(async () =>
+            await store.AbortAdmissionAsync(admission.Metadata, TestContext.Current.CancellationToken).ConfigureAwait(true));
+        state.DomainRecords.ShouldNotBeEmpty();
+        state.IdentityRecords.ShouldNotBeEmpty();
+
+        state.RejectDeletes = 0;
+        CoarseIdempotencyDecision corrected = await store.RecordAdmissionAsync(
+            DirectContext(new TenantScopedCommand(BoundTenant, "corrected"), "01ARZ3NDEKTSV4RRFFQ69G5FAY"),
+            TestContext.Current.CancellationToken);
+
+        corrected.Kind.ShouldBe(CoarseIdempotencyDecisionKind.Proceed);
+        state.DomainRecords.ShouldHaveSingleItem().ReservationId.ShouldNotBe(originalReservation);
+        state.IdentityRecords.ShouldHaveSingleItem().PriorOutcome.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task FailedAbortCleanupShouldNotDeleteAReplacementReservation()
+    {
+        FakeCoarseIdempotencyStateClient state = new();
+        DaprCoarseIdempotencyStore store = new(state, new FixedClock());
+        CoarseIdempotencyDecision admission = await store.RecordAdmissionAsync(
+            DirectContext(new TenantScopedCommand(BoundTenant, "before"), "01ARZ3NDEKTSV4RRFFQ69G5FAY"),
+            TestContext.Current.CancellationToken);
+        admission.Kind.ShouldBe(CoarseIdempotencyDecisionKind.Proceed);
+        state.RejectDeletes = 3;
+        await Should.ThrowAsync<InvalidOperationException>(async () =>
+            await store.AbortAdmissionAsync(admission.Metadata, TestContext.Current.CancellationToken).ConfigureAwait(true));
+
+        const string replacementReservation = "replacement-reservation";
+        state.ReplaceStoredReservation(replacementReservation);
+        state.RejectDeletes = 0;
+        CoarseIdempotencyDecision retry = await store.RecordAdmissionAsync(
+            DirectContext(new TenantScopedCommand(BoundTenant, "corrected"), "01ARZ3NDEKTSV4RRFFQ69G5FAY"),
+            TestContext.Current.CancellationToken);
+
+        retry.Kind.ShouldBe(CoarseIdempotencyDecisionKind.Conflict);
+        state.DomainRecords.ShouldHaveSingleItem().ReservationId.ShouldBe(replacementReservation);
+        state.IdentityRecords.ShouldHaveSingleItem().DomainReservation.ShouldNotBeNull().ReservationId.ShouldBe(replacementReservation);
+    }
+
+    [Fact]
+    public async Task AcknowledgementLossCleanupFailureShouldReleaseOnTheNextAdmission()
+    {
+        FakeCoarseIdempotencyStateClient state = new()
+        {
+            ThrowAfterIdentityClaimSave = true,
+            RejectDeletes = 3,
+        };
+        DaprCoarseIdempotencyStore store = new(state, new FixedClock());
+        await Should.ThrowAsync<IOException>(async () =>
+            await store.RecordAdmissionAsync(
+                DirectContext(new TenantScopedCommand(BoundTenant, "before"), "01ARZ3NDEKTSV4RRFFQ69G5FAY"),
+                TestContext.Current.CancellationToken).ConfigureAwait(true));
+        state.IdentityRecords.ShouldNotBeEmpty();
+
+        state.RejectDeletes = 0;
+        CoarseIdempotencyDecision corrected = await store.RecordAdmissionAsync(
+            DirectContext(new TenantScopedCommand(BoundTenant, "corrected"), "01ARZ3NDEKTSV4RRFFQ69G5FAY"),
+            TestContext.Current.CancellationToken);
+
+        corrected.Kind.ShouldBe(CoarseIdempotencyDecisionKind.Proceed);
+        state.IdentityRecords.ShouldHaveSingleItem().PriorOutcome.ShouldBeNull();
+        state.DomainRecords.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task FailedFallbackAuditShouldRestoreTheQueuedOutcomeOnTheNextStore()
+    {
+        FakeCoarseIdempotencyStateClient state = new();
+        RecordingReplayIntentQueue queue = new();
+        RecordingAuditWriter audit = new()
+        {
+            PostCommitResult = AuditWriteResult.Unavailable(AuditFailureReasonCodes.PostCommitAuditFailed),
+        };
+        RecordingDispatcher dispatcher = new(onDispatch: () =>
+        {
+            state.RejectIdentityOutcomeSaves = 100;
+            state.RejectReceiptOutcomeSaves = 100;
+            state.RejectPrimaryOutcomeSaves = 100;
+        });
+        CommandGateway firstGateway = Gateway(dispatcher,
+            idempotencyStore: new DaprCoarseIdempotencyStore(state, new FixedClock(), audit),
+            replayQueue: queue,
+            auditWriter: audit,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+        ChatBotCommandSubmission request = Submission(Principal(BoundTenant), RetryCommand(), origin: ChatBotSurfaceOrigin.Ui);
+
+        (await firstGateway.SubmitAsync(request, TestContext.Current.CancellationToken)).Problem.ShouldNotBeNull().Status.ShouldBe(503);
+        queue.Intents.ShouldHaveSingleItem().AcceptedOutcome.ShouldNotBeNull();
+        state.RejectIdentityOutcomeSaves = 0;
+        state.RejectReceiptOutcomeSaves = 0;
+        state.RejectPrimaryOutcomeSaves = 0;
+
+        CommandGateway restartedGateway = Gateway(dispatcher,
+            idempotencyStore: new DaprCoarseIdempotencyStore(state, new FixedClock(), new RecordingAuditWriter()),
+            replayQueue: queue,
+            auditWriter: new RecordingAuditWriter(),
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+        ChatBotGatewayResult replay = await restartedGateway.SubmitAsync(request, TestContext.Current.CancellationToken);
+
+        replay.IsAccepted.ShouldBeTrue();
+        replay.Accepted.ShouldNotBeNull().PriorOutcome.ShouldNotBeNull().CommandId.ShouldBe(request.Request.CommandId);
+        dispatcher.DispatchCount.ShouldBe(1);
+        state.ReceiptRecords.ShouldHaveSingleItem().PriorOutcome.ShouldNotBeNull();
+    }
+
     private static ChatBotGatewayContext DirectContext(object command, string commandId)
     {
         ClaimsPrincipal principal = Principal(BoundTenant);
@@ -5407,6 +5559,25 @@ public sealed class CommandGatewayTests
 
         public void RemoveDomain(string key) { lock (_sync) { _records.Remove(key); } }
 
+        public void ReplaceStoredReservation(string reservationId)
+        {
+            lock (_sync)
+            {
+                foreach (string key in _records.Keys.ToArray())
+                {
+                    (object Record, int Version) current = _records[key];
+                    if (current.Record is CoarseIdempotencyRecord domain)
+                    {
+                        _records[key] = (domain with { ReservationId = reservationId }, current.Version + 1);
+                    }
+                    else if (current.Record is CoarseCommandIdentityRecord identity && identity.DomainReservation is { } reservation)
+                    {
+                        _records[key] = (identity with { DomainReservation = reservation with { ReservationId = reservationId } }, current.Version + 1);
+                    }
+                }
+            }
+        }
+
         public void SeedDomain(CoarseIdempotencyRecord record)
         { lock (_sync) { _records.Add(record.CoarseKeyHash, (record, 1)); } }
 
@@ -6527,6 +6698,8 @@ public sealed class CommandGatewayTests
     private sealed class RecordingReplayIntentQueue : IAuditReplayIntentQueue
     {
         public List<AuditReplayIntent> Intents { get; } = [];
+
+        public IReadOnlyList<AuditReplayIntent> Snapshot() => Intents;
 
         public ValueTask EnqueueAsync(AuditReplayIntent intent, CancellationToken cancellationToken)
         {

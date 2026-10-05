@@ -132,6 +132,13 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         CoarseIdempotencyDecision idempotencyDecision = await idempotencyStore
             .RecordAdmissionAsync(context, cancellationToken)
             .ConfigureAwait(false);
+        if (idempotencyDecision.Kind == CoarseIdempotencyDecisionKind.RecoveryPending &&
+            idempotencyStore is DaprCoarseIdempotencyStore daprStore)
+        {
+            idempotencyDecision = await RestoreQueuedOutcomeAsync(
+                daprStore, context, binding.TenantId, idempotencyDecision, cancellationToken).ConfigureAwait(false);
+        }
+
         if (idempotencyDecision.Kind == CoarseIdempotencyDecisionKind.ReplayPriorOutcome)
         {
             await RecordDuplicateReplaySideEffectsAsync(context, idempotencyDecision, cancellationToken)
@@ -370,4 +377,32 @@ internal sealed class ChatBotCommandAdmissionPipeline(
             submission.Request.CommandType,
             nameof(Contracts.Commands.CaptureMailboxMessageIntake),
             StringComparison.Ordinal);
+
+    private async ValueTask<CoarseIdempotencyDecision> RestoreQueuedOutcomeAsync(
+        DaprCoarseIdempotencyStore store,
+        ChatBotGatewayContext context,
+        string tenantId,
+        CoarseIdempotencyDecision pending,
+        CancellationToken cancellationToken)
+    {
+        foreach (AuditReplayIntent intent in replayIntentQueue.Snapshot())
+        {
+            if (intent.Kind != AuditReplayIntentKind.PostCommitAuditReconciliation ||
+                intent.AcceptedOutcome is not { } outcome ||
+                !string.Equals(intent.TenantId, tenantId, StringComparison.Ordinal) ||
+                !string.Equals(outcome.CommandId, context.Submission.Request.CommandId, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (!await store.ReconcileOutcomeAsync(intent, cancellationToken).ConfigureAwait(false))
+            {
+                continue;
+            }
+
+            return await idempotencyStore.RecordAdmissionAsync(context, cancellationToken).ConfigureAwait(false);
+        }
+
+        return pending;
+    }
 }

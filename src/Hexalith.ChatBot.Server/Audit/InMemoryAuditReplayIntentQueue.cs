@@ -16,6 +16,8 @@ internal sealed class InMemoryAuditReplayIntentQueue : IAuditReplayIntentQueue
         }
     }
 
+    public IReadOnlyList<AuditReplayIntent> Snapshot() => Intents;
+
     public ValueTask EnqueueAsync(AuditReplayIntent intent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(intent);
