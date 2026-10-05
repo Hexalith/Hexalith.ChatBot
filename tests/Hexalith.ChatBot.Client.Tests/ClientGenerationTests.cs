@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Reflection.Emit;
+using System.Diagnostics;
 using System.Runtime.Serialization;
 using System.Security.Cryptography;
 using System.Text;
@@ -73,6 +75,82 @@ public static class ClientGenerationTests
         string actual = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(File.ReadAllText(GeneratedClientPath())))).ToLowerInvariant();
 
         actual.ShouldBe(expected);
+    }
+
+    [Fact]
+    public static async Task IsolatedNswagGenerationShouldMatchCheckedInOutputByteForByte()
+    {
+        string assetsPath = Path.Combine(RepositoryRoot, "src", "Hexalith.ChatBot.Client", "obj", "project.assets.json");
+        using JsonDocument assets = JsonDocument.Parse(File.ReadAllText(assetsPath));
+        string package = assets.RootElement.GetProperty("libraries").EnumerateObject()
+            .Single(item => item.Name.StartsWith("NSwag.MSBuild/", StringComparison.Ordinal)).Name;
+        string version = package[(package.IndexOf('/') + 1)..];
+        string tool = assets.RootElement.GetProperty("packageFolders").EnumerateObject()
+            .Select(folder => Path.Combine(folder.Name, "nswag.msbuild", version.ToLowerInvariant(), "tools", "Net100", "dotnet-nswag.dll"))
+            .First(File.Exists);
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), "chatbot-nswag-" + Guid.NewGuid().ToString("N"));
+        string clientDirectory = Path.Combine(temporaryRoot, "src", "Hexalith.ChatBot.Client");
+        string contractDirectory = Path.Combine(temporaryRoot, "src", "Hexalith.ChatBot.Contracts", "openapi");
+        Directory.CreateDirectory(Path.Combine(clientDirectory, "Generated"));
+        Directory.CreateDirectory(contractDirectory);
+        try
+        {
+            File.Copy(Path.Combine(RepositoryRoot, "src", "Hexalith.ChatBot.Client", "nswag.json"), Path.Combine(clientDirectory, "nswag.json"));
+            File.Copy(Path.Combine(RepositoryRoot, "src", "Hexalith.ChatBot.Contracts", "openapi", "hexalith.chatbot.v1.yaml"),
+                Path.Combine(contractDirectory, "hexalith.chatbot.v1.yaml"));
+            ProcessStartInfo start = new("dotnet") { WorkingDirectory = clientDirectory, RedirectStandardOutput = true, RedirectStandardError = true };
+            start.ArgumentList.Add(tool);
+            start.ArgumentList.Add("run");
+            start.ArgumentList.Add("nswag.json");
+            start.ArgumentList.Add("/variables:Configuration=Release");
+            using Process process = Process.Start(start).ShouldNotBeNull();
+            Task<string> stdout = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
+            Task<string> stderr = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
+            await process.WaitForExitAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+            string[] output = [await stdout.ConfigureAwait(true), await stderr.ConfigureAwait(true)];
+            process.ExitCode.ShouldBe(0, string.Join(Environment.NewLine, output));
+            File.ReadAllBytes(Path.Combine(clientDirectory, "Generated", "HexalithChatBotClient.g.cs"))
+                .SequenceEqual(File.ReadAllBytes(GeneratedClientPath())).ShouldBeTrue();
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public static async Task FacadeShouldReuseCallerStableCommandIdAndRejectInvalidIdsBeforeTransport()
+    {
+        RecordingTransportClient transport = new();
+        ChatBotClient client = new(transport);
+        const string commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+        using CancellationTokenSource source = new();
+        await client.SubmitWithCommandIdAsync(new StartConversationIntake(), commandId,
+            correlationId: "01ARZ3NDEKTSV4RRFFQ69G5FAW", cancellationToken: source.Token).ConfigureAwait(true);
+        transport.LastBody.ShouldNotBeNull().CommandId.ShouldBe(commandId);
+        await client.SubmitWithCommandIdAsync(new StartConversationIntake(), commandId,
+            correlationId: "01ARZ3NDEKTSV4RRFFQ69G5FAW", cancellationToken: source.Token).ConfigureAwait(true);
+        transport.LastBody.ShouldNotBeNull().CommandId.ShouldBe(commandId);
+        Should.Throw<ArgumentException>(() => client.SubmitWithCommandIdAsync(new StartConversationIntake(), "invalid"));
+        transport.LastBody.ShouldNotBeNull().CommandId.ShouldBe(commandId);
+    }
+
+    [Fact]
+    public static void FacadeShouldRejectCommandTypeLongerThanOpenApiMaximumBeforeTransport()
+    {
+        AssemblyBuilder assembly = AssemblyBuilder.DefineDynamicAssembly(
+            new AssemblyName("ChatBotLongCommandTypeTest"), AssemblyBuilderAccess.Run);
+        TypeBuilder builder = assembly.DefineDynamicModule("main").DefineType(
+            new string('A', 161), TypeAttributes.Public | TypeAttributes.Class);
+        builder.AddInterfaceImplementation(typeof(IChatBotCommand));
+        builder.DefineDefaultConstructor(MethodAttributes.Public);
+        IChatBotCommand command = (IChatBotCommand)Activator.CreateInstance(builder.CreateType())!;
+        RecordingTransportClient transport = new();
+        ChatBotClient client = new(transport);
+
+        Should.Throw<ArgumentException>(() => client.SubmitWithCommandIdAsync(
+            command, "01ARZ3NDEKTSV4RRFFQ69G5FAV"));
+        transport.LastBody.ShouldBeNull();
     }
 
     [Fact]
@@ -840,6 +918,17 @@ public static class ClientGenerationTests
 
         return directory?.FullName ?? throw new InvalidOperationException("Could not locate repository root.");
     }
+
+    [Fact]
+    public static void FacadeShouldRejectCommandTypesOverOpenApiLengthBeforeTransport()
+    {
+        RecordingTransportClient transport = new();
+        ChatBotClient client = new(transport);
+        Should.Throw<ArgumentException>(() => client.SubmitAsync(new Axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx()));
+        transport.LastBody.ShouldBeNull();
+    }
+
+    private sealed record Axxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx : IChatBotCommand;
 
     private sealed record StartConversationIntake : IChatBotCommand;
 

@@ -15,11 +15,13 @@ using Hexalith.ChatBot.Server.Association.Scoring;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
+using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Conversations;
 using Hexalith.ChatBot.Server.Lifecycle.AiExecution;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
 using Hexalith.ChatBot.Server.Projections;
@@ -1062,10 +1064,118 @@ public sealed class ServerBootstrapApiTests
         string secondBody = await second.Content
             .ReadAsStringAsync(TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
-        secondBody.ShouldBe(firstBody);
+        AssertReplayMatchesStoredOutcome(firstBody, secondBody);
         secondBody.ShouldNotContain("allowed-resource", Case.Insensitive);
         secondBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
     }
+
+    [Theory]
+    [InlineData("malformed-json")]
+    [InlineData("command-type-suffix")]
+    [InlineData("command-type-pattern")]
+    [InlineData("command-type-too-long")]
+    [InlineData("wrong-metadata-type")]
+    [InlineData("mismatched-casing")]
+    [InlineData("malformed-specialized-body")]
+    [InlineData("invalid-specialized-enum")]
+    [InlineData("fractional-specialized-integer")]
+    [InlineData("unsupported-media-type")]
+    [InlineData("vendor-json-media-type")]
+    [InlineData("unknown-origin")]
+    [InlineData("null-scoring-signal")]
+    [InlineData("invalid-init-only-member")]
+    [InlineData("nested-casing-override")]
+    [InlineData("nested-object-casing-override")]
+    public async Task CommandEndpointShouldRejectInvalidContractBeforeAdmissionWithVersionedSafeProblem(string scenario)
+    {
+        RecordingDispatcher dispatcher = new();
+        InMemoryAuditWriter audit = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha", services =>
+        {
+            services.AddSingleton<ICommandDispatcher>(dispatcher);
+            services.AddSingleton<IAuditWriter>(audit);
+        });
+        using HttpClient client = factory.CreateClient();
+        const string commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
+        string payload = scenario switch
+        {
+            "malformed-json" => "{",
+            "command-type-suffix" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"TenantScopedCommand","command":{},"requestSchemaVersion":"v1"}""",
+            "command-type-pattern" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"lowercaseName","command":{},"requestSchemaVersion":"v1"}""",
+            "command-type-too-long" => $$"""{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"{{new string('A', 161)}}","command":{},"requestSchemaVersion":"v1"}""",
+            "wrong-metadata-type" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"RecordGovernedNote","command":{"noteId":"note-1"},"actorType":42,"requestSchemaVersion":"v1"}""",
+            "mismatched-casing" => """{"CommandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"RecordGovernedNote","command":{"noteId":"note-1"},"requestSchemaVersion":"v1"}""",
+            "malformed-specialized-body" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"RequestFailedWorkflowRetry","command":{},"requestSchemaVersion":"v1"}""",
+            "invalid-specialized-enum" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"AssociateEmailToProject","command":{"associationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","intakeId":"01ARZ3NDEKTSV4RRFFQ69G5FAZ","projectId":"project-001","decisionKind":"not-a-decision","decisionNote":null,"candidateEvidenceFingerprint":"hash-project","sourceVersion":1,"schemaVersion":"chatbot.association-decision-command.v1"},"requestSchemaVersion":"v1"}""",
+            "fractional-specialized-integer" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"AssociateEmailToProject","command":{"associationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","intakeId":"01ARZ3NDEKTSV4RRFFQ69G5FAZ","projectId":"project-001","decisionKind":"associate","decisionNote":null,"candidateEvidenceFingerprint":"hash-project","sourceVersion":1.5,"schemaVersion":"chatbot.association-decision-command.v1"},"requestSchemaVersion":"v1"}""",
+            "unknown-origin" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"RecordGovernedNote","command":{"noteId":"note-1"},"origin":"unknown","requestSchemaVersion":"v1"}""",
+            "null-scoring-signal" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"ScoreMailboxMessageAssociation","command":{"associationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","intakeId":"01ARZ3NDEKTSV4RRFFQ69G5FAZ","sourceMailboxId":"mailbox-1","sourceConversationId":"conversation-1","sourceThreadId":null,"deterministicSignals":[null],"thresholdPolicy":null,"candidates":null,"exclusions":null,"result":null,"scoringKernelVersion":"v1"},"requestSchemaVersion":"v1"}""",
+            "invalid-init-only-member" => ProposeActionRequestBody("""{"secret":"value"}"""),
+            "nested-casing-override" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"ScoreMailboxMessageAssociation","command":{"associationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","intakeId":"01ARZ3NDEKTSV4RRFFQ69G5FAZ","sourceMailboxId":"mailbox-1","sourceConversationId":"conversation-1","sourceThreadId":null,"deterministicSignals":[],"DeterministicSignals":[null],"thresholdPolicy":null,"candidates":null,"exclusions":null,"result":null,"scoringKernelVersion":"v1"},"requestSchemaVersion":"v1"}""",
+            "nested-object-casing-override" => ProposeActionRequestBody("\"owner-001\"").Replace(
+                "\"proposalInputMetadata\":{\"source\":\"trusted\"}",
+                "\"proposalInputMetadata\":{\"source\":\"trusted\"},\"ProposalInputMetadata\":42",
+                StringComparison.Ordinal),
+            _ => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"RecordGovernedNote","command":{"noteId":"note-1"},"requestSchemaVersion":"v1"}""",
+        };
+        using HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands")
+        {
+            Content = new StringContent(payload, Encoding.UTF8,
+                scenario == "unsupported-media-type" ? "text/plain" :
+                scenario == "vendor-json-media-type" ? "application/vnd.chatbot+json" : "application/json"),
+        };
+
+        using HttpResponseMessage response = await client.SendAsync(request, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("code").GetString().ShouldBe("command_contract_invalid");
+        root.GetProperty("schemaVersion").GetString().ShouldBe("chatbot.message-catalog.v1");
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe("metadata_only");
+        if (scenario is "wrong-metadata-type" or "malformed-specialized-body" or "command-type-suffix" or
+            "command-type-pattern" or "command-type-too-long" or
+            "invalid-specialized-enum" or "fractional-specialized-integer" or "unknown-origin" or
+            "null-scoring-signal" or "invalid-init-only-member" or "nested-casing-override" or "nested-object-casing-override")
+        {
+            root.GetProperty("correlationId").GetString().ShouldBe(commandId);
+        }
+
+        dispatcher.DispatchCount.ShouldBe(0);
+        audit.Envelopes.ShouldBeEmpty();
+        body.ShouldNotContain("note-1", Case.Insensitive);
+        body.ShouldNotContain("not-a-decision", Case.Insensitive);
+        body.ShouldNotContain("project-001", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandEndpointShouldAcceptObjectValuedProposalMetadataAtValidationBoundary()
+    {
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
+        using HttpClient client = factory.CreateClient();
+        using HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands")
+        {
+            Content = new StringContent(ProposeActionRequestBody("\"owner-001\""), Encoding.UTF8, "application/json"),
+        };
+
+        using HttpResponseMessage response = await client.SendAsync(request, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        response.StatusCode.ShouldNotBe(HttpStatusCode.BadRequest);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        body.ShouldNotContain("command_contract_invalid", Case.Sensitive);
+    }
+
+    private static string ProposeActionRequestBody(string stateOwnerJson)
+        => $$"""
+        {"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"ProposeAIAction","command":{
+          "projectId":"project-001","taskIntentId":"task-001","sourceMessageId":"message-001",
+          "requesterId":"requester-001","intendedCommandName":"AppendConversationMessage",
+          "actionKind":"summarize","expectedSourceVersion":1,"evidenceReferences":[],
+          "affectedResourceReferences":[],"recipientReferences":[],"policySnapshotId":null,
+          "correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","transitionId":"transition-001",
+          "proposalInputMetadata":{"source":"trusted"},"stateOwnerAggregateId":{{stateOwnerJson}}
+        },"requestSchemaVersion":"v1"}
+        """;
 
     [Fact]
     public async Task CommandEndpointShouldReturnMetadataOnlyConflictAndSkipDispatch()
@@ -1183,7 +1293,7 @@ public sealed class ServerBootstrapApiTests
         using JsonDocument problem = JsonDocument.Parse(body);
         JsonElement root = problem.RootElement;
         root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
-        root.GetProperty("taskId").ValueKind.ShouldBe(JsonValueKind.Null);
+        root.TryGetProperty("taskId", out _).ShouldBeFalse();
         response.Headers.GetValues("X-Correlation-Id").Single().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
         response.Headers.Contains("X-Hexalith-Task-Id").ShouldBeFalse();
         body.ShouldNotContain("/tmp/sensitive-correlation", Case.Insensitive);
@@ -1281,7 +1391,7 @@ public sealed class ServerBootstrapApiTests
         root.GetProperty("partialOutputs").GetProperty("completionStatus").GetString().ShouldBe("accepted-projection-pending");
         root.GetProperty("partialOutputs").GetProperty("auditStatus").GetString().ShouldBe("committed");
         root.GetProperty("safeNextActions").EnumerateArray().Single().GetString().ShouldBe("none");
-        root.GetProperty("terminalReason").ValueKind.ShouldBe(JsonValueKind.Null);
+        root.TryGetProperty("terminalReason", out _).ShouldBeFalse();
         root.GetProperty("acceptedAt").GetDateTimeOffset().Offset.ShouldBe(TimeSpan.Zero);
         root.GetProperty("lastUpdatedAt").GetDateTimeOffset().Offset.ShouldBe(TimeSpan.Zero);
         root.GetProperty("partialOutputs").GetProperty("acceptedAt").GetDateTimeOffset().ShouldBe(
@@ -1292,6 +1402,71 @@ public sealed class ServerBootstrapApiTests
         body.ShouldNotContain("/tmp/item", Case.Insensitive);
         body.ShouldNotContain("C:\\", Case.Insensitive);
         body.ShouldNotContain("raw exception", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task OperationStatusGetShouldUseInjectedClockAtRetryDueBoundary()
+    {
+        DateTimeOffset acceptedAt = new(2026, 8, 9, 10, 0, 0, TimeSpan.Zero);
+        DateTimeOffset dueAt = acceptedAt.AddSeconds(30);
+        MutableStatusClock clock = new(dueAt.AddTicks(-1));
+        InMemoryOperationStatusStore store = new();
+        CommandSubmissionResponse accepted = new()
+        {
+            CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            OperationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+            TaskId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+            LifecycleState = Hexalith.ChatBot.Client.Generated.LifecycleState.Correcting,
+            AcceptedAt = acceptedAt,
+        };
+        await store.UpsertAsync(OperationStatusRecord.Accepted("tenant-alpha", accepted, false, acceptedAt) with
+        {
+            RetryCount = 1,
+            MaxAttempts = 5,
+            NextRetryAt = dueAt,
+        }, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha", services =>
+        {
+            services.AddSingleton<IOperationStatusStore>(store);
+            services.AddSingleton<ISystemClock>(clock);
+        });
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage before = await client.SendAsync(
+            OperationStatusRequest(accepted.OperationId), TestContext.Current.CancellationToken).ConfigureAwait(true);
+        before.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using JsonDocument beforeBody = JsonDocument.Parse(await before.Content.ReadAsStringAsync(
+            TestContext.Current.CancellationToken).ConfigureAwait(true));
+        beforeBody.RootElement.GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
+
+        clock.UtcNow = dueAt;
+        using HttpResponseMessage atDue = await client.SendAsync(
+            OperationStatusRequest(accepted.OperationId), TestContext.Current.CancellationToken).ConfigureAwait(true);
+        atDue.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using JsonDocument dueBody = JsonDocument.Parse(await atDue.Content.ReadAsStringAsync(
+            TestContext.Current.CancellationToken).ConfigureAwait(true));
+        dueBody.RootElement.GetProperty("retryEligible").GetBoolean().ShouldBeTrue();
+        dueBody.RootElement.GetProperty("nextRetryAt").GetDateTimeOffset().ShouldBe(dueAt);
+
+        CorrectionPropagationRequest resumed = new(
+            "tenant-alpha", "actor-alpha", "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY", "correction-1", "wf-1", "project-001", "project-002", 3,
+            accepted.CorrelationId, acceptedAt, acceptedAt.AddMinutes(10), OperationId: accepted.OperationId);
+        await new OperationStatusWorkflowStatusSink(store, clock).ReportAsync(
+            resumed, CorrectionPropagationWorkflowStatuses.Started, 1,
+            CorrectionPropagationWorkflowFailureCodes.None, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        using HttpResponseMessage activeAttempt = await client.SendAsync(
+            OperationStatusRequest(accepted.OperationId), TestContext.Current.CancellationToken).ConfigureAwait(true);
+        using JsonDocument activeBody = JsonDocument.Parse(await activeAttempt.Content.ReadAsStringAsync(
+            TestContext.Current.CancellationToken).ConfigureAwait(true));
+        activeBody.RootElement.GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
+        activeBody.RootElement.TryGetProperty("nextRetryAt", out _).ShouldBeFalse();
+    }
+
+    private sealed class MutableStatusClock(DateTimeOffset utcNow) : ISystemClock
+    {
+        public DateTimeOffset UtcNow { get; set; } = utcNow;
     }
 
     [Fact]
@@ -1416,7 +1591,7 @@ public sealed class ServerBootstrapApiTests
         string duplicateBody = await duplicate.Content
             .ReadAsStringAsync(TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
-        duplicateBody.ShouldBe(firstBody);
+        AssertReplayMatchesStoredOutcome(firstBody, duplicateBody);
 
         using HttpResponseMessage response = await client
             .SendAsync(OperationStatusRequest("01ARZ3NDEKTSV4RRFFQ69G5FAX"), TestContext.Current.CancellationToken)
@@ -1533,7 +1708,7 @@ public sealed class ServerBootstrapApiTests
         string replayBody = await replay.Content
             .ReadAsStringAsync(TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
-        replayBody.ShouldBe(firstBody);
+        AssertReplayMatchesStoredOutcome(firstBody, replayBody);
 
         using HttpResponseMessage response = await client
             .SendAsync(OperationStatusRequest("01ARZ3NDEKTSV4RRFFQ69G5FAX"), TestContext.Current.CancellationToken)
@@ -2450,7 +2625,7 @@ public sealed class ServerBootstrapApiTests
         replay.StatusCode.ShouldBe(HttpStatusCode.Accepted);
         string firstBody = await first.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
         string replayBody = await replay.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
-        replayBody.ShouldBe(firstBody);
+        AssertReplayMatchesStoredOutcome(firstBody, replayBody);
 
         provider.ExecuteCount.ShouldBe(0);
         provider.LastRequest.ShouldBeNull();
@@ -2635,13 +2810,15 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
-    public async Task CommandEndpointShouldCollapseUnknownSurfaceOriginToTheSafeApiDefault()
+    public async Task CommandEndpointShouldRejectUnknownSurfaceOriginWithSafeProblem()
     {
-        // AC2: an unknown/unattributed origin is never trusted as an arbitrary value — it collapses to api.
-        InMemoryAuditWriter auditWriter = await SubmitGovernedNoteCapturingAudit(bodyOrigin: "totally-unknown-surface").ConfigureAwait(true);
-
-        auditWriter.Envelopes.ShouldNotBeEmpty();
-        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SurfaceOrigin == "api");
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
+        using HttpClient client = factory.CreateClient();
+        using HttpResponseMessage response = await client.SendAsync(
+            RecordGovernedNoteRequest("01ARZ3NDEKTSV4RRFFQ69G5FAZ", "totally-unknown-surface"),
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json");
     }
 
     private static async Task<InMemoryAuditWriter> SubmitGovernedNoteCapturingAudit(string? bodyOrigin = null, string? headerOrigin = null)
@@ -2899,13 +3076,33 @@ public sealed class ServerBootstrapApiTests
             AttachmentRedactionState: "metadata_only");
     }
 
+    private static void AssertReplayMatchesStoredOutcome(string acceptedBody, string replayBody)
+    {
+        using JsonDocument accepted = JsonDocument.Parse(acceptedBody);
+        using JsonDocument replay = JsonDocument.Parse(replayBody);
+        JsonElement original = accepted.RootElement;
+        JsonElement actual = replay.RootElement;
+        JsonElement prior = actual.GetProperty("priorOutcome");
+        foreach (string name in new[] { "commandId", "correlationId", "operationId", "taskId", "lifecycleState", "acceptedAt", "reasonCode", "retryEligible" })
+        {
+            bool present = original.TryGetProperty(name, out JsonElement expected);
+            actual.TryGetProperty(name, out JsonElement current).ShouldBe(present);
+            prior.TryGetProperty(name, out JsonElement stored).ShouldBe(present);
+            if (present)
+            {
+                current.ToString().ShouldBe(expected.ToString());
+                stored.ToString().ShouldBe(expected.ToString());
+            }
+        }
+    }
+
     private static HttpRequestMessage CommandSubmissionRequest(string tenantId, string resourceName)
     {
         string payload =
             $$"""
             {
               "commandId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
-              "commandType": "TenantScopedCommand",
+              "commandType": "TenantScopedAction",
               "command": {
                 "tenantId": "{{tenantId}}",
                 "resourceName": "{{resourceName}}"

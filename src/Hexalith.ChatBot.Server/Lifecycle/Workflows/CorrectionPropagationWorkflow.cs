@@ -35,6 +35,9 @@ internal sealed class CorrectionPropagationWorkflow
                 request,
                 _retryOptions);
 
+        public Task CallRetryStatusAsync(CorrectionPropagationRetryStatusInput input)
+            => context.CallActivityAsync<bool>(nameof(CorrectionPropagationRetryStatusActivity), input, _retryOptions);
+
         public Task CallStartAsync(CorrectionPropagationStartInput input)
             => context.CallActivityAsync<bool>(
                 nameof(CorrectionPropagationStartActivity),

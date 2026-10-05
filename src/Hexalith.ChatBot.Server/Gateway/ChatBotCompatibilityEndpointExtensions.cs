@@ -87,15 +87,22 @@ internal static class ChatBotCompatibilityEndpointExtensions
         _ = app.MapPost(
             "/api/v1/commands",
             async (
-                CommandSubmissionWireRequest wireRequest,
                 HttpContext httpContext,
                 CommandGateway gateway,
+                IChatBotProblemDetailsFactory problemDetailsFactory,
                 CancellationToken cancellationToken) =>
             {
-                var request = wireRequest.ToGeneratedRequest();
-                request.CommandId = NormalizeCommandId(request.CommandId);
+                (Hexalith.ChatBot.Client.Generated.CommandSubmissionRequest? request, string? declaredOrigin) =
+                    await CommandSubmissionContractAdapter.ReadAsync(httpContext, cancellationToken).ConfigureAwait(false);
+                if (request is null)
+                {
+                    ChatBotCorrelationContext invalidContext = httpContext.GetCorrelationContext();
+                    return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                        problemDetailsFactory.CreateValidationProblem(invalidContext.CorrelationId, invalidContext.TaskId)));
+                }
+
                 ChatBotCorrelationContext correlationContext = httpContext.ResolveCorrelationContext(request.CommandId);
-                ChatBotSurfaceOrigin origin = ResolveSurfaceOrigin(wireRequest, httpContext);
+                ChatBotSurfaceOrigin origin = ResolveSurfaceOrigin(declaredOrigin, httpContext);
                 string? replayRunId = ResolveReplayRunId(httpContext);
                 ChatBotGatewayResult result = await gateway
                     .SubmitAsync(
@@ -108,6 +115,11 @@ internal static class ChatBotCompatibilityEndpointExtensions
                             replayRunId),
                         cancellationToken)
                     .ConfigureAwait(false);
+
+                if (result.Accepted is { } accepted)
+                {
+                    httpContext.SetResponseCorrelationContext(accepted.CorrelationId, accepted.TaskId);
+                }
 
                 return CommandGatewayHttpResults.ToHttpResult(result);
             });
@@ -407,11 +419,6 @@ internal static class ChatBotCompatibilityEndpointExtensions
             });
     }
 
-    private static string NormalizeCommandId(string? value)
-        => ChatBotCommandId.TryParse(value, out ChatBotCommandId commandId)
-            ? commandId.Value
-            : ChatBotCommandId.New().Value;
-
     private static async Task<IResult> ExecuteReadQueryAsync(
         string aggregateId,
         string queryType,
@@ -496,9 +503,9 @@ internal static class ChatBotCompatibilityEndpointExtensions
                 correlationContext.CorrelationId,
                 correlationContext.TaskId)));
 
-    private static ChatBotSurfaceOrigin ResolveSurfaceOrigin(CommandSubmissionWireRequest wireRequest, HttpContext httpContext)
+    private static ChatBotSurfaceOrigin ResolveSurfaceOrigin(string? declaredOrigin, HttpContext httpContext)
     {
-        string? declared = wireRequest.Origin;
+        string? declared = declaredOrigin;
         if (string.IsNullOrWhiteSpace(declared)
             && httpContext.Request.Headers.TryGetValue("X-Hexalith-Surface-Origin", out Microsoft.Extensions.Primitives.StringValues header)
             && header.Count == 1)

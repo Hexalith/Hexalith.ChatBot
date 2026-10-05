@@ -13,6 +13,15 @@ public interface IChatBotClient
         ChatBotSurfaceOrigin origin = ChatBotSurfaceOrigin.Api,
         CancellationToken cancellationToken = default);
 
+    Task<CommandSubmissionResponse> SubmitWithCommandIdAsync(
+        IChatBotCommand command,
+        string commandId,
+        string? correlationId = null,
+        string? taskId = null,
+        ChatBotSurfaceOrigin origin = ChatBotSurfaceOrigin.Api,
+        CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Caller-stable command identifiers are not supported by this client implementation.");
+
     Task<OperationStatus> GetOperationStatusAsync(
         string operationId,
         string? correlationId = null,

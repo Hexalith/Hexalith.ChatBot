@@ -7,4 +7,5 @@ internal enum CoarseIdempotencyDecisionKind
     Proceed,
     ReplayPriorOutcome,
     Conflict,
+    RecoveryPending,
 }

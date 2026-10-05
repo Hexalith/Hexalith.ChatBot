@@ -33,5 +33,40 @@
     "validation_error",
     "conflict",
     "internal_error"
-  ]
+  ],
+  "runtimeOutcomes": {
+    "accepted": {
+      "commandId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+      "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+      "operationId": "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      "taskId": "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      "lifecycleState": "Proposed",
+      "acceptedAt": "2026-06-01T08:00:00Z",
+      "reasonCode": "command_accepted",
+      "retryEligible": false
+    },
+    "conflict": {
+      "status": 409,
+      "category": "conflict",
+      "code": "idempotency_conflict_command_execution",
+      "schemaVersion": "chatbot.message-catalog.v1",
+      "visibility": "metadata_only"
+    },
+    "denied": {
+      "status": 401,
+      "category": "authentication_failure",
+      "code": "authentication_denied",
+      "schemaVersion": "chatbot.message-catalog.v1",
+      "visibility": "metadata_only"
+    },
+    "pending": {
+      "completionStatus": "accepted-projection-pending",
+      "reasonCode": "command_accepted",
+      "retryEligible": false
+    },
+    "workflowFailure": {
+      "reasonCode": "vector_reindex_failed",
+      "workflowLastFailureCode": "vector_reindex_failed"
+    }
+  }
 }

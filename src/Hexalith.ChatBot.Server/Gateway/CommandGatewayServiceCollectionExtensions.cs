@@ -344,6 +344,7 @@ internal static class CommandGatewayServiceCollectionExtensions
             options.RegisterWorkflow<IngestionBindingWorkflow>();
             options.RegisterActivity<CorrectionPropagationScopeActivity>();
             options.RegisterActivity<CorrectionPropagationResolveCaseActivity>();
+            options.RegisterActivity<CorrectionPropagationRetryStatusActivity>();
             options.RegisterActivity<CorrectionPropagationStartActivity>();
             options.RegisterActivity<CorrectionPropagationRunStoreActivity>();
             options.RegisterActivity<CorrectionPropagationCompleteActivity>();

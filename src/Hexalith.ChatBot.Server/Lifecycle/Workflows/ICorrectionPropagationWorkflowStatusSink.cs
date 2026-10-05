@@ -7,5 +7,6 @@ internal interface ICorrectionPropagationWorkflowStatusSink
         string workflowStatus,
         int workflowRetryCount,
         string? workflowLastFailureCode,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        DateTimeOffset? retryDueAt = null);
 }

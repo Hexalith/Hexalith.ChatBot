@@ -9,6 +9,23 @@ internal sealed class ChatBotProblemDetailsFactory(
     IUserFacingRedactionStage redactionStage,
     IUserFacingMessageTelemetry telemetry) : IChatBotProblemDetailsFactory
 {
+    public ProblemDetails CreateValidationProblem(string correlationId, string? taskId)
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.CommandContractInvalid);
+        return redactionStage.Apply(new ProblemDetails
+        {
+            Type = ChatBotProblemTypes.ValidationFailure,
+            Title = entry.Headline,
+            Status = StatusCodes.Status400BadRequest,
+            Category = ProblemDetailsCategory.Validation_error,
+            Code = entry.Code,
+            Message = entry.Reason,
+            CorrelationId = correlationId,
+            TaskId = taskId,
+            Retryable = false,
+            ClientAction = ClientAction(entry.NextAction),
+        });
+    }
     public ProblemDetails CreateAuthorizationProblem(string reasonCode, string correlationId, string? taskId)
     {
         string catalogCode = AuthorizationCatalogCode(reasonCode);

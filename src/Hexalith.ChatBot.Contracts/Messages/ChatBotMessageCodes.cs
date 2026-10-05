@@ -4,6 +4,16 @@ namespace Hexalith.ChatBot.Contracts.Messages;
 
 public static class ChatBotMessageCodes
 {
+    public const string CommandAccepted = "command_accepted";
+    public const string CommandContractInvalid = "command_contract_invalid";
+    public const string AssociationCorrectionCaseResolutionUnavailable = "association_correction_case_resolution_unavailable";
+    public const string AssociationCorrectionStoreUnavailable = "association_correction_store_unavailable";
+    public const string MemoriesCorrectionFailed = "memories_correction_failed";
+    public const string MemoriesCorrectionInvalidStatus = "memories_correction_invalid_status";
+    public const string MemoriesCorrectionTimedOut = "memories_correction_timed_out";
+    public const string M0StoreInvalidationFailed = "m0_store_invalidation_failed";
+    public const string VectorReindexFailed = "vector_reindex_failed";
+    public const string VectorReindexSloExceeded = "vector_reindex_slo_exceeded";
     /// <summary>
     /// The full FR77 reason-code catalog, derived by reflection over the <see cref="string"/> constants declared on
     /// this type. Exposed as a single reusable set so reason-code validators (the degraded-dependency incident and

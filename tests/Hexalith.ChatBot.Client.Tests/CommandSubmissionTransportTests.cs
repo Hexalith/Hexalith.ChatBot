@@ -26,9 +26,12 @@ public sealed class CommandSubmissionTransportTests
             {
               "commandId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
               "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+              "operationId": "01ARZ3NDEKTSV4RRFFQ69G5FAX",
               "taskId": "01ARZ3NDEKTSV4RRFFQ69G5FAX",
               "lifecycleState": "Proposed",
-              "acceptedAt": "2026-06-10T00:00:00+00:00"
+              "acceptedAt": "2026-06-10T00:00:00+00:00",
+              "reasonCode": "command_accepted",
+              "retryEligible": false
             }
             """;
         CapturingHandler handler = new(HttpStatusCode.Accepted, responseBody);
@@ -55,6 +58,9 @@ public sealed class CommandSubmissionTransportTests
         response.CommandId.ShouldBe(CommandId);
         response.CorrelationId.ShouldBe(CorrelationId);
         response.TaskId.ShouldBe(TaskId);
+        response.OperationId.ShouldBe(TaskId);
+        response.ReasonCode.ShouldBe(ChatBotMessageCode.Command_accepted);
+        response.RetryEligible.ShouldBeFalse();
         response.LifecycleState.ShouldBe(LifecycleState.Proposed);
     }
 

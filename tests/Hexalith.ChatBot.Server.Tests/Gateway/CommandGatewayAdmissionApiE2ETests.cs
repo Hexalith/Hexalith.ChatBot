@@ -56,6 +56,18 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway;
 
 public sealed class CommandGatewayAdmissionApiE2ETests
 {
+    private static void AssertReplayBody(string firstBody, string replayBody)
+    {
+        using JsonDocument first = JsonDocument.Parse(firstBody);
+        using JsonDocument replay = JsonDocument.Parse(replayBody);
+        foreach (JsonProperty property in first.RootElement.EnumerateObject())
+        {
+            replay.RootElement.GetProperty(property.Name).GetRawText().ShouldBe(property.Value.GetRawText());
+        }
+
+        replay.RootElement.GetProperty("priorOutcome").GetRawText().ShouldBe(first.RootElement.GetRawText());
+    }
+
     [Fact]
     public async Task CommandGatewayApi_ShouldResolveMailboxParticipantsBeforeEventStoreSubmission()
     {
@@ -943,7 +955,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
         first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
         replay.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        replayBody.ShouldBe(firstBody);
+        AssertReplayBody(firstBody, replayBody);
         conflict.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         eventStore.Submitted.Count.ShouldBe(1);
         idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
@@ -997,8 +1009,9 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         approvalDecision.StatusCode.ShouldBe(HttpStatusCode.Accepted);
         send.StatusCode.ShouldBe(HttpStatusCode.Accepted);
         replay.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        (await replay.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true))
-            .ShouldBe(await send.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true));
+        AssertReplayBody(
+            await send.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true),
+            await replay.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true));
 
         eventStore.Submitted.Select(static request => request.CommandType).ShouldBe(
             [
@@ -1131,7 +1144,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures.ShouldHaveSingleItem();
         fact.TenantId.ShouldBe("tenant-alpha");
         fact.ActorId.ShouldBe("actor-alpha");
-        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.CommandType.ShouldBe("TenantScopedAction");
         fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.CommandNotAllowlisted);
         fact.CorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         fact.TaskId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
@@ -1382,7 +1395,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             commandAllowlist: new AllowAllSpineCommandAllowlist(),
             serviceClientControlStateProvider: new FixedServiceClientControlStateProvider(ContractServiceClientControlState.Disabled),
             principalSubject: "service-account-cli-automation-client",
-            additionalClaims: ServiceClientGrantClaims("ui", "TenantScopedCommand"));
+            additionalClaims: ServiceClientGrantClaims("ui", "TenantScopedAction"));
         using HttpClient disabledClient = disabledFactory.CreateClient();
 
         using HttpResponseMessage disabledResponse = await disabledClient
@@ -1396,7 +1409,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         disabledAuditWriter.Envelopes.ShouldBeEmpty();
         disabledIdempotencyStore.RecordCount.ShouldBe(0);
         ChatBotAuthorizationFailureAuditFact fact = disabledAuditWriter.AuthorizationFailures.ShouldHaveSingleItem();
-        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.CommandType.ShouldBe("TenantScopedAction");
         fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ServiceClientDisabled);
 
         string disabledBody = await disabledResponse.Content
@@ -1468,14 +1481,14 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             envelope.StateTransition == "Received->Proposed" &&
             envelope.SourceEvidenceRefs.Contains("admin-operation:command-capability-disable") &&
             envelope.SourceEvidenceRefs.Contains("admin-scope:policy") &&
-            envelope.SourceEvidenceRefs.Contains("command-capability:TenantScopedCommand") &&
+            envelope.SourceEvidenceRefs.Contains("command-capability:TenantScopedAction") &&
             envelope.SourceEvidenceRefs.Contains("reason:command-capability-unsafe-execution"));
         adminAuditWriter.Envelopes.Skip(2).ShouldAllBe(static envelope =>
             envelope.ActorType == "human" &&
             envelope.StateTransition == "Active->Disabled" &&
             envelope.SourceEvidenceRefs.Contains("admin-operation:command-capability-disable-approve") &&
             envelope.SourceEvidenceRefs.Contains("admin-scope:policy") &&
-            envelope.SourceEvidenceRefs.Contains("command-capability:TenantScopedCommand") &&
+            envelope.SourceEvidenceRefs.Contains("command-capability:TenantScopedAction") &&
             envelope.SourceEvidenceRefs.Contains("reason:command-capability-unsafe-execution") &&
             envelope.SourceEvidenceRefs.Contains("admin-subject:admin-approver"));
         adminIdempotencyStore.Records.Select(static record => record.OperationClass).ShouldBe(
@@ -1499,7 +1512,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         RecordingDispatcher disabledDispatcher = new();
         RecordingAuditWriter disabledAuditWriter = new();
         InMemoryCoarseIdempotencyStore disabledIdempotencyStore = new(new SystemClock());
-        FixedCommandCapabilityControlStateProvider disabledCapabilityProvider = new("tenant-alpha", "TenantScopedCommand");
+        FixedCommandCapabilityControlStateProvider disabledCapabilityProvider = new("tenant-alpha", "TenantScopedAction");
         using WebApplicationFactory<Program> disabledFactory = GatewayFactory(
             tenantId: "tenant-alpha",
             disabledDispatcher,
@@ -1519,11 +1532,11 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         disabledDispatcher.DispatchCount.ShouldBe(0);
         disabledAuditWriter.Envelopes.ShouldBeEmpty();
         disabledIdempotencyStore.RecordCount.ShouldBe(0);
-        disabledCapabilityProvider.Requests.ShouldBe([("tenant-alpha", "TenantScopedCommand")]);
+        disabledCapabilityProvider.Requests.ShouldBe([("tenant-alpha", "TenantScopedAction")]);
         ChatBotAuthorizationFailureAuditFact fact = disabledAuditWriter.AuthorizationFailures.ShouldHaveSingleItem();
         fact.TenantId.ShouldBe("tenant-alpha");
         fact.ActorId.ShouldBe("actor-alpha");
-        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.CommandType.ShouldBe("TenantScopedAction");
         fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.CommandCapabilityDisabled);
         fact.SurfaceOrigin.ShouldBe("ui");
 
@@ -1580,7 +1593,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             envelope.StateTransition == "Received->Proposed" &&
             envelope.SourceEvidenceRefs.Contains("admin-operation:command-capability-rate-limit") &&
             envelope.SourceEvidenceRefs.Contains("admin-scope:policy") &&
-            envelope.SourceEvidenceRefs.Contains("command-capability:TenantScopedCommand") &&
+            envelope.SourceEvidenceRefs.Contains("command-capability:TenantScopedAction") &&
             envelope.SourceEvidenceRefs.Contains("reason:command-capability-noisy-submissions") &&
             envelope.SourceEvidenceRefs.Contains("command-capability-rate-limit-old:0") &&
             envelope.SourceEvidenceRefs.Contains("command-capability-rate-limit-new:2") &&
@@ -1595,7 +1608,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         JsonElement root = accepted.RootElement;
         root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
-        body.ShouldNotContain("TenantScopedCommand", Case.Insensitive);
+        body.ShouldNotContain("TenantScopedAction", Case.Insensitive);
         body.ShouldNotContain("@", Case.Insensitive);
         body.ShouldNotContain("oauth", Case.Insensitive);
         body.ShouldNotContain("secret", Case.Insensitive);
@@ -1675,7 +1688,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             commandAllowlist: new AllowAllSpineCommandAllowlist(),
             commandCapabilityRateLimitProvider: new FixedCommandCapabilityRateLimitProvider(
                 "tenant-alpha",
-                "TenantScopedCommand",
+                "TenantScopedAction",
                 new CommandCapabilityRateLimitState(2, CommandCapabilityRateLimitWindow.RollingHour)),
             commandCapabilityCommandHistory: new FixedCommandCapabilityCommandHistory(
             [
@@ -1701,7 +1714,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures.ShouldHaveSingleItem();
         fact.TenantId.ShouldBe("tenant-alpha");
         fact.ActorId.ShouldBe("actor-alpha");
-        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.CommandType.ShouldBe("TenantScopedAction");
         fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited);
         fact.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.CommandCapabilityDisabled);
         fact.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.CommandCapabilityQuarantined);
@@ -1718,7 +1731,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         problemRoot.GetProperty("clientAction").GetString().ShouldBe(ChatBotMessageNextActions.RetryLater);
         problemRoot.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
-        body.ShouldNotContain("TenantScopedCommand", Case.Insensitive);
+        body.ShouldNotContain("TenantScopedAction", Case.Insensitive);
         body.ShouldNotContain("payload-sentinel", Case.Insensitive);
         body.ShouldNotContain("oauth", Case.Insensitive);
         body.ShouldNotContain("fingerprint", Case.Insensitive);
@@ -1818,7 +1831,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             commandAllowlist: new AllowAllSpineCommandAllowlist(),
             serviceClientControlStateProvider: new FixedServiceClientControlStateProvider(ContractServiceClientControlState.Quarantined),
             principalSubject: "service-account-cli-automation-client",
-            additionalClaims: ServiceClientGrantClaims("ui", "TenantScopedCommand"));
+            additionalClaims: ServiceClientGrantClaims("ui", "TenantScopedAction"));
         using HttpClient quarantinedClient = quarantinedFactory.CreateClient();
 
         using HttpResponseMessage quarantinedResponse = await quarantinedClient
@@ -1832,7 +1845,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         quarantinedAuditWriter.Envelopes.ShouldBeEmpty();
         quarantinedIdempotencyStore.RecordCount.ShouldBe(0);
         ChatBotAuthorizationFailureAuditFact fact = quarantinedAuditWriter.AuthorizationFailures.ShouldHaveSingleItem();
-        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.CommandType.ShouldBe("TenantScopedAction");
         fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ServiceClientQuarantined);
 
         string quarantinedBody = await quarantinedResponse.Content
@@ -1943,7 +1956,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             commandAllowlist: new AllowAllSpineCommandAllowlist(),
             aiActorControlStateProvider: new FixedAiActorControlStateProvider(ContractAiActorControlState.Quarantined),
             principalSubject: "ai-gpt-mediation-actor",
-            additionalClaims: AiActorGrantClaims("ui", "TenantScopedCommand"));
+            additionalClaims: AiActorGrantClaims("ui", "TenantScopedAction"));
         using HttpClient quarantinedClient = quarantinedFactory.CreateClient();
 
         using HttpResponseMessage quarantinedResponse = await quarantinedClient
@@ -1957,7 +1970,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         quarantinedAuditWriter.Envelopes.ShouldBeEmpty();
         quarantinedIdempotencyStore.RecordCount.ShouldBe(0);
         ChatBotAuthorizationFailureAuditFact fact = quarantinedAuditWriter.AuthorizationFailures.ShouldHaveSingleItem();
-        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.CommandType.ShouldBe("TenantScopedAction");
         fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AiActorQuarantined);
         fact.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.AiActorDisabled);
         fact.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientQuarantined);
@@ -2056,7 +2069,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                 DateTimeOffset.UtcNow.AddMinutes(-20),
             ]),
             principalSubject: "ai-gpt-mediation-actor",
-            additionalClaims: AiActorGrantClaims("ui", "TenantScopedCommand"));
+            additionalClaims: AiActorGrantClaims("ui", "TenantScopedAction"));
         using HttpClient client = factory.CreateClient();
 
         using HttpResponseMessage response = await client
@@ -2070,7 +2083,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         auditWriter.Envelopes.ShouldBeEmpty();
         idempotencyStore.RecordCount.ShouldBe(0);
         ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures.ShouldHaveSingleItem();
-        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.CommandType.ShouldBe("TenantScopedAction");
         fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AiActorRateLimited);
         fact.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.AiActorDisabled);
         fact.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.AiActorQuarantined);
@@ -2236,7 +2249,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.Decision == "allow");
         auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.TenantId == "tenant-alpha");
         auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.ActorId == "actor-alpha");
-        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.CommandName == "TenantScopedCommand");
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.CommandName == "TenantScopedAction");
 
         string body = await response.Content
             .ReadAsStringAsync(TestContext.Current.CancellationToken)
@@ -2263,7 +2276,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             auditWriter,
             idempotencyStore: idempotencyStore,
             principalSubject: "service-account-cli-automation-client",
-            additionalClaims: ServiceClientGrantClaims("cli", "TenantScopedCommand"));
+            additionalClaims: ServiceClientGrantClaims("cli", "TenantScopedAction"));
         using HttpClient client = factory.CreateClient();
 
         using HttpResponseMessage response = await client
@@ -2307,7 +2320,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Theory]
-    [InlineData("mcp", "cli", "TenantScopedCommand", ChatBotAuthorizationReasonCodes.ServiceClientWrongSurface)]
+    [InlineData("mcp", "cli", "TenantScopedAction", ChatBotAuthorizationReasonCodes.ServiceClientWrongSurface)]
     [InlineData("cli", "cli", "CaptureMailboxMessageIntake", ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped)]
     public async Task CommandGatewayApi_ShouldFailClosedServiceClientGrantErrorsBeforeDurableWork(
         string requestOrigin,
@@ -2344,7 +2357,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures.ShouldHaveSingleItem();
         fact.TenantId.ShouldBe("tenant-alpha");
         fact.ActorId.ShouldBe("service-account-cli-automation-client");
-        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.CommandType.ShouldBe("TenantScopedAction");
         fact.ReasonCode.ShouldBe(expectedReason);
         fact.CorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         fact.TaskId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
@@ -2484,8 +2497,11 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         string firstBody = await first.Content
             .ReadAsStringAsync(TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
+        using HttpRequestMessage changedTaskReplay = CommandSubmissionRequest("tenant-alpha", "allowed-resource");
+        changedTaskReplay.Headers.Remove("X-Hexalith-Task-Id");
+        changedTaskReplay.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FBB");
         using HttpResponseMessage second = await client
-            .SendAsync(CommandSubmissionRequest("tenant-alpha", "allowed-resource"), TestContext.Current.CancellationToken)
+            .SendAsync(changedTaskReplay, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         string secondBody = await second.Content
             .ReadAsStringAsync(TestContext.Current.CancellationToken)
@@ -2493,7 +2509,12 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
         first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
         second.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        secondBody.ShouldBe(firstBody);
+        AssertReplayBody(firstBody, secondBody);
+        using JsonDocument replayJson = JsonDocument.Parse(secondBody);
+        string storedOperationId = replayJson.RootElement.GetProperty("operationId").GetString().ShouldNotBeNull();
+        second.Headers.GetValues("X-Hexalith-Task-Id").Single().ShouldBe(storedOperationId);
+        second.Headers.GetValues("X-Correlation-Id").Single()
+            .ShouldBe(replayJson.RootElement.GetProperty("correlationId").GetString());
         dispatcher.DispatchCount.ShouldBe(1);
         idempotencyStore.RecordCount.ShouldBe(1);
         auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
@@ -2548,7 +2569,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
         first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
         duplicate.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        duplicateBody.ShouldBe(firstBody);
+        AssertReplayBody(firstBody, duplicateBody);
         dispatcher.DispatchCount.ShouldBe(1);
         CoarseIdempotencyRecord record = idempotencyStore.Records.Single();
         record.OperationClass.ShouldBe(CoarseIdempotencyOperationClass.MessageIntake.Code);
@@ -2632,7 +2653,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures.Single();
         fact.TenantId.ShouldBe("unavailable");
         fact.ActorId.ShouldBe("anonymous");
-        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.CommandType.ShouldBe("TenantScopedAction");
         fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthenticationDenied);
         fact.CorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         fact.TaskId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
@@ -2675,7 +2696,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures.Single();
         fact.TenantId.ShouldBe("tenant-alpha");
         fact.ActorId.ShouldBe("actor-alpha");
-        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.CommandType.ShouldBe("TenantScopedAction");
         fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.TenantMismatch);
         fact.CorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         fact.TaskId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
@@ -3145,7 +3166,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             $$"""
             {
               "commandId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
-              "commandType": "TenantScopedCommand",
+              "commandType": "TenantScopedAction",
               {{originProperty}}"command": {
                 "tenantId": "{{tenantId}}",
                 "resourceName": "{{resourceName}}"
@@ -3409,7 +3430,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     private static ContractSubmitCommandCapabilityDisable CommandCapabilityDisableSubmitCommand()
         => new(
             "command-capability-disable-001",
-            "TenantScopedCommand",
+            "TenantScopedAction",
             "command-capability-unsafe-execution",
             "policy-snapshot-policy-admin-v1",
             ContractCommandCapabilityControlState.Active,
@@ -3422,7 +3443,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     private static ContractApproveCommandCapabilityDisable CommandCapabilityDisableApprovalCommand()
         => new(
             "command-capability-disable-001",
-            "TenantScopedCommand",
+            "TenantScopedAction",
             "command-capability-unsafe-execution",
             "policy-snapshot-policy-admin-v1",
             ContractCommandCapabilityControlState.Active,
@@ -3436,7 +3457,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     private static ContractSubmitCommandCapabilityRateLimit CommandCapabilityRateLimitCommand()
         => new(
             "command-capability-rate-limit-001",
-            "TenantScopedCommand",
+            "TenantScopedAction",
             "command-capability-noisy-submissions",
             "policy-snapshot-policy-admin-v1",
             OldBudget: 0,

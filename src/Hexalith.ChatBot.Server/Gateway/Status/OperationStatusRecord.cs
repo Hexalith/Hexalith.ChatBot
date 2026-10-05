@@ -30,7 +30,9 @@ internal sealed record OperationStatusRecord(
     string? WorkflowInstanceId = null,
     string? WorkflowStatus = null,
     int WorkflowRetryCount = 0,
-    string? WorkflowLastFailureCode = null)
+    string? WorkflowLastFailureCode = null,
+    string ReasonCode = ChatBotMessageCodes.CommandAccepted,
+    CommandSubmissionResponse? PriorOutcome = null)
 {
     public const string AcceptedProjectionPending = "accepted-projection-pending";
     public const string Completed = "completed";
@@ -46,7 +48,7 @@ internal sealed record OperationStatusRecord(
     public static string OperationIdFor(CommandSubmissionResponse response)
     {
         ArgumentNullException.ThrowIfNull(response);
-        return response.TaskId ?? response.CommandId;
+        return string.IsNullOrWhiteSpace(response.OperationId) ? response.TaskId ?? response.CommandId : response.OperationId;
     }
 
     public static OperationStatusRecord Accepted(
@@ -72,8 +74,8 @@ internal sealed record OperationStatusRecord(
             auditReconciliationRequired ? AuditReconciling : AuditCommitted,
             [ChatBotMessageNextActions.None],
             null,
-            response.AcceptedAt,
-            lastUpdatedAt,
+            response.AcceptedAt.ToUniversalTime(),
+            lastUpdatedAt.ToUniversalTime(),
             operationClass,
             maxAttempts,
             NextRetryAt: null,
@@ -83,6 +85,7 @@ internal sealed record OperationStatusRecord(
             TerminalReasonCode: null,
             PartialOutputCodes: [],
             OriginalOperationId: OperationIdFor(response),
-            DuplicateAttemptCount: 0);
+            DuplicateAttemptCount: 0,
+            ReasonCode: ChatBotMessageCodes.CommandAccepted);
     }
 }

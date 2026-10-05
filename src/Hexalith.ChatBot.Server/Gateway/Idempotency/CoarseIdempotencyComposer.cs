@@ -13,6 +13,21 @@ internal static class CoarseIdempotencyComposer
         ChatBotGatewayContext context,
         DateTimeOffset now)
     {
+        CoarseIdempotencyRecord record = ComposeCore(context, now);
+        string bodyHash = HashCommandInput(context.Submission.Request.Command);
+        string identityKey = HashParts(context.TenantBinding.TenantId, "command-identity", context.Submission.Request.CommandId);
+        string fingerprint = HashParts(
+            context.TenantBinding.TenantId,
+            AuditMetadata.SafeCommandName(context.Submission.Request.CommandType),
+            context.Actor.ActorId,
+            bodyHash);
+        return record with { IdentityKeyHash = identityKey, CallerFingerprint = fingerprint };
+    }
+
+    private static CoarseIdempotencyRecord ComposeCore(
+        ChatBotGatewayContext context,
+        DateTimeOffset now)
+    {
         ArgumentNullException.ThrowIfNull(context);
 
         if (IsMailboxIntake(context))
@@ -86,6 +101,10 @@ internal static class CoarseIdempotencyComposer
         string coarseKeyHash = HashParts(
             context.TenantBinding.TenantId,
             operation.Code,
+            context.Submission.Request.CommandId);
+        string legacyKeyHash = HashParts(
+            context.TenantBinding.TenantId,
+            operation.Code,
             commandName,
             commandInputHash,
             context.Actor.ActorId);
@@ -97,7 +116,7 @@ internal static class CoarseIdempotencyComposer
             context.TenantBinding.TenantId,
             operation.Code,
             coarseKeyHash,
-            commandInputHash,
+            HashParts(commandName, commandInputHash, context.Actor.ActorId),
             context.Submission.CorrelationId,
             context.Submission.TaskId,
             context.Submission.Request.CommandId,
@@ -105,7 +124,8 @@ internal static class CoarseIdempotencyComposer
             context.Actor.ActorId,
             now,
             expiresAt,
-            PriorOutcome: null);
+            PriorOutcome: null,
+            LegacyKeyHash: legacyKeyHash);
     }
 
     private static CoarseIdempotencyRecord ComposeMessageIntakeRecord(ChatBotGatewayContext context, DateTimeOffset now)

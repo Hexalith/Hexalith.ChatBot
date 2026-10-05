@@ -164,11 +164,42 @@ public sealed class CorrectionPropagationCoordinatorTests
 
         result.Status.ShouldBe(CorrectionPropagationWorkflowStatuses.Completed);
         steps.ResolveCalls.ShouldBe(2);
+        steps.RetryStatusInputs.Count.ShouldBe(2);
+        steps.RetryStatusInputs[0].RetryCount.ShouldBe(1);
+        steps.RetryStatusInputs[0].FailureCode.ShouldBe(CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable);
+        steps.RetryStatusInputs[0].RetryDueAt.ShouldBe(steps.CurrentUtc.AddSeconds(30));
+        steps.RetryStatusInputs[1].WorkflowStatus.ShouldBe(CorrectionPropagationWorkflowStatuses.Started);
+        steps.RetryStatusInputs[1].RetryDueAt.ShouldBeNull();
+        steps.SchedulingOrder.IndexOf("timer").ShouldBeLessThan(steps.SchedulingOrder.IndexOf("retry-status"));
         steps.TimerDelays.ShouldContain(TimeSpan.FromSeconds(30));
         statuses.ShouldContain(static status =>
             status.Status == CorrectionPropagationWorkflowStatuses.Retrying
             && status.LastFailureCode == CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable);
         writer.CommandTypes.First().ShouldBe(nameof(StartMailboxAssociationCorrectionPropagation));
+    }
+
+    [Fact]
+    public async Task CorrectedCaseResolutionShouldStopSchedulingAtAttemptLimit()
+    {
+        RecordingWriter writer = new();
+        List<CorrectionPropagationWorkflowProgress> statuses = [];
+        ActivityBackedSteps steps = new(
+            new CorrectionPropagationActivityCatalog(
+                CorrectionPropagationStoreKeys.RequiredM0.Select(static key => new SucceedingActivity(key, StartedAt.AddSeconds(5)))),
+            writer, new RecordingAlertSink(), new RecordingAuditWriter(), statuses)
+        {
+            ResolveFailuresRemaining = 5,
+        };
+
+        await Should.ThrowAsync<InvalidOperationException>(async () =>
+            await CorrectionPropagationWorkflowRunner.RunAsync(Request(), steps).ConfigureAwait(true));
+
+        steps.ResolveCalls.ShouldBe(5);
+        steps.TimerDelays.Count.ShouldBe(4);
+        steps.RetryStatusInputs.Last().RetryCount.ShouldBe(5);
+        steps.RetryStatusInputs.Last().WorkflowStatus.ShouldBe(CorrectionPropagationWorkflowStatuses.Failed);
+        statuses.Last().Status.ShouldBe(CorrectionPropagationWorkflowStatuses.Failed);
+        writer.CommandTypes.ShouldBeEmpty();
     }
 
     [Fact]
@@ -329,6 +360,10 @@ public sealed class CorrectionPropagationCoordinatorTests
 
         public List<TimeSpan> TimerDelays { get; } = [];
 
+        public List<CorrectionPropagationRetryStatusInput> RetryStatusInputs { get; } = [];
+
+        public List<string> SchedulingOrder { get; } = [];
+
         public DateTimeOffset CurrentUtc => StartedAt.AddSeconds(1);
 
         public void SetStatus(CorrectionPropagationWorkflowProgress progress) => statuses.Add(progress);
@@ -348,6 +383,13 @@ public sealed class CorrectionPropagationCoordinatorTests
             return Task.FromResult("case-corrected-001");
         }
 
+        public Task CallRetryStatusAsync(CorrectionPropagationRetryStatusInput input)
+        {
+            SchedulingOrder.Add("retry-status");
+            RetryStatusInputs.Add(input);
+            return Task.CompletedTask;
+        }
+
         public async Task CallStartAsync(CorrectionPropagationStartInput input)
             => _ = await new CorrectionPropagationStartActivity(writer).RunAsync(null!, input).ConfigureAwait(false);
 
@@ -356,6 +398,7 @@ public sealed class CorrectionPropagationCoordinatorTests
 
         public Task CreateTimerAsync(TimeSpan delay)
         {
+            SchedulingOrder.Add("timer");
             TimerDelays.Add(delay);
             return Task.CompletedTask;
         }

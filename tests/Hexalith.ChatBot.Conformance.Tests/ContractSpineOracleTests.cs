@@ -1,4 +1,15 @@
+using System.Security.Claims;
 using System.Text.Json;
+
+using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Gateway.Idempotency;
+using Hexalith.ChatBot.Server.Gateway.Redaction;
+using Hexalith.ChatBot.Server.Gateway.Status;
+using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 
 using Shouldly;
 
@@ -11,6 +22,95 @@ public static class ContractSpineOracleTests
     private static readonly string RepositoryRoot = LocateRepositoryRoot();
     private static readonly string ContractPath = Path.Combine(RepositoryRoot, "src", "Hexalith.ChatBot.Contracts", "openapi", "hexalith.chatbot.v1.yaml");
     private static readonly string OraclePath = Path.Combine(RepositoryRoot, "tests", "fixtures", "story-1-2-contract-spine-oracle.json");
+
+    [Fact]
+    public static async Task RuntimeGatewayAndStatusOutcomesShouldMatchSafeOracle()
+    {
+        using JsonDocument fixture = JsonDocument.Parse(File.ReadAllText(OraclePath));
+        JsonElement expected = fixture.RootElement.GetProperty("runtimeOutcomes");
+        JsonElement expectedAccepted = expected.GetProperty("accepted");
+        DateTimeOffset now = new(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
+        FixedClock clock = new(now);
+        CountingDispatcher dispatcher = new(clock);
+        InMemoryOperationStatusStore statuses = new();
+        InMemoryCoarseIdempotencyStore idempotency = new(clock);
+        CommandGateway gateway = new(
+            new ClaimsAuthenticationStage(),
+            new ClaimsTenantBindingStage(),
+            new PassThroughAuthorizationStage(),
+            new PassThroughRiskClassifier(),
+            new PassThroughApprovalGate(),
+            idempotency,
+            new InMemoryAuditWriter(),
+            new InMemoryAuditReplayIntentQueue(),
+            new InMemoryOperatorAlertSink(),
+            statuses,
+            clock,
+            new CommandSubmissionLifecycleTransitionGuard(),
+            dispatcher,
+            new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry()),
+            new OracleAllowlist());
+        ClaimsPrincipal principal = new(new ClaimsIdentity(
+            [new Claim("sub", "actor-alpha"), new Claim("eventstore:tenant", "tenant-alpha")], "oracle"));
+        ChatBotCommandSubmission submission = Submission(principal, "allowed-resource");
+
+        ChatBotGatewayResult accepted = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
+        ChatBotGatewayResult replay = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
+        ChatBotGatewayResult conflict = await gateway.SubmitAsync(
+            Submission(principal, "different-resource"), TestContext.Current.CancellationToken);
+        ChatBotGatewayResult denied = await gateway.SubmitAsync(
+            Submission(new ClaimsPrincipal(new ClaimsIdentity()), "allowed-resource"),
+            TestContext.Current.CancellationToken);
+
+        dispatcher.Count.ShouldBe(1);
+        accepted.IsAccepted.ShouldBeTrue();
+        replay.IsAccepted.ShouldBeTrue();
+        conflict.IsAccepted.ShouldBeFalse();
+        denied.IsAccepted.ShouldBeFalse();
+
+        using JsonDocument acceptedJson = JsonDocument.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(accepted.Accepted));
+        using JsonDocument replayJson = JsonDocument.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(replay.Accepted));
+        AssertSafeOutcome(acceptedJson.RootElement, expectedAccepted);
+        AssertSafeOutcome(replayJson.RootElement, expectedAccepted);
+        AssertSafeOutcome(replayJson.RootElement.GetProperty("priorOutcome"), expectedAccepted);
+
+        using JsonDocument conflictJson = JsonDocument.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(conflict.Problem));
+        using JsonDocument deniedJson = JsonDocument.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(denied.Problem));
+        AssertSafeProblem(conflictJson.RootElement, expected.GetProperty("conflict"));
+        AssertSafeProblem(deniedJson.RootElement, expected.GetProperty("denied"));
+        conflictJson.RootElement.GetRawText().ShouldNotContain("allowed-resource", Case.Insensitive);
+        conflictJson.RootElement.GetRawText().ShouldNotContain("different-resource", Case.Insensitive);
+        deniedJson.RootElement.GetRawText().ShouldNotContain("allowed-resource", Case.Insensitive);
+
+        OperationStatusRecord status = (await statuses.TryGetAsync(
+            "tenant-alpha", expectedAccepted.GetProperty("operationId").GetString()!, TestContext.Current.CancellationToken))!;
+        JsonElement statusJson = OperationStatusHttpResults.ToJsonElement(status, now);
+        statusJson.GetProperty("operationId").GetString().ShouldBe(expectedAccepted.GetProperty("operationId").GetString());
+        foreach (JsonProperty property in expected.GetProperty("pending").EnumerateObject())
+        {
+            statusJson.GetProperty(property.Name).GetRawText().ShouldBe(property.Value.GetRawText());
+        }
+
+        AssertSafeOutcome(statusJson.GetProperty("priorOutcome"), expectedAccepted);
+
+        OperationStatusWorkflowStatusSink sink = new(statuses, clock);
+        CorrectionPropagationRequest correction = new(
+            "tenant-alpha", "actor-alpha", "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY", "correction-1", "wf-1", "project-001", "project-002", 3,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW", now, now.AddMinutes(10),
+            OperationId: expectedAccepted.GetProperty("operationId").GetString()!);
+        await sink.ReportAsync(correction, CorrectionPropagationWorkflowStatuses.Delayed, 1,
+            "vector_reindex_failed", TestContext.Current.CancellationToken);
+        OperationStatusRecord failed = (await statuses.TryGetAsync(
+            "tenant-alpha", expectedAccepted.GetProperty("operationId").GetString()!, TestContext.Current.CancellationToken))!;
+        JsonElement failedJson = OperationStatusHttpResults.ToJsonElement(failed, now);
+        foreach (string field in new[] { "reasonCode", "workflowLastFailureCode" })
+        {
+            failedJson.GetProperty(field).GetString().ShouldBe(expected.GetProperty("workflowFailure").GetProperty(field).GetString());
+        }
+
+        AssertSafeOutcome(failedJson.GetProperty("priorOutcome"), expectedAccepted);
+    }
 
     [Fact]
     public static void StoryTwelveOracleShouldTrackCurrentCommandSubmissionContract()
@@ -71,6 +171,72 @@ public static class ContractSpineOracleTests
 
         extensionCategories.ShouldBe(oracleCategories, ignoreOrder: false);
         problemCategories.ShouldBe(oracleCategories, ignoreOrder: false);
+    }
+
+    private static ChatBotCommandSubmission Submission(ClaimsPrincipal principal, string resource)
+        => new(
+            principal,
+            new CommandSubmissionRequest
+            {
+                CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                CommandType = "TenantScopedAction",
+                Command = new OracleCommand("tenant-alpha", resource),
+                RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
+            },
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+
+    private static void AssertSafeOutcome(JsonElement actual, JsonElement expected)
+    {
+        foreach (JsonProperty property in expected.EnumerateObject())
+        {
+            JsonElement value = actual.GetProperty(property.Name);
+            if (property.Name == "acceptedAt")
+            {
+                DateTimeOffset timestamp = value.GetDateTimeOffset();
+                timestamp.ShouldBe(property.Value.GetDateTimeOffset());
+                timestamp.Offset.ShouldBe(TimeSpan.Zero);
+            }
+            else
+            {
+                value.GetRawText().ShouldBe(property.Value.GetRawText(), property.Name);
+            }
+        }
+    }
+
+    private static void AssertSafeProblem(JsonElement actual, JsonElement expected)
+    {
+        actual.GetProperty("status").GetInt32().ShouldBe(expected.GetProperty("status").GetInt32());
+        foreach (string field in new[] { "category", "code", "schemaVersion" })
+        {
+            actual.GetProperty(field).GetString().ShouldBe(expected.GetProperty(field).GetString());
+        }
+
+        actual.GetProperty("details").GetProperty("visibility").GetString()
+            .ShouldBe(expected.GetProperty("visibility").GetString());
+    }
+
+    private sealed record OracleCommand(string TenantId, string ResourceName);
+
+    private sealed class OracleAllowlist : ISpineCommandAllowlist
+    {
+        public bool IsAllowed(string? commandType) => commandType == "TenantScopedAction";
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : ISystemClock
+    {
+        public DateTimeOffset UtcNow { get; } = now;
+    }
+
+    private sealed class CountingDispatcher(FixedClock clock) : ICommandDispatcher
+    {
+        public int Count { get; private set; }
+
+        public ValueTask<ChatBotDispatchResult> DispatchAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
+        {
+            Count++;
+            return ValueTask.FromResult(new ChatBotDispatchResult(clock.UtcNow.ToOffset(TimeSpan.FromHours(2))));
+        }
     }
 
     private static YamlMappingNode LoadContract()

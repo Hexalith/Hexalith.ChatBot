@@ -1,3 +1,5 @@
+using Hexalith.ChatBot.Client.Generated;
+
 namespace Hexalith.ChatBot.Server.Audit;
 
 internal sealed record AuditReplayIntent(
@@ -9,4 +11,7 @@ internal sealed record AuditReplayIntent(
     string CorrelationId,
     string? IdempotencyKey,
     string ReasonCode,
-    DateTimeOffset QueuedAt);
+    DateTimeOffset QueuedAt,
+    CommandSubmissionResponse? AcceptedOutcome = null,
+    string? CoarseKeyHash = null,
+    string? IdentityKeyHash = null);

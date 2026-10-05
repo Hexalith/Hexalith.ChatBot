@@ -31,6 +31,17 @@ internal static class ChatBotCorrelationHttpContextExtensions
             ? context
             : httpContext.ResolveCorrelationContext();
 
+    public static void SetResponseCorrelationContext(this HttpContext httpContext, string correlationId, string? taskId)
+    {
+        ArgumentNullException.ThrowIfNull(httpContext);
+        httpContext.Items[ContextItemKey] = new ChatBotCorrelationContext(correlationId, taskId);
+        System.Diagnostics.Activity.Current?.SetTag("hexalith.correlation_id", correlationId);
+        if (taskId is not null)
+        {
+            System.Diagnostics.Activity.Current?.SetTag("hexalith.task_id", taskId);
+        }
+    }
+
     private static ChatBotCorrelationContext Create(HttpContext httpContext, string? fallbackCorrelationId)
     {
         string? correlationHeader = HeaderValue(httpContext, "X-Correlation-Id");

@@ -17,7 +17,7 @@ using Hexalith.EventStore.DomainService;
 
 namespace Hexalith.ChatBot.Server.Queries;
 
-internal sealed class OperationStatusQueryHandler(IOperationStatusStore statusStore)
+internal sealed class OperationStatusQueryHandler(IOperationStatusStore statusStore, ISystemClock? clock = null)
     : ChatBotReadQueryHandler<OperationStatusQuery>
 {
     public override string QueryType => ChatBotReadQueryTypes.OperationStatus;
@@ -35,6 +35,6 @@ internal sealed class OperationStatusQueryHandler(IOperationStatusStore statusSt
 
         return record is null
             ? QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound)
-            : QueryResult.FromPayload(OperationStatusHttpResults.ToJsonElement(record), "chatbot.operation-status.v1");
+            : QueryResult.FromPayload(OperationStatusHttpResults.ToJsonElement(record, clock?.UtcNow), "chatbot.operation-status.v1");
     }
 }

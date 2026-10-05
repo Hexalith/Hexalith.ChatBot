@@ -10,6 +10,23 @@ public static partial class MessageCatalogContractTests
 {
     private static readonly Regex MessageCodePattern = MessageCodeRegex();
 
+    [Theory]
+    [InlineData(ChatBotMessageCodes.AssociationCorrectionCaseResolutionUnavailable)]
+    [InlineData(ChatBotMessageCodes.AssociationCorrectionStoreUnavailable)]
+    [InlineData(ChatBotMessageCodes.MemoriesCorrectionFailed)]
+    [InlineData(ChatBotMessageCodes.MemoriesCorrectionInvalidStatus)]
+    [InlineData(ChatBotMessageCodes.MemoriesCorrectionTimedOut)]
+    [InlineData(ChatBotMessageCodes.M0StoreInvalidationFailed)]
+    [InlineData(ChatBotMessageCodes.VectorReindexFailed)]
+    [InlineData(ChatBotMessageCodes.VectorReindexSloExceeded)]
+    public static void CorrectionWorkflowStatusCodesShouldResolveToSafeCatalogEntries(string code)
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(code);
+        entry.Code.ShouldBe(code);
+        entry.DetailVisibility.ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        entry.DisabledActionReason.ShouldBe(ChatBotDisabledActionReasons.DependencyDegraded);
+    }
+
     [Fact]
     public static void CatalogShouldExposeStableVersionAndRequiredEntries()
     {

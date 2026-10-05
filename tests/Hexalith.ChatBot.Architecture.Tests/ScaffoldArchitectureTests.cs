@@ -825,6 +825,59 @@ public static class ScaffoldArchitectureTests
     }
 
     [Fact]
+    public static void GatewaySourcesMustNotDeclareCompetingContractWireDtos()
+    {
+        string gatewayRoot = Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.Server", "Gateway");
+        HashSet<string> generatedNames = ["CommandSubmissionRequest", "CommandSubmissionResponse", "PriorCommandOutcome", "OperationStatus", "ProblemDetails"];
+        HashSet<string> acceptedFields = ["CommandId", "CorrelationId", "OperationId", "LifecycleState", "AcceptedAt", "ReasonCode", "RetryEligible", "PriorOutcome"];
+        List<string> violations = [];
+
+        foreach (string file in Directory.EnumerateFiles(gatewayRoot, "*.cs", SearchOption.AllDirectories))
+        {
+            SyntaxNode root = CSharpSyntaxTree.ParseText(
+                File.ReadAllText(file), cancellationToken: TestContext.Current.CancellationToken)
+                .GetRoot(TestContext.Current.CancellationToken);
+            foreach (TypeDeclarationSyntax declaration in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+            {
+                string name = declaration.Identifier.ValueText;
+                HashSet<string> fields = declaration.Members.OfType<PropertyDeclarationSyntax>()
+                    .Select(static property => property.Identifier.ValueText)
+                    .Concat(declaration is RecordDeclarationSyntax record
+                        ? record.ParameterList?.Parameters.Select(static parameter => parameter.Identifier.ValueText) ?? []
+                        : [])
+                    .ToHashSet(StringComparer.Ordinal);
+                if (generatedNames.Contains(name) ||
+                    name.EndsWith("WireModel", StringComparison.Ordinal) ||
+                    name.EndsWith("WireRequest", StringComparison.Ordinal) ||
+                    name.EndsWith("WireResponse", StringComparison.Ordinal) ||
+                    (name != "OperationStatusRecord" && fields.Count(acceptedFields.Contains) >= 5))
+                {
+                    violations.Add($"{Path.GetRelativePath(RepositoryRoot(), file)}:{name}");
+                }
+            }
+        }
+
+        violations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void ContractSpineOperationsShouldBindTypedClientAndSeparatelyGovernedSurfaces()
+    {
+        string openApi = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.Contracts", "openapi", "hexalith.chatbot.v1.yaml"));
+        openApi.ShouldContain("operationId: SubmitCommand");
+        openApi.ShouldContain("operationId: GetOperationStatus");
+
+        Type facade = typeof(Hexalith.ChatBot.Client.IChatBotClient);
+        facade.GetMethod("SubmitAsync").ShouldNotBeNull();
+        facade.GetMethod("SubmitWithCommandIdAsync").ShouldNotBeNull();
+        facade.GetMethod("GetOperationStatusAsync").ShouldNotBeNull();
+        Hexalith.ChatBot.Mcp.ChatBotMcpToolCatalog.Tools
+            .ShouldContain(static tool => tool.ContractName == "GetOperationStatus" && !tool.StateChanging);
+        typeof(Hexalith.ChatBot.Cli.ChatBotCliService).GetMethod("ShowOperationStatusAsync").ShouldNotBeNull();
+        typeof(Hexalith.ChatBot.Cli.ChatBotCliService).GetMethod("RunSafelyAsync").ShouldNotBeNull();
+    }
+
+    [Fact]
     public static void ContractsQueriesShouldStayLowDependency()
     {
         string root = RepositoryRoot();

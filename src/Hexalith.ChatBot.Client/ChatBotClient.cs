@@ -22,17 +22,30 @@ public sealed partial class ChatBotClient : IChatBotClient
         string? taskId = null,
         ChatBotSurfaceOrigin origin = ChatBotSurfaceOrigin.Api,
         CancellationToken cancellationToken = default)
+        => SubmitWithCommandIdAsync(command, ChatBotCommandId.New().Value, correlationId, taskId, origin, cancellationToken);
+
+    public Task<CommandSubmissionResponse> SubmitWithCommandIdAsync(
+        IChatBotCommand command,
+        string commandId,
+        string? correlationId = null,
+        string? taskId = null,
+        ChatBotSurfaceOrigin origin = ChatBotSurfaceOrigin.Api,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
 
+        if (!ChatBotCommandId.TryParse(commandId, out ChatBotCommandId parsedCommandId))
+        {
+            throw new ArgumentException("Command identifiers must be ULIDs.", nameof(commandId));
+        }
+
         string commandType = ResolveCommandType(command);
-        string commandId = ChatBotCommandId.New().Value;
         string effectiveCorrelationId = NormalizeCorrelationId(correlationId);
         string? effectiveTaskId = NormalizeTaskId(taskId);
 
         var request = new CommandSubmissionRequest
         {
-            CommandId = commandId,
+            CommandId = parsedCommandId.Value,
             CommandType = commandType,
             Command = command,
             RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
@@ -187,7 +200,8 @@ public sealed partial class ChatBotClient : IChatBotClient
     {
         string commandType = command.GetType().Name;
 
-        if (!CommandTypeNamePattern().IsMatch(commandType) ||
+        if (commandType.Length > 160 ||
+            !CommandTypeNamePattern().IsMatch(commandType) ||
             commandType.EndsWith("Command", StringComparison.Ordinal))
         {
             throw new ArgumentException(

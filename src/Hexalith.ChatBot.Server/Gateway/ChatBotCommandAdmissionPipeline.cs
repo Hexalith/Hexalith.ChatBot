@@ -147,6 +147,14 @@ internal sealed class ChatBotCommandAdmissionPipeline(
                 submission.TaskId);
         }
 
+        if (idempotencyDecision.Kind == CoarseIdempotencyDecisionKind.RecoveryPending)
+        {
+            return ChatBotCommandAdmissionDecision.Rejected(
+                "idempotency_outcome_unavailable",
+                submission.CorrelationId,
+                submission.TaskId);
+        }
+
         LifecycleTransitionValidation lifecycleTransition = lifecycleTransitionGuard.ValidateCommandSubmission(context);
         if (!lifecycleTransition.IsValid)
         {
@@ -235,6 +243,7 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         OperationStatusRecord replayStatus = existingStatus is not null
             ? existingStatus with { LastUpdatedAt = clock.UtcNow }
             : OperationStatusRecord.Accepted(context.TenantBinding.TenantId, priorOutcome, false, clock.UtcNow);
+        replayStatus = replayStatus with { PriorOutcome = priorOutcome };
         if (string.Equals(idempotencyDecision.Metadata.OperationClass, CoarseIdempotencyOperationClass.MessageIntake.Code, StringComparison.Ordinal))
         {
             replayStatus = replayStatus with

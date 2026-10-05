@@ -9,6 +9,7 @@ internal sealed class NullCorrectionPropagationWorkflowStatusSink : ICorrectionP
         string workflowStatus,
         int workflowRetryCount,
         string? workflowLastFailureCode,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        DateTimeOffset? retryDueAt = null)
         => ValueTask.CompletedTask;
 }

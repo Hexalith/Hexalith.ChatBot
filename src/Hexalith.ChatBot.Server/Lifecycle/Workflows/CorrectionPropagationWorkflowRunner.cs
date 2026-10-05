@@ -3,6 +3,7 @@ namespace Hexalith.ChatBot.Server.Lifecycle.Workflows;
 internal static class CorrectionPropagationWorkflowRunner
 {
     private static readonly TimeSpan RemoteStatusPollDelay = TimeSpan.FromSeconds(30);
+    private const int MaxCaseResolutionRetries = 5;
 
     public static async Task<CorrectionPropagationWorkflowResult> RunAsync(
         CorrectionPropagationRequest input,
@@ -82,6 +83,7 @@ internal static class CorrectionPropagationWorkflowRunner
         CorrectionPropagationRequest input,
         ICorrectionPropagationWorkflowSteps steps)
     {
+        int retryCount = 0;
         while (true)
         {
             try
@@ -92,12 +94,37 @@ internal static class CorrectionPropagationWorkflowRunner
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
+                retryCount++;
+                if (retryCount >= MaxCaseResolutionRetries)
+                {
+                    steps.SetStatus(Progress(
+                        input,
+                        CorrectionPropagationWorkflowStatuses.Failed,
+                        retryCount,
+                        CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable));
+                    await steps.CallRetryStatusAsync(new CorrectionPropagationRetryStatusInput(
+                        input, retryCount, CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable,
+                        CorrectionPropagationWorkflowStatuses.Failed)).ConfigureAwait(true);
+                    throw new InvalidOperationException(CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable, exception);
+                }
+
                 steps.SetStatus(Progress(
                     input,
                     CorrectionPropagationWorkflowStatuses.Retrying,
-                    0,
+                    retryCount,
                     CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable));
-                await steps.CreateTimerAsync(RemoteStatusPollDelay).ConfigureAwait(true);
+                // Schedule first, then publish a due time derived from the workflow clock. Activity
+                // latency can no longer make the status eligible before the timer exists.
+                Task timer = steps.CreateTimerAsync(RemoteStatusPollDelay);
+                DateTimeOffset dueAt = steps.CurrentUtc.Add(RemoteStatusPollDelay);
+                await steps.CallRetryStatusAsync(new CorrectionPropagationRetryStatusInput(
+                    input, retryCount, CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable,
+                    RetryDueAt: dueAt)).ConfigureAwait(true);
+                await timer.ConfigureAwait(true);
+                // The due window closes when the timer fires and the next attempt starts.
+                await steps.CallRetryStatusAsync(new CorrectionPropagationRetryStatusInput(
+                    input, retryCount, CorrectionPropagationWorkflowFailureCodes.None,
+                    CorrectionPropagationWorkflowStatuses.Started)).ConfigureAwait(true);
             }
         }
     }

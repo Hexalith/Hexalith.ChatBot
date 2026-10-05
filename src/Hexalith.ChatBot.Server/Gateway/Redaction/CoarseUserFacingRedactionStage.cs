@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Messages;
 
 namespace Hexalith.ChatBot.Server.Gateway.Redaction;
 
@@ -28,6 +29,7 @@ internal sealed class CoarseUserFacingRedactionStage : IUserFacingRedactionStage
             {
                 Visibility = ProblemDetailsDetailsVisibility.Metadata_only,
             },
+            SchemaVersion = ChatBotMessageCatalogVersion.Current,
         };
     }
 }

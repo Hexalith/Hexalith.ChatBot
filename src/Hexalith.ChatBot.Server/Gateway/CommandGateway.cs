@@ -70,13 +70,33 @@ internal sealed class CommandGateway(
     {
         ArgumentNullException.ThrowIfNull(submission);
 
-        ChatBotCommandAdmissionDecision admissionDecision = await admission
-            .AdmitAsync(submission, cancellationToken)
-            .ConfigureAwait(false);
+        ChatBotCommandAdmissionDecision admissionDecision;
+        try
+        {
+            admissionDecision = await admission.AdmitAsync(submission, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateAuditUnavailable(submission.CorrelationId, submission.TaskId));
+        }
 
         if (admissionDecision.Kind == ChatBotCommandAdmissionDecisionKind.ReplayPriorOutcome)
         {
-            return ChatBotGatewayResult.AcceptedResult(admissionDecision.PriorOutcome!);
+            CommandSubmissionResponse stored = admissionDecision.PriorOutcome!;
+            stored.OperationId = string.IsNullOrWhiteSpace(stored.OperationId) ? stored.TaskId ?? stored.CommandId : stored.OperationId;
+            stored.AcceptedAt = stored.AcceptedAt.ToUniversalTime();
+            stored.PriorOutcome = new PriorCommandOutcome
+            {
+                CommandId = stored.CommandId,
+                CorrelationId = stored.CorrelationId,
+                OperationId = stored.OperationId,
+                TaskId = stored.TaskId,
+                LifecycleState = stored.LifecycleState,
+                AcceptedAt = stored.AcceptedAt,
+                ReasonCode = stored.ReasonCode,
+                RetryEligible = stored.RetryEligible,
+            };
+            return ChatBotGatewayResult.AcceptedResult(stored);
         }
 
         if (!admissionDecision.IsAccepted)
@@ -116,13 +136,47 @@ internal sealed class CommandGateway(
             CommandId = submission.Request.CommandId,
             CorrelationId = submission.CorrelationId,
             TaskId = submission.TaskId,
+            OperationId = submission.TaskId ?? submission.Request.CommandId,
             LifecycleState = LifecycleState.Proposed,
-            AcceptedAt = dispatchResult.AcceptedAt,
+            AcceptedAt = dispatchResult.AcceptedAt.ToUniversalTime(),
+            ReasonCode = ChatBotMessageCode.Command_accepted,
+            RetryEligible = false,
         };
 
-        await idempotencyStore
-            .RecordOutcomeAsync(idempotency, response, cancellationToken)
-            .ConfigureAwait(false);
+        try
+        {
+            await idempotencyStore
+                .RecordOutcomeAsync(idempotency, response, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            AuditEnvelope failedReceiptEnvelope = AuditEnvelopeFactory.PostCommit(context, dispatchResult, transition, clock.UtcNow);
+            try
+            {
+                // The EventStore command has committed. Persist the metadata-only outcome
+                // evidence in the independent audit seam before returning a retryable error.
+                _ = await auditWriter.RecordPostCommitAsync(failedReceiptEnvelope, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception auditException) when (auditException is not OperationCanceledException)
+            {
+                // The replay intent and operator alert still carry the exact safe outcome.
+            }
+
+            await QueueReplayIntentAsync(
+                AuditReplayIntentKind.PostCommitAuditReconciliation,
+                failedReceiptEnvelope,
+                "idempotency_outcome_unavailable",
+                cancellationToken,
+                response,
+                idempotency).ConfigureAwait(false);
+            await AlertAsync(
+                OperatorAlertKind.PostCommitAuditReconciliationRequired,
+                failedReceiptEnvelope,
+                "idempotency_outcome_unavailable",
+                cancellationToken).ConfigureAwait(false);
+            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateAuditUnavailable(submission.CorrelationId, submission.TaskId));
+        }
 
         AuditEnvelope postCommitEnvelope = AuditEnvelopeFactory.PostCommit(context, dispatchResult, transition, clock.UtcNow);
         AuditWriteResult postCommitAudit = await auditWriter.RecordPostCommitAsync(postCommitEnvelope, cancellationToken).ConfigureAwait(false);
@@ -164,6 +218,11 @@ internal sealed class CommandGateway(
             return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateAuditUnavailable(decision.CorrelationId, decision.TaskId));
         }
 
+        if (string.Equals(reasonCode, "idempotency_outcome_unavailable", StringComparison.Ordinal))
+        {
+            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateAuditUnavailable(decision.CorrelationId, decision.TaskId));
+        }
+
         if (string.Equals(reasonCode, LifecycleTransitionReasonCodes.InvalidTransition, StringComparison.Ordinal))
         {
             return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateInvalidLifecycleTransition(decision.CorrelationId, decision.TaskId));
@@ -183,7 +242,9 @@ internal sealed class CommandGateway(
         AuditReplayIntentKind kind,
         AuditEnvelope envelope,
         string reasonCode,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CommandSubmissionResponse? acceptedOutcome = null,
+        CoarseIdempotencyMetadata? idempotency = null)
     {
         await replayIntentQueue
             .EnqueueAsync(
@@ -196,7 +257,10 @@ internal sealed class CommandGateway(
                     envelope.CorrelationId,
                     envelope.IdempotencyKey,
                     reasonCode,
-                    clock.UtcNow),
+                    clock.UtcNow,
+                    acceptedOutcome,
+                    idempotency?.CoarseKeyHash,
+                    idempotency?.IdentityKeyHash),
                 cancellationToken)
             .ConfigureAwait(false);
     }

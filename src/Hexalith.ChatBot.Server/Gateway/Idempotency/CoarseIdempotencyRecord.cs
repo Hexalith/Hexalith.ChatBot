@@ -14,4 +14,7 @@ internal sealed record CoarseIdempotencyRecord(
     string RequesterId,
     DateTimeOffset CreatedAt,
     DateTimeOffset ExpiresAt,
-    CommandSubmissionResponse? PriorOutcome);
+    CommandSubmissionResponse? PriorOutcome,
+    string? IdentityKeyHash = null,
+    string? CallerFingerprint = null,
+    string? LegacyKeyHash = null);

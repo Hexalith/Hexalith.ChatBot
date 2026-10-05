@@ -17,4 +17,7 @@ internal sealed record CoarseIdempotencyDecision(
 
     public static CoarseIdempotencyDecision Conflict(CoarseIdempotencyMetadata metadata)
         => new(CoarseIdempotencyDecisionKind.Conflict, metadata, null);
+
+    public static CoarseIdempotencyDecision RecoveryPending(CoarseIdempotencyMetadata metadata)
+        => new(CoarseIdempotencyDecisionKind.RecoveryPending, metadata, null);
 }

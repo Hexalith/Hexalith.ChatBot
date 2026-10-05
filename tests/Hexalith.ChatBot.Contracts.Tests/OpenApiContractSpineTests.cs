@@ -56,6 +56,68 @@ public static partial class OpenApiContractSpineTests
     }
 
     [Fact]
+    public static void AcceptedReplayAndStatusSchemasShouldShareTheCompleteSafeOutcome()
+    {
+        YamlMappingNode schemas = Mapping(Mapping(LoadContract(), "components"), "schemas");
+        string[] safeFields = ["commandId", "correlationId", "operationId", "lifecycleState", "acceptedAt", "reasonCode", "retryEligible"];
+        YamlMappingNode accepted = Mapping(schemas, "AcceptedCommand");
+        YamlMappingNode prior = Mapping(schemas, "PriorCommandOutcome");
+        YamlMappingNode status = Mapping(schemas, "OperationStatus");
+
+        foreach (YamlMappingNode schema in new[] { accepted, prior })
+        {
+            string[] required = Sequence(schema, "required").Children.OfType<YamlScalarNode>()
+                .Select(static value => value.Value.ShouldNotBeNull()).ToArray();
+            ShouldContainAll(required, safeFields);
+            RequiredKeys(Mapping(schema, "properties")).ShouldContain("taskId");
+            Mapping(Mapping(schema, "properties"), "acceptedAt").Children[new YamlScalarNode("format")]
+                .ShouldBeOfType<YamlScalarNode>().Value.ShouldBe("date-time");
+        }
+
+        string[] statusRequired = Sequence(status, "required").Children.OfType<YamlScalarNode>()
+            .Select(static value => value.Value.ShouldNotBeNull()).ToArray();
+        ShouldContainAll(statusRequired, ["reasonCode", "retryEligible"]);
+        Scalar(Mapping(Mapping(status, "properties"), "priorOutcome"), "$ref")
+            .ShouldBe("#/components/schemas/PriorCommandOutcome");
+    }
+
+    [Fact]
+    public static void PublishedAcceptedStatusAndProblemExamplesShouldMatchTheirReferencedSchemas()
+    {
+        YamlMappingNode root = LoadContract();
+        YamlMappingNode responses = Mapping(Mapping(root, "components"), "responses");
+        foreach (string responseName in new[]
+        {
+            "AcceptedCommand", "OperationStatus", "ValidationFailure", "SafeAuthorizationDenial401",
+            "SafeAuthorizationDenial403", "Conflict", "InternalFailure",
+        })
+        {
+            YamlMappingNode content = Mapping(Mapping(responses, responseName), "content");
+            YamlMappingNode media = content.Children.Values.OfType<YamlMappingNode>().ShouldHaveSingleItem();
+            YamlMappingNode schema = Mapping(media, "schema");
+            foreach (YamlNode exampleNode in Mapping(media, "examples").Children.Values)
+            {
+                YamlMappingNode exampleRef = exampleNode.ShouldBeOfType<YamlMappingNode>();
+                YamlMappingNode example = ResolveLocalReference(root, Scalar(exampleRef, "$ref")).ShouldBeOfType<YamlMappingNode>();
+                ValidateExampleNode(root, example.Children[new YamlScalarNode("value")], schema, responseName);
+            }
+        }
+    }
+
+    [Fact]
+    public static void CommandRequestShouldRequireJsonAndBoundCommandTypeBeforeAdmission()
+    {
+        YamlMappingNode root = LoadContract();
+        YamlMappingNode operation = Operation(root, "/api/v1/commands", "post");
+        RequiredKeys(Mapping(Mapping(operation, "requestBody"), "content")).ShouldBe(["application/json"]);
+
+        YamlMappingNode request = Mapping(Mapping(Mapping(root, "components"), "schemas"), "CommandSubmissionRequest");
+        YamlMappingNode commandType = Mapping(Mapping(request, "properties"), "commandType");
+        Scalar(commandType, "maxLength").ShouldBe("160");
+        Scalar(commandType, "pattern").ShouldBe("^[A-Z][A-Za-z0-9]*$");
+    }
+
+    [Fact]
     public static void ContractSpineShouldDeclareRequiredSharedSchemasHeadersAndResponses()
     {
         YamlMappingNode components = Mapping(LoadContract(), "components");
@@ -437,6 +499,119 @@ public static partial class OpenApiContractSpineTests
         }
 
         return current;
+    }
+
+    private static void ValidateExampleNode(YamlMappingNode root, YamlNode value, YamlMappingNode schema, string path)
+    {
+        if (schema.Children.TryGetValue(new YamlScalarNode("$ref"), out YamlNode? reference))
+        {
+            ValidateExampleNode(root, value,
+                ResolveLocalReference(root, reference.ShouldBeOfType<YamlScalarNode>().Value.ShouldNotBeNull())
+                    .ShouldBeOfType<YamlMappingNode>(), path);
+            return;
+        }
+
+        if (schema.Children.TryGetValue(new YamlScalarNode("allOf"), out YamlNode? allOf))
+        {
+            foreach (YamlMappingNode branch in allOf.ShouldBeOfType<YamlSequenceNode>().Children.OfType<YamlMappingNode>())
+            {
+                ValidateExampleNode(root, value, branch, path);
+            }
+
+            return;
+        }
+
+        if (schema.Children.TryGetValue(new YamlScalarNode("oneOf"), out YamlNode? oneOf))
+        {
+            // The existing TaskId/CommandId alternatives share the same ULID shape.
+            // Validate their common wire shape without treating the overlap as an example error.
+            ValidateExampleNode(root, value, oneOf.ShouldBeOfType<YamlSequenceNode>().Children[0]
+                .ShouldBeOfType<YamlMappingNode>(), path);
+            return;
+        }
+
+        if (!schema.Children.TryGetValue(new YamlScalarNode("type"), out YamlNode? typeNode))
+        {
+            return;
+        }
+
+        string type = typeNode.ShouldBeOfType<YamlScalarNode>().Value.ShouldNotBeNull();
+        if (type == "object")
+        {
+            YamlMappingNode objectValue = value.ShouldBeOfType<YamlMappingNode>($"{path} must be an object");
+            if (schema.Children.TryGetValue(new YamlScalarNode("required"), out YamlNode? required))
+            {
+                foreach (YamlScalarNode member in required.ShouldBeOfType<YamlSequenceNode>().Children.OfType<YamlScalarNode>())
+                {
+                    objectValue.Children.ContainsKey(new YamlScalarNode(member.Value)).ShouldBeTrue($"{path}.{member.Value}");
+                }
+            }
+
+            if (schema.Children.TryGetValue(new YamlScalarNode("properties"), out YamlNode? propertiesNode))
+            {
+                YamlMappingNode properties = propertiesNode.ShouldBeOfType<YamlMappingNode>();
+                foreach ((YamlNode memberName, YamlNode memberValue) in objectValue.Children)
+                {
+                    string name = memberName.ShouldBeOfType<YamlScalarNode>().Value.ShouldNotBeNull();
+                    if (properties.Children.TryGetValue(new YamlScalarNode(name), out YamlNode? propertySchema))
+                    {
+                        ValidateExampleNode(root, memberValue, propertySchema.ShouldBeOfType<YamlMappingNode>(), path + "." + name);
+                    }
+                    else if (schema.Children.TryGetValue(new YamlScalarNode("additionalProperties"), out YamlNode? additional))
+                    {
+                        additional.ShouldBeOfType<YamlScalarNode>().Value.ShouldNotBe("false", $"{path}.{name}");
+                    }
+                }
+            }
+
+            return;
+        }
+
+        if (type == "array")
+        {
+            YamlSequenceNode array = value.ShouldBeOfType<YamlSequenceNode>($"{path} must be an array");
+            if (schema.Children.TryGetValue(new YamlScalarNode("items"), out YamlNode? items))
+            {
+                foreach (YamlNode item in array.Children)
+                {
+                    ValidateExampleNode(root, item, items.ShouldBeOfType<YamlMappingNode>(), path + "[]");
+                }
+            }
+
+            return;
+        }
+
+        string scalar = value.ShouldBeOfType<YamlScalarNode>($"{path} must be scalar").Value.ShouldNotBeNull();
+        if (type == "boolean")
+        {
+            bool.TryParse(scalar, out _).ShouldBeTrue(path);
+        }
+        else if (type == "integer")
+        {
+            long.TryParse(scalar, out _).ShouldBeTrue(path);
+        }
+        else if (type == "string" && schema.Children.TryGetValue(new YamlScalarNode("format"), out YamlNode? format) &&
+            format.ShouldBeOfType<YamlScalarNode>().Value == "date-time")
+        {
+            DateTimeOffset.TryParse(scalar, out DateTimeOffset timestamp).ShouldBeTrue(path);
+            timestamp.Offset.ShouldBe(TimeSpan.Zero, path);
+        }
+
+        if (schema.Children.TryGetValue(new YamlScalarNode("const"), out YamlNode? constant))
+        {
+            scalar.ShouldBe(constant.ShouldBeOfType<YamlScalarNode>().Value, path);
+        }
+
+        if (schema.Children.TryGetValue(new YamlScalarNode("enum"), out YamlNode? enumNode))
+        {
+            enumNode.ShouldBeOfType<YamlSequenceNode>().Children.OfType<YamlScalarNode>()
+                .Select(static item => item.Value).ShouldContain(scalar, path);
+        }
+
+        if (schema.Children.TryGetValue(new YamlScalarNode("pattern"), out YamlNode? pattern))
+        {
+            Regex.IsMatch(scalar, pattern.ShouldBeOfType<YamlScalarNode>().Value.ShouldNotBeNull()).ShouldBeTrue(path);
+        }
     }
 
     private static string ResolveParameterName(YamlMappingNode parameter)

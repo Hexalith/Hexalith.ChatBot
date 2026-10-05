@@ -4,6 +4,16 @@ public static class ChatBotMessageCatalog
 {
     public static IReadOnlyList<ChatBotMessageCatalogEntry> Entries { get; } =
     [
+        new(ChatBotMessageCodes.CommandAccepted, "Command accepted.", "The command was accepted for processing.", ChatBotMessageNextActions.None, null, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.CommandContractInvalid, "Validation failed.", "Correct the request metadata and retry.", ChatBotMessageNextActions.CorrectRequest, ChatBotDisabledActionReasons.StateNotPermitted, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.AssociationCorrectionCaseResolutionUnavailable, "Correction case unavailable.", "The correction case cannot be resolved yet.", ChatBotMessageNextActions.RetryLater, ChatBotDisabledActionReasons.DependencyDegraded, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.AssociationCorrectionStoreUnavailable, "Correction store unavailable.", "The correction store is temporarily unavailable.", ChatBotMessageNextActions.RetryLater, ChatBotDisabledActionReasons.DependencyDegraded, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.MemoriesCorrectionFailed, "Memory correction failed.", "The memory correction could not be completed.", ChatBotMessageNextActions.Escalate, ChatBotDisabledActionReasons.DependencyDegraded, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.MemoriesCorrectionInvalidStatus, "Memory correction needs review.", "The memory correction returned an invalid status.", ChatBotMessageNextActions.Escalate, ChatBotDisabledActionReasons.DependencyDegraded, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.MemoriesCorrectionTimedOut, "Memory correction delayed.", "The memory correction did not complete in time.", ChatBotMessageNextActions.RetryLater, ChatBotDisabledActionReasons.DependencyDegraded, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.M0StoreInvalidationFailed, "Store invalidation delayed.", "The corrected source is awaiting store invalidation.", ChatBotMessageNextActions.RetryLater, ChatBotDisabledActionReasons.DependencyDegraded, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.VectorReindexFailed, "Vector reindex failed.", "The vector index correction could not be completed.", ChatBotMessageNextActions.Escalate, ChatBotDisabledActionReasons.DependencyDegraded, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.VectorReindexSloExceeded, "Vector reindex delayed.", "The vector index is awaiting correction.", ChatBotMessageNextActions.Escalate, ChatBotDisabledActionReasons.DependencyDegraded, ChatBotDetailVisibility.MetadataOnly),
         new(
             ChatBotMessageCodes.AuthenticationDenied,
             "Authentication required.",

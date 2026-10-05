@@ -38,7 +38,7 @@ internal static class AuditEnvelopeFactory
     {
         ArgumentNullException.ThrowIfNull(dispatchResult);
 
-        return Create(
+        AuditEnvelope envelope = Create(
             context,
             timestamp,
             AuditCommitPhase.PostCommit,
@@ -47,6 +47,18 @@ internal static class AuditEnvelopeFactory
             stateTransition: transition.ToString(),
             outcome: "proposed",
             resourceId: dispatchResult.ResourceId);
+        List<string> receiptRefs =
+        [
+            .. envelope.SourceEvidenceRefs,
+            $"operation:{context.Submission.TaskId ?? context.Submission.Request.CommandId}",
+            $"accepted-at:{dispatchResult.AcceptedAt.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture)}",
+        ];
+        if (context.Idempotency?.IdentityKeyHash is { } identityKey)
+        {
+            receiptRefs.Add($"identity-key:{identityKey}");
+        }
+
+        return envelope with { SourceEvidenceRefs = receiptRefs };
     }
 
     public static AuditEnvelope DuplicateMailboxIntakeSuppressed(

@@ -32,10 +32,23 @@ public static class ProblemDetailsContractTests
             "retryable",
             "clientAction",
             "details",
+            "schemaVersion",
         })
         {
             properties.ShouldContain(property);
         }
+    }
+
+    [Fact]
+    public static void ProblemDetailsShouldRequireVersionedMetadataOnlyFailureShape()
+    {
+        YamlMappingNode schema = Schema("ProblemDetails");
+        string[] required = Sequence(schema, "required").Children.OfType<YamlScalarNode>()
+            .Select(static value => value.Value.ShouldNotBeNull()).ToArray();
+        required.ShouldContain("schemaVersion");
+        Scalar(Mapping(Mapping(schema, "properties"), "schemaVersion"), "const")
+            .ShouldBe(ChatBotMessageCatalogVersion.Current);
+        Scalar(schema, "additionalProperties").ShouldBe("false");
     }
 
     [Fact]

@@ -593,13 +593,19 @@ components:
       required:
         - commandId
         - correlationId
+        - operationId
         - lifecycleState
         - acceptedAt
+        - reasonCode
+        - retryEligible
       properties:
         commandId:
           $ref: "#/components/schemas/CommandId"
         correlationId:
           $ref: "#/components/schemas/CorrelationId"
+        operationId:
+          $ref: "#/components/schemas/CommandId"
+          description: Canonical status identity, equal to taskId when supplied and commandId otherwise.
         taskId:
           $ref: "#/components/schemas/TaskId"
         lifecycleState:
@@ -608,6 +614,43 @@ components:
           type: string
           format: date-time
           description: UTC acceptance timestamp.
+        reasonCode:
+          $ref: "#/components/schemas/ChatBotMessageCode"
+        retryEligible:
+          type: boolean
+          description: False on acceptance; true only when a scheduled retry is currently due and attempts remain.
+        priorOutcome:
+          $ref: "#/components/schemas/PriorCommandOutcome"
+    PriorCommandOutcome:
+      type: object
+      additionalProperties: false
+      required:
+        - commandId
+        - correlationId
+        - operationId
+        - lifecycleState
+        - acceptedAt
+        - reasonCode
+        - retryEligible
+      properties:
+        commandId:
+          $ref: "#/components/schemas/CommandId"
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        operationId:
+          $ref: "#/components/schemas/CommandId"
+        taskId:
+          $ref: "#/components/schemas/TaskId"
+        lifecycleState:
+          $ref: "#/components/schemas/LifecycleState"
+        acceptedAt:
+          type: string
+          format: date-time
+          description: UTC acceptance timestamp.
+        reasonCode:
+          $ref: "#/components/schemas/ChatBotMessageCode"
+        retryEligible:
+          type: boolean
     TaskIntentState:
       type: string
       description: Durable task-intent lifecycle state.
@@ -1222,6 +1265,8 @@ components:
         - maxAttempts
         - acceptedAt
         - lastUpdatedAt
+        - reasonCode
+        - retryEligible
       properties:
         operationId:
           oneOf:
@@ -1233,6 +1278,13 @@ components:
           $ref: "#/components/schemas/CorrelationId"
         lifecycleState:
           $ref: "#/components/schemas/LifecycleState"
+        reasonCode:
+          $ref: "#/components/schemas/ChatBotMessageCode"
+        retryEligible:
+          type: boolean
+          description: True only after nextRetryAt is due and retryCount is below maxAttempts.
+        priorOutcome:
+          $ref: "#/components/schemas/PriorCommandOutcome"
         retryCount:
           type: integer
           format: int32
@@ -3126,6 +3178,16 @@ components:
     ChatBotMessageCode:
       type: string
       enum:
+        - command_accepted
+        - command_contract_invalid
+        - association_correction_case_resolution_unavailable
+        - association_correction_store_unavailable
+        - memories_correction_failed
+        - memories_correction_invalid_status
+        - memories_correction_timed_out
+        - m0_store_invalidation_failed
+        - vector_reindex_failed
+        - vector_reindex_slo_exceeded
         - authentication_denied
         - authorization_denied
         - audit_unavailable
@@ -3195,6 +3257,7 @@ components:
         - retryable
         - clientAction
         - details
+        - schemaVersion
       properties:
         type:
           type: string
@@ -3249,6 +3312,9 @@ components:
             - none
         details:
           $ref: "#/components/schemas/ProblemDetailsDetails"
+        schemaVersion:
+          type: string
+          const: chatbot.message-catalog.v1
     ProblemDetailsDetails:
       type: object
       additionalProperties: false
@@ -8374,8 +8440,8 @@ components:
       type: string
       description: >-
         Adapter-declared surface origin (FR85 / S7), captured at the boundary as provenance. M0
-        exercises ui and api; the remaining values are reserved. An absent or unknown value is
-        treated as api by the server.
+        exercises ui and api; the remaining values are reserved. An absent value
+        defaults to api; a supplied value outside this enum is rejected.
       enum:
         - api
         - ui
@@ -8427,8 +8493,11 @@ components:
         commandId: 01ARZ3NDEKTSV4RRFFQ69G5FAV
         correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
         taskId: 01ARZ3NDEKTSV4RRFFQ69G5FAX
+        operationId: 01ARZ3NDEKTSV4RRFFQ69G5FAX
         lifecycleState: Proposed
         acceptedAt: "2026-05-30T00:00:00Z"
+        reasonCode: command_accepted
+        retryEligible: false
     OperationStatusProjectionPending:
       summary: Synthetic projection-pending operation status.
       value:
@@ -8445,6 +8514,10 @@ components:
           auditStatus: committed
         safeNextActions:
           - none
+        operationClass: command-execution
+        maxAttempts: 1
+        reasonCode: command_accepted
+        retryEligible: false
         acceptedAt: "2026-05-30T00:00:00Z"
         lastUpdatedAt: "2026-05-30T00:00:00Z"
     OperationAuditHistoryPostCommit:
@@ -8473,6 +8546,7 @@ components:
         instance: urn:hexalith:chatbot:problem:synthetic-validation
         category: validation_error
         code: command_contract_invalid
+        schemaVersion: chatbot.message-catalog.v1
         message: Correct the request metadata and retry.
         correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
         retryable: false
@@ -8487,6 +8561,7 @@ components:
         status: 401
         category: authentication_failure
         code: authentication_denied
+        schemaVersion: chatbot.message-catalog.v1
         message: Authentication is required before this operation can continue.
         correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
         retryable: false
@@ -8501,6 +8576,7 @@ components:
         status: 403
         category: authorization_denied
         code: authorization_denied
+        schemaVersion: chatbot.message-catalog.v1
         message: The operation is not available to this caller.
         correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
         retryable: false
@@ -8515,6 +8591,7 @@ components:
         status: 409
         category: conflict
         code: idempotency_conflict_command_execution
+        schemaVersion: chatbot.message-catalog.v1
         message: The command conflicts with an existing submission record.
         correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
         taskId: 01ARZ3NDEKTSV4RRFFQ69G5FAX
@@ -8530,6 +8607,7 @@ components:
         status: 503
         category: internal_error
         code: audit_unavailable
+        schemaVersion: chatbot.message-catalog.v1
         message: The command cannot be accepted until audit recording is available.
         correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
         retryable: true

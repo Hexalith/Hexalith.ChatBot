@@ -12,6 +12,8 @@ internal interface ICorrectionPropagationWorkflowSteps
 
     Task<string> CallResolveCorrectedCaseAsync(CorrectionPropagationRequest request);
 
+    Task CallRetryStatusAsync(CorrectionPropagationRetryStatusInput input);
+
     Task CallStartAsync(CorrectionPropagationStartInput input);
 
     Task<CorrectionPropagationActivityResult> CallStoreAsync(CorrectionPropagationStoreActivityInput input);

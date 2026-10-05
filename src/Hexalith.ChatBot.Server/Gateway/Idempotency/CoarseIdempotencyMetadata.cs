@@ -4,7 +4,8 @@ internal sealed record CoarseIdempotencyMetadata(
     string OperationClass,
     string CoarseKeyHash,
     string CanonicalEquivalenceHash,
-    DateTimeOffset ExpiresAt)
+    DateTimeOffset ExpiresAt,
+    string? IdentityKeyHash = null)
 {
     public static CoarseIdempotencyMetadata UnsafeCreateForTesting(
         string operationClass,
