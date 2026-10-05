@@ -17,6 +17,9 @@ internal static class ChatBotProblemTypes
     /// <summary>A required audit write was unavailable.</summary>
     public const string AuditUnavailable = "https://hexalith.dev/errors/chatbot/audit-unavailable";
 
+    /// <summary>A required state or recovery dependency is unavailable.</summary>
+    public const string DependencyUnavailable = "https://hexalith.dev/errors/chatbot/dependency-degraded";
+
     /// <summary>Emitted only after admission accepted the caller, when dispatch could not be completed.</summary>
     public const string DispatchUnavailable = "https://hexalith.dev/errors/chatbot/dispatch-unavailable";
 

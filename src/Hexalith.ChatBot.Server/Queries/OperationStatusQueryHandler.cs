@@ -10,6 +10,7 @@ using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
+using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Client.Queries;
 using Hexalith.EventStore.Contracts.Queries;
@@ -17,7 +18,10 @@ using Hexalith.EventStore.DomainService;
 
 namespace Hexalith.ChatBot.Server.Queries;
 
-internal sealed class OperationStatusQueryHandler(IOperationStatusStore statusStore, ISystemClock? clock = null)
+internal sealed class OperationStatusQueryHandler(
+    IOperationStatusStore statusStore,
+    ISystemClock? clock = null,
+    ICorrectionPropagationWorkflowRuntime? workflowRuntime = null)
     : ChatBotReadQueryHandler<OperationStatusQuery>
 {
     public override string QueryType => ChatBotReadQueryTypes.OperationStatus;
@@ -32,6 +36,20 @@ internal sealed class OperationStatusQueryHandler(IOperationStatusStore statusSt
         OperationStatusRecord? record = await statusStore
             .TryGetAsync(query.TenantId, request.OperationId, cancellationToken)
             .ConfigureAwait(false);
+
+        if (record?.NextRetryAt is not null && record.WorkflowInstanceId is { } instanceId)
+        {
+            CorrectionPropagationWorkflowProgress? progress = workflowRuntime is { IsAvailable: true, HasAuthoritativeProgress: true }
+                ? await workflowRuntime.ReadProgressAsync(instanceId, cancellationToken).ConfigureAwait(false)
+                : null;
+            if (progress is null || progress.Status != CorrectionPropagationWorkflowStatuses.Retrying ||
+                progress.WorkflowInstanceId != instanceId || progress.TenantId != query.TenantId ||
+                progress.CorrelationId != record.CorrelationId || progress.RetryCount != record.WorkflowRetryCount ||
+                progress.RetryDueAt != record.NextRetryAt)
+            {
+                record = record with { NextRetryAt = null };
+            }
+        }
 
         return record is null
             ? QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound)

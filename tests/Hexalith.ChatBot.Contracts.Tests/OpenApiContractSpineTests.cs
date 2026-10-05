@@ -69,6 +69,8 @@ public static partial class OpenApiContractSpineTests
             string[] required = Sequence(schema, "required").Children.OfType<YamlScalarNode>()
                 .Select(static value => value.Value.ShouldNotBeNull()).ToArray();
             ShouldContainAll(required, safeFields);
+            required.ShouldNotContain("taskId");
+            required.ShouldNotContain("priorOutcome");
             RequiredKeys(Mapping(schema, "properties")).ShouldContain("taskId");
             Mapping(Mapping(schema, "properties"), "acceptedAt").Children[new YamlScalarNode("format")]
                 .ShouldBeOfType<YamlScalarNode>().Value.ShouldBe("date-time");
@@ -76,9 +78,54 @@ public static partial class OpenApiContractSpineTests
 
         string[] statusRequired = Sequence(status, "required").Children.OfType<YamlScalarNode>()
             .Select(static value => value.Value.ShouldNotBeNull()).ToArray();
-        ShouldContainAll(statusRequired, ["reasonCode", "retryEligible"]);
+        ShouldContainAll(statusRequired, ["operationId", "commandId", "correlationId", "lifecycleState", "retryCount",
+            "completionStatus", "auditStatus", "partialOutputs", "safeNextActions", "operationClass", "maxAttempts",
+            "acceptedAt", "lastUpdatedAt", "reasonCode", "retryEligible"]);
+        statusRequired.ShouldNotContain("priorOutcome");
+        ShouldContainAll(Sequence(Mapping(schemas, "OperationStatusPartialOutputs"), "required").Children.OfType<YamlScalarNode>()
+            .Select(static value => value.Value.ShouldNotBeNull()).ToArray(), ["acceptedAt", "completionStatus", "auditStatus"]);
         Scalar(Mapping(Mapping(status, "properties"), "priorOutcome"), "$ref")
             .ShouldBe("#/components/schemas/PriorCommandOutcome");
+    }
+
+    [Fact]
+    public static void ExampleValidationMustRejectEmptyDeclaredSafeNextActions()
+    {
+        YamlMappingNode root = LoadContract();
+        YamlMappingNode schemas = Mapping(Mapping(root, "components"), "schemas");
+        YamlMappingNode actions = Mapping(Mapping(Mapping(schemas, "OperationStatus"), "properties"), "safeNextActions");
+        Should.Throw<ShouldAssertException>(() => ValidateExampleNode(root, new YamlSequenceNode(), actions, "OperationStatus.safeNextActions"))
+            .Message.ShouldContain("OperationStatus.safeNextActions");
+    }
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, true)]
+    [InlineData(2, true)]
+    [InlineData(3, false)]
+    public static void ExampleValidationMustEnforceDeclaredArrayCardinality(int count, bool valid)
+    {
+        YamlMappingNode root = LoadContract();
+        YamlMappingNode schema = new()
+        {
+            { new YamlScalarNode("type"), new YamlScalarNode("array") },
+            { new YamlScalarNode("minItems"), new YamlScalarNode("1") },
+            { new YamlScalarNode("maxItems"), new YamlScalarNode("2") },
+            { new YamlScalarNode("items"), new YamlMappingNode { { new YamlScalarNode("type"), new YamlScalarNode("string") } } },
+        };
+        YamlSequenceNode values = new();
+        for (int index = 0; index < count; index++)
+        {
+            values.Children.Add(new YamlScalarNode("none"));
+        }
+        if (valid)
+        {
+            ValidateExampleNode(root, values, schema, "bounded-array");
+        }
+        else
+        {
+            Should.Throw<ShouldAssertException>(() => ValidateExampleNode(root, values, schema, "bounded-array"));
+        }
     }
 
     [Fact]
@@ -570,6 +617,20 @@ public static partial class OpenApiContractSpineTests
         if (type == "array")
         {
             YamlSequenceNode array = value.ShouldBeOfType<YamlSequenceNode>($"{path} must be an array");
+            if (schema.Children.TryGetValue(new YamlScalarNode("minItems"), out YamlNode? minimumItems))
+            {
+                array.Children.Count.ShouldBeGreaterThanOrEqualTo(int.Parse(
+                    minimumItems.ShouldBeOfType<YamlScalarNode>().Value.ShouldNotBeNull(),
+                    System.Globalization.CultureInfo.InvariantCulture), path);
+            }
+
+            if (schema.Children.TryGetValue(new YamlScalarNode("maxItems"), out YamlNode? maximumItems))
+            {
+                array.Children.Count.ShouldBeLessThanOrEqualTo(int.Parse(
+                    maximumItems.ShouldBeOfType<YamlScalarNode>().Value.ShouldNotBeNull(),
+                    System.Globalization.CultureInfo.InvariantCulture), path);
+            }
+
             if (schema.Children.TryGetValue(new YamlScalarNode("items"), out YamlNode? items))
             {
                 foreach (YamlNode item in array.Children)

@@ -14,6 +14,24 @@ internal sealed class DaprCorrectionPropagationWorkflowRuntime(
     private readonly IChatBotMetrics _metrics = metrics ?? NullChatBotMetrics.Instance;
     public bool IsAvailable => true;
 
+    public bool HasAuthoritativeProgress => true;
+
+    public async ValueTask<CorrectionPropagationWorkflowProgress?> ReadProgressAsync(string instanceId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            WorkflowState state = await workflowClient.GetWorkflowStateAsync(instanceId,
+                getInputsAndOutputs: false, cancellation: cancellationToken).ConfigureAwait(false);
+            return state.RuntimeStatus == WorkflowRuntimeStatus.Running
+                ? state.ReadCustomStatusAs<CorrectionPropagationWorkflowProgress>()
+                : null;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
     public async ValueTask ScheduleAsync(CorrectionPropagationRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);

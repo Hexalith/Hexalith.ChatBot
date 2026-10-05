@@ -69,7 +69,7 @@ public sealed class CommandSubmissionTransportTests
     {
         CapturingHandler handler = new(HttpStatusCode.Accepted,
             """
-            {"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","lifecycleState":"Proposed","acceptedAt":"2026-06-10T00:00:00Z"}
+            {"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","lifecycleState":"Proposed","acceptedAt":"2026-06-10T00:00:00Z","reasonCode":"command_accepted","retryEligible":false}
             """);
         GeneratedClient client = NewClient(handler);
         CommandSubmissionRequest request = Request();
@@ -91,7 +91,7 @@ public sealed class CommandSubmissionTransportTests
         CapturingHandler handler = new(
             HttpStatusCode.Accepted,
             """
-            {"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","lifecycleState":0,"acceptedAt":"2026-06-10T00:00:00Z"}
+            {"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","lifecycleState":0,"acceptedAt":"2026-06-10T00:00:00Z","reasonCode":"command_accepted","retryEligible":false}
             """);
         GeneratedClient client = NewClient(handler);
 
@@ -114,7 +114,7 @@ public sealed class CommandSubmissionTransportTests
         CapturingHandler handler = new(
             HttpStatusCode.OK,
             """
-            {"operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","safeNextActions":[1]}
+            {"operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","lifecycleState":"Proposed","retryCount":0,"completionStatus":"accepted-projection-pending","auditStatus":"committed","partialOutputs":{"acceptedAt":"2026-06-10T00:00:00Z","completionStatus":"accepted-projection-pending","auditStatus":"committed"},"safeNextActions":[1],"operationClass":"command-execution","maxAttempts":1,"acceptedAt":"2026-06-10T00:00:00Z","lastUpdatedAt":"2026-06-10T00:00:00Z","reasonCode":"command_accepted","retryEligible":false}
             """);
         GeneratedClient client = NewClient(handler);
 
@@ -134,7 +134,7 @@ public sealed class CommandSubmissionTransportTests
         CapturingHandler handler = new(
             HttpStatusCode.OK,
             """
-            {"operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","safeNextActions":["retry-later","escalate"]}
+            {"operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","lifecycleState":"Proposed","retryCount":0,"completionStatus":"accepted-projection-pending","auditStatus":"committed","partialOutputs":{"acceptedAt":"2026-06-10T00:00:00Z","completionStatus":"accepted-projection-pending","auditStatus":"committed"},"safeNextActions":["retry-later","escalate"],"operationClass":"command-execution","maxAttempts":1,"acceptedAt":"2026-06-10T00:00:00Z","lastUpdatedAt":"2026-06-10T00:00:00Z","reasonCode":"command_accepted","retryEligible":false}
             """);
         GeneratedClient client = NewClient(handler);
 
@@ -179,6 +179,47 @@ public sealed class CommandSubmissionTransportTests
         response.ShouldNotContain("secret", Case.Insensitive);
     }
 
+    public static IEnumerable<object[]> RequiredResponseMembers()
+    {
+        string[] acceptance = ["commandId", "correlationId", "operationId", "lifecycleState", "acceptedAt", "reasonCode", "retryEligible"];
+        foreach (string member in acceptance)
+        {
+            yield return ["accepted", member];
+            yield return ["accepted", "priorOutcome." + member];
+            yield return ["status", "priorOutcome." + member];
+        }
+        foreach (string member in new[] { "operationId", "commandId", "correlationId", "lifecycleState", "retryCount", "completionStatus", "auditStatus", "partialOutputs", "safeNextActions", "operationClass", "maxAttempts", "acceptedAt", "lastUpdatedAt", "reasonCode", "retryEligible" })
+        {
+            yield return ["status", member];
+        }
+        foreach (string member in new[] { "acceptedAt", "completionStatus", "auditStatus" })
+        {
+            yield return ["status", "partialOutputs." + member];
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(RequiredResponseMembers))]
+    public async Task HttpDeserializationMustRejectEveryMissingRequiredResponseFact(string responseKind, string memberPath)
+    {
+        ArgumentNullException.ThrowIfNull(memberPath);
+        var acceptance = Newtonsoft.Json.Linq.JObject.Parse("""
+            {"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","lifecycleState":"Proposed","acceptedAt":"2026-06-10T00:00:00Z","reasonCode":"command_accepted","retryEligible":false}
+            """);
+        var body = responseKind == "accepted" ? (Newtonsoft.Json.Linq.JObject)acceptance.DeepClone() : Newtonsoft.Json.Linq.JObject.Parse("""
+            {"operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","lifecycleState":"Proposed","retryCount":0,"completionStatus":"accepted-projection-pending","auditStatus":"committed","partialOutputs":{"acceptedAt":"2026-06-10T00:00:00Z","completionStatus":"accepted-projection-pending","auditStatus":"committed"},"safeNextActions":["none"],"operationClass":"command-execution","maxAttempts":1,"acceptedAt":"2026-06-10T00:00:00Z","lastUpdatedAt":"2026-06-10T00:00:00Z","reasonCode":"command_accepted","retryEligible":false}
+            """);
+        body["priorOutcome"] = acceptance;
+        ((Newtonsoft.Json.Linq.JProperty)body.SelectToken(memberPath)!.Parent!).Remove();
+        GeneratedClient client = NewClient(new CapturingHandler(responseKind == "accepted" ? HttpStatusCode.Accepted : HttpStatusCode.OK, body.ToString()));
+        HexalithChatBotApiException exception = await Should.ThrowAsync<HexalithChatBotApiException>(async () =>
+        {
+            if (responseKind == "accepted") { _ = await client.SubmitCommandAsync(CorrelationId, null, Request(), TestContext.Current.CancellationToken).ConfigureAwait(true); }
+            else { _ = await client.GetOperationStatusAsync(CommandId, CorrelationId, null, TestContext.Current.CancellationToken).ConfigureAwait(true); }
+        });
+        exception.InnerException.ShouldBeOfType<JsonSerializationException>().Message.ShouldContain(memberPath.Split('.').Last());
+    }
+
     private static CommandSubmissionRequest Request()
         => new()
         {
@@ -197,6 +238,7 @@ public sealed class CommandSubmissionTransportTests
             {
               "type": "https://problems.hexalith.local/chatbot/{{status}}",
               "title": "Synthetic metadata-only problem",
+              "schemaVersion": "chatbot.message-catalog.v1",
               "status": {{status}},
               "category": "{{WireValue(category)}}",
               "code": "synthetic_metadata_only_problem",

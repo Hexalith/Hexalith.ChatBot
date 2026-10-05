@@ -5,6 +5,9 @@ using Dapr.Client;
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.EventStore.Client.Gateway;
+using Hexalith.EventStore.Contracts.Commands;
+using Hexalith.ChatBot.Server.Operations;
 
 namespace Hexalith.ChatBot.Server.Gateway.Idempotency;
 
@@ -13,6 +16,8 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
     private readonly ICoarseIdempotencyStateClient _state;
     private readonly ISystemClock clock;
     private readonly IAuditHistoryReader? _auditHistory;
+    private readonly IEventStoreGatewayClient? _eventStore;
+    internal static readonly TimeSpan ReservationLease = TimeSpan.FromMinutes(2);
     private readonly ConcurrentDictionary<string, CommandSubmissionResponse> _pendingOutcomes = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, byte> _unadmittedReservations = new(StringComparer.Ordinal);
 
@@ -21,11 +26,17 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
     {
     }
 
-    internal DaprCoarseIdempotencyStore(ICoarseIdempotencyStateClient state, ISystemClock clock, IAuditHistoryReader? auditHistory = null)
+    public DaprCoarseIdempotencyStore(DaprClient client, ISystemClock clock, IAuditHistoryReader auditHistory, IEventStoreGatewayClient eventStore)
+        : this(new DaprCoarseIdempotencyStateClient(client), clock, auditHistory, eventStore)
+    {
+    }
+
+    internal DaprCoarseIdempotencyStore(ICoarseIdempotencyStateClient state, ISystemClock clock, IAuditHistoryReader? auditHistory = null, IEventStoreGatewayClient? eventStore = null)
     {
         _state = state;
         this.clock = clock;
         _auditHistory = auditHistory;
+        _eventStore = eventStore;
     }
 
     public async ValueTask<CoarseIdempotencyDecision> RecordAdmissionAsync(
@@ -35,16 +46,21 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         ArgumentNullException.ThrowIfNull(context);
         DateTimeOffset now = clock.UtcNow;
         CoarseIdempotencyRecord proposed = CoarseIdempotencyComposer.ComposeCommandExecutionRecord(context, now)
-            with { ReservationId = Guid.NewGuid().ToString("N") };
+            with
+            {
+                ReservationId = Guid.NewGuid().ToString("N"),
+                DispatchState = CoarseDispatchState.Reserved,
+                ReservationLeaseExpiresAt = now.Add(ReservationLease),
+            };
         CoarseIdempotencyMetadata metadata = Metadata(proposed);
         context.SetIdempotency(metadata);
 
         CoarseCommandIdentityRecord? owner = await ReadIdentityAsync(proposed.IdentityKeyHash!, cancellationToken).ConfigureAwait(false);
-        if (owner is not null && IsUnadmitted(owner.DomainReservation?.ReservationId) && owner.PriorOutcome is null)
+        if (owner is not null && CanRelease(owner.DomainReservation) && owner.PriorOutcome is null)
         {
             bool released = await TryReleaseUnadmittedIdentityAsync(proposed.IdentityKeyHash!, owner, cancellationToken).ConfigureAwait(false);
             owner = await ReadIdentityAsync(proposed.IdentityKeyHash!, cancellationToken).ConfigureAwait(false);
-            if (!released && owner is not null && IsUnadmitted(owner.DomainReservation?.ReservationId) && owner.PriorOutcome is null)
+            if (!released && owner is not null && CanRelease(owner.DomainReservation) && owner.PriorOutcome is null)
             {
                 return CoarseIdempotencyDecision.RecoveryPending(metadata);
             }
@@ -66,8 +82,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         if (proposed.LegacyKeyHash is { } legacyKey)
         {
             (CoarseIdempotencyRecord? legacy, _) = await ReadDomainAsync(legacyKey, cancellationToken).ConfigureAwait(false);
-            if (legacy is not null && legacy.ExpiresAt > now &&
-                string.Equals(legacy.CommandId, proposed.CommandId, StringComparison.Ordinal))
+            if (legacy is not null && legacy.ExpiresAt > now)
             {
                 return legacy.PriorOutcome is null
                     ? CoarseIdempotencyDecision.RecoveryPending(metadata)
@@ -89,13 +104,18 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             {
                 if (receipt.PriorOutcome is not null && receipt.ExpiresAt <= now)
                 {
+                    // Preserve the caller receipt before logically expiring the sole domain copy.
+                    if (!await EnsureIdentityOutcomeAsync(receipt, cancellationToken).ConfigureAwait(false))
+                    {
+                        return CoarseIdempotencyDecision.RecoveryPending(metadata);
+                    }
                     (CoarseIdempotencyRecord? primary, _) = await ReadDomainAsync(proposed.CoarseKeyHash, cancellationToken).ConfigureAwait(false);
                     if (primary is not null && primary.PriorOutcome is null && SameReservation(primary, receipt))
                     {
                         return await DomainDecisionAsync(receipt, proposed, metadata, cancellationToken).ConfigureAwait(false);
                     }
 
-                    if (!await _state.TryDeleteAsync(receiptKey, receiptEtag, cancellationToken).ConfigureAwait(false))
+                    if (!await _state.TrySaveDomainAsync(receiptKey, receipt with { Released = true }, receiptEtag, cancellationToken).ConfigureAwait(false))
                     {
                         return CoarseIdempotencyDecision.RecoveryPending(metadata);
                     }
@@ -112,20 +132,23 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         {
             if (existing.PriorOutcome is null)
             {
-                return CoarseIdempotencyDecision.Conflict(metadata);
+                return await DomainDecisionAsync(existing, proposed, metadata, cancellationToken).ConfigureAwait(false);
             }
 
             if (!await EnsureIdentityOutcomeAsync(existing, cancellationToken).ConfigureAwait(false))
             {
-                return CoarseIdempotencyDecision.Conflict(metadata);
+                return CoarseIdempotencyDecision.RecoveryPending(metadata);
             }
 
-            if (!await _state.TryDeleteAsync(proposed.CoarseKeyHash, etag ?? string.Empty, cancellationToken).ConfigureAwait(false))
+            if (!await _state.TrySaveDomainAsync(proposed.CoarseKeyHash, existing with { Released = true }, etag, cancellationToken).ConfigureAwait(false))
             {
-                return CoarseIdempotencyDecision.Conflict(metadata);
+                return CoarseIdempotencyDecision.RecoveryPending(metadata);
             }
-            existing = null;
-            etag = string.Empty;
+            (existing, etag) = await ReadDomainAsync(proposed.CoarseKeyHash, cancellationToken).ConfigureAwait(false);
+            if (existing is not null)
+            {
+                return await DomainDecisionAsync(existing, proposed, metadata, cancellationToken).ConfigureAwait(false);
+            }
         }
 
         if (existing is not null)
@@ -139,22 +162,27 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             if (!saved)
             {
                 (existing, _) = await ReadDomainAsync(proposed.CoarseKeyHash, cancellationToken).ConfigureAwait(false);
-                return existing is null ? CoarseIdempotencyDecision.Conflict(metadata) :
+                return existing is null ? CoarseIdempotencyDecision.RecoveryPending(metadata) :
                     await DomainDecisionAsync(existing, proposed, metadata, cancellationToken).ConfigureAwait(false);
             }
 
+            (CoarseIdempotencyRecord? receiptOwner, string receiptVersion) = receiptKey is null
+                ? (null, string.Empty)
+                : await ReadDomainAsync(receiptKey, cancellationToken).ConfigureAwait(false);
             if (receiptKey is not null &&
-                !await _state.TrySaveDomainAsync(receiptKey, proposed, string.Empty, cancellationToken).ConfigureAwait(false))
+                (receiptOwner is not null ||
+                 !await _state.TrySaveDomainAsync(receiptKey, proposed, receiptVersion, cancellationToken).ConfigureAwait(false)))
             {
-                await DeletePendingDomainAsync(proposed.CoarseKeyHash, proposed, cancellationToken).ConfigureAwait(false);
+                await ReleasePendingDomainAsync(proposed.CoarseKeyHash, proposed, cancellationToken).ConfigureAwait(false);
                 (CoarseIdempotencyRecord? currentReceipt, _) = await ReadDomainAsync(receiptKey, cancellationToken).ConfigureAwait(false);
-                return currentReceipt is null ? CoarseIdempotencyDecision.Conflict(metadata) :
+                return currentReceipt is null ? CoarseIdempotencyDecision.RecoveryPending(metadata) :
                     await DomainDecisionAsync(currentReceipt, proposed, metadata, cancellationToken).ConfigureAwait(false);
             }
 
             CoarseCommandIdentityRecord identity = new(
                 proposed.TenantId, proposed.CommandId, proposed.CallerFingerprint!, proposed.CoarseKeyHash, now, null, proposed);
-            bool claimed = await _state.TrySaveIdentityAsync(proposed.IdentityKeyHash!, identity, string.Empty, cancellationToken).ConfigureAwait(false);
+            (CoarseCommandIdentityRecord? claimOwner, string claimVersion) = await ReadIdentityWithEtagAsync(proposed.IdentityKeyHash!, cancellationToken).ConfigureAwait(false);
+            bool claimed = claimOwner is null && await _state.TrySaveIdentityAsync(proposed.IdentityKeyHash!, identity, claimVersion, cancellationToken).ConfigureAwait(false);
             if (claimed)
             {
                 return CoarseIdempotencyDecision.Proceed(metadata);
@@ -163,10 +191,10 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             owner = await ReadIdentityAsync(proposed.IdentityKeyHash!, cancellationToken).ConfigureAwait(false);
             if (receiptKey is not null)
             {
-                await DeletePendingDomainAsync(receiptKey, proposed, cancellationToken).ConfigureAwait(false);
+                await ReleasePendingDomainAsync(receiptKey, proposed, cancellationToken).ConfigureAwait(false);
             }
-            await DeletePendingDomainAsync(proposed.CoarseKeyHash, proposed, cancellationToken).ConfigureAwait(false);
-            return owner is null ? CoarseIdempotencyDecision.Conflict(metadata) :
+            await ReleasePendingDomainAsync(proposed.CoarseKeyHash, proposed, cancellationToken).ConfigureAwait(false);
+            return owner is null ? CoarseIdempotencyDecision.RecoveryPending(metadata) :
                 await IdentityDecisionAsync(owner, proposed, metadata, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception)
@@ -174,18 +202,12 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             RememberUnadmitted(proposed.ReservationId);
             try
             {
-                await DeleteOwnedPendingIdentityAsync(proposed.IdentityKeyHash!, proposed, cancellationToken).ConfigureAwait(false);
-                if (receiptKey is not null)
-                {
-                    await DeletePendingDomainAsync(receiptKey, proposed, cancellationToken).ConfigureAwait(false);
-                }
-
-                await DeletePendingDomainAsync(proposed.CoarseKeyHash, proposed, cancellationToken).ConfigureAwait(false);
+                await AbortAdmissionCoreAsync(Metadata(proposed), cancellationToken).ConfigureAwait(false);
             }
             catch (Exception cleanupFailure) when (cleanupFailure is not OperationCanceledException)
             {
                 // The committed reservation stays marked so the next admission can remove it
-                // after the state store accepts conditional deletes again.
+                // after the state store accepts conditional releases again.
             }
 
             try
@@ -203,6 +225,80 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             throw;
         }
     }
+
+    /// <summary>Atomically fences dispatch and retains the exact response before the external call.</summary>
+    public async ValueTask<bool> PrepareDispatchAsync(
+        CoarseIdempotencyMetadata metadata,
+        CommandSubmissionResponse outcome,
+        CancellationToken cancellationToken)
+    {
+        if (metadata.IdentityKeyHash is not { } key)
+        {
+            return false;
+        }
+
+        (CoarseCommandIdentityRecord? identity, string etag) = await ReadIdentityWithEtagAsync(key, cancellationToken).ConfigureAwait(false);
+        CoarseIdempotencyRecord? reservation = identity?.DomainReservation;
+        if (identity?.PriorOutcome is not null || reservation is null ||
+            !MatchesMetadata(reservation, metadata) || reservation.DispatchState != CoarseDispatchState.Reserved ||
+            reservation.ReservationLeaseExpiresAt is not { } lease || lease <= clock.UtcNow ||
+            !string.Equals(outcome.CommandId, reservation.CommandId, StringComparison.Ordinal) ||
+            !string.Equals(outcome.CorrelationId, reservation.CorrelationId, StringComparison.Ordinal) ||
+            !string.Equals(outcome.OperationId, reservation.TaskId ?? reservation.CommandId, StringComparison.Ordinal) ||
+            outcome.AcceptedAt.Offset != TimeSpan.Zero)
+        {
+            return false;
+        }
+
+        (CoarseIdempotencyRecord? domain, _) = await ReadDomainAsync(metadata.CoarseKeyHash, cancellationToken).ConfigureAwait(false);
+        if (domain is null || !SameReservation(domain, reservation) || domain.DispatchState != CoarseDispatchState.Reserved)
+        {
+            return false;
+        }
+
+        CoarseIdempotencyRecord prepared = reservation with
+        {
+            DispatchState = CoarseDispatchState.Dispatching,
+            PreparedOutcome = Clone(outcome),
+        };
+        try
+        {
+            return await _state.TrySaveIdentityAsync(key, identity! with { DomainReservation = prepared }, etag, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // This method has not returned to the gateway, so external dispatch has not
+            // started. An acknowledged-loss write can be reclaimed only after this exact
+            // prepared ownership is durably fenced off; ordinary abort still denies Dispatching.
+            try
+            {
+                (CoarseCommandIdentityRecord? current, string currentEtag) = await ReadIdentityWithEtagAsync(key, cancellationToken).ConfigureAwait(false);
+                if (current?.PriorOutcome is null && current?.DomainReservation is { } currentReservation &&
+                    currentReservation.DispatchState == CoarseDispatchState.Dispatching &&
+                    SameReservation(currentReservation, prepared) &&
+                    currentReservation.PreparedOutcome is { } currentOutcome &&
+                    SamePreparedOutcome(currentOutcome, outcome) &&
+                    await _state.TrySaveIdentityAsync(key,
+                        current with { DomainReservation = currentReservation with { DispatchState = CoarseDispatchState.Aborted } },
+                        currentEtag, cancellationToken).ConfigureAwait(false))
+                {
+                    await AbortAdmissionCoreAsync(metadata, cancellationToken).ConfigureAwait(false);
+                }
+            }
+            catch (Exception cleanupFailure) when (cleanupFailure is not OperationCanceledException)
+            {
+                // Retain the conservative dispatch fence if abort ownership cannot be persisted.
+            }
+
+            throw;
+        }
+    }
+
+    private static bool SamePreparedOutcome(CommandSubmissionResponse actual, CommandSubmissionResponse expected)
+        => actual.CommandId == expected.CommandId && actual.CorrelationId == expected.CorrelationId &&
+            actual.TaskId == expected.TaskId && actual.OperationId == expected.OperationId &&
+            actual.LifecycleState == expected.LifecycleState && actual.AcceptedAt == expected.AcceptedAt &&
+            actual.ReasonCode == expected.ReasonCode && actual.RetryEligible == expected.RetryEligible;
 
     public async ValueTask RecordOutcomeAsync(
         CoarseIdempotencyMetadata metadata,
@@ -224,7 +320,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         // not prevent another durable record from keeping the committed outcome recoverable.
         try
         {
-            identityStored = await EnsureIdentityOutcomeAsync(metadata.IdentityKeyHash, metadata.CoarseKeyHash, stored, cancellationToken).ConfigureAwait(false);
+            identityStored = await EnsureIdentityOutcomeAsync(metadata.IdentityKeyHash, metadata, stored, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -245,7 +341,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
 
         try
         {
-            domainStored = await EnsurePrimaryDomainOutcomeAsync(metadata.CoarseKeyHash, stored, cancellationToken).ConfigureAwait(false);
+            domainStored = await EnsurePrimaryDomainOutcomeAsync(metadata, stored, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -286,8 +382,19 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         }
     }
 
-    private async ValueTask AbortAdmissionCoreAsync(CoarseIdempotencyMetadata metadata, CancellationToken cancellationToken)
+    /// <summary>Releases prepared ownership only with the dispatcher's proof that no external write was attempted.</summary>
+    public ValueTask AbortUndispatchedAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse preparedOutcome,
+        CancellationToken cancellationToken)
+        => AbortAdmissionCoreAsync(metadata, cancellationToken, preparedOutcome);
+
+    private async ValueTask AbortAdmissionCoreAsync(CoarseIdempotencyMetadata metadata, CancellationToken cancellationToken,
+        CommandSubmissionResponse? undispatchedOutcome = null)
     {
+        if (!await FenceAbortAsync(metadata, cancellationToken, undispatchedOutcome).ConfigureAwait(false))
+        {
+            throw new InvalidOperationException("Admission ownership cannot be aborted after dispatch or replacement.");
+        }
+
         if (metadata.IdentityKeyHash is { } identityKey)
         {
             (CoarseCommandIdentityRecord? identity, string identityEtag) = await ReadIdentityWithEtagAsync(identityKey, cancellationToken).ConfigureAwait(false);
@@ -296,20 +403,99 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
                 (metadata.CreatedAt is null || identity.CreatedAt == metadata.CreatedAt) &&
                 string.Equals(identity.DomainReservation?.ReservationId, metadata.ReservationId, StringComparison.Ordinal))
             {
-                await DeletePendingAsync(identityKey, identityEtag, identity, null, cancellationToken).ConfigureAwait(false);
+                await ReleasePendingAsync(identityKey, identityEtag, identity, null, cancellationToken).ConfigureAwait(false);
             }
         }
 
         if (DomainReceiptKey(metadata.OperationClass, metadata.CoarseKeyHash) is { } receiptKey)
         {
-            await DeletePendingDomainForMetadataAsync(receiptKey, metadata, cancellationToken).ConfigureAwait(false);
+            await ReleasePendingDomainForMetadataAsync(receiptKey, metadata, cancellationToken).ConfigureAwait(false);
         }
 
-        await DeletePendingDomainForMetadataAsync(metadata.CoarseKeyHash, metadata, cancellationToken).ConfigureAwait(false);
+        await ReleasePendingDomainForMetadataAsync(metadata.CoarseKeyHash, metadata, cancellationToken).ConfigureAwait(false);
     }
 
+    private async ValueTask<bool> FenceAbortAsync(CoarseIdempotencyMetadata metadata, CancellationToken cancellationToken,
+        CommandSubmissionResponse? undispatchedOutcome = null)
+    {
+        // The identity is the dispatch authority. CAS it before releasing any domain copies.
+        if (metadata.IdentityKeyHash is { } identityKey)
+        {
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                (CoarseCommandIdentityRecord? identity, string etag) = await ReadIdentityWithEtagAsync(identityKey, cancellationToken).ConfigureAwait(false);
+                if (identity is null)
+                {
+                    break;
+                }
+
+                if (identity.DomainReservation is not { } reservation || !MatchesMetadata(reservation, metadata))
+                {
+                    // A caller-ID winner in another domain does not own this losing reservation.
+                    // Leave that identity untouched and fence the matching domain below.
+                    break;
+                }
+
+                if (identity.PriorOutcome is not null || reservation.DispatchState == CoarseDispatchState.Unknown ||
+                    reservation.DispatchState == CoarseDispatchState.Dispatching &&
+                    (undispatchedOutcome is null || reservation.PreparedOutcome is not { } prepared ||
+                     !SamePreparedOutcome(prepared, undispatchedOutcome)))
+                {
+                    return false;
+                }
+
+                if (reservation.DispatchState == CoarseDispatchState.Aborted ||
+                    await _state.TrySaveIdentityAsync(identityKey,
+                        identity with { DomainReservation = reservation with { DispatchState = CoarseDispatchState.Aborted } },
+                        etag, cancellationToken).ConfigureAwait(false))
+                {
+                    return true;
+                }
+                if (attempt == 2)
+                {
+                    return false;
+                }
+            }
+        }
+
+        // A failed first-write can leave a domain reservation without an identity. Its
+        // bounded lease is also checked at dispatch, so an old owner cannot dispatch it.
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            (CoarseIdempotencyRecord? domain, string etag) = await ReadDomainAsync(metadata.CoarseKeyHash, cancellationToken).ConfigureAwait(false);
+            if (domain is null || !MatchesMetadata(domain, metadata))
+            {
+                return true;
+            }
+
+            if (domain.PriorOutcome is not null || domain.DispatchState is CoarseDispatchState.Unknown or CoarseDispatchState.Dispatching)
+            {
+                return false;
+            }
+
+            if (domain.DispatchState == CoarseDispatchState.Aborted ||
+                await _state.TrySaveDomainAsync(metadata.CoarseKeyHash,
+                    domain with { DispatchState = CoarseDispatchState.Aborted }, etag, cancellationToken).ConfigureAwait(false))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool MatchesMetadata(CoarseIdempotencyRecord reservation, CoarseIdempotencyMetadata metadata)
+        => string.Equals(reservation.ReservationId, metadata.ReservationId, StringComparison.Ordinal) &&
+            string.Equals(reservation.IdentityKeyHash, metadata.IdentityKeyHash, StringComparison.Ordinal) &&
+            string.Equals(reservation.CoarseKeyHash, metadata.CoarseKeyHash, StringComparison.Ordinal) &&
+            string.Equals(reservation.CanonicalEquivalenceHash, metadata.CanonicalEquivalenceHash, StringComparison.Ordinal) &&
+            reservation.CreatedAt == metadata.CreatedAt;
+
     /// <summary>Reconciles a post-dispatch, metadata-only receipt from the independent audit replay queue.</summary>
-    internal async ValueTask<bool> ReconcileOutcomeAsync(AuditReplayIntent intent, CancellationToken cancellationToken)
+    internal async ValueTask<bool> ReconcileOutcomeAsync(
+        AuditReplayIntent intent,
+        CancellationToken cancellationToken,
+        CoarseIdempotencyMetadata? retry = null)
     {
         ArgumentNullException.ThrowIfNull(intent);
         if (intent.AcceptedOutcome is not { } outcome || intent.IdentityKeyHash is not { } identityKey ||
@@ -322,13 +508,35 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         CoarseCommandIdentityRecord? identity = await ReadIdentityAsync(identityKey, cancellationToken).ConfigureAwait(false);
         if (identity?.DomainReservation is not { } reservation ||
             !string.Equals(identity.TenantId, intent.TenantId, StringComparison.Ordinal) ||
+            !string.Equals(reservation.RequesterId, intent.ActorId, StringComparison.Ordinal) ||
             !string.Equals(identity.CommandId, outcome.CommandId, StringComparison.Ordinal) ||
             !string.Equals(identity.DomainKeyHash, domainKey, StringComparison.Ordinal) ||
+            (retry is not null &&
+             (!string.Equals(reservation.CoarseKeyHash, retry.CoarseKeyHash, StringComparison.Ordinal) ||
+              !string.Equals(reservation.CanonicalEquivalenceHash, retry.CanonicalEquivalenceHash, StringComparison.Ordinal))) ||
             !string.Equals(reservation.IdentityKeyHash, identityKey, StringComparison.Ordinal) ||
             !string.Equals(reservation.CorrelationId, outcome.CorrelationId, StringComparison.Ordinal) ||
             !string.Equals(outcome.OperationId, outcome.TaskId ?? outcome.CommandId, StringComparison.Ordinal))
         {
             return false;
+        }
+
+        if (reservation.PreparedOutcome is { } prepared &&
+            (prepared.CommandId != outcome.CommandId || prepared.TaskId != outcome.TaskId ||
+             prepared.OperationId != outcome.OperationId || prepared.CorrelationId != outcome.CorrelationId ||
+             prepared.AcceptedAt != outcome.AcceptedAt || prepared.LifecycleState != outcome.LifecycleState ||
+             prepared.ReasonCode != outcome.ReasonCode || prepared.RetryEligible != outcome.RetryEligible))
+        {
+            return false;
+        }
+
+        if (reservation.PreparedOutcome is { } preparedReceipt && _eventStore is not null)
+        {
+            CommandStatusQueryResponse? evidence = await _eventStore.GetCommandStatusAsync(identity.CommandId, cancellationToken).ConfigureAwait(false);
+            if (!HasCommittedOutcomeEvidence(evidence, identity, preparedReceipt))
+            {
+                return false;
+            }
         }
 
         await RecordOutcomeAsync(Metadata(reservation), outcome, cancellationToken).ConfigureAwait(false);
@@ -437,7 +645,8 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             (CoarseIdempotencyRecord? receipt, _) = await ReadDomainAsync(pendingReceiptKey, cancellationToken).ConfigureAwait(false);
             domain = receipt?.PriorOutcome is not null ? receipt : domain;
         }
-        if (domain?.PriorOutcome is null)
+        if (domain?.PriorOutcome is null ||
+            (identity.DomainReservation is { } owned && !SameReservation(domain, owned)))
         {
             return CoarseIdempotencyDecision.RecoveryPending(metadata);
         }
@@ -488,6 +697,11 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         if (existing.PriorOutcome is null && existing.IdentityKeyHash is { } identityKey)
         {
             CoarseCommandIdentityRecord? identity = await ReadIdentityAsync(identityKey, cancellationToken).ConfigureAwait(false);
+            if (identity is not null)
+            {
+                await RecoverPendingOutcomeAsync(identityKey, identity, cancellationToken).ConfigureAwait(false);
+                identity = await ReadIdentityAsync(identityKey, cancellationToken).ConfigureAwait(false) ?? identity;
+            }
             CommandSubmissionResponse? durableOutcome = identity?.PriorOutcome;
             if (durableOutcome is null)
             {
@@ -522,18 +736,19 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         CoarseCommandIdentityRecord identity = new(
             proposed.TenantId, proposed.CommandId, proposed.CallerFingerprint!, existing.CoarseKeyHash,
             clock.UtcNow, Clone(existing.PriorOutcome!));
-        bool claimed = await _state.TrySaveIdentityAsync(proposed.IdentityKeyHash!, identity, string.Empty, cancellationToken).ConfigureAwait(false);
+        (CoarseCommandIdentityRecord? claimOwner, string claimVersion) = await ReadIdentityWithEtagAsync(proposed.IdentityKeyHash!, cancellationToken).ConfigureAwait(false);
+        bool claimed = claimOwner is null && await _state.TrySaveIdentityAsync(proposed.IdentityKeyHash!, identity, claimVersion, cancellationToken).ConfigureAwait(false);
         if (claimed)
         {
             return CoarseIdempotencyDecision.ReplayPriorOutcome(metadata, Clone(existing.PriorOutcome!));
         }
 
         CoarseCommandIdentityRecord? owner = await ReadIdentityAsync(proposed.IdentityKeyHash!, cancellationToken).ConfigureAwait(false);
-        return owner is null ? CoarseIdempotencyDecision.Conflict(metadata) :
+        return owner is null ? CoarseIdempotencyDecision.RecoveryPending(metadata) :
             await IdentityDecisionAsync(owner, proposed, metadata, cancellationToken).ConfigureAwait(false);
     }
 
-    private async ValueTask DeletePendingDomainForMetadataAsync(
+    private async ValueTask ReleasePendingDomainForMetadataAsync(
         string key,
         CoarseIdempotencyMetadata metadata,
         CancellationToken cancellationToken)
@@ -547,21 +762,21 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             string.Equals(record.ReservationId, metadata.ReservationId, StringComparison.Ordinal) &&
             (metadata.CreatedAt is null || record.CreatedAt == metadata.CreatedAt))
         {
-            await DeletePendingDomainAsync(key, record, cancellationToken).ConfigureAwait(false);
+            await ReleasePendingDomainAsync(key, record, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private async ValueTask DeletePendingDomainAsync(string key, CoarseIdempotencyRecord expected, CancellationToken cancellationToken)
+    private async ValueTask ReleasePendingDomainAsync(string key, CoarseIdempotencyRecord expected, CancellationToken cancellationToken)
     {
         (CoarseIdempotencyRecord? record, string etag) = await ReadDomainAsync(key, cancellationToken).ConfigureAwait(false);
         if (record is not null && record.PriorOutcome is null && SameReservation(record, expected) &&
             !string.IsNullOrWhiteSpace(etag))
         {
-            await DeletePendingAsync(key, etag, null, expected, cancellationToken).ConfigureAwait(false);
+            await ReleasePendingAsync(key, etag, null, expected, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private async ValueTask DeleteOwnedPendingIdentityAsync(
+    private async ValueTask ReleaseOwnedPendingIdentityAsync(
         string key,
         CoarseIdempotencyRecord expected,
         CancellationToken cancellationToken)
@@ -574,11 +789,11 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             string.Equals(identity.DomainReservation?.ReservationId, expected.ReservationId, StringComparison.Ordinal) &&
             !string.IsNullOrWhiteSpace(etag))
         {
-            await DeletePendingAsync(key, etag, identity, null, cancellationToken).ConfigureAwait(false);
+            await ReleasePendingAsync(key, etag, identity, null, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private async ValueTask DeletePendingAsync(
+    private async ValueTask ReleasePendingAsync(
         string key,
         string etag,
         CoarseCommandIdentityRecord? originalIdentity,
@@ -587,7 +802,12 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
     {
         for (int attempt = 0; attempt < 3; attempt++)
         {
-            if (await _state.TryDeleteAsync(key, etag, cancellationToken).ConfigureAwait(false))
+            // Keep the key's ETag generation alive. Physical deletion would allow a backend
+            // to reuse the old ETag and authorize a paused owner's save or cleanup.
+            bool released = originalIdentity is not null
+                ? await _state.TrySaveIdentityAsync(key, originalIdentity with { Released = true }, etag, cancellationToken).ConfigureAwait(false)
+                : await _state.TrySaveDomainAsync(key, originalDomain! with { Released = true }, etag, cancellationToken).ConfigureAwait(false);
+            if (released)
             {
                 return;
             }
@@ -642,7 +862,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
 
     private async ValueTask<bool> EnsureIdentityOutcomeAsync(
         string? identityKey,
-        string domainKey,
+        CoarseIdempotencyMetadata metadata,
         CommandSubmissionResponse outcome,
         CancellationToken cancellationToken)
     {
@@ -654,7 +874,8 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         for (int attempt = 0; attempt < 3; attempt++)
         {
             (CoarseCommandIdentityRecord? identity, string etag) = await ReadIdentityWithEtagAsync(identityKey, cancellationToken).ConfigureAwait(false);
-            if (identity is null || identity.DomainKeyHash != domainKey)
+            if (identity is null || identity.DomainKeyHash != metadata.CoarseKeyHash ||
+                identity.DomainReservation is { } owned && !MatchesMetadata(owned, metadata))
             {
                 return false;
             }
@@ -689,7 +910,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
                 CoarseCommandIdentityRecord restored = new(
                     domain.TenantId, domain.CommandId, domain.CallerFingerprint!, domain.CoarseKeyHash,
                     domain.CreatedAt, Clone(domain.PriorOutcome));
-                if (await _state.TrySaveIdentityAsync(identityKey, restored, string.Empty, cancellationToken).ConfigureAwait(false))
+                if (await _state.TrySaveIdentityAsync(identityKey, restored, etag, cancellationToken).ConfigureAwait(false))
                 {
                     return true;
                 }
@@ -715,14 +936,14 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
     }
 
     private async ValueTask<bool> EnsurePrimaryDomainOutcomeAsync(
-        string key,
+        CoarseIdempotencyMetadata metadata,
         CommandSubmissionResponse outcome,
         CancellationToken cancellationToken)
     {
         for (int attempt = 0; attempt < 3; attempt++)
         {
-            (CoarseIdempotencyRecord? record, string etag) = await ReadDomainAsync(key, cancellationToken).ConfigureAwait(false);
-            if (record is null)
+            (CoarseIdempotencyRecord? record, string etag) = await ReadDomainAsync(metadata.CoarseKeyHash, cancellationToken).ConfigureAwait(false);
+            if (record is null || !MatchesMetadata(record, metadata))
             {
                 return false;
             }
@@ -732,7 +953,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
                 return string.Equals(record.PriorOutcome.CommandId, outcome.CommandId, StringComparison.Ordinal);
             }
 
-            if (await _state.TrySaveDomainAsync(key, record with { PriorOutcome = Clone(outcome) }, etag, cancellationToken).ConfigureAwait(false))
+            if (await _state.TrySaveDomainAsync(metadata.CoarseKeyHash, record with { PriorOutcome = Clone(outcome) }, etag, cancellationToken).ConfigureAwait(false))
             {
                 return true;
             }
@@ -756,7 +977,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             (reservation, _) = await ReadDomainAsync(metadata.CoarseKeyHash, cancellationToken).ConfigureAwait(false);
         }
 
-        return reservation is not null &&
+        return reservation is not null && MatchesMetadata(reservation, metadata) &&
             await EnsureDomainReceiptAsync(receiptKey, reservation, outcome, cancellationToken).ConfigureAwait(false);
     }
 
@@ -769,9 +990,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         for (int attempt = 0; attempt < 3; attempt++)
         {
             (CoarseIdempotencyRecord? current, string etag) = await ReadDomainAsync(receiptKey, cancellationToken).ConfigureAwait(false);
-            if (current is not null &&
-                (!string.Equals(current.IdentityKeyHash, reservation.IdentityKeyHash, StringComparison.Ordinal) ||
-                 !string.Equals(current.CanonicalEquivalenceHash, reservation.CanonicalEquivalenceHash, StringComparison.Ordinal)))
+            if (current is not null && !SameReservation(current, reservation))
             {
                 return false;
             }
@@ -806,6 +1025,23 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             string.Equals(current.ReservationId, original.ReservationId, StringComparison.Ordinal) &&
             current.CreatedAt == original.CreatedAt;
 
+    private static bool HasCommittedOutcomeEvidence(
+        CommandStatusQueryResponse? evidence,
+        CoarseCommandIdentityRecord identity,
+        CommandSubmissionResponse prepared)
+        => evidence is not null &&
+            string.Equals(evidence.MessageId, identity.CommandId, StringComparison.Ordinal) &&
+            string.Equals(evidence.TenantId, identity.TenantId, StringComparison.Ordinal) &&
+            string.Equals(evidence.Domain, ChatBotEventStore.DomainName, StringComparison.Ordinal) &&
+            string.Equals(evidence.CorrelationId, prepared.CorrelationId, StringComparison.Ordinal) &&
+            Enum.IsDefined(typeof(CommandStatus), evidence.StatusCode) &&
+            string.Equals(evidence.Status, ((CommandStatus)evidence.StatusCode).ToString(), StringComparison.Ordinal) &&
+            (evidence.StatusCode is (int)CommandStatus.EventsStored or (int)CommandStatus.EventsPublished or
+                (int)CommandStatus.Completed or (int)CommandStatus.PublishFailed) &&
+            (evidence.CommittedEventSequence > 0 ||
+             evidence.StatusCode == (int)CommandStatus.Completed && evidence.EventCount == 0) &&
+            string.IsNullOrWhiteSpace(evidence.RejectionEventType);
+
     private async ValueTask RecoverPendingOutcomeAsync(
         string identityKey,
         CoarseCommandIdentityRecord identity,
@@ -813,6 +1049,26 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
     {
         if (identity.PriorOutcome is not null || identity.DomainReservation is not { } reservation)
         {
+            return;
+        }
+
+        if (reservation.DispatchState == CoarseDispatchState.Dispatching &&
+            reservation.PreparedOutcome is { } prepared && _eventStore is not null)
+        {
+            try
+            {
+                CommandStatusQueryResponse? evidence = await _eventStore.GetCommandStatusAsync(identity.CommandId, cancellationToken).ConfigureAwait(false);
+                if (HasCommittedOutcomeEvidence(evidence, identity, prepared))
+                {
+                    await RecordOutcomeAsync(Metadata(reservation), prepared, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // An unavailable or unproven SDK status cannot authorize acceptance or redispatch.
+            }
+
             return;
         }
 
@@ -856,7 +1112,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         CancellationToken cancellationToken)
     {
         string? reservationId = owner.DomainReservation?.ReservationId;
-        if (!IsUnadmitted(reservationId) || owner.PriorOutcome is not null || owner.DomainReservation is not { } reservation)
+        if (!CanRelease(owner.DomainReservation) || owner.PriorOutcome is not null || owner.DomainReservation is not { } reservation)
         {
             return false;
         }
@@ -876,15 +1132,20 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
 
         try
         {
-            if (DomainReceiptKey(reservation.OperationClass, reservation.CoarseKeyHash) is { } receiptKey)
+            if (!await FenceAbortAsync(Metadata(reservation), cancellationToken).ConfigureAwait(false))
             {
-                await DeletePendingDomainAsync(receiptKey, reservation, cancellationToken).ConfigureAwait(false);
+                return false;
             }
 
-            await DeletePendingDomainAsync(reservation.CoarseKeyHash, reservation, cancellationToken).ConfigureAwait(false);
+            if (DomainReceiptKey(reservation.OperationClass, reservation.CoarseKeyHash) is { } receiptKey)
+            {
+                await ReleasePendingDomainAsync(receiptKey, reservation, cancellationToken).ConfigureAwait(false);
+            }
+
+            await ReleasePendingDomainAsync(reservation.CoarseKeyHash, reservation, cancellationToken).ConfigureAwait(false);
             if (current is not null)
             {
-                await DeleteOwnedPendingIdentityAsync(identityKey, reservation, cancellationToken).ConfigureAwait(false);
+                await ReleaseOwnedPendingIdentityAsync(identityKey, reservation, cancellationToken).ConfigureAwait(false);
             }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -910,7 +1171,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         }
 
         (CoarseIdempotencyRecord? record, _) = await ReadDomainAsync(key, cancellationToken).ConfigureAwait(false);
-        if (record is null || record.PriorOutcome is not null || !IsUnadmitted(record.ReservationId))
+        if (record is null || record.PriorOutcome is not null || !CanRelease(record))
         {
             return true;
         }
@@ -918,7 +1179,23 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         string reservationId = record.ReservationId!;
         try
         {
-            await DeletePendingDomainAsync(key, record, cancellationToken).ConfigureAwait(false);
+            if (record.IdentityKeyHash is { } identityKey)
+            {
+                CoarseCommandIdentityRecord? identity = await ReadIdentityAsync(identityKey, cancellationToken).ConfigureAwait(false);
+                if (identity?.DomainReservation is { } owner && SameReservation(owner, record))
+                {
+                    if (!CanRelease(owner))
+                    {
+                        return true;
+                    }
+                    return await TryReleaseUnadmittedIdentityAsync(identityKey, identity, cancellationToken).ConfigureAwait(false);
+                }
+            }
+            if (!await FenceAbortAsync(Metadata(record), cancellationToken).ConfigureAwait(false))
+            {
+                return false;
+            }
+            await ReleasePendingDomainAsync(key, record, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -989,17 +1266,30 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         }
     }
 
+    private bool CanRelease(CoarseIdempotencyRecord? reservation)
+        => reservation is not null &&
+            (reservation.DispatchState == CoarseDispatchState.Aborted ||
+             (reservation.DispatchState == CoarseDispatchState.Reserved &&
+              (IsUnadmitted(reservation.ReservationId) ||
+               reservation.ReservationLeaseExpiresAt is { } lease && lease <= clock.UtcNow)));
+
     private bool IsUnadmitted(string? reservationId)
         => !string.IsNullOrEmpty(reservationId) && _unadmittedReservations.ContainsKey(reservationId);
 
     private async ValueTask<(CoarseIdempotencyRecord? Record, string Etag)> ReadDomainAsync(string key, CancellationToken cancellationToken)
-        => await _state.ReadDomainAsync(key, cancellationToken).ConfigureAwait(false);
+    {
+        (CoarseIdempotencyRecord? record, string etag) = await _state.ReadDomainAsync(key, cancellationToken).ConfigureAwait(false);
+        return (record?.Released is true ? null : record, etag);
+    }
 
     private async ValueTask<CoarseCommandIdentityRecord?> ReadIdentityAsync(string key, CancellationToken cancellationToken)
         => (await ReadIdentityWithEtagAsync(key, cancellationToken).ConfigureAwait(false)).Record;
 
     private async ValueTask<(CoarseCommandIdentityRecord? Record, string Etag)> ReadIdentityWithEtagAsync(string key, CancellationToken cancellationToken)
-        => await _state.ReadIdentityAsync(key, cancellationToken).ConfigureAwait(false);
+    {
+        (CoarseCommandIdentityRecord? record, string etag) = await _state.ReadIdentityAsync(key, cancellationToken).ConfigureAwait(false);
+        return (record?.Released is true ? null : record, etag);
+    }
 
     private static CoarseIdempotencyMetadata Metadata(CoarseIdempotencyRecord record)
         => new(record.OperationClass, record.CoarseKeyHash, record.CanonicalEquivalenceHash, record.ExpiresAt,

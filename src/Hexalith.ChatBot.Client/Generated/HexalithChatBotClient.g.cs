@@ -1566,22 +1566,22 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class CommandSubmissionRequest
     {
 
-        [Newtonsoft.Json.JsonProperty("commandId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandId", Required = Newtonsoft.Json.Required.Always)]
         public string CommandId { get; set; } = default!;
 
         /// <summary>
         /// Imperative command contract type name without the Command suffix.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("commandType", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandType", Required = Newtonsoft.Json.Required.Always)]
         public string CommandType { get; set; } = default!;
 
         /// <summary>
         /// Typed command body supplied through IChatBotCommand.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("command", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("command", Required = Newtonsoft.Json.Required.Always)]
         public object Command { get; set; } = new object();
 
-        [Newtonsoft.Json.JsonProperty("requestSchemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requestSchemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CommandSubmissionRequestRequestSchemaVersion RequestSchemaVersion { get; set; } = default!;
 
@@ -1607,39 +1607,39 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class CommandSubmissionResponse
     {
 
-        [Newtonsoft.Json.JsonProperty("commandId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandId", Required = Newtonsoft.Json.Required.Always)]
         public string CommandId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
         /// <summary>
         /// Canonical status identity, equal to taskId when supplied and commandId otherwise.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.Always)]
         public string OperationId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("taskId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? TaskId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("lifecycleState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("lifecycleState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public LifecycleState LifecycleState { get; set; } = default!;
 
         /// <summary>
         /// UTC acceptance timestamp.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("acceptedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("acceptedAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset AcceptedAt { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ChatBotMessageCode ReasonCode { get; set; } = default!;
 
         /// <summary>
         /// False on acceptance; true only when a scheduled retry is currently due and attempts remain.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("retryEligible", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retryEligible", Required = Newtonsoft.Json.Required.Always)]
         public bool RetryEligible { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("priorOutcome", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -1651,33 +1651,33 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class PriorCommandOutcome
     {
 
-        [Newtonsoft.Json.JsonProperty("commandId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandId", Required = Newtonsoft.Json.Required.Always)]
         public string CommandId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.Always)]
         public string OperationId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("taskId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? TaskId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("lifecycleState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("lifecycleState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public LifecycleState LifecycleState { get; set; } = default!;
 
         /// <summary>
         /// UTC acceptance timestamp.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("acceptedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("acceptedAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset AcceptedAt { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ChatBotMessageCode ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retryEligible", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retryEligible", Required = Newtonsoft.Json.Required.Always)]
         public bool RetryEligible { get; set; } = default!;
 
     }
@@ -1722,7 +1722,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <summary>
         /// Metadata-only evidence reference or offset token.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceReference { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("startOffset", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -1740,71 +1740,71 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class TaskIntentRecord
     {
 
-        [Newtonsoft.Json.JsonProperty("taskIntentId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("taskIntentId", Required = Newtonsoft.Json.Required.Always)]
         public string TaskIntentId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("tenantId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("tenantId", Required = Newtonsoft.Json.Required.Always)]
         public string TenantId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceMessageId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterPartyId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterPartyId", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterPartyId { get; set; } = default!;
 
         /// <summary>
         /// Safe summary generated from metadata-only deterministic signals; never raw source text.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("detectedIntentSummary", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("detectedIntentSummary", Required = Newtonsoft.Json.Required.Always)]
         public string DetectedIntentSummary { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("detectedActionKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("detectedActionKind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationDetectedActionKind DetectedActionKind { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceEvidenceOffsets", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceEvidenceOffsets", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<TaskIntentSourceEvidenceOffset> SourceEvidenceOffsets { get; set; } = new System.Collections.Generic.List<TaskIntentSourceEvidenceOffset>();
 
-        [Newtonsoft.Json.JsonProperty("kernelVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("kernelVersion", Required = Newtonsoft.Json.Required.Always)]
         public string KernelVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.Always)]
         public double ConfidenceScore { get; set; } = default!;
 
         /// <summary>
         /// UTC detection timestamp.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("detectedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("detectedAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset DetectedAt { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public TaskIntentState State { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         public string SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ChatBotMessageCode ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceProvenance", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceProvenance", Required = Newtonsoft.Json.Required.Always)]
         public string SourceProvenance { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public TaskIntentRecordRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         public string RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -1850,54 +1850,54 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class CaptureTaskIntent
     {
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceMessageId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterPartyId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterPartyId", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterPartyId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("detectedIntentSummary", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("detectedIntentSummary", Required = Newtonsoft.Json.Required.Always)]
         public string DetectedIntentSummary { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("detectedActionKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("detectedActionKind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationDetectedActionKind DetectedActionKind { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceEvidenceOffsets", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceEvidenceOffsets", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<TaskIntentSourceEvidenceOffset> SourceEvidenceOffsets { get; set; } = new System.Collections.Generic.List<TaskIntentSourceEvidenceOffset>();
 
-        [Newtonsoft.Json.JsonProperty("kernelVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("kernelVersion", Required = Newtonsoft.Json.Required.Always)]
         public string KernelVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.Always)]
         public double ConfidenceScore { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("detectedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("detectedAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset DetectedAt { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CaptureTaskIntentRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         public string RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correctedContextReady", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correctedContextReady", Required = Newtonsoft.Json.Required.Always)]
         public bool CorrectedContextReady { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         public string SchemaVersion { get; set; } = default!;
 
     }
@@ -1906,43 +1906,43 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ProposeAIAction
     {
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("taskIntentId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("taskIntentId", Required = Newtonsoft.Json.Required.Always)]
         public string TaskIntentId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceMessageId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterId", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("intendedCommandName", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("intendedCommandName", Required = Newtonsoft.Json.Required.Always)]
         public string IntendedCommandName { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("actionKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("actionKind", Required = Newtonsoft.Json.Required.Always)]
         public string ActionKind { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("expectedSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("expectedSourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long ExpectedSourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceReferences", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> EvidenceReferences { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("affectedResourceReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("affectedResourceReferences", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> AffectedResourceReferences { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("recipientReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("recipientReferences", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> RecipientReferences { get; set; } = new System.Collections.Generic.List<string>();
 
         [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("transitionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("transitionId", Required = Newtonsoft.Json.Required.Always)]
         public string TransitionId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("sourceConversationItemId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -1989,32 +1989,32 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MarkTaskIntentDisposition
     {
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("taskIntentId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("taskIntentId", Required = Newtonsoft.Json.Required.Always)]
         public string TaskIntentId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceMessageId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("disposition", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("disposition", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MarkTaskIntentDispositionDisposition Disposition { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("expectedSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("expectedSourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long ExpectedSourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceReferences", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> EvidenceReferences { get; set; } = new System.Collections.Generic.List<string>();
 
         [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("transitionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("transitionId", Required = Newtonsoft.Json.Required.Always)]
         public string TransitionId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("predecessorTaskIntentId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -2029,13 +2029,13 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class TaskIntentAvailableTransition
     {
 
-        [Newtonsoft.Json.JsonProperty("transition", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("transition", Required = Newtonsoft.Json.Required.Always)]
         public string Transition { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("label", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("label", Required = Newtonsoft.Json.Required.Always)]
         public string Label { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("enabled", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("enabled", Required = Newtonsoft.Json.Required.Always)]
         public bool Enabled { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("disabledReasonCode", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -2050,26 +2050,26 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class TaskIntentReviewSourceMessage
     {
 
-        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceMessageId { get; set; } = default!;
 
         /// <summary>
         /// Authorized review-only full source message content.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("content", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("content", Required = Newtonsoft.Json.Required.Always)]
         public string Content { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("contentType", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("contentType", Required = Newtonsoft.Json.Required.Always)]
         public string ContentType { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public TaskIntentReviewSourceMessageRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public string SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceReferences", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> EvidenceReferences { get; set; } = new System.Collections.Generic.List<string>();
 
     }
@@ -2078,25 +2078,25 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class TaskIntentTransitionAuditSummary
     {
 
-        [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.Always)]
         public string OperationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("status", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("status", Required = Newtonsoft.Json.Required.Always)]
         public string Status { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("actorId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("actorId", Required = Newtonsoft.Json.Required.Always)]
         public string ActorId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("decidedAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("decidedAtUtc", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset DecidedAtUtc { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public TaskIntentTransitionAuditSummaryRedactionState RedactionState { get; set; } = default!;
 
@@ -2106,16 +2106,16 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class TaskIntentReview
     {
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("taskIntentId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("taskIntentId", Required = Newtonsoft.Json.Required.Always)]
         public string TaskIntentId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("available", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("available", Required = Newtonsoft.Json.Required.Always)]
         public bool Available { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("record", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -2124,10 +2124,10 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("sourceMessage", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public TaskIntentReviewSourceMessage? SourceMessage { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("availableTransitions", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("availableTransitions", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<TaskIntentAvailableTransition> AvailableTransitions { get; set; } = new System.Collections.Generic.List<TaskIntentAvailableTransition>();
 
-        [Newtonsoft.Json.JsonProperty("auditHistory", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("auditHistory", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<TaskIntentTransitionAuditSummary> AuditHistory { get; set; } = new System.Collections.Generic.List<TaskIntentTransitionAuditSummary>();
 
         [Newtonsoft.Json.JsonProperty("currentState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -2137,14 +2137,14 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public long? SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public TaskIntentReviewRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         public string SchemaVersion { get; set; } = default!;
 
     }
@@ -2153,57 +2153,57 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class OperationStatus
     {
 
-        [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.Always)]
         public string OperationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandId", Required = Newtonsoft.Json.Required.Always)]
         public string CommandId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("lifecycleState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("lifecycleState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public LifecycleState LifecycleState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ChatBotMessageCode ReasonCode { get; set; } = default!;
 
         /// <summary>
         /// True only after nextRetryAt is due and retryCount is below maxAttempts.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("retryEligible", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retryEligible", Required = Newtonsoft.Json.Required.Always)]
         public bool RetryEligible { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("priorOutcome", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public PriorCommandOutcome? PriorOutcome { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retryCount", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retryCount", Required = Newtonsoft.Json.Required.Always)]
         public int RetryCount { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("completionStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("completionStatus", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OperationCompletionStatus CompletionStatus { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("auditStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("auditStatus", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OperationAuditStatus AuditStatus { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("partialOutputs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("partialOutputs", Required = Newtonsoft.Json.Required.Always)]
         public OperationStatusPartialOutputs PartialOutputs { get; set; } = new OperationStatusPartialOutputs();
 
-        [Newtonsoft.Json.JsonProperty("safeNextActions", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        [Newtonsoft.Json.JsonProperty("safeNextActions", Required = Newtonsoft.Json.Required.Always, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public System.Collections.Generic.ICollection<ChatBotMessageNextAction> SafeNextActions { get; set; } = new System.Collections.Generic.List<ChatBotMessageNextAction>();
 
         [Newtonsoft.Json.JsonProperty("terminalReason", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ChatBotMessageCode? TerminalReason { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("operationClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("operationClass", Required = Newtonsoft.Json.Required.Always)]
         public string OperationClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("maxAttempts", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("maxAttempts", Required = Newtonsoft.Json.Required.Always)]
         public int MaxAttempts { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("nextRetryAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -2245,13 +2245,13 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <summary>
         /// UTC acceptance timestamp.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("acceptedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("acceptedAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset AcceptedAt { get; set; } = default!;
 
         /// <summary>
         /// UTC last status update timestamp.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("lastUpdatedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("lastUpdatedAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset LastUpdatedAt { get; set; } = default!;
 
     }
@@ -2260,14 +2260,14 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class OperationStatusPartialOutputs
     {
 
-        [Newtonsoft.Json.JsonProperty("acceptedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("acceptedAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset AcceptedAt { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("completionStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("completionStatus", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OperationCompletionStatus CompletionStatus { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("auditStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("auditStatus", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OperationAuditStatus AuditStatus { get; set; } = default!;
 
@@ -2277,17 +2277,17 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class OperationAuditHistory
     {
 
-        [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.Always)]
         public string OperationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("auditStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("auditStatus", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OperationAuditStatus AuditStatus { get; set; } = default!;
 
         /// <summary>
         /// Post-commit audit envelope summaries for the operation, in record order.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("entries", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("entries", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<AuditHistoryEntry> Entries { get; set; } = new System.Collections.Generic.List<AuditHistoryEntry>();
 
     }
@@ -2296,52 +2296,52 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class AuditHistoryEntry
     {
 
-        [Newtonsoft.Json.JsonProperty("phase", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("phase", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AuditHistoryPhase Phase { get; set; } = default!;
 
         /// <summary>
         /// Stable audit decision code (e.g. allow, reject).
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("decision", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("decision", Required = Newtonsoft.Json.Required.Always)]
         public string Decision { get; set; } = default!;
 
         /// <summary>
         /// Stable audit reason code.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
         /// <summary>
         /// Stable audit outcome code.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("outcome", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("outcome", Required = Newtonsoft.Json.Required.Always)]
         public string Outcome { get; set; } = default!;
 
         /// <summary>
         /// Lifecycle state-transition code carried by the envelope.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("stateTransition", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("stateTransition", Required = Newtonsoft.Json.Required.Always)]
         public string StateTransition { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionDecision", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionDecision", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AuditHistoryEntryRedactionDecision RedactionDecision { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("surfaceOrigin", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("surfaceOrigin", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SurfaceOrigin SurfaceOrigin { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("resourceId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("resourceId", Required = Newtonsoft.Json.Required.Always)]
         public string ResourceId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
         /// <summary>
         /// UTC audit record timestamp.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("recordedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("recordedAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset RecordedAt { get; set; } = default!;
 
     }
@@ -2776,7 +2776,7 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ProjectConversationResponse
     {
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("projectDisplayName", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -2788,37 +2788,37 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("tenantContext", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? TenantContext { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("status", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("status", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationReadStatus Status { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("conversationState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("conversationState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public LifecycleState ConversationState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("items", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("items", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<ProjectConversationItem> Items { get; set; } = new System.Collections.Generic.List<ProjectConversationItem>();
 
-        [Newtonsoft.Json.JsonProperty("page", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("page", Required = Newtonsoft.Json.Required.Always)]
         public ProjectConversationCursorPage Page { get; set; } = new ProjectConversationCursorPage();
 
-        [Newtonsoft.Json.JsonProperty("sourceProvenance", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceProvenance", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationResponseSourceProvenance SourceProvenance { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationResponseRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationResponseRetentionClass RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationResponseSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -2836,64 +2836,64 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <summary>
         /// Authorized tenant scope reference for the package; never raw tenant authority and never present in denial bodies.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("tenantId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("tenantId", Required = Newtonsoft.Json.Required.Always)]
         public string TenantId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
         /// <summary>
         /// Authorized policy snapshot identifier only; never policy body.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionDecision", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionDecision", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectAiContextPackageRedactionDecision RedactionDecision { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectAiContextPackageRetentionClass RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("providerReuseSetting", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("providerReuseSetting", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectAiContextPackageProviderReuseSetting ProviderReuseSetting { get; set; } = default!;
 
         /// <summary>
         /// Stable package reference; never raw provider detail or file content.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("packageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("packageId", Required = Newtonsoft.Json.Required.Always)]
         public string PackageId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("packageVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("packageVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectAiContextPackagePackageVersion PackageVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectAiContextPackageSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("includedFiles", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("includedFiles", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<ProjectAiContextPackageFile> IncludedFiles { get; set; } = new System.Collections.Generic.List<ProjectAiContextPackageFile>();
 
-        [Newtonsoft.Json.JsonProperty("excludedFiles", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("excludedFiles", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<ProjectAiContextPackageExclusion> ExcludedFiles { get; set; } = new System.Collections.Generic.List<ProjectAiContextPackageExclusion>();
 
-        [Newtonsoft.Json.JsonProperty("sourceEvidenceReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceEvidenceReferences", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> SourceEvidenceReferences { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("sourceProvenance", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceProvenance", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectAiContextPackageSourceProvenance SourceProvenance { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("derivationKernelVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("derivationKernelVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectAiContextPackageDerivationKernelVersion DerivationKernelVersion { get; set; } = default!;
 
@@ -2906,36 +2906,36 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <summary>
         /// Stable metadata reference token only.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("referenceToken", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("referenceToken", Required = Newtonsoft.Json.Required.Always)]
         public string ReferenceToken { get; set; } = default!;
 
         /// <summary>
         /// Authorized stable folder reference only; never folder name or path.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("folderId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("folderId", Required = Newtonsoft.Json.Required.Always)]
         public string FolderId { get; set; } = default!;
 
         /// <summary>
         /// Authorized stable file reference only; never file name, path, bytes, or content.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("fileId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("fileId", Required = Newtonsoft.Json.Required.Always)]
         public string FileId { get; set; } = default!;
 
         /// <summary>
         /// Stable provider attachment id already projected by the conversation read model.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("sourceProviderAttachmentId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceProviderAttachmentId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceProviderAttachmentId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectAiContextPackageFileRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectAiContextPackageFileRetentionClass RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceEvidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceEvidenceReference", Required = Newtonsoft.Json.Required.Always)]
         public string SourceEvidenceReference { get; set; } = default!;
 
     }
@@ -2947,10 +2947,10 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <summary>
         /// Stable metadata-only token; redacted tokens do not expose folder, file, provider, or path data.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("referenceToken", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("referenceToken", Required = Newtonsoft.Json.Required.Always)]
         public string ReferenceToken { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectAiContextPackageExclusionReasonCode ReasonCode { get; set; } = default!;
 
@@ -2969,10 +2969,10 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("nextCursor", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? NextCursor { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("hasMore", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("hasMore", Required = Newtonsoft.Json.Required.Always)]
         public bool HasMore { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("pageSize", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("pageSize", Required = Newtonsoft.Json.Required.Always)]
         public int PageSize { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("authoritativeCoverage", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -2987,19 +2987,19 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ProjectConversationStreamCoverage
     {
 
-        [Newtonsoft.Json.JsonProperty("stateOwnerAggregateId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("stateOwnerAggregateId", Required = Newtonsoft.Json.Required.Always)]
         public string StateOwnerAggregateId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("firstSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("firstSourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long FirstSourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("lastSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("lastSourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long LastSourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("isContiguous", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("isContiguous", Required = Newtonsoft.Json.Required.Always)]
         public bool IsContiguous { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("coversAllKnownEvents", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("coversAllKnownEvents", Required = Newtonsoft.Json.Required.Always)]
         public bool CoversAllKnownEvents { get; set; } = default!;
 
     }
@@ -3008,41 +3008,41 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ProjectConversationItem
     {
 
-        [Newtonsoft.Json.JsonProperty("itemId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("itemId", Required = Newtonsoft.Json.Required.Always)]
         public string ItemId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("kind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("kind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationItemKind Kind { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("actorKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("actorKind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationActorKind ActorKind { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("actorLabel", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("actorLabel", Required = Newtonsoft.Json.Required.Always)]
         public string ActorLabel { get; set; } = default!;
 
         /// <summary>
         /// Server-side UTC source/projection ordering timestamp.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("occurredAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("occurredAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset OccurredAt { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("lifecycleState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("lifecycleState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public LifecycleState LifecycleState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("thresholdBand", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("thresholdBand", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationThresholdBand ThresholdBand { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.Always)]
         public double ConfidenceScore { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.Always)]
         public string AssociationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceMailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceMailboxId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceMailboxId { get; set; } = default!;
 
         /// <summary>
@@ -3057,7 +3057,7 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("internetMessageId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? InternetMessageId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceConversationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceConversationId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceConversationId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("sourceThreadId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -3087,26 +3087,26 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("sourceProvenanceDisplayToken", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SourceProvenanceDisplayToken { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceProvenance", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceProvenance", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationItemSourceProvenance SourceProvenance { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationItemRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationItemRetentionClass RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationItemSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("authenticity", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -3767,47 +3767,47 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class AiResponseProgress
     {
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("conversationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("conversationId", Required = Newtonsoft.Json.Required.Always)]
         public string ConversationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("responseId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("responseId", Required = Newtonsoft.Json.Required.Always)]
         public string ResponseId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("generationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("generationId", Required = Newtonsoft.Json.Required.Always)]
         public string GenerationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sequence", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sequence", Required = Newtonsoft.Json.Required.Always)]
         public long Sequence { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiResponseProgressState State { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("terminalReason", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("terminalReason", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiResponseTerminalReason TerminalReason { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.Always)]
         public string SafeNextAction { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiResponseProgressRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("visibilityState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("visibilityState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiResponseProgressVisibilityState VisibilityState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("isTerminal", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("isTerminal", Required = Newtonsoft.Json.Required.Always)]
         public bool IsTerminal { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("stateOwnerAggregateId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -3825,36 +3825,36 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class AiResponseProgressNudge
     {
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("conversationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("conversationId", Required = Newtonsoft.Json.Required.Always)]
         public string ConversationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("responseId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("responseId", Required = Newtonsoft.Json.Required.Always)]
         public string ResponseId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("generationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("generationId", Required = Newtonsoft.Json.Required.Always)]
         public string GenerationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sequence", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sequence", Required = Newtonsoft.Json.Required.Always)]
         public long Sequence { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiResponseProgressState State { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiResponseProgressNudgeRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("visibilityState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("visibilityState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiResponseProgressNudgeVisibilityState VisibilityState { get; set; } = default!;
 
@@ -3894,32 +3894,32 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ProjectConversationItemClassification
     {
 
-        [Newtonsoft.Json.JsonProperty("kind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("kind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationClassificationKind Kind { get; set; } = default!;
 
         /// <summary>
         /// Deterministic server-side classification kernel version.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("kernelVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("kernelVersion", Required = Newtonsoft.Json.Required.Always)]
         public string KernelVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.Always)]
         public double ConfidenceScore { get; set; } = default!;
 
         /// <summary>
         /// Stable message/catalog code for localized explanation.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("messageCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("messageCode", Required = Newtonsoft.Json.Required.Always)]
         public string MessageCode { get; set; } = default!;
 
         /// <summary>
         /// Safe evidence identifiers or offsets only; never raw email subject, body, HTML, provider source context, prompt, output, tool result, hidden file name, participant name, or project name.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("sourceEvidenceIds", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceEvidenceIds", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> SourceEvidenceIds { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationItemClassificationRedactionState RedactionState { get; set; } = default!;
 
@@ -3932,23 +3932,23 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <summary>
         /// Safe detected intent summary token or localized-safe phrase; never raw source text.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("summary", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("summary", Required = Newtonsoft.Json.Required.Always)]
         public string Summary { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("actionKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("actionKind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationDetectedActionKind ActionKind { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceEvidenceIds", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceEvidenceIds", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> SourceEvidenceIds { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.Always)]
         public string SafeNextAction { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("messageCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("messageCode", Required = Newtonsoft.Json.Required.Always)]
         public string MessageCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationDetectedIntentRedactionState RedactionState { get; set; } = default!;
 
@@ -3961,7 +3961,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <summary>
         /// Safe model/version or unavailable token; never provider request or response details.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("generatedBy", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("generatedBy", Required = Newtonsoft.Json.Required.Always)]
         public string GeneratedBy { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("generatedAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -3970,7 +3970,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <summary>
         /// Safe source evidence identifiers used for generation.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("sourceEvidenceIds", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceEvidenceIds", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> SourceEvidenceIds { get; set; } = new System.Collections.Generic.List<string>();
 
         [Newtonsoft.Json.JsonProperty("contextPackageId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -3979,7 +3979,7 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("contextPackageVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? ContextPackageVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationAiSummaryProvenanceRedactionState RedactionState { get; set; } = default!;
 
@@ -3989,13 +3989,13 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ProjectConversationReviewHistoryEntry
     {
 
-        [Newtonsoft.Json.JsonProperty("reviewedResourceKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reviewedResourceKind", Required = Newtonsoft.Json.Required.Always)]
         public string ReviewedResourceKind { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reviewedResourceId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reviewedResourceId", Required = Newtonsoft.Json.Required.Always)]
         public string ReviewedResourceId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("actionCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("actionCode", Required = Newtonsoft.Json.Required.Always)]
         public string ActionCode { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("decisionCode", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -4010,7 +4010,7 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("actorLabel", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? ActorLabel { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reviewedAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reviewedAtUtc", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset ReviewedAtUtc { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("surfaceOrigin", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -4025,11 +4025,11 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? OperationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationReviewHistoryEntryRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
     }
@@ -4041,7 +4041,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <summary>
         /// Consolidated metadata-only status facets in stable S1 display order.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("facets", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("facets", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<ProjectConversationItemStatusFacet> Facets { get; set; } = new System.Collections.Generic.List<ProjectConversationItemStatusFacet>();
 
     }
@@ -4050,27 +4050,27 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ProjectConversationItemStatusFacet
     {
 
-        [Newtonsoft.Json.JsonProperty("domain", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("domain", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationItemStatusFacetDomain Domain { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("health", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("health", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ChatBotHealthStatus Health { get; set; } = default!;
 
         /// <summary>
         /// Stable projected status token; never derived from UI counts.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("sourceState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceState", Required = Newtonsoft.Json.Required.Always)]
         public string SourceState { get; set; } = default!;
 
         /// <summary>
         /// Message-catalog code or UI resource key for localized rendering.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("messageCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("messageCode", Required = Newtonsoft.Json.Required.Always)]
         public string MessageCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.Always)]
         public string SafeNextAction { get; set; } = default!;
 
         /// <summary>
@@ -4349,13 +4349,13 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ProblemDetails
     {
 
-        [Newtonsoft.Json.JsonProperty("type", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("type", Required = Newtonsoft.Json.Required.Always)]
         public string Type { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("title", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("title", Required = Newtonsoft.Json.Required.Always)]
         public string Title { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("status", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("status", Required = Newtonsoft.Json.Required.Always)]
         public int Status { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("detail", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -4364,33 +4364,33 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("instance", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? Instance { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("category", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("category", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProblemDetailsCategory Category { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("code", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("code", Required = Newtonsoft.Json.Required.Always)]
         public string Code { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("message", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("message", Required = Newtonsoft.Json.Required.Always)]
         public string Message { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("taskId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? TaskId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retryable", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retryable", Required = Newtonsoft.Json.Required.Always)]
         public bool Retryable { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("clientAction", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("clientAction", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProblemDetailsClientAction ClientAction { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("details", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("details", Required = Newtonsoft.Json.Required.Always)]
         public ProblemDetailsDetails Details { get; set; } = new ProblemDetailsDetails();
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         public string SchemaVersion { get; set; } = default!;
 
     }
@@ -4399,7 +4399,7 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ProblemDetailsDetails
     {
 
-        [Newtonsoft.Json.JsonProperty("visibility", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("visibility", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProblemDetailsDetailsVisibility Visibility { get; set; } = default!;
 
@@ -4409,16 +4409,16 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class CaptureMailboxMessageIntake
     {
 
-        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.Always)]
         public string IntakeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("source", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("source", Required = Newtonsoft.Json.Required.Always)]
         public MailboxMessageSourceIdentity Source { get; set; } = new MailboxMessageSourceIdentity();
 
-        [Newtonsoft.Json.JsonProperty("recipients", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("recipients", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<MailboxRecipientIdentity> Recipients { get; set; } = new System.Collections.Generic.List<MailboxRecipientIdentity>();
 
-        [Newtonsoft.Json.JsonProperty("attachments", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("attachments", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<MailboxAttachmentReference> Attachments { get; set; } = new System.Collections.Generic.List<MailboxAttachmentReference>();
 
         [Newtonsoft.Json.JsonProperty("authenticity", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -4430,28 +4430,28 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxMessageSourceIdentity
     {
 
-        [Newtonsoft.Json.JsonProperty("providerMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("providerMessageId", Required = Newtonsoft.Json.Required.Always)]
         public string ProviderMessageId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("internetMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("internetMessageId", Required = Newtonsoft.Json.Required.Always)]
         public string InternetMessageId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("conversationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("conversationId", Required = Newtonsoft.Json.Required.Always)]
         public string ConversationId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("threadId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? ThreadId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("mailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("mailboxId", Required = Newtonsoft.Json.Required.Always)]
         public string MailboxId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sender", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sender", Required = Newtonsoft.Json.Required.Always)]
         public MailboxParticipantIdentity Sender { get; set; } = new MailboxParticipantIdentity();
 
         /// <summary>
         /// UTC provider received timestamp with source timezone context preserved separately.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("receivedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("receivedAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset ReceivedAt { get; set; } = default!;
 
         /// <summary>
@@ -4469,10 +4469,10 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("sourceTimezone", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SourceTimezone { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceContext", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceContext", Required = Newtonsoft.Json.Required.Always)]
         public string SourceContext { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceSchemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceSchemaVersion", Required = Newtonsoft.Json.Required.Always)]
         public int SourceSchemaVersion { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("delegatedSender", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -4487,7 +4487,7 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxParticipantIdentity
     {
 
-        [Newtonsoft.Json.JsonProperty("address", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("address", Required = Newtonsoft.Json.Required.Always)]
         public string Address { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("displayName", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -4499,13 +4499,13 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxRecipientIdentity
     {
 
-        [Newtonsoft.Json.JsonProperty("address", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("address", Required = Newtonsoft.Json.Required.Always)]
         public string Address { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("displayName", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? DisplayName { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("kind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("kind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxRecipientIdentityKind Kind { get; set; } = default!;
 
@@ -4515,7 +4515,7 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxAttachmentReference
     {
 
-        [Newtonsoft.Json.JsonProperty("providerAttachmentId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("providerAttachmentId", Required = Newtonsoft.Json.Required.Always)]
         public string ProviderAttachmentId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("name", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -4533,10 +4533,10 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxAuthenticityMetadata
     {
 
-        [Newtonsoft.Json.JsonProperty("authenticationResults", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("authenticationResults", Required = Newtonsoft.Json.Required.Always)]
         public MailboxAuthenticationResultSnapshot AuthenticationResults { get; set; } = new MailboxAuthenticationResultSnapshot();
 
-        [Newtonsoft.Json.JsonProperty("headerInspection", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("headerInspection", Required = Newtonsoft.Json.Required.Always)]
         public MailboxHeaderInspectionSnapshot HeaderInspection { get; set; } = new MailboxHeaderInspectionSnapshot();
 
         [Newtonsoft.Json.JsonProperty("strictnessPolicy", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -4548,7 +4548,7 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxDelegatedSenderSnapshot
     {
 
-        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxDelegatedSenderState State { get; set; } = default!;
 
@@ -4558,10 +4558,10 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("principalFor", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public MailboxParticipantIdentity? PrincipalFor { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceRefs", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> EvidenceRefs { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("discrepancies", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        [Newtonsoft.Json.JsonProperty("discrepancies", Required = Newtonsoft.Json.Required.Always, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public System.Collections.Generic.ICollection<MailboxHeaderDiscrepancyKind> Discrepancies { get; set; } = new System.Collections.Generic.List<MailboxHeaderDiscrepancyKind>();
 
     }
@@ -4570,17 +4570,17 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxExternalSenderPosture
     {
 
-        [Newtonsoft.Json.JsonProperty("externalSender", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("externalSender", Required = Newtonsoft.Json.Required.Always)]
         public bool ExternalSender { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("partyResolutionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("partyResolutionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxPartyResolutionState PartyResolutionState { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("resolvedPartyRef", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? ResolvedPartyRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceRefs", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> EvidenceRefs { get; set; } = new System.Collections.Generic.List<string>();
 
     }
@@ -4589,14 +4589,14 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxAuthenticityStrictnessPolicySnapshot
     {
 
-        [Newtonsoft.Json.JsonProperty("strictness", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("strictness", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxAuthenticityStrictness Strictness { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policyVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policyVersion", Required = Newtonsoft.Json.Required.Always)]
         public string PolicyVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
     }
@@ -4605,26 +4605,26 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxAuthenticationResultSnapshot
     {
 
-        [Newtonsoft.Json.JsonProperty("spf", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("spf", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxAuthenticationVerdictKind Spf { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("dkim", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("dkim", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxAuthenticationVerdictKind Dkim { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("dmarc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("dmarc", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxAuthenticationVerdictKind Dmarc { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("compositeAuthentication", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("compositeAuthentication", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxAuthenticationVerdictKind CompositeAuthentication { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("compositeAuthenticationReason", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? CompositeAuthenticationReason { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("authenticationResultsHeaders", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("authenticationResultsHeaders", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<MailboxSelectedHeaderSnapshot> AuthenticationResultsHeaders { get; set; } = new System.Collections.Generic.List<MailboxSelectedHeaderSnapshot>();
 
     }
@@ -4633,29 +4633,29 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxHeaderInspectionSnapshot
     {
 
-        [Newtonsoft.Json.JsonProperty("receivedHeaders", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("receivedHeaders", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<MailboxSelectedHeaderSnapshot> ReceivedHeaders { get; set; } = new System.Collections.Generic.List<MailboxSelectedHeaderSnapshot>();
 
-        [Newtonsoft.Json.JsonProperty("authenticationResultsHeaders", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("authenticationResultsHeaders", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<MailboxSelectedHeaderSnapshot> AuthenticationResultsHeaders { get; set; } = new System.Collections.Generic.List<MailboxSelectedHeaderSnapshot>();
 
-        [Newtonsoft.Json.JsonProperty("from", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("from", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxHeaderValueState From { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("replyTo", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("replyTo", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxHeaderValueState ReplyTo { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sender", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sender", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxHeaderValueState Sender { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("xOriginalSender", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("xOriginalSender", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxHeaderValueState XOriginalSender { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("discrepancies", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        [Newtonsoft.Json.JsonProperty("discrepancies", Required = Newtonsoft.Json.Required.Always, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public System.Collections.Generic.ICollection<MailboxHeaderDiscrepancyKind> Discrepancies { get; set; } = new System.Collections.Generic.List<MailboxHeaderDiscrepancyKind>();
 
     }
@@ -4664,14 +4664,14 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxSelectedHeaderSnapshot
     {
 
-        [Newtonsoft.Json.JsonProperty("name", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("name", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxSelectedHeaderSnapshotName Name { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("ordinal", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("ordinal", Required = Newtonsoft.Json.Required.Always)]
         public int Ordinal { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("valueState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("valueState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxHeaderValueState ValueState { get; set; } = default!;
 
@@ -4828,25 +4828,25 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ResolveMailboxMessageParticipants
     {
 
-        [Newtonsoft.Json.JsonProperty("resolutionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("resolutionId", Required = Newtonsoft.Json.Required.Always)]
         public string ResolutionId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.Always)]
         public string IntakeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceMailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceMailboxId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceMailboxId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceParticipants", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceParticipants", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<MailboxParticipantSourceReference> SourceParticipants { get; set; } = new System.Collections.Generic.List<MailboxParticipantSourceReference>();
 
-        [Newtonsoft.Json.JsonProperty("resolvedParticipants", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("resolvedParticipants", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<ResolvedMailboxParticipantReference> ResolvedParticipants { get; set; } = new System.Collections.Generic.List<ResolvedMailboxParticipantReference>();
 
-        [Newtonsoft.Json.JsonProperty("unresolvedParticipants", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("unresolvedParticipants", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<UnresolvedMailboxParticipantEvidence> UnresolvedParticipants { get; set; } = new System.Collections.Generic.List<UnresolvedMailboxParticipantEvidence>();
 
-        [Newtonsoft.Json.JsonProperty("resolutionKernelVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("resolutionKernelVersion", Required = Newtonsoft.Json.Required.Always)]
         public string ResolutionKernelVersion { get; set; } = default!;
 
     }
@@ -4855,20 +4855,20 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxParticipantSourceReference
     {
 
-        [Newtonsoft.Json.JsonProperty("sourceParticipantId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceParticipantId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceParticipantId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("role", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("role", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxParticipantSourceReferenceRole Role { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceReference { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("addressEvidence", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("addressEvidence", Required = Newtonsoft.Json.Required.Always)]
         public string AddressEvidence { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("displayNameEvidence", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -4880,25 +4880,25 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ResolvedMailboxParticipantReference
     {
 
-        [Newtonsoft.Json.JsonProperty("sourceParticipantId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceParticipantId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceParticipantId { get; set; } = default!;
 
         /// <summary>
         /// Stable PartyId reference; never provider display-name or address evidence.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("partyId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("partyId", Required = Newtonsoft.Json.Required.Always)]
         public string PartyId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("partyTenantId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("partyTenantId", Required = Newtonsoft.Json.Required.Always)]
         public string PartyTenantId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceReference { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("status", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("status", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ParticipantResolutionStatus Status { get; set; } = default!;
 
@@ -4908,20 +4908,20 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class UnresolvedMailboxParticipantEvidence
     {
 
-        [Newtonsoft.Json.JsonProperty("sourceParticipantId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceParticipantId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceParticipantId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceReference { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reason", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reason", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ParticipantResolutionBlockedReason Reason { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("allowedReviewActions", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        [Newtonsoft.Json.JsonProperty("allowedReviewActions", Required = Newtonsoft.Json.Required.Always, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public System.Collections.Generic.ICollection<ParticipantReviewAction> AllowedReviewActions { get; set; } = new System.Collections.Generic.List<ParticipantReviewAction>();
 
     }
@@ -5005,37 +5005,37 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ScoreMailboxMessageAssociation
     {
 
-        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.Always)]
         public string AssociationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.Always)]
         public string IntakeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceMailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceMailboxId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceMailboxId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceConversationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceConversationId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceConversationId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("sourceThreadId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SourceThreadId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("deterministicSignals", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("deterministicSignals", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<AssociationDeterministicSignal> DeterministicSignals { get; set; } = new System.Collections.Generic.List<AssociationDeterministicSignal>();
 
-        [Newtonsoft.Json.JsonProperty("thresholdPolicy", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("thresholdPolicy", Required = Newtonsoft.Json.Required.Always)]
         public AssociationThresholdPolicySnapshot ThresholdPolicy { get; set; } = new AssociationThresholdPolicySnapshot();
 
-        [Newtonsoft.Json.JsonProperty("candidates", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("candidates", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<AssociationCandidate> Candidates { get; set; } = new System.Collections.Generic.List<AssociationCandidate>();
 
-        [Newtonsoft.Json.JsonProperty("exclusions", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("exclusions", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<AssociationExclusion> Exclusions { get; set; } = new System.Collections.Generic.List<AssociationExclusion>();
 
-        [Newtonsoft.Json.JsonProperty("result", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("result", Required = Newtonsoft.Json.Required.Always)]
         public AssociationScoringResult Result { get; set; } = new AssociationScoringResult();
 
-        [Newtonsoft.Json.JsonProperty("scoringKernelVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("scoringKernelVersion", Required = Newtonsoft.Json.Required.Always)]
         public string ScoringKernelVersion { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("externalSender", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -5053,29 +5053,29 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class AssociateEmailToProject
     {
 
-        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.Always)]
         public string AssociationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.Always)]
         public string IntakeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("decisionKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("decisionKind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationDecisionKind DecisionKind { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("decisionNote", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? DecisionNote { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("candidateEvidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("candidateEvidenceFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string CandidateEvidenceFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         public string SchemaVersion { get; set; } = default!;
 
     }
@@ -5084,26 +5084,26 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class RejectEmailProjectAssociation
     {
 
-        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.Always)]
         public string AssociationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.Always)]
         public string IntakeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("decisionKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("decisionKind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationDecisionKind DecisionKind { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("decisionNote", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? DecisionNote { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("candidateEvidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("candidateEvidenceFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string CandidateEvidenceFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         public string SchemaVersion { get; set; } = default!;
 
     }
@@ -5112,26 +5112,26 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class DeferEmailProjectAssociation
     {
 
-        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.Always)]
         public string AssociationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.Always)]
         public string IntakeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("decisionKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("decisionKind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationDecisionKind DecisionKind { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("decisionNote", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? DecisionNote { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("candidateEvidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("candidateEvidenceFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string CandidateEvidenceFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         public string SchemaVersion { get; set; } = default!;
 
     }
@@ -5140,26 +5140,26 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MarkEmailAssociationNeedsReview
     {
 
-        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.Always)]
         public string AssociationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.Always)]
         public string IntakeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("decisionKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("decisionKind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationDecisionKind DecisionKind { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("decisionNote", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? DecisionNote { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("candidateEvidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("candidateEvidenceFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string CandidateEvidenceFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         public string SchemaVersion { get; set; } = default!;
 
     }
@@ -5168,41 +5168,41 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class CorrectEmailProjectAssociation
     {
 
-        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.Always)]
         public string AssociationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.Always)]
         public string IntakeId { get; set; } = default!;
 
         /// <summary>
         /// Opaque current project identifier to prove source-project authority.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("priorProjectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("priorProjectId", Required = Newtonsoft.Json.Required.Always)]
         public string PriorProjectId { get; set; } = default!;
 
         /// <summary>
         /// Opaque corrected project identifier; authority comes from authenticated context.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("targetProjectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("targetProjectId", Required = Newtonsoft.Json.Required.Always)]
         public string TargetProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correctionKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correctionKind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationCorrectionKind CorrectionKind { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("correctionRationale", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? CorrectionRationale { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("predecessorAssociationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("predecessorAssociationId", Required = Newtonsoft.Json.Required.Always)]
         public string PredecessorAssociationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("candidateEvidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("candidateEvidenceFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string CandidateEvidenceFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         public string SchemaVersion { get; set; } = default!;
 
     }
@@ -5211,16 +5211,16 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SetAssociationConfidenceThresholds
     {
 
-        [Newtonsoft.Json.JsonProperty("policyId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policyId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicyId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("tHigh", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("tHigh", Required = Newtonsoft.Json.Required.Always)]
         public double THigh { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("tLow", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("tLow", Required = Newtonsoft.Json.Required.Always)]
         public double TLow { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policyVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policyVersion", Required = Newtonsoft.Json.Required.Always)]
         public string PolicyVersion { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("evaluationRunReference", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -5235,41 +5235,41 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitTenantPolicyChange
     {
 
-        [Newtonsoft.Json.JsonProperty("policyChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policyChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicyChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourcePolicySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourcePolicySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string SourcePolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("proposedPolicySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("proposedPolicySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string ProposedPolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("changedKnobIds", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        [Newtonsoft.Json.JsonProperty("changedKnobIds", Required = Newtonsoft.Json.Required.Always, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public System.Collections.Generic.ICollection<ChangedKnobIds> ChangedKnobIds { get; set; } = new System.Collections.Generic.List<ChangedKnobIds>();
 
-        [Newtonsoft.Json.JsonProperty("changeSet", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("changeSet", Required = Newtonsoft.Json.Required.Always)]
         public TenantPolicyChangeSet ChangeSet { get; set; } = new TenantPolicyChangeSet();
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitTenantPolicyChangeSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldValueFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldValueFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string OldValueFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newValueFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newValueFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string NewValueFingerprint { get; set; } = default!;
 
     }
@@ -5278,35 +5278,35 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ApproveTenantPolicyChange
     {
 
-        [Newtonsoft.Json.JsonProperty("policyChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policyChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicyChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("pendingPolicySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("pendingPolicySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PendingPolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("activatedPolicySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("activatedPolicySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string ActivatedPolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("changedKnobIds", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        [Newtonsoft.Json.JsonProperty("changedKnobIds", Required = Newtonsoft.Json.Required.Always, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public System.Collections.Generic.ICollection<ChangedKnobIds2> ChangedKnobIds { get; set; } = new System.Collections.Generic.List<ChangedKnobIds2>();
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.Always)]
         public string ApproverRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApproveTenantPolicyChangeSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -5315,7 +5315,7 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class TenantPolicyChangeSet
     {
 
-        [Newtonsoft.Json.JsonProperty("values", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("values", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<TenantPolicyValue> Values { get; set; } = new System.Collections.Generic.List<TenantPolicyValue>();
 
     }
@@ -5324,7 +5324,7 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class TenantPolicyValue
     {
 
-        [Newtonsoft.Json.JsonProperty("knobId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("knobId", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public TenantPolicyValueKnobId KnobId { get; set; } = default!;
 
@@ -5352,37 +5352,37 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitMailboxSourceDisable
     {
 
-        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string DisableChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("mailboxSourceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("mailboxSourceRef", Required = Newtonsoft.Json.Required.Always)]
         public string MailboxSourceRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxSourceControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxSourceControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitMailboxSourceDisableSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -5391,40 +5391,40 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ApproveMailboxSourceDisable
     {
 
-        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string DisableChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("mailboxSourceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("mailboxSourceRef", Required = Newtonsoft.Json.Required.Always)]
         public string MailboxSourceRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxSourceControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxSourceControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.Always)]
         public string ApproverRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApproveMailboxSourceDisableSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -5433,37 +5433,37 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitMailboxSourceQuarantine
     {
 
-        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string QuarantineChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("mailboxSourceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("mailboxSourceRef", Required = Newtonsoft.Json.Required.Always)]
         public string MailboxSourceRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxSourceControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxSourceControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitMailboxSourceQuarantineSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -5472,40 +5472,40 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ApproveMailboxSourceQuarantine
     {
 
-        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string QuarantineChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("mailboxSourceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("mailboxSourceRef", Required = Newtonsoft.Json.Required.Always)]
         public string MailboxSourceRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxSourceControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxSourceControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.Always)]
         public string ApproverRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApproveMailboxSourceQuarantineSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -5514,39 +5514,39 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitMailboxSourceRateLimit
     {
 
-        [Newtonsoft.Json.JsonProperty("rateLimitChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("rateLimitChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string RateLimitChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("mailboxSourceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("mailboxSourceRef", Required = Newtonsoft.Json.Required.Always)]
         public string MailboxSourceRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldBudget", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldBudget", Required = Newtonsoft.Json.Required.Always)]
         public int OldBudget { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newBudget", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newBudget", Required = Newtonsoft.Json.Required.Always)]
         public int NewBudget { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("window", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("window", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxRateLimitWindow Window { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitMailboxSourceRateLimitSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -5579,37 +5579,37 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitServiceClientDisable
     {
 
-        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string DisableChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("serviceClientRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("serviceClientRef", Required = Newtonsoft.Json.Required.Always)]
         public string ServiceClientRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ServiceClientControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ServiceClientControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitServiceClientDisableSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -5618,40 +5618,40 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ApproveServiceClientDisable
     {
 
-        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string DisableChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("serviceClientRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("serviceClientRef", Required = Newtonsoft.Json.Required.Always)]
         public string ServiceClientRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ServiceClientControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ServiceClientControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.Always)]
         public string ApproverRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApproveServiceClientDisableSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -5660,37 +5660,37 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitServiceClientQuarantine
     {
 
-        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string QuarantineChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("serviceClientRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("serviceClientRef", Required = Newtonsoft.Json.Required.Always)]
         public string ServiceClientRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ServiceClientControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ServiceClientControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitServiceClientQuarantineSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -5699,40 +5699,40 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ApproveServiceClientQuarantine
     {
 
-        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string QuarantineChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("serviceClientRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("serviceClientRef", Required = Newtonsoft.Json.Required.Always)]
         public string ServiceClientRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ServiceClientControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ServiceClientControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.Always)]
         public string ApproverRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApproveServiceClientQuarantineSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -5756,37 +5756,37 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitAiActorDisable
     {
 
-        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string DisableChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("aiActorRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("aiActorRef", Required = Newtonsoft.Json.Required.Always)]
         public string AiActorRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiActorControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiActorControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitAiActorDisableSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -5795,40 +5795,40 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ApproveAiActorDisable
     {
 
-        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string DisableChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("aiActorRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("aiActorRef", Required = Newtonsoft.Json.Required.Always)]
         public string AiActorRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiActorControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiActorControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.Always)]
         public string ApproverRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApproveAiActorDisableSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -5837,37 +5837,37 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitAiActorQuarantine
     {
 
-        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string QuarantineChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("aiActorRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("aiActorRef", Required = Newtonsoft.Json.Required.Always)]
         public string AiActorRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiActorControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiActorControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitAiActorQuarantineSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -5876,40 +5876,40 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ApproveAiActorQuarantine
     {
 
-        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string QuarantineChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("aiActorRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("aiActorRef", Required = Newtonsoft.Json.Required.Always)]
         public string AiActorRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiActorControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiActorControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.Always)]
         public string ApproverRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApproveAiActorQuarantineSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -5948,37 +5948,37 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitCommandCapabilityDisable
     {
 
-        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string DisableChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandCapabilityRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandCapabilityRef", Required = Newtonsoft.Json.Required.Always)]
         public string CommandCapabilityRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CommandCapabilityControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CommandCapabilityControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitCommandCapabilityDisableSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -5987,40 +5987,40 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ApproveCommandCapabilityDisable
     {
 
-        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string DisableChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandCapabilityRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandCapabilityRef", Required = Newtonsoft.Json.Required.Always)]
         public string CommandCapabilityRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CommandCapabilityControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CommandCapabilityControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.Always)]
         public string ApproverRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApproveCommandCapabilityDisableSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -6044,37 +6044,37 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitOutboundChannelDisable
     {
 
-        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string DisableChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("outboundChannelRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("outboundChannelRef", Required = Newtonsoft.Json.Required.Always)]
         public string OutboundChannelRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OutboundChannelControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OutboundChannelControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitOutboundChannelDisableSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -6083,40 +6083,40 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ApproveOutboundChannelDisable
     {
 
-        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("disableChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string DisableChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("outboundChannelRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("outboundChannelRef", Required = Newtonsoft.Json.Required.Always)]
         public string OutboundChannelRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OutboundChannelControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OutboundChannelControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.Always)]
         public string ApproverRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApproveOutboundChannelDisableSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -6125,37 +6125,37 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitOutboundChannelQuarantine
     {
 
-        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string QuarantineChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("outboundChannelRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("outboundChannelRef", Required = Newtonsoft.Json.Required.Always)]
         public string OutboundChannelRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OutboundChannelControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OutboundChannelControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitOutboundChannelQuarantineSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -6164,40 +6164,40 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ApproveOutboundChannelQuarantine
     {
 
-        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string QuarantineChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("outboundChannelRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("outboundChannelRef", Required = Newtonsoft.Json.Required.Always)]
         public string OutboundChannelRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OutboundChannelControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OutboundChannelControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.Always)]
         public string ApproverRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApproveOutboundChannelQuarantineSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -6206,37 +6206,37 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitCommandCapabilityQuarantine
     {
 
-        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string QuarantineChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandCapabilityRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandCapabilityRef", Required = Newtonsoft.Json.Required.Always)]
         public string CommandCapabilityRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CommandCapabilityControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CommandCapabilityControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitCommandCapabilityQuarantineSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -6245,40 +6245,40 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ApproveCommandCapabilityQuarantine
     {
 
-        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("quarantineChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string QuarantineChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandCapabilityRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandCapabilityRef", Required = Newtonsoft.Json.Required.Always)]
         public string CommandCapabilityRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CommandCapabilityControlState OldState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CommandCapabilityControlState NewState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.Always)]
         public string ApproverRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApproveCommandCapabilityQuarantineSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -6287,39 +6287,39 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitAiActorRateLimit
     {
 
-        [Newtonsoft.Json.JsonProperty("rateLimitChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("rateLimitChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string RateLimitChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("aiActorRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("aiActorRef", Required = Newtonsoft.Json.Required.Always)]
         public string AiActorRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldBudget", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldBudget", Required = Newtonsoft.Json.Required.Always)]
         public int OldBudget { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newBudget", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newBudget", Required = Newtonsoft.Json.Required.Always)]
         public int NewBudget { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("window", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("window", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiActorRateLimitWindow Window { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitAiActorRateLimitSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -6337,39 +6337,39 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitCommandCapabilityRateLimit
     {
 
-        [Newtonsoft.Json.JsonProperty("rateLimitChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("rateLimitChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string RateLimitChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandCapabilityRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandCapabilityRef", Required = Newtonsoft.Json.Required.Always)]
         public string CommandCapabilityRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldBudget", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldBudget", Required = Newtonsoft.Json.Required.Always)]
         public int OldBudget { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newBudget", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newBudget", Required = Newtonsoft.Json.Required.Always)]
         public int NewBudget { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("window", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("window", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CommandCapabilityRateLimitWindow Window { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitCommandCapabilityRateLimitSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -6387,39 +6387,39 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitOutboundChannelRateLimit
     {
 
-        [Newtonsoft.Json.JsonProperty("rateLimitChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("rateLimitChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string RateLimitChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("outboundChannelRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("outboundChannelRef", Required = Newtonsoft.Json.Required.Always)]
         public string OutboundChannelRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldBudget", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldBudget", Required = Newtonsoft.Json.Required.Always)]
         public int OldBudget { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newBudget", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newBudget", Required = Newtonsoft.Json.Required.Always)]
         public int NewBudget { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("window", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("window", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OutboundChannelRateLimitWindow Window { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitOutboundChannelRateLimitSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -6437,39 +6437,39 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitServiceClientRateLimit
     {
 
-        [Newtonsoft.Json.JsonProperty("rateLimitChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("rateLimitChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string RateLimitChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("serviceClientRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("serviceClientRef", Required = Newtonsoft.Json.Required.Always)]
         public string ServiceClientRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldBudget", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldBudget", Required = Newtonsoft.Json.Required.Always)]
         public int OldBudget { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newBudget", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newBudget", Required = Newtonsoft.Json.Required.Always)]
         public int NewBudget { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("window", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("window", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ServiceClientRateLimitWindow Window { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitServiceClientRateLimitSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -6487,38 +6487,38 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitMailboxConfigurationChange
     {
 
-        [Newtonsoft.Json.JsonProperty("configurationChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("configurationChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string ConfigurationChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceConfigurationSnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceConfigurationSnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceConfigurationSnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("proposedConfigurationSnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("proposedConfigurationSnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string ProposedConfigurationSnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("changeSet", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("changeSet", Required = Newtonsoft.Json.Required.Always)]
         public MailboxConfigurationChangeSet ChangeSet { get; set; } = new MailboxConfigurationChangeSet();
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitMailboxConfigurationChangeSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldConfigurationFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldConfigurationFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string OldConfigurationFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newConfigurationFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newConfigurationFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string NewConfigurationFingerprint { get; set; } = default!;
 
     }
@@ -6527,43 +6527,43 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class RecordMailboxProviderConnection
     {
 
-        [Newtonsoft.Json.JsonProperty("providerConnectionChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("providerConnectionChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string ProviderConnectionChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("providerConnectionRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("providerConnectionRef", Required = Newtonsoft.Json.Required.Always)]
         public string ProviderConnectionRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("providerKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("providerKind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxProviderKind ProviderKind { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("credentialFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("credentialFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string CredentialFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("permissionEvidenceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("permissionEvidenceRef", Required = Newtonsoft.Json.Required.Always)]
         public string PermissionEvidenceRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("freshness", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("freshness", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxPermissionFreshnessState Freshness { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public RecordMailboxProviderConnectionSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
     }
@@ -6572,16 +6572,16 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxConfigurationChangeSet
     {
 
-        [Newtonsoft.Json.JsonProperty("monitoredPatterns", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("monitoredPatterns", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<MonitoredMailboxPattern> MonitoredPatterns { get; set; } = new System.Collections.Generic.List<MonitoredMailboxPattern>();
 
-        [Newtonsoft.Json.JsonProperty("routingRules", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("routingRules", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<MailboxRoutingRule> RoutingRules { get; set; } = new System.Collections.Generic.List<MailboxRoutingRule>();
 
-        [Newtonsoft.Json.JsonProperty("providerConnections", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("providerConnections", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<MailboxProviderConnectionMetadata> ProviderConnections { get; set; } = new System.Collections.Generic.List<MailboxProviderConnectionMetadata>();
 
-        [Newtonsoft.Json.JsonProperty("permissionStatuses", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("permissionStatuses", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<MailboxPermissionStatus> PermissionStatuses { get; set; } = new System.Collections.Generic.List<MailboxPermissionStatus>();
 
     }
@@ -6590,19 +6590,19 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MonitoredMailboxPattern
     {
 
-        [Newtonsoft.Json.JsonProperty("mailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("mailboxId", Required = Newtonsoft.Json.Required.Always)]
         public string MailboxId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceContext", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceContext", Required = Newtonsoft.Json.Required.Always)]
         public string SourceContext { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("providerConnectionRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("providerConnectionRef", Required = Newtonsoft.Json.Required.Always)]
         public string ProviderConnectionRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("isEnabled", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("isEnabled", Required = Newtonsoft.Json.Required.Always)]
         public bool IsEnabled { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("patternRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("patternRef", Required = Newtonsoft.Json.Required.Always)]
         public string PatternRef { get; set; } = default!;
 
     }
@@ -6611,23 +6611,23 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxRoutingRule
     {
 
-        [Newtonsoft.Json.JsonProperty("routingRuleId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("routingRuleId", Required = Newtonsoft.Json.Required.Always)]
         public string RoutingRuleId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("kind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("kind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxRoutingRuleKind Kind { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceContext", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceContext", Required = Newtonsoft.Json.Required.Always)]
         public string SourceContext { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("targetRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("targetRef", Required = Newtonsoft.Json.Required.Always)]
         public string TargetRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("priority", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("priority", Required = Newtonsoft.Json.Required.Always)]
         public int Priority { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
     }
@@ -6636,24 +6636,24 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxProviderConnectionMetadata
     {
 
-        [Newtonsoft.Json.JsonProperty("providerConnectionRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("providerConnectionRef", Required = Newtonsoft.Json.Required.Always)]
         public string ProviderConnectionRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("providerKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("providerKind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxProviderKind ProviderKind { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("credentialFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("credentialFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string CredentialFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("permissionEvidenceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("permissionEvidenceRef", Required = Newtonsoft.Json.Required.Always)]
         public string PermissionEvidenceRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("freshness", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("freshness", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxPermissionFreshnessState Freshness { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("lastCheckedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("lastCheckedAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset LastCheckedAt { get; set; } = default!;
 
     }
@@ -6662,27 +6662,27 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxPermissionStatus
     {
 
-        [Newtonsoft.Json.JsonProperty("permissionStatusRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("permissionStatusRef", Required = Newtonsoft.Json.Required.Always)]
         public string PermissionStatusRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("providerConnectionRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("providerConnectionRef", Required = Newtonsoft.Json.Required.Always)]
         public string ProviderConnectionRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("permission", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("permission", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxPermissionStatusPermission Permission { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("freshness", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("freshness", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxPermissionFreshnessState Freshness { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("permissionEvidenceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("permissionEvidenceRef", Required = Newtonsoft.Json.Required.Always)]
         public string PermissionEvidenceRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("lastCheckedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("lastCheckedAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset LastCheckedAt { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
     }
@@ -6691,34 +6691,34 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxHealthStatusRecord
     {
 
-        [Newtonsoft.Json.JsonProperty("healthRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("healthRef", Required = Newtonsoft.Json.Required.Always)]
         public string HealthRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("mailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("mailboxId", Required = Newtonsoft.Json.Required.Always)]
         public string MailboxId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("health", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("health", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxProcessingHealth Health { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxDegradationReasonCode ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("permissionFreshness", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("permissionFreshness", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxPermissionFreshnessState PermissionFreshness { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("ownerRole", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("ownerRole", Required = Newtonsoft.Json.Required.Always)]
         public string OwnerRole { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.Always)]
         public string SafeNextAction { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("safeRecoveryText", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("safeRecoveryText", Required = Newtonsoft.Json.Required.Always)]
         public string SafeRecoveryText { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("observedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("observedAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset ObservedAt { get; set; } = default!;
 
     }
@@ -6727,17 +6727,17 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class GetMailboxConfigurationSummary
     {
 
-        [Newtonsoft.Json.JsonProperty("scopeUsed", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("scopeUsed", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public GetMailboxConfigurationSummaryScopeUsed ScopeUsed { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("activeSnapshotRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("activeSnapshotRef", Required = Newtonsoft.Json.Required.Always)]
         public string ActiveSnapshotRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("aggregationLimit", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("aggregationLimit", Required = Newtonsoft.Json.Required.Always)]
         public int AggregationLimit { get; set; } = default!;
 
     }
@@ -6746,30 +6746,30 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class MailboxConfigurationSummary
     {
 
-        [Newtonsoft.Json.JsonProperty("activeSnapshotRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("activeSnapshotRef", Required = Newtonsoft.Json.Required.Always)]
         public string ActiveSnapshotRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxConfigurationSummarySchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("monitoredPatterns", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("monitoredPatterns", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<MonitoredMailboxPattern> MonitoredPatterns { get; set; } = new System.Collections.Generic.List<MonitoredMailboxPattern>();
 
-        [Newtonsoft.Json.JsonProperty("routingRules", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("routingRules", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<MailboxRoutingRule> RoutingRules { get; set; } = new System.Collections.Generic.List<MailboxRoutingRule>();
 
-        [Newtonsoft.Json.JsonProperty("providerConnections", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("providerConnections", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<MailboxProviderConnectionMetadata> ProviderConnections { get; set; } = new System.Collections.Generic.List<MailboxProviderConnectionMetadata>();
 
-        [Newtonsoft.Json.JsonProperty("health", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("health", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<MailboxHealthStatusRecord> Health { get; set; } = new System.Collections.Generic.List<MailboxHealthStatusRecord>();
 
-        [Newtonsoft.Json.JsonProperty("summaryFreshness", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("summaryFreshness", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public MailboxConfigurationSummarySummaryFreshness SummaryFreshness { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -6916,14 +6916,14 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ComplianceAuditFilterRef
     {
 
-        [Newtonsoft.Json.JsonProperty("filterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("filterRef", Required = Newtonsoft.Json.Required.Always)]
         public string FilterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("filterKey", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("filterKey", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ComplianceAuditFilterRefFilterKey FilterKey { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("valueRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("valueRef", Required = Newtonsoft.Json.Required.Always)]
         public string ValueRef { get; set; } = default!;
 
     }
@@ -6932,19 +6932,19 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ComplianceAuditQueryFilters
     {
 
-        [Newtonsoft.Json.JsonProperty("queryRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("queryRef", Required = Newtonsoft.Json.Required.Always)]
         public string QueryRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("filters", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("filters", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<ComplianceAuditFilterRef> Filters { get; set; } = new System.Collections.Generic.List<ComplianceAuditFilterRef>();
 
-        [Newtonsoft.Json.JsonProperty("fromUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("fromUtc", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset FromUtc { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("toUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("toUtc", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset ToUtc { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("limit", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("limit", Required = Newtonsoft.Json.Required.Always)]
         public int Limit { get; set; } = default!;
 
     }
@@ -6953,45 +6953,45 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ComplianceAuditResultRow
     {
 
-        [Newtonsoft.Json.JsonProperty("auditRecordRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("auditRecordRef", Required = Newtonsoft.Json.Required.Always)]
         public string AuditRecordRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("actorRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("actorRef", Required = Newtonsoft.Json.Required.Always)]
         public string ActorRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("actorType", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("actorType", Required = Newtonsoft.Json.Required.Always)]
         public string ActorType { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandRef", Required = Newtonsoft.Json.Required.Always)]
         public string CommandRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("resourceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("resourceRef", Required = Newtonsoft.Json.Required.Always)]
         public string ResourceRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("decision", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("decision", Required = Newtonsoft.Json.Required.Always)]
         public string Decision { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("recordedAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("recordedAtUtc", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset RecordedAtUtc { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ComplianceAuditRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("escalationStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("escalationStatus", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ComplianceEscalationStatus EscalationStatus { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.Always)]
         public string SafeNextAction { get; set; } = default!;
 
     }
@@ -7000,39 +7000,39 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ComplianceAuditDetail
     {
 
-        [Newtonsoft.Json.JsonProperty("auditRecordRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("auditRecordRef", Required = Newtonsoft.Json.Required.Always)]
         public string AuditRecordRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandRef", Required = Newtonsoft.Json.Required.Always)]
         public string CommandRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("resourceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("resourceRef", Required = Newtonsoft.Json.Required.Always)]
         public string ResourceRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("recordedAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("recordedAtUtc", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset RecordedAtUtc { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ComplianceAuditRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("escalationStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("escalationStatus", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ComplianceEscalationStatus EscalationStatus { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("visibleMetadataRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("visibleMetadataRefs", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> VisibleMetadataRefs { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.Always)]
         public string SafeNextAction { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionReasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionReasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string RedactionReasonCode { get; set; } = default!;
 
     }
@@ -7041,19 +7041,19 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ComplianceAuditSearchResult
     {
 
-        [Newtonsoft.Json.JsonProperty("queryRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("queryRef", Required = Newtonsoft.Json.Required.Always)]
         public string QueryRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("rows", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("rows", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<ComplianceAuditResultRow> Rows { get; set; } = new System.Collections.Generic.List<ComplianceAuditResultRow>();
 
-        [Newtonsoft.Json.JsonProperty("resultFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("resultFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string ResultFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("generatedAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("generatedAtUtc", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset GeneratedAtUtc { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -7062,14 +7062,14 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SearchComplianceAuditRecords
     {
 
-        [Newtonsoft.Json.JsonProperty("scopeUsed", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("scopeUsed", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SearchComplianceAuditRecordsScopeUsed ScopeUsed { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("query", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("query", Required = Newtonsoft.Json.Required.Always)]
         public ComplianceAuditQueryFilters Query { get; set; } = new ComplianceAuditQueryFilters();
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -7078,17 +7078,17 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class GetComplianceAuditDetail
     {
 
-        [Newtonsoft.Json.JsonProperty("scopeUsed", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("scopeUsed", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public GetComplianceAuditDetailScopeUsed ScopeUsed { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("auditRecordRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("auditRecordRef", Required = Newtonsoft.Json.Required.Always)]
         public string AuditRecordRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
     }
@@ -7097,35 +7097,35 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ComplianceInvestigationIntentMetadata
     {
 
-        [Newtonsoft.Json.JsonProperty("investigationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("investigationId", Required = Newtonsoft.Json.Required.Always)]
         public string InvestigationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("queryRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("queryRef", Required = Newtonsoft.Json.Required.Always)]
         public string QueryRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("filterRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("filterRefs", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> FilterRefs { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ComplianceAuditRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("escalationStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("escalationStatus", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ComplianceEscalationStatus EscalationStatus { get; set; } = default!;
 
@@ -7135,7 +7135,7 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class RequestComplianceInvestigation : ComplianceInvestigationIntentMetadata
     {
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public RequestComplianceInvestigationSchemaVersion SchemaVersion { get; set; } = default!;
 
@@ -7145,42 +7145,42 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class RequestComplianceEscalation
     {
 
-        [Newtonsoft.Json.JsonProperty("escalationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("escalationId", Required = Newtonsoft.Json.Required.Always)]
         public string EscalationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("investigationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("investigationId", Required = Newtonsoft.Json.Required.Always)]
         public string InvestigationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("auditRecordRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("auditRecordRef", Required = Newtonsoft.Json.Required.Always)]
         public string AuditRecordRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("escalationTargetRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("escalationTargetRef", Required = Newtonsoft.Json.Required.Always)]
         public string EscalationTargetRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ComplianceAuditRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("escalationStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("escalationStatus", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ComplianceEscalationStatus EscalationStatus { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public RequestComplianceEscalationSchemaVersion SchemaVersion { get; set; } = default!;
 
@@ -7190,14 +7190,14 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class RetentionWindow
     {
 
-        [Newtonsoft.Json.JsonProperty("retentionClassId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClassId", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public RetentionWindowRetentionClassId RetentionClassId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionWindowRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionWindowRef", Required = Newtonsoft.Json.Required.Always)]
         public string RetentionWindowRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("windowDays", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("windowDays", Required = Newtonsoft.Json.Required.Always)]
         public int WindowDays { get; set; } = default!;
 
     }
@@ -7206,7 +7206,7 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class RetentionConfigurationChangeSet
     {
 
-        [Newtonsoft.Json.JsonProperty("windows", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("windows", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<RetentionWindow> Windows { get; set; } = new System.Collections.Generic.List<RetentionWindow>();
 
     }
@@ -7215,51 +7215,51 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class RetentionSnapshotMetadata
     {
 
-        [Newtonsoft.Json.JsonProperty("snapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("snapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string SnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public RetentionSnapshotMetadataSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("supersedesSnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("supersedesSnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string SupersedesSnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("supersededBySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("supersededBySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string SupersededBySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("actorRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("actorRef", Required = Newtonsoft.Json.Required.Always)]
         public string ActorRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("scopeUsed", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("scopeUsed", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public RetentionSnapshotMetadataScopeUsed ScopeUsed { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("changedRetentionClassIds", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("changedRetentionClassIds", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> ChangedRetentionClassIds { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("effectiveAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("effectiveAtUtc", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset EffectiveAtUtc { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldSnapshotFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldSnapshotFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string OldSnapshotFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newSnapshotFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newSnapshotFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string NewSnapshotFingerprint { get; set; } = default!;
 
     }
@@ -7268,10 +7268,10 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class RetentionValidationResult
     {
 
-        [Newtonsoft.Json.JsonProperty("isValid", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("isValid", Required = Newtonsoft.Json.Required.Always)]
         public bool IsValid { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("errors", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("errors", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> Errors { get; set; } = new System.Collections.Generic.List<string>();
 
     }
@@ -7280,44 +7280,44 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SubmitRetentionConfigurationChange
     {
 
-        [Newtonsoft.Json.JsonProperty("retentionChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionChangeId", Required = Newtonsoft.Json.Required.Always)]
         public string RetentionChangeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceRetentionSnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceRetentionSnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceRetentionSnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("proposedRetentionSnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("proposedRetentionSnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string ProposedRetentionSnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("changeSet", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("changeSet", Required = Newtonsoft.Json.Required.Always)]
         public RetentionConfigurationChangeSet ChangeSet { get; set; } = new RetentionConfigurationChangeSet();
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SubmitRetentionConfigurationChangeSchemaVersion SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("oldRetentionSnapshotFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("oldRetentionSnapshotFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string OldRetentionSnapshotFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("newRetentionSnapshotFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("newRetentionSnapshotFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string NewRetentionSnapshotFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("effectiveAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("effectiveAtUtc", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset EffectiveAtUtc { get; set; } = default!;
 
     }
@@ -7326,26 +7326,26 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class AssociationDeterministicSignal
     {
 
-        [Newtonsoft.Json.JsonProperty("signalClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("signalClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationSignalClass SignalClass { get; set; } = default!;
 
         /// <summary>
         /// Opaque project identifier; never a display name.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceReference { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("weight", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("weight", Required = Newtonsoft.Json.Required.Always)]
         public double Weight { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requiredForAutoAssociation", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requiredForAutoAssociation", Required = Newtonsoft.Json.Required.Always)]
         public bool RequiredForAutoAssociation { get; set; } = default!;
 
     }
@@ -7354,7 +7354,7 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class AssociationCandidate
     {
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
         /// <summary>
@@ -7363,22 +7363,22 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("displayName", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? DisplayName { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.Always)]
         public double ConfidenceScore { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("rank", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("rank", Required = Newtonsoft.Json.Required.Always)]
         public int Rank { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCodes", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        [Newtonsoft.Json.JsonProperty("reasonCodes", Required = Newtonsoft.Json.Required.Always, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public System.Collections.Generic.ICollection<AssociationReasonCode> ReasonCodes { get; set; } = new System.Collections.Generic.List<AssociationReasonCode>();
 
-        [Newtonsoft.Json.JsonProperty("evidenceRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceRefs", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<AssociationEvidenceReference> EvidenceRefs { get; set; } = new System.Collections.Generic.List<AssociationEvidenceReference>();
 
-        [Newtonsoft.Json.JsonProperty("confidenceInputs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("confidenceInputs", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<AssociationConfidenceInput> ConfidenceInputs { get; set; } = new System.Collections.Generic.List<AssociationConfidenceInput>();
 
-        [Newtonsoft.Json.JsonProperty("requiredEvidenceComplete", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requiredEvidenceComplete", Required = Newtonsoft.Json.Required.Always)]
         public bool RequiredEvidenceComplete { get; set; } = default!;
 
     }
@@ -7387,13 +7387,13 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class AssociationEvidenceReference
     {
 
-        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceReference { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceFingerprint { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceKind", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceKind { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("signalClass", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -7427,21 +7427,21 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class AssociationConfidenceInput
     {
 
-        [Newtonsoft.Json.JsonProperty("signalClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("signalClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationSignalClass SignalClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationReasonCode ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("weight", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("weight", Required = Newtonsoft.Json.Required.Always)]
         public double Weight { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceReference { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceFingerprint { get; set; } = default!;
 
     }
@@ -7453,21 +7453,21 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <summary>
         /// Opaque project identifier only; unauthorized display names are suppressed.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationExclusionState State { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationReasonCode ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceReference { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.Always)]
         public string EvidenceFingerprint { get; set; } = default!;
 
     }
@@ -7476,13 +7476,13 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class AssociationThresholdPolicySnapshot
     {
 
-        [Newtonsoft.Json.JsonProperty("tHigh", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("tHigh", Required = Newtonsoft.Json.Required.Always)]
         public double THigh { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("tLow", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("tLow", Required = Newtonsoft.Json.Required.Always)]
         public double TLow { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policyVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policyVersion", Required = Newtonsoft.Json.Required.Always)]
         public string PolicyVersion { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("evaluationRunReference", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -7494,50 +7494,50 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class AssociationScoringResult
     {
 
-        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.Always)]
         public double ConfidenceScore { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("thresholdBand", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("thresholdBand", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationThresholdBand ThresholdBand { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("outcome", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("outcome", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationScoringOutcome Outcome { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCodes", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        [Newtonsoft.Json.JsonProperty("reasonCodes", Required = Newtonsoft.Json.Required.Always, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public System.Collections.Generic.ICollection<AssociationReasonCode> ReasonCodes { get; set; } = new System.Collections.Generic.List<AssociationReasonCode>();
 
-        [Newtonsoft.Json.JsonProperty("kernelVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("kernelVersion", Required = Newtonsoft.Json.Required.Always)]
         public string KernelVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("detectedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("detectedAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset DetectedAt { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceMailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceMailboxId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceMailboxId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.Always)]
         public string IntakeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceConversationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceConversationId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceConversationId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("sourceThreadId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SourceThreadId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationScoringResultRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationScoringResultRetentionClass RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         public string SchemaVersion { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("externalSender", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -7555,43 +7555,43 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class AssociationRoutingStatus
     {
 
-        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.Always)]
         public string AssociationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.Always)]
         public string IntakeId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceMailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceMailboxId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceMailboxId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceConversationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceConversationId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceConversationId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("sourceThreadId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SourceThreadId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("lifecycleState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("lifecycleState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public LifecycleState LifecycleState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("outcome", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("outcome", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationScoringOutcome Outcome { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("thresholdBand", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("thresholdBand", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationThresholdBand ThresholdBand { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.Always)]
         public double ConfidenceScore { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCodes", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        [Newtonsoft.Json.JsonProperty("reasonCodes", Required = Newtonsoft.Json.Required.Always, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public System.Collections.Generic.ICollection<AssociationReasonCode> ReasonCodes { get; set; } = new System.Collections.Generic.List<AssociationReasonCode>();
 
-        [Newtonsoft.Json.JsonProperty("candidates", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("candidates", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<AssociationCandidate> Candidates { get; set; } = new System.Collections.Generic.List<AssociationCandidate>();
 
-        [Newtonsoft.Json.JsonProperty("exclusions", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("exclusions", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<AssociationExclusion> Exclusions { get; set; } = new System.Collections.Generic.List<AssociationExclusion>();
 
         [Newtonsoft.Json.JsonProperty("externalSender", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -7603,43 +7603,43 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("routingReason", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? RoutingReason { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("thresholdPolicyVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("thresholdPolicyVersion", Required = Newtonsoft.Json.Required.Always)]
         public string ThresholdPolicyVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceRefs", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<AssociationEvidenceReference> EvidenceRefs { get; set; } = new System.Collections.Generic.List<AssociationEvidenceReference>();
 
-        [Newtonsoft.Json.JsonProperty("kernelVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("kernelVersion", Required = Newtonsoft.Json.Required.Always)]
         public string KernelVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("detectedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("detectedAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset DetectedAt { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceProvenance", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceProvenance", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationRoutingStatusSourceProvenance SourceProvenance { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationRoutingStatusRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationRoutingStatusRetentionClass RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         public string SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long SourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("disabledActionReasonCodes", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("disabledActionReasonCodes", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> DisabledActionReasonCodes { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("nextActionReasonCodes", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        [Newtonsoft.Json.JsonProperty("nextActionReasonCodes", Required = Newtonsoft.Json.Required.Always, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public System.Collections.Generic.ICollection<ChatBotMessageCode> NextActionReasonCodes { get; set; } = new System.Collections.Generic.List<ChatBotMessageCode>();
 
         [Newtonsoft.Json.JsonProperty("decisionKind", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -8024,10 +8024,10 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class AiActionRiskInputTuple
     {
 
-        [Newtonsoft.Json.JsonProperty("intendedCommandName", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("intendedCommandName", Required = Newtonsoft.Json.Required.Always)]
         public string IntendedCommandName { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("actionClasses", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        [Newtonsoft.Json.JsonProperty("actionClasses", Required = Newtonsoft.Json.Required.Always, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public System.Collections.Generic.ICollection<AiActionRiskActionClass> ActionClasses { get; set; } = new System.Collections.Generic.List<AiActionRiskActionClass>();
 
         [Newtonsoft.Json.JsonProperty("effectSurface", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -8055,7 +8055,7 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("projectAuthorizationState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? ProjectAuthorizationState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
     }
@@ -8064,49 +8064,49 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class AiActionRiskClassificationRecord
     {
 
-        [Newtonsoft.Json.JsonProperty("riskClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("riskClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiActionRiskClass RiskClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("riskActionClasses", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        [Newtonsoft.Json.JsonProperty("riskActionClasses", Required = Newtonsoft.Json.Required.Always, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public System.Collections.Generic.ICollection<AiActionRiskActionClass> RiskActionClasses { get; set; } = new System.Collections.Generic.List<AiActionRiskActionClass>();
 
-        [Newtonsoft.Json.JsonProperty("classifierVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("classifierVersion", Required = Newtonsoft.Json.Required.Always)]
         public string ClassifierVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("inputTuple", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("inputTuple", Required = Newtonsoft.Json.Required.Always)]
         public AiActionRiskInputTuple InputTuple { get; set; } = new AiActionRiskInputTuple();
 
         [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandAllowlistVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandAllowlistVersion", Required = Newtonsoft.Json.Required.Always)]
         public string CommandAllowlistVersion { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("commandDefaultRisk", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiActionRiskClass? CommandDefaultRisk { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterAuthorityClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterAuthorityClass", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterAuthorityClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string ReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AiActionRiskClassificationRecordRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         public string RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         public string SchemaVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("producedAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("producedAtUtc", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset ProducedAtUtc { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("indeterminateReason", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -8133,63 +8133,63 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ExecuteLowRiskAIAssistance
     {
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("proposalId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("proposalId", Required = Newtonsoft.Json.Required.Always)]
         public string ProposalId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("taskIntentId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("taskIntentId", Required = Newtonsoft.Json.Required.Always)]
         public string TaskIntentId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceMessageId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterId", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("assistanceKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("assistanceKind", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public LowRiskAiAssistanceKind AssistanceKind { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("contextPackageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("contextPackageId", Required = Newtonsoft.Json.Required.Always)]
         public string ContextPackageId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("contextPackageVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("contextPackageVersion", Required = Newtonsoft.Json.Required.Always)]
         public string ContextPackageVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("contextPackageRedactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("contextPackageRedactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ExecuteLowRiskAIAssistanceContextPackageRedactionState ContextPackageRedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         public string RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("providerReuseSetting", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("providerReuseSetting", Required = Newtonsoft.Json.Required.Always)]
         public string ProviderReuseSetting { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceEvidenceReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceEvidenceReferences", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> SourceEvidenceReferences { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("authorizedContextReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("authorizedContextReferences", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> AuthorizedContextReferences { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("excludedContextReasons", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("excludedContextReasons", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> ExcludedContextReasons { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("expectedProposalSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("expectedProposalSourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long ExpectedProposalSourceVersion { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("executionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("executionId", Required = Newtonsoft.Json.Required.Always)]
         public string ExecutionId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("transitionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("transitionId", Required = Newtonsoft.Json.Required.Always)]
         public string TransitionId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("sourceConversationItemId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -8201,11 +8201,11 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("executionRecord", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public LowRiskAiAssistanceExecutionRecord? ExecutionRecord { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ExecuteLowRiskAIAssistanceRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ExecuteLowRiskAIAssistanceSchemaVersion SchemaVersion { get; set; } = default!;
 
@@ -8215,54 +8215,54 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ExecuteApprovedAIAction
     {
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("proposalId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("proposalId", Required = Newtonsoft.Json.Required.Always)]
         public string ProposalId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("approvalId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approvalId", Required = Newtonsoft.Json.Required.Always)]
         public string ApprovalId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("taskIntentId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("taskIntentId", Required = Newtonsoft.Json.Required.Always)]
         public string TaskIntentId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceMessageId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterId", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandName", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandName", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ExecuteApprovedAIActionCommandName CommandName { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandAllowlistVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandAllowlistVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ExecuteApprovedAIActionCommandAllowlistVersion CommandAllowlistVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("expectedApprovalSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("expectedApprovalSourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long ExpectedApprovalSourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("expectedProposalSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("expectedProposalSourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long ExpectedProposalSourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("executionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("executionId", Required = Newtonsoft.Json.Required.Always)]
         public string ExecutionId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("transitionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("transitionId", Required = Newtonsoft.Json.Required.Always)]
         public string TransitionId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceEvidenceReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceEvidenceReferences", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> SourceEvidenceReferences { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("affectedResourceReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("affectedResourceReferences", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> AffectedResourceReferences { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("recipientReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("recipientReferences", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> RecipientReferences { get; set; } = new System.Collections.Generic.List<string>();
 
         [Newtonsoft.Json.JsonProperty("sourceConversationItemId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -8271,24 +8271,24 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("actionSummaryRedactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("actionSummaryRedactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ExecuteApprovedAIActionActionSummaryRedactionState ActionSummaryRedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correctedContextReady", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correctedContextReady", Required = Newtonsoft.Json.Required.Always)]
         public bool CorrectedContextReady { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("executionRecord", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public ApprovedAiActionExecutionRecord? ExecutionRecord { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ExecuteApprovedAIActionRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         public string RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ExecuteApprovedAIActionSchemaVersion SchemaVersion { get; set; } = default!;
 
@@ -8298,20 +8298,20 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class OutboundDraftContent
     {
 
-        [Newtonsoft.Json.JsonProperty("subject", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("subject", Required = Newtonsoft.Json.Required.Always)]
         public string Subject { get; set; } = default!;
 
         /// <summary>
         /// Governed draft content for later in-product rendering; excluded from audit evidence and problem details.
         /// </summary>
-        [Newtonsoft.Json.JsonProperty("contentText", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("contentText", Required = Newtonsoft.Json.Required.Always)]
         public string ContentText { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("contentFormat", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("contentFormat", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OutboundDraftContentContentFormat ContentFormat { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("contentRedactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("contentRedactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OutboundDraftContentContentRedactionState ContentRedactionState { get; set; } = default!;
 
@@ -8321,16 +8321,16 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class CreateOutboundDraft
     {
 
-        [Newtonsoft.Json.JsonProperty("draftId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("draftId", Required = Newtonsoft.Json.Required.Always)]
         public string DraftId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterId", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceActorId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceActorId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceActorId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("sourceConversationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -8342,37 +8342,37 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("sourceConversationItemId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SourceConversationItemId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("recipientRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("recipientRefs", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> RecipientRefs { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("contextRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("contextRefs", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> ContextRefs { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("governedContent", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("governedContent", Required = Newtonsoft.Json.Required.Always)]
         public OutboundDraftContent GovernedContent { get; set; } = new OutboundDraftContent();
 
-        [Newtonsoft.Json.JsonProperty("senderAuthorityClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("senderAuthorityClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CreateOutboundDraftSenderAuthorityClass SenderAuthorityClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("hasM365SendPosture", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("hasM365SendPosture", Required = Newtonsoft.Json.Required.Always)]
         public bool HasM365SendPosture { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CreateOutboundDraftRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CreateOutboundDraftRetentionClass RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CreateOutboundDraftSchemaVersion SchemaVersion { get; set; } = default!;
 
@@ -8382,13 +8382,13 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class OutboundApprovalContentSnapshot
     {
 
-        [Newtonsoft.Json.JsonProperty("proposedContent", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("proposedContent", Required = Newtonsoft.Json.Required.Always)]
         public OutboundDraftContent ProposedContent { get; set; } = new OutboundDraftContent();
 
         [Newtonsoft.Json.JsonProperty("approvedContent", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public OutboundDraftContent? ApprovedContent { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("proposedContentRedactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("proposedContentRedactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OutboundApprovalContentSnapshotProposedContentRedactionState ProposedContentRedactionState { get; set; } = default!;
 
@@ -8396,11 +8396,11 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OutboundApprovalContentSnapshotApprovedContentRedactionState? ApprovedContentRedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("publicRedactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("publicRedactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OutboundApprovalContentSnapshotPublicRedactionState PublicRedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OutboundApprovalContentSnapshotSchemaVersion SchemaVersion { get; set; } = default!;
 
@@ -8410,16 +8410,16 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class RequestOutboundSendApproval
     {
 
-        [Newtonsoft.Json.JsonProperty("approvalId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approvalId", Required = Newtonsoft.Json.Required.Always)]
         public string ApprovalId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("draftId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("draftId", Required = Newtonsoft.Json.Required.Always)]
         public string DraftId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterId", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("sourceConversationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -8431,56 +8431,56 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("sourceConversationItemId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SourceConversationItemId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("recipientRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("recipientRefs", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> RecipientRefs { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("contextRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("contextRefs", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> ContextRefs { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotVisibility", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotVisibility", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public RequestOutboundSendApprovalPolicySnapshotVisibility PolicySnapshotVisibility { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandName", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandName", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public RequestOutboundSendApprovalCommandName CommandName { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandAllowlistVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandAllowlistVersion", Required = Newtonsoft.Json.Required.Always)]
         public string CommandAllowlistVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("expectedPostStateRedactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("expectedPostStateRedactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public RequestOutboundSendApprovalExpectedPostStateRedactionState ExpectedPostStateRedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("contentSnapshot", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("contentSnapshot", Required = Newtonsoft.Json.Required.Always)]
         public OutboundApprovalContentSnapshot ContentSnapshot { get; set; } = new OutboundApprovalContentSnapshot();
 
-        [Newtonsoft.Json.JsonProperty("senderAuthorityClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("senderAuthorityClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public RequestOutboundSendApprovalSenderAuthorityClass SenderAuthorityClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceFreshness", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceFreshness", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApprovalEvidenceFreshness EvidenceFreshness { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("expectedDraftSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("expectedDraftSourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long ExpectedDraftSourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public RequestOutboundSendApprovalRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public RequestOutboundSendApprovalRetentionClass RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public RequestOutboundSendApprovalSchemaVersion SchemaVersion { get; set; } = default!;
 
@@ -8493,36 +8493,36 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class DecideOutboundApproval
     {
 
-        [Newtonsoft.Json.JsonProperty("approvalId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approvalId", Required = Newtonsoft.Json.Required.Always)]
         public string ApprovalId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("draftId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("draftId", Required = Newtonsoft.Json.Required.Always)]
         public string DraftId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("decision", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("decision", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApprovalDecisionKind Decision { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("decisionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("decisionId", Required = Newtonsoft.Json.Required.Always)]
         public string DecisionId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("expectedApprovalSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("expectedApprovalSourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long ExpectedApprovalSourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("approvedContent", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public OutboundDraftContent? ApprovedContent { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("decisionRationaleRedactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("decisionRationaleRedactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public DecideOutboundApprovalDecisionRationaleRedactionState DecisionRationaleRedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public DecideOutboundApprovalSchemaVersion SchemaVersion { get; set; } = default!;
 
@@ -8532,22 +8532,22 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ExecuteApprovedOutboundDraft
     {
 
-        [Newtonsoft.Json.JsonProperty("sendId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sendId", Required = Newtonsoft.Json.Required.Always)]
         public string SendId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("approvalId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approvalId", Required = Newtonsoft.Json.Required.Always)]
         public string ApprovalId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("draftId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("draftId", Required = Newtonsoft.Json.Required.Always)]
         public string DraftId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterId", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sendActorId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sendActorId", Required = Newtonsoft.Json.Required.Always)]
         public string SendActorId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("sourceConversationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -8559,59 +8559,59 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("sourceConversationItemId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SourceConversationItemId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("recipientRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("recipientRefs", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> RecipientRefs { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("contextRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("contextRefs", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> ContextRefs { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandName", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandName", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ExecuteApprovedOutboundDraftCommandName CommandName { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandAllowlistVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandAllowlistVersion", Required = Newtonsoft.Json.Required.Always)]
         public string CommandAllowlistVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("senderAuthorityClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("senderAuthorityClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ExecuteApprovedOutboundDraftSenderAuthorityClass SenderAuthorityClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceFreshness", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceFreshness", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApprovalEvidenceFreshness EvidenceFreshness { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("expectedApprovalSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("expectedApprovalSourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long ExpectedApprovalSourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("expectedDraftSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("expectedDraftSourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long ExpectedDraftSourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("adapterMode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("adapterMode", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ExecuteApprovedOutboundDraftAdapterMode AdapterMode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("adapterStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("adapterStatus", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ExecuteApprovedOutboundDraftAdapterStatus AdapterStatus { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("adapterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("adapterRef", Required = Newtonsoft.Json.Required.Always)]
         public string AdapterRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ExecuteApprovedOutboundDraftRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ExecuteApprovedOutboundDraftRetentionClass RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ExecuteApprovedOutboundDraftSchemaVersion SchemaVersion { get; set; } = default!;
 
@@ -8624,11 +8624,11 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class SenderAuthorityClassificationResult
     {
 
-        [Newtonsoft.Json.JsonProperty("authorityClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("authorityClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SenderAuthorityClassificationResultAuthorityClass AuthorityClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.Always)]
         public string RequesterRef { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("mailboxRef", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -8643,14 +8643,14 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("approvalRef", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? ApprovalRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotRef", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotRef { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("evidenceFreshness", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("evidenceFreshness", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SenderAuthorityClassificationResultEvidenceFreshness EvidenceFreshness { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("auditEvidenceRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("auditEvidenceRefs", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> AuditEvidenceRefs { get; set; } = new System.Collections.Generic.List<string>();
 
         [Newtonsoft.Json.JsonProperty("denialReason", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -8662,45 +8662,45 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class ApprovedAiActionExecutionRecord
     {
 
-        [Newtonsoft.Json.JsonProperty("executionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("executionId", Required = Newtonsoft.Json.Required.Always)]
         public string ExecutionId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("proposalId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("proposalId", Required = Newtonsoft.Json.Required.Always)]
         public string ProposalId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("approvalId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approvalId", Required = Newtonsoft.Json.Required.Always)]
         public string ApprovalId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandName", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandName", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApprovedAiActionExecutionRecordCommandName CommandName { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("commandAllowlistVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("commandAllowlistVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApprovedAiActionExecutionRecordCommandAllowlistVersion CommandAllowlistVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("outcome", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("outcome", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApprovedAiActionExecutionRecordOutcome Outcome { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("executedAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("executedAtUtc", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset ExecutedAtUtc { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("auditOperationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("auditOperationId", Required = Newtonsoft.Json.Required.Always)]
         public string AuditOperationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("auditStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("auditStatus", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApprovedAiActionExecutionRecordAuditStatus AuditStatus { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("generatedContentVisibility", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("generatedContentVisibility", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApprovedAiActionExecutionRecordGeneratedContentVisibility GeneratedContentVisibility { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApprovedAiActionExecutionRecordSafeNextAction SafeNextAction { get; set; } = default!;
 
@@ -8710,14 +8710,14 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("retryability", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? Retryability { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApprovedAiActionExecutionRecordRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         public string RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApprovedAiActionExecutionRecordSchemaVersion SchemaVersion { get; set; } = default!;
 
@@ -8727,36 +8727,36 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class DecideAiActionApproval
     {
 
-        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Always)]
         public string ProjectId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("approvalId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("approvalId", Required = Newtonsoft.Json.Required.Always)]
         public string ApprovalId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("proposalId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("proposalId", Required = Newtonsoft.Json.Required.Always)]
         public string ProposalId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.Always)]
         public string SourceMessageId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("decision", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("decision", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ApprovalDecisionKind Decision { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("expectedApprovalSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("expectedApprovalSourceVersion", Required = Newtonsoft.Json.Required.Always)]
         public long ExpectedApprovalSourceVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("decisionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("decisionId", Required = Newtonsoft.Json.Required.Always)]
         public string DecisionId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("rationaleRedactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("rationaleRedactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public DecideAiActionApprovalRationaleRedactionState RationaleRedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public DecideAiActionApprovalSchemaVersion SchemaVersion { get; set; } = default!;
 
@@ -8766,65 +8766,65 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class LowRiskAiAssistanceExecutionRecord
     {
 
-        [Newtonsoft.Json.JsonProperty("executionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("executionId", Required = Newtonsoft.Json.Required.Always)]
         public string ExecutionId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("proposalId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("proposalId", Required = Newtonsoft.Json.Required.Always)]
         public string ProposalId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("assistanceKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("assistanceKind", Required = Newtonsoft.Json.Required.Always)]
         public string AssistanceKind { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("outcome", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("outcome", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public LowRiskAiAssistanceExecutionRecordOutcome Outcome { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("providerName", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("providerName", Required = Newtonsoft.Json.Required.Always)]
         public string ProviderName { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("modelVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("modelVersion", Required = Newtonsoft.Json.Required.Always)]
         public string ModelVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("generatedAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("generatedAtUtc", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset GeneratedAtUtc { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("sourceEvidenceIds", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("sourceEvidenceIds", Required = Newtonsoft.Json.Required.Always)]
         public System.Collections.Generic.ICollection<string> SourceEvidenceIds { get; set; } = new System.Collections.Generic.List<string>();
 
-        [Newtonsoft.Json.JsonProperty("contextPackageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("contextPackageId", Required = Newtonsoft.Json.Required.Always)]
         public string ContextPackageId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("contextPackageVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("contextPackageVersion", Required = Newtonsoft.Json.Required.Always)]
         public string ContextPackageVersion { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("contextRedactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("contextRedactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public LowRiskAiAssistanceExecutionRecordContextRedactionState ContextRedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
         public string PolicySnapshotId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("policyReasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("policyReasonCode", Required = Newtonsoft.Json.Required.Always)]
         public string PolicyReasonCode { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("auditOperationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("auditOperationId", Required = Newtonsoft.Json.Required.Always)]
         public string AuditOperationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("auditStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("auditStatus", Required = Newtonsoft.Json.Required.Always)]
         public string AuditStatus { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
         public string CorrelationId { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("generatedSummaryRedactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("generatedSummaryRedactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public LowRiskAiAssistanceExecutionRecordGeneratedSummaryRedactionState GeneratedSummaryRedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("generatedContentVisibility", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("generatedContentVisibility", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public LowRiskAiAssistanceExecutionRecordGeneratedContentVisibility GeneratedContentVisibility { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ChatBotMessageNextAction SafeNextAction { get; set; } = default!;
 
@@ -8834,15 +8834,15 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("retryability", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? Retryability { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public LowRiskAiAssistanceExecutionRecordRedactionState RedactionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public LowRiskAiAssistanceExecutionRecordRetentionClass RetentionClass { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public LowRiskAiAssistanceExecutionRecordSchemaVersion SchemaVersion { get; set; } = default!;
 

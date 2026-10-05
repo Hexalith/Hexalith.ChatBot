@@ -868,13 +868,42 @@ public static class ScaffoldArchitectureTests
         openApi.ShouldContain("operationId: GetOperationStatus");
 
         Type facade = typeof(Hexalith.ChatBot.Client.IChatBotClient);
-        facade.GetMethod("SubmitAsync").ShouldNotBeNull();
-        facade.GetMethod("SubmitWithCommandIdAsync").ShouldNotBeNull();
-        facade.GetMethod("GetOperationStatusAsync").ShouldNotBeNull();
-        Hexalith.ChatBot.Mcp.ChatBotMcpToolCatalog.Tools
-            .ShouldContain(static tool => tool.ContractName == "GetOperationStatus" && !tool.StateChanging);
-        typeof(Hexalith.ChatBot.Cli.ChatBotCliService).GetMethod("ShowOperationStatusAsync").ShouldNotBeNull();
-        typeof(Hexalith.ChatBot.Cli.ChatBotCliService).GetMethod("RunSafelyAsync").ShouldNotBeNull();
+        foreach (Type type in new[] { facade, typeof(Hexalith.ChatBot.Client.ChatBotClient) })
+        {
+            AssertSignature(type, "SubmitAsync", typeof(Task<Hexalith.ChatBot.Client.Generated.CommandSubmissionResponse>),
+                typeof(Hexalith.ChatBot.Contracts.Commands.IChatBotCommand), typeof(string), typeof(string),
+                typeof(Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigin), typeof(CancellationToken));
+            AssertSignature(type, "SubmitWithCommandIdAsync", typeof(Task<Hexalith.ChatBot.Client.Generated.CommandSubmissionResponse>),
+                typeof(Hexalith.ChatBot.Contracts.Commands.IChatBotCommand), typeof(string), typeof(string), typeof(string),
+                typeof(Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigin), typeof(CancellationToken));
+            AssertSignature(type, "GetOperationStatusAsync", typeof(Task<Hexalith.ChatBot.Client.Generated.OperationStatus>),
+                typeof(string), typeof(string), typeof(string), typeof(CancellationToken));
+        }
+        foreach (Type type in new[] { typeof(Hexalith.ChatBot.Client.Generated.IClient), typeof(Hexalith.ChatBot.Client.Generated.Client) })
+        {
+            AssertSignature(type, "SubmitCommandAsync", typeof(Task<Hexalith.ChatBot.Client.Generated.CommandSubmissionResponse>),
+                typeof(string), typeof(string), typeof(Hexalith.ChatBot.Client.Generated.CommandSubmissionRequest), typeof(CancellationToken));
+            AssertSignature(type, "GetOperationStatusAsync", typeof(Task<Hexalith.ChatBot.Client.Generated.OperationStatus>),
+                typeof(string), typeof(string), typeof(string), typeof(CancellationToken));
+        }
+        Hexalith.ChatBot.Mcp.ChatBotMcpToolCatalog.TryGet("chatbot.operation.status", out var statusTool).ShouldBeTrue();
+        statusTool.ContractName.ShouldBe("GetOperationStatus");
+        statusTool.StateChanging.ShouldBeFalse();
+        statusTool.RequiredArguments.ShouldBe(["operationId"]);
+        statusTool.OptionalArguments.ShouldBe(["correlationId", "taskId", "tenant"]);
+        AssertSignature(typeof(Hexalith.ChatBot.Mcp.ChatBotMcpService), "InvokeAsync", typeof(Task<JsonElement>),
+            typeof(Hexalith.ChatBot.Mcp.ChatBotMcpInvocation), typeof(CancellationToken));
+        AssertSignature(typeof(Hexalith.ChatBot.Cli.ChatBotCliService), "ShowOperationStatusAsync", typeof(Task<int>),
+            typeof(string), typeof(Hexalith.ChatBot.Cli.ChatBotCliOptions), typeof(CancellationToken));
+        AssertSignature(typeof(Hexalith.ChatBot.Cli.ChatBotCliService), "RunSafelyAsync", typeof(Task<int>),
+            typeof(Func<Task<int>>), typeof(Hexalith.ChatBot.Cli.ChatBotCliOptions));
+    }
+
+    private static void AssertSignature(Type type, string name, Type returnType, params Type[] parameterTypes)
+    {
+        var method = type.GetMethod(name, parameterTypes).ShouldNotBeNull($"{type.FullName}.{name} must retain its contract signature");
+        method.ReturnType.ShouldBe(returnType);
+        method.GetParameters().Select(static parameter => parameter.ParameterType).ShouldBe(parameterTypes);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
@@ -94,8 +95,11 @@ public sealed class OperationStatusWorkflowStatusSinkTests
         failed.NextRetryAt.ShouldBeNull();
         JsonElement failedWire = OperationStatusHttpResults.ToJsonElement(failed, now.AddSeconds(30));
         failedWire.GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
-        failedWire.GetProperty("reasonCode").GetString().ShouldBe(CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable);
-        failedWire.GetProperty("safeNextActions").EnumerateArray().Single().GetString().ShouldBe("retry-later");
+        failedWire.GetProperty("reasonCode").GetString().ShouldBe(ChatBotMessageCodes.AssociationCorrectionPropagationFailed);
+        failedWire.GetProperty("failureReasonCode").GetString().ShouldBe(CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable);
+        failedWire.GetProperty("workflowLastFailureCode").GetString().ShouldBe(CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable);
+        failedWire.GetProperty("terminalReasonCode").GetString().ShouldBe(ChatBotMessageCodes.AssociationCorrectionPropagationFailed);
+        failedWire.GetProperty("safeNextActions").EnumerateArray().Single().GetString().ShouldBe("escalate");
 
         await sink.ReportAsync(request, CorrectionPropagationWorkflowStatuses.Started, 0,
             CorrectionPropagationWorkflowFailureCodes.None, TestContext.Current.CancellationToken);
@@ -104,6 +108,8 @@ public sealed class OperationStatusWorkflowStatusSinkTests
         recovered.ReasonCode.ShouldBe("association_correction_propagation_pending");
         recovered.CompletionStatus.ShouldBe(OperationStatusRecord.AcceptedProjectionPending);
         recovered.WorkflowLastFailureCode.ShouldBeNull();
+        recovered.FailureReasonCode.ShouldBeNull();
+        recovered.TerminalReasonCode.ShouldBeNull();
         recovered.SafeNextActions.Single().ShouldBe("retry-later");
 
         await sink.ReportAsync(request, CorrectionPropagationWorkflowStatuses.Completed, 0,

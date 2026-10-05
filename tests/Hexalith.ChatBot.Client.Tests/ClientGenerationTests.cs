@@ -39,6 +39,7 @@ public static class ClientGenerationTests
         generator.GetProperty("useBaseUrl").GetBoolean().ShouldBeFalse();
         generator.GetProperty("generateOptionalPropertiesAsNullable").GetBoolean().ShouldBeTrue();
         generator.GetProperty("generateNullableReferenceTypes").GetBoolean().ShouldBeTrue();
+        generator.GetProperty("requiredPropertiesMustBeDefined").GetBoolean().ShouldBeTrue();
     }
 
     [Fact]

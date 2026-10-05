@@ -296,10 +296,26 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             auditEntry.GetProperty("correlationId").GetString().ShouldBe(correlationId);
 
             // 5) Idempotent replay: the same submission (same fresh ids) yields one durable effect (the source
-            //    version does not advance) and an identical response body.
+            //    version does not advance) and preserves every canonical acceptance fact.
             CommandSubmissionOutcome replay = await SubmitGovernedNoteAsync(client, accessToken, noteId, commandId, taskId, correlationId, cancellationToken).ConfigureAwait(true);
             replay.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-            replay.Body.ShouldBe(first.Body);
+            using JsonDocument firstDocument = JsonDocument.Parse(first.Body);
+            using JsonDocument replayDocument = JsonDocument.Parse(replay.Body);
+            JsonElement canonical = firstDocument.RootElement;
+            JsonElement replayed = replayDocument.RootElement;
+            string[] acceptanceFields = ["commandId", "correlationId", "taskId", "operationId", "lifecycleState", "acceptedAt", "reasonCode", "retryEligible"];
+            canonical.EnumerateObject().Select(static member => member.Name).Order(StringComparer.Ordinal)
+                .ShouldBe(acceptanceFields.Order(StringComparer.Ordinal));
+            replayed.EnumerateObject().Select(static member => member.Name).Order(StringComparer.Ordinal)
+                .ShouldBe(acceptanceFields.Append("priorOutcome").Order(StringComparer.Ordinal));
+            JsonElement prior = replayed.GetProperty("priorOutcome");
+            prior.EnumerateObject().Select(static member => member.Name).Order(StringComparer.Ordinal)
+                .ShouldBe(acceptanceFields.Order(StringComparer.Ordinal));
+            foreach (string field in acceptanceFields)
+            {
+                replayed.GetProperty(field).GetRawText().ShouldBe(canonical.GetProperty(field).GetRawText());
+                prior.GetProperty(field).GetRawText().ShouldBe(canonical.GetProperty(field).GetRawText());
+            }
             JsonElement viewAfterReplay = await ReadGovernedOperationViewAsync(client, accessToken, noteId, correlationId, cancellationToken).ConfigureAwait(true);
             viewAfterReplay.GetProperty("sourceVersion").GetInt64().ShouldBe(1);
             await AssertGovernedOperationViewRemainsStableAsync(

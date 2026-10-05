@@ -18,4 +18,8 @@ internal sealed record CoarseIdempotencyRecord(
     string? IdentityKeyHash = null,
     string? CallerFingerprint = null,
     string? LegacyKeyHash = null,
-    string? ReservationId = null);
+    string? ReservationId = null,
+    CoarseDispatchState DispatchState = CoarseDispatchState.Unknown,
+    DateTimeOffset? ReservationLeaseExpiresAt = null,
+    CommandSubmissionResponse? PreparedOutcome = null,
+    bool Released = false);

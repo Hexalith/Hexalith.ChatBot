@@ -96,6 +96,7 @@ internal sealed class AcceptedCommandDispatcher(
                 CorrelationId: context.Submission.CorrelationId,
                 Extensions: BuildExtensions(context, plan));
 
+            context.MarkExternalEffectAttempted();
             _ = await eventStore.SubmitCommandAsync(request, cancellationToken).ConfigureAwait(false);
 
             if (plan.CorrectionPropagation is not null && correctionPropagation?.IsReady is true)
@@ -112,7 +113,11 @@ internal sealed class AcceptedCommandDispatcher(
                     .ConfigureAwait(false);
             }
 
-            return new ChatBotDispatchResult(clock.UtcNow, plan.AggregateId);
+            return new ChatBotDispatchResult(context.PreparedAcceptedAt ?? clock.UtcNow.ToUniversalTime(), plan.AggregateId);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException && !context.ExternalEffectAttempted)
+        {
+            throw new CommandNotSubmittedException(exception);
         }
         finally
         {
@@ -709,6 +714,7 @@ internal sealed class AcceptedCommandDispatcher(
                 ?? throw new InvalidOperationException("The conversation writer is not configured.");
             string policySnapshotId = execution.PolicySnapshotId ?? "unavailable";
             string auditOperationId = $"audit:{execution.ExecutionId}";
+            context.MarkExternalEffectAttempted();
             ConversationAppendResult append = await writer
                 .PrepareAppendConversationMessageAsync(
                     new ApprovedAiConversationAppendRequest(
@@ -917,6 +923,7 @@ internal sealed class AcceptedCommandDispatcher(
 
             IOutboundMailboxSender sender = outboundMailboxSender
                 ?? throw new InvalidOperationException("The outbound mailbox sender is not configured.");
+            context.MarkExternalEffectAttempted();
             OutboundMailboxSendResult adapterResult = await sender
                 .SendAsync(
                     new OutboundMailboxSendRequest(

@@ -45,7 +45,7 @@
       "generateResponseClasses": true,
       "responseClass": "HexalithChatBotResponse",
       "namespace": "Hexalith.ChatBot.Client.Generated",
-      "requiredPropertiesMustBeDefined": false,
+      "requiredPropertiesMustBeDefined": true,
       "generateOptionalPropertiesAsNullable": true,
       "generateNullableReferenceTypes": true,
       "dateType": "System.DateTimeOffset",

@@ -162,25 +162,57 @@ internal sealed class ChatBotCommandAdmissionPipeline(
                 submission.TaskId);
         }
 
-        LifecycleTransitionValidation lifecycleTransition = lifecycleTransitionGuard.ValidateCommandSubmission(context);
-        if (!lifecycleTransition.IsValid)
+        string exceptionReason = "idempotency_outcome_unavailable";
+        try
         {
-            AuditEnvelope rejectionEnvelope = AuditEnvelopeFactory.RejectedLifecycleTransition(context, lifecycleTransition, clock.UtcNow);
-            AuditWriteResult rejectionAudit = await auditWriter.RecordPreCommitAsync(rejectionEnvelope, cancellationToken).ConfigureAwait(false);
-            if (!rejectionAudit.Succeeded)
+            LifecycleTransitionValidation lifecycleTransition = lifecycleTransitionGuard.ValidateCommandSubmission(context);
+            if (!lifecycleTransition.IsValid)
+            {
+                AuditEnvelope rejectionEnvelope = AuditEnvelopeFactory.RejectedLifecycleTransition(context, lifecycleTransition, clock.UtcNow);
+                exceptionReason = AuditFailureReasonCodes.AuditUnavailable;
+                AuditWriteResult rejectionAudit = await auditWriter.RecordPreCommitAsync(rejectionEnvelope, cancellationToken).ConfigureAwait(false);
+                if (!rejectionAudit.Succeeded)
+                {
+                    await QueueReplayIntentAsync(
+                        AuditReplayIntentKind.PreCommitOperationReplay,
+                        rejectionEnvelope,
+                        rejectionAudit.ReasonCode,
+                        cancellationToken)
+                        .ConfigureAwait(false);
+                    await AlertAsync(OperatorAlertKind.AuditUnavailable, rejectionEnvelope, rejectionAudit.ReasonCode, cancellationToken)
+                        .ConfigureAwait(false);
+
+                    await AbortSafelyAsync(idempotencyDecision.Metadata, cancellationToken).ConfigureAwait(false);
+
+                    return ChatBotCommandAdmissionDecision.Rejected(
+                        AuditFailureReasonCodes.AuditUnavailable,
+                        submission.CorrelationId,
+                        submission.TaskId);
+                }
+
+                await AbortSafelyAsync(idempotencyDecision.Metadata, cancellationToken).ConfigureAwait(false);
+
+                return ChatBotCommandAdmissionDecision.Rejected(
+                    LifecycleTransitionReasonCodes.InvalidTransition,
+                    submission.CorrelationId,
+                    submission.TaskId);
+            }
+
+            AuditEnvelope preCommitEnvelope = AuditEnvelopeFactory.PreCommit(context, lifecycleTransition.Transition, clock.UtcNow);
+            exceptionReason = AuditFailureReasonCodes.AuditUnavailable;
+            AuditWriteResult preCommitAudit = await auditWriter.RecordPreCommitAsync(preCommitEnvelope, cancellationToken).ConfigureAwait(false);
+            if (!preCommitAudit.Succeeded)
             {
                 await QueueReplayIntentAsync(
                     AuditReplayIntentKind.PreCommitOperationReplay,
-                    rejectionEnvelope,
-                    rejectionAudit.ReasonCode,
+                    preCommitEnvelope,
+                    preCommitAudit.ReasonCode,
                     cancellationToken)
                     .ConfigureAwait(false);
-                await AlertAsync(OperatorAlertKind.AuditUnavailable, rejectionEnvelope, rejectionAudit.ReasonCode, cancellationToken)
+                await AlertAsync(OperatorAlertKind.AuditUnavailable, preCommitEnvelope, preCommitAudit.ReasonCode, cancellationToken)
                     .ConfigureAwait(false);
 
-                await idempotencyStore
-                    .AbortAdmissionAsync(idempotencyDecision.Metadata, cancellationToken)
-                    .ConfigureAwait(false);
+                await AbortSafelyAsync(idempotencyDecision.Metadata, cancellationToken).ConfigureAwait(false);
 
                 return ChatBotCommandAdmissionDecision.Rejected(
                     AuditFailureReasonCodes.AuditUnavailable,
@@ -188,40 +220,25 @@ internal sealed class ChatBotCommandAdmissionPipeline(
                     submission.TaskId);
             }
 
-            await idempotencyStore
-                .AbortAdmissionAsync(idempotencyDecision.Metadata, cancellationToken)
-                .ConfigureAwait(false);
-
-            return ChatBotCommandAdmissionDecision.Rejected(
-                LifecycleTransitionReasonCodes.InvalidTransition,
-                submission.CorrelationId,
-                submission.TaskId);
+            return ChatBotCommandAdmissionDecision.Accepted(context, idempotencyDecision.Metadata, lifecycleTransition.Transition);
         }
-
-        AuditEnvelope preCommitEnvelope = AuditEnvelopeFactory.PreCommit(context, lifecycleTransition.Transition, clock.UtcNow);
-        AuditWriteResult preCommitAudit = await auditWriter.RecordPreCommitAsync(preCommitEnvelope, cancellationToken).ConfigureAwait(false);
-        if (!preCommitAudit.Succeeded)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            await QueueReplayIntentAsync(
-                AuditReplayIntentKind.PreCommitOperationReplay,
-                preCommitEnvelope,
-                preCommitAudit.ReasonCode,
-                cancellationToken)
-                .ConfigureAwait(false);
-            await AlertAsync(OperatorAlertKind.AuditUnavailable, preCommitEnvelope, preCommitAudit.ReasonCode, cancellationToken)
-                .ConfigureAwait(false);
-
-            await idempotencyStore
-                .AbortAdmissionAsync(idempotencyDecision.Metadata, cancellationToken)
-                .ConfigureAwait(false);
-
-            return ChatBotCommandAdmissionDecision.Rejected(
-                AuditFailureReasonCodes.AuditUnavailable,
-                submission.CorrelationId,
-                submission.TaskId);
+            await AbortSafelyAsync(idempotencyDecision.Metadata, cancellationToken).ConfigureAwait(false);
+            return ChatBotCommandAdmissionDecision.Rejected(exceptionReason, submission.CorrelationId, submission.TaskId);
         }
+    }
 
-        return ChatBotCommandAdmissionDecision.Accepted(context, idempotencyDecision.Metadata, lifecycleTransition.Transition);
+    private async ValueTask AbortSafelyAsync(CoarseIdempotencyMetadata metadata, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await idempotencyStore.AbortAdmissionAsync(metadata, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // A failed durable cleanup retains its abort fence or bounded pre-dispatch lease.
+        }
     }
 
     private async ValueTask RecordDuplicateReplaySideEffectsAsync(
@@ -249,7 +266,8 @@ internal sealed class ChatBotCommandAdmissionPipeline(
             .ConfigureAwait(false);
         OperationStatusRecord replayStatus = existingStatus is not null
             ? existingStatus with { LastUpdatedAt = clock.UtcNow }
-            : OperationStatusRecord.Accepted(context.TenantBinding.TenantId, priorOutcome, false, clock.UtcNow);
+            : OperationStatusRecord.Accepted(context.TenantBinding.TenantId, priorOutcome, true, clock.UtcNow,
+                idempotencyDecision.Metadata.OperationClass);
         replayStatus = replayStatus with { PriorOutcome = priorOutcome };
         if (string.Equals(idempotencyDecision.Metadata.OperationClass, CoarseIdempotencyOperationClass.MessageIntake.Code, StringComparison.Ordinal))
         {
@@ -275,20 +293,27 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         string reasonCode,
         CancellationToken cancellationToken)
     {
-        await replayIntentQueue
-            .EnqueueAsync(
-                new AuditReplayIntent(
-                    kind,
-                    envelope.TenantId,
-                    envelope.ActorId,
-                    envelope.CommandName,
-                    envelope.ResourceId,
-                    envelope.CorrelationId,
-                    envelope.IdempotencyKey,
-                    reasonCode,
-                    clock.UtcNow),
-                cancellationToken)
-            .ConfigureAwait(false);
+        try
+        {
+            await replayIntentQueue
+                .EnqueueAsync(
+                    new AuditReplayIntent(
+                        kind,
+                        envelope.TenantId,
+                        envelope.ActorId,
+                        envelope.CommandName,
+                        envelope.ResourceId,
+                        envelope.CorrelationId,
+                        envelope.IdempotencyKey,
+                        reasonCode,
+                        clock.UtcNow),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Advisory notification cannot replace a safe admission failure.
+        }
     }
 
     private async ValueTask AlertAsync(
@@ -297,17 +322,24 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         string reasonCode,
         CancellationToken cancellationToken)
     {
-        await operatorAlertSink
-            .EmitAsync(
-                new OperatorAlert(
-                    kind,
-                    reasonCode,
-                    envelope.TenantId,
-                    envelope.CommandName,
-                    envelope.CorrelationId,
-                    clock.UtcNow),
-                cancellationToken)
-            .ConfigureAwait(false);
+        try
+        {
+            await operatorAlertSink
+                .EmitAsync(
+                    new OperatorAlert(
+                        kind,
+                        reasonCode,
+                        envelope.TenantId,
+                        envelope.CommandName,
+                        envelope.CorrelationId,
+                        clock.UtcNow),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Advisory notification cannot replace a safe admission failure.
+        }
     }
 
     private async ValueTask QueueUnresolvedMailboxScopeAsync(
@@ -385,22 +417,42 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         CoarseIdempotencyDecision pending,
         CancellationToken cancellationToken)
     {
-        foreach (AuditReplayIntent intent in replayIntentQueue.Snapshot())
+        IReadOnlyList<AuditReplayIntent> intents;
+        try
+        {
+            intents = replayIntentQueue.Snapshot();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return pending;
+        }
+
+        foreach (AuditReplayIntent intent in intents)
         {
             if (intent.Kind != AuditReplayIntentKind.PostCommitAuditReconciliation ||
                 intent.AcceptedOutcome is not { } outcome ||
                 !string.Equals(intent.TenantId, tenantId, StringComparison.Ordinal) ||
-                !string.Equals(outcome.CommandId, context.Submission.Request.CommandId, StringComparison.Ordinal))
+                !string.Equals(intent.CoarseKeyHash, pending.Metadata.CoarseKeyHash, StringComparison.Ordinal) ||
+                (pending.Metadata.OperationClass == CoarseIdempotencyOperationClass.CommandExecution.Code &&
+                 !string.Equals(outcome.CommandId, context.Submission.Request.CommandId, StringComparison.Ordinal)))
             {
                 continue;
             }
 
-            if (!await store.ReconcileOutcomeAsync(intent, cancellationToken).ConfigureAwait(false))
+            try
             {
-                continue;
-            }
+                if (!await store.ReconcileOutcomeAsync(intent, cancellationToken, pending.Metadata).ConfigureAwait(false))
+                {
+                    continue;
+                }
 
-            return await idempotencyStore.RecordAdmissionAsync(context, cancellationToken).ConfigureAwait(false);
+                await replayIntentQueue.AcknowledgeAsync(intent, cancellationToken).ConfigureAwait(false);
+                return await idempotencyStore.RecordAdmissionAsync(context, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // One failed reconciliation cannot hide a later valid intent or replace the safe response.
+            }
         }
 
         return pending;

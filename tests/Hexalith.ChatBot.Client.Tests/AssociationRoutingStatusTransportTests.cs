@@ -138,6 +138,7 @@ public sealed class AssociationRoutingStatusTransportTests
             {
               "type": "https://problems.hexalith.local/chatbot/{{status}}",
               "title": "Synthetic metadata-only association routing problem",
+              "schemaVersion": "chatbot.message-catalog.v1",
               "status": {{status}},
               "category": "{{WireValue(category)}}",
               "code": "synthetic_association_routing_problem",

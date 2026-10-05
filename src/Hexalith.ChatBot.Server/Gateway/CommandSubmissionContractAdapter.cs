@@ -20,6 +20,7 @@ internal static partial class CommandSubmissionContractAdapter
     ];
 
     private static readonly NullabilityInfoContext Nullability = new();
+    private static readonly Lock NullabilitySync = new();
 
     private static readonly JsonSerializerOptions CommandJsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly IReadOnlyDictionary<string, Type> KnownCommandTypes = typeof(IChatBotCommand).Assembly.GetTypes()
@@ -106,6 +107,22 @@ internal static partial class CommandSubmissionContractAdapter
 
     private static bool OptionalString(JsonElement root, string name)
         => !root.TryGetProperty(name, out JsonElement element) || element.ValueKind == JsonValueKind.String;
+
+    private static bool AllowsNull(ParameterInfo parameter)
+    {
+        lock (NullabilitySync)
+        {
+            return Nullability.Create(parameter).ReadState == NullabilityState.Nullable;
+        }
+    }
+
+    private static bool AllowsNull(PropertyInfo property)
+    {
+        lock (NullabilitySync)
+        {
+            return Nullability.Create(property).WriteState == NullabilityState.Nullable;
+        }
+    }
 
     private static bool ValidateKnownCommand(string commandType, JsonElement command)
     {
@@ -215,7 +232,7 @@ internal static partial class CommandSubmissionContractAdapter
             string propertyName = JsonNamingPolicy.CamelCase.ConvertName(parameter.Name!);
             bool present = element.TryGetProperty(propertyName, out JsonElement member);
             bool required = !parameter.HasDefaultValue &&
-                Nullability.Create(parameter).ReadState != NullabilityState.Nullable;
+                !AllowsNull(parameter);
             if (!present)
             {
                 if (required)
@@ -237,7 +254,7 @@ internal static partial class CommandSubmissionContractAdapter
             }
 
             if (!ValidateValue(member, parameter.ParameterType, depth + 1,
-                Nullability.Create(parameter).ReadState == NullabilityState.Nullable))
+                AllowsNull(parameter)))
             {
                 return false;
             }
@@ -254,7 +271,7 @@ internal static partial class CommandSubmissionContractAdapter
                 JsonNamingPolicy.CamelCase.ConvertName(property.Name);
             if (element.TryGetProperty(propertyName, out JsonElement member) &&
                 !ValidateValue(member, property.PropertyType, depth + 1,
-                    Nullability.Create(property).WriteState == NullabilityState.Nullable))
+                    AllowsNull(property)))
             {
                 return false;
             }

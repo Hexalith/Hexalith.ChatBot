@@ -6,4 +6,7 @@ internal interface IAuditReplayIntentQueue
 
     /// <summary>Returns the intents currently retained for operator or automatic reconciliation.</summary>
     IReadOnlyList<AuditReplayIntent> Snapshot() => [];
+
+    /// <summary>Acknowledges only an intent whose outcome was successfully reconciled.</summary>
+    ValueTask AcknowledgeAsync(AuditReplayIntent intent, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }

@@ -39,10 +39,10 @@ internal sealed class OperationStatusWorkflowStatusSink(
         bool retrying = string.Equals(workflowStatus, CorrectionPropagationWorkflowStatuses.Retrying, StringComparison.Ordinal);
         bool completed = string.Equals(workflowStatus, CorrectionPropagationWorkflowStatuses.Completed, StringComparison.Ordinal);
         DateTimeOffset now = clock.UtcNow;
-        string reason = currentFailure is not null && ChatBotMessageCodes.All.Contains(currentFailure)
-            ? currentFailure
+        string reason = failed ? ChatBotMessageCodes.AssociationCorrectionPropagationFailed
+            : currentFailure is not null && ChatBotMessageCodes.All.Contains(currentFailure)
+                ? currentFailure
             : delayed ? ChatBotMessageCodes.AssociationCorrectionPropagationDelayed
-            : failed ? ChatBotMessageCodes.AssociationCorrectionPropagationFailed
             : completed
                 ? ChatBotMessageCodes.AssociationCorrectionPropagationComplete
                 : ChatBotMessageCodes.AssociationCorrectionPropagationPending;
@@ -52,6 +52,8 @@ internal sealed class OperationStatusWorkflowStatusSink(
             WorkflowStatus = workflowStatus,
             WorkflowRetryCount = workflowRetryCount,
             WorkflowLastFailureCode = currentFailure,
+            FailureReasonCode = currentFailure,
+            TerminalReasonCode = failed ? ChatBotMessageCodes.AssociationCorrectionPropagationFailed : null,
             ReasonCode = reason,
             SafeNextActions = [ChatBotMessageCatalog.Resolve(reason).NextAction],
             CompletionStatus = failed ? OperationStatusRecord.Failed

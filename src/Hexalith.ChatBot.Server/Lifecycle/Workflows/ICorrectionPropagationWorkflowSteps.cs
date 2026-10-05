@@ -20,6 +20,12 @@ internal interface ICorrectionPropagationWorkflowSteps
 
     Task CreateTimerAsync(TimeSpan delay);
 
+    /// <summary>Obtains an activity-recorded snapshot of the shared observable UTC authority.</summary>
+    Task<DateTimeOffset> ReadUtcAsync() => Task.FromResult(CurrentUtc);
+
+    /// <summary>Schedules the same absolute UTC instant published as retry eligibility.</summary>
+    Task CreateTimerAtAsync(DateTimeOffset dueAt) => CreateTimerAsync(dueAt - CurrentUtc);
+
     Task CallCompleteAsync(CorrectionPropagationRequest request);
 
     Task<bool> CallDelayAsync(CorrectionPropagationDelayInput input);

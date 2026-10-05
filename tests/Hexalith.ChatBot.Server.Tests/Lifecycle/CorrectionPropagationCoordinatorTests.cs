@@ -322,8 +322,8 @@ public sealed class CorrectionPropagationCoordinatorTests
         ActivityBackedSteps steps = new(catalog, writer, alerts, audit, statuses);
         _ = await CorrectionPropagationWorkflowRunner.RunAsync(request, steps).ConfigureAwait(false);
         statuses.ShouldNotBeEmpty();
-        statuses.ShouldAllBe(static status =>
-            status.Status != CorrectionPropagationWorkflowStatuses.Retrying);
+        statuses.Where(static status => status.Status == CorrectionPropagationWorkflowStatuses.Retrying)
+            .ShouldAllBe(static status => status.RetryCount == 0);
     }
 
     private static CorrectionPropagationRequest Request()

@@ -5,7 +5,6 @@ using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Observability;
-using Hexalith.EventStore.Client.Gateway;
 
 namespace Hexalith.ChatBot.Server.Gateway;
 
@@ -77,7 +76,7 @@ internal sealed class CommandGateway(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateAuditUnavailable(submission.CorrelationId, submission.TaskId));
+            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateDependencyUnavailable(submission.CorrelationId, submission.TaskId));
         }
 
         if (admissionDecision.Kind == ChatBotCommandAdmissionDecisionKind.ReplayPriorOutcome)
@@ -107,16 +106,71 @@ internal sealed class CommandGateway(
         ChatBotGatewayContext context = admissionDecision.Context!;
         CoarseIdempotencyMetadata idempotency = admissionDecision.Idempotency!;
         LifecycleTransitionDefinition transition = admissionDecision.LifecycleTransition!;
+        CommandSubmissionResponse response = new()
+        {
+            CommandId = submission.Request.CommandId,
+            CorrelationId = submission.CorrelationId,
+            TaskId = submission.TaskId,
+            OperationId = submission.TaskId ?? submission.Request.CommandId,
+            LifecycleState = LifecycleState.Proposed,
+            AcceptedAt = clock.UtcNow.ToUniversalTime(),
+            ReasonCode = ChatBotMessageCode.Command_accepted,
+            RetryEligible = false,
+        };
+
+        context.SetPreparedAcceptedAt(response.AcceptedAt);
+        try
+        {
+            if (!await idempotencyStore.PrepareDispatchAsync(idempotency, response, cancellationToken).ConfigureAwait(false))
+            {
+                await AbortSafelyAsync(idempotency, cancellationToken).ConfigureAwait(false);
+                return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateDependencyUnavailable(submission.CorrelationId, submission.TaskId));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Preparation has not returned to dispatch. Even an acknowledgement lost to
+            // cancellation can be released using its exact prepared response and owner.
+            await AbortUndispatchedAfterCancellationAsync(idempotency, response).ConfigureAwait(false);
+            throw;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            await AbortSafelyAsync(idempotency, cancellationToken).ConfigureAwait(false);
+            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateDependencyUnavailable(submission.CorrelationId, submission.TaskId));
+        }
+
         ChatBotDispatchResult dispatchResult;
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             dispatchResult = await dispatcher.DispatchAsync(context, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is EventStoreGatewayException or HttpRequestException or InvalidOperationException)
+        catch (OperationCanceledException)
         {
-            await idempotencyStore
-                .AbortAdmissionAsync(idempotency, cancellationToken)
-                .ConfigureAwait(false);
+            if (!context.ExternalEffectAttempted)
+            {
+                await AbortUndispatchedAfterCancellationAsync(idempotency, response).ConfigureAwait(false);
+            }
+            throw;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            if (ex is CommandNotSubmittedException)
+            {
+                try
+                {
+                    await idempotencyStore.AbortUndispatchedAsync(idempotency, response, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception cleanupFailure) when (cleanupFailure is not OperationCanceledException)
+                {
+                    // A persisted abort fence permits later cleanup; an unavailable fence stays fail-closed.
+                }
+            }
+            else
+            {
+                await AbortSafelyAsync(idempotency, cancellationToken).ConfigureAwait(false);
+            }
             AuditEnvelope preCommitEnvelope = AuditEnvelopeFactory.PreCommit(context, transition, clock.UtcNow);
             await QueueReplayIntentAsync(
                 AuditReplayIntentKind.PreCommitOperationReplay,
@@ -131,18 +185,6 @@ internal sealed class CommandGateway(
                 problemDetailsFactory.CreateDispatchUnavailable(submission.CorrelationId, submission.TaskId));
         }
 
-        CommandSubmissionResponse response = new()
-        {
-            CommandId = submission.Request.CommandId,
-            CorrelationId = submission.CorrelationId,
-            TaskId = submission.TaskId,
-            OperationId = submission.TaskId ?? submission.Request.CommandId,
-            LifecycleState = LifecycleState.Proposed,
-            AcceptedAt = dispatchResult.AcceptedAt.ToUniversalTime(),
-            ReasonCode = ChatBotMessageCode.Command_accepted,
-            RetryEligible = false,
-        };
-
         try
         {
             await idempotencyStore
@@ -151,7 +193,7 @@ internal sealed class CommandGateway(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            AuditEnvelope failedReceiptEnvelope = AuditEnvelopeFactory.PostCommit(context, dispatchResult, transition, clock.UtcNow);
+            AuditEnvelope failedReceiptEnvelope = AuditEnvelopeFactory.PostCommit(context, dispatchResult with { AcceptedAt = response.AcceptedAt }, transition, clock.UtcNow);
             bool auditEvidenceRetained = false;
             try
             {
@@ -180,10 +222,10 @@ internal sealed class CommandGateway(
                 failedReceiptEnvelope,
                 recoveryReason,
                 cancellationToken).ConfigureAwait(false);
-            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateAuditUnavailable(submission.CorrelationId, submission.TaskId));
+            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateDependencyUnavailable(submission.CorrelationId, submission.TaskId));
         }
 
-        AuditEnvelope postCommitEnvelope = AuditEnvelopeFactory.PostCommit(context, dispatchResult, transition, clock.UtcNow);
+        AuditEnvelope postCommitEnvelope = AuditEnvelopeFactory.PostCommit(context, dispatchResult with { AcceptedAt = response.AcceptedAt }, transition, clock.UtcNow);
         AuditWriteResult postCommitAudit = await auditWriter.RecordPostCommitAsync(postCommitEnvelope, cancellationToken).ConfigureAwait(false);
         if (!postCommitAudit.Succeeded)
         {
@@ -215,6 +257,32 @@ internal sealed class CommandGateway(
         return ChatBotGatewayResult.AcceptedResult(response, !postCommitAudit.Succeeded);
     }
 
+    private async ValueTask AbortUndispatchedAfterCancellationAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse prepared)
+    {
+        using CancellationTokenSource cleanup = new(TimeSpan.FromSeconds(5));
+        try
+        {
+            await idempotencyStore.AbortUndispatchedAsync(metadata, prepared, cleanup.Token).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Cleanup cannot replace the caller's cancellation. A persisted abort fence
+            // is recoverable; an unavailable fence conservatively retains ownership.
+        }
+    }
+
+    private async ValueTask AbortSafelyAsync(CoarseIdempotencyMetadata metadata, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await idempotencyStore.AbortAdmissionAsync(metadata, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Durable abort/lease fencing permits later cleanup without changing this safe failure response.
+        }
+    }
+
     private ChatBotGatewayResult Denied(ChatBotCommandAdmissionDecision decision)
     {
         string reasonCode = decision.ReasonCode ?? ChatBotAuthorizationReasonCodes.AuthorizationDenied;
@@ -225,7 +293,7 @@ internal sealed class CommandGateway(
 
         if (string.Equals(reasonCode, "idempotency_outcome_unavailable", StringComparison.Ordinal))
         {
-            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateAuditUnavailable(decision.CorrelationId, decision.TaskId));
+            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateDependencyUnavailable(decision.CorrelationId, decision.TaskId));
         }
 
         if (string.Equals(reasonCode, LifecycleTransitionReasonCodes.InvalidTransition, StringComparison.Ordinal))
@@ -251,23 +319,30 @@ internal sealed class CommandGateway(
         CommandSubmissionResponse? acceptedOutcome = null,
         CoarseIdempotencyMetadata? idempotency = null)
     {
-        await replayIntentQueue
-            .EnqueueAsync(
-                new AuditReplayIntent(
-                    kind,
-                    envelope.TenantId,
-                    envelope.ActorId,
-                    envelope.CommandName,
-                    envelope.ResourceId,
-                    envelope.CorrelationId,
-                    envelope.IdempotencyKey,
-                    reasonCode,
-                    clock.UtcNow,
-                    acceptedOutcome,
-                    idempotency?.CoarseKeyHash,
-                    idempotency?.IdentityKeyHash),
-                cancellationToken)
-            .ConfigureAwait(false);
+        try
+        {
+            await replayIntentQueue
+                .EnqueueAsync(
+                    new AuditReplayIntent(
+                        kind,
+                        envelope.TenantId,
+                        envelope.ActorId,
+                        envelope.CommandName,
+                        envelope.ResourceId,
+                        envelope.CorrelationId,
+                        envelope.IdempotencyKey,
+                        reasonCode,
+                        clock.UtcNow,
+                        acceptedOutcome,
+                        idempotency?.CoarseKeyHash,
+                        idempotency?.IdentityKeyHash),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Operational notification is advisory; durable reservation ownership remains authoritative.
+        }
     }
 
     private async ValueTask AlertAsync(
@@ -276,16 +351,23 @@ internal sealed class CommandGateway(
         string reasonCode,
         CancellationToken cancellationToken)
     {
-        await operatorAlertSink
-            .EmitAsync(
-                new OperatorAlert(
-                    kind,
-                    reasonCode,
-                    envelope.TenantId,
-                    envelope.CommandName,
-                    envelope.CorrelationId,
-                    clock.UtcNow),
-                cancellationToken)
-            .ConfigureAwait(false);
+        try
+        {
+            await operatorAlertSink
+                .EmitAsync(
+                    new OperatorAlert(
+                        kind,
+                        reasonCode,
+                        envelope.TenantId,
+                        envelope.CommandName,
+                        envelope.CorrelationId,
+                        clock.UtcNow),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Operational notification is advisory; durable reservation ownership remains authoritative.
+        }
     }
 }

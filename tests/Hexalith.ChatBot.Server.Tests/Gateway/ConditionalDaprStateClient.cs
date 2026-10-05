@@ -11,12 +11,32 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway;
 /// <summary>
 /// Dapr-compatible conditional state seam. First-write concurrency is enforced only when the
 /// production client passes <see cref="ConcurrencyMode.FirstWrite"/> on the save call.
+/// State crosses the configured JSON byte boundary on every write and read.
 /// </summary>
 internal sealed class ConditionalDaprStateClient : DaprClient
 {
     private readonly Lock _sync = new();
-    private readonly Dictionary<string, (object Value, int Version)> _records = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (byte[] Bytes, int Version)> _records = new(StringComparer.Ordinal);
     private readonly List<IdentitySave> _identitySaves = [];
+
+    public string? BlockNextWriteKind { get; set; }
+    public ManualResetEventSlim? OwnershipWriteEntered { get; set; }
+    public ManualResetEventSlim? OwnershipWriteRelease { get; set; }
+    public int PhysicalDeletes { get; private set; }
+
+    private void GateOwnershipWrite(string kind)
+    {
+        if (BlockNextWriteKind != kind || OwnershipWriteEntered is null || OwnershipWriteRelease is null)
+        {
+            return;
+        }
+        BlockNextWriteKind = null;
+        OwnershipWriteEntered.Set();
+        if (!OwnershipWriteRelease.Wait(TimeSpan.FromSeconds(15)))
+        {
+            throw new TimeoutException("The production state write gate was not released.");
+        }
+    }
 
     public Barrier? IdentityCreateBarrier { get; init; }
 
@@ -42,8 +62,9 @@ internal sealed class ConditionalDaprStateClient : DaprClient
     {
         lock (_sync)
         {
-            if (_records.TryGetValue(key, out (object Value, int Version) current) && current.Value is TValue typed)
+            if (_records.TryGetValue(key, out (byte[] Bytes, int Version) current))
             {
+                TValue typed = JsonSerializer.Deserialize<TValue>(current.Bytes, JsonSerializerOptions)!;
                 return Task.FromResult((typed, current.Version.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             }
 
@@ -60,6 +81,20 @@ internal sealed class ConditionalDaprStateClient : DaprClient
         IReadOnlyDictionary<string, string>? metadata = null,
         CancellationToken cancellationToken = default)
     {
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(value, JsonSerializerOptions);
+        if (value is CoarseCommandIdentityRecord { Released: true })
+        {
+            GateOwnershipWrite("identity-release");
+        }
+        else if (value is CoarseCommandIdentityRecord { DomainReservation.DispatchState: CoarseDispatchState.Dispatching })
+        {
+            GateOwnershipWrite("prepare");
+        }
+        else if (value is CoarseIdempotencyRecord { Released: true })
+        {
+            GateOwnershipWrite("domain-release");
+        }
+
         if (value is CoarseCommandIdentityRecord { PriorOutcome: null } && string.IsNullOrEmpty(etag))
         {
             IdentityCreateBarrier?.SignalAndWait(TimeSpan.FromSeconds(10), cancellationToken);
@@ -69,7 +104,7 @@ internal sealed class ConditionalDaprStateClient : DaprClient
         {
             bool firstWrite = stateOptions?.Concurrency == ConcurrencyMode.FirstWrite;
             bool saved;
-            if (_records.TryGetValue(key, out (object Value, int Version) current))
+            if (_records.TryGetValue(key, out (byte[] Bytes, int Version) current))
             {
                 string currentEtag = current.Version.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 if (firstWrite && etag != currentEtag)
@@ -78,7 +113,7 @@ internal sealed class ConditionalDaprStateClient : DaprClient
                 }
                 else
                 {
-                    _records[key] = (value!, current.Version + 1);
+                    _records[key] = (bytes, current.Version + 1);
                     saved = true;
                 }
             }
@@ -88,7 +123,7 @@ internal sealed class ConditionalDaprStateClient : DaprClient
             }
             else
             {
-                _records[key] = (value!, 1);
+                _records[key] = (bytes, 1);
                 saved = true;
             }
 
@@ -111,7 +146,8 @@ internal sealed class ConditionalDaprStateClient : DaprClient
     {
         lock (_sync)
         {
-            if (_records.TryGetValue(key, out (object Value, int Version) current) &&
+            PhysicalDeletes++;
+            if (_records.TryGetValue(key, out (byte[] Bytes, int Version) current) &&
                 etag == current.Version.ToString(System.Globalization.CultureInfo.InvariantCulture))
             {
                 _records.Remove(key);

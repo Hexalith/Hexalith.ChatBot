@@ -16,6 +16,18 @@ internal sealed record ChatBotGatewayContext(
 
     public ChatBotApprovalResult? ApprovalResult { get; private set; }
 
+    /// <summary>The UTC acceptance identity prepared before external dispatch.</summary>
+    public DateTimeOffset? PreparedAcceptedAt { get; private set; }
+
+    /// <summary>Whether dispatch has attempted an external write whose outcome may be uncertain.</summary>
+    public bool ExternalEffectAttempted { get; private set; }
+
+    /// <summary>Marks the boundary before invoking an external writer or EventStore submission.</summary>
+    public void MarkExternalEffectAttempted() => ExternalEffectAttempted = true;
+
+    /// <summary>Uses the same acceptance instant in dispatch evidence and the durable response.</summary>
+    public void SetPreparedAcceptedAt(DateTimeOffset acceptedAt) => PreparedAcceptedAt = acceptedAt.ToUniversalTime();
+
     public void SetIdempotency(CoarseIdempotencyMetadata metadata)
     {
         ArgumentNullException.ThrowIfNull(metadata);

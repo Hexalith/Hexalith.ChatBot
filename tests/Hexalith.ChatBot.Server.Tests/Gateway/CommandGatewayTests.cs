@@ -59,7 +59,7 @@ using OutboundChannelControlState = Hexalith.ChatBot.Contracts.Enums.OutboundCha
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
 
-public sealed class CommandGatewayTests
+public sealed partial class CommandGatewayTests
 {
     private const string ActorId = "actor-alpha";
     private const string BoundTenant = "tenant-alpha";
@@ -541,9 +541,13 @@ public sealed class CommandGatewayTests
         DaprCoarseIdempotencyStore durable = new(state, clock);
         InMemoryCoarseIdempotencyStore memory = new(clock);
         ChatBotGatewayContext first = DirectContext(AssociationDecisionCommand(), "01ARZ3NDEKTSV4RRFFQ69G5FAY");
-        (await durable.RecordAdmissionAsync(first, TestContext.Current.CancellationToken)).Kind.ShouldBe(CoarseIdempotencyDecisionKind.Proceed);
-        (await memory.RecordAdmissionAsync(DirectContext(AssociationDecisionCommand(), "01ARZ3NDEKTSV4RRFFQ69G5FAY"),
-            TestContext.Current.CancellationToken)).Kind.ShouldBe(CoarseIdempotencyDecisionKind.Proceed);
+        CoarseIdempotencyDecision owned = await durable.RecordAdmissionAsync(first, TestContext.Current.CancellationToken);
+        owned.Kind.ShouldBe(CoarseIdempotencyDecisionKind.Proceed);
+        (await durable.PrepareDispatchAsync(owned.Metadata, PreparedOutcome(first, clock.UtcNow), TestContext.Current.CancellationToken)).ShouldBeTrue();
+        ChatBotGatewayContext memoryContext = DirectContext(AssociationDecisionCommand(), "01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        CoarseIdempotencyDecision memoryOwned = await memory.RecordAdmissionAsync(memoryContext, TestContext.Current.CancellationToken);
+        memoryOwned.Kind.ShouldBe(CoarseIdempotencyDecisionKind.Proceed);
+        (await memory.PrepareDispatchAsync(memoryOwned.Metadata, PreparedOutcome(memoryContext, clock.UtcNow), TestContext.Current.CancellationToken)).ShouldBeTrue();
 
         clock.UtcNow = clock.UtcNow.AddHours(25);
         ChatBotGatewayContext competing = DirectContext(AssociationDecisionCommand(projectId: "project-002"), "01ARZ3NDEKTSV4RRFFQ69G5FBB");
@@ -695,7 +699,7 @@ public sealed class CommandGatewayTests
         CoarseIdempotencyDecision first = await store.RecordAdmissionAsync(
             DirectContext(new TenantScopedCommand(BoundTenant, "before"), "01ARZ3NDEKTSV4RRFFQ69G5FAY"),
             TestContext.Current.CancellationToken);
-        first.Kind.ShouldBe(CoarseIdempotencyDecisionKind.Conflict);
+        first.Kind.ShouldBe(CoarseIdempotencyDecisionKind.RecoveryPending);
         state.DomainRecords.ShouldBeEmpty();
         state.IdentityRecords.ShouldBeEmpty();
 
@@ -5507,6 +5511,22 @@ public sealed class CommandGatewayTests
         private readonly Dictionary<string, (object Record, int Version)> _records = new(StringComparer.Ordinal);
         private int _blockNextReceiptOutcomeWrite;
 
+        public string? BlockNextWriteKind { get; set; }
+        public ManualResetEventSlim? OwnershipWriteEntered { get; set; }
+        public ManualResetEventSlim? OwnershipWriteRelease { get; set; }
+        public int PhysicalDeletes { get; private set; }
+
+        private void GateOwnershipWrite(string kind)
+        {
+            if (BlockNextWriteKind != kind || OwnershipWriteEntered is null || OwnershipWriteRelease is null) { return; }
+            BlockNextWriteKind = null;
+            OwnershipWriteEntered.Set();
+            if (!OwnershipWriteRelease.Wait(TimeSpan.FromSeconds(15)))
+            {
+                throw new TimeoutException("The ownership write gate was not released.");
+            }
+        }
+
         public int RejectIdentityOutcomeSaves { get; set; }
 
         public int RejectDomainSaves { get; set; }
@@ -5514,6 +5534,10 @@ public sealed class CommandGatewayTests
         public int RejectDeletes { get; set; }
 
         public int RejectIdentityClaims { get; set; }
+
+        public int RejectAbortFenceSaves { get; set; }
+
+        public int RejectReceiptCreates { get; set; }
 
         public int RejectReceiptOutcomeSaves { get; set; }
 
@@ -5542,19 +5566,19 @@ public sealed class CommandGatewayTests
         public IReadOnlyList<CoarseIdempotencyRecord> DomainRecords
         {
             get { lock (_sync) { return _records.Where(static entry => !entry.Key.StartsWith("domain-receipt:", StringComparison.Ordinal))
-                .Select(static entry => entry.Value.Record).OfType<CoarseIdempotencyRecord>().ToArray(); } }
+                .Select(static entry => entry.Value.Record).OfType<CoarseIdempotencyRecord>().Where(static record => !record.Released).ToArray(); } }
         }
 
         public IReadOnlyList<CoarseIdempotencyRecord> ReceiptRecords
         {
             get { lock (_sync) { return _records.Where(static entry => entry.Key.StartsWith("domain-receipt:", StringComparison.Ordinal))
-                .Select(static entry => entry.Value.Record).OfType<CoarseIdempotencyRecord>().ToArray(); } }
+                .Select(static entry => entry.Value.Record).OfType<CoarseIdempotencyRecord>().Where(static record => !record.Released).ToArray(); } }
         }
 
         public IReadOnlyList<CoarseCommandIdentityRecord> IdentityRecords
         {
             get { lock (_sync) { return _records.Values.Select(static entry => entry.Record)
-                .OfType<CoarseCommandIdentityRecord>().ToArray(); } }
+                .OfType<CoarseCommandIdentityRecord>().Where(static record => !record.Released).ToArray(); } }
         }
 
         public void RemoveDomain(string key) { lock (_sync) { _records.Remove(key); } }
@@ -5568,11 +5592,11 @@ public sealed class CommandGatewayTests
                     (object Record, int Version) current = _records[key];
                     if (current.Record is CoarseIdempotencyRecord domain)
                     {
-                        _records[key] = (domain with { ReservationId = reservationId }, current.Version + 1);
+                        _records[key] = (domain with { ReservationId = reservationId, DispatchState = CoarseDispatchState.Reserved, PreparedOutcome = null }, current.Version + 1);
                     }
                     else if (current.Record is CoarseCommandIdentityRecord identity && identity.DomainReservation is { } reservation)
                     {
-                        _records[key] = (identity with { DomainReservation = reservation with { ReservationId = reservationId } }, current.Version + 1);
+                        _records[key] = (identity with { DomainReservation = reservation with { ReservationId = reservationId, DispatchState = CoarseDispatchState.Reserved, PreparedOutcome = null } }, current.Version + 1);
                     }
                 }
             }
@@ -5595,6 +5619,7 @@ public sealed class CommandGatewayTests
 
         public Task<bool> TrySaveDomainAsync(string key, CoarseIdempotencyRecord record, string etag, CancellationToken cancellationToken)
         {
+            if (record.Released) { GateOwnershipWrite("domain-release"); }
             if (record.PriorOutcome is not null && key.StartsWith("domain-receipt:", StringComparison.Ordinal) &&
                 Interlocked.Exchange(ref _blockNextReceiptOutcomeWrite, 0) == 1 &&
                 ReceiptOutcomeWriteEntered is { } entered && ReceiptOutcomeWriteRelease is { } release)
@@ -5608,6 +5633,16 @@ public sealed class CommandGatewayTests
 
             lock (_sync)
             {
+                if (record.Released && RejectRelease(key))
+                {
+                    return Task.FromResult(false);
+                }
+                if (!record.Released && record.PriorOutcome is null && key.StartsWith("domain-receipt:", StringComparison.Ordinal) && RejectReceiptCreates > 0)
+                {
+                    RejectReceiptCreates--;
+                    return Task.FromResult(false);
+                }
+
                 if (record.PriorOutcome is not null && ThrowOutcomeWrites > 0)
                 {
                     ThrowOutcomeWrites--;
@@ -5648,13 +5683,25 @@ public sealed class CommandGatewayTests
 
         public Task<bool> TrySaveIdentityAsync(string key, CoarseCommandIdentityRecord record, string etag, CancellationToken cancellationToken)
         {
-            if (record.PriorOutcome is null)
+            if (record.Released) { GateOwnershipWrite("identity-release"); }
+            else if (record.DomainReservation?.DispatchState == CoarseDispatchState.Dispatching) { GateOwnershipWrite("prepare"); }
+            if (record.PriorOutcome is null && string.IsNullOrEmpty(etag))
             {
                 IdentityClaimBarrier?.SignalAndWait(TimeSpan.FromSeconds(10));
             }
 
             lock (_sync)
             {
+                if (record.Released && RejectRelease(key))
+                {
+                    return Task.FromResult(false);
+                }
+                if (!record.Released && record.DomainReservation?.DispatchState == CoarseDispatchState.Aborted && RejectAbortFenceSaves > 0)
+                {
+                    RejectAbortFenceSaves--;
+                    return Task.FromResult(false);
+                }
+
                 if (record.PriorOutcome is not null && ThrowOutcomeWrites > 0)
                 {
                     ThrowOutcomeWrites--;
@@ -5687,6 +5734,7 @@ public sealed class CommandGatewayTests
         {
             lock (_sync)
             {
+                PhysicalDeletes++;
                 if (ReplacePendingDomainOnNextDelete is { } replacement &&
                     _records.TryGetValue(key, out (object Record, int Version) pending) &&
                     pending.Record is CoarseIdempotencyRecord { PriorOutcome: null })
@@ -5711,6 +5759,24 @@ public sealed class CommandGatewayTests
 
                 return Task.FromResult(false);
             }
+        }
+
+        private bool RejectRelease(string key)
+        {
+            if (ReplacePendingDomainOnNextDelete is { } replacement &&
+                _records.TryGetValue(key, out (object Record, int Version) pending) &&
+                pending.Record is CoarseIdempotencyRecord { PriorOutcome: null })
+            {
+                ReplacePendingDomainOnNextDelete = null;
+                _records[key] = (replacement, pending.Version + 1);
+                return true;
+            }
+            if (RejectDeletes > 0)
+            {
+                RejectDeletes--;
+                return true;
+            }
+            return false;
         }
 
         private bool TrySave(string key, object record, string etag)
@@ -6596,6 +6662,9 @@ public sealed class CommandGatewayTests
 
     private sealed class RecordingIdempotencyStore(List<string>? stages = null) : IIdempotencyStore
     {
+        public ValueTask<bool> PrepareDispatchAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse outcome, CancellationToken cancellationToken)
+            => ValueTask.FromResult(true);
+
         public ValueTask<CoarseIdempotencyDecision> RecordAdmissionAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
         {
             stages?.Add("coarse-idempotency");
@@ -6627,11 +6696,12 @@ public sealed class CommandGatewayTests
             => LifecycleTransitionValidation.Valid(new LifecycleTransitionDefinition("Received", "Skipped"));
     }
 
-    private sealed class RecordingLifecycleTransitionGuard(List<string> stages) : ILifecycleTransitionGuard
+    private sealed class RecordingLifecycleTransitionGuard(List<string> stages, bool throwValidation = false) : ILifecycleTransitionGuard
     {
         public LifecycleTransitionValidation ValidateCommandSubmission(ChatBotGatewayContext context)
         {
             stages.Add("lifecycle-validation");
+            if (throwValidation) { throw new InvalidOperationException("Injected lifecycle failure."); }
             return LifecycleTransitionValidation.Valid(new LifecycleTransitionDefinition("Received", "Proposed"));
         }
 
@@ -6666,6 +6736,10 @@ public sealed class CommandGatewayTests
     {
         public List<ChatBotAuthorizationFailureAuditFact> AuthorizationFailures { get; } = [];
         public List<AuditEnvelope> Envelopes { get; } = [];
+        public bool ThrowPreCommit { get; init; }
+
+        public Action? OnPreCommit { get; init; }
+
         public AuditWriteResult PreCommitResult { get; init; } = AuditWriteResult.Success;
         public AuditWriteResult PostCommitResult { get; init; } = AuditWriteResult.Success;
 
@@ -6684,6 +6758,8 @@ public sealed class CommandGatewayTests
         {
             Envelopes.Add(envelope);
             stages?.Add("pre-commit-audit");
+            OnPreCommit?.Invoke();
+            if (ThrowPreCommit) { throw new IOException("Injected pre-commit audit failure."); }
             return ValueTask.FromResult(PreCommitResult);
         }
 
@@ -6699,10 +6775,25 @@ public sealed class CommandGatewayTests
     {
         public List<AuditReplayIntent> Intents { get; } = [];
 
-        public IReadOnlyList<AuditReplayIntent> Snapshot() => Intents;
+        public bool ThrowNotifications { get; init; }
+        public bool ThrowSnapshot { get; init; }
+        public Action? OnSnapshot { get; set; }
+
+        public IReadOnlyList<AuditReplayIntent> Snapshot()
+        {
+            OnSnapshot?.Invoke();
+            return ThrowSnapshot ? throw new IOException("Injected queue failure.") : Intents.ToArray();
+        }
+
+        public ValueTask AcknowledgeAsync(AuditReplayIntent intent, CancellationToken cancellationToken)
+        {
+            Intents.Remove(intent);
+            return ValueTask.CompletedTask;
+        }
 
         public ValueTask EnqueueAsync(AuditReplayIntent intent, CancellationToken cancellationToken)
         {
+            if (ThrowNotifications) { throw new IOException("Injected queue failure."); }
             Intents.Add(intent);
             return ValueTask.CompletedTask;
         }
@@ -6711,9 +6802,11 @@ public sealed class CommandGatewayTests
     private sealed class RecordingOperatorAlertSink : IOperatorAlertSink
     {
         public List<OperatorAlert> Alerts { get; } = [];
+        public bool ThrowNotifications { get; init; }
 
         public ValueTask EmitAsync(OperatorAlert alert, CancellationToken cancellationToken)
         {
+            if (ThrowNotifications) { throw new IOException("Injected alert failure."); }
             Alerts.Add(alert);
             return ValueTask.CompletedTask;
         }
@@ -6747,6 +6840,9 @@ public sealed class CommandGatewayTests
 
     private sealed class AbortTrackingIdempotencyStore : IIdempotencyStore
     {
+        public ValueTask<bool> PrepareDispatchAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse outcome, CancellationToken cancellationToken)
+            => ValueTask.FromResult(true);
+
         public int AbortCount { get; private set; }
 
         public ValueTask<CoarseIdempotencyDecision> RecordAdmissionAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)

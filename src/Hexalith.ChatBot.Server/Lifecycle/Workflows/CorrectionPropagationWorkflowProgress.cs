@@ -8,4 +8,6 @@ internal sealed record CorrectionPropagationWorkflowProgress(
     long SourceVersion,
     int StoresCompleted,
     string LastFailureCode,
-    string CorrelationId);
+    string CorrelationId,
+    int RetryCount = 0,
+    DateTimeOffset? RetryDueAt = null);

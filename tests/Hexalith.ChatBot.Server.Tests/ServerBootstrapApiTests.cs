@@ -1104,6 +1104,48 @@ public sealed class ServerBootstrapApiTests
         secondBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
     }
 
+    [Fact]
+    public async Task ReplayWithoutStoredTaskMustClearRetryTaskFromTraceAndMatchResponseIdentity()
+    {
+        RecordingDispatcher dispatcher = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha", services => services.AddSingleton<ICommandDispatcher>(dispatcher));
+        using HttpClient client = factory.CreateClient();
+        using HttpRequestMessage original = CommandSubmissionRequest("tenant-alpha", "allowed-resource");
+        original.Headers.Remove("X-Hexalith-Task-Id");
+        using HttpResponseMessage accepted = await client.SendAsync(original, TestContext.Current.CancellationToken);
+        accepted.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        string firstBody = await accepted.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        System.Diagnostics.ActivityTraceId traceId = System.Diagnostics.ActivityTraceId.CreateRandom();
+        TaskCompletionSource<System.Diagnostics.Activity> stopped = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        using System.Diagnostics.ActivityListener listener = new()
+        {
+            ShouldListenTo = static _ => true,
+            Sample = static (ref System.Diagnostics.ActivityCreationOptions<System.Diagnostics.ActivityContext> _) => System.Diagnostics.ActivitySamplingResult.AllDataAndRecorded,
+            SampleUsingParentId = static (ref System.Diagnostics.ActivityCreationOptions<string> _) => System.Diagnostics.ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activity => { if (activity.Kind == System.Diagnostics.ActivityKind.Server && activity.TraceId == traceId) { stopped.TrySetResult(activity); } },
+        };
+        System.Diagnostics.ActivitySource.AddActivityListener(listener);
+        using HttpRequestMessage retry = CommandSubmissionRequest("tenant-alpha", "allowed-resource");
+        retry.Headers.Remove("X-Correlation-Id");
+        retry.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAZ");
+        retry.Headers.Add("traceparent", $"00-{traceId}-{System.Diagnostics.ActivitySpanId.CreateRandom()}-01");
+        using HttpResponseMessage replay = await client.SendAsync(retry, TestContext.Current.CancellationToken);
+        replay.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        string replayBody = await replay.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        AssertReplayMatchesStoredOutcome(firstBody, replayBody);
+        using JsonDocument parsed = JsonDocument.Parse(replayBody);
+        JsonElement body = parsed.RootElement;
+        body.GetProperty("operationId").GetString().ShouldBe(body.GetProperty("commandId").GetString());
+        body.TryGetProperty("taskId", out _).ShouldBeFalse();
+        replay.Headers.Contains("X-Hexalith-Task-Id").ShouldBeFalse();
+        string responseCorrelation = body.GetProperty("correlationId").GetString()!;
+        replay.Headers.GetValues("X-Correlation-Id").Single().ShouldBe(responseCorrelation);
+        System.Diagnostics.Activity trace = await stopped.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        trace.GetTagItem("hexalith.correlation_id").ShouldBe(responseCorrelation);
+        trace.GetTagItem("hexalith.task_id").ShouldBeNull();
+        dispatcher.DispatchCount.ShouldBe(1);
+    }
+
     [Theory]
     [InlineData("malformed-json")]
     [InlineData("command-type-suffix")]

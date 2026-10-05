@@ -345,6 +345,7 @@ internal static class CommandGatewayServiceCollectionExtensions
             options.RegisterActivity<CorrectionPropagationScopeActivity>();
             options.RegisterActivity<CorrectionPropagationResolveCaseActivity>();
             options.RegisterActivity<CorrectionPropagationRetryStatusActivity>();
+            options.RegisterActivity<CorrectionPropagationClockActivity>();
             options.RegisterActivity<CorrectionPropagationStartActivity>();
             options.RegisterActivity<CorrectionPropagationRunStoreActivity>();
             options.RegisterActivity<CorrectionPropagationCompleteActivity>();

@@ -29,6 +29,9 @@ internal interface IChatBotProblemDetailsFactory
 
     ProblemDetails CreateAuditUnavailable(string correlationId, string? taskId);
 
+    /// <summary>Returns a safe transient dependency failure without attributing it to audit or conflicting content.</summary>
+    ProblemDetails CreateDependencyUnavailable(string correlationId, string? taskId) => CreateDispatchUnavailable(correlationId, taskId);
+
     ProblemDetails CreateDispatchUnavailable(string correlationId, string? taskId);
 
     ProblemDetails CreateIdempotencyConflict(string correlationId, string? taskId, string? catalogCode = null);
