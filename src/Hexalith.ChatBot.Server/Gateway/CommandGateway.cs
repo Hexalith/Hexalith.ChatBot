@@ -152,28 +152,33 @@ internal sealed class CommandGateway(
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             AuditEnvelope failedReceiptEnvelope = AuditEnvelopeFactory.PostCommit(context, dispatchResult, transition, clock.UtcNow);
+            bool auditEvidenceRetained = false;
             try
             {
                 // The EventStore command has committed. Persist the metadata-only outcome
                 // evidence in the independent audit seam before returning a retryable error.
-                _ = await auditWriter.RecordPostCommitAsync(failedReceiptEnvelope, cancellationToken).ConfigureAwait(false);
+                AuditWriteResult fallbackAudit = await auditWriter.RecordPostCommitAsync(failedReceiptEnvelope, cancellationToken).ConfigureAwait(false);
+                auditEvidenceRetained = fallbackAudit.Succeeded;
             }
             catch (Exception auditException) when (auditException is not OperationCanceledException)
             {
-                // The replay intent and operator alert still carry the exact safe outcome.
+                // The process-local replay intent and alert still carry the exact safe outcome.
             }
 
+            string recoveryReason = auditEvidenceRetained
+                ? "idempotency_outcome_unavailable"
+                : "post_commit_evidence_unavailable";
             await QueueReplayIntentAsync(
                 AuditReplayIntentKind.PostCommitAuditReconciliation,
                 failedReceiptEnvelope,
-                "idempotency_outcome_unavailable",
+                recoveryReason,
                 cancellationToken,
                 response,
                 idempotency).ConfigureAwait(false);
             await AlertAsync(
                 OperatorAlertKind.PostCommitAuditReconciliationRequired,
                 failedReceiptEnvelope,
-                "idempotency_outcome_unavailable",
+                recoveryReason,
                 cancellationToken).ConfigureAwait(false);
             return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateAuditUnavailable(submission.CorrelationId, submission.TaskId));
         }

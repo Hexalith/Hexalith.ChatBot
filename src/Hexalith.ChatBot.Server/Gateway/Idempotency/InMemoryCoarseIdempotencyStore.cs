@@ -133,7 +133,7 @@ internal sealed class InMemoryCoarseIdempotencyStore(ISystemClock clock) : IIdem
     }
 
     private static CoarseIdempotencyMetadata Metadata(CoarseIdempotencyRecord record)
-        => new(record.OperationClass, record.CoarseKeyHash, record.CanonicalEquivalenceHash, record.ExpiresAt, record.IdentityKeyHash);
+        => new(record.OperationClass, record.CoarseKeyHash, record.CanonicalEquivalenceHash, record.ExpiresAt, record.IdentityKeyHash, record.CreatedAt);
 
     private static CommandSubmissionResponse Clone(CommandSubmissionResponse outcome)
         => new()

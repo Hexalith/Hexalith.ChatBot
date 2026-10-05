@@ -15,6 +15,11 @@ namespace Hexalith.ChatBot.Client.Generated;
 /// </summary>
 internal sealed class StrictEnumContractResolver : DefaultContractResolver
 {
+    public StrictEnumContractResolver()
+    {
+        NamingStrategy = new CamelCaseNamingStrategy();
+    }
+
     protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
     {
         JsonProperty property = base.CreateProperty(member, memberSerialization);

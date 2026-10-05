@@ -13,6 +13,7 @@ public sealed class OperationStatusWorkflowStatusSinkTests
 {
     [Theory]
     [InlineData("association_correction_case_resolution_unavailable", "association_correction_case_resolution_unavailable")]
+    [InlineData("association_correction_store_unavailable", "association_correction_store_unavailable")]
     [InlineData("m0_store_invalidation_failed", "m0_store_invalidation_failed")]
     [InlineData("vector_reindex_failed", "vector_reindex_failed")]
     [InlineData("memories_correction_invalid_status", "memories_correction_invalid_status")]

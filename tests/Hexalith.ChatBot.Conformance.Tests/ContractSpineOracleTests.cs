@@ -71,7 +71,7 @@ public static class ContractSpineOracleTests
         using JsonDocument acceptedJson = JsonDocument.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(accepted.Accepted));
         using JsonDocument replayJson = JsonDocument.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(replay.Accepted));
         AssertSafeOutcome(acceptedJson.RootElement, expectedAccepted);
-        AssertSafeOutcome(replayJson.RootElement, expectedAccepted);
+        AssertSafeOutcome(replayJson.RootElement, expectedAccepted, includesPriorOutcome: true);
         AssertSafeOutcome(replayJson.RootElement.GetProperty("priorOutcome"), expectedAccepted);
 
         using JsonDocument conflictJson = JsonDocument.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(conflict.Problem));
@@ -186,8 +186,9 @@ public static class ContractSpineOracleTests
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             "01ARZ3NDEKTSV4RRFFQ69G5FAX");
 
-    private static void AssertSafeOutcome(JsonElement actual, JsonElement expected)
+    private static void AssertSafeOutcome(JsonElement actual, JsonElement expected, bool includesPriorOutcome = false)
     {
+        actual.EnumerateObject().Count().ShouldBe(expected.EnumerateObject().Count() + (includesPriorOutcome ? 1 : 0));
         foreach (JsonProperty property in expected.EnumerateObject())
         {
             JsonElement value = actual.GetProperty(property.Name);
@@ -206,13 +207,18 @@ public static class ContractSpineOracleTests
 
     private static void AssertSafeProblem(JsonElement actual, JsonElement expected)
     {
-        actual.GetProperty("status").GetInt32().ShouldBe(expected.GetProperty("status").GetInt32());
-        foreach (string field in new[] { "category", "code", "schemaVersion" })
+        actual.EnumerateObject().Count().ShouldBe(expected.EnumerateObject().Count());
+        foreach (JsonProperty field in expected.EnumerateObject())
         {
-            actual.GetProperty(field).GetString().ShouldBe(expected.GetProperty(field).GetString());
+            if (field.Name != "visibility")
+            {
+                actual.GetProperty(field.Name).GetRawText().ShouldBe(field.Value.GetRawText(), field.Name);
+            }
         }
 
-        actual.GetProperty("details").GetProperty("visibility").GetString()
+        JsonElement details = actual.GetProperty("details");
+        details.EnumerateObject().Count().ShouldBe(1);
+        details.GetProperty("visibility").GetString()
             .ShouldBe(expected.GetProperty("visibility").GetString());
     }
 

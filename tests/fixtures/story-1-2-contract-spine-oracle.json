@@ -46,16 +46,30 @@
       "retryEligible": false
     },
     "conflict": {
+      "type": "https://hexalith.dev/errors/chatbot/idempotency-conflict",
+      "title": "Idempotency conflict.",
       "status": 409,
       "category": "conflict",
       "code": "idempotency_conflict_command_execution",
+      "message": "The command conflicts with an existing submission record.",
+      "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+      "taskId": "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      "retryable": false,
+      "clientAction": "none",
       "schemaVersion": "chatbot.message-catalog.v1",
       "visibility": "metadata_only"
     },
     "denied": {
+      "type": "https://hexalith.dev/errors/chatbot/authorization-denied",
+      "title": "Authentication required.",
       "status": 401,
       "category": "authentication_failure",
       "code": "authentication_denied",
+      "message": "Authentication is required before this operation can continue.",
+      "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+      "taskId": "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      "retryable": false,
+      "clientAction": "authenticate",
       "schemaVersion": "chatbot.message-catalog.v1",
       "visibility": "metadata_only"
     },

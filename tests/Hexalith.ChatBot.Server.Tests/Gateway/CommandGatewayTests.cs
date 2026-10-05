@@ -458,6 +458,30 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task PendingPreUpgradeGenericRecordShouldBlockNewKeyAdmission()
+    {
+        FixedClock clock = new();
+        ChatBotGatewayContext context = DirectContext(
+            new TenantScopedCommand(BoundTenant, "allowed-resource"), "01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        CoarseIdempotencyRecord proposed = CoarseIdempotencyComposer.ComposeCommandExecutionRecord(context, clock.UtcNow);
+        CoarseIdempotencyRecord legacy = proposed with
+        {
+            CoarseKeyHash = proposed.LegacyKeyHash!,
+            IdentityKeyHash = null,
+            CallerFingerprint = null,
+        };
+        FakeCoarseIdempotencyStateClient state = new();
+        state.SeedDomain(legacy);
+        DaprCoarseIdempotencyStore store = new(state, clock);
+
+        CoarseIdempotencyDecision decision = await store.RecordAdmissionAsync(context, TestContext.Current.CancellationToken);
+
+        decision.Kind.ShouldBe(CoarseIdempotencyDecisionKind.RecoveryPending);
+        state.DomainRecords.ShouldHaveSingleItem().ShouldBe(legacy);
+        state.IdentityRecords.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task DaprDomainConflictShouldNotStrandTheRejectedCallerId()
     {
         FakeCoarseIdempotencyStateClient state = new();
@@ -551,6 +575,68 @@ public sealed class CommandGatewayTests
         (await store.RecordAdmissionAsync(corrected, TestContext.Current.CancellationToken)).Kind.ShouldBe(CoarseIdempotencyDecisionKind.Proceed);
     }
 
+    [Theory]
+    [InlineData("domain")]
+    [InlineData("receipt")]
+    [InlineData("identity")]
+    public async Task AcknowledgementLossBeforeAdmissionShouldCleanOnlyItsOwnReservation(string failurePoint)
+    {
+        FakeCoarseIdempotencyStateClient state = new()
+        {
+            ThrowAfterPendingDomainSave = failurePoint == "domain",
+            ThrowAfterReceiptReservationSave = failurePoint == "receipt",
+            ThrowAfterIdentityClaimSave = failurePoint == "identity",
+        };
+        DaprCoarseIdempotencyStore store = new(state, new FixedClock());
+        object command = failurePoint == "receipt"
+            ? AssociationDecisionCommand()
+            : new TenantScopedCommand(BoundTenant, "before");
+        ChatBotGatewayContext first = DirectContext(command, "01ARZ3NDEKTSV4RRFFQ69G5FAY");
+
+        await Should.ThrowAsync<IOException>(async () =>
+            await store.RecordAdmissionAsync(first, TestContext.Current.CancellationToken).ConfigureAwait(true));
+
+        state.DomainRecords.ShouldBeEmpty();
+        state.ReceiptRecords.ShouldBeEmpty();
+        state.IdentityRecords.ShouldBeEmpty();
+        ChatBotGatewayContext corrected = DirectContext(
+            failurePoint == "receipt" ? AssociationDecisionCommand() : new TenantScopedCommand(BoundTenant, "corrected"),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        (await store.RecordAdmissionAsync(corrected, TestContext.Current.CancellationToken)).Kind.ShouldBe(CoarseIdempotencyDecisionKind.Proceed);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AbortCleanupShouldNotDeleteAReplacementReservation(bool committedReplacement)
+    {
+        FakeCoarseIdempotencyStateClient state = new();
+        DaprCoarseIdempotencyStore store = new(state, new FixedClock());
+        CoarseIdempotencyDecision admission = await store.RecordAdmissionAsync(
+            DirectContext(new TenantScopedCommand(BoundTenant, "before"), "01ARZ3NDEKTSV4RRFFQ69G5FAY"),
+            TestContext.Current.CancellationToken);
+        admission.Kind.ShouldBe(CoarseIdempotencyDecisionKind.Proceed);
+        CoarseIdempotencyRecord original = state.DomainRecords.ShouldHaveSingleItem();
+        CoarseIdempotencyRecord replacement = original with
+        {
+            ReservationId = Guid.NewGuid().ToString("N"),
+            PriorOutcome = committedReplacement ? new CommandSubmissionResponse
+            {
+                CommandId = original.CommandId,
+                CorrelationId = CorrelationId,
+                OperationId = TaskId,
+                LifecycleState = Hexalith.ChatBot.Client.Generated.LifecycleState.Proposed,
+                AcceptedAt = original.CreatedAt,
+            } : null,
+        };
+        state.ReplacePendingDomainOnNextDelete = replacement;
+
+        await store.AbortAdmissionAsync(admission.Metadata, TestContext.Current.CancellationToken);
+
+        state.DomainRecords.ShouldHaveSingleItem().ShouldBe(replacement);
+        state.IdentityRecords.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task MissingDomainAfterDispatchShouldKeepIdentityScopedReplayReceipt()
     {
@@ -619,12 +705,20 @@ public sealed class CommandGatewayTests
         corrected.Kind.ShouldBe(CoarseIdempotencyDecisionKind.Proceed);
     }
 
-    [Fact]
-    public async Task FailedPostDispatchOutcomeWritesShouldFailClosedWithoutSecondDispatch()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task FailedPostDispatchOutcomeWritesShouldFailClosedWithoutSecondDispatch(bool auditAvailable)
     {
         FakeCoarseIdempotencyStateClient state = new();
         RecordingReplayIntentQueue replayQueue = new();
         RecordingOperatorAlertSink alertSink = new();
+        RecordingAuditWriter audit = new()
+        {
+            PostCommitResult = auditAvailable
+                ? AuditWriteResult.Success
+                : AuditWriteResult.Unavailable(AuditFailureReasonCodes.PostCommitAuditFailed),
+        };
         RecordingDispatcher dispatcher = new(onDispatch: () =>
         {
             state.RejectDomainSaves = 3;
@@ -633,7 +727,8 @@ public sealed class CommandGatewayTests
         CommandGateway gateway = Gateway(dispatcher,
             idempotencyStore: new DaprCoarseIdempotencyStore(state, new FixedClock()),
             replayQueue: replayQueue,
-            alertSink: alertSink);
+            alertSink: alertSink,
+            auditWriter: audit);
         ChatBotCommandSubmission request = Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed"));
 
         ChatBotGatewayResult first = await gateway.SubmitAsync(request, TestContext.Current.CancellationToken);
@@ -645,12 +740,14 @@ public sealed class CommandGatewayTests
         retry.Accepted.ShouldNotBeNull().PriorOutcome.ShouldNotBeNull();
         dispatcher.DispatchCount.ShouldBe(1);
         state.IdentityRecords.ShouldHaveSingleItem().PriorOutcome.ShouldNotBeNull();
-        replayQueue.Intents.ShouldHaveSingleItem().ReasonCode.ShouldBe("idempotency_outcome_unavailable");
+        string expectedReason = auditAvailable ? "idempotency_outcome_unavailable" : "post_commit_evidence_unavailable";
+        replayQueue.Intents.ShouldHaveSingleItem().ReasonCode.ShouldBe(expectedReason);
         replayQueue.Intents[0].AcceptedOutcome.ShouldNotBeNull().OperationId.ShouldBe(request.TaskId);
         replayQueue.Intents[0].CoarseKeyHash.ShouldNotBeNullOrWhiteSpace();
         replayQueue.Intents[0].IdentityKeyHash.ShouldNotBeNullOrWhiteSpace();
         replayQueue.Intents[0].Kind.ShouldBe(AuditReplayIntentKind.PostCommitAuditReconciliation);
         alertSink.Alerts.ShouldHaveSingleItem().Kind.ShouldBe(OperatorAlertKind.PostCommitAuditReconciliationRequired);
+        alertSink.Alerts[0].ReasonCode.ShouldBe(expectedReason);
     }
 
     [Fact]
@@ -675,6 +772,60 @@ public sealed class CommandGatewayTests
         state.DomainRecords.ShouldBeEmpty();
         state.ReceiptRecords.ShouldHaveSingleItem().PriorOutcome.ShouldNotBeNull();
         dispatcher.DispatchCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task ExpiredReceiptShouldProtectPendingSpecializedPrimaryFromSecondDispatch()
+    {
+        MutableClock clock = new(new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero));
+        FakeCoarseIdempotencyStateClient state = new();
+        RecordingDispatcher dispatcher = new(onDispatch: () => state.RejectPrimaryOutcomeSaves = 3);
+        CommandGateway gateway = Gateway(dispatcher, clock: clock,
+            idempotencyStore: new DaprCoarseIdempotencyStore(state, clock),
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+        ClaimsPrincipal principal = Principal(BoundTenant);
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(
+            Submission(principal, AssociationDecisionCommand(), origin: ChatBotSurfaceOrigin.Ui), TestContext.Current.CancellationToken);
+        state.DomainRecords.ShouldHaveSingleItem().PriorOutcome.ShouldBeNull();
+        state.ReceiptRecords.ShouldHaveSingleItem().PriorOutcome.ShouldNotBeNull();
+
+        clock.UtcNow = clock.UtcNow.AddHours(25);
+        ChatBotGatewayResult replay = await gateway.SubmitAsync(
+            Submission(principal, AssociationDecisionCommand(), origin: ChatBotSurfaceOrigin.Ui,
+                commandId: "01ARZ3NDEKTSV4RRFFQ69G5FBB"), TestContext.Current.CancellationToken);
+
+        first.IsAccepted.ShouldBeTrue();
+        replay.IsAccepted.ShouldBeTrue();
+        replay.Accepted.ShouldNotBeNull().CommandId.ShouldBe(first.Accepted.ShouldNotBeNull().CommandId);
+        state.ReceiptRecords.ShouldHaveSingleItem().PriorOutcome.ShouldNotBeNull();
+        dispatcher.DispatchCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task OldCallerIdentityShouldReplayAfterSpecializedDomainKeyIsReused()
+    {
+        MutableClock clock = new(new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero));
+        FakeCoarseIdempotencyStateClient state = new();
+        RecordingDispatcher dispatcher = new();
+        CommandGateway gateway = Gateway(dispatcher, clock: clock,
+            idempotencyStore: new DaprCoarseIdempotencyStore(state, clock),
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+        ClaimsPrincipal principal = Principal(BoundTenant);
+        ChatBotCommandSubmission original = Submission(principal, AssociationDecisionCommand(), origin: ChatBotSurfaceOrigin.Ui);
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(original, TestContext.Current.CancellationToken);
+        clock.UtcNow = clock.UtcNow.AddHours(25);
+        ChatBotGatewayResult replacement = await gateway.SubmitAsync(
+            Submission(principal, AssociationDecisionCommand(projectId: "project-002"), origin: ChatBotSurfaceOrigin.Ui,
+                commandId: "01ARZ3NDEKTSV4RRFFQ69G5FBB"), TestContext.Current.CancellationToken);
+        ChatBotGatewayResult oldReplay = await gateway.SubmitAsync(original, TestContext.Current.CancellationToken);
+
+        first.IsAccepted.ShouldBeTrue();
+        replacement.IsAccepted.ShouldBeTrue();
+        oldReplay.IsAccepted.ShouldBeTrue();
+        oldReplay.Accepted.ShouldNotBeNull().CommandId.ShouldBe(first.Accepted.ShouldNotBeNull().CommandId);
+        dispatcher.DispatchCount.ShouldBe(2);
     }
 
     [Fact]
@@ -5220,6 +5371,14 @@ public sealed class CommandGatewayTests
 
         public int ThrowReads { get; set; }
 
+        public bool ThrowAfterPendingDomainSave { get; set; }
+
+        public bool ThrowAfterReceiptReservationSave { get; set; }
+
+        public bool ThrowAfterIdentityClaimSave { get; set; }
+
+        public CoarseIdempotencyRecord? ReplacePendingDomainOnNextDelete { get; set; }
+
         public Barrier? IdentityClaimBarrier { get; set; }
 
         public ManualResetEventSlim? ReceiptOutcomeWriteEntered { get; set; }
@@ -5302,7 +5461,17 @@ public sealed class CommandGatewayTests
                     return Task.FromResult(false);
                 }
 
-                return Task.FromResult(TrySave(key, record, etag));
+                bool saved = TrySave(key, record, etag);
+                if (saved && record.PriorOutcome is null &&
+                    ((key.StartsWith("domain-receipt:", StringComparison.Ordinal) && ThrowAfterReceiptReservationSave) ||
+                     (!key.StartsWith("domain-receipt:", StringComparison.Ordinal) && ThrowAfterPendingDomainSave)))
+                {
+                    ThrowAfterReceiptReservationSave = false;
+                    ThrowAfterPendingDomainSave = false;
+                    throw new IOException("Injected acknowledgement loss after a domain reservation commit.");
+                }
+
+                return Task.FromResult(saved);
             }
         }
 
@@ -5332,7 +5501,14 @@ public sealed class CommandGatewayTests
                     return Task.FromResult(false);
                 }
 
-                return Task.FromResult(TrySave(key, record, etag));
+                bool saved = TrySave(key, record, etag);
+                if (saved && record.PriorOutcome is null && ThrowAfterIdentityClaimSave)
+                {
+                    ThrowAfterIdentityClaimSave = false;
+                    throw new IOException("Injected acknowledgement loss after an identity claim commit.");
+                }
+
+                return Task.FromResult(saved);
             }
         }
 
@@ -5340,6 +5516,15 @@ public sealed class CommandGatewayTests
         {
             lock (_sync)
             {
+                if (ReplacePendingDomainOnNextDelete is { } replacement &&
+                    _records.TryGetValue(key, out (object Record, int Version) pending) &&
+                    pending.Record is CoarseIdempotencyRecord { PriorOutcome: null })
+                {
+                    ReplacePendingDomainOnNextDelete = null;
+                    _records[key] = (replacement, pending.Version + 1);
+                    return Task.FromResult(false);
+                }
+
                 if (RejectDeletes > 0)
                 {
                     RejectDeletes--;

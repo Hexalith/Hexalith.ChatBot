@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.Serialization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -21,6 +22,10 @@ internal static partial class CommandSubmissionContractAdapter
     private static readonly NullabilityInfoContext Nullability = new();
 
     private static readonly JsonSerializerOptions CommandJsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly IReadOnlyDictionary<string, Type> KnownCommandTypes = typeof(IChatBotCommand).Assembly.GetTypes()
+        .Where(candidate => !candidate.IsAbstract && typeof(IChatBotCommand).IsAssignableFrom(candidate))
+        .GroupBy(candidate => candidate.Name, StringComparer.Ordinal)
+        .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
     public static async Task<(CommandSubmissionRequest? Request, string? Origin)> ReadAsync(HttpContext context, CancellationToken cancellationToken)
     {
@@ -104,10 +109,8 @@ internal static partial class CommandSubmissionContractAdapter
 
     private static bool ValidateKnownCommand(string commandType, JsonElement command)
     {
-        Type? type = typeof(IChatBotCommand).Assembly.GetTypes()
-            .FirstOrDefault(candidate => candidate.Name == commandType &&
-                !candidate.IsAbstract && typeof(IChatBotCommand).IsAssignableFrom(candidate));
-        return type is null || ValidateValue(command, type, 0, allowNull: false);
+        return !KnownCommandTypes.TryGetValue(commandType, out Type? type) ||
+            ValidateValue(command, type, 0, allowNull: false);
     }
 
     private static bool ValidateValue(JsonElement element, Type type, int depth, bool allowNull)
@@ -175,10 +178,13 @@ internal static partial class CommandSubmissionContractAdapter
              type.GetGenericTypeDefinition() == typeof(IDictionary<,>) ||
              type.GetGenericTypeDefinition() == typeof(Dictionary<,>)))
         {
+            Type keyType = type.GetGenericArguments()[0];
             Type valueType = type.GetGenericArguments()[1];
             return element.ValueKind == JsonValueKind.Object &&
                 !HasCaseInsensitiveDuplicates(element) &&
-                element.EnumerateObject().All(item => ValidateValue(item.Value, valueType, depth + 1, allowNull: false));
+                element.EnumerateObject().All(item =>
+                    ValidateDictionaryKey(item.Name, keyType) &&
+                    ValidateValue(item.Value, valueType, depth + 1, allowNull: false));
         }
 
         if (type != typeof(string) && typeof(System.Collections.IEnumerable).IsAssignableFrom(type))
@@ -287,6 +293,18 @@ internal static partial class CommandSubmissionContractAdapter
     {
         HashSet<string> names = new(StringComparer.OrdinalIgnoreCase);
         return element.EnumerateObject().Any(property => !names.Add(property.Name));
+    }
+
+    private static bool ValidateDictionaryKey(string key, Type type)
+    {
+        if (type == typeof(string))
+        {
+            return true;
+        }
+
+        return type.IsEnum && type.GetFields(BindingFlags.Public | BindingFlags.Static).Any(field =>
+            string.Equals(key, field.Name, StringComparison.Ordinal) ||
+            string.Equals(key, field.GetCustomAttribute<EnumMemberAttribute>()?.Value, StringComparison.Ordinal));
     }
 
     [GeneratedRegex("^[A-Z][A-Za-z0-9]*$", RegexOptions.CultureInvariant)]

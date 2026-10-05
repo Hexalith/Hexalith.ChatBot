@@ -17,4 +17,5 @@ internal sealed record CoarseIdempotencyRecord(
     CommandSubmissionResponse? PriorOutcome,
     string? IdentityKeyHash = null,
     string? CallerFingerprint = null,
-    string? LegacyKeyHash = null);
+    string? LegacyKeyHash = null,
+    string? ReservationId = null);

@@ -588,13 +588,44 @@ public static partial class OpenApiContractSpineTests
         }
         else if (type == "integer")
         {
-            long.TryParse(scalar, out _).ShouldBeTrue(path);
+            long.TryParse(scalar, out long number).ShouldBeTrue(path);
+            if (schema.Children.TryGetValue(new YamlScalarNode("minimum"), out YamlNode? minimum))
+            {
+                number.ShouldBeGreaterThanOrEqualTo(long.Parse(
+                    minimum.ShouldBeOfType<YamlScalarNode>().Value.ShouldNotBeNull(),
+                    System.Globalization.CultureInfo.InvariantCulture), path);
+            }
+
+            if (schema.Children.TryGetValue(new YamlScalarNode("maximum"), out YamlNode? maximum))
+            {
+                number.ShouldBeLessThanOrEqualTo(long.Parse(
+                    maximum.ShouldBeOfType<YamlScalarNode>().Value.ShouldNotBeNull(),
+                    System.Globalization.CultureInfo.InvariantCulture), path);
+            }
         }
         else if (type == "string" && schema.Children.TryGetValue(new YamlScalarNode("format"), out YamlNode? format) &&
             format.ShouldBeOfType<YamlScalarNode>().Value == "date-time")
         {
             DateTimeOffset.TryParse(scalar, out DateTimeOffset timestamp).ShouldBeTrue(path);
             timestamp.Offset.ShouldBe(TimeSpan.Zero, path);
+        }
+
+        if (type == "string")
+        {
+            int length = scalar.EnumerateRunes().Count();
+            if (schema.Children.TryGetValue(new YamlScalarNode("minLength"), out YamlNode? minimumLength))
+            {
+                length.ShouldBeGreaterThanOrEqualTo(int.Parse(
+                    minimumLength.ShouldBeOfType<YamlScalarNode>().Value.ShouldNotBeNull(),
+                    System.Globalization.CultureInfo.InvariantCulture), path);
+            }
+
+            if (schema.Children.TryGetValue(new YamlScalarNode("maxLength"), out YamlNode? maximumLength))
+            {
+                length.ShouldBeLessThanOrEqualTo(int.Parse(
+                    maximumLength.ShouldBeOfType<YamlScalarNode>().Value.ShouldNotBeNull(),
+                    System.Globalization.CultureInfo.InvariantCulture), path);
+            }
         }
 
         if (schema.Children.TryGetValue(new YamlScalarNode("const"), out YamlNode? constant))

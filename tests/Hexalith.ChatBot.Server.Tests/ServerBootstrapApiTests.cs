@@ -930,6 +930,31 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task TypedFacadeShouldSubmitCamelCaseCommandAndReplayStableIdentityOverHttp()
+    {
+        RecordingDispatcher dispatcher = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<ICommandDispatcher>(dispatcher));
+        using HttpClient http = factory.CreateClient();
+        Hexalith.ChatBot.Client.ChatBotClient facade = new(new Hexalith.ChatBot.Client.Generated.Client(http));
+        const string commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
+        const string correlationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
+        Hexalith.ChatBot.Contracts.Commands.RecordGovernedNote command = new("note-1");
+
+        CommandSubmissionResponse first = await facade.SubmitWithCommandIdAsync(
+            command, commandId, correlationId, cancellationToken: TestContext.Current.CancellationToken);
+        CommandSubmissionResponse replay = await facade.SubmitWithCommandIdAsync(
+            command, commandId, correlationId, cancellationToken: TestContext.Current.CancellationToken);
+
+        first.CommandId.ShouldBe(commandId);
+        first.OperationId.ShouldBe(commandId);
+        replay.OperationId.ShouldBe(first.OperationId);
+        replay.CommandId.ShouldBe(first.CommandId);
+        dispatcher.DispatchCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task CommandEndpointShouldGenerateAndEchoMissingCorrelationHeader()
     {
         using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
@@ -949,8 +974,18 @@ public sealed class ServerBootstrapApiTests
         using JsonDocument accepted = JsonDocument.Parse(body);
         string correlationId = accepted.RootElement.GetProperty("correlationId").GetString().ShouldNotBeNull();
         correlationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        string commandId = accepted.RootElement.GetProperty("commandId").GetString().ShouldNotBeNull();
+        accepted.RootElement.GetProperty("operationId").GetString().ShouldBe(commandId);
         response.Headers.GetValues("X-Correlation-Id").Single().ShouldBe(correlationId);
         response.Headers.Contains("X-Hexalith-Task-Id").ShouldBeFalse();
+
+        using HttpRequestMessage statusRequest = new(HttpMethod.Get, $"/api/v1/operations/{commandId}");
+        using HttpResponseMessage statusResponse = await client.SendAsync(
+            statusRequest, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        statusResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using JsonDocument status = JsonDocument.Parse(await statusResponse.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true));
+        status.RootElement.GetProperty("operationId").GetString().ShouldBe(commandId);
     }
 
     [Fact]
@@ -1086,6 +1121,7 @@ public sealed class ServerBootstrapApiTests
     [InlineData("invalid-init-only-member")]
     [InlineData("nested-casing-override")]
     [InlineData("nested-object-casing-override")]
+    [InlineData("invalid-dictionary-enum-key")]
     public async Task CommandEndpointShouldRejectInvalidContractBeforeAdmissionWithVersionedSafeProblem(string scenario)
     {
         RecordingDispatcher dispatcher = new();
@@ -1116,6 +1152,7 @@ public sealed class ServerBootstrapApiTests
                 "\"proposalInputMetadata\":{\"source\":\"trusted\"}",
                 "\"proposalInputMetadata\":{\"source\":\"trusted\"},\"ProposalInputMetadata\":42",
                 StringComparison.Ordinal),
+            "invalid-dictionary-enum-key" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"SubmitTenantPolicyChange","command":{"policyChangeId":"change-1","sourcePolicySnapshotId":"source-1","proposedPolicySnapshotId":"next-1","sourceVersion":1,"changedKnobIds":["ai-action.low-risk-allowed"],"changeSet":{"values":[{"knobId":"ai-action.low-risk-allowed","aiActionLowRiskAllowed":{"invalid-action":true}}]},"reasonCode":"test","requesterRef":"actor-1","schemaVersion":"v1","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","oldValueFingerprint":"old","newValueFingerprint":"new"},"requestSchemaVersion":"v1"}""",
             _ => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"RecordGovernedNote","command":{"noteId":"note-1"},"requestSchemaVersion":"v1"}""",
         };
         using HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands")
@@ -1137,7 +1174,8 @@ public sealed class ServerBootstrapApiTests
         if (scenario is "wrong-metadata-type" or "malformed-specialized-body" or "command-type-suffix" or
             "command-type-pattern" or "command-type-too-long" or
             "invalid-specialized-enum" or "fractional-specialized-integer" or "unknown-origin" or
-            "null-scoring-signal" or "invalid-init-only-member" or "nested-casing-override" or "nested-object-casing-override")
+            "null-scoring-signal" or "invalid-init-only-member" or "nested-casing-override" or "nested-object-casing-override" or
+            "invalid-dictionary-enum-key")
         {
             root.GetProperty("correlationId").GetString().ShouldBe(commandId);
         }
