@@ -51,7 +51,20 @@ internal sealed class ConditionalDaprStateClient : DaprClient
         }
     }
 
-    public override JsonSerializerOptions JsonSerializerOptions { get; } = new();
+    /// <summary>
+    /// Gets the serializer options; defaults to the production options of the dedicated idempotency DAPR client so the
+    /// persisted bytes match what production writes.
+    /// </summary>
+    public override JsonSerializerOptions JsonSerializerOptions { get; } = CoarseIdempotencyStateJson.Options;
+
+    /// <summary>Returns the persisted JSON of a key, exactly as it crossed the byte boundary.</summary>
+    public string StoredJson(string key)
+    {
+        lock (_sync)
+        {
+            return System.Text.Encoding.UTF8.GetString(_records[key].Bytes);
+        }
+    }
 
     public override Task<(TValue value, string etag)> GetStateAndETagAsync<TValue>(
         string storeName,

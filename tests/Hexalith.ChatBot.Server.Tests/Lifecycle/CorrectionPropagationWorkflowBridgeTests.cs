@@ -130,6 +130,76 @@ public sealed class CorrectionPropagationWorkflowBridgeTests
     }
 
     [Theory]
+    [InlineData(null)]
+    [InlineData(CorrectionPropagationWorkflowFailureCodes.StoreUnavailable)]
+    public async Task RegisteredPendingStorePollShouldReportPendingUnlessTheStoreReportsAFailure(string? storeFailureCode)
+    {
+        RegisteredCorrectionWorkflowContext context = new() { PendingStoreCycles = true, PendingStoreFailureCode = storeFailureCode };
+        InMemoryOperationStatusStore statusStore = new();
+        const string operationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX";
+        const string correlationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
+        CommandSubmissionResponse accepted = new()
+        {
+            CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY", OperationId = operationId, CorrelationId = correlationId,
+            AcceptedAt = context.UtcNow, LifecycleState = LifecycleState.Correcting,
+        };
+        await statusStore.UpsertAsync(OperationStatusRecord.Accepted("tenant-alpha", accepted, false, context.UtcNow), TestContext.Current.CancellationToken);
+        ServiceCollection services = new();
+        services.AddLogging();
+        services.AddChatBotCorrectionPropagationWorkflow();
+        services.AddSingleton<ISystemClock>(context);
+        services.AddSingleton<IMemoriesCaseResolver>(context);
+        services.AddSingleton<IOperationStatusStore>(statusStore);
+        services.AddSingleton<ICorrectionPropagationWorkflowStatusSink, OperationStatusWorkflowStatusSink>();
+        using ServiceProvider provider = services.BuildServiceProvider();
+        context.Services = provider;
+        context.Factory = provider.GetRequiredService<IWorkflowsFactory>();
+        (provider.GetService<WorkflowRuntimeOptions>() ?? provider.GetRequiredService<IOptions<WorkflowRuntimeOptions>>().Value)
+            .ApplyRegistrations(context.Factory);
+        context.Factory.TryCreateWorkflow(new TaskIdentifier(nameof(CorrectionPropagationWorkflow)), provider, out var workflow, out Exception? failure)
+            .ShouldBeTrue(failure?.Message);
+        CorrectionPropagationRequest request = new(
+            "tenant-alpha", "actor-alpha", "01ARZ3NDEKTSV4RRFFQ69G5FAV", accepted.CommandId,
+            "correction-1", context.InstanceId, "project-001", "project-002", 3, correlationId,
+            context.UtcNow, context.UtcNow.AddMinutes(10), CorrectedCaseId: "case-corrected", OperationId: operationId);
+
+        Task<object?> running = workflow!.RunAsync(context, request);
+        await context.ScheduledStatus.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // A healthy pending poll is not a store outage: no failure is recorded and the reason is "pending".
+        string expectedReason = storeFailureCode ?? ChatBotMessageCodes.AssociationCorrectionPropagationPending;
+        context.Progress!.Status.ShouldBe(CorrectionPropagationWorkflowStatuses.Retrying);
+        context.Progress.LastFailureCode.ShouldBe(storeFailureCode ?? CorrectionPropagationWorkflowFailureCodes.None);
+        OperationStatusRecord projected = (await statusStore.TryGetAsync("tenant-alpha", operationId, TestContext.Current.CancellationToken))!;
+        projected.ReasonCode.ShouldBe(expectedReason);
+        projected.FailureReasonCode.ShouldBe(storeFailureCode);
+        projected.WorkflowLastFailureCode.ShouldBe(storeFailureCode);
+        projected.SafeNextActions.ShouldBe([ChatBotMessageCatalog.Resolve(expectedReason).NextAction]);
+        projected.NextRetryAt.ShouldBe(context.TimerDueAt);
+        JsonElement pending = await StatusAsync(statusStore, context, operationId, correlationId);
+        pending.GetProperty("reasonCode").GetString().ShouldBe(expectedReason);
+        if (storeFailureCode is null)
+        {
+            pending.TryGetProperty("failureReasonCode", out _).ShouldBeFalse("A healthy poll must not publish a failure cause.");
+            pending.TryGetProperty("workflowLastFailureCode", out _).ShouldBeFalse("A healthy poll must not publish a workflow failure.");
+        }
+        else
+        {
+            pending.GetProperty("failureReasonCode").GetString().ShouldBe(storeFailureCode);
+        }
+
+        context.UtcNow = context.TimerDueAt!.Value;
+        context.Timer.TrySetResult();
+        await context.SecondSchedule.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        context.UtcNow = context.TimerDueAt!.Value;
+        context.Timer.TrySetResult();
+        await context.ThirdStore.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        context.StoreCompletion.TrySetResult();
+        _ = await running.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        context.Progress!.Status.ShouldBe(CorrectionPropagationWorkflowStatuses.Completed);
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]

@@ -44,9 +44,14 @@ internal static class CommandGatewayServiceCollectionExtensions
     private static string Ipv4Loopback(string endpoint)
         => endpoint.Replace("localhost", "127.0.0.1", StringComparison.OrdinalIgnoreCase);
 
-    private static Dapr.Client.DaprClient BuildDaprClient()
+    private static Dapr.Client.DaprClient BuildDaprClient(System.Text.Json.JsonSerializerOptions? jsonSerializerOptions = null)
     {
         Dapr.Client.DaprClientBuilder builder = new();
+        if (jsonSerializerOptions is not null)
+        {
+            _ = builder.UseJsonSerializationOptions(jsonSerializerOptions);
+        }
+
         string? grpcEndpoint = Environment.GetEnvironmentVariable("DAPR_GRPC_ENDPOINT");
         string resolved = Ipv4Loopback(string.IsNullOrWhiteSpace(grpcEndpoint)
             ? $"http://127.0.0.1:{Environment.GetEnvironmentVariable("DAPR_GRPC_PORT") ?? "50001"}"
@@ -187,7 +192,17 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddScoped<IProjectDirectory, UnavailableProjectDirectory>()
             .AddScoped<IAssociationScoringOrchestrator, AssociationScoringOrchestrator>()
             .AddSingleton(static _ => BuildDaprClient())
-            .AddSingleton<IIdempotencyStore, DaprCoarseIdempotencyStore>()
+            // Coarse idempotency records embed generated enums; their dedicated DAPR client persists EnumMember wire
+            // values (integer tokens are still accepted, interpreted with the current generated numbering) while the
+            // shared client keeps the DAPR web defaults.
+            .AddKeyedSingleton(
+                CoarseIdempotencyStateJson.DaprClientKey,
+                static (_, _) => BuildDaprClient(CoarseIdempotencyStateJson.Options))
+            .AddSingleton<IIdempotencyStore>(static services => new DaprCoarseIdempotencyStore(
+                services.GetRequiredKeyedService<Dapr.Client.DaprClient>(CoarseIdempotencyStateJson.DaprClientKey),
+                services.GetRequiredService<ISystemClock>(),
+                services.GetRequiredService<IAuditHistoryReader>(),
+                services.GetRequiredService<Hexalith.EventStore.Client.Gateway.IEventStoreGatewayClient>()))
             .AddSingleton<InMemoryAuditWriter>()
             // Story 9.1 (NFR49a): the WORM hash-chain store sits behind the post-commit audit seam via the
             // ChainedAuditWriter decorator (fail-open-then-reconcile). The in-process append-only store is the M0

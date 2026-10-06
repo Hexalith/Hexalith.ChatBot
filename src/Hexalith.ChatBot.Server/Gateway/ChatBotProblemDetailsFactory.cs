@@ -12,6 +12,7 @@ internal sealed class ChatBotProblemDetailsFactory(
     public ProblemDetails CreateValidationProblem(string correlationId, string? taskId)
     {
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.CommandContractInvalid);
+
         return redactionStage.Apply(new ProblemDetails
         {
             Type = ChatBotProblemTypes.ValidationFailure,
@@ -26,6 +27,7 @@ internal sealed class ChatBotProblemDetailsFactory(
             ClientAction = ClientAction(entry.NextAction),
         });
     }
+
     public ProblemDetails CreateAuthorizationProblem(string reasonCode, string correlationId, string? taskId)
     {
         string catalogCode = AuthorizationCatalogCode(reasonCode);

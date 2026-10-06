@@ -951,20 +951,24 @@ public sealed class LiveContinuityAspireE2eTests
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The admission proof is the emitted problem <c>type</c>, not a status class. Requiring <c>400</c>/<c>422</c>
-    /// was unsatisfiable for every possible input: <see cref="ChatBotProblemDetailsFactory"/> emits only
-    /// <c>401</c>, <c>403</c>, <c>409</c> and <c>503</c>, and the deliberately invalid <c>IntakeId</c> below is
-    /// rejected inside <c>AcceptedCommandDispatcher.BuildPlanAsync</c>, whose
-    /// <see cref="InvalidOperationException"/> <c>CommandGateway</c> classifies as a transient dispatch outage.
-    /// The lane therefore retried a permanent, correct-by-design <c>503</c> until its startup budget expired.
+    /// The admission proof is the emitted problem <c>type</c>, not a status class. For an admitted bearer the
+    /// deliberately invalid <c>IntakeId</c> of <see cref="MailboxAdmissionProbeBody"/> is rejected inside
+    /// <c>AcceptedCommandDispatcher.BuildPlanAsync</c>, before any external write, and <c>CommandGateway</c> answers
+    /// the safe <c>503</c> <c>dispatch-unavailable</c> problem; no post-admission <c>400</c>/<c>422</c> exists.
     /// </para>
     /// <para>
     /// <c>dispatch-unavailable</c> is emitted from exactly one place — the <c>catch</c> around
     /// <c>dispatcher.DispatchAsync</c>, which is reachable only after <c>admissionDecision.IsAccepted</c> — so it is
     /// categorical proof that the bearer cleared authentication, authorization, tenant binding and the service-client
-    /// grant. That is a strictly more specific assertion than "the status was 400 or 422", and unlike it, reachable.
-    /// A credential rejection (<c>401</c>/<c>403</c>) and the pre-commit <c>audit-unavailable</c> denial are
+    /// grant. A credential rejection (<c>401</c>/<c>403</c>) and the pre-commit <c>audit-unavailable</c> denial are
     /// deliberately NOT accepted: both are emitted before or instead of admission acceptance.
+    /// </para>
+    /// <para>
+    /// A <c>400</c>/<c>422</c> is never admission proof. The OpenAPI request contract is validated BEFORE
+    /// authentication, so a contract-invalid body answers the versioned <c>400</c> whatever the bearer — the former
+    /// probe body (an incomplete mailbox source) passed with any token for exactly that reason. The probe therefore
+    /// sends <see cref="MailboxAdmissionProbeBody"/>, which satisfies the published contract and is invalid only after
+    /// admission. <c>ServerBootstrapApiTests</c> pins this validation/authentication/admission order in-process.
     /// </para>
     /// </remarks>
     private static async Task AssertMailboxTokenAdmissionAsync(
@@ -974,10 +978,9 @@ public sealed class LiveContinuityAspireE2eTests
         CancellationToken cancellationToken)
     {
         using HttpClient client = application.CreateHttpClient("chatbot");
-        // Deliberately invalid after admission: IntakeId is not a ULID. Auth must pass; the command must not Accepted.
-        string body = $$"""
-            {"commandId":"{{ChatBotCommandId.New().Value}}","commandType":"CaptureMailboxMessageIntake","command":{"intakeId":"not-a-ulid","source":{"providerMessageId":"probe","mailboxId":"probe","receivedAtUtc":"2026-08-01T00:00:00Z"},"recipients":[],"attachments":[]},"origin":"mailbox","requestSchemaVersion":"v1"}
-            """;
+        // Contract-valid but deliberately invalid after admission: IntakeId is not a ULID. Auth must pass; the command
+        // must not be Accepted.
+        string body = MailboxAdmissionProbeBody(ChatBotCommandId.New().Value);
         HttpStatusCode? lastStatus = null;
         // The probe used to report only the status code, so a persistent 503 could not be told apart from a slow
         // start and never named its own reason code. ChatBot answers this path with a redacted ProblemDetails whose
@@ -997,12 +1000,6 @@ public sealed class LiveContinuityAspireE2eTests
                 request.Headers.Add("X-Correlation-Id", ChatBotCorrelationId.New().Value);
                 using HttpResponseMessage response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
-                // Decision 3 option 1: only post-admission validation failures prove admission without enqueueing work.
-                if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity)
-                {
-                    return;
-                }
-
                 // Resource Healthy means the adapter endpoint is serving, not that the EventStore/DAPR command spine
                 // behind admission has finished warming up. That path intentionally returns 503 until it is ready,
                 // matching the ordinary Tier-3 acceptance test's first-command retry discipline.
@@ -1014,8 +1011,8 @@ public sealed class LiveContinuityAspireE2eTests
                     ? problemDetails[..512]
                     : problemDetails;
 
-                // The other reachable post-admission outcome (see the remarks above): only the accepted branch of
-                // CommandGateway can emit this type, so observing it proves the bearer was admitted.
+                // The only admission proof (see the remarks above): only the accepted branch of CommandGateway can
+                // emit this type, so observing it proves the bearer was admitted.
                 if (ProvesMailboxAdmission(response.StatusCode, problemDetails))
                 {
                     return;
@@ -1116,19 +1113,31 @@ public sealed class LiveContinuityAspireE2eTests
             or HttpStatusCode.InsufficientStorage;
 
     /// <summary>
-    /// Companion to <see cref="AssertMailboxTokenAdmissionAsync"/>: proves the auth-before-validation pipeline
-    /// ordering that probe's own <c>400</c>/<c>422</c> expectation depends on, by sending the identical
-    /// post-admission-invalid payload with no bearer at all and requiring the auth boundary — not the same
-    /// validation failure — to reject it first.
+    /// The contract-valid mailbox admission probe body: every published <c>CaptureMailboxMessageIntake</c> member is
+    /// present with its declared type, so the request passes the OpenAPI boundary and reaches authentication, while the
+    /// intake identity is deliberately not a ULID so an admitted request fails in dispatch planning before any write.
+    /// The provider message identity embeds the command ID so a probe never shares its mailbox-intake deduplication
+    /// key with an earlier run against the same persistent state store.
+    /// </summary>
+    /// <param name="commandId">The caller-stable command identifier.</param>
+    /// <returns>The JSON request body.</returns>
+    internal static string MailboxAdmissionProbeBody(string commandId)
+        => $$"""
+            {"commandId":"{{commandId}}","commandType":"CaptureMailboxMessageIntake","command":{"intakeId":"not-a-ulid","source":{"providerMessageId":"recovery-admission-probe-{{commandId}}","internetMessageId":"<recovery-admission-probe-{{commandId}}@example.test>","conversationId":"recovery-admission-probe-{{commandId}}","threadId":null,"mailboxId":"recovery-admission-probe","sender":{"address":"probe@example.test","displayName":null},"receivedAt":"2026-08-01T00:00:00Z","sentAt":null,"createdAt":null,"sourceTimezone":null,"sourceContext":"mailbox:metadata","sourceSchemaVersion":1},"recipients":[],"attachments":[]},"origin":"mailbox","requestSchemaVersion":"v1"}
+            """;
+
+    /// <summary>
+    /// Companion to <see cref="AssertMailboxTokenAdmissionAsync"/>: proves an invalid bearer is rejected at the
+    /// authentication boundary, before admission, by sending the identical contract-valid probe body with a forged
+    /// bearer and requiring <c>401</c>. A contract-invalid body would answer the validation <c>400</c> first and prove
+    /// nothing about authentication.
     /// </summary>
     private static async Task AssertInvalidMailboxBearerIsRejectedBeforeAdmissionAsync(
         DistributedApplication application,
         CancellationToken cancellationToken)
     {
         using HttpClient client = application.CreateHttpClient("chatbot");
-        string body = $$"""
-            {"commandId":"{{ChatBotCommandId.New().Value}}","commandType":"CaptureMailboxMessageIntake","command":{"intakeId":"not-a-ulid","source":{"providerMessageId":"probe","mailboxId":"probe","receivedAtUtc":"2026-08-01T00:00:00Z"},"recipients":[],"attachments":[]},"origin":"mailbox","requestSchemaVersion":"v1"}
-            """;
+        string body = MailboxAdmissionProbeBody(ChatBotCommandId.New().Value);
         using HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands")
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),
@@ -1140,8 +1149,8 @@ public sealed class LiveContinuityAspireE2eTests
         if (response.StatusCode != HttpStatusCode.Unauthorized)
         {
             throw new InvalidOperationException(
-                $"An invalid mailbox bearer returned {(int)response.StatusCode} instead of 401 — the sibling admission " +
-                "probe's 400/422 expectation would not prove auth ran first.");
+                $"An invalid mailbox bearer returned {(int)response.StatusCode} instead of 401 for a contract-valid body — " +
+                "the authentication boundary did not reject it before admission.");
         }
     }
 

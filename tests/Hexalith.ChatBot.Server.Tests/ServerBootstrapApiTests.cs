@@ -729,6 +729,31 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public void ServerHostShouldRegisterDurableIdempotencyStoreWithItsRecoveryInputs()
+    {
+        using WebApplicationFactory<Program> factory = new();
+        IServiceProvider services = factory.Services;
+
+        IIdempotencyStore registered = services.GetRequiredService<IIdempotencyStore>();
+        DaprCoarseIdempotencyStore store = registered.ShouldBeOfType<DaprCoarseIdempotencyStore>();
+        services.GetRequiredService<IIdempotencyStore>().ShouldBeSameAs(store);
+
+        // Durable recovery needs both the retained audit history and authoritative EventStore command status.
+        store.AuditHistory.ShouldNotBeNull().ShouldBeSameAs(services.GetRequiredService<IAuditHistoryReader>());
+        store.EventStore.ShouldNotBeNull().ShouldBeOfType<EventStoreGatewayClient>();
+
+        // The store persists through its dedicated DAPR client: EnumMember wire values for generated enums, while
+        // the shared host client keeps the DAPR web defaults the EventStore read-model batch seam depends on.
+        Dapr.Client.DaprClient idempotencyClient = store.StateClient.ShouldBeOfType<DaprCoarseIdempotencyStateClient>().Client;
+        idempotencyClient.ShouldBeSameAs(services.GetRequiredKeyedService<Dapr.Client.DaprClient>(CoarseIdempotencyStateJson.DaprClientKey));
+        idempotencyClient.JsonSerializerOptions.ShouldBeSameAs(CoarseIdempotencyStateJson.Options);
+        idempotencyClient.JsonSerializerOptions.Converters.ShouldContain(static converter => converter is EnumMemberWireValueJsonConverterFactory);
+        Dapr.Client.DaprClient shared = services.GetRequiredService<Dapr.Client.DaprClient>();
+        shared.ShouldNotBeSameAs(idempotencyClient);
+        shared.JsonSerializerOptions.Converters.ShouldNotContain(static converter => converter is EnumMemberWireValueJsonConverterFactory);
+    }
+
+    [Fact]
     public async Task ChatBotCompatibilityHealthEndpointShouldReturnHealthyStatus()
     {
         using WebApplicationFactory<Program> factory = new();
@@ -877,6 +902,52 @@ public sealed class ServerBootstrapApiTests
         root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe("metadata_only");
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
         body.ShouldNotContain("restricted-project-sentinel", Case.Insensitive);
+    }
+
+    /// <summary>
+    /// Pins the boundary order the live Tier-3 mailbox-bearer probes rely on: the published request contract is
+    /// validated before authentication (so a contract-invalid body answers the versioned 400 whatever the bearer), a
+    /// contract-valid body is rejected at the authentication boundary (401) without credentials, and the same body with
+    /// an admitted principal reaches dispatch, whose deliberately invalid intake identity yields dispatch-unavailable —
+    /// the only response that proves admission. A 400 therefore never proves a bearer was admitted.
+    /// </summary>
+    [Fact]
+    public async Task CommandEndpointShouldValidateContractBeforeAuthenticationAndAuthenticateBeforeAdmission()
+    {
+        const string commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
+
+        using WebApplicationFactory<Program> anonymousFactory = new();
+        using HttpClient anonymous = anonymousFactory.CreateClient();
+        using HttpResponseMessage incomplete = await anonymous
+            .SendAsync(MailboxAdmissionProbeRequest(IncompleteMailboxAdmissionProbeBody(commandId)), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        incomplete.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        using (JsonDocument problem = JsonDocument.Parse(await incomplete.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true)))
+        {
+            problem.RootElement.GetProperty("type").GetString().ShouldBe(ChatBotProblemTypes.ValidationFailure);
+            problem.RootElement.GetProperty("code").GetString().ShouldBe("command_contract_invalid");
+        }
+
+        using HttpResponseMessage unauthenticated = await anonymous
+            .SendAsync(MailboxAdmissionProbeRequest(MailboxAdmissionProbeBody(commandId)), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        unauthenticated.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        using (JsonDocument problem = JsonDocument.Parse(await unauthenticated.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true)))
+        {
+            problem.RootElement.GetProperty("type").GetString().ShouldBe(ChatBotProblemTypes.AuthorizationDenied);
+            problem.RootElement.GetProperty("code").GetString().ShouldBe("authentication_denied");
+        }
+
+        using WebApplicationFactory<Program> admittedFactory = AuthenticatedFactory("tenant-alpha");
+        using HttpClient admitted = admittedFactory.CreateClient();
+        using HttpResponseMessage dispatchUnavailable = await admitted
+            .SendAsync(MailboxAdmissionProbeRequest(MailboxAdmissionProbeBody(commandId)), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        dispatchUnavailable.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        using (JsonDocument problem = JsonDocument.Parse(await dispatchUnavailable.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true)))
+        {
+            problem.RootElement.GetProperty("type").GetString().ShouldBe(ChatBotProblemTypes.DispatchUnavailable);
+        }
     }
 
     [Fact]
@@ -3416,6 +3487,33 @@ public sealed class ServerBootstrapApiTests
         request.Headers.Add("X-Hexalith-Task-Id", taskId);
         request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
 
+        return request;
+    }
+
+    /// <summary>
+    /// The contract-valid mailbox admission probe body used by the live Tier-3 lane: every published member is present
+    /// with its declared type, while the intake identity is deliberately not a ULID so an admitted request fails in
+    /// dispatch planning before any external write.
+    /// </summary>
+    private static string MailboxAdmissionProbeBody(string commandId)
+        => $$"""
+            {"commandId":"{{commandId}}","commandType":"CaptureMailboxMessageIntake","command":{"intakeId":"not-a-ulid","source":{"providerMessageId":"recovery-admission-probe-{{commandId}}","internetMessageId":"<recovery-admission-probe-{{commandId}}@example.test>","conversationId":"recovery-admission-probe-{{commandId}}","threadId":null,"mailboxId":"recovery-admission-probe","sender":{"address":"probe@example.test","displayName":null},"receivedAt":"2026-08-01T00:00:00Z","sentAt":null,"createdAt":null,"sourceTimezone":null,"sourceContext":"mailbox:metadata","sourceSchemaVersion":1},"recipients":[],"attachments":[]},"origin":"mailbox","requestSchemaVersion":"v1"}
+            """;
+
+    /// <summary>The former live probe body: its source identity misses required members, so it never passes the contract.</summary>
+    private static string IncompleteMailboxAdmissionProbeBody(string commandId)
+        => $$"""
+            {"commandId":"{{commandId}}","commandType":"CaptureMailboxMessageIntake","command":{"intakeId":"not-a-ulid","source":{"providerMessageId":"probe","mailboxId":"probe","receivedAtUtc":"2026-08-01T00:00:00Z"},"recipients":[],"attachments":[]},"origin":"mailbox","requestSchemaVersion":"v1"}
+            """;
+
+    private static HttpRequestMessage MailboxAdmissionProbeRequest(string body)
+    {
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands")
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "not-a-real-token");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
         return request;
     }
 

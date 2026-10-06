@@ -8,17 +8,24 @@ internal sealed class UncertainExternalWriters : IConversationWriter, IOutboundM
 {
     public int Attempts { get; private set; }
 
+    /// <summary>Gets a value indicating whether writes are acknowledged as committed instead of losing their acknowledgement.</summary>
+    public bool AcknowledgeWrites { get; init; }
+
     public ValueTask<ConversationAppendResult> PrepareAppendConversationMessageAsync(
         ApprovedAiConversationAppendRequest request, CancellationToken cancellationToken)
     {
         Attempts++;
-        throw new IOException("Injected uncertain conversation write.");
+        return AcknowledgeWrites
+            ? ValueTask.FromResult(new ConversationAppendResult("appended", "committed", "metadata_only", "none"))
+            : throw new IOException("Injected uncertain conversation write.");
     }
 
     public ValueTask<OutboundMailboxSendResult> SendAsync(OutboundMailboxSendRequest request,
         CancellationToken cancellationToken = default)
     {
         Attempts++;
-        throw new IOException("Injected uncertain mailbox write.");
+        return AcknowledgeWrites
+            ? ValueTask.FromResult(OutboundMailboxSendResult.Sent("adapter:mailbox-outbound:sent"))
+            : throw new IOException("Injected uncertain mailbox write.");
     }
 }

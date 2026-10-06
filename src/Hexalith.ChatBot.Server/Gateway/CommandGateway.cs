@@ -131,12 +131,14 @@ internal sealed class CommandGateway(
         {
             // Preparation has not returned to dispatch. Even an acknowledgement lost to
             // cancellation can be released using its exact prepared response and owner.
-            await AbortUndispatchedAfterCancellationAsync(idempotency, response).ConfigureAwait(false);
+            await AbortUndispatchedIndependentlyAsync(idempotency, response).ConfigureAwait(false);
             throw;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            await AbortSafelyAsync(idempotency, cancellationToken).ConfigureAwait(false);
+            // Preparation never returned to dispatch, so even a committed-then-lost preparation write is proven
+            // undispatched: retry the exact-prepared release when the store's own fence could not be persisted.
+            await AbortUndispatchedIndependentlyAsync(idempotency, response).ConfigureAwait(false);
             return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateDependencyUnavailable(submission.CorrelationId, submission.TaskId));
         }
 
@@ -150,25 +152,23 @@ internal sealed class CommandGateway(
         {
             if (!context.ExternalEffectAttempted)
             {
-                await AbortUndispatchedAfterCancellationAsync(idempotency, response).ConfigureAwait(false);
+                await AbortUndispatchedIndependentlyAsync(idempotency, response).ConfigureAwait(false);
             }
             throw;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            if (ex is CommandNotSubmittedException)
+            if (ex is CommandNotSubmittedException or CommandDefinitivelyRefusedException)
             {
-                try
-                {
-                    await idempotencyStore.AbortUndispatchedAsync(idempotency, response, cancellationToken).ConfigureAwait(false);
-                }
-                catch (Exception cleanupFailure) when (cleanupFailure is not OperationCanceledException)
-                {
-                    // A persisted abort fence permits later cleanup; an unavailable fence stays fail-closed.
-                }
+                // Either no external write was attempted, or EventStore definitively refused the only one: release
+                // the exact prepared ownership so a retry can dispatch again under EventStore message-ID dedupe. The
+                // release uses a bounded independent token so caller cancellation cannot strand proven-undispatched
+                // ownership in Dispatching.
+                await AbortUndispatchedIndependentlyAsync(idempotency, response).ConfigureAwait(false);
             }
             else
             {
+                // A possibly committed external write keeps its fenced ownership until authoritative recovery.
                 await AbortSafelyAsync(idempotency, cancellationToken).ConfigureAwait(false);
             }
             AuditEnvelope preCommitEnvelope = AuditEnvelopeFactory.PreCommit(context, transition, clock.UtcNow);
@@ -257,7 +257,10 @@ internal sealed class CommandGateway(
         return ChatBotGatewayResult.AcceptedResult(response, !postCommitAudit.Succeeded);
     }
 
-    private async ValueTask AbortUndispatchedAfterCancellationAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse prepared)
+    /// <summary>
+    /// Releases exact prepared ownership proven not to have committed, using a bounded token independent of the caller.
+    /// </summary>
+    private async ValueTask AbortUndispatchedIndependentlyAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse prepared)
     {
         using CancellationTokenSource cleanup = new(TimeSpan.FromSeconds(5));
         try
@@ -266,7 +269,7 @@ internal sealed class CommandGateway(
         }
         catch (Exception)
         {
-            // Cleanup cannot replace the caller's cancellation. A persisted abort fence
+            // Cleanup cannot replace the caller's outcome. A persisted abort fence
             // is recoverable; an unavailable fence conservatively retains ownership.
         }
     }

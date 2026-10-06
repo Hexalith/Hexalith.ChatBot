@@ -14,10 +14,14 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway;
 public sealed partial class CommandGatewayTests
 {
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task LostPreparationAcknowledgementShouldAbortOnlyWithAPersistedMatchingFenceBeforeDispatch(bool abortFenceUnavailable)
+    [InlineData("available")]
+    [InlineData("transient")]
+    [InlineData("persistent")]
+    public async Task LostPreparationAcknowledgementShouldAbortOnlyWithAPersistedMatchingFenceBeforeDispatch(string abortFence)
     {
+        // "transient": the store's own in-preparation fence fails once and the gateway's exact-prepared release then
+        // persists it. "persistent": every abort fence write fails, so ownership stays conservatively retained.
+        bool abortFenceUnavailable = abortFence == "persistent";
         FakeCoarseIdempotencyStateClient state = new();
         RecordingDispatcher originalDispatcher = new();
         RecordingAuditWriter audit = new()
@@ -27,7 +31,12 @@ public sealed partial class CommandGatewayTests
             OnPreCommit = () =>
             {
                 state.ThrowAfterIdentityClaimSave = true;
-                state.RejectAbortFenceSaves = abortFenceUnavailable ? 1 : 0;
+                state.RejectAbortFenceSaves = abortFence switch
+                {
+                    "transient" => 1,
+                    "persistent" => 100,
+                    _ => 0,
+                };
             },
         };
         ChatBotCommandSubmission original = Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "before"));

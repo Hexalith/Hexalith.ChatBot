@@ -125,15 +125,27 @@ public static class ClientGenerationTests
         RecordingTransportClient transport = new();
         ChatBotClient client = new(transport);
         const string commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+        const string correlationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
         using CancellationTokenSource source = new();
+        using CancellationTokenSource retrySource = new();
+
         await client.SubmitWithCommandIdAsync(new StartConversationIntake(), commandId,
-            correlationId: "01ARZ3NDEKTSV4RRFFQ69G5FAW", cancellationToken: source.Token).ConfigureAwait(true);
+            correlationId: correlationId, cancellationToken: source.Token).ConfigureAwait(true);
         transport.LastBody.ShouldNotBeNull().CommandId.ShouldBe(commandId);
+        transport.LastCorrelationId.ShouldBe(correlationId);
+        transport.LastCancellationToken.ShouldBe(source.Token);
+
+        // The retry reuses the same stable identity and correlation while honouring its own cancellation.
         await client.SubmitWithCommandIdAsync(new StartConversationIntake(), commandId,
-            correlationId: "01ARZ3NDEKTSV4RRFFQ69G5FAW", cancellationToken: source.Token).ConfigureAwait(true);
+            correlationId: correlationId, cancellationToken: retrySource.Token).ConfigureAwait(true);
         transport.LastBody.ShouldNotBeNull().CommandId.ShouldBe(commandId);
-        Should.Throw<ArgumentException>(() => client.SubmitWithCommandIdAsync(new StartConversationIntake(), "invalid"));
+        transport.LastCorrelationId.ShouldBe(correlationId);
+        transport.LastCancellationToken.ShouldBe(retrySource.Token);
+
+        Should.Throw<ArgumentException>(() => client.SubmitWithCommandIdAsync(new StartConversationIntake(), "invalid",
+            correlationId: correlationId, cancellationToken: source.Token));
         transport.LastBody.ShouldNotBeNull().CommandId.ShouldBe(commandId);
+        transport.LastCancellationToken.ShouldBe(retrySource.Token);
     }
 
     [Fact]
@@ -949,6 +961,8 @@ public static class ClientGenerationTests
 
         public CommandSubmissionRequest? LastBody { get; private set; }
 
+        public CancellationToken LastCancellationToken { get; private set; }
+
         public Task<CommandSubmissionResponse> SubmitCommandAsync(string? x_Correlation_Id, string? x_Hexalith_Task_Id, CommandSubmissionRequest body)
             => SubmitCommandAsync(x_Correlation_Id, x_Hexalith_Task_Id, body, CancellationToken.None);
 
@@ -957,6 +971,7 @@ public static class ClientGenerationTests
             LastCorrelationId = x_Correlation_Id;
             LastTaskId = x_Hexalith_Task_Id;
             LastBody = body;
+            LastCancellationToken = cancellationToken;
 
             return Task.FromResult(new CommandSubmissionResponse
             {

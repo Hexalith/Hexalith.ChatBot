@@ -42,8 +42,10 @@ internal static class CorrectionPropagationWorkflowRunner
                 remoteOperationId = result.RemoteOperationId;
                 if (result.IsPending)
                 {
+                    // A healthy pending poll carries no failure: report it as propagation pending, not as a
+                    // store outage. Only an explicit store failure code reaches the status sink as a failure.
                     await WaitForRetryAsync(resolvedInput, steps, 0,
-                        result.FailureReasonCode ?? CorrectionPropagationWorkflowFailureCodes.StoreUnavailable,
+                        result.FailureReasonCode ?? CorrectionPropagationWorkflowFailureCodes.None,
                         results.Count).ConfigureAwait(true);
                 }
             }

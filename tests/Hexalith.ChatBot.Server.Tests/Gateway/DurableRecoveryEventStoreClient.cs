@@ -14,9 +14,15 @@ internal sealed class DurableRecoveryEventStoreClient : IEventStoreGatewayClient
 
     public int SubmissionCount { get; private set; }
 
+    /// <summary>Gets the message identifier of every submission, in order.</summary>
+    public List<string> SubmittedMessageIds { get; } = [];
+
     public bool SubmissionUncertain { get; init; }
 
     public CancellationTokenSource? CancelOnSubmission { get; init; }
+
+    /// <summary>Gets or sets a failure EventStore returns for every submission while set (for example a refusal).</summary>
+    public Exception? SubmissionFailure { get; set; }
 
     public Task<CommandStatusQueryResponse?> GetCommandStatusAsync(string messageId, CancellationToken cancellationToken = default)
         => Unavailable ? throw new HttpRequestException("Injected platform outage.") : Task.FromResult(Evidence);
@@ -24,7 +30,13 @@ internal sealed class DurableRecoveryEventStoreClient : IEventStoreGatewayClient
     public Task<SubmitCommandResponse> SubmitCommandAsync(SubmitCommandRequest request, CancellationToken cancellationToken = default)
     {
         SubmissionCount++;
+        SubmittedMessageIds.Add(request.MessageId);
         CancelOnSubmission?.Cancel();
+        if (SubmissionFailure is { } failure)
+        {
+            throw failure;
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
         return SubmissionUncertain ? throw new InvalidOperationException("Injected uncertain platform acknowledgement.")
             : Task.FromResult(new SubmitCommandResponse(request.CorrelationId!, MessageId: request.MessageId));

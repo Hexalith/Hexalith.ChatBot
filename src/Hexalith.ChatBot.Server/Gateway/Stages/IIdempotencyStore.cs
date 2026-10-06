@@ -21,7 +21,10 @@ internal interface IIdempotencyStore
 
     ValueTask AbortAdmissionAsync(CoarseIdempotencyMetadata metadata, CancellationToken cancellationToken);
 
-    /// <summary>Fences matching prepared ownership after dispatch proves no external write was attempted.</summary>
+    /// <summary>
+    /// Fences matching prepared ownership after dispatch proves nothing committed: no external write was attempted, or
+    /// EventStore definitively refused the only one.
+    /// </summary>
     ValueTask AbortUndispatchedAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse preparedOutcome,
         CancellationToken cancellationToken) => AbortAdmissionAsync(metadata, cancellationToken);
 }

@@ -129,7 +129,21 @@ public static class ContractSpineOracleTests
 
         YamlMappingNode extension = Mapping(operation, "x-hexalith-command-submission");
         JsonElement adapterInputShape = oracle.RootElement.GetProperty("adapterInputShape");
-        Scalar(extension, "adapterContract").ShouldBe(adapterInputShape.GetProperty("adapterContract").GetString());
+        string[] adapterContract = Sequence(extension, "adapterContract").Children.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull()).ToArray();
+        adapterContract.ShouldBe(
+            adapterInputShape.GetProperty("adapterContract").EnumerateArray().Select(static item => item.GetString().ShouldNotBeNull()).ToArray(),
+            ignoreOrder: false);
+
+        // Every published adapter entry point must name a real typed-facade submission method (and every facade
+        // submission method must be published), so adding or renaming one without updating the spine fails here.
+        string[] facadeSubmissionMethods = typeof(Hexalith.ChatBot.Client.IChatBotClient).GetMethods()
+            .Where(static method => method.Name.StartsWith("Submit", StringComparison.Ordinal))
+            .Select(static method => $"IChatBotClient.{method.Name}")
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        adapterContract.Order(StringComparer.Ordinal).ToArray().ShouldBe(facadeSubmissionMethods);
         Scalar(extension, "commandMarker").ShouldBe(adapterInputShape.GetProperty("commandMarker").GetString());
 
         YamlMappingNode requestSchema = Mapping(Mapping(Mapping(root, "components"), "schemas"), adapterInputShape.GetProperty("requestSchema").GetString().ShouldNotBeNull());

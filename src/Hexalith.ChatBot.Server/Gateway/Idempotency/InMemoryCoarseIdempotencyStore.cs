@@ -172,7 +172,10 @@ internal sealed class InMemoryCoarseIdempotencyStore(ISystemClock clock) : IIdem
     public ValueTask AbortAdmissionAsync(CoarseIdempotencyMetadata metadata, CancellationToken cancellationToken)
         => AbortCore(metadata, null);
 
-    /// <summary>Releases only the exact prepared response after dispatch proves no external write was attempted.</summary>
+    /// <summary>
+    /// Releases only the exact prepared response after dispatch proves nothing committed (no external write was
+    /// attempted, or EventStore definitively refused the only one).
+    /// </summary>
     public ValueTask AbortUndispatchedAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse preparedOutcome,
         CancellationToken cancellationToken) => AbortCore(metadata, preparedOutcome);
 

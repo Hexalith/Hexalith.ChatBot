@@ -96,8 +96,18 @@ internal sealed class AcceptedCommandDispatcher(
                 CorrelationId: context.Submission.CorrelationId,
                 Extensions: BuildExtensions(context, plan));
 
+            // Planning can already have invoked a conversation or mailbox writer. Only when EventStore is the sole
+            // external write attempted can its definitive refusal prove that nothing committed.
+            bool writerAttemptedBeforeSubmission = context.ExternalEffectAttempted;
             context.MarkExternalEffectAttempted();
-            _ = await eventStore.SubmitCommandAsync(request, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                _ = await eventStore.SubmitCommandAsync(request, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception refusal) when (!writerAttemptedBeforeSubmission && EventStoreDefinitiveRefusal.IsDefinitive(refusal))
+            {
+                throw new CommandDefinitivelyRefusedException(refusal);
+            }
 
             if (plan.CorrectionPropagation is not null && correctionPropagation?.IsReady is true)
             {

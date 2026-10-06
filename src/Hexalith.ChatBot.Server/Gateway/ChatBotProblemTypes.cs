@@ -10,7 +10,9 @@ namespace Hexalith.ChatBot.Server.Gateway;
 /// </remarks>
 internal static class ChatBotProblemTypes
 {
+    /// <summary>The request did not match the published OpenAPI command-submission contract.</summary>
     public const string ValidationFailure = "https://hexalith.dev/errors/chatbot/validation-failure";
+
     /// <summary>Authorization or authentication was denied.</summary>
     public const string AuthorizationDenied = "https://hexalith.dev/errors/chatbot/authorization-denied";
 

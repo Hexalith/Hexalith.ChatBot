@@ -51,7 +51,9 @@ internal static class AuditEnvelopeFactory
         [
             .. envelope.SourceEvidenceRefs,
             $"operation:{context.Submission.TaskId ?? context.Submission.Request.CommandId}",
-            $"accepted-at:{dispatchResult.AcceptedAt.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture)}",
+            // A Z-suffixed UTC round-trip token keeps the evidence inside the safe-token charset ('+' is not allowed),
+            // so compliance detail retains it; the recovery parser accepts both the Z and +00:00 spellings.
+            $"accepted-at:{dispatchResult.AcceptedAt.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture)}",
         ];
         if (context.Idempotency?.IdentityKeyHash is { } identityKey)
         {

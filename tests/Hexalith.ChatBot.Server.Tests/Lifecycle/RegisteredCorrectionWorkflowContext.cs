@@ -30,6 +30,7 @@ internal sealed class RegisteredCorrectionWorkflowContext : WorkflowContext, ISy
     public bool FailScheduledPublication { get; init; }
     public bool FailActivePublication { get; init; }
     public bool PendingStoreCycles { get; init; }
+    public string? PendingStoreFailureCode { get; init; } = CorrectionPropagationWorkflowFailureCodes.StoreUnavailable;
     public bool FailLaterScheduledPublication { get; init; }
     public TaskCompletionSource SecondSchedule { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public TaskCompletionSource ThirdStore { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -87,7 +88,7 @@ internal sealed class RegisteredCorrectionWorkflowContext : WorkflowContext, ISy
             if (_storeCalls <= 2)
             {
                 return (T)(object)new CorrectionPropagationActivityResult(store.StoreKey, "awaiting-completion",
-                    CorrectionPropagationWorkflowFailureCodes.StoreUnavailable, UtcNow, "remote-operation");
+                    PendingStoreFailureCode, UtcNow, "remote-operation");
             }
             ThirdStore.TrySetResult();
             await StoreCompletion.Task.ConfigureAwait(false);

@@ -66,5 +66,14 @@ public sealed partial class CommandGatewayTests
             .RecordAdmissionAsync(context, TestContext.Current.CancellationToken);
         replay.Kind.ShouldBe(CoarseIdempotencyDecisionKind.ReplayPriorOutcome);
         AssertPreparedOutcome(replay.PriorOutcome!, prepared);
+
+        // Generated enums are persisted as their stable wire values, never as generation-dependent ordinals.
+        using System.Text.Json.JsonDocument persisted = System.Text.Json.JsonDocument.Parse(backend.StoredJson(owner.Metadata.IdentityKeyHash!));
+        System.Text.Json.JsonElement priorOutcome = persisted.RootElement.GetProperty("priorOutcome");
+        priorOutcome.GetProperty("reasonCode").GetString().ShouldBe("command_accepted");
+        priorOutcome.GetProperty("lifecycleState").GetString().ShouldBe(prepared.LifecycleState.ToString());
+        System.Text.Json.JsonElement dispatchState = persisted.RootElement.GetProperty("domainReservation").GetProperty("dispatchState");
+        dispatchState.ValueKind.ShouldBe(System.Text.Json.JsonValueKind.String);
+        Enum.TryParse(dispatchState.GetString(), ignoreCase: false, out CoarseDispatchState _).ShouldBeTrue();
     }
 }

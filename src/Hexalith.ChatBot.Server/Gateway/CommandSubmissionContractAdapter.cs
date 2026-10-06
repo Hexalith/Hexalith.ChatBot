@@ -12,12 +12,58 @@ using Hexalith.ChatBot.Server.Gateway.Correlation;
 namespace Hexalith.ChatBot.Server.Gateway;
 
 /// <summary>Checks the OpenAPI request metadata before any command admission work begins.</summary>
+/// <remarks>
+/// The OpenAPI <c>CommandSubmissionRequest</c> schema is the wire authority (AD-18). The values below restate it for
+/// fast pre-admission validation; the conformance drift test binds every one of them to the YAML schema so a change
+/// on either side fails before merge.
+/// </remarks>
 internal static partial class CommandSubmissionContractAdapter
 {
-    private static readonly HashSet<string> AllowedProperties =
-    [
+    /// <summary>The <c>CommandSubmissionRequest</c> properties; any other root member is rejected.</summary>
+    internal static readonly IReadOnlySet<string> RequestProperties = new HashSet<string>(StringComparer.Ordinal)
+    {
         "commandId", "commandType", "command", "requestSchemaVersion", "actorType", "riskClass", "thresholdBand", "origin",
-    ];
+    };
+
+    /// <summary>The <c>CommandSubmissionRequest</c> required properties, in schema order.</summary>
+    internal static readonly IReadOnlyList<string> RequiredRequestProperties =
+        ["commandId", "commandType", "command", "requestSchemaVersion"];
+
+    /// <summary>The <c>commandType</c> maximum length.</summary>
+    internal const int CommandTypeMaxLength = 160;
+
+    /// <summary>The <c>commandType</c> pattern.</summary>
+    internal const string CommandTypePatternText = "^[A-Z][A-Za-z0-9]*$";
+
+    /// <summary>The forbidden <c>commandType</c> suffix (schema <c>not: pattern: "Command$"</c>).</summary>
+    internal const string ForbiddenCommandTypeSuffix = "Command";
+
+    /// <summary>The only accepted <c>requestSchemaVersion</c>.</summary>
+    internal const string RequestSchemaVersion = "v1";
+
+    /// <summary>The closed <c>ActorType</c> enum.</summary>
+    internal static readonly IReadOnlySet<string> ActorTypes = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "human", "ai", "service", "system",
+    };
+
+    /// <summary>The closed <c>RiskClass</c> enum.</summary>
+    internal static readonly IReadOnlySet<string> RiskClasses = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "none", "low", "medium", "high", "blocked",
+    };
+
+    /// <summary>The closed <c>ThresholdBand</c> enum.</summary>
+    internal static readonly IReadOnlySet<string> ThresholdBands = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "below", "within", "above", "critical",
+    };
+
+    /// <summary>The closed <c>SurfaceOrigin</c> enum.</summary>
+    internal static readonly IReadOnlySet<string> SurfaceOrigins = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "ui", "api", "cli", "mcp", "worker", "mailbox", "ai",
+    };
 
     private static readonly NullabilityInfoContext Nullability = new();
     private static readonly Lock NullabilitySync = new();
@@ -56,21 +102,21 @@ internal static partial class CommandSubmissionContractAdapter
                 context.ResolveCorrelationContext(parsedId.Value);
             }
 
-            if (root.EnumerateObject().Any(property => !AllowedProperties.Contains(property.Name)) ||
+            if (root.EnumerateObject().Any(property => !RequestProperties.Contains(property.Name)) ||
                 !RequiredString(root, "commandId", out string? commandId) ||
                 !ChatBotCommandId.TryParse(commandId, out ChatBotCommandId commandIdentifier) ||
                 !RequiredString(root, "commandType", out string? commandType) ||
-                commandType!.Length > 160 ||
+                commandType!.Length > CommandTypeMaxLength ||
                 !CommandTypePattern().IsMatch(commandType) ||
-                commandType.EndsWith("Command", StringComparison.Ordinal) ||
+                commandType.EndsWith(ForbiddenCommandTypeSuffix, StringComparison.Ordinal) ||
                 !RequiredString(root, "requestSchemaVersion", out string? version) ||
-                !string.Equals(version, "v1", StringComparison.Ordinal) ||
+                !string.Equals(version, RequestSchemaVersion, StringComparison.Ordinal) ||
                 !root.TryGetProperty("command", out JsonElement command) ||
                 command.ValueKind != JsonValueKind.Object ||
-                !OptionalEnum(root, "actorType", ["human", "ai", "service", "system"]) ||
-                !OptionalEnum(root, "riskClass", ["none", "low", "medium", "high", "blocked"]) ||
-                !OptionalEnum(root, "thresholdBand", ["below", "within", "above", "critical"]) ||
-                !OptionalEnum(root, "origin", ["ui", "api", "cli", "mcp", "worker", "mailbox", "ai"]) ||
+                !OptionalEnum(root, "actorType", ActorTypes) ||
+                !OptionalEnum(root, "riskClass", RiskClasses) ||
+                !OptionalEnum(root, "thresholdBand", ThresholdBands) ||
+                !OptionalEnum(root, "origin", SurfaceOrigins) ||
                 !ValidateKnownCommand(commandType, command))
             {
                 return (null, null);
@@ -101,12 +147,9 @@ internal static partial class CommandSubmissionContractAdapter
         return !string.IsNullOrWhiteSpace(value);
     }
 
-    private static bool OptionalEnum(JsonElement root, string name, HashSet<string> values)
+    private static bool OptionalEnum(JsonElement root, string name, IReadOnlySet<string> values)
         => !root.TryGetProperty(name, out JsonElement element) ||
             (element.ValueKind == JsonValueKind.String && values.Contains(element.GetString() ?? string.Empty));
-
-    private static bool OptionalString(JsonElement root, string name)
-        => !root.TryGetProperty(name, out JsonElement element) || element.ValueKind == JsonValueKind.String;
 
     private static bool AllowsNull(ParameterInfo parameter)
     {
@@ -324,6 +367,6 @@ internal static partial class CommandSubmissionContractAdapter
             string.Equals(key, field.GetCustomAttribute<EnumMemberAttribute>()?.Value, StringComparison.Ordinal));
     }
 
-    [GeneratedRegex("^[A-Z][A-Za-z0-9]*$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(CommandTypePatternText, RegexOptions.CultureInvariant)]
     private static partial Regex CommandTypePattern();
 }

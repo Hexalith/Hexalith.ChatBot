@@ -6,6 +6,9 @@ internal sealed class DaprCoarseIdempotencyStateClient(DaprClient client) : ICoa
 {
     private const string StateStoreName = "chatbot-statestore";
 
+    /// <summary>Gets the DAPR client whose serializer persists the records.</summary>
+    internal DaprClient Client => client;
+
     private static readonly StateOptions StateOptions = new()
     {
         Consistency = ConsistencyMode.Strong,

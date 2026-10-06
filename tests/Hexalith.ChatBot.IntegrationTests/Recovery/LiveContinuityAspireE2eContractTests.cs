@@ -1,8 +1,13 @@
 using System.Net;
+using System.Text;
 using System.Text.Json;
 
+using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.RecoverySandbox;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Gateway;
+
+using Microsoft.AspNetCore.Http;
 
 using Shouldly;
 
@@ -168,6 +173,29 @@ public sealed class LiveContinuityAspireE2eContractTests
     [InlineData("", false)]
     public void MailboxAdmissionProofRequiresTheDispatchUnavailableProblemType(string problemDetails, bool expected)
         => LiveContinuityAspireE2eTests.IsDispatchUnavailableProblem(problemDetails).ShouldBe(expected);
+
+    /// <summary>
+    /// The live mailbox-bearer probes are only meaningful when their body passes the OpenAPI request contract, which is
+    /// validated BEFORE authentication: a contract-invalid body answers the validation 400 whatever the bearer and so
+    /// proves nothing about admission. Drives the PRODUCTION request adapter over the exact probe body.
+    /// </summary>
+    [Fact]
+    public async Task MailboxAdmissionProbeBodyShouldPassTheProductionRequestContract()
+    {
+        const string commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
+        DefaultHttpContext context = new();
+        context.Request.ContentType = "application/json";
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(LiveContinuityAspireE2eTests.MailboxAdmissionProbeBody(commandId)));
+
+        (CommandSubmissionRequest? request, string? origin) = await CommandSubmissionContractAdapter
+            .ReadAsync(context, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        CommandSubmissionRequest admitted = request.ShouldNotBeNull();
+        admitted.CommandId.ShouldBe(commandId);
+        admitted.CommandType.ShouldBe("CaptureMailboxMessageIntake");
+        origin.ShouldBe("mailbox");
+    }
 
     /// <summary>
     /// The admission proof requires BOTH the dispatch-unavailable problem type AND a 503; the body predicate alone

@@ -62,7 +62,9 @@ paths:
         "500":
           $ref: "#/components/responses/InternalFailure"
       x-hexalith-command-submission:
-        adapterContract: IChatBotClient.SubmitAsync
+        adapterContract:
+          - IChatBotClient.SubmitAsync
+          - IChatBotClient.SubmitWithCommandIdAsync
         commandMarker: IChatBotCommand
         tenantAuthority: authenticated-context
         runtimeBehavior: deferred-to-later-stories

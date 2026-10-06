@@ -39,6 +39,15 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         _eventStore = eventStore;
     }
 
+    /// <summary>Gets the conditional state seam that persists identity, domain, and receipt records.</summary>
+    internal ICoarseIdempotencyStateClient StateClient => _state;
+
+    /// <summary>Gets the retained audit history used to reconcile a lost receipt, when wired.</summary>
+    internal IAuditHistoryReader? AuditHistory => _auditHistory;
+
+    /// <summary>Gets the authoritative EventStore command-status source used for durable recovery, when wired.</summary>
+    internal IEventStoreGatewayClient? EventStore => _eventStore;
+
     public async ValueTask<CoarseIdempotencyDecision> RecordAdmissionAsync(
         ChatBotGatewayContext context,
         CancellationToken cancellationToken)
@@ -382,7 +391,10 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         }
     }
 
-    /// <summary>Releases prepared ownership only with the dispatcher's proof that no external write was attempted.</summary>
+    /// <summary>
+    /// Releases prepared ownership only with the dispatcher's proof that nothing committed (no external write was
+    /// attempted, or EventStore definitively refused the only one).
+    /// </summary>
     public ValueTask AbortUndispatchedAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse preparedOutcome,
         CancellationToken cancellationToken)
         => AbortAdmissionCoreAsync(metadata, cancellationToken, preparedOutcome);
@@ -543,7 +555,15 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         return true;
     }
 
-    /// <summary>Restores a receipt from a retained post-commit audit envelope after a process restart.</summary>
+    /// <summary>
+    /// Restores a receipt from a post-commit audit envelope that the registered <see cref="IAuditHistoryReader"/> still
+    /// retains, for example after this store instance is replaced while the audit history survives.
+    /// </summary>
+    /// <remarks>
+    /// The only registered audit-history reader is the in-memory audit writer, so this path does not survive a process
+    /// restart; restart recovery uses the authoritative EventStore command-status evidence instead. Cross-restart audit
+    /// reconciliation requires a deployment-provided durable audit-history reader.
+    /// </remarks>
     internal async ValueTask<bool> ReconcileOutcomeFromAuditAsync(AuditEnvelope envelope, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(envelope);

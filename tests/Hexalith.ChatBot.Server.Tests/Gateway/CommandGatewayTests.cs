@@ -931,7 +931,12 @@ public sealed partial class CommandGatewayTests
         AuditEnvelope receipt = audit.Envelopes.Single(static envelope => envelope.Phase == AuditCommitPhase.PostCommit);
         receipt.SourceEvidenceRefs.ShouldContain($"command:{request.Request.CommandId}");
         receipt.SourceEvidenceRefs.ShouldContain($"operation:{request.TaskId}");
-        receipt.SourceEvidenceRefs.ShouldContain($"accepted-at:{queue.Intents[0].AcceptedOutcome!.AcceptedAt:O}");
+        string acceptedAtRef = $"accepted-at:{queue.Intents[0].AcceptedOutcome!.AcceptedAt.UtcDateTime:O}";
+        acceptedAtRef.ShouldEndWith("Z");
+        receipt.SourceEvidenceRefs.ShouldContain(acceptedAtRef);
+
+        // The Z-suffixed token stays inside the safe-token charset, so compliance detail retains it.
+        AuditMetadata.SafeOptionalToken(acceptedAtRef).ShouldBe(acceptedAtRef);
 
         state.RejectIdentityOutcomeSaves = 0;
         state.RejectReceiptOutcomeSaves = 0;
@@ -977,8 +982,10 @@ public sealed partial class CommandGatewayTests
         dispatcher.DispatchCount.ShouldBe(1);
     }
 
-    [Fact]
-    public async Task RetainedPostCommitAuditEnvelopeShouldReconstructOutcomeAfterStoreRestart()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RetainedPostCommitAuditEnvelopeShouldReconstructOutcomeAfterStoreRestart(bool legacyOffsetSpelling)
     {
         FakeCoarseIdempotencyStateClient state = new();
         RecordingAuditWriter audit = new();
@@ -996,6 +1003,18 @@ public sealed partial class CommandGatewayTests
         (await gateway.SubmitAsync(request, TestContext.Current.CancellationToken)).Problem.ShouldNotBeNull().Status.ShouldBe(503);
         AuditEnvelope retained = audit.Envelopes.Single(static envelope => envelope.Phase == AuditCommitPhase.PostCommit);
         retained.SourceEvidenceRefs.ShouldContain(reference => reference.StartsWith("identity-key:", StringComparison.Ordinal));
+        string acceptedAtRef = retained.SourceEvidenceRefs.Single(static reference => reference.StartsWith("accepted-at:", StringComparison.Ordinal));
+        acceptedAtRef.ShouldEndWith("Z");
+        if (legacyOffsetSpelling)
+        {
+            // Envelopes written before the Z-suffixed token used the "+00:00" round-trip spelling.
+            string legacyRef = acceptedAtRef[..^1] + "+00:00";
+            retained = retained with
+            {
+                SourceEvidenceRefs = [.. retained.SourceEvidenceRefs.Select(reference => reference == acceptedAtRef ? legacyRef : reference)],
+            };
+        }
+
         state.RejectIdentityOutcomeSaves = 0;
         state.RejectReceiptOutcomeSaves = 0;
         state.RejectPrimaryOutcomeSaves = 0;

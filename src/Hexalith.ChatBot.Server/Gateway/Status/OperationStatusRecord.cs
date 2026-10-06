@@ -1,15 +1,21 @@
+using System.Text.Json.Serialization;
+
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 
 namespace Hexalith.ChatBot.Server.Gateway.Status;
 
+// The generated enums (LifecycleState, and ChatBotMessageCode inside the prior outcome) are persisted in DAPR state as
+// their stable [EnumMember] wire values rather than generation-dependent ordinals. Integer tokens are still accepted but
+// interpreted with the current generated numbering, so they decode correctly only for records written by the same enum
+// generation; records persisted before a renumbering misdecode (accepted while the product is pre-release).
 internal sealed record OperationStatusRecord(
     string TenantId,
     string OperationId,
     string CommandId,
     string CorrelationId,
-    LifecycleState LifecycleState,
+    [property: JsonConverter(typeof(EnumMemberWireValueJsonConverter<LifecycleState>))] LifecycleState LifecycleState,
     int RetryCount,
     string CompletionStatus,
     string AuditStatus,
@@ -32,7 +38,7 @@ internal sealed record OperationStatusRecord(
     int WorkflowRetryCount = 0,
     string? WorkflowLastFailureCode = null,
     string ReasonCode = ChatBotMessageCodes.CommandAccepted,
-    CommandSubmissionResponse? PriorOutcome = null)
+    [property: JsonConverter(typeof(EnumMemberWireValueObjectJsonConverter<CommandSubmissionResponse>))] CommandSubmissionResponse? PriorOutcome = null)
 {
     public const string AcceptedProjectionPending = "accepted-projection-pending";
     public const string Completed = "completed";
