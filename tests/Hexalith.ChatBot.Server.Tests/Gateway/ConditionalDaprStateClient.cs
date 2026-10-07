@@ -99,6 +99,14 @@ internal sealed class ConditionalDaprStateClient : DaprClient
         {
             GateOwnershipWrite("identity-release");
         }
+        else if (value is CoarseCommandIdentityRecord { PriorOutcome: null, DomainReservation.SdkSubmissionAccepted: true })
+        {
+            GateOwnershipWrite("sdk-confirmation");
+        }
+        else if (value is CoarseCommandIdentityRecord { PriorOutcome: null, DomainReservation.PreparedAggregateId: not null })
+        {
+            GateOwnershipWrite("target");
+        }
         else if (value is CoarseCommandIdentityRecord { DomainReservation.DispatchState: CoarseDispatchState.Dispatching })
         {
             GateOwnershipWrite("prepare");

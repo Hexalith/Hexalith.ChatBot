@@ -86,12 +86,13 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             return await IdentityDecisionAsync(owner, proposed, metadata, cancellationToken).ConfigureAwait(false);
         }
 
-        // Old generic records used a body-derived key and had no caller-ID index. Keep their
-        // unexpired, unchanged-body replay path during the upgrade window.
+        // Old generic records used a body-derived key and had no caller-ID index. Keep their unchanged-body replay
+        // during the upgrade window; expiry never proves that an unresolved historical dispatch did not commit.
         if (proposed.LegacyKeyHash is { } legacyKey)
         {
             (CoarseIdempotencyRecord? legacy, _) = await ReadDomainAsync(legacyKey, cancellationToken).ConfigureAwait(false);
-            if (legacy is not null && legacy.ExpiresAt > now)
+            if (legacy is not null && (legacy.ExpiresAt > now ||
+                legacy.PriorOutcome is null && legacy.DispatchState == CoarseDispatchState.Unknown))
             {
                 return legacy.PriorOutcome is null
                     ? CoarseIdempotencyDecision.RecoveryPending(metadata)
@@ -303,11 +304,82 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         }
     }
 
+    /// <summary>Uses the prepared owner's conditional identity write to retain the actual dispatch-plan target.</summary>
+    public async ValueTask<bool> BindDispatchTargetAsync(
+        CoarseIdempotencyMetadata metadata,
+        CommandSubmissionResponse preparedOutcome,
+        string aggregateId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(aggregateId) || metadata.IdentityKeyHash is not { } key)
+        {
+            return false;
+        }
+
+        (CoarseCommandIdentityRecord? identity, string etag) = await ReadIdentityWithEtagAsync(key, cancellationToken).ConfigureAwait(false);
+        if (identity?.PriorOutcome is not null || identity?.DomainReservation is not { } reservation ||
+            !MatchesMetadata(reservation, metadata) || reservation.DispatchState != CoarseDispatchState.Dispatching ||
+            reservation.PreparedOutcome is not { } prepared || !SamePreparedOutcome(prepared, preparedOutcome) ||
+            reservation.PreparedAggregateId is { } target && !string.Equals(target, aggregateId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        (CoarseIdempotencyRecord? domain, _) = await ReadDomainAsync(metadata.CoarseKeyHash, cancellationToken).ConfigureAwait(false);
+        if (domain is null || !SameReservation(domain, reservation))
+        {
+            return false;
+        }
+
+        // Even an already matching target must win a current ownership CAS. An older read cannot authorize submission
+        // after a concurrent release/replacement. An acknowledgement loss is handled by the gateway's existing
+        // known-undispatched release, unless planning may already have attempted another external write.
+        return await _state.TrySaveIdentityAsync(key,
+            identity! with { DomainReservation = reservation with { PreparedAggregateId = aggregateId } },
+            etag, cancellationToken).ConfigureAwait(false);
+    }
+
     private static bool SamePreparedOutcome(CommandSubmissionResponse actual, CommandSubmissionResponse expected)
         => actual.CommandId == expected.CommandId && actual.CorrelationId == expected.CorrelationId &&
             actual.TaskId == expected.TaskId && actual.OperationId == expected.OperationId &&
             actual.LifecycleState == expected.LifecycleState && actual.AcceptedAt == expected.AcceptedAt &&
             actual.ReasonCode == expected.ReasonCode && actual.RetryEligible == expected.RetryEligible;
+
+    /// <summary>CAS-fences observed SDK acceptance onto the current exact prepared dispatch reservation.</summary>
+    public async ValueTask<bool> ConfirmSdkSubmissionAcceptedAsync(
+        CoarseIdempotencyMetadata metadata,
+        CommandSubmissionResponse preparedOutcome,
+        string aggregateId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(aggregateId) || metadata.IdentityKeyHash is not { } key)
+        {
+            return false;
+        }
+
+        (CoarseCommandIdentityRecord? identity, string etag) = await ReadIdentityWithEtagAsync(key, cancellationToken).ConfigureAwait(false);
+        if (identity?.PriorOutcome is not null || identity?.DomainReservation is not { } reservation ||
+            !MatchesMetadata(reservation, metadata) || reservation.OperationClass != metadata.OperationClass ||
+            reservation.DispatchState != CoarseDispatchState.Dispatching ||
+            reservation.PreparedOutcome is not { } prepared || !SamePreparedOutcome(prepared, preparedOutcome) ||
+            !string.Equals(reservation.PreparedAggregateId, aggregateId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        (CoarseIdempotencyRecord? domain, _) = await ReadDomainAsync(metadata.CoarseKeyHash, cancellationToken).ConfigureAwait(false);
+        if (domain is null || !SameReservation(domain, reservation))
+        {
+            return false;
+        }
+
+        // Winning a current ETag is required even if confirmation was already present. A paused older owner cannot
+        // authorize receipt persistence after another owner replaces it. A committed write remains proof even when
+        // its acknowledgement is lost; the gateway still returns its existing safe receipt-failure response.
+        return await _state.TrySaveIdentityAsync(key,
+            identity! with { DomainReservation = reservation with { SdkSubmissionAccepted = true } },
+            etag, cancellationToken).ConfigureAwait(false);
+    }
 
     public async ValueTask RecordOutcomeAsync(
         CoarseIdempotencyMetadata metadata,
@@ -448,7 +520,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
                     break;
                 }
 
-                if (identity.PriorOutcome is not null || reservation.DispatchState == CoarseDispatchState.Unknown ||
+                if (identity.PriorOutcome is not null || reservation.SdkSubmissionAccepted || reservation.DispatchState == CoarseDispatchState.Unknown ||
                     reservation.DispatchState == CoarseDispatchState.Dispatching &&
                     (undispatchedOutcome is null || reservation.PreparedOutcome is not { } prepared ||
                      !SamePreparedOutcome(prepared, undispatchedOutcome)))
@@ -1050,6 +1122,9 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         CoarseCommandIdentityRecord identity,
         CommandSubmissionResponse prepared)
         => evidence is not null &&
+            identity.DomainReservation is { DispatchState: CoarseDispatchState.Dispatching, SdkSubmissionAccepted: true, PreparedAggregateId: { } aggregateId } &&
+            !string.IsNullOrWhiteSpace(aggregateId) && !string.IsNullOrWhiteSpace(evidence.AggregateId) &&
+            string.Equals(evidence.AggregateId, aggregateId, StringComparison.Ordinal) &&
             string.Equals(evidence.MessageId, identity.CommandId, StringComparison.Ordinal) &&
             string.Equals(evidence.TenantId, identity.TenantId, StringComparison.Ordinal) &&
             string.Equals(evidence.Domain, ChatBotEventStore.DomainName, StringComparison.Ordinal) &&

@@ -1,0 +1,947 @@
+{
+  "schemaVersion": "2.0",
+  "recordKind": "story",
+  "recordLedgerKey": "1-2-publish-the-openapi-contract-spine-and-typed-client",
+  "storyKey": "1-2-publish-the-openapi-contract-spine-and-typed-client",
+  "storyTitle": "Story 1.2: Publish the OpenAPI Contract Spine and Typed Client",
+  "storyPath": "_bmad-output/implementation-artifacts/spec-1-2-publish-the-openapi-contract-spine-and-typed-client.md",
+  "targetStatus": "done",
+  "persistedStatus": "done",
+  "sprintStatusKey": "1-2-publish-the-openapi-contract-spine-and-typed-client",
+  "bootstrap": false,
+  "scope": {
+    "mode": "diff",
+    "implementationDigest": "8b35f822dde96b1974017f6e8639611a89aef2b66cc4b45fa1c4a9fe01a40f5c",
+    "transitionPaths": [
+      "_bmad-output/implementation-artifacts/spec-1-2-publish-the-openapi-contract-spine-and-typed-client.md",
+      "_bmad-output/implementation-artifacts/evidence/1-2-publish-the-openapi-contract-spine-and-typed-client.json",
+      "_bmad-output/implementation-artifacts/sprint-status.yaml"
+    ],
+    "repositories": [
+      {
+        "name": "root",
+        "path": ".",
+        "baseCommit": "$BASE",
+        "headCommit": "$HEAD",
+        "includeWorkingTree": false,
+        "includePaths": [
+          "_bmad-output/implementation-artifacts/deferred-work.md",
+          "_bmad-output/implementation-artifacts/evidence/1-2-publish-the-openapi-contract-spine-and-typed-client.json",
+          "_bmad-output/implementation-artifacts/spec-1-2-publish-the-openapi-contract-spine-and-typed-client.md",
+          "_bmad-output/implementation-artifacts/sprint-status.yaml",
+          "src/Hexalith.ChatBot.Server/Gateway/ChatBotGatewayContext.cs",
+          "src/Hexalith.ChatBot.Server/Gateway/CommandGateway.cs",
+          "src/Hexalith.ChatBot.Server/Gateway/CommandSubmissionContractAdapter.cs",
+          "src/Hexalith.ChatBot.Server/Gateway/Idempotency/CoarseCommandIdentityRecord.cs",
+          "src/Hexalith.ChatBot.Server/Gateway/Idempotency/CoarseIdempotencyRecord.cs",
+          "src/Hexalith.ChatBot.Server/Gateway/Idempotency/DaprCoarseIdempotencyStore.cs",
+          "src/Hexalith.ChatBot.Server/Gateway/Idempotency/InMemoryCoarseIdempotencyStore.cs",
+          "src/Hexalith.ChatBot.Server/Gateway/Stages/AcceptedCommandDispatcher.cs",
+          "src/Hexalith.ChatBot.Server/Gateway/Stages/IIdempotencyStore.cs",
+          "tests/Hexalith.ChatBot.Client.Tests/CommandSubmissionTransportTests.cs",
+          "tests/Hexalith.ChatBot.RecoverySandbox/RecoveryDependencyExercise.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Gateway/CoarseIdempotencyStateJsonTests.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.CancellationFencing.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.DefinitiveRefusal.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.DurableRecovery.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.SdkConfirmation.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.SerializedOwnership.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.TargetBinding.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Gateway/ConditionalDaprStateClient.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Gateway/DurableRecoveryEventStoreClient.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Gateway/SdkConfirmationWorkflowCoordinator.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/EventStoreGatewayClientRefusalTests.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs"
+        ]
+      }
+    ]
+  },
+  "results": [
+    {
+      "lane": "Hexalith.ChatBot.Contracts.Tests",
+      "trx": "merge-test-lanes/Hexalith.ChatBot.Contracts.Tests.trx",
+      "provenance": "merge-test-lanes/Hexalith.ChatBot.Contracts.Tests.provenance.json",
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Contracts.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "method:Hexalith.ChatBot.Contracts.Tests.AdminContractTests.AdminOperationContractsShouldSerializeMetadataOnly"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Client.Tests",
+      "trx": "merge-test-lanes/Hexalith.ChatBot.Client.Tests.trx",
+      "provenance": "merge-test-lanes/Hexalith.ChatBot.Client.Tests.provenance.json",
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Client.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "method:Hexalith.ChatBot.Client.Tests.AssociationRoutingStatusTransportTests.GetAssociationRoutingStatusShouldParseDeclaredProblemResponsesAsMetadataOnlyTypedExceptions"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Architecture.Tests",
+      "trx": "merge-test-lanes/Hexalith.ChatBot.Architecture.Tests.trx",
+      "provenance": "merge-test-lanes/Hexalith.ChatBot.Architecture.Tests.provenance.json",
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Architecture.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "method:Hexalith.ChatBot.Architecture.Tests.AdapterBoundaryFitnessTests.NoAdapterTypeDependsOnServerGatewayNamespaces"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Conformance.Tests",
+      "trx": "merge-test-lanes/Hexalith.ChatBot.Conformance.Tests.trx",
+      "provenance": "merge-test-lanes/Hexalith.ChatBot.Conformance.Tests.provenance.json",
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Conformance.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "method:Hexalith.ChatBot.Conformance.Tests.CommandSubmissionRequestContractDriftTests.ABodyCarryingEveryDeclaredRootPropertyShouldParse"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Cli.Tests",
+      "trx": "merge-test-lanes/Hexalith.ChatBot.Cli.Tests.trx",
+      "provenance": "merge-test-lanes/Hexalith.ChatBot.Cli.Tests.provenance.json",
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Cli.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "method:Hexalith.ChatBot.Cli.Tests.ChatBotCliCommandTests.AcceptedCommandJsonOutputReportsPartialSuccessWorkflowMetadata"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Mcp.Tests",
+      "trx": "merge-test-lanes/Hexalith.ChatBot.Mcp.Tests.trx",
+      "provenance": "merge-test-lanes/Hexalith.ChatBot.Mcp.Tests.provenance.json",
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Mcp.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "method:Hexalith.ChatBot.Mcp.Tests.ChatBotMcpServiceTests.AttributedMcpToolParametersShouldMatchCatalogArgumentContract"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Server.Tests",
+      "trx": "merge-test-lanes/Hexalith.ChatBot.Server.Tests.trx",
+      "provenance": "merge-test-lanes/Hexalith.ChatBot.Server.Tests.provenance.json",
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Server.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "method:Hexalith.ChatBot.Server.Tests.Adapters.Folders.FoldersFolderStoreTests.StoreMailboxAttachmentShouldMapFoldersApiFailuresToSafeMetadata"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.IntegrationTests",
+      "trx": "merge-test-lanes/Hexalith.ChatBot.IntegrationTests.trx",
+      "provenance": "merge-test-lanes/Hexalith.ChatBot.IntegrationTests.provenance.json",
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.IntegrationTests.trx",
+      "source": "current-run",
+      "selectors": [
+        "method:Hexalith.ChatBot.IntegrationTests.ChatBotDeadLetterSubscriptionTopologyTests.BlankConfiguredValuesMustFallBackRatherThanReachTheSubscriptionAsEmpty"
+      ],
+      "allowSkipped": true,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "aspire-dapr-primary",
+      "trx": "topology-primary/topology-acceptance.trx",
+      "provenance": "topology-primary/topology-acceptance.provenance.json",
+      "artifactLocator": "file:topology-primary/topology-acceptance.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": "aspire-dapr"
+    },
+    {
+      "lane": "story-evidence-gate",
+      "trx": "story-evidence-gate/story-evidence-gate.trx",
+      "provenance": "story-evidence-gate/story-evidence-gate.provenance.json",
+      "artifactLocator": "file:story-evidence-gate/story-evidence-gate.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    }
+  ],
+  "primaryPaths": [
+    {
+      "class": "aspire-dapr",
+      "lane": "aspire-dapr-primary"
+    }
+  ],
+  "mappings": [
+    {
+      "id": "task-1",
+      "kind": "task",
+      "paths": [
+        "src/Hexalith.ChatBot.Server/Gateway/ChatBotGatewayContext.cs",
+        "src/Hexalith.ChatBot.Server/Gateway/CommandGateway.cs",
+        "src/Hexalith.ChatBot.Server/Gateway/Stages/AcceptedCommandDispatcher.cs",
+        "src/Hexalith.ChatBot.Server/Gateway/Stages/IIdempotencyStore.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CoarseIdempotencyStateJsonTests.HistoricalPreparedStateWithoutSdkConfirmationMustRemainUnconfirmed",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ConfirmationPersistenceFailureMustUseTheExistingReceiptBoundaryAndRetainItsDurableProof",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.FailedConfirmationMustNotPrecedeRequiredWorkflowStartup",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PausedSdkConfirmationMustLoseItsCasWhenThePreparedOwnerChanges",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SdkConfirmationMustMatchThePreparedResponseActualTargetAndCurrentOwner"
+      ]
+    },
+    {
+      "id": "task-2",
+      "kind": "task",
+      "paths": [
+        "src/Hexalith.ChatBot.Server/Gateway/Idempotency/DaprCoarseIdempotencyStore.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.CommittedLegacyGenericExpiryMustStillPermitFreshCallerOwnership",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ExpiredGenericLegacyUnknownMustRemainPendingAcrossOriginalAndReplacementStores"
+      ]
+    },
+    {
+      "id": "task-3",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.IntegrationTests.Recovery.RecoveryDependencyExerciseTests.FaultIsObservedByTheConcreteSeamAndRecoveryIsIdempotent",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.LegacyChangedTargetMustRemainPendingWithoutAcknowledgedSdkSubmissionAfterEveryServiceReplacement",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PreparedOutcomeShouldRecoverAcrossEveryServiceReplacementOnlyWithMatchingSdkCommitEvidence",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ProductionStateAdapterMustRoundTripReservationPreparationAndReleaseAcrossFreshServices",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SameTargetLegacyStatusMustRequireObservedSdkAcceptanceOfThePreparedOwner"
+      ]
+    },
+    {
+      "id": "task-4",
+      "kind": "task",
+      "paths": [
+        "tests/Hexalith.ChatBot.Client.Tests/CommandSubmissionTransportTests.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.Client.Tests.CommandSubmissionTransportTests.HttpDeserializationMustRejectEveryMissingRequiredResponseFact",
+        "Hexalith.ChatBot.Client.Tests.CommandSubmissionTransportTests.SubmitCommandShouldParseDeclaredProblemResponsesAsMetadataOnlyTypedExceptions"
+      ]
+    },
+    {
+      "id": "task-5",
+      "kind": "task",
+      "paths": [
+        "src/Hexalith.ChatBot.Server/Gateway/Idempotency/CoarseCommandIdentityRecord.cs",
+        "src/Hexalith.ChatBot.Server/Gateway/Idempotency/DaprCoarseIdempotencyStore.cs",
+        "src/Hexalith.ChatBot.Server/Gateway/Idempotency/InMemoryCoarseIdempotencyStore.cs",
+        "src/Hexalith.ChatBot.Server/Gateway/Stages/IIdempotencyStore.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.DispatchTargetBindingMustMatchPreparedOutcomeAndCurrentOwner",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PreparedOutcomeShouldRecoverAcrossEveryServiceReplacementOnlyWithMatchingSdkCommitEvidence",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SdkBackedQueuedReconciliationMustAlsoMatchThePreparedAggregateTarget"
+      ]
+    },
+    {
+      "id": "task-6",
+      "kind": "task",
+      "paths": [
+        "src/Hexalith.ChatBot.Server/Gateway/ChatBotGatewayContext.cs",
+        "src/Hexalith.ChatBot.Server/Gateway/CommandGateway.cs",
+        "src/Hexalith.ChatBot.Server/Gateway/Stages/AcceptedCommandDispatcher.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ActualEnrichedDispatchPlanMustBindItsStateOwnerTargetBeforeTheSdkPost",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.FailedTargetBindingMustPreventSdkSubmissionAndPreserveAttemptedWriterOwnership",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PausedTargetBindingMustLoseItsCasAfterExactPreparedReleaseAndReplacement"
+      ]
+    },
+    {
+      "id": "task-7",
+      "kind": "task",
+      "paths": [
+        "tests/Hexalith.ChatBot.RecoverySandbox/RecoveryDependencyExercise.cs",
+        "tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.DurableRecovery.cs",
+        "tests/Hexalith.ChatBot.Server.Tests/Gateway/DurableRecoveryEventStoreClient.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.LegacyChangedTargetMustRemainPendingWithoutAcknowledgedSdkSubmissionAfterEveryServiceReplacement",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PreparedOutcomeShouldRecoverAcrossEveryServiceReplacementOnlyWithMatchingSdkCommitEvidence",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SameTargetLegacyStatusMustRequireObservedSdkAcceptanceOfThePreparedOwner",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SdkBackedQueuedReconciliationMustAlsoMatchThePreparedAggregateTarget"
+      ]
+    },
+    {
+      "id": "task-8",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PausedCleanupMustNotRemoveOrOverwriteAReplacement",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PausedPreparationMustLoseItsCasAfterLogicalReleaseAndReplacement",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ProductionStateAdapterMustRoundTripReservationPreparationAndReleaseAcrossFreshServices"
+      ]
+    },
+    {
+      "id": "task-9",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.IsolatedNswagGenerationShouldMatchCheckedInOutputByteForByte",
+        "Hexalith.ChatBot.Client.Tests.CommandSubmissionTransportTests.HttpDeserializationMustRejectEveryMissingRequiredResponseFact",
+        "Hexalith.ChatBot.Client.Tests.CommandSubmissionTransportTests.SubmitCommandShouldPostTheTypedCommandRequestAndParseAcceptedResponse"
+      ]
+    },
+    {
+      "id": "task-10",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.CorrectionPropagationCoordinatorTests.CorrectedCaseResolutionShouldStopSchedulingAtAttemptLimit",
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.CorrectionPropagationWorkflowBridgeTests.RegisteredResolverMustExecuteAtMostFiveTimesAndExposeTerminalEscalationWithOriginalCause",
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.OperationStatusWorkflowStatusSinkTests.ReportAsyncShouldWriteWorkflowFieldsOntoExistingOperationStatus"
+      ]
+    },
+    {
+      "id": "task-11",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.CorrectionPropagationProgressReadTests.ProductionProgressReaderShouldBindStatusEligibilityToRunningCurrentSchedule",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ReplayWithoutStoredTaskMustClearRetryTaskFromTraceAndMatchResponseIdentity"
+      ]
+    },
+    {
+      "id": "task-12",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ProductionDispatcherWithoutGatewayTargetBindingMustFailClosedBeforeSdkSubmission",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.StoreWithoutPreparationImplementationMustFailClosedBeforeDispatch"
+      ]
+    },
+    {
+      "id": "task-13",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.CancellationBeforeExternalWriteMustReleaseExactPreparedOwnership",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.KnownUndispatchedAbortMustMatchPreparedOutcomeAndOwner",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PossibleExternalWriteShouldRemainRecoveryPendingWithoutRedispatch",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.RealPlanningFailureShouldReleaseOnlyUndispatchedPreparedOwnership"
+      ]
+    },
+    {
+      "id": "task-14",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.AbortedInMemoryAdmissionShouldReleaseWaitersWithoutCancelingTheirRequestsOrDispatchingAnOldOwner",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.InMemoryConcurrentIdenticalCallerClaimAfterExpiryMustReplayWinningDomainOutcome",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.InMemoryExpiredReservedLeaseShouldReleaseWaitersAndFenceResumedOwner"
+      ]
+    },
+    {
+      "id": "task-15",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.DaprDomainConflictShouldNotStrandTheRejectedCallerId",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.LosingDomainCleanupShouldSurviveUnrelatedWinningIdentityAndEveryServiceReplacement"
+      ]
+    },
+    {
+      "id": "task-16",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.CorrectionPropagationProgressReadTests.ProductionProgressReaderShouldBindStatusEligibilityToRunningCurrentSchedule",
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.CorrectionPropagationWorkflowBridgeTests.RegisteredPendingStoreWorkflowShouldSuppressOldScheduleWhenActiveClearAndLaterPublicationFail"
+      ]
+    },
+    {
+      "id": "task-17",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.MissingRetryStatusShouldRetainAttemptPolicyAndRequireAuditReconciliationOnReplay",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PreparedOutcomeShouldRecoverAcrossEveryServiceReplacementOnlyWithMatchingSdkCommitEvidence",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ReplayShouldPreserveReconcilingAuditStatusAndNeverDowngradeToCommitted"
+      ]
+    },
+    {
+      "id": "task-18",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.ContractSpineOperationsShouldBindTypedClientAndSeparatelyGovernedSurfaces",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PreparedOutcomeShouldRecoverAcrossEveryServiceReplacementOnlyWithMatchingSdkCommitEvidence"
+      ]
+    },
+    {
+      "id": "task-19",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ActiveLeaseShouldSurviveAnotherInstanceAndExpiredOldOwnerMustNotDispatch",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.DurableAbortedFenceShouldRecoverCleanupAfterEveryApplicationServiceIsReplaced",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.HistoricalUnknownDispatchReservationShouldRemainFailClosedAfterExpiry"
+      ]
+    },
+    {
+      "id": "task-20",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PreparedOutcomeShouldRecoverAcrossEveryServiceReplacementOnlyWithMatchingSdkCommitEvidence",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ProductionStateAdapterMustRoundTripReservationPreparationAndReleaseAcrossFreshServices",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SdkConfirmationMustMatchThePreparedResponseActualTargetAndCurrentOwner"
+      ]
+    },
+    {
+      "id": "task-21",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.LifecycleExceptionShouldFenceOwnershipAndKeepDependencyCauseDuringCleanupFailure",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.StateReadOutageShouldReturnDependencyFailureWithoutCreatingConflictOrAuditCause",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ThrowingOrFailedPreCommitAuditShouldPreserveAuditResponseWhenCleanupIsUnavailable"
+      ]
+    },
+    {
+      "id": "task-22",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.FailedSpecializedReceiptCreateWithoutAnOwnerShouldBeRetryableAndLeaveNoReservation",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PendingSpecializedDomainShouldNotExpireBeforeItsOutcome",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SoleExpiredShadowReceiptMustRetainOriginalCallerOutcomeBeforeDeletion"
+      ]
+    },
+    {
+      "id": "task-23",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.NotificationAndQueueSnapshotFailuresShouldNotReplaceRetryableRecoveryResponse",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SpecializedDifferentCallerShouldReconcileLaterValidQueueItemAndAcknowledgeOnlyThatItem"
+      ]
+    },
+    {
+      "id": "task-24",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.CorrectionPropagationWorkflowBridgeTests.RegisteredPendingStoreWorkflowShouldSuppressOldScheduleWhenActiveClearAndLaterPublicationFail",
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.CorrectionPropagationWorkflowBridgeTests.RegisteredWorkflowShouldUseSharedUtcAndAdvanceTimersDespiteStatusPublicationFailures"
+      ]
+    },
+    {
+      "id": "task-25",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
+      ]
+    },
+    {
+      "id": "task-26",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.GatewaySourcesMustNotDeclareCompetingContractWireDtos",
+        "Hexalith.ChatBot.Cli.Tests.ChatBotCliCommandTests.AcceptedCommandJsonOutputReportsPartialSuccessWorkflowMetadata",
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.IsolatedNswagGenerationShouldMatchCheckedInOutputByteForByte",
+        "Hexalith.ChatBot.Conformance.Tests.ContractSpineOracleTests.RuntimeGatewayAndStatusOutcomesShouldMatchSafeOracle",
+        "Hexalith.ChatBot.Contracts.Tests.OpenApiContractSpineTests.AcceptedReplayAndStatusSchemasShouldShareTheCompleteSafeOutcome",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology",
+        "Hexalith.ChatBot.Mcp.Tests.ChatBotMcpServiceTests.AttributedMcpToolParametersShouldMatchCatalogArgumentContract",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SameTargetLegacyStatusMustRequireObservedSdkAcceptanceOfThePreparedOwner"
+      ]
+    },
+    {
+      "id": "task-27",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Contracts.Tests.OpenApiContractSpineTests.AcceptedReplayAndStatusSchemasShouldShareTheCompleteSafeOutcome",
+        "Hexalith.ChatBot.Contracts.Tests.OpenApiContractSpineTests.ContractSpineShouldDeclareOpenApiFoundation",
+        "Hexalith.ChatBot.Contracts.Tests.OpenApiContractSpineTests.ExamplesShouldConformToContractIdentifierAndProblemStatusShape",
+        "Hexalith.ChatBot.Contracts.Tests.ProblemDetailsContractTests.ProblemDetailsShouldRequireVersionedMetadataOnlyFailureShape"
+      ]
+    },
+    {
+      "id": "task-28",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.FacadeShouldRejectCommandTypeLongerThanOpenApiMaximumBeforeTransport",
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.FacadeShouldReuseCallerStableCommandIdAndRejectInvalidIdsBeforeTransport"
+      ]
+    },
+    {
+      "id": "task-29",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.GeneratedOutputHashShouldMatchCheckedInFreshnessFixture",
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.GeneratedOutputShouldExistUnderGeneratedAndCarrySafeProvenance",
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.IsolatedNswagGenerationShouldMatchCheckedInOutputByteForByte"
+      ]
+    },
+    {
+      "id": "task-30",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.GatewaySourcesMustNotDeclareCompetingContractWireDtos",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldAcceptAuthenticatedTenantBoundSubmission",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.OperationStatusEndpointShouldReturnProjectionPendingMetadataOnlyStatus"
+      ]
+    },
+    {
+      "id": "task-31",
+      "kind": "task",
+      "paths": [
+        "src/Hexalith.ChatBot.Server/Gateway/CommandGateway.cs",
+        "src/Hexalith.ChatBot.Server/Gateway/Idempotency/DaprCoarseIdempotencyStore.cs",
+        "src/Hexalith.ChatBot.Server/Gateway/Idempotency/InMemoryCoarseIdempotencyStore.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ConflictingDuplicateShouldReturnMetadataOnlyProblemAndSkipAuditAndDispatch",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ProblemDetailsFactoryShouldRecordUncategorizedAuthorizationReasonWithoutRawInput",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ProblemDetailsFactoryShouldReturnCatalogBackedCurrentGatewayProblems"
+      ]
+    },
+    {
+      "id": "task-32",
+      "kind": "task",
+      "paths": [
+        "src/Hexalith.ChatBot.Server/Gateway/CommandGateway.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ConflictingDuplicateShouldReturnMetadataOnlyProblemAndSkipAuditAndDispatch",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.DaprStateStoreShouldReserveCallerIdAfterSpecializedDomainReplay",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.EquivalentDuplicateShouldReplayPriorOutcomeAndNeverDispatchAgain",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.OldCallerIdentityShouldReplayAfterSpecializedDomainKeyIsReused"
+      ]
+    },
+    {
+      "id": "task-33",
+      "kind": "task",
+      "paths": [
+        "tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldNotEchoInvalidCorrelationMetadataInSafeProblemDetails",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldRejectInvalidContractBeforeAdmissionWithVersionedSafeProblem",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.OperationStatusEndpointShouldRejectInvalidOperationIdWithoutEchoingUnsafeCorrelationMetadata"
+      ]
+    },
+    {
+      "id": "task-34",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.OperationStatusWorkflowStatusSinkTests.ReportAsyncShouldWriteWorkflowFieldsOntoExistingOperationStatus",
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.OperationStatusWorkflowStatusSinkTests.StatusWireShouldPreserveKnownWorkflowCausesAndBoundUnknownExternalCause",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.OperationStatusEndpointShouldExposeRetryReplayMetadataOnly"
+      ]
+    },
+    {
+      "id": "task-35",
+      "kind": "task",
+      "paths": [
+        "tests/Hexalith.ChatBot.Client.Tests/CommandSubmissionTransportTests.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.ContractSpineOperationsShouldBindTypedClientAndSeparatelyGovernedSurfaces",
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.GatewaySourcesMustNotDeclareCompetingContractWireDtos",
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.IsolatedNswagGenerationShouldMatchCheckedInOutputByteForByte",
+        "Hexalith.ChatBot.Contracts.Tests.OpenApiContractSpineTests.AcceptedReplayAndStatusSchemasShouldShareTheCompleteSafeOutcome",
+        "Hexalith.ChatBot.Contracts.Tests.ProblemDetailsContractTests.ProblemDetailsShouldRequireVersionedMetadataOnlyFailureShape"
+      ]
+    },
+    {
+      "id": "task-36",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Conformance.Tests.ContractSpineOracleTests.RuntimeGatewayAndStatusOutcomesShouldMatchSafeOracle",
+        "Hexalith.ChatBot.Conformance.Tests.ContractSpineOracleTests.StoryTwelveOracleShouldTrackCurrentCommandSubmissionContract",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldRejectCursorMintedForDifferentScope",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldUseSdkProtectedCursorScope"
+      ]
+    },
+    {
+      "id": "task-37",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ConflictingDuplicateShouldReturnMetadataOnlyProblemAndSkipAuditAndDispatch",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.DaprStateStoreShouldReplayUnexpiredPreUpgradeGenericRecordByLegacyKey",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.UnexpiredLegacyGenericRecordShouldRetainItsOutcomeOrReservationAcrossDifferentCallerIds"
+      ]
+    },
+    {
+      "id": "task-38",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Contracts.Tests.OpenApiContractSpineTests.CommandRequestShouldRequireJsonAndBoundCommandTypeBeforeAdmission",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldRejectInvalidContractBeforeAdmissionWithVersionedSafeProblem"
+      ]
+    },
+    {
+      "id": "task-39",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PreparedOutcomeShouldRecoverAcrossEveryServiceReplacementOnlyWithMatchingSdkCommitEvidence",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.RetainedPostCommitAuditEnvelopeShouldReconstructOutcomeAfterStoreRestart",
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.CorrectionPropagationWorkflowBridgeTests.RegisteredWorkflowShouldUseSharedUtcAndAdvanceTimersDespiteStatusPublicationFailures",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.OperationStatusGetShouldUseInjectedClockAtRetryDueBoundary"
+      ]
+    },
+    {
+      "id": "task-40",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ConflictingDuplicateShouldReturnMetadataOnlyProblemAndSkipAuditAndDispatch",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.EquivalentDuplicateShouldReplayPriorOutcomeAndNeverDispatchAgain",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldReplayEquivalentDuplicateWithoutSecondDispatch",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ReplayWithoutStoredTaskMustClearRetryTaskFromTraceAndMatchResponseIdentity"
+      ]
+    },
+    {
+      "id": "task-41",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.GatewaySourcesMustNotDeclareCompetingContractWireDtos",
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.IsolatedNswagGenerationShouldMatchCheckedInOutputByteForByte",
+        "Hexalith.ChatBot.Conformance.Tests.ContractSpineOracleTests.RuntimeGatewayAndStatusOutcomesShouldMatchSafeOracle",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldReplayEquivalentDuplicateWithoutSecondDispatch"
+      ]
+    },
+    {
+      "id": "task-42",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.AcknowledgementLossBeforeAdmissionShouldCleanOnlyItsOwnReservation",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ConcurrentSpecializedCommandsWithOneCallerIdShouldDispatchOnce",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.DaprDomainConflictShouldNotStrandTheRejectedCallerId",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.DaprStateStoreShouldNotReserveCallerIdWhenDomainWriteFails"
+      ]
+    },
+    {
+      "id": "task-43",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldRejectInvalidContractBeforeAdmissionWithVersionedSafeProblem",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldValidateContractBeforeAuthenticationAndAuthenticateBeforeAdmission"
+      ]
+    },
+    {
+      "id": "task-44",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.CorrectionPropagationProgressReadTests.ProductionProgressReaderShouldBindStatusEligibilityToRunningCurrentSchedule",
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.CorrectionPropagationWorkflowBridgeTests.RegisteredResolverMustExecuteAtMostFiveTimesAndExposeTerminalEscalationWithOriginalCause",
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.OperationStatusWorkflowStatusSinkTests.RetryActivityShouldPublishDueTimeAndEligibilityUntilAttemptLimit"
+      ]
+    },
+    {
+      "id": "task-45",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Client.Tests.CommandSubmissionTransportTests.SubmitCommandShouldPostTheTypedCommandRequestAndParseAcceptedResponse",
+        "Hexalith.ChatBot.Conformance.Tests.ContractSpineOracleTests.RuntimeGatewayAndStatusOutcomesShouldMatchSafeOracle",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldAcceptAuthenticatedTenantBoundSubmission",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldReplayEquivalentDuplicateWithoutSecondDispatch"
+      ]
+    },
+    {
+      "id": "task-46",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.FacadeShouldRejectCommandTypeLongerThanOpenApiMaximumBeforeTransport",
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.IsolatedNswagGenerationShouldMatchCheckedInOutputByteForByte"
+      ]
+    },
+    {
+      "id": "task-47",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Contracts.Tests.OpenApiContractSpineTests.CommandRequestShouldRequireJsonAndBoundCommandTypeBeforeAdmission",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldAcceptAuthenticatedTenantBoundSubmission",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldRejectInvalidContractBeforeAdmissionWithVersionedSafeProblem",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.OperationStatusEndpointShouldReturnProjectionPendingMetadataOnlyStatus"
+      ]
+    },
+    {
+      "id": "task-48",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldAcceptObjectValuedProposalMetadataAtValidationBoundary",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldRejectInvalidContractBeforeAdmissionWithVersionedSafeProblem",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.TypedFacadeShouldPreserveCaseDistinctProposalMetadataKeysAtValidationBoundary"
+      ]
+    },
+    {
+      "id": "task-49",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ExpiredReceiptShouldProtectPendingSpecializedPrimaryFromSecondDispatch",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PendingSpecializedDomainShouldNotExpireBeforeItsOutcome"
+      ]
+    },
+    {
+      "id": "task-50",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.FailedAbortCleanupShouldAdmitTheCorrectedCommandAfterTheStoreRecovers",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.FailedAbortCleanupShouldNotDeleteAReplacementReservation",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.FailedConditionalAbortShouldReportFailureAndAllowLaterCleanup",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.FailedIdentityClaimShouldReconcileTransientConditionalDomainDelete"
+      ]
+    },
+    {
+      "id": "task-51",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.FailedPostDispatchOutcomeWritesShouldFailClosedWithoutSecondDispatch",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.GatewayShouldAcceptIdentityScopedReceiptWhenDomainDisappearsAfterDispatch",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.MissingDomainAfterDispatchShouldKeepIdentityScopedReplayReceipt"
+      ]
+    },
+    {
+      "id": "task-52",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.OperationStatusWorkflowStatusSinkTests.ReportAsyncShouldWriteWorkflowFieldsOntoExistingOperationStatus",
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.OperationStatusWorkflowStatusSinkTests.StatusWireShouldPreserveKnownWorkflowCausesAndBoundUnknownExternalCause",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.OperationStatusGetShouldUseInjectedClockAtRetryDueBoundary"
+      ]
+    },
+    {
+      "id": "task-53",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointBodyDeclaredSurfaceOriginShouldTakePrecedenceOverHeader",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldDefaultSurfaceOriginToApiWhenNeitherBodyNorHeaderDeclareIt",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldFallBackToSurfaceOriginHeaderWhenBodyOriginIsAbsent",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldRejectUnknownSurfaceOriginWithSafeProblem"
+      ]
+    },
+    {
+      "id": "task-54",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.DifferentCallerIdShouldRemainReservedWhileDomainReceiptRepairIsBlocked",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.FailedSpecializedDomainReceiptShouldRepairFromCallerIdentityBeforeReplay",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.MissingPrimaryDomainAfterSpecializedDispatchShouldReplayByDomainReceipt"
+      ]
+    },
+    {
+      "id": "task-55",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.DoubleOutcomeFailureShouldRemainRetryableAndRecoverWithoutRedispatch",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ThrownPostDispatchStateReadsShouldReturnSafeProblemAndRecover",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ThrownPostDispatchStateWritesShouldKeepRetryableReceipt"
+      ]
+    },
+    {
+      "id": "task-56",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Conformance.Tests.CommandSubmissionRequestContractDriftTests.AdapterPropertyListShouldMatchTheClosedRequestSchema",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldRejectInvalidContractBeforeAdmissionWithVersionedSafeProblem"
+      ]
+    },
+    {
+      "id": "task-57",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.CorrectionPropagationProgressReadTests.ProductionProgressReaderShouldBindStatusEligibilityToRunningCurrentSchedule",
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.CorrectionPropagationWorkflowBridgeTests.RegisteredPendingStoreWorkflowShouldSuppressOldScheduleWhenActiveClearAndLaterPublicationFail",
+        "Hexalith.ChatBot.Server.Tests.Lifecycle.CorrectionPropagationWorkflowBridgeTests.RegisteredWorkflowShouldUseSharedUtcAndAdvanceTimersDespiteStatusPublicationFailures"
+      ]
+    },
+    {
+      "id": "task-58",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Contracts.Tests.OpenApiContractSpineTests.ExampleValidationMustEnforceDeclaredArrayCardinality",
+        "Hexalith.ChatBot.Contracts.Tests.OpenApiContractSpineTests.ExamplesShouldConformToContractIdentifierAndProblemStatusShape",
+        "Hexalith.ChatBot.Contracts.Tests.OpenApiContractSpineTests.PublishedAcceptedStatusAndProblemExamplesShouldMatchTheirReferencedSchemas"
+      ]
+    },
+    {
+      "id": "task-59",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ConcurrentSpecializedCommandsWithOneCallerIdShouldDispatchOnce",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ProductionDaprConditionalWritesShouldUseStrongFirstWriteOptions",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ProductionDaprIdentitySaveShouldAdmitOneStrongFirstWriteWinner"
+      ]
+    },
+    {
+      "id": "task-60",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Client.Tests.CommandSubmissionTransportTests.SubmitCommandShouldSerializeContractEnumsByTheirEnumMemberWireValues",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.TypedFacadeShouldPreserveCaseDistinctProposalMetadataKeysAtValidationBoundary",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.TypedFacadeShouldSubmitCamelCaseCommandAndReplayStableIdentityOverHttp"
+      ]
+    },
+    {
+      "id": "task-61",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CoarseIdempotencyStateJsonTests.EveryGeneratedReasonCodeShouldPersistAsItsEnumMemberValue",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PendingPreUpgradeGenericRecordShouldBlockNewKeyAdmission",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.UnexpiredLegacyGenericRecordShouldRetainItsOutcomeOrReservationAcrossDifferentCallerIds"
+      ]
+    },
+    {
+      "id": "task-62",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.AcknowledgementLossBeforeAdmissionShouldCleanOnlyItsOwnReservation",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.AcknowledgementLossCleanupFailureShouldReleaseOnTheNextAdmission",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.FailedAbortCleanupShouldNotDeleteAReplacementReservation",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PausedCleanupMustNotRemoveOrOverwriteAReplacement"
+      ]
+    },
+    {
+      "id": "task-63",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.DoubleOutcomeFailureShouldRemainRetryableAndRecoverWithoutRedispatch",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ExpiredReceiptShouldProtectPendingSpecializedPrimaryFromSecondDispatch",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.OldCallerIdentityShouldReplayAfterSpecializedDomainKeyIsReused",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SoleExpiredShadowReceiptMustRetainOriginalCallerOutcomeBeforeDeletion"
+      ]
+    },
+    {
+      "id": "task-64",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Conformance.Tests.ContractSpineOracleTests.RuntimeGatewayAndStatusOutcomesShouldMatchSafeOracle",
+        "Hexalith.ChatBot.Contracts.Tests.OpenApiContractSpineTests.ExamplesShouldConformToContractIdentifierAndProblemStatusShape",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldAcceptAuthenticatedTenantBoundSubmission",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.OperationStatusEndpointShouldReturnProjectionPendingMetadataOnlyStatus"
+      ]
+    },
+    {
+      "id": "task-65",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ProductionDaprConditionalWritesShouldUseStrongFirstWriteOptions",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ProductionDaprIdentitySaveShouldAdmitOneStrongFirstWriteWinner",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ProductionStateAdapterMustRoundTripReservationPreparationAndReleaseAcrossFreshServices"
+      ]
+    },
+    {
+      "id": "ac-1",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.GatewaySourcesMustNotDeclareCompetingContractWireDtos",
+        "Hexalith.ChatBot.Contracts.Tests.OpenApiContractSpineTests.ContractSpineShouldDeclareOpenApiFoundation",
+        "Hexalith.ChatBot.Contracts.Tests.OpenApiContractSpineTests.ContractSpineShouldExposeCommandSubmissionOperationStatusAndProjectConversation"
+      ]
+    },
+    {
+      "id": "ac-2",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.ContractSpineOperationsShouldBindTypedClientAndSeparatelyGovernedSurfaces",
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.GeneratedOutputHashShouldMatchCheckedInFreshnessFixture",
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.IsolatedNswagGenerationShouldMatchCheckedInOutputByteForByte"
+      ]
+    },
+    {
+      "id": "ac-3",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.FacadeShouldReuseCallerStableCommandIdAndRejectInvalidIdsBeforeTransport",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.TypedFacadeShouldSubmitCamelCaseCommandAndReplayStableIdentityOverHttp"
+      ]
+    },
+    {
+      "id": "ac-4",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Conformance.Tests.ContractSpineOracleTests.RuntimeGatewayAndStatusOutcomesShouldMatchSafeOracle",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldRejectInvalidContractBeforeAdmissionWithVersionedSafeProblem",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.OperationStatusEndpointShouldCollapseCrossTenantAndUnknownOperations",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldRejectCursorMintedForDifferentScope"
+      ]
+    },
+    {
+      "id": "ac-5",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.DispatchTargetBindingMustMatchPreparedOutcomeAndCurrentOwner",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.PreparedOutcomeShouldRecoverAcrossEveryServiceReplacementOnlyWithMatchingSdkCommitEvidence",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SdkBackedQueuedReconciliationMustAlsoMatchThePreparedAggregateTarget"
+      ]
+    },
+    {
+      "id": "ac-6",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CoarseIdempotencyStateJsonTests.HistoricalPreparedStateWithoutSdkConfirmationMustRemainUnconfirmed",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ExpiredGenericLegacyUnknownMustRemainPendingAcrossOriginalAndReplacementStores",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SameTargetLegacyStatusMustRequireObservedSdkAcceptanceOfThePreparedOwner",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SdkConfirmationMustMatchThePreparedResponseActualTargetAndCurrentOwner"
+      ]
+    }
+  ],
+  "outOfScopeDisclosures": [],
+  "reportPath": "_bmad-output/implementation-artifacts/evidence/reports/1-2-publish-the-openapi-contract-spine-and-typed-client.json"
+}

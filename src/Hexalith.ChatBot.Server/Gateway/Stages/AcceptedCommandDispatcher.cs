@@ -86,6 +86,11 @@ internal sealed class AcceptedCommandDispatcher(
         try
         {
             EventStoreDispatchPlan plan = await BuildPlanAsync(context, cancellationToken).ConfigureAwait(false);
+            if (!await context.BindDispatchTargetAsync(plan.AggregateId, cancellationToken).ConfigureAwait(false))
+            {
+                throw new InvalidOperationException("The prepared dispatch target could not be durably bound.");
+            }
+
             SubmitCommandRequest request = new(
                 MessageId: context.Submission.Request.CommandId,
                 Tenant: context.TenantBinding.TenantId,
@@ -103,6 +108,7 @@ internal sealed class AcceptedCommandDispatcher(
             try
             {
                 _ = await eventStore.SubmitCommandAsync(request, cancellationToken).ConfigureAwait(false);
+                context.MarkSdkSubmissionAccepted();
             }
             catch (Exception refusal) when (!writerAttemptedBeforeSubmission && EventStoreDefinitiveRefusal.IsDefinitive(refusal))
             {

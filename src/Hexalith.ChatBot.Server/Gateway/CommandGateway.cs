@@ -119,6 +119,8 @@ internal sealed class CommandGateway(
         };
 
         context.SetPreparedAcceptedAt(response.AcceptedAt);
+        context.SetDispatchTargetBinding((aggregateId, token) =>
+            idempotencyStore.BindDispatchTargetAsync(idempotency, response, aggregateId, token));
         try
         {
             if (!await idempotencyStore.PrepareDispatchAsync(idempotency, response, cancellationToken).ConfigureAwait(false))
@@ -187,6 +189,15 @@ internal sealed class CommandGateway(
 
         try
         {
+            // Observe SDK success in the dispatcher, but persist it only at the existing post-dispatch receipt
+            // boundary, after workflow startup. Failure here must not create an earlier scheduling-loss boundary.
+            if (context.SdkSubmissionAccepted &&
+                !await idempotencyStore.ConfirmSdkSubmissionAcceptedAsync(idempotency, response,
+                    context.PreparedAggregateId!, cancellationToken).ConfigureAwait(false))
+            {
+                throw new InvalidOperationException("SDK submission acceptance could not be durably confirmed.");
+            }
+
             await idempotencyStore
                 .RecordOutcomeAsync(idempotency, response, cancellationToken)
                 .ConfigureAwait(false);

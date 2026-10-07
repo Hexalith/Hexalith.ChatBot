@@ -17,7 +17,19 @@ internal sealed class DurableRecoveryEventStoreClient : IEventStoreGatewayClient
     /// <summary>Gets the message identifier of every submission, in order.</summary>
     public List<string> SubmittedMessageIds { get; } = [];
 
-    public bool SubmissionUncertain { get; init; }
+    /// <summary>Gets every attempted SDK request, including a transport failure before arrival.</summary>
+    public List<SubmitCommandRequest> SubmittedRequests { get; } = [];
+
+    /// <summary>Gets the number of submissions that arrived beyond the injected transport-failure boundary.</summary>
+    public int ReceivedSubmissionCount { get; private set; }
+
+    /// <summary>Gets or sets whether an arriving submission retains its genuine aggregate-bound committed status.</summary>
+    public bool RetainCommittedEvidence { get; set; }
+
+    /// <summary>Gets or sets a callback invoked once a submission reaches the platform.</summary>
+    public Action<SubmitCommandRequest>? OnReceivedSubmission { get; set; }
+
+    public bool SubmissionUncertain { get; set; }
 
     public CancellationTokenSource? CancelOnSubmission { get; init; }
 
@@ -31,6 +43,7 @@ internal sealed class DurableRecoveryEventStoreClient : IEventStoreGatewayClient
     {
         SubmissionCount++;
         SubmittedMessageIds.Add(request.MessageId);
+        SubmittedRequests.Add(request);
         CancelOnSubmission?.Cancel();
         if (SubmissionFailure is { } failure)
         {
@@ -38,6 +51,17 @@ internal sealed class DurableRecoveryEventStoreClient : IEventStoreGatewayClient
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        ReceivedSubmissionCount++;
+        if (RetainCommittedEvidence)
+        {
+            Evidence = new CommandStatusQueryResponse(request.CorrelationId!, nameof(CommandStatus.Completed),
+                (int)CommandStatus.Completed, MessageId: request.MessageId)
+            {
+                TenantId = request.Tenant, Domain = request.Domain, AggregateId = request.AggregateId,
+                CommittedEventSequence = 1, EventCount = 1,
+            };
+        }
+        OnReceivedSubmission?.Invoke(request);
         return SubmissionUncertain ? throw new InvalidOperationException("Injected uncertain platform acknowledgement.")
             : Task.FromResult(new SubmitCommandResponse(request.CorrelationId!, MessageId: request.MessageId));
     }

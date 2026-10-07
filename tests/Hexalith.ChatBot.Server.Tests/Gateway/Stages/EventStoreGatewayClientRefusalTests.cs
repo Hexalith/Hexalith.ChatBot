@@ -101,7 +101,10 @@ public sealed class EventStoreGatewayClientRefusalTests
             CorrelationId,
             null,
             ChatBotSurfaceOrigin.Ui);
-        return new ChatBotGatewayContext(submission, new ChatBotAuthenticatedActor("actor-alpha", principal), new ChatBotTenantBinding(Tenant));
+        ChatBotGatewayContext context = new(submission, new ChatBotAuthenticatedActor("actor-alpha", principal), new ChatBotTenantBinding(Tenant));
+        // This standalone transport test supplies the gateway's binding explicitly; ownership fencing has separate tests.
+        context.SetDispatchTargetBinding(static (_, _) => ValueTask.FromResult(true));
+        return context;
     }
 
     private sealed class FixedClock : ISystemClock

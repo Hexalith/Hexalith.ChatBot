@@ -107,7 +107,7 @@ internal static partial class CommandSubmissionContractAdapter
                 !ChatBotCommandId.TryParse(commandId, out ChatBotCommandId commandIdentifier) ||
                 !RequiredString(root, "commandType", out string? commandType) ||
                 commandType!.Length > CommandTypeMaxLength ||
-                !CommandTypePattern().IsMatch(commandType) ||
+                CommandTypePattern().Match(commandType).Length != commandType.Length ||
                 commandType.EndsWith(ForbiddenCommandTypeSuffix, StringComparison.Ordinal) ||
                 !RequiredString(root, "requestSchemaVersion", out string? version) ||
                 !string.Equals(version, RequestSchemaVersion, StringComparison.Ordinal) ||
@@ -241,7 +241,7 @@ internal static partial class CommandSubmissionContractAdapter
             Type keyType = type.GetGenericArguments()[0];
             Type valueType = type.GetGenericArguments()[1];
             return element.ValueKind == JsonValueKind.Object &&
-                !HasCaseInsensitiveDuplicates(element) &&
+                !HasDuplicateProperties(element, keyType == typeof(string) ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase) &&
                 element.EnumerateObject().All(item =>
                     ValidateDictionaryKey(item.Name, keyType) &&
                     ValidateValue(item.Value, valueType, depth + 1, allowNull: false));
@@ -259,7 +259,7 @@ internal static partial class CommandSubmissionContractAdapter
             return false;
         }
 
-        if (HasCaseInsensitiveDuplicates(element))
+        if (HasDuplicateProperties(element, StringComparer.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -349,9 +349,9 @@ internal static partial class CommandSubmissionContractAdapter
         return true;
     }
 
-    private static bool HasCaseInsensitiveDuplicates(JsonElement element)
+    private static bool HasDuplicateProperties(JsonElement element, StringComparer comparer)
     {
-        HashSet<string> names = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> names = new(comparer);
         return element.EnumerateObject().Any(property => !names.Add(property.Name));
     }
 

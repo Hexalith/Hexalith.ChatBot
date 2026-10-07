@@ -961,6 +961,7 @@ public sealed class ServerBootstrapApiTests
             .ConfigureAwait(true);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        response.Content.Headers.ContentType?.MediaType.ShouldBe("application/json");
         string body = await response.Content
             .ReadAsStringAsync(TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
@@ -1039,6 +1040,7 @@ public sealed class ServerBootstrapApiTests
             .ConfigureAwait(true);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        response.Content.Headers.ContentType?.MediaType.ShouldBe("application/json");
         string body = await response.Content
             .ReadAsStringAsync(TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
@@ -1054,6 +1056,7 @@ public sealed class ServerBootstrapApiTests
         using HttpResponseMessage statusResponse = await client.SendAsync(
             statusRequest, TestContext.Current.CancellationToken).ConfigureAwait(true);
         statusResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        statusResponse.Content.Headers.ContentType?.MediaType.ShouldBe("application/json");
         using JsonDocument status = JsonDocument.Parse(await statusResponse.Content
             .ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true));
         status.RootElement.GetProperty("operationId").GetString().ShouldBe(commandId);
@@ -1163,6 +1166,8 @@ public sealed class ServerBootstrapApiTests
 
         first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
         second.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        first.Content.Headers.ContentType?.MediaType.ShouldBe("application/json");
+        second.Content.Headers.ContentType?.MediaType.ShouldBe("application/json");
         dispatcher.DispatchCount.ShouldBe(1);
         string firstBody = await first.Content
             .ReadAsStringAsync(TestContext.Current.CancellationToken)
@@ -1221,9 +1226,12 @@ public sealed class ServerBootstrapApiTests
     [InlineData("malformed-json")]
     [InlineData("command-type-suffix")]
     [InlineData("command-type-pattern")]
+    [InlineData("command-type-trailing-newline")]
     [InlineData("command-type-too-long")]
     [InlineData("wrong-metadata-type")]
     [InlineData("mismatched-casing")]
+    [InlineData("unsupported-request-schema-version")]
+    [InlineData("undeclared-root-property")]
     [InlineData("malformed-specialized-body")]
     [InlineData("invalid-specialized-enum")]
     [InlineData("fractional-specialized-integer")]
@@ -1235,6 +1243,7 @@ public sealed class ServerBootstrapApiTests
     [InlineData("nested-casing-override")]
     [InlineData("nested-object-casing-override")]
     [InlineData("invalid-dictionary-enum-key")]
+    [InlineData("duplicate-dictionary-key")]
     public async Task CommandEndpointShouldRejectInvalidContractBeforeAdmissionWithVersionedSafeProblem(string scenario)
     {
         RecordingDispatcher dispatcher = new();
@@ -1251,9 +1260,12 @@ public sealed class ServerBootstrapApiTests
             "malformed-json" => "{",
             "command-type-suffix" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"TenantScopedCommand","command":{},"requestSchemaVersion":"v1"}""",
             "command-type-pattern" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"lowercaseName","command":{},"requestSchemaVersion":"v1"}""",
+            "command-type-trailing-newline" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"ProbeCommand\n","command":{},"requestSchemaVersion":"v1"}""",
             "command-type-too-long" => $$"""{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"{{new string('A', 161)}}","command":{},"requestSchemaVersion":"v1"}""",
             "wrong-metadata-type" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"RecordGovernedNote","command":{"noteId":"note-1"},"actorType":42,"requestSchemaVersion":"v1"}""",
             "mismatched-casing" => """{"CommandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"RecordGovernedNote","command":{"noteId":"note-1"},"requestSchemaVersion":"v1"}""",
+            "unsupported-request-schema-version" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"RecordGovernedNote","command":{"noteId":"note-1"},"requestSchemaVersion":"v2"}""",
+            "undeclared-root-property" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"RecordGovernedNote","command":{"noteId":"note-1"},"requestSchemaVersion":"v1","unexpectedField":true}""",
             "malformed-specialized-body" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"RequestFailedWorkflowRetry","command":{},"requestSchemaVersion":"v1"}""",
             "invalid-specialized-enum" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"AssociateEmailToProject","command":{"associationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","intakeId":"01ARZ3NDEKTSV4RRFFQ69G5FAZ","projectId":"project-001","decisionKind":"not-a-decision","decisionNote":null,"candidateEvidenceFingerprint":"hash-project","sourceVersion":1,"schemaVersion":"chatbot.association-decision-command.v1"},"requestSchemaVersion":"v1"}""",
             "fractional-specialized-integer" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"AssociateEmailToProject","command":{"associationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","intakeId":"01ARZ3NDEKTSV4RRFFQ69G5FAZ","projectId":"project-001","decisionKind":"associate","decisionNote":null,"candidateEvidenceFingerprint":"hash-project","sourceVersion":1.5,"schemaVersion":"chatbot.association-decision-command.v1"},"requestSchemaVersion":"v1"}""",
@@ -1264,6 +1276,10 @@ public sealed class ServerBootstrapApiTests
             "nested-object-casing-override" => ProposeActionRequestBody("\"owner-001\"").Replace(
                 "\"proposalInputMetadata\":{\"source\":\"trusted\"}",
                 "\"proposalInputMetadata\":{\"source\":\"trusted\"},\"ProposalInputMetadata\":42",
+                StringComparison.Ordinal),
+            "duplicate-dictionary-key" => ProposeActionRequestBody("\"owner-001\"").Replace(
+                "\"proposalInputMetadata\":{\"source\":\"trusted\"}",
+                "\"proposalInputMetadata\":{\"source\":\"one\",\"source\":\"two\"}",
                 StringComparison.Ordinal),
             "invalid-dictionary-enum-key" => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"SubmitTenantPolicyChange","command":{"policyChangeId":"change-1","sourcePolicySnapshotId":"source-1","proposedPolicySnapshotId":"next-1","sourceVersion":1,"changedKnobIds":["ai-action.low-risk-allowed"],"changeSet":{"values":[{"knobId":"ai-action.low-risk-allowed","aiActionLowRiskAllowed":{"invalid-action":true}}]},"reasonCode":"test","requesterRef":"actor-1","schemaVersion":"v1","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","oldValueFingerprint":"old","newValueFingerprint":"new"},"requestSchemaVersion":"v1"}""",
             _ => """{"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAY","commandType":"RecordGovernedNote","command":{"noteId":"note-1"},"requestSchemaVersion":"v1"}""",
@@ -1285,10 +1301,11 @@ public sealed class ServerBootstrapApiTests
         root.GetProperty("schemaVersion").GetString().ShouldBe("chatbot.message-catalog.v1");
         root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe("metadata_only");
         if (scenario is "wrong-metadata-type" or "malformed-specialized-body" or "command-type-suffix" or
-            "command-type-pattern" or "command-type-too-long" or
+            "command-type-pattern" or "command-type-trailing-newline" or "command-type-too-long" or
+            "unsupported-request-schema-version" or "undeclared-root-property" or
             "invalid-specialized-enum" or "fractional-specialized-integer" or "unknown-origin" or
             "null-scoring-signal" or "invalid-init-only-member" or "nested-casing-override" or "nested-object-casing-override" or
-            "invalid-dictionary-enum-key")
+            "invalid-dictionary-enum-key" or "duplicate-dictionary-key")
         {
             root.GetProperty("correlationId").GetString().ShouldBe(commandId);
         }
@@ -1314,6 +1331,42 @@ public sealed class ServerBootstrapApiTests
         response.StatusCode.ShouldNotBe(HttpStatusCode.BadRequest);
         string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
         body.ShouldNotContain("command_contract_invalid", Case.Sensitive);
+    }
+
+    [Fact]
+    public async Task TypedFacadeShouldPreserveCaseDistinctProposalMetadataKeysAtValidationBoundary()
+    {
+        using WebApplicationFactory<Program> factory = new();
+        using HttpClient http = factory.CreateClient();
+        Hexalith.ChatBot.Client.ChatBotClient facade = new(new Hexalith.ChatBot.Client.Generated.Client(http));
+        const string correlationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
+        Hexalith.ChatBot.Contracts.Commands.ProposeAIAction command = new(
+            ProjectId: "project-001",
+            TaskIntentId: "task-001",
+            SourceMessageId: "message-001",
+            RequesterId: "requester-001",
+            IntendedCommandName: "AppendConversationMessage",
+            ActionKind: "summarize",
+            ExpectedSourceVersion: 1,
+            EvidenceReferences: ["evidence-safe"],
+            AffectedResourceReferences: [],
+            RecipientReferences: [],
+            PolicySnapshotId: null,
+            CorrelationId: correlationId,
+            TransitionId: "transition-001",
+            ProposalInputMetadata: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["source"] = "one",
+                ["Source"] = "two",
+            });
+
+        // A valid envelope reaches authentication; malformed typed member aliases still fail before that boundary.
+        HexalithChatBotApiException<ProblemDetails> problem = await Should.ThrowAsync<HexalithChatBotApiException<ProblemDetails>>(
+            () => facade.SubmitWithCommandIdAsync(command, "01ARZ3NDEKTSV4RRFFQ69G5FAY", correlationId,
+                cancellationToken: TestContext.Current.CancellationToken));
+        problem.StatusCode.ShouldBe((int)HttpStatusCode.Unauthorized);
+        problem.Result.Code.ShouldBe("authentication_denied");
+        problem.Result.SchemaVersion.ShouldBe("chatbot.message-catalog.v1");
     }
 
     private static string ProposeActionRequestBody(string stateOwnerJson)
@@ -1520,6 +1573,7 @@ public sealed class ServerBootstrapApiTests
             .ConfigureAwait(true);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        response.Content.Headers.ContentType?.MediaType.ShouldBe("application/json");
         response.Headers.GetValues("X-Correlation-Id").Single().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         response.Headers.GetValues("X-Hexalith-Task-Id").Single().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
         string body = await response.Content

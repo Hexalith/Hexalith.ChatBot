@@ -22,4 +22,6 @@ internal sealed record CoarseIdempotencyRecord(
     CoarseDispatchState DispatchState = CoarseDispatchState.Unknown,
     DateTimeOffset? ReservationLeaseExpiresAt = null,
     CommandSubmissionResponse? PreparedOutcome = null,
-    bool Released = false);
+    bool Released = false,
+    string? PreparedAggregateId = null,
+    bool SdkSubmissionAccepted = false);

@@ -47,9 +47,12 @@ public sealed class AcceptedCommandDispatcherTests
         FixedClock clock = new();
         AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), clock);
 
+        ChatBotGatewayContext context = Context(WireCommand(NoteId));
+        context.SdkSubmissionAccepted.ShouldBeFalse();
         ChatBotDispatchResult result = await dispatcher.DispatchAsync(
-            Context(WireCommand(NoteId)),
+            context,
             TestContext.Current.CancellationToken);
+        context.SdkSubmissionAccepted.ShouldBeTrue();
 
         SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
         request.MessageId.ShouldBe(CommandId);
@@ -100,8 +103,10 @@ public sealed class AcceptedCommandDispatcherTests
             new FixedClock(),
             metrics: metrics);
 
+        ChatBotGatewayContext context = Context(WireCommand(NoteId));
         await Should.ThrowAsync<InvalidOperationException>(
-            () => dispatcher.DispatchAsync(Context(WireCommand(NoteId)), TestContext.Current.CancellationToken).AsTask());
+            () => dispatcher.DispatchAsync(context, TestContext.Current.CancellationToken).AsTask());
+        context.SdkSubmissionAccepted.ShouldBeFalse();
 
         (string operationClass, string tenantId, _) = metrics.Latencies.ShouldHaveSingleItem();
         operationClass.ShouldBe(ChatBotOperationClasses.CommandExecution);
@@ -1667,10 +1672,15 @@ public sealed class AcceptedCommandDispatcherTests
             CorrelationId,
             taskId,
             ChatBotSurfaceOrigin.Ui);
-        return new ChatBotGatewayContext(
-            submission,
-            new ChatBotAuthenticatedActor("actor-alpha", principal),
-            new ChatBotTenantBinding(Tenant));
+        return StandaloneContext(submission, principal, Tenant);
+    }
+
+    /// <summary>Models the gateway binding explicitly for standalone dispatch-plan tests; store fencing is tested through the gateway.</summary>
+    private static ChatBotGatewayContext StandaloneContext(ChatBotCommandSubmission submission, ClaimsPrincipal principal, string tenant)
+    {
+        ChatBotGatewayContext context = new(submission, new ChatBotAuthenticatedActor("actor-alpha", principal), new ChatBotTenantBinding(tenant));
+        context.SetDispatchTargetBinding(static (_, _) => ValueTask.FromResult(true));
+        return context;
     }
 
     // The inbound wire body is camelCase, mirroring what the adapter posts to /api/v1/commands.
@@ -1865,10 +1875,7 @@ public sealed class AcceptedCommandDispatcherTests
             CorrelationId,
             TaskId,
             ChatBotSurfaceOrigin.Ui);
-        return new ChatBotGatewayContext(
-            submission,
-            new ChatBotAuthenticatedActor("actor-alpha", principal),
-            new ChatBotTenantBinding(tenant));
+        return StandaloneContext(submission, principal, tenant);
     }
 
     // Story 9.4: a replay-run variant of OutboundSendContext — same outbound-send authority claims, but bound to a TEST
@@ -1903,10 +1910,7 @@ public sealed class AcceptedCommandDispatcherTests
             TaskId,
             ChatBotSurfaceOrigin.Ui,
             replayRunId);
-        return new ChatBotGatewayContext(
-            submission,
-            new ChatBotAuthenticatedActor("actor-alpha", principal),
-            new ChatBotTenantBinding(tenant));
+        return StandaloneContext(submission, principal, tenant);
     }
 
     private static Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft OutboundDraft(string draftId)
@@ -1953,10 +1957,7 @@ public sealed class AcceptedCommandDispatcherTests
             CorrelationId,
             TaskId,
             ChatBotSurfaceOrigin.Ui);
-        return new ChatBotGatewayContext(
-            submission,
-            new ChatBotAuthenticatedActor("actor-alpha", principal),
-            new ChatBotTenantBinding(tenant));
+        return StandaloneContext(submission, principal, tenant);
     }
 
     // A RequestOutboundSendApproval carrying the trusted approval metadata the dispatcher's approval-request branch

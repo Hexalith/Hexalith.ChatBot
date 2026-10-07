@@ -150,6 +150,9 @@ internal sealed class RecoveryDependencyExercise(
             throw new InvalidOperationException("The ai-provider recovery exercise was not admitted; the admission stages are not exercising cleanly.");
         }
 
+        CommandSubmissionResponse prepared = await PrepareAdmissionDispatchAsync(decision, cancellationToken).ConfigureAwait(false);
+        int effectsBefore = state.EffectCount("ai-provider", tenantRef);
+
         // AI assistance still submits through the EventStore client; do not attribute that submit to the
         // command-execution ledger (Restore for ai-provider would not clear it).
         bool previousRecording = eventStore.RecordCommandExecutionEffects;
@@ -266,7 +269,7 @@ internal sealed class RecoveryDependencyExercise(
         // Succeeded dispatch mirrors CommandGateway.RecordOutcomeAsync so same-correlation replay is safe.
         if (faultObserved)
         {
-            await AbortAdmissionAsync(decision, cancellationToken).ConfigureAwait(false);
+            await AbortControlledFaultAsync(decision, prepared, "ai-provider", effectsBefore).ConfigureAwait(false);
         }
         else
         {
@@ -303,6 +306,8 @@ internal sealed class RecoveryDependencyExercise(
             new RecoveryParticipantResolutionOrchestrator(),
             new RecoveryAssociationScoringOrchestrator(),
             new SystemClock());
+        CommandSubmissionResponse prepared = await PrepareAdmissionDispatchAsync(decision, cancellationToken).ConfigureAwait(false);
+        int effectsBefore = state.EffectCount("command-execution", tenantRef);
         try
         {
             _ = await dispatcher.DispatchAsync(decision.Context!, cancellationToken).ConfigureAwait(false);
@@ -311,7 +316,7 @@ internal sealed class RecoveryDependencyExercise(
         }
         catch (Exception) when (state.IsFaulted("command-execution"))
         {
-            await AbortAdmissionAsync(decision, cancellationToken).ConfigureAwait(false);
+            await AbortControlledFaultAsync(decision, prepared, "command-execution", effectsBefore).ConfigureAwait(false);
             return (FaultObserved: true, Committed: false, FaultSignalCode: "command_execution_unavailable");
         }
     }
@@ -455,6 +460,53 @@ internal sealed class RecoveryDependencyExercise(
             cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Uses the real store's prepared-response and target fences before a standalone dispatcher invocation.</summary>
+    private async ValueTask<CommandSubmissionResponse> PrepareAdmissionDispatchAsync(
+        ChatBotCommandAdmissionDecision decision,
+        CancellationToken cancellationToken)
+    {
+        ChatBotGatewayContext context = decision.Context!;
+        CoarseIdempotencyMetadata metadata = decision.Idempotency!;
+        CommandSubmissionResponse response = AdmissionOutcome(decision);
+        context.SetPreparedAcceptedAt(response.AcceptedAt);
+        if (!await _idempotencyStore.PrepareDispatchAsync(metadata, response, cancellationToken).ConfigureAwait(false))
+        {
+            throw new InvalidOperationException("The recovery exercise could not prepare its dispatch ownership.");
+        }
+        context.SetDispatchTargetBinding((target, token) => _idempotencyStore.BindDispatchTargetAsync(metadata, response, target, token));
+        return response;
+    }
+
+    /// <summary>
+    /// Releases the exact prepared response only for a controlled synthetic dependency fault with no new effect.
+    /// The sandbox's retained fault/effect ledger is fixture ground truth; it is not production SDK recovery proof.
+    /// Ordinary unknown dispatch failures retain ownership through <see cref="AbortAdmissionAsync"/>.
+    /// </summary>
+    private async ValueTask AbortControlledFaultAsync(ChatBotCommandAdmissionDecision decision, CommandSubmissionResponse prepared,
+        string dependency, int effectsBefore)
+    {
+        if (!state.IsFaulted(dependency) || state.EffectCount(dependency, decision.Context!.TenantBinding.TenantId) != effectsBefore)
+        {
+            throw new InvalidOperationException("The controlled dependency fault did not prove absence of a new effect.");
+        }
+        using CancellationTokenSource cleanup = new(TimeSpan.FromSeconds(5));
+        await _idempotencyStore.AbortUndispatchedAsync(decision.Idempotency!, prepared, cleanup.Token).ConfigureAwait(false);
+    }
+
+    /// <summary>Builds the same canonical response before dispatch and when recording its outcome.</summary>
+    private static CommandSubmissionResponse AdmissionOutcome(ChatBotCommandAdmissionDecision decision)
+        => new()
+        {
+            CommandId = decision.Context!.Submission.Request.CommandId,
+            CorrelationId = decision.CorrelationId,
+            TaskId = decision.TaskId,
+            OperationId = decision.TaskId ?? decision.Context.Submission.Request.CommandId,
+            LifecycleState = Hexalith.ChatBot.Client.Generated.LifecycleState.Proposed,
+            AcceptedAt = decision.Context.PreparedAcceptedAt ?? DateTimeOffset.UtcNow,
+            ReasonCode = Hexalith.ChatBot.Client.Generated.ChatBotMessageCode.Command_accepted,
+            RetryEligible = false,
+        };
+
     private async ValueTask RecordAdmissionOutcomeAsync(
         ChatBotCommandAdmissionDecision decision,
         CancellationToken cancellationToken)
@@ -464,14 +516,13 @@ internal sealed class RecoveryDependencyExercise(
             return;
         }
 
-        CommandSubmissionResponse response = new()
+        CommandSubmissionResponse response = AdmissionOutcome(decision);
+        if (decision.Context.SdkSubmissionAccepted &&
+            !await _idempotencyStore.ConfirmSdkSubmissionAcceptedAsync(decision.Idempotency, response,
+                decision.Context.PreparedAggregateId!, cancellationToken).ConfigureAwait(false))
         {
-            CommandId = decision.Context.Submission.Request.CommandId,
-            CorrelationId = decision.CorrelationId,
-            TaskId = decision.TaskId,
-            LifecycleState = Hexalith.ChatBot.Client.Generated.LifecycleState.Proposed,
-            AcceptedAt = DateTimeOffset.UtcNow,
-        };
+            throw new InvalidOperationException("The recovery exercise could not retain its observed SDK acceptance.");
+        }
         await _idempotencyStore
             .RecordOutcomeAsync(decision.Idempotency, response, cancellationToken)
             .ConfigureAwait(false);

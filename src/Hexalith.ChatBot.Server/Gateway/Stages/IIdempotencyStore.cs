@@ -14,6 +14,20 @@ internal interface IIdempotencyStore
         CommandSubmissionResponse outcome,
         CancellationToken cancellationToken) => ValueTask.FromResult(false);
 
+    /// <summary>Fences the actual planned EventStore aggregate target onto the matching prepared dispatch ownership.</summary>
+    ValueTask<bool> BindDispatchTargetAsync(
+        CoarseIdempotencyMetadata metadata,
+        CommandSubmissionResponse preparedOutcome,
+        string aggregateId,
+        CancellationToken cancellationToken) => ValueTask.FromResult(false);
+
+    /// <summary>Retains observed SDK acceptance only for the exact prepared owner, response, and aggregate.</summary>
+    ValueTask<bool> ConfirmSdkSubmissionAcceptedAsync(
+        CoarseIdempotencyMetadata metadata,
+        CommandSubmissionResponse preparedOutcome,
+        string aggregateId,
+        CancellationToken cancellationToken) => ValueTask.FromResult(false);
+
     ValueTask RecordOutcomeAsync(
         CoarseIdempotencyMetadata metadata,
         CommandSubmissionResponse outcome,

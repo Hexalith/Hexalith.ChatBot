@@ -152,6 +152,53 @@ internal sealed class InMemoryCoarseIdempotencyStore(ISystemClock clock) : IIdem
         }
     }
 
+    /// <summary>Retains the actual planned target only on the matching prepared dispatch owner.</summary>
+    public ValueTask<bool> BindDispatchTargetAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse preparedOutcome,
+        string aggregateId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_sync)
+        {
+            if (string.IsNullOrWhiteSpace(aggregateId) ||
+                !_records.TryGetValue(metadata.CoarseKeyHash, out PendingRecord? pending) ||
+                pending.Record.ReservationId != metadata.ReservationId || pending.Record.IdentityKeyHash != metadata.IdentityKeyHash ||
+                pending.Record.OperationClass != metadata.OperationClass || pending.Record.CanonicalEquivalenceHash != metadata.CanonicalEquivalenceHash ||
+                pending.Record.PriorOutcome is not null || pending.Record.DispatchState != CoarseDispatchState.Dispatching ||
+                pending.Record.PreparedOutcome is not { } prepared || !SameOutcome(prepared, preparedOutcome) ||
+                pending.Record.PreparedAggregateId is { } target && !string.Equals(target, aggregateId, StringComparison.Ordinal))
+            {
+                return ValueTask.FromResult(false);
+            }
+
+            pending.Record = pending.Record with { PreparedAggregateId = aggregateId };
+            return ValueTask.FromResult(true);
+        }
+    }
+
+    /// <summary>Retains SDK acceptance on the same exact prepared owner and planned aggregate.</summary>
+    public ValueTask<bool> ConfirmSdkSubmissionAcceptedAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse preparedOutcome,
+        string aggregateId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_sync)
+        {
+            if (string.IsNullOrWhiteSpace(aggregateId) ||
+                !_records.TryGetValue(metadata.CoarseKeyHash, out PendingRecord? pending) ||
+                pending.Record.ReservationId != metadata.ReservationId || pending.Record.IdentityKeyHash != metadata.IdentityKeyHash ||
+                pending.Record.OperationClass != metadata.OperationClass || pending.Record.CanonicalEquivalenceHash != metadata.CanonicalEquivalenceHash ||
+                pending.Record.CreatedAt != metadata.CreatedAt ||
+                pending.Record.PriorOutcome is not null || pending.Record.DispatchState != CoarseDispatchState.Dispatching ||
+                pending.Record.PreparedOutcome is not { } prepared || !SameOutcome(prepared, preparedOutcome) ||
+                !string.Equals(pending.Record.PreparedAggregateId, aggregateId, StringComparison.Ordinal))
+            {
+                return ValueTask.FromResult(false);
+            }
+
+            pending.Record = pending.Record with { SdkSubmissionAccepted = true };
+            return ValueTask.FromResult(true);
+        }
+    }
+
     public ValueTask RecordOutcomeAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse outcome, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(metadata);
@@ -185,6 +232,7 @@ internal sealed class InMemoryCoarseIdempotencyStore(ISystemClock clock) : IIdem
         lock (_sync)
         {
             if (_records.TryGetValue(metadata.CoarseKeyHash, out PendingRecord? pending) && pending.Record.PriorOutcome is null &&
+                !pending.Record.SdkSubmissionAccepted &&
                 pending.Record.ReservationId == metadata.ReservationId &&
                 (pending.Record.DispatchState == CoarseDispatchState.Reserved ||
                  pending.Record.DispatchState == CoarseDispatchState.Dispatching && undispatchedOutcome is not null &&

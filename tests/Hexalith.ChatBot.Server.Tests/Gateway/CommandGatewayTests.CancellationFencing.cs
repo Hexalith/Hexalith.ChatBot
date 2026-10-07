@@ -142,6 +142,8 @@ public sealed partial class CommandGatewayTests
             return prepared;
         }
         public ValueTask RecordOutcomeAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse outcome, CancellationToken token) => real.RecordOutcomeAsync(metadata, outcome, token);
+        public ValueTask<bool> BindDispatchTargetAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse outcome, string aggregateId, CancellationToken token)
+            => real.BindDispatchTargetAsync(metadata, outcome, aggregateId, token);
         public ValueTask AbortAdmissionAsync(CoarseIdempotencyMetadata metadata, CancellationToken token) => real.AbortAdmissionAsync(metadata, token);
         public ValueTask AbortUndispatchedAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse outcome, CancellationToken token)
         {

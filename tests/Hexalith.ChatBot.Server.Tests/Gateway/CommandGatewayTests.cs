@@ -5556,6 +5556,14 @@ public sealed partial class CommandGatewayTests
 
         public int RejectAbortFenceSaves { get; set; }
 
+        public int RejectTargetBindings { get; set; }
+
+        public bool ThrowAfterTargetBindingSave { get; set; }
+
+        public int RejectSdkConfirmations { get; set; }
+
+        public bool ThrowAfterSdkConfirmationSave { get; set; }
+
         public int RejectReceiptCreates { get; set; }
 
         public int RejectReceiptOutcomeSaves { get; set; }
@@ -5703,6 +5711,8 @@ public sealed partial class CommandGatewayTests
         public Task<bool> TrySaveIdentityAsync(string key, CoarseCommandIdentityRecord record, string etag, CancellationToken cancellationToken)
         {
             if (record.Released) { GateOwnershipWrite("identity-release"); }
+            else if (record.PriorOutcome is null && record.DomainReservation?.SdkSubmissionAccepted is true) { GateOwnershipWrite("sdk-confirmation"); }
+            else if (record.PriorOutcome is null && record.DomainReservation?.PreparedAggregateId is not null) { GateOwnershipWrite("target"); }
             else if (record.DomainReservation?.DispatchState == CoarseDispatchState.Dispatching) { GateOwnershipWrite("prepare"); }
             if (record.PriorOutcome is null && string.IsNullOrEmpty(etag))
             {
@@ -5718,6 +5728,18 @@ public sealed partial class CommandGatewayTests
                 if (!record.Released && record.DomainReservation?.DispatchState == CoarseDispatchState.Aborted && RejectAbortFenceSaves > 0)
                 {
                     RejectAbortFenceSaves--;
+                    return Task.FromResult(false);
+                }
+
+                if (!record.Released && record.PriorOutcome is null && record.DomainReservation is { DispatchState: CoarseDispatchState.Dispatching, SdkSubmissionAccepted: true } && RejectSdkConfirmations > 0)
+                {
+                    RejectSdkConfirmations--;
+                    return Task.FromResult(false);
+                }
+
+                if (!record.Released && record.PriorOutcome is null && record.DomainReservation is { DispatchState: CoarseDispatchState.Dispatching, SdkSubmissionAccepted: false, PreparedAggregateId: not null } && RejectTargetBindings > 0)
+                {
+                    RejectTargetBindings--;
                     return Task.FromResult(false);
                 }
 
@@ -5739,6 +5761,18 @@ public sealed partial class CommandGatewayTests
                 }
 
                 bool saved = TrySave(key, record, etag);
+                if (saved && !record.Released && record.PriorOutcome is null &&
+                    record.DomainReservation is { SdkSubmissionAccepted: true } && ThrowAfterSdkConfirmationSave)
+                {
+                    ThrowAfterSdkConfirmationSave = false;
+                    throw new IOException("Injected acknowledgement loss after the SDK confirmation commit.");
+                }
+                if (saved && !record.Released && record.PriorOutcome is null &&
+                    record.DomainReservation is { DispatchState: CoarseDispatchState.Dispatching, SdkSubmissionAccepted: false, PreparedAggregateId: not null } && ThrowAfterTargetBindingSave)
+                {
+                    ThrowAfterTargetBindingSave = false;
+                    throw new IOException("Injected acknowledgement loss after the target binding commit.");
+                }
                 if (saved && record.PriorOutcome is null && ThrowAfterIdentityClaimSave)
                 {
                     ThrowAfterIdentityClaimSave = false;

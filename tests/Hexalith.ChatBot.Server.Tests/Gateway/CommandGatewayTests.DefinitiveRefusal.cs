@@ -330,6 +330,9 @@ public sealed partial class CommandGatewayTests
         public ValueTask<bool> PrepareDispatchAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse outcome, CancellationToken token)
             => real.PrepareDispatchAsync(metadata, outcome, token);
 
+        public ValueTask<bool> BindDispatchTargetAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse outcome, string aggregateId, CancellationToken token)
+            => real.BindDispatchTargetAsync(metadata, outcome, aggregateId, token);
+
         public ValueTask RecordOutcomeAsync(CoarseIdempotencyMetadata metadata, CommandSubmissionResponse outcome, CancellationToken token)
             => real.RecordOutcomeAsync(metadata, outcome, token);
 

@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
@@ -179,37 +180,40 @@ public sealed partial class CommandGatewayTests
     }
 
     [Theory]
-    [InlineData("valid")]
-    [InlineData("events-stored")]
-    [InlineData("events-published")]
-    [InlineData("publish-failed")]
-    [InlineData("no-op")]
-    [InlineData("rejection-event")]
-    [InlineData("rejected")]
-    [InlineData("missing")]
-    [InlineData("message")]
-    [InlineData("tenant")]
-    [InlineData("domain")]
-    [InlineData("processing")]
-    [InlineData("correlation")]
-    [InlineData("status-name")]
-    [InlineData("no-commit")]
-    [InlineData("unavailable")]
-    public async Task PreparedOutcomeShouldRecoverAcrossEveryServiceReplacementOnlyWithMatchingSdkCommitEvidence(string scenario)
+    [InlineData("valid", true)]
+    [InlineData("events-stored", true)]
+    [InlineData("events-published", true)]
+    [InlineData("publish-failed", true)]
+    [InlineData("no-op", true)]
+    [InlineData("rejection-event", true)]
+    [InlineData("rejected", true)]
+    [InlineData("missing", true)]
+    [InlineData("message", true)]
+    [InlineData("tenant", true)]
+    [InlineData("domain", true)]
+    [InlineData("aggregate", true)]
+    [InlineData("aggregate-missing", true)]
+    [InlineData("aggregate-empty", true)]
+    [InlineData("target-missing", true)]
+    [InlineData("historical-unknown", true)]
+    [InlineData("processing", true)]
+    [InlineData("correlation", true)]
+    [InlineData("status-name", true)]
+    [InlineData("no-commit", true)]
+    [InlineData("unavailable", true)]
+    [InlineData("valid", false)]
+    [InlineData("events-stored", false)]
+    [InlineData("events-published", false)]
+    [InlineData("publish-failed", false)]
+    [InlineData("no-op", false)]
+    public async Task PreparedOutcomeShouldRecoverAcrossEveryServiceReplacementOnlyWithMatchingSdkCommitEvidence(string scenario, bool confirmationPresent)
     {
         FakeCoarseIdempotencyStateClient state = new();
         MutableClock clock = new(FixedClock.FixedUtcNow);
-        DurableRecoveryEventStoreClient platform = new();
+        DurableRecoveryEventStoreClient platform = new() { RetainCommittedEvidence = true };
         ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), AssociationDecisionCommand());
-        RecordingDispatcher originalDispatcher = new(onDispatch: () =>
-        {
-            state.ThrowOutcomeWrites = 100;
-            platform.Evidence = new CommandStatusQueryResponse(submission.CorrelationId, nameof(CommandStatus.Completed),
-                (int)CommandStatus.Completed, MessageId: submission.Request.CommandId)
-            {
-                TenantId = BoundTenant, Domain = "chatbot", CommittedEventSequence = 1, EventCount = 1,
-            };
-        });
+        platform.OnReceivedSubmission = _ => state.ThrowOutcomeWrites = 100;
+        AcceptedCommandDispatcher originalDispatcher = new(platform, null!, null!, clock);
         CommandGateway original = Gateway(originalDispatcher, clock: clock,
             idempotencyStore: new DaprCoarseIdempotencyStore(state, clock, eventStore: platform),
             auditWriter: new RecordingAuditWriter { PostCommitResult = AuditWriteResult.Unavailable("audit_unavailable") },
@@ -220,7 +224,20 @@ public sealed partial class CommandGatewayTests
         prepared.AcceptedAt.Offset.ShouldBe(TimeSpan.Zero);
         state.DomainRecords.Single().PriorOutcome.ShouldBeNull();
         state.IdentityRecords.Single().PriorOutcome.ShouldBeNull();
-        originalDispatcher.DispatchCount.ShouldBe(1);
+        platform.SubmissionCount.ShouldBe(1);
+        state.IdentityRecords.Single().DomainReservation!.PreparedAggregateId.ShouldBe(AssociationDecisionCommand().AssociationId);
+
+        state.IdentityRecords.Single().DomainReservation!.SdkSubmissionAccepted.ShouldBeTrue();
+        if (!confirmationPresent)
+        {
+            // Models historical state with no positive SDK confirmation, even though all other proof matches.
+            CoarseCommandIdentityRecord identity = state.IdentityRecords.Single();
+            (CoarseCommandIdentityRecord? _, string version) = await state.ReadIdentityAsync(identity.DomainReservation!.IdentityKeyHash!, TestContext.Current.CancellationToken);
+            (await state.TrySaveIdentityAsync(identity.DomainReservation.IdentityKeyHash!, identity with
+            {
+                DomainReservation = identity.DomainReservation with { SdkSubmissionAccepted = false },
+            }, version, TestContext.Current.CancellationToken)).ShouldBeTrue();
+        }
 
         platform.Evidence = scenario switch
         {
@@ -228,6 +245,9 @@ public sealed partial class CommandGatewayTests
             "message" => platform.Evidence! with { MessageId = "01ARZ3NDEKTSV4RRFFQ69G5FBB" },
             "tenant" => platform.Evidence! with { TenantId = OtherTenant },
             "domain" => platform.Evidence! with { Domain = "other" },
+            "aggregate" => platform.Evidence! with { AggregateId = "01ARZ3NDEKTSV4RRFFQ69G5FBB" },
+            "aggregate-missing" => platform.Evidence! with { AggregateId = null },
+            "aggregate-empty" => platform.Evidence! with { AggregateId = " " },
             "processing" => platform.Evidence! with { Status = nameof(CommandStatus.Processing), StatusCode = (int)CommandStatus.Processing },
             "correlation" => platform.Evidence! with { CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FBB" },
             "status-name" => platform.Evidence! with { Status = nameof(CommandStatus.Rejected) },
@@ -240,6 +260,19 @@ public sealed partial class CommandGatewayTests
             "rejected" => platform.Evidence! with { Status = nameof(CommandStatus.Rejected), StatusCode = (int)CommandStatus.Rejected },
             _ => platform.Evidence,
         };
+        if (scenario is "target-missing" or "historical-unknown")
+        {
+            CoarseCommandIdentityRecord identity = state.IdentityRecords.Single();
+            (CoarseCommandIdentityRecord? _, string version) = await state.ReadIdentityAsync(identity.DomainReservation!.IdentityKeyHash!, TestContext.Current.CancellationToken);
+            (await state.TrySaveIdentityAsync(identity.DomainReservation.IdentityKeyHash!, identity with
+            {
+                DomainReservation = identity.DomainReservation with
+                {
+                    PreparedAggregateId = scenario == "target-missing" ? null : identity.DomainReservation.PreparedAggregateId,
+                    DispatchState = scenario == "historical-unknown" ? CoarseDispatchState.Unknown : identity.DomainReservation.DispatchState,
+                },
+            }, version, TestContext.Current.CancellationToken)).ShouldBeTrue();
+        }
         platform.Unavailable = scenario == "unavailable";
         state.ThrowOutcomeWrites = 0;
         clock.UtcNow += TimeSpan.FromHours(25);
@@ -252,11 +285,12 @@ public sealed partial class CommandGatewayTests
         ChatBotGatewayResult recovered = await replacement.SubmitAsync(submission, TestContext.Current.CancellationToken);
 
         replacementDispatcher.DispatchCount.ShouldBe(0);
-        if (scenario is "valid" or "events-stored" or "events-published" or "publish-failed" or "no-op")
+        if (confirmationPresent && scenario is "valid" or "events-stored" or "events-published" or "publish-failed" or "no-op")
         {
             recovered.IsAccepted.ShouldBeTrue();
             AssertPreparedOutcome(recovered.Accepted!, prepared);
             AssertPreparedOutcome(state.IdentityRecords.Single().PriorOutcome!, prepared);
+            state.IdentityRecords.Single().DomainReservation!.PreparedAggregateId.ShouldBe(platform.Evidence!.AggregateId);
             AssertPreparedOutcome(state.ReceiptRecords.Single().PriorOutcome!, prepared);
             var status = (await replacementStatus.TryGetAsync(BoundTenant, prepared.OperationId, TestContext.Current.CancellationToken)).ShouldNotBeNull();
             status.OperationClass.ShouldBe(state.IdentityRecords.Single().DomainReservation!.OperationClass);
@@ -270,6 +304,73 @@ public sealed partial class CommandGatewayTests
             state.IdentityRecords.Single().PriorOutcome.ShouldBeNull();
             state.ReceiptRecords.Single().PriorOutcome.ShouldBeNull();
         }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LegacyChangedTargetMustRemainPendingWithoutAcknowledgedSdkSubmissionAfterEveryServiceReplacement(bool committedB)
+    {
+        FakeCoarseIdempotencyStateClient state = new();
+        MutableClock clock = new(FixedClock.FixedUtcNow);
+        DurableRecoveryEventStoreClient platform = new() { RetainCommittedEvidence = true };
+        const string aggregateA = "01ARZ3NDEKTSV4RRFFQ69G5FAZ";
+        const string aggregateB = "01ARZ3NDEKTSV4RRFFQ69G5FBB";
+        ChatBotGatewayContext oldContext = DirectContext(new RecordGovernedNote(aggregateA), "01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        CoarseIdempotencyRecord current = CoarseIdempotencyComposer.ComposeCommandExecutionRecord(oldContext, clock.UtcNow);
+        CommandSubmissionResponse acceptedA = PreparedOutcome(oldContext, clock.UtcNow);
+        CoarseIdempotencyRecord legacy = current with
+        {
+            CoarseKeyHash = current.LegacyKeyHash!, IdentityKeyHash = null, CallerFingerprint = null,
+            LegacyKeyHash = null, PriorOutcome = acceptedA,
+        };
+        state.SeedDomain(legacy);
+        _ = await platform.SubmitCommandAsync(new Hexalith.EventStore.Contracts.Commands.SubmitCommandRequest(
+            oldContext.Submission.Request.CommandId, BoundTenant, "chatbot", aggregateA, nameof(RecordGovernedNote),
+            System.Text.Json.JsonSerializer.SerializeToElement(new RecordGovernedNote(aggregateA)), oldContext.Submission.CorrelationId),
+            TestContext.Current.CancellationToken);
+        CommandStatusQueryResponse committedA = platform.Evidence.ShouldNotBeNull();
+        state.IdentityRecords.ShouldBeEmpty();
+
+        // B's changed body cannot find A's old body-keyed receipt. A failure before arrival retains A's SDK status;
+        // the second case reaches B's aggregate and retains its commit, but its lost acknowledgement is still unproven.
+        ChatBotCommandSubmission changed = Submission(Principal(BoundTenant), new RecordGovernedNote(aggregateB));
+        platform.SubmissionFailure = committedB ? null : new HttpRequestException("Injected failure before B's POST reaches EventStore.");
+        platform.SubmissionUncertain = committedB;
+        ChatBotGatewayResult failedB = await Gateway(new AcceptedCommandDispatcher(platform, null!, null!, clock), clock: clock,
+            idempotencyStore: new DaprCoarseIdempotencyStore(state, clock, eventStore: platform)).SubmitAsync(changed, TestContext.Current.CancellationToken);
+        failedB.IsAccepted.ShouldBeFalse();
+        failedB.Problem.ShouldNotBeNull().Status.ShouldBe(503);
+        platform.SubmissionCount.ShouldBe(2);
+        platform.ReceivedSubmissionCount.ShouldBe(committedB ? 2 : 1);
+        platform.Evidence!.AggregateId.ShouldBe(committedB ? aggregateB : aggregateA);
+        if (!committedB)
+        {
+            platform.Evidence.ShouldBe(committedA);
+        }
+        platform.SubmittedRequests.Select(static request => request.MessageId).Distinct().ShouldHaveSingleItem();
+        platform.SubmittedRequests.Select(static request => request.CorrelationId).Distinct().ShouldHaveSingleItem();
+        CoarseCommandIdentityRecord retainedB = state.IdentityRecords.ShouldHaveSingleItem();
+        retainedB.DomainReservation!.PreparedAggregateId.ShouldBe(aggregateB);
+        CommandSubmissionResponse preparedB = retainedB.DomainReservation.PreparedOutcome.ShouldNotBeNull();
+        AssertPreparedOutcome(preparedB, acceptedA);
+
+        // Replace every application service; only the coarse state and authoritative platform evidence survive.
+        clock.UtcNow += TimeSpan.FromHours(25);
+        RecordingDispatcher replacementDispatcher = new();
+        ChatBotGatewayResult result = await Gateway(replacementDispatcher, clock: clock,
+            idempotencyStore: new DaprCoarseIdempotencyStore(state, clock, eventStore: platform)).SubmitAsync(changed, TestContext.Current.CancellationToken);
+        result.IsAccepted.ShouldBeFalse();
+        replacementDispatcher.DispatchCount.ShouldBe(0);
+        state.IdentityRecords.Single().DomainReservation!.PreparedAggregateId.ShouldBe(aggregateB);
+        state.DomainRecords.Single(record => record.CoarseKeyHash == legacy.CoarseKeyHash).ShouldBe(legacy);
+        result.Problem.ShouldNotBeNull().Status.ShouldBe(503);
+        result.Problem.Retryable.ShouldBeTrue();
+        state.IdentityRecords.ShouldHaveSingleItem().PriorOutcome.ShouldBeNull();
+        state.IdentityRecords.Single().DomainReservation!.SdkSubmissionAccepted.ShouldBeFalse();
+        state.DomainRecords.Single(record => record.CoarseKeyHash == retainedB.DomainKeyHash).PriorOutcome.ShouldBeNull();
+        platform.SubmissionCount.ShouldBe(2);
+        platform.ReceivedSubmissionCount.ShouldBe(committedB ? 2 : 1);
     }
 
     [Fact]

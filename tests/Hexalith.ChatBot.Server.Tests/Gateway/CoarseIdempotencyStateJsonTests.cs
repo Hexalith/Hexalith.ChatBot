@@ -32,6 +32,23 @@ public sealed class CoarseIdempotencyStateJsonTests
         AssertSameOutcome(restored.PriorOutcome.ShouldNotBeNull(), record.PriorOutcome!);
         AssertSameOutcome(restored.DomainReservation.ShouldNotBeNull().PreparedOutcome.ShouldNotBeNull(), record.DomainReservation!.PreparedOutcome!);
         restored.DomainReservation.DispatchState.ShouldBe(CoarseDispatchState.Dispatching);
+        restored.DomainReservation.SdkSubmissionAccepted.ShouldBeTrue();
+        reservation.GetProperty("sdkSubmissionAccepted").GetBoolean().ShouldBeTrue();
+    }
+
+    [Fact]
+    public void HistoricalPreparedStateWithoutSdkConfirmationMustRemainUnconfirmed()
+    {
+        CoarseCommandIdentityRecord record = Identity(Outcome(ChatBotMessageCode.Command_accepted, LifecycleState.Proposed)) with { PriorOutcome = null };
+        var historical = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(record, CoarseIdempotencyStateJson.Options))!;
+        historical["domainReservation"]!.AsObject().Remove("sdkSubmissionAccepted").ShouldBeTrue();
+
+        CoarseCommandIdentityRecord restored = JsonSerializer.Deserialize<CoarseCommandIdentityRecord>(historical.ToJsonString(), CoarseIdempotencyStateJson.Options)
+            .ShouldNotBeNull();
+
+        restored.DomainReservation!.SdkSubmissionAccepted.ShouldBeFalse();
+        restored.DomainReservation.PreparedOutcome.ShouldNotBeNull();
+        restored.PriorOutcome.ShouldBeNull();
     }
 
     [Fact]
@@ -180,7 +197,8 @@ public sealed class CoarseIdempotencyStateJsonTests
                 ReservationId: "reservation-1",
                 DispatchState: CoarseDispatchState.Dispatching,
                 ReservationLeaseExpiresAt: AcceptedAt.AddMinutes(2),
-                PreparedOutcome: outcome));
+                PreparedOutcome: outcome,
+                SdkSubmissionAccepted: true));
 
     private static void AssertSameOutcome(CommandSubmissionResponse actual, CommandSubmissionResponse expected)
     {

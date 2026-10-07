@@ -196,6 +196,7 @@ public sealed class CommandSubmissionTransportTests
         {
             yield return ["status", "partialOutputs." + member];
         }
+        yield return ["problem", "schemaVersion"];
     }
 
     [Theory]
@@ -210,11 +211,21 @@ public sealed class CommandSubmissionTransportTests
             {"operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","lifecycleState":"Proposed","retryCount":0,"completionStatus":"accepted-projection-pending","auditStatus":"committed","partialOutputs":{"acceptedAt":"2026-06-10T00:00:00Z","completionStatus":"accepted-projection-pending","auditStatus":"committed"},"safeNextActions":["none"],"operationClass":"command-execution","maxAttempts":1,"acceptedAt":"2026-06-10T00:00:00Z","lastUpdatedAt":"2026-06-10T00:00:00Z","reasonCode":"command_accepted","retryEligible":false}
             """);
         body["priorOutcome"] = acceptance;
+        if (responseKind == "problem")
+        {
+            body = Newtonsoft.Json.Linq.JObject.Parse(ProblemBody(400, ProblemDetailsCategory.Validation_error, ProblemDetailsClientAction.CorrectRequest));
+        }
         ((Newtonsoft.Json.Linq.JProperty)body.SelectToken(memberPath)!.Parent!).Remove();
-        GeneratedClient client = NewClient(new CapturingHandler(responseKind == "accepted" ? HttpStatusCode.Accepted : HttpStatusCode.OK, body.ToString()));
+        HttpStatusCode responseStatus = responseKind switch
+        {
+            "accepted" => HttpStatusCode.Accepted,
+            "problem" => HttpStatusCode.BadRequest,
+            _ => HttpStatusCode.OK,
+        };
+        GeneratedClient client = NewClient(new CapturingHandler(responseStatus, body.ToString()));
         HexalithChatBotApiException exception = await Should.ThrowAsync<HexalithChatBotApiException>(async () =>
         {
-            if (responseKind == "accepted") { _ = await client.SubmitCommandAsync(CorrelationId, null, Request(), TestContext.Current.CancellationToken).ConfigureAwait(true); }
+            if (responseKind is "accepted" or "problem") { _ = await client.SubmitCommandAsync(CorrelationId, null, Request(), TestContext.Current.CancellationToken).ConfigureAwait(true); }
             else { _ = await client.GetOperationStatusAsync(CommandId, CorrelationId, null, TestContext.Current.CancellationToken).ConfigureAwait(true); }
         });
         exception.InnerException.ShouldBeOfType<JsonSerializationException>().Message.ShouldContain(memberPath.Split('.').Last());
