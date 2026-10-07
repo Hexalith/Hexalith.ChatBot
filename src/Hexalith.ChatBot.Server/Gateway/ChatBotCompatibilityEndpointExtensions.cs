@@ -217,7 +217,7 @@ internal static class ChatBotCompatibilityEndpointExtensions
 
                 return await ExecuteProjectConversationQueryAsync(
                     projectId,
-                    new ProjectConversationQuery(projectId, cursor, Math.Clamp(pageSize ?? 25, 1, 100), false, false, correlationContext.TaskId),
+                    new ProjectConversationQuery(projectId, cursor, Math.Clamp(pageSize ?? 25, 1, 100), correlationContext.TaskId),
                     httpContext,
                     serviceProvider,
                     problemDetailsFactory,
@@ -256,7 +256,7 @@ internal static class ChatBotCompatibilityEndpointExtensions
                 return await ExecuteReadQueryAsync(
                     projectId,
                     ChatBotReadQueryTypes.TaskIntentReview,
-                    new TaskIntentReviewQuery(projectId, taskIntentId, false, correlationContext.TaskId),
+                    new TaskIntentReviewQuery(projectId, taskIntentId, correlationContext.TaskId),
                     httpContext,
                     serviceProvider,
                     problemDetailsFactory,
@@ -359,7 +359,7 @@ internal static class ChatBotCompatibilityEndpointExtensions
                 return await ExecuteReadQueryAsync(
                     query?.QueryRef ?? ChatBotReadQueryTypes.ComplianceAuditSearch,
                     ChatBotReadQueryTypes.ComplianceAuditSearch,
-                    new ComplianceAuditSearchQuery(query, false, correlationContext.TaskId),
+                    new ComplianceAuditSearchQuery(query, correlationContext.TaskId),
                     httpContext,
                     serviceProvider,
                     problemDetailsFactory,
@@ -389,8 +389,6 @@ internal static class ChatBotCompatibilityEndpointExtensions
                     ChatBotReadQueryTypes.ComplianceAuditDetail,
                     new ComplianceAuditDetailQuery(
                         auditRecordRef,
-                        false,
-                        [],
                         correlationContext.TaskId),
                     httpContext,
                     serviceProvider,

@@ -99,7 +99,7 @@ public sealed class EscalationEvaluationCoordinatorTests
             new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
             new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
         ];
-        return new NotificationRecipientCandidate(recipientRef, Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test"))));
+        return new NotificationRecipientCandidate(recipientRef, Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.PolicyPrincipal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")), Hexalith.ChatBot.Contracts.Enums.AdminScope.Operate));
     }
 
     private sealed class FixedClock(DateTimeOffset now) : ISystemClock

@@ -15,7 +15,8 @@ internal sealed class ServiceClientGrantProjectionCache(ISystemClock clock)
     /// <summary>The maximum time since a current revocation check.</summary>
     public static readonly TimeSpan RevocationStaleness = TimeSpan.FromSeconds(60);
     private readonly ConcurrentDictionary<ChatBotOwnerAuthorityRequest, ChatBotOwnerAuthorityEvidence> _entries = new();
-    private readonly ConcurrentDictionary<(string, string, string, string), byte> _revocations = new();
+    private readonly ConcurrentDictionary<(string, string, string, string), DateTimeOffset> _revocations = new();
+    private readonly ConcurrentDictionary<(string, string, string), DateTimeOffset> _clientRevocationWatermarks = new();
 
     /// <summary>Stores owner-observed evidence; supplied token grants cannot refresh authority.</summary>
     public void Upsert(ChatBotOwnerAuthorityEvidence evidence)
@@ -30,9 +31,12 @@ internal sealed class ServiceClientGrantProjectionCache(ISystemClock clock)
         {
             InvalidateRevocation(grant.TenantId, grant.ServiceClientId, ChatBotSurfaceOrigins.ToWireValue(grant.SurfaceOrigin), grant.GrantId);
         }
-        else if (!IsRevoked(evidence.Request, grant.GrantId))
+        else if (!evidence.Request.RequireCurrent && !IsRevoked(evidence.Request, grant.GrantId) && !PredatesClientRevocation(evidence))
         {
-            _entries[evidence.Request] = evidence;
+            _entries.AddOrUpdate(evidence.Request, evidence, (_, previous) =>
+                evidence.ObservedAt > previous.ObservedAt ||
+                (evidence.ObservedAt == previous.ObservedAt && evidence.RevocationCheckedAt > previous.RevocationCheckedAt)
+                    ? evidence : previous);
         }
     }
 
@@ -45,11 +49,11 @@ internal sealed class ServiceClientGrantProjectionCache(ISystemClock clock)
         }
 
         DateTimeOffset now = clock.UtcNow;
-        if (evidence.IsRevoked || grant.IsRevoked || IsRevoked(request, grant.GrantId) ||
+        if (evidence.IsRevoked || grant.IsRevoked || IsRevoked(request, grant.GrantId) || PredatesClientRevocation(evidence) ||
             evidence.ObservedAt > now || evidence.RevocationCheckedAt > now || evidence.ExpiresAt <= now || grant.ExpiresAt <= now ||
             now - evidence.ObservedAt >= NormalGrantStaleness || now - evidence.RevocationCheckedAt >= RevocationStaleness)
         {
-            _entries.TryRemove(request, out _);
+            ((ICollection<KeyValuePair<ChatBotOwnerAuthorityRequest, ChatBotOwnerAuthorityEvidence>>)_entries).Remove(new(request, evidence));
             return null;
         }
 
@@ -58,7 +62,42 @@ internal sealed class ServiceClientGrantProjectionCache(ISystemClock clock)
 
     /// <summary>Immediately denies known revocation, scoped by tenant, client, origin and grant.</summary>
     public void InvalidateRevocation(string tenantId, string serviceClientId, string surfaceOrigin, string grantId)
-        => _revocations[(tenantId, serviceClientId, surfaceOrigin, grantId)] = 0;
+    {
+        DateTimeOffset revokedAt = clock.UtcNow;
+        _revocations.AddOrUpdate((tenantId, serviceClientId, surfaceOrigin, grantId), revokedAt, (_, previous) => previous > revokedAt ? previous : revokedAt);
+        if (grantId.Length == 0)
+        {
+            _clientRevocationWatermarks.AddOrUpdate((tenantId, serviceClientId, surfaceOrigin), revokedAt, (_, previous) => previous > revokedAt ? previous : revokedAt);
+        }
+        foreach (var entry in _entries)
+        {
+            if (entry.Key.TenantId == tenantId && entry.Key.ResourceId == serviceClientId && ChatBotSurfaceOrigins.ToWireValue(entry.Key.Origin) == surfaceOrigin &&
+                (grantId.Length == 0 || entry.Value.ServiceGrant?.GrantId == grantId))
+            {
+                ((ICollection<KeyValuePair<ChatBotOwnerAuthorityRequest, ChatBotOwnerAuthorityEvidence>>)_entries).Remove(entry);
+            }
+        }
+    }
+
+    /// <summary>Clears only client-wide revocation after a newer validated owner grant; exact grants stay revoked.</summary>
+    public void ObserveAllowedEvidence(ChatBotOwnerAuthorityEvidence evidence)
+    {
+        if (!evidence.IsAllowed || evidence.IsRevoked || evidence.ServiceGrant is not { IsRevoked: false } || evidence.Request.Authority != "service-grant")
+        {
+            return;
+        }
+
+        var key = (evidence.Request.TenantId, evidence.Request.ResourceId, ChatBotSurfaceOrigins.ToWireValue(evidence.Request.Origin), string.Empty);
+        if (_revocations.TryGetValue(key, out DateTimeOffset revokedAt) && evidence.RevocationCheckedAt > revokedAt)
+        {
+            ((ICollection<KeyValuePair<(string, string, string, string), DateTimeOffset>>)_revocations).Remove(new(key, revokedAt));
+        }
+    }
+
+    /// <summary>Rejects evidence observed at or before a client-wide revocation, even after a newer re-grant.</summary>
+    public bool PredatesClientRevocation(ChatBotOwnerAuthorityEvidence evidence)
+        => _clientRevocationWatermarks.TryGetValue((evidence.Request.TenantId, evidence.Request.ResourceId, ChatBotSurfaceOrigins.ToWireValue(evidence.Request.Origin)), out DateTimeOffset revokedAt) &&
+            evidence.RevocationCheckedAt <= revokedAt;
 
     /// <summary>Checks revocation without extending the cache.</summary>
     public bool IsRevoked(ChatBotOwnerAuthorityRequest request, string? grantId = null)

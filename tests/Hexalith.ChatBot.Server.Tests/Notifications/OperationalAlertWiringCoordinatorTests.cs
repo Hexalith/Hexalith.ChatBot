@@ -262,7 +262,7 @@ public sealed class OperationalAlertWiringCoordinatorTests
             new Claim("sub", recipientRef),
             new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
         ];
-        return new NotificationRecipientCandidate(recipientRef, Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test"))));
+        return new NotificationRecipientCandidate(recipientRef, Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.PolicyPrincipal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")), Hexalith.ChatBot.Contracts.Enums.AdminScope.SeeOnly));
     }
 
     private static NotificationRecipientCandidate BuildCandidate(string recipientRef, string role, string actorType)
@@ -273,7 +273,7 @@ public sealed class OperationalAlertWiringCoordinatorTests
             new Claim(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
             new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
         ];
-        return new NotificationRecipientCandidate(recipientRef, Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test"))));
+        return new NotificationRecipientCandidate(recipientRef, Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.PolicyPrincipal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")), Hexalith.ChatBot.Contracts.Enums.AdminScope.SeeOnly));
     }
 
     private static void AssertDelivery(

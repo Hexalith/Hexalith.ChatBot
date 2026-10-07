@@ -19,7 +19,7 @@ public sealed class ServiceClientQuarantineAuthorizationTests
     [Fact]
     public async Task QuarantineProposalShouldRequireHumanTenantAdmin()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
             Submission(QuarantineSubmit()),
@@ -53,7 +53,7 @@ public sealed class ServiceClientQuarantineAuthorizationTests
     [Fact]
     public async Task QuarantineApprovalShouldRequireHumanTenantAdminAndDistinctApprover()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
             Submission(QuarantineApproval()),
@@ -90,7 +90,7 @@ public sealed class ServiceClientQuarantineAuthorizationTests
     [Fact]
     public async Task QuarantineCommandsShouldRejectInvalidMetadataOnlyPayloads()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (SubmitServiceClientQuarantine invalid in new[]
                  {
@@ -140,7 +140,7 @@ public sealed class ServiceClientQuarantineAuthorizationTests
 
     private static ChatBotCommandSubmission Submission(object command)
         => new(
-            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test"))),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")), bindTenant: true),
             new CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
@@ -160,7 +160,7 @@ public sealed class ServiceClientQuarantineAuthorizationTests
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
             ],
-            "test")));
+            "test")), bindTenant: true);
         return new ChatBotAuthenticatedActor("actor-alpha", principal);
     }
 }

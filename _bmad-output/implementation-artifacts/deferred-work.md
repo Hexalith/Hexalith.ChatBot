@@ -1333,3 +1333,11 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
   summary: Creation commands authorize against their new client-generated identifier (`NoteId`, `DraftId`, `IntakeId`, `*ChangeId`), so a real ChatBot owner mapping must either accept any not-yet-existing id (making the check meaningless) or reject every creation.
   evidence: Blind-hunter BH12 at `src/Hexalith.ChatBot.Server/Authorization/ChatBotAuthorityCatalog.cs` resource-property column; medium if true, unverified because owner-mapping semantics for `ChatBot`/`operation` requests are unspecified until A13. Settle by defining whether create rows need a parent/target scope separate from the new id.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
+  summary: Specify owner authority for compliance escalation targets and machine grant delegation before production mappings can make those references authoritative.
+  evidence: C-B3 is medium if true (unverified); EscalationTargetRef currently denotes an opaque project/group target, SendActorId is bound upstream, and outbound authority denies. Settle the target/delegation identity contract in A13 rather than inventing Parties mappings.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
+  summary: Define owner-backed authority and runtime revocation behavior for tenant activity SignalR subscriptions.
+  evidence: C-B8 is a pre-existing ownerless subscription path that broadcasts a tenant-only advisory nudge. Shared tenant binding now rejects ambiguity, but current owner membership/service-grant subscription semantics need a separate catalog and owner-mapping decision.

@@ -349,12 +349,13 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
     public async ValueTask<IReadOnlyList<AiExecutionWorkItem>> ListExhaustedAsync(
         string? afterKey,
         int maximumCount,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? tenantId = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumCount);
-        IReadOnlyList<AiExecutionWorkItem> indexed = await ListIndexedAsync(cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<AiExecutionWorkItem> indexed = await ListIndexedAsync(cancellationToken, tenantId).ConfigureAwait(false);
         return indexed
-            .Where(static item => item.Status is AiExecutionWorkStatus.Exhausted)
+            .Where(item => item.Status is AiExecutionWorkStatus.Exhausted && (tenantId is null || item.TenantId == tenantId))
             .Where(item => afterKey is null || string.CompareOrdinal(item.Key, afterKey) > 0)
             .OrderBy(static item => item.Key, StringComparer.Ordinal)
             .Take(maximumCount)
@@ -364,14 +365,26 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
     public async ValueTask<bool> RecoverExhaustedAsync(
         string key,
         DateTimeOffset now,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? tenantId = null)
     {
+        if (tenantId is not null && !KeyBelongsToTenant(key, tenantId))
+        {
+            return false;
+        }
+
+        AiExecutionWorkItem? existing = await GetAsync(key, cancellationToken).ConfigureAwait(false);
+        if (existing is null || (tenantId is not null && existing.TenantId != tenantId))
+        {
+            return false;
+        }
+
         bool recovered = false;
         _ = await UpdateAsync(
             key,
             current =>
             {
-                recovered = current is not null && current.Status is AiExecutionWorkStatus.Exhausted;
+                recovered = current is not null && current.Status is AiExecutionWorkStatus.Exhausted && (tenantId is null || current.TenantId == tenantId);
                 return recovered
                     ? current! with
                     {
@@ -451,7 +464,7 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
         return false;
     }
 
-    private async Task<IReadOnlyList<AiExecutionWorkItem>> ListIndexedAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<AiExecutionWorkItem>> ListIndexedAsync(CancellationToken cancellationToken, string? tenantId = null)
     {
         AiExecutionWorkIndex index = (await _store
             .GetAsync<AiExecutionWorkIndex>(ChatBotReadModelStoreNames.StateStoreName, IndexKey, cancellationToken)
@@ -465,6 +478,11 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
                 : [indexEntry];
             foreach (string workKey in workKeys)
             {
+                if (tenantId is not null && !KeyBelongsToTenant(workKey, tenantId))
+                {
+                    continue;
+                }
+
                 AiExecutionWorkItem? item = await GetAsync(workKey, cancellationToken).ConfigureAwait(false);
                 if (item is not null)
                 {
@@ -474,6 +492,21 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
         }
 
         return items;
+    }
+
+    private static bool KeyBelongsToTenant(string key, string tenantId)
+    {
+        if (key.StartsWith("ai-execution-v2.", StringComparison.Ordinal))
+        {
+            string[] segments = key.Split('.');
+            return segments.Length == 6 && segments[1] == Convert.ToHexString(Encoding.UTF8.GetBytes(tenantId)) &&
+                segments.Skip(1).All(static segment => segment.Length is > 0 and <= 2048 && segment.Length % 2 == 0 &&
+                    segment.All(static character => character is >= '0' and <= '9' or >= 'A' and <= 'F'));
+        }
+
+        // Legacy unescaped delimiters are safe only when all five identity segments are unambiguous.
+        string[] legacy = key.Split(':');
+        return legacy.Length == 6 && legacy[0] == "ai-execution" && legacy[1] == tenantId && legacy.Skip(1).All(static segment => segment.Length > 0);
     }
 
     private async Task QuarantineAsync(

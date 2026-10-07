@@ -1,4 +1,7 @@
-using System.Security.Claims;
+using Hexalith.ChatBot.Server.Authentication;
+using Hexalith.ChatBot.Server.Authorization;
+using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Audit;
 
 using Hexalith.EventStore.Client.Queries;
 
@@ -6,7 +9,7 @@ namespace Hexalith.ChatBot.Server.Lifecycle.AiExecution;
 
 internal static class AiExecutionRecoveryEndpoints
 {
-    private const string QueryType = "chatbot-ai-execution-exhausted";
+    private const string QueryType = AiExecutionRecoveryOperations.List;
 
     public static WebApplication MapAiExecutionRecoveryEndpoints(this WebApplication app)
     {
@@ -15,16 +18,21 @@ internal static class AiExecutionRecoveryEndpoints
             "/api/v1/operations/ai-executions/exhausted",
             async (
                 HttpContext httpContext,
+                ChatBotRequestContextResolver contextResolver,
+                ChatBotRequestAuthorizer authorizer,
                 IAiExecutionWorkStore workStore,
                 IQueryCursorCodec cursorCodec,
                 string? cursor,
                 int? pageSize,
                 CancellationToken cancellationToken) =>
             {
-                if (!TryAuthenticatedScope(httpContext.User, out string scope))
+                ChatBotRequestContext? context = contextResolver.ResolveCurrent();
+                if (context is null || !(await authorizer.AuthorizeAsync(context, QueryType, true, new { }, cancellationToken).ConfigureAwait(false)).IsAllowed)
                 {
-                    return Results.StatusCode(StatusCodes.Status401Unauthorized);
+                    return SafeNotFound();
                 }
+
+                string scope = $"tenant:{context.TenantId}:actor:{context.SubjectId}";
 
                 if (!cursorCodec.TryDecode(cursor, QueryType, scope, out string? afterKey, out _))
                 {
@@ -33,7 +41,7 @@ internal static class AiExecutionRecoveryEndpoints
 
                 int take = Math.Clamp(pageSize ?? 50, 1, 100);
                 IReadOnlyList<AiExecutionWorkItem> rows = await workStore
-                    .ListExhaustedAsync(afterKey, take + 1, cancellationToken)
+                    .ListExhaustedAsync(afterKey, take + 1, cancellationToken, context.TenantId)
                     .ConfigureAwait(false);
                 bool hasMore = rows.Count > take;
                 AiExecutionWorkItem[] visible = rows.Take(take).ToArray();
@@ -51,37 +59,36 @@ internal static class AiExecutionRecoveryEndpoints
             "/api/v1/operations/ai-executions/exhausted/recover",
             async (
                 HttpContext httpContext,
+                ChatBotRequestContextResolver contextResolver,
+                ChatBotRequestAuthorizer authorizer,
                 IAiExecutionWorkStore workStore,
                 AiExecutionRecoveryRequest request,
+                ISystemClock clock,
                 CancellationToken cancellationToken) =>
             {
-                if (!TryAuthenticatedScope(httpContext.User, out _))
-                {
-                    return Results.StatusCode(StatusCodes.Status401Unauthorized);
-                }
-
                 if (string.IsNullOrWhiteSpace(request.Key))
                 {
-                    return Results.BadRequest(new { code = "invalid_exhausted_work_identity" });
+                    return SafeNotFound();
+                }
+
+                ChatBotRequestContext? context = contextResolver.ResolveCurrent();
+                if (context is null || !(await authorizer.AuthorizeAsync(context, AiExecutionRecoveryOperations.Recover, false, request, cancellationToken).ConfigureAwait(false)).IsAllowed)
+                {
+                    return SafeNotFound();
                 }
 
                 bool recovered = await workStore
-                    .RecoverExhaustedAsync(request.Key, DateTimeOffset.UtcNow, cancellationToken)
+                    .RecoverExhaustedAsync(request.Key, clock.UtcNow, cancellationToken, context.TenantId)
                     .ConfigureAwait(false);
                 return recovered
                     ? Results.Ok(new { status = "recovered", key = request.Key })
-                    : Results.NotFound(new { code = "exhausted_work_not_found" });
+                    : SafeNotFound();
             });
 
         return app;
     }
 
-    private static bool TryAuthenticatedScope(ClaimsPrincipal principal, out string scope)
-    {
-        string? actor = principal.FindFirst("sub")?.Value ?? principal.Identity?.Name;
-        scope = $"operator:{actor}";
-        return principal.Identity?.IsAuthenticated is true && !string.IsNullOrWhiteSpace(actor);
-    }
+    private static IResult SafeNotFound() => Results.NotFound(new { code = ChatBotAuthorizationReasonCodes.SafeNotFound });
 
     private static AiExecutionExhaustedRow ToOperatorRow(AiExecutionWorkItem item)
         => new(

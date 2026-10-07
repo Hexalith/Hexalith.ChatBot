@@ -3660,7 +3660,7 @@ public sealed partial class CommandGatewayTests
             envelope.SourceEvidenceRefs.ShouldContain("classifier:chatbot.ai-action-risk-classifier.m0.v1");
             envelope.SourceEvidenceRefs.ShouldContain("risk-class:approval-required");
             envelope.SourceEvidenceRefs.ShouldContain("risk-action:modifies-state");
-            envelope.SourceEvidenceRefs.ShouldContain("reason:risky_action_class");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:indeterminate_missing_requester_authority");
         }
     }
 
@@ -3784,7 +3784,7 @@ public sealed partial class CommandGatewayTests
     }
 
     [Fact]
-    public async Task OutboundDraftCreationShouldUseDraftOperationClassAndMetadataOnlyAudit()
+    public async Task OutboundDraftCreationCannotTrustTokenScopeOrPolicyLabels()
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new();
@@ -3809,23 +3809,12 @@ public sealed partial class CommandGatewayTests
                 OutboundDraftCommand()),
             TestContext.Current.CancellationToken);
 
-        result.IsAccepted.ShouldBeTrue();
-        dispatcher.DispatchCount.ShouldBe(1);
-        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass
-            .ShouldBe(CoarseIdempotencyOperationClass.OutboundDraftCreation.Code);
-        OperationStatusRecord? status = await statusStore
-            .TryGetAsync(BoundTenant, OperationStatusRecord.OperationIdFor(result.Accepted!), TestContext.Current.CancellationToken);
-        status.ShouldNotBeNull().OperationClass.ShouldBe(CoarseIdempotencyOperationClass.OutboundDraftCreation.Code);
-        auditWriter.Envelopes.Count.ShouldBe(2);
-        auditWriter.Envelopes.ShouldAllBe(static envelope =>
-            envelope.SourceEvidenceRefs.Contains("outbound-draft:draft-001") &&
-            envelope.SourceEvidenceRefs.Contains("sender-authority:draft-only") &&
-            envelope.SourceEvidenceRefs.Contains("requester:requester-001") &&
-            envelope.SourceEvidenceRefs.Contains("project:project-001") &&
-            envelope.SourceEvidenceRefs.Contains("policy-snapshot:policy-snap-001") &&
-            envelope.SourceEvidenceRefs.Contains("recipient:party-001"));
-        JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web))
-            .ShouldNotContain("Governed draft content.", Case.Insensitive);
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem!.Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        Serialized(result.Problem).ShouldNotContain("Governed draft content.", Case.Insensitive);
     }
 
     [Theory]
@@ -3925,7 +3914,7 @@ public sealed partial class CommandGatewayTests
 
     [Theory]
     [InlineData(false, false)]
-    [InlineData(true, true)]
+    [InlineData(true, false)]
     public async Task OutboundDraftCreationByServiceActorShouldRequireDelegatedRequesterEvidence(
         bool includeDelegatedRequester,
         bool expectedAccepted)
@@ -3976,7 +3965,7 @@ public sealed partial class CommandGatewayTests
     }
 
     [Fact]
-    public async Task OutboundSendShouldUseOutboundSendIdempotencyAndMetadataOnlyAudit()
+    public async Task OutboundSendCannotTrustTokenMailboxAuthorityOrCreateReplayRecords()
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new();
@@ -4008,24 +3997,15 @@ public sealed partial class CommandGatewayTests
             Submission(principal, OutboundSendCommand("send-003"), commandId: "01ARZ3NDEKTSV4RRFFQ69G5FBB"),
             TestContext.Current.CancellationToken);
 
-        first.IsAccepted.ShouldBeTrue();
-        replay.IsAccepted.ShouldBeTrue();
-        reusedReplayId.IsAccepted.ShouldBeFalse();
-        reusedReplayId.Problem.ShouldNotBeNull().Code.ShouldBe("idempotency_conflict_outbound_send");
-        replay.Accepted!.CommandId.ShouldBe(first.Accepted!.CommandId);
-        dispatcher.DispatchCount.ShouldBe(1);
-        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(CoarseIdempotencyOperationClass.OutboundSend.Code);
-        auditWriter.Envelopes.Count.ShouldBe(2);
-        auditWriter.Envelopes.ShouldAllBe(static envelope =>
-            envelope.SourceEvidenceRefs.Contains("outbound-draft:draft-001") &&
-            envelope.SourceEvidenceRefs.Contains("approval:approval-001") &&
-            envelope.SourceEvidenceRefs.Contains("sender-authority:authenticated-user-send") &&
-            envelope.SourceEvidenceRefs.Contains("send-actor:actor-alpha") &&
-            envelope.SourceEvidenceRefs.Contains("adapter-mode:approved") &&
-            envelope.SourceEvidenceRefs.Contains("recipient:party-001"));
-        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        serialized.ShouldNotContain("Governed draft content.", Case.Insensitive);
-        serialized.ShouldNotContain("Approved governed content.", Case.Insensitive);
+        foreach (ChatBotGatewayResult denied in new[] { first, replay, reusedReplayId })
+        {
+            denied.IsAccepted.ShouldBeFalse();
+            denied.Problem!.Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+            Serialized(denied.Problem).ShouldNotContain("Approved governed content.", Case.Insensitive);
+        }
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
     }
 
     [Theory]
@@ -4092,13 +4072,13 @@ public sealed partial class CommandGatewayTests
         idempotencyStore.RecordCount.ShouldBe(1);
         auditWriter.Envelopes.Count.ShouldBe(2);
         auditWriter.Envelopes.ShouldAllBe(static envelope =>
-            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:low_risk_policy_false") &&
+            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:risk_not_low_risk") &&
             envelope.SourceEvidenceRefs.Contains("context-package:context-package-001") &&
             envelope.SourceEvidenceRefs.Contains("execution:ai-execution-001"));
     }
 
     [Fact]
-    public async Task LowRiskAiExecutionPolicyAllowedShouldProceedThroughAuditAndDispatchWithPolicyRefs()
+    public async Task LowRiskAiExecutionCannotTrustRequesterLabelsEvenWhenTenantPolicyAllows()
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new();
@@ -4120,7 +4100,7 @@ public sealed partial class CommandGatewayTests
         dispatcher.DispatchCount.ShouldBe(1);
         auditWriter.Envelopes.Count.ShouldBe(2);
         auditWriter.Envelopes.ShouldAllBe(static envelope =>
-            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:low-risk-execute-allowed") &&
+            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:risk_not_low_risk") &&
             envelope.SourceEvidenceRefs.Contains("context-package:context-package-001") &&
             envelope.SourceEvidenceRefs.Contains("execution:ai-execution-001"));
     }
@@ -4218,7 +4198,7 @@ public sealed partial class CommandGatewayTests
     }
 
     [Fact]
-    public async Task ApprovalDecisionShouldUseSharedSpineAndApprovalDecisionIdempotency()
+    public async Task ApprovalDecisionCannotTrustTokenRequesterAuthority()
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new();
@@ -4241,14 +4221,11 @@ public sealed partial class CommandGatewayTests
                 ApprovalDecisionCommand(decisionId: "approval-decision-002"), commandId: "01ARZ3NDEKTSV4RRFFQ69G5FBB"),
             TestContext.Current.CancellationToken);
 
-        first.IsAccepted.ShouldBeTrue();
-        replay.IsAccepted.ShouldBeTrue();
-        replay.Accepted!.CommandId.ShouldBe(first.Accepted!.CommandId);
-        dispatcher.DispatchCount.ShouldBe(1);
-        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(CoarseIdempotencyOperationClass.ApprovalDecision.Code);
-        auditWriter.Envelopes.ShouldAllBe(static envelope =>
-            envelope.SourceEvidenceRefs.Contains("approval:approval:ai-proposal-001") &&
-            envelope.SourceEvidenceRefs.Contains("approval-decision:approve"));
+        first.IsAccepted.ShouldBeFalse();
+        replay.IsAccepted.ShouldBeFalse();
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
     }
 
     [Fact]
@@ -4787,8 +4764,11 @@ public sealed partial class CommandGatewayTests
         serialized.ShouldNotContain("hash-project-002", Case.Insensitive);
     }
 
-    [Fact]
-    public async Task MailboxIntakeMissingTenantContextShouldFailClosedBeforeDurableStateWork()
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("ambiguous")]
+    [InlineData("malformed")]
+    public async Task MailboxIntakeMissingTenantContextShouldFailClosedBeforeDurableStateWork(string scenario)
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new();
@@ -4803,8 +4783,18 @@ public sealed partial class CommandGatewayTests
             idempotencyStore: idempotencyStore,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
+        ClaimsPrincipal principal = Principal(null);
+        if (scenario == "ambiguous")
+        {
+            ((ClaimsIdentity)principal.Identity!).AddClaims([new("tenant", "tenant-alpha"), new("tenant", "tenant-beta")]);
+        }
+        else if (scenario == "malformed")
+        {
+            ((ClaimsIdentity)principal.Identity!).AddClaim(new("tenant", "malformed tenant"));
+        }
+
         ChatBotGatewayResult result = await gateway.SubmitAsync(
-            Submission(Principal(null), MailboxCommand(), origin: ChatBotSurfaceOrigin.Mailbox),
+            Submission(principal, MailboxCommand(), origin: ChatBotSurfaceOrigin.Mailbox),
             TestContext.Current.CancellationToken);
 
         result.IsAccepted.ShouldBeFalse();
@@ -5225,24 +5215,24 @@ public sealed partial class CommandGatewayTests
     [Theory]
     [InlineData(
         ParticipantAuthorizationStage.UnresolvedValue,
-        ChatBotAuthorizationReasonCodes.UnresolvedParticipant,
-        ChatBotMessageCodes.UnresolvedParticipant,
+        ChatBotAuthorizationReasonCodes.AuthorizationDenied,
+        ChatBotMessageCodes.AuthorizationDenied,
         ProblemDetailsClientAction.RequestAccess)]
     [InlineData(
         ParticipantAuthorizationStage.EmailOnlyValue,
-        ChatBotAuthorizationReasonCodes.UnauthorizedParticipant,
-        ChatBotMessageCodes.UnauthorizedParticipant,
+        ChatBotAuthorizationReasonCodes.AuthorizationDenied,
+        ChatBotMessageCodes.AuthorizationDenied,
         ProblemDetailsClientAction.RequestAccess)]
     [InlineData(
         ParticipantAuthorizationStage.UnauthorizedValue,
-        ChatBotAuthorizationReasonCodes.UnauthorizedParticipant,
-        ChatBotMessageCodes.UnauthorizedParticipant,
+        ChatBotAuthorizationReasonCodes.AuthorizationDenied,
+        ChatBotMessageCodes.AuthorizationDenied,
         ProblemDetailsClientAction.RequestAccess)]
     [InlineData(
         ParticipantAuthorizationStage.DirectoryDegradedValue,
-        ChatBotAuthorizationReasonCodes.ParticipantDirectoryDegraded,
-        ChatBotMessageCodes.ParticipantDirectoryDegraded,
-        ProblemDetailsClientAction.RetryLater)]
+        ChatBotAuthorizationReasonCodes.AuthorizationDenied,
+        ChatBotMessageCodes.AuthorizationDenied,
+        ProblemDetailsClientAction.RequestAccess)]
     public async Task ParticipantAuthorizationShouldBlockBeforeDurableMutationAndReturnCatalogBackedProblem(
         string authority,
         string expectedReasonCode,
@@ -5885,7 +5875,8 @@ public sealed partial class CommandGatewayTests
         IRiskClassifier? riskClassifier = null,
         IApprovalGate? approvalGate = null,
         IChatBotMetrics? metrics = null,
-        IAuthorizationFailureCounter? authorizationFailureCounter = null)
+        IAuthorizationFailureCounter? authorizationFailureCounter = null,
+        Hexalith.ChatBot.Server.Authorization.ChatBotRequestAuthorizer? requestAuthorizer = null)
         => new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),
@@ -5904,7 +5895,7 @@ public sealed partial class CommandGatewayTests
             commandAllowlist ?? new PermissiveSpineCommandAllowlist(),
             metrics,
             authorizationFailureCounter,
-            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock ?? new FixedClock()));
+            requestAuthorizer: requestAuthorizer ?? Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock ?? new FixedClock()));
 
     private static IChatBotProblemDetailsFactory DefaultProblemDetailsFactory()
         => new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry());

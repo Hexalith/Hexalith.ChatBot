@@ -103,6 +103,17 @@ public sealed partial class CommandGatewayTests
             new Claim(OutboundSendAuthorityEvaluator.MailboxIdClaim, "mailbox-001"),
             new Claim(OutboundSendAuthorityEvaluator.MailboxOwnerClaim, "mailbox-001"),
             new Claim(OutboundSendAuthorityEvaluator.OwnMailboxMailSendClaim, "true")), command);
+        if (boundary == "mailbox")
+        {
+            ChatBotGatewayResult denied = await Gateway(dispatcher, idempotencyStore: store).SubmitAsync(request, caller.Token);
+            denied.IsAccepted.ShouldBeFalse();
+            platform.SubmissionCount.ShouldBe(0);
+            writers.Attempts.ShouldBe(0);
+            state.IdentityRecords.ShouldBeEmpty();
+            state.DomainRecords.ShouldBeEmpty();
+            if (!durable) { ((InMemoryCoarseIdempotencyStore)store).RecordCount.ShouldBe(0); }
+            return;
+        }
         await Should.ThrowAsync<OperationCanceledException>(() => Gateway(dispatcher, idempotencyStore: store).SubmitAsync(request, caller.Token).AsTask());
         platform.SubmissionCount.ShouldBe(boundary == "eventstore" ? 1 : 0);
         writers.Attempts.ShouldBe(boundary == "eventstore" ? 0 : 1);

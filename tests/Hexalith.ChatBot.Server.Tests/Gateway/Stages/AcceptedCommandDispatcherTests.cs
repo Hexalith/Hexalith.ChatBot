@@ -9,6 +9,8 @@ using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Adapters.Conversations;
 using Hexalith.ChatBot.Server.Adapters.Projects;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Authorization;
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Observability;
@@ -40,14 +42,58 @@ public sealed class AcceptedCommandDispatcherTests
     private const string CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
     private const string TaskId = "01ARZ3NDEKTSV4RRFFQ69G5FAX";
 
-    [Fact]
-    public async Task DispatchShouldSubmitGovernedNoteWithTenantDomainAggregateAndProvenance()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AuthorityChangingDuringTargetBindingPreventsExternalDispatchAndAllowsFreshRetry(bool revoked)
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock) { Transform = evidence => evidence with { ExpiresAt = clock.UtcNow.AddSeconds(1) } };
+        ServiceClientGrantProjectionCache cache = new(clock);
+        ChatBotRequestAuthorizer authorizer = new(new(), owner, clock, cache);
+        Hexalith.ChatBot.Server.Authentication.ChatBotRequestContext bound = TrustedAuthorityFixture.Context(actorClass: "service", origin: ChatBotSurfaceOrigin.Ui);
+        ChatBotAuthorityDecision decision = await authorizer.AuthorizeAsync(bound, nameof(RecordGovernedNote), false, new RecordGovernedNote(NoteId), TestContext.Current.CancellationToken);
+        decision.IsAllowed.ShouldBeTrue();
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), clock);
+        ChatBotGatewayContext context = Context(WireCommand(NoteId)) with
+        {
+            Actor = new ChatBotAuthenticatedActor(bound.SubjectId, decision.Principal!, bound.ActorClass, bound.ServiceClientId, bound),
+        };
+        context.SetDispatchTargetBinding(async (_, _) =>
+        {
+            await Task.Yield();
+            if (revoked) { cache.InvalidateRevocation(Tenant, bound.ServiceClientId!, "ui", "synthetic-grant-v1"); }
+            else { clock.UtcNow += TimeSpan.FromSeconds(2); }
+            return true;
+        });
+        await Should.ThrowAsync<CommandNotSubmittedException>(() => dispatcher.DispatchAsync(context, TestContext.Current.CancellationToken).AsTask());
+        gateway.Submitted.ShouldBeEmpty();
+        context.ExternalEffectAttempted.ShouldBeFalse();
+        context.SdkSubmissionAccepted.ShouldBeFalse();
+
+        owner.Transform = evidence => evidence with { ServiceGrant = evidence.ServiceGrant is { } grant ? grant with { GrantId = "fresh-owner-grant" } : null };
+        ChatBotAuthorityDecision fresh = await authorizer.AuthorizeAsync(bound, nameof(RecordGovernedNote), false, new RecordGovernedNote(NoteId), TestContext.Current.CancellationToken);
+        fresh.IsAllowed.ShouldBeTrue();
+        ChatBotGatewayContext retry = Context(WireCommand(NoteId)) with
+        {
+            Actor = new ChatBotAuthenticatedActor(bound.SubjectId, fresh.Principal!, bound.ActorClass, bound.ServiceClientId, bound),
+        };
+        _ = await dispatcher.DispatchAsync(retry, TestContext.Current.CancellationToken);
+        gateway.Submitted.ShouldHaveSingleItem().AggregateId.ShouldBe(NoteId);
+        retry.SdkSubmissionAccepted.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("user")]
+    public async Task DispatchShouldSubmitGovernedNoteWithTenantDomainAggregateAndProvenance(string? actorType)
     {
         RecordingEventStoreGatewayClient gateway = new();
         FixedClock clock = new();
         AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), clock);
 
-        ChatBotGatewayContext context = Context(WireCommand(NoteId));
+        ChatBotGatewayContext context = Context(WireCommand(NoteId), actorType: actorType);
         context.SdkSubmissionAccepted.ShouldBeFalse();
         ChatBotDispatchResult result = await dispatcher.DispatchAsync(
             context,
@@ -63,6 +109,8 @@ public sealed class AcceptedCommandDispatcherTests
         request.CorrelationId.ShouldBe(CorrelationId);
         request.Extensions.ShouldNotBeNull();
         request.Extensions!["taskId"].ShouldBe(TaskId);
+        request.Extensions["actorType"].ShouldBe("human");
+        AuditEnvelopeFactory.PreCommit(context, new Hexalith.ChatBot.Server.Lifecycle.StateModel.LifecycleTransitionDefinition("Received", "Proposed"), clock.UtcNow).ActorType.ShouldBe("human");
 
         // Accepted timestamp comes from the clock; resource id is the aggregate id for downstream audit/status.
         result.AcceptedAt.ShouldBe(FixedClock.FixedUtcNow);
@@ -1657,9 +1705,11 @@ public sealed class AcceptedCommandDispatcherTests
     private static ChatBotGatewayContext Context(
         JsonElement command,
         string? taskId = TaskId,
-        string commandType = nameof(RecordGovernedNote))
+        string commandType = nameof(RecordGovernedNote),
+        string? actorType = null)
     {
-        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")));
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")), bindTenant: true);
+        if (actorType is not null) { ((ClaimsIdentity)principal.Identity!).AddClaim(new(ParticipantAuthorizationStage.ActorTypeClaim, actorType)); }
         ChatBotCommandSubmission submission = new(
             principal,
             new CommandSubmissionRequest
@@ -1678,7 +1728,8 @@ public sealed class AcceptedCommandDispatcherTests
     /// <summary>Models the gateway binding explicitly for standalone dispatch-plan tests; store fencing is tested through the gateway.</summary>
     private static ChatBotGatewayContext StandaloneContext(ChatBotCommandSubmission submission, ClaimsPrincipal principal, string tenant)
     {
-        ChatBotGatewayContext context = new(submission, new ChatBotAuthenticatedActor("actor-alpha", principal), new ChatBotTenantBinding(tenant));
+        Hexalith.ChatBot.Server.Authentication.ChatBotRequestContextResolver.TryResolve(principal, submission.Origin, out Hexalith.ChatBot.Server.Authentication.ChatBotRequestContext? bound, out _).ShouldBeTrue();
+        ChatBotGatewayContext context = new(submission, new ChatBotAuthenticatedActor(bound!.SubjectId, principal, bound.ActorClass, bound.ServiceClientId, bound), new ChatBotTenantBinding(tenant));
         context.SetDispatchTargetBinding(static (_, _) => ValueTask.FromResult(true));
         return context;
     }
@@ -1862,7 +1913,7 @@ public sealed class AcceptedCommandDispatcherTests
                 new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundSendAuthorityEvaluator.MailboxOwnerClaim, "mailbox-001"),
                 new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundSendAuthorityEvaluator.OwnMailboxMailSendClaim, "true"),
             ],
-            "test")));
+            "test")), bindTenant: true);
         ChatBotCommandSubmission submission = new(
             principal,
             new CommandSubmissionRequest
@@ -1896,7 +1947,7 @@ public sealed class AcceptedCommandDispatcherTests
                 new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundSendAuthorityEvaluator.MailboxOwnerClaim, "mailbox-001"),
                 new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundSendAuthorityEvaluator.OwnMailboxMailSendClaim, "true"),
             ],
-            "test")));
+            "test")), bindTenant: true);
         ChatBotCommandSubmission submission = new(
             principal,
             new CommandSubmissionRequest
@@ -1944,7 +1995,7 @@ public sealed class AcceptedCommandDispatcherTests
                 new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundDraftAuthorityEvaluator.ProjectScopeClaim, "project-001:outbound-draft"),
                 new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundDraftAuthorityEvaluator.TenantOutboundPolicyClaim, "draft-only"),
             ],
-            "test")));
+            "test")), bindTenant: true);
         ChatBotCommandSubmission submission = new(
             principal,
             new CommandSubmissionRequest

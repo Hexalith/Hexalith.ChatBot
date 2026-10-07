@@ -340,6 +340,44 @@ public sealed class AiExecutionCoordinatorTests
     }
 
     [Fact]
+    public async Task ScopedRecoveryNeverFetchesForeignOrAmbiguousWorkItemKeys()
+    {
+        DurableReadModelStore durable = new();
+        ReadModelAiExecutionWorkStore store = new(durable);
+        AiExecutionWorkItem own = Item(Started(1)) with { Status = AiExecutionWorkStatus.Exhausted };
+        AiExecutionWorkItem foreign = Item(Started(2)) with { TenantId = "tenant-beta", Status = AiExecutionWorkStatus.Exhausted,
+            Key = AiExecutionWorkItem.KeyFor("tenant-beta", "project-alpha", "conversation-alpha", "response-2", "generation-2") };
+        AiExecutionWorkItem ownLegacy = Item(Started(3)) with { Status = AiExecutionWorkStatus.Exhausted };
+        ownLegacy = ownLegacy with { Key = AiExecutionWorkItem.LegacyKeyFor(ownLegacy.TenantId, ownLegacy.ProjectId, ownLegacy.ConversationId, ownLegacy.ResponseId, ownLegacy.GenerationId) };
+        AiExecutionWorkItem foreignLegacy = Item(Started(4)) with { TenantId = "tenant-beta", Status = AiExecutionWorkStatus.Exhausted };
+        foreignLegacy = foreignLegacy with { Key = AiExecutionWorkItem.LegacyKeyFor(foreignLegacy.TenantId, foreignLegacy.ProjectId, foreignLegacy.ConversationId, foreignLegacy.ResponseId, foreignLegacy.GenerationId) };
+        string ambiguous = "ai-execution:tenant-alpha:ambiguous:project:conversation:response:generation";
+        await store.UpsertStartedAsync(own, TestContext.Current.CancellationToken);
+        await store.UpsertStartedAsync(foreign, TestContext.Current.CancellationToken);
+        await store.UpsertStartedAsync(ownLegacy, TestContext.Current.CancellationToken);
+        await store.UpsertStartedAsync(foreignLegacy, TestContext.Current.CancellationToken);
+        await durable.SaveAsync("state", "chatbot:ai-execution:index:v1", new AiExecutionWorkIndex([own.Key, foreign.Key, ownLegacy.Key, foreignLegacy.Key, ambiguous]), TestContext.Current.CancellationToken);
+        durable.ReadKeys.Clear();
+        IReadOnlyList<AiExecutionWorkItem> exhausted = await store.ListExhaustedAsync(null, 200, TestContext.Current.CancellationToken, own.TenantId);
+        exhausted.Select(static item => item.Key).ShouldBe([own.Key, ownLegacy.Key], ignoreOrder: true);
+        durable.ReadKeys.ShouldContain(own.Key);
+        durable.ReadKeys.ShouldContain(ownLegacy.Key);
+        durable.ReadKeys.ShouldNotContain(foreign.Key);
+        durable.ReadKeys.ShouldNotContain(foreignLegacy.Key);
+        durable.ReadKeys.ShouldNotContain(ambiguous);
+        durable.ReadKeys.Clear();
+        (await store.RecoverExhaustedAsync(foreign.Key, Now, TestContext.Current.CancellationToken, own.TenantId)).ShouldBeFalse();
+        (await store.RecoverExhaustedAsync(ambiguous, Now, TestContext.Current.CancellationToken, own.TenantId)).ShouldBeFalse();
+        (await store.RecoverExhaustedAsync(foreignLegacy.Key, Now, TestContext.Current.CancellationToken, own.TenantId)).ShouldBeFalse();
+        durable.ReadKeys.ShouldBeEmpty();
+        (await store.RecoverExhaustedAsync(own.Key, Now, TestContext.Current.CancellationToken, own.TenantId)).ShouldBeTrue();
+        (await store.RecoverExhaustedAsync(ownLegacy.Key, Now, TestContext.Current.CancellationToken, own.TenantId)).ShouldBeTrue();
+        AiExecutionWorkItem recovered = (await durable.GetAsync<AiExecutionWorkItem>("chatbot-state", ownLegacy.Key, TestContext.Current.CancellationToken)).Value!;
+        recovered.Status.ShouldBe(AiExecutionWorkStatus.Pending);
+        recovered.TenantId.ShouldBe(own.TenantId);
+    }
+
+    [Fact]
     public async Task ProductionReadModelStoreShouldPreserveOutboxAndLeaseAcrossInstances()
     {
         DurableReadModelStore durable = new();
@@ -609,7 +647,13 @@ public sealed class AiExecutionCoordinatorTests
     {
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(
-                services => services.AddSingleton<IStartupFilter, OperatorPrincipalStartupFilter>()));
+                services =>
+                {
+                    services.AddSingleton<IStartupFilter, OperatorPrincipalStartupFilter>();
+                    Hexalith.ChatBot.Tests.TrustedAuthority.TrustedAuthorityClock clock = new();
+                    services.AddSingleton<ISystemClock>(clock);
+                    services.AddSingleton<Hexalith.ChatBot.Server.Authorization.IChatBotOwnerAuthorityProvider>(new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticOwnerAuthorityProvider(clock));
+                }));
         IAiExecutionWorkStore store = factory.Services.GetRequiredService<IAiExecutionWorkStore>();
         for (int index = 1; index <= 105; index++)
         {
@@ -625,7 +669,17 @@ public sealed class AiExecutionCoordinatorTests
                 TestContext.Current.CancellationToken)).ShouldBeTrue();
         }
 
+        AiExecutionWorkItem foreign = Item(Started(106)) with { TenantId = "tenant-beta", Key = AiExecutionWorkItem.KeyFor("tenant-beta", "project-alpha", "conversation-alpha", "response-106", "generation-106") };
+        await store.UpsertStartedAsync(foreign, TestContext.Current.CancellationToken);
+        (await store.TryClaimAsync(foreign.Key, "operator-test-owner", Now, TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken)).ShouldNotBeNull();
+        (await store.MarkExhaustedAsync(foreign.Key, "operator-test-owner", Now, "test-exhaustion", TestContext.Current.CancellationToken)).ShouldBeTrue();
         using HttpClient client = factory.CreateClient();
+        using HttpResponseMessage forbidden = await client.PostAsJsonAsync("/api/v1/operations/ai-executions/exhausted/recover", new { key = foreign.Key }, TestContext.Current.CancellationToken);
+        using HttpResponseMessage missing = await client.PostAsJsonAsync("/api/v1/operations/ai-executions/exhausted/recover", new { key = "missing-key" }, TestContext.Current.CancellationToken);
+        forbidden.StatusCode.ShouldBe(System.Net.HttpStatusCode.NotFound);
+        missing.StatusCode.ShouldBe(forbidden.StatusCode);
+        (await forbidden.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldBe(await missing.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        (await store.ListExhaustedAsync(null, 200, TestContext.Current.CancellationToken, "tenant-beta")).ShouldHaveSingleItem().Key.ShouldBe(foreign.Key);
         List<string> keys = [];
         string? cursor = null;
         do
@@ -897,7 +951,7 @@ public sealed class AiExecutionCoordinatorTests
             {
                 app.Use(async (context, continuation) =>
                 {
-                    context.User = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "operator-alpha")], "test")));
+                    context.User = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "operator-alpha"), new Claim("eventstore:tenant", "tenant-alpha")], "test")));
                     await continuation().ConfigureAwait(false);
                 });
                 next(app);
@@ -1129,6 +1183,7 @@ public sealed class AiExecutionCoordinatorTests
         private readonly object _gate = new();
         private readonly Dictionary<string, object> _values = new(StringComparer.Ordinal);
         private readonly Dictionary<string, long> _versions = new(StringComparer.Ordinal);
+        public List<string> ReadKeys { get; } = [];
 
         public Task<ReadModelEntry<TValue>> GetAsync<TValue>(
             string storeName,
@@ -1139,6 +1194,7 @@ public sealed class AiExecutionCoordinatorTests
             cancellationToken.ThrowIfCancellationRequested();
             lock (_gate)
             {
+                ReadKeys.Add(key);
                 return Task.FromResult(_values.TryGetValue(key, out object? value)
                     ? new ReadModelEntry<TValue>((TValue)value, _versions[key].ToString(System.Globalization.CultureInfo.InvariantCulture))
                     : new ReadModelEntry<TValue>(null, null));

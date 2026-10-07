@@ -121,6 +121,12 @@ internal sealed class CommandGateway(
             RetryEligible = false,
         };
 
+        if (context.Actor.Principal is Hexalith.ChatBot.Server.Authorization.ChatBotAuthorityPrincipal authority && !authority.IsCurrent(clock.UtcNow))
+        {
+            await AbortSafelyAsync(idempotency, cancellationToken).ConfigureAwait(false);
+            return Denied(ChatBotCommandAdmissionDecision.Rejected(ChatBotAuthorizationReasonCodes.AuthorizationDenied, submission.CorrelationId, submission.TaskId));
+        }
+
         context.SetPreparedAcceptedAt(response.AcceptedAt);
         context.SetDispatchTargetBinding((aggregateId, token) =>
             idempotencyStore.BindDispatchTargetAsync(idempotency, response, aggregateId, token));
@@ -145,6 +151,12 @@ internal sealed class CommandGateway(
             // undispatched: retry the exact-prepared release when the store's own fence could not be persisted.
             await AbortUndispatchedIndependentlyAsync(idempotency, response).ConfigureAwait(false);
             return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateDependencyUnavailable(submission.CorrelationId, submission.TaskId));
+        }
+
+        if (context.Actor.Principal is Hexalith.ChatBot.Server.Authorization.ChatBotAuthorityPrincipal preparedAuthority && !preparedAuthority.IsCurrent(clock.UtcNow))
+        {
+            await AbortUndispatchedIndependentlyAsync(idempotency, response).ConfigureAwait(false);
+            return Denied(ChatBotCommandAdmissionDecision.Rejected(ChatBotAuthorizationReasonCodes.AuthorizationDenied, submission.CorrelationId, submission.TaskId));
         }
 
         ChatBotDispatchResult dispatchResult;

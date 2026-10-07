@@ -19,7 +19,7 @@ public sealed class ServiceClientDisableAuthorizationTests
     [Fact]
     public async Task DisableProposalShouldRequireHumanTenantAdmin()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
             Submission(DisableSubmit()),
@@ -53,7 +53,7 @@ public sealed class ServiceClientDisableAuthorizationTests
     [Fact]
     public async Task DisableApprovalShouldRequireHumanTenantAdminAndDistinctApprover()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
             Submission(DisableApproval()),
@@ -90,7 +90,7 @@ public sealed class ServiceClientDisableAuthorizationTests
     [Fact]
     public async Task DisableCommandsShouldRejectInvalidMetadataOnlyPayloads()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (SubmitServiceClientDisable invalid in new[]
                  {
@@ -140,7 +140,7 @@ public sealed class ServiceClientDisableAuthorizationTests
 
     private static ChatBotCommandSubmission Submission(object command)
         => new(
-            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test"))),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")), bindTenant: true),
             new CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
@@ -160,7 +160,7 @@ public sealed class ServiceClientDisableAuthorizationTests
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
             ],
-            "test")));
+            "test")), bindTenant: true);
         return new ChatBotAuthenticatedActor("actor-alpha", principal);
     }
 }

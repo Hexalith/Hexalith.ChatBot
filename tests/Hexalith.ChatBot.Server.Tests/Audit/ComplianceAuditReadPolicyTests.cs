@@ -334,21 +334,21 @@ public static class ComplianceAuditReadPolicyTests
         => Actor("human", role);
 
     private static ClaimsPrincipal ProjectOwner(string role, string project)
-        => Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
+        => Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.PolicyPrincipal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "actor-alpha"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, "human"),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
                 new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, project),
             ],
-            "test")));
+            "test")), Hexalith.ChatBot.Contracts.Enums.AdminScope.Compliance);
 
     private static ClaimsPrincipal Actor(string actorType, string role)
-        => Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
+        => Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.PolicyPrincipal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "actor-alpha"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
             ],
-            "test")));
+            "test")), Hexalith.ChatBot.Contracts.Enums.AdminScope.Compliance);
 }

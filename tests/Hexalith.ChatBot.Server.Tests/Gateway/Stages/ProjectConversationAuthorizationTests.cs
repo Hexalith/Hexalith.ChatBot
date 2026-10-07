@@ -20,7 +20,7 @@ public sealed class ProjectConversationAuthorizationTests
     {
         using JsonDocument document = JsonDocument.Parse($$"""{"{{propertyName}}":"project-alpha"}""");
 
-        ChatBotAuthorizationResult result = await new ParticipantAuthorizationStage().AuthorizeAsync(
+        ChatBotAuthorizationResult result = await new ParticipantAuthorizationStage( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer()).AuthorizeAsync(
             Submission(document.RootElement.Clone()),
             Actor("project-alpha"),
             new ChatBotTenantBinding("tenant-alpha"),
@@ -35,7 +35,7 @@ public sealed class ProjectConversationAuthorizationTests
         using JsonDocument document = JsonDocument.Parse(
             """{"projectId":"project-alpha","ProjectId":"project-alpha"}""");
 
-        ChatBotAuthorizationResult result = await new ParticipantAuthorizationStage().AuthorizeAsync(
+        ChatBotAuthorizationResult result = await new ParticipantAuthorizationStage( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer()).AuthorizeAsync(
             Submission(document.RootElement.Clone()),
             Actor("project-alpha"),
             new ChatBotTenantBinding("tenant-alpha"),
@@ -50,7 +50,7 @@ public sealed class ProjectConversationAuthorizationTests
     {
         using JsonDocument document = JsonDocument.Parse("""{"projectId":"project-alpha"}""");
 
-        ChatBotAuthorizationResult result = await new ParticipantAuthorizationStage().AuthorizeAsync(
+        ChatBotAuthorizationResult result = await new ParticipantAuthorizationStage( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer()).AuthorizeAsync(
             Submission(
                 document.RootElement.Clone(),
                 nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteLowRiskAIAssistance)),
@@ -103,7 +103,7 @@ public sealed class ProjectConversationAuthorizationTests
                 new Claim("eventstore:tenant", "tenant-alpha"),
                 new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, projectId),
             ],
-            "test")));
+            "test")), bindTenant: true);
         return new ChatBotAuthenticatedActor("actor-alpha", principal);
     }
 }

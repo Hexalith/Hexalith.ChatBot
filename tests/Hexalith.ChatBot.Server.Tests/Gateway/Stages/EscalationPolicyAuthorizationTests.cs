@@ -15,7 +15,7 @@ public sealed class EscalationPolicyAuthorizationTests
     [Fact]
     public async Task EscalationPolicyChangeShouldAllowOnlyHumanPolicyScopeHolders()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (ChatBotAuthenticatedActor actor in new[]
                  {
@@ -54,7 +54,7 @@ public sealed class EscalationPolicyAuthorizationTests
     [Fact]
     public async Task EscalationPolicyChangeShouldRejectInvalidOrStalePayloads()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (SubmitEscalationPolicyChange invalid in new[]
                  {
@@ -118,7 +118,7 @@ public sealed class EscalationPolicyAuthorizationTests
 
     private static ChatBotCommandSubmission Submission(object command, string? commandType = null)
         => new(
-            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test"))),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")), bindTenant: true),
             new CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
@@ -138,7 +138,7 @@ public sealed class EscalationPolicyAuthorizationTests
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
             ],
-            "test")));
+            "test")), bindTenant: true);
         return new ChatBotAuthenticatedActor("actor-alpha", principal);
     }
 }

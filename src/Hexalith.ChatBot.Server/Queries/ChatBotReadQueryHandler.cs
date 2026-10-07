@@ -24,16 +24,19 @@ internal abstract class ChatBotReadQueryHandler<TRequest>(ChatBotRequestContextR
     public async Task<QueryResult> ExecuteAsync(QueryEnvelope query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        ChatBotRequestContext? context = contextResolver.ResolveCurrent();
+        ChatBotRequestContext? context = contextResolver.ResolveQuery(query);
         if (context is null || query.Domain != Domain || query.QueryType != QueryType || query.TenantId != context.TenantId || query.UserId != context.SubjectId)
         {
             return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);
         }
 
         TRequest? request;
+        JsonElement original;
         try
         {
-            request = JsonSerializer.Deserialize<TRequest>(query.Payload, JsonOptions);
+            using JsonDocument document = JsonDocument.Parse(query.Payload);
+            original = document.RootElement.Clone();
+            request = original.Deserialize<TRequest>(JsonOptions);
         }
         catch (JsonException)
         {
@@ -45,7 +48,7 @@ internal abstract class ChatBotReadQueryHandler<TRequest>(ChatBotRequestContextR
             return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);
         }
 
-        ChatBotAuthorityDecision decision = await authorizer.AuthorizeAsync(context, QueryType, true, request, cancellationToken).ConfigureAwait(false);
+        ChatBotAuthorityDecision decision = await authorizer.AuthorizeAsync(context, QueryType, true, original, cancellationToken).ConfigureAwait(false);
         if (!decision.IsAllowed)
         {
             return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);

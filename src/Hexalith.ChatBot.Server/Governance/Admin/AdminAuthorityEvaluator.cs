@@ -21,6 +21,6 @@ internal static class AdminAuthorityEvaluator
         => principal is ChatBotAuthorityPrincipal { Context.IsMachine: false } authority && authority.HasAdminScope("tenant");
 
     /// <summary>Checks exact current Projects authority. Wildcards never widen scope.</summary>
-    public static bool HasProjectAuthority(ClaimsPrincipal principal, string projectRef, bool allowWildcard = false)
+    public static bool HasProjectAuthority(ClaimsPrincipal principal, string projectRef)
         => principal is ChatBotAuthorityPrincipal authority && authority.HasProject(projectRef);
 }

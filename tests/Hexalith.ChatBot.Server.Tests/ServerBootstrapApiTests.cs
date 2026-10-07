@@ -2911,7 +2911,7 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
-    public async Task CommandEndpointShouldAdmitAllowedLowRiskAiAssistanceOnceAndReplayDuplicate()
+    public async Task CommandEndpointShouldRouteUnmappedRequesterAuthorityToApprovalAndReplayDuplicate()
     {
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAiAssistanceProvider provider = new("success");
@@ -2947,7 +2947,7 @@ public sealed class ServerBootstrapApiTests
         SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
         submitted.CommandType.ShouldBe("ExecuteLowRiskAIAssistance");
         submitted.AggregateId.ShouldBe("project-001");
-        submitted.Payload.GetProperty("ExecutionRecord").ValueKind.ShouldBe(JsonValueKind.Null);
+        submitted.Payload.GetProperty("ExecutionRecord").GetProperty("PolicyReasonCode").GetString().ShouldBe("risk_not_low_risk");
         string submittedPayload = submitted.Payload.GetRawText();
         submittedPayload.ShouldNotContain("raw prompt", Case.Insensitive);
         submittedPayload.ShouldNotContain("raw provider payload", Case.Insensitive);
@@ -2956,7 +2956,7 @@ public sealed class ServerBootstrapApiTests
 
         auditWriter.Envelopes.Count.ShouldBe(2);
         auditWriter.Envelopes.ShouldAllBe(static envelope =>
-            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:low-risk-execute-allowed") &&
+            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:risk_not_low_risk") &&
             envelope.SourceEvidenceRefs.Contains("context-package:context-package-001") &&
             envelope.SourceEvidenceRefs.Contains("execution:ai-execution-001"));
     }
@@ -2987,7 +2987,7 @@ public sealed class ServerBootstrapApiTests
         provider.ExecuteCount.ShouldBe(0);
         SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
         submitted.Payload.GetProperty("ExecutionRecord").GetProperty("Outcome").GetString().ShouldBe("pending-approval");
-        submitted.Payload.GetProperty("ExecutionRecord").GetProperty("PolicyReasonCode").GetString().ShouldBe("low_risk_policy_false");
+        submitted.Payload.GetProperty("ExecutionRecord").GetProperty("PolicyReasonCode").GetString().ShouldBe("risk_not_low_risk");
         submitted.Payload.GetProperty("ExecutionRecord").GetProperty("SafeNextAction").GetString().ShouldBe("review-ai-action");
         auditWriter.Envelopes.Count.ShouldBe(2);
         string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);

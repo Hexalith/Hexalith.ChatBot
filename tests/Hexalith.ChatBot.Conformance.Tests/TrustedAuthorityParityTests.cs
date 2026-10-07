@@ -24,6 +24,7 @@ public sealed class TrustedAuthorityParityTests
     private const string Note = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
     private const string Forbidden = "01ARZ3NDEKTSV4RRFFQ69G5FAZ";
     private const string Missing = "01ARZ3NDEKTSV4RRFFQ69G5FAX";
+    private const string AuthorizedMissing = "01ARZ3NDEKTSV4RRFFQ69G5FAA";
     private const string OwnerPii = "owner-email@example.test";
     private const string OwnerError = "restricted-owner-error@example.test";
     private const string ForbiddenContent = "restricted-forbidden-record-content";
@@ -67,7 +68,7 @@ public sealed class TrustedAuthorityParityTests
                 return evidence;
             },
             Allows = request => request.TenantId == tenant && request.PrincipalId == "actor-alpha" &&
-                (request.Authority is "identity" or "service-grant" || request.ResourceId == Note),
+                (request.Authority is "identity" or "service-grant" || request.ResourceId is Note or AuthorizedMissing),
         };
         CountingGovernedOperationStore store = new()
         {
@@ -103,20 +104,26 @@ public sealed class TrustedAuthorityParityTests
         string missingBody = await missing.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         forbiddenBody.ShouldBe(missingBody);
         store.Reads.ShouldBe(1);
+        using HttpResponseMessage authorizedMissing = await client.GetAsync($"/api/v1/governed-operations/{AuthorizedMissing}", TestContext.Current.CancellationToken);
+        authorizedMissing.StatusCode.ShouldBe(forbidden.StatusCode);
+        string authorizedMissingBody = await authorizedMissing.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        authorizedMissingBody.ShouldBe(forbiddenBody);
+        store.Reads.ShouldBe(2);
         using HttpResponseMessage commandDenied = await client.PostAsJsonAsync("/api/v1/commands",
             new { commandId = Note, commandType = nameof(RecordGovernedNote), command = new { noteId = Forbidden }, requestSchemaVersion = "v1" }, TestContext.Current.CancellationToken);
         commandDenied.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         factory.Services.GetRequiredService<InMemoryAuditWriter>().AuthorizationFailures.ShouldNotBeEmpty();
         forbiddenEvidenceObserved.ShouldBeTrue();
         ownerErrorObserved.ShouldBeTrue();
-        store.Reads.ShouldBe(1);
+        store.Reads.ShouldBe(2);
         store.Writes.ShouldBe(0);
         capture.Logs.ShouldNotBeEmpty();
+        capture.Logs.ShouldContain(static entry => entry.Contains("Owner ChatBot unavailable", StringComparison.Ordinal) && entry.Contains("InvalidOperationException", StringComparison.Ordinal) && entry.Contains("Warning", StringComparison.Ordinal));
         capture.Traces.ShouldNotBeEmpty();
         owner.Requests.ShouldAllBe(request => request.PrincipalId == "actor-alpha" && request.TenantId == tenant && request.ActorClass == actorClass && ChatBotSurfaceOrigins.ToWireValue(request.Origin) == origin);
         string[] outputs =
         [
-            forbiddenBody, missingBody,
+            forbiddenBody, missingBody, authorizedMissingBody,
             await commandDenied.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
             await allowed.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
             JsonSerializer.Serialize(factory.Services.GetRequiredService<InMemoryAuditWriter>().AuthorizationFailures),

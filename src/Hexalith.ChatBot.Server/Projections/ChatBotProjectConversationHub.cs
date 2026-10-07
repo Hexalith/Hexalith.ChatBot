@@ -57,11 +57,10 @@ internal sealed class ChatBotProjectConversationHub(IConfiguration configuration
     private bool IsTenantAuthorized(string tenantId)
     {
         ClaimsPrincipal? user = Context.User;
-        if (user?.Identity?.IsAuthenticated == true)
+        if (user?.Identities.Any(static identity => identity.IsAuthenticated) == true)
         {
-            return user.Claims.Any(claim =>
-                claim.Type is "eventstore:tenant" or "tenant" &&
-                string.Equals(claim.Value, tenantId, StringComparison.Ordinal));
+            return ChatBotRequestContextResolver.TryResolve(user, Contracts.Enums.ChatBotSurfaceOrigin.Ui, out ChatBotRequestContext? context, out _) &&
+                string.Equals(context?.TenantId, tenantId, StringComparison.Ordinal);
         }
 
         // Unauthenticated caller: allowed ONLY when JWT bearer auth is NOT configured — the in-process / self-hosted

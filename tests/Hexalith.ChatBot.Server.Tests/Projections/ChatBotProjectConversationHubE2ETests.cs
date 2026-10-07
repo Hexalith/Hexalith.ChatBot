@@ -97,6 +97,29 @@ public sealed class ChatBotProjectConversationHubE2ETests
         error.Message.ShouldContain("tenant-forbidden");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SupplementalIdentityCannotJoinAnotherTenant(bool authenticatedSupplement)
+    {
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("ChatBot:ProjectionChangeNotifications:Enabled", "true");
+            builder.ConfigureServices(services => services.AddSingleton<IStartupFilter>(new AuthenticatedTenantStartupFilter(Tenant, authenticatedSupplement)));
+        });
+        await using HubConnection connection = BuildHubConnection(factory.Server);
+        await connection.StartAsync(TestContext.Current.CancellationToken);
+        (await Should.ThrowAsync<HubException>(() => connection.InvokeAsync("JoinTenant", OtherTenant, TestContext.Current.CancellationToken))).Message.ShouldContain("tenant-forbidden");
+        if (authenticatedSupplement)
+        {
+            (await Should.ThrowAsync<HubException>(() => connection.InvokeAsync("JoinTenant", Tenant, TestContext.Current.CancellationToken))).Message.ShouldContain("tenant-forbidden");
+        }
+        else
+        {
+            await connection.InvokeAsync("JoinTenant", Tenant, TestContext.Current.CancellationToken);
+        }
+    }
+
     [Fact]
     public async Task AuthenticatedSameTenantJoinShouldBeAuthorizedAndReceiveItsOwnTenantSignal()
     {
@@ -209,7 +232,7 @@ public sealed class ChatBotProjectConversationHubE2ETests
     // Injects an authenticated principal carrying the eventstore:tenant claim into every request (mirrors the
     // TestPrincipalStartupFilter used by ProjectConversationProjectionTests) so the hub's authenticated authorization
     // branch is exercised without configuring a real JWT issuer. SignalR populates HubCallerContext.User from it.
-    private sealed class AuthenticatedTenantStartupFilter(string tenantId) : IStartupFilter
+    private sealed class AuthenticatedTenantStartupFilter(string tenantId, bool? authenticatedSupplement = null) : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
             => app =>
@@ -222,6 +245,10 @@ public sealed class ChatBotProjectConversationHubE2ETests
                             new Claim("eventstore:tenant", tenantId),
                         ],
                         "test")));
+                    if (authenticatedSupplement is not null)
+                    {
+                        context.User.AddIdentity(new ClaimsIdentity([new Claim("tenant", OtherTenant)], authenticatedSupplement.Value ? "authenticated-supplement" : null));
+                    }
                     await continuation().ConfigureAwait(false);
                 });
                 next(app);

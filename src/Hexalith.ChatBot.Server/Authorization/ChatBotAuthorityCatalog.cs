@@ -1,5 +1,6 @@
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Server.Queries;
+using Hexalith.ChatBot.Server.Lifecycle.AiExecution;
 
 namespace Hexalith.ChatBot.Server.Authorization;
 
@@ -80,6 +81,8 @@ internal sealed class ChatBotAuthorityCatalog
         new(ChatBotReadQueryTypes.GovernedOperation, true, null, "NoteId", false, false),
         new(ChatBotReadQueryTypes.ComplianceAuditSearch, true, "compliance", null, false, false),
         new(ChatBotReadQueryTypes.ComplianceAuditDetail, true, "compliance", "AuditRecordRef", false, false),
+        new(AiExecutionRecoveryOperations.List, true, "operate", null, false, false),
+        new(AiExecutionRecoveryOperations.Recover, false, "operate", null, false, false),
     ];
     private readonly IReadOnlyDictionary<(bool, string), ChatBotAuthorityRequirement> _rows;
 

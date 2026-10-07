@@ -32,7 +32,7 @@ public sealed class AssociationThresholdAuthorizationTests
     [Fact]
     public async Task ThresholdMutationShouldRequireTenantAdminHumanActor()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         ChatBotAuthorizationResult serviceDenied = await stage.AuthorizeAsync(
             Submission(),
@@ -68,7 +68,7 @@ public sealed class AssociationThresholdAuthorizationTests
     [Fact]
     public async Task AdminAssignmentShouldRequireHumanTenantAdmin()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         ChatBotAuthorizationResult tenantAdminHuman = await stage.AuthorizeAsync(
             Submission(AdminAssignment()),
@@ -97,7 +97,7 @@ public sealed class AssociationThresholdAuthorizationTests
     [Fact]
     public async Task AdminQueueOperationShouldRequireHumanOperateScope()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (ChatBotAuthenticatedActor actor in new[]
                  {
@@ -135,7 +135,7 @@ public sealed class AssociationThresholdAuthorizationTests
     [Fact]
     public async Task TenantPolicyChangeShouldRequireHumanPolicyScopeAndValidClosedSchema()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (ChatBotAuthenticatedActor actor in new[]
                  {
@@ -206,7 +206,7 @@ public sealed class AssociationThresholdAuthorizationTests
     [Fact]
     public async Task TenantPolicyApprovalShouldRequireDistinctRequesterAndApproverRefs()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
             Submission(PolicyApproval()),
@@ -240,7 +240,7 @@ public sealed class AssociationThresholdAuthorizationTests
     [Fact]
     public async Task AdminAssignmentShouldRequireAuditObligationFields()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (AssignTenantAdminRole command in new[]
                  {
@@ -266,7 +266,7 @@ public sealed class AssociationThresholdAuthorizationTests
     [Fact]
     public async Task AdminQueueOperationShouldRequireAffectedItemsAndAuditObligationFields()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (ExecuteAdminQueueOperation command in new[]
                  {
@@ -297,7 +297,7 @@ public sealed class AssociationThresholdAuthorizationTests
     [Fact]
     public async Task OperationalQueueClaimAssignAndPrioritizeShouldRequireHumanOperateScopeAndSafeMetadata()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (ExecuteAdminQueueOperation command in new[]
                  {
@@ -363,7 +363,7 @@ public sealed class AssociationThresholdAuthorizationTests
     [Fact]
     public async Task MailboxConfigurationChangeShouldRequireHumanMailboxScopeAndValidMetadataOnlyPayload()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (ChatBotAuthenticatedActor actor in new[]
                  {
@@ -440,7 +440,7 @@ public sealed class AssociationThresholdAuthorizationTests
     [Fact]
     public async Task MailboxProviderConnectionShouldRequireHumanMailboxScope()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
             Submission(ProviderConnectionCommand()),
@@ -476,7 +476,7 @@ public sealed class AssociationThresholdAuthorizationTests
     [Fact]
     public async Task ComplianceCommandsShouldRequireHumanComplianceScopeAndValidMetadataOnlyPayloads()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (ChatBotAuthenticatedActor actor in new[]
                  {
@@ -559,7 +559,7 @@ public sealed class AssociationThresholdAuthorizationTests
     {
         command ??= new Hexalith.ChatBot.Contracts.Commands.SetAssociationConfidenceThresholds("association", 0.9, 0.6, "policy-v1", null, null);
         return new(
-            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test"))),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")), bindTenant: true),
             new CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
@@ -835,7 +835,7 @@ public sealed class AssociationThresholdAuthorizationTests
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
             ],
-            "test")));
+            "test")), bindTenant: true);
         return new ChatBotAuthenticatedActor("actor-alpha", principal);
     }
 }

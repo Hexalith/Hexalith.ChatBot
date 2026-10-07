@@ -262,11 +262,12 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
     public ValueTask<IReadOnlyList<AiExecutionWorkItem>> ListExhaustedAsync(
         string? afterKey,
         int maximumCount,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? tenantId = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<AiExecutionWorkItem> items = _items.Values
-            .Where(static item => item.Status is AiExecutionWorkStatus.Exhausted)
+            .Where(item => item.Status is AiExecutionWorkStatus.Exhausted && (tenantId is null || item.TenantId == tenantId))
             .Where(item => afterKey is null || string.CompareOrdinal(item.Key, afterKey) > 0)
             .OrderBy(static item => item.Key, StringComparer.Ordinal)
             .Take(maximumCount)
@@ -274,12 +275,12 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
         return ValueTask.FromResult(items);
     }
 
-    public ValueTask<bool> RecoverExhaustedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken)
+    public ValueTask<bool> RecoverExhaustedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken, string? tenantId = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         while (_items.TryGetValue(key, out AiExecutionWorkItem? current))
         {
-            if (current.Status is not AiExecutionWorkStatus.Exhausted)
+            if (current.Status is not AiExecutionWorkStatus.Exhausted || (tenantId is not null && current.TenantId != tenantId))
             {
                 return ValueTask.FromResult(false);
             }

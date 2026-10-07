@@ -162,7 +162,7 @@ public sealed partial class CommandGatewayTests
             ? new DaprCoarseIdempotencyStore(state, clock, eventStore: platform)
             : new InMemoryCoarseIdempotencyStore(clock);
         object command = failure == "writer-then-rejection"
-            ? OutboundSendCommand("send-refused-after-write")
+            ? ApprovedExecutionCommand()
             : new RecordGovernedNote("01ARZ3NDEKTSV4RRFFQ69G5FAZ");
         ChatBotCommandSubmission submission = Submission(Principal(BoundTenant,
             new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),

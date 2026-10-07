@@ -31,7 +31,7 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
             return DomainServiceAdmissionResult.Accepted();
         }
 
-        ChatBotRequestContext? requestContext = requestContextResolver.ResolveCurrent();
+        ChatBotRequestContext? requestContext = requestContextResolver.ResolveCommand(context.Command);
         if (requestContext is null || !string.Equals(context.Command.UserId, requestContext.SubjectId, StringComparison.Ordinal))
         {
             return await RejectTransportAsync(context.Command, requestContext, ChatBotAuthorizationReasonCodes.AuthenticationDenied, cancellationToken).ConfigureAwait(false);
@@ -47,6 +47,12 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
             return Rejected(context.Command, reasonCode);
         }
 
+        if (!ChatBotCanonicalDispatchTarget.TryResolve(context.Command.CommandType, (JsonElement)submission!.Request.Command!, out string? canonicalTarget) ||
+            !string.Equals(context.Command.AggregateId, canonicalTarget, StringComparison.Ordinal))
+        {
+            return await RejectTransportAsync(context.Command, requestContext, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken).ConfigureAwait(false);
+        }
+
         ChatBotCommandAdmissionDecision decision = await admission
             .AdmitAsync(submission!, cancellationToken)
             .ConfigureAwait(false);
@@ -58,6 +64,12 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
                 await idempotencyStore
                     .AbortAdmissionAsync(decision.Idempotency, cancellationToken)
                     .ConfigureAwait(false);
+            }
+
+            if (decision.Context!.Actor.Principal is Hexalith.ChatBot.Server.Authorization.ChatBotAuthorityPrincipal principal &&
+                !admission.IsCurrent(principal))
+            {
+                return await RejectTransportAsync(context.Command, requestContext, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken).ConfigureAwait(false);
             }
 
             return DomainServiceAdmissionResult.Accepted();

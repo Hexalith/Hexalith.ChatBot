@@ -37,7 +37,7 @@ internal sealed class SyntheticServiceClientGrantResolver : IServiceClientGrantR
         ArgumentNullException.ThrowIfNull(tenantBinding);
         cancellationToken.ThrowIfCancellationRequested();
 
-        ClaimsPrincipal principal = actor.Principal;
+        ClaimsPrincipal principal = actor.Principal is Hexalith.ChatBot.Server.Authorization.ChatBotAuthorityPrincipal authority ? authority.Context.Principal : actor.Principal;
         if (!TryReadSingleSafe(principal, ServiceClientIdClaim, out string? serviceClientId, out string reasonCode) ||
             !TryReadSingleSafe(principal, GrantIdClaim, out string? grantId, out reasonCode) ||
             !TryReadSingleSafe(principal, GrantTenantClaim, out string? grantTenant, out reasonCode) ||

@@ -38,7 +38,7 @@ internal static class ComplianceAuditReadPolicy
                 .Where(static reference => reference.StartsWith("project:", StringComparison.Ordinal))
                 .Select(static reference => reference["project:".Length..])
                 .Where(AuditMetadata.IsSafeStableIdentifier)
-                .Any(projectRef => AdminAuthorityEvaluator.HasProjectAuthority(principal, projectRef, allowWildcard: false));
+                .Any(projectRef => AdminAuthorityEvaluator.HasProjectAuthority(principal, projectRef));
     }
 
     public static ComplianceAuditSearchResult Search(

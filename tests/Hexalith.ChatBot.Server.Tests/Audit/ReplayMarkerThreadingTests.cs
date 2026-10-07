@@ -186,7 +186,7 @@ public sealed class ReplayMarkerThreadingTests
 
     private static ChatBotGatewayContext Context(string? replayRunId, string tenant = Tenant)
     {
-        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")));
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.PolicyPrincipal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")), Hexalith.ChatBot.Contracts.Enums.AdminScope.Compliance);
         ChatBotCommandSubmission submission = new(
             principal,
             new CommandSubmissionRequest
@@ -207,11 +207,11 @@ public sealed class ReplayMarkerThreadingTests
     }
 
     private static ClaimsPrincipal CompliancePrincipal()
-        => Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
+        => Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.PolicyPrincipal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "actor-alpha"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, "human"),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, "compliance-admin"),
             ],
-            "test")));
+            "test")), Hexalith.ChatBot.Contracts.Enums.AdminScope.Compliance);
 }

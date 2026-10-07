@@ -20,7 +20,7 @@ public sealed class TenantExportAuthorizationTests
     [Fact]
     public async Task ExportRequestShouldAllowOnlyHumanComplianceScopeHolders()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
             Submission(ExportRequest()),
@@ -51,7 +51,7 @@ public sealed class TenantExportAuthorizationTests
     [Fact]
     public async Task ExportRequestShouldRejectInvalidOrStalePayloads()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (SubmitTenantExportRequest invalid in new[]
                  {
@@ -104,7 +104,7 @@ public sealed class TenantExportAuthorizationTests
 
     private static ChatBotCommandSubmission Submission(object command, string? commandType = null)
         => new(
-            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test"))),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")), bindTenant: true),
             new CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
@@ -121,10 +121,11 @@ public sealed class TenantExportAuthorizationTests
         ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "actor-alpha"),
+                new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-authorized-001"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
             ],
-            "test")));
+            "test")), bindTenant: true);
         return new ChatBotAuthenticatedActor("actor-alpha", principal);
     }
 }

@@ -8,7 +8,6 @@ namespace Hexalith.ChatBot.Server.Gateway.Stages;
 
 internal sealed class ClaimsTenantBindingStage : ITenantBindingStage
 {
-    private static readonly string[] TenantClaimTypes = ["eventstore:tenant", "tenant"];
     private static readonly HashSet<string> TenantScopedIdentifierDomains =
         new(StringComparer.Ordinal)
         {

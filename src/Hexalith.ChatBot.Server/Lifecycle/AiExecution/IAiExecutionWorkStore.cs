@@ -63,7 +63,8 @@ internal interface IAiExecutionWorkStore
     ValueTask<IReadOnlyList<AiExecutionWorkItem>> ListExhaustedAsync(
         string? afterKey,
         int maximumCount,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        string? tenantId = null);
 
-    ValueTask<bool> RecoverExhaustedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken);
+    ValueTask<bool> RecoverExhaustedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken, string? tenantId = null);
 }

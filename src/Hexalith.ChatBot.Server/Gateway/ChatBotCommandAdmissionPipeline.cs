@@ -30,6 +30,9 @@ internal sealed class ChatBotCommandAdmissionPipeline(
     IChatBotMetrics? metrics = null,
     IAuthorizationFailureCounter? authorizationFailureCounter = null)
 {
+    /// <summary>Revalidates retained owner bounds immediately before SDK admission effects.</summary>
+    public bool IsCurrent(ChatBotAuthorityPrincipal principal) => requestAuthorizer.IsCurrent(principal);
+
     private readonly IChatBotMetrics _metrics = metrics ?? NullChatBotMetrics.Instance;
 
     /// <summary>Audits a denied SDK transport binding without admitting caller-controlled envelope authority.</summary>
@@ -170,6 +173,11 @@ internal sealed class ChatBotCommandAdmissionPipeline(
                 submission.TaskId);
         }
 
+        if (!authority.Principal!.IsCurrent(clock.UtcNow))
+        {
+            return await DenyAsync(submission, binding.TenantId, actor.ActorId, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken).ConfigureAwait(false);
+        }
+
         CoarseIdempotencyDecision idempotencyDecision = await idempotencyStore
             .RecordAdmissionAsync(context, cancellationToken)
             .ConfigureAwait(false);
@@ -206,6 +214,12 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         string exceptionReason = "idempotency_outcome_unavailable";
         try
         {
+            if (!authority.Principal!.IsCurrent(clock.UtcNow))
+            {
+                await AbortSafelyAsync(idempotencyDecision.Metadata, cancellationToken).ConfigureAwait(false);
+                return await DenyAsync(submission, binding.TenantId, actor.ActorId, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken).ConfigureAwait(false);
+            }
+
             LifecycleTransitionValidation lifecycleTransition = lifecycleTransitionGuard.ValidateCommandSubmission(context);
             if (!lifecycleTransition.IsValid)
             {
@@ -259,6 +273,12 @@ internal sealed class ChatBotCommandAdmissionPipeline(
                     AuditFailureReasonCodes.AuditUnavailable,
                     submission.CorrelationId,
                     submission.TaskId);
+            }
+
+            if (!authority.Principal!.IsCurrent(clock.UtcNow))
+            {
+                await AbortSafelyAsync(idempotencyDecision.Metadata, cancellationToken).ConfigureAwait(false);
+                return await DenyAsync(submission, binding.TenantId, actor.ActorId, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken).ConfigureAwait(false);
             }
 
             return ChatBotCommandAdmissionDecision.Accepted(context, idempotencyDecision.Metadata, lifecycleTransition.Transition);

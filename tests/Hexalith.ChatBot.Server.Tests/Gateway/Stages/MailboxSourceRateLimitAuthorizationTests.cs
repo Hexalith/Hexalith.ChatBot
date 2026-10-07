@@ -18,7 +18,7 @@ public sealed class MailboxSourceRateLimitAuthorizationTests
     [Fact]
     public async Task RateLimitShouldRequireHumanMailboxScopeWithNoApprover()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         // A single authorized human mailbox-admin (or tenant-admin union) applies it — no approver needed.
         foreach (ChatBotAuthenticatedActor allowedActor in new[]
@@ -59,7 +59,7 @@ public sealed class MailboxSourceRateLimitAuthorizationTests
     [Fact]
     public async Task RateLimitShouldRejectOutOfBoundsOrUndeclaredBudgetAtGateway()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (SubmitMailboxSourceRateLimit invalid in new[]
                  {
@@ -112,7 +112,7 @@ public sealed class MailboxSourceRateLimitAuthorizationTests
 
     private static ChatBotCommandSubmission Submission(object command)
         => new(
-            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test"))),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")), bindTenant: true),
             new CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
@@ -132,7 +132,7 @@ public sealed class MailboxSourceRateLimitAuthorizationTests
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
             ],
-            "test")));
+            "test")), bindTenant: true);
         return new ChatBotAuthenticatedActor("actor-alpha", principal);
     }
 }

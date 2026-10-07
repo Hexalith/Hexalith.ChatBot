@@ -85,6 +85,7 @@ internal sealed class AcceptedCommandDispatcher(
         long startTimestamp = Stopwatch.GetTimestamp();
         try
         {
+            RequireCurrentAuthority(context);
             EventStoreDispatchPlan plan = await BuildPlanAsync(context, cancellationToken).ConfigureAwait(false);
             if (!await context.BindDispatchTargetAsync(plan.AggregateId, cancellationToken).ConfigureAwait(false))
             {
@@ -104,6 +105,7 @@ internal sealed class AcceptedCommandDispatcher(
             // Planning can already have invoked a conversation or mailbox writer. Only when EventStore is the sole
             // external write attempted can its definitive refusal prove that nothing committed.
             bool writerAttemptedBeforeSubmission = context.ExternalEffectAttempted;
+            RequireCurrentAuthority(context);
             context.MarkExternalEffectAttempted();
             try
             {
@@ -117,6 +119,7 @@ internal sealed class AcceptedCommandDispatcher(
 
             if (plan.CorrectionPropagation is not null && correctionPropagation?.IsReady is true)
             {
+                RequireCurrentAuthority(context);
                 await correctionPropagation
                     .StartAsync(plan.CorrectionPropagation, cancellationToken)
                     .ConfigureAwait(false);
@@ -124,6 +127,7 @@ internal sealed class AcceptedCommandDispatcher(
 
             if (plan.IngestionBinding is not null && ingestionBinding?.IsReady is true)
             {
+                RequireCurrentAuthority(context);
                 await ingestionBinding
                     .StartAsync(plan.IngestionBinding, cancellationToken)
                     .ConfigureAwait(false);
@@ -138,6 +142,14 @@ internal sealed class AcceptedCommandDispatcher(
         finally
         {
             RecordDispatchLatency(context, startTimestamp);
+        }
+    }
+
+    private void RequireCurrentAuthority(ChatBotGatewayContext context)
+    {
+        if (context.Actor.Principal is Hexalith.ChatBot.Server.Authorization.ChatBotAuthorityPrincipal authority && !authority.IsCurrent(clock.UtcNow))
+        {
+            throw new InvalidOperationException("The bound authority is no longer current.");
         }
     }
 
@@ -210,6 +222,7 @@ internal sealed class AcceptedCommandDispatcher(
                 throw new InvalidOperationException("The participant-resolution command is missing its source identity.");
             }
 
+            RequireCurrentAuthority(context);
             ResolveMailboxMessageParticipants resolved = await participantResolution
                 .ResolveAsync(commandPayload, context, cancellationToken)
                 .ConfigureAwait(false);
@@ -235,6 +248,7 @@ internal sealed class AcceptedCommandDispatcher(
                 throw new InvalidOperationException("The association-scoring command is missing its deterministic evidence.");
             }
 
+            RequireCurrentAuthority(context);
             ScoreMailboxMessageAssociation scored = await associationScoring
                 .ScoreAsync(commandPayload, context, cancellationToken)
                 .ConfigureAwait(false);
@@ -730,6 +744,7 @@ internal sealed class AcceptedCommandDispatcher(
                 ?? throw new InvalidOperationException("The conversation writer is not configured.");
             string policySnapshotId = execution.PolicySnapshotId ?? "unavailable";
             string auditOperationId = $"audit:{execution.ExecutionId}";
+            RequireCurrentAuthority(context);
             context.MarkExternalEffectAttempted();
             ConversationAppendResult append = await writer
                 .PrepareAppendConversationMessageAsync(
@@ -939,6 +954,7 @@ internal sealed class AcceptedCommandDispatcher(
 
             IOutboundMailboxSender sender = outboundMailboxSender
                 ?? throw new InvalidOperationException("The outbound mailbox sender is not configured.");
+            RequireCurrentAuthority(context);
             context.MarkExternalEffectAttempted();
             OutboundMailboxSendResult adapterResult = await sender
                 .SendAsync(
@@ -1163,12 +1179,10 @@ internal sealed class AcceptedCommandDispatcher(
             ["decidedAt"] = clock.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
         };
 
-        string? actorType = context.Actor.Principal.Claims
-            .FirstOrDefault(static claim => string.Equals(claim.Type, "actor_type", StringComparison.Ordinal))?
-            .Value;
-        if (!string.IsNullOrWhiteSpace(actorType))
+        extensions["actorType"] = context.Actor.RequestContext?.ActorClass ?? context.Actor.ActorType;
+        if (context.Actor.RequestContext?.ServiceClientId is { } clientId)
         {
-            extensions["actorType"] = actorType;
+            extensions["serviceClientId"] = clientId;
         }
 
         if (!string.IsNullOrWhiteSpace(context.Submission.TaskId))

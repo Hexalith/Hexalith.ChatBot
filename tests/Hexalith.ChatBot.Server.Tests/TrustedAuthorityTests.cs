@@ -115,15 +115,23 @@ public sealed class TrustedAuthorityTests
 
     [Theory]
     [InlineData("sub", "actor-other")]
-    [InlineData("tenant", "tenant-beta")]
     [InlineData("actor_type", "service")]
-    [InlineData("tenant", "")]
     [InlineData("sub", "malformed subject")]
     public void ConflictingOrMalformedAuthenticatedEvidenceDenies(string type, string value)
     {
         ClaimsPrincipal principal = TrustedAuthorityFixture.Principal();
         principal.AddIdentity(new ClaimsIdentity([new Claim(type, value)], "authenticated-supplement"));
         ChatBotRequestContextResolver.TryResolve(principal, ChatBotSurfaceOrigin.Ui, out _, out _).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("chatbot:service-client-id", "client-a", "preferred_username", "service-account-client-b")]
+    [InlineData("preferred_username", "service-account-client-a", "preferred_username", "service-account-client-b")]
+    public void ConflictingServiceAccountEvidenceDenies(string firstType, string firstValue, string secondType, string secondValue)
+    {
+        ClaimsPrincipal principal = TrustedAuthorityFixture.Principal();
+        ((ClaimsIdentity)principal.Identity!).AddClaims([new(firstType, firstValue), new(secondType, secondValue)]);
+        ChatBotRequestContextResolver.TryResolve(principal, ChatBotSurfaceOrigin.Api, out _, out _).ShouldBeFalse();
     }
 
     [Fact]
@@ -263,7 +271,7 @@ public sealed class TrustedAuthorityTests
         Hexalith.ChatBot.Server.Governance.AiMediation.IMailboxMessageContentSource content = System.Reflection.DispatchProxy.Create<Hexalith.ChatBot.Server.Governance.AiMediation.IMailboxMessageContentSource, ProtectedAccessProbe>();
         TaskIntentReviewQueryHandler handler = new(TrustedAuthorityFixture.Resolver(TrustedAuthorityFixture.Principal()), TrustedAuthorityFixture.Authorizer(clock, owner), store, content);
         QueryEnvelope envelope = new("tenant-alpha", "chatbot", "intent-alpha", ChatBotReadQueryTypes.TaskIntentReview,
-            JsonSerializer.SerializeToUtf8Bytes(new TaskIntentReviewQuery("project-alpha", "intent-alpha", projectReadAuthorized, null)), "correlation-alpha", "actor-alpha") { IsGlobalAdmin = true };
+            JsonSerializer.SerializeToUtf8Bytes(new { ProjectId = "project-alpha", TaskIntentId = "intent-alpha", ProjectReadAuthorized = projectReadAuthorized, TaskId = (string?)null }), "correlation-alpha", "actor-alpha") { IsGlobalAdmin = true };
         QueryResult result = await handler.ExecuteAsync(envelope, TestContext.Current.CancellationToken);
         result.Success.ShouldBeFalse();
         result.ErrorMessage.ShouldBe(ChatBotAuthorizationReasonCodes.SafeNotFound);

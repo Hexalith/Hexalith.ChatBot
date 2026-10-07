@@ -24,7 +24,7 @@ public sealed class OutboundChannelDisableAuthorizationTests
     [Fact]
     public async Task DisableProposalShouldRequireHumanPolicyAdmin()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         // Outbound-channel governance is the policy-admin's domain (the "policy administrator" persona maps to
         // AdminScope.Policy). A policy-admin is allowed; a tenant-admin is also allowed via the FR75a scope union.
@@ -66,7 +66,7 @@ public sealed class OutboundChannelDisableAuthorizationTests
     [Fact]
     public async Task DisableApprovalShouldRequireHumanPolicyAdminAndDistinctApprover()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (ChatBotAuthenticatedActor allowedActor in new[]
                  {
@@ -112,7 +112,7 @@ public sealed class OutboundChannelDisableAuthorizationTests
     [Fact]
     public async Task DisableCommandsShouldRejectInvalidMetadataOnlyPayloads()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (SubmitOutboundChannelDisable invalid in new[]
                  {
@@ -165,7 +165,7 @@ public sealed class OutboundChannelDisableAuthorizationTests
 
     private static ChatBotCommandSubmission Submission(object command, string commandType)
         => new(
-            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test"))),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")), bindTenant: true),
             new CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
@@ -185,7 +185,7 @@ public sealed class OutboundChannelDisableAuthorizationTests
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
             ],
-            "test")));
+            "test")), bindTenant: true);
         return new ChatBotAuthenticatedActor("actor-alpha", principal);
     }
 }

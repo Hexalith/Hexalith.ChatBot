@@ -477,8 +477,8 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             ],
             ignoreOrder: false);
         risk.GetProperty("ClassifierVersion").GetString().ShouldBe("chatbot.ai-action-risk-classifier.m0.v1");
-        risk.GetProperty("ReasonCode").GetString().ShouldBe("risky_action_class");
-        risk.GetProperty("RequesterAuthorityClass").GetString().ShouldBe("project-contributor");
+        risk.GetProperty("ReasonCode").GetString().ShouldBe("indeterminate_missing_requester_authority");
+        risk.GetProperty("RequesterAuthorityClass").GetString().ShouldBe("undeclared");
         risk.GetProperty("CommandAllowlistVersion").GetString().ShouldBe("ai-action-command-allowlist.m0");
         risk.GetProperty("InputTuple").GetProperty("TenantPolicyClassification").GetString().ShouldBe("approval-required");
 
@@ -487,7 +487,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
         auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.CommandName == nameof(ProposeAIAction));
         auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("risk-class:approval-required"));
-        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("reason:risky_action_class"));
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("reason:indeterminate_missing_requester_authority"));
         auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("risk-action:modifies-state"));
         auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("risk-action:acts-on-behalf"));
         idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
@@ -508,7 +508,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Fact]
-    public async Task CommandGatewayApi_ShouldAdmitAllowedLowRiskAiAssistanceWithoutStartingProvider()
+    public async Task CommandGatewayApi_ShouldRouteUnmappedRequesterAuthorityToApprovalWithoutStartingProvider()
     {
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAuditWriter auditWriter = new();
@@ -537,8 +537,8 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         submitted.AggregateId.ShouldBe("project-001");
         submitted.CommandType.ShouldBe(nameof(ExecuteLowRiskAIAssistance));
         JsonElement payload = submitted.Payload;
-        payload.GetProperty("ExecutionRecord").ValueKind.ShouldBe(JsonValueKind.Null);
-        payload.GetProperty("RiskClassification").GetProperty("RiskClass").GetString().ShouldBe("low-risk");
+        payload.GetProperty("ExecutionRecord").GetProperty("PolicyReasonCode").GetString().ShouldBe("risk_not_low_risk");
+        payload.GetProperty("RiskClassification").GetProperty("RiskClass").GetString().ShouldBe("approval-required");
         payload.GetRawText().ShouldNotContain("prompt", Case.Insensitive);
         payload.GetRawText().ShouldNotContain("completion", Case.Insensitive);
         payload.GetRawText().ShouldNotContain("raw provider payload", Case.Insensitive);
@@ -547,7 +547,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
             [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
         auditWriter.Envelopes.ShouldAllBe(static envelope =>
-            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:low-risk-execute-allowed") &&
+            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:risk_not_low_risk") &&
             envelope.SourceEvidenceRefs.Contains("context-package:context-package-001") &&
             envelope.SourceEvidenceRefs.Contains("execution:ai-execution-001"));
         idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
@@ -593,7 +593,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         JsonElement record = submitted.Payload.GetProperty("ExecutionRecord");
         record.GetProperty("Outcome").GetString().ShouldBe("pending-approval");
         record.GetProperty("ProviderName").GetString().ShouldBe("not-invoked");
-        record.GetProperty("PolicyReasonCode").GetString().ShouldBe("low_risk_policy_false");
+        record.GetProperty("PolicyReasonCode").GetString().ShouldBe("risk_not_low_risk");
         record.GetProperty("SafeNextAction").GetString().ShouldBe("review-ai-action");
         submitted.Payload.GetRawText().ShouldNotContain("provider payload", Case.Insensitive);
         submitted.Payload.GetRawText().ShouldNotContain("prompt", Case.Insensitive);
@@ -602,7 +602,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
             [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
         auditWriter.Envelopes.ShouldAllBe(static envelope =>
-            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:low_risk_policy_false") &&
+            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:risk_not_low_risk") &&
             envelope.SourceEvidenceRefs.Contains("context-package:context-package-001") &&
             envelope.SourceEvidenceRefs.Contains("execution:ai-execution-001"));
         idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
@@ -793,7 +793,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Fact]
-    public async Task CommandGatewayApi_ShouldCreateOutboundDraftThroughSpineWithoutExternalSend()
+    public async Task CommandGatewayApi_ShouldDenyDraftWithoutTrustedOutboundAuthorityMapping()
     {
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAuditWriter auditWriter = new();
@@ -810,57 +810,21 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             .SendAsync(OutboundDraftSubmissionRequest(), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
-        submitted.Tenant.ShouldBe("tenant-alpha");
-        submitted.Domain.ShouldBe("chatbot");
-        submitted.AggregateId.ShouldBe("draft-001");
-        submitted.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft));
-        submitted.Payload.GetProperty("DraftId").GetString().ShouldBe("draft-001");
-        submitted.Payload.GetProperty("ProjectId").GetString().ShouldBe("project-001");
-        submitted.Payload.GetProperty("SenderAuthorityClass").GetString().ShouldBe("draft-only");
-        submitted.Payload.GetProperty("HasM365SendPosture").GetBoolean().ShouldBeFalse();
-        submitted.Payload.TryGetProperty("AdapterMode", out _).ShouldBeFalse();
-        submitted.Payload.TryGetProperty("ProviderPayload", out _).ShouldBeFalse();
-
-        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
-            CoarseIdempotencyOperationClass.OutboundDraftCreation.Code);
-        auditWriter.AuthorizationFailures.ShouldBeEmpty();
-        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
-            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
-        auditWriter.Envelopes.ShouldAllBe(static envelope =>
-            envelope.CommandName == nameof(Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft) &&
-            envelope.SourceEvidenceRefs.Contains("outbound-draft:draft-001") &&
-            envelope.SourceEvidenceRefs.Contains("sender-authority:draft-only") &&
-            envelope.SourceEvidenceRefs.Contains("requester:actor-alpha") &&
-            envelope.SourceEvidenceRefs.Contains("project:project-001") &&
-            envelope.SourceEvidenceRefs.Contains("policy-snapshot:policy-snap-001") &&
-            envelope.SourceEvidenceRefs.Contains("recipient:party-001"));
-        JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web))
-            .ShouldNotContain("Governed draft content.", Case.Insensitive);
-
-        string body = await response.Content
-            .ReadAsStringAsync(TestContext.Current.CancellationToken)
-            .ConfigureAwait(true);
-        using JsonDocument accepted = JsonDocument.Parse(body);
-        JsonElement root = accepted.RootElement;
-        root.GetProperty("commandId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
-        root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
-        root.GetProperty("taskId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
-        root.GetProperty("lifecycleState").GetString().ShouldBe("Proposed");
-        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
-        body.ShouldNotContain("project-001", Case.Insensitive);
-        body.ShouldNotContain("recipient:party-001", Case.Insensitive);
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        eventStore.Submitted.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotDisabledActionReasons.InsufficientAuthority);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         body.ShouldNotContain("Governed draft content.", Case.Insensitive);
-        body.ShouldNotContain("Graph", Case.Insensitive);
-        body.ShouldNotContain("SMTP", Case.Insensitive);
+        body.ShouldNotContain("project-001", Case.Insensitive);
     }
 
     [Theory]
     [InlineData("missing-project-authority", false, true, true, false, ChatBotDisabledActionReasons.InsufficientAuthority)]
     [InlineData("missing-outbound-draft-scope", true, false, true, false, ChatBotDisabledActionReasons.InsufficientAuthority)]
-    [InlineData("m365-send-posture-present", true, true, true, true, ChatBotDisabledActionReasons.PolicyBlocked)]
-    [InlineData("tenant-policy-disables-draft-only", true, true, false, false, ChatBotDisabledActionReasons.PolicyBlocked)]
+    [InlineData("m365-send-posture-present", true, true, true, true, ChatBotDisabledActionReasons.InsufficientAuthority)]
+    [InlineData("tenant-policy-disables-draft-only", true, true, false, false, ChatBotDisabledActionReasons.InsufficientAuthority)]
     public async Task CommandGatewayApi_ShouldDenyOutboundDraftAuthorityGapsBeforeDurableMutation(
         string caseName,
         bool includeProjectAuthority,
@@ -911,7 +875,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Fact]
-    public async Task CommandGatewayApi_ShouldReplayEquivalentOutboundDraftAndRejectConflictingDuplicate()
+    public async Task CommandGatewayApi_ShouldDenyRepeatedDraftsBeforeCreatingReplayAuthority()
     {
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAuditWriter auditWriter = new();
@@ -953,33 +917,19 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             .ReadAsStringAsync(TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
-        first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        replay.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        AssertReplayBody(firstBody, replayBody);
-        conflict.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-        eventStore.Submitted.Count.ShouldBe(1);
-        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
-            CoarseIdempotencyOperationClass.OutboundDraftCreation.Code);
-        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
-            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
-
-        using JsonDocument problem = JsonDocument.Parse(conflictBody);
-        JsonElement root = problem.RootElement;
-        root.GetProperty("category").GetString().ShouldBe("conflict");
-        root.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.IdempotencyConflictOutboundDraftCreation);
-        root.GetProperty("retryable").GetBoolean().ShouldBeFalse();
-        root.GetProperty("clientAction").GetString().ShouldBe(ChatBotMessageNextActions.None);
-        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
-        conflictBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
-        conflictBody.ShouldNotContain("project-001", Case.Insensitive);
-        conflictBody.ShouldNotContain("recipient:party-001", Case.Insensitive);
+        foreach (HttpResponseMessage denied in new[] { first, replay, conflict }) { denied.StatusCode.ShouldBe(HttpStatusCode.Forbidden); }
+        firstBody.ShouldBe(replayBody);
+        eventStore.Submitted.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.Count.ShouldBe(3);
         conflictBody.ShouldNotContain("Changed governed draft content", Case.Insensitive);
         conflictBody.ShouldNotContain("sender@example.test", Case.Insensitive);
         conflictBody.ShouldNotContain("Project Alpha", Case.Insensitive);
     }
 
     [Fact]
-    public async Task CommandGatewayApi_ShouldPauseOutboundSendForApprovalThenSubmitApprovedSendOnceWithDefaultAdapterFailClosed()
+    public async Task CommandGatewayApi_ShouldAdmitApprovalRequestButDenyUnmappedApprovalAndSendAuthority()
     {
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAuditWriter auditWriter = new();
@@ -1006,67 +956,19 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             .ConfigureAwait(true);
 
         approvalRequest.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        approvalDecision.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        send.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        replay.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        AssertReplayBody(
-            await send.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true),
-            await replay.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true));
-
-        eventStore.Submitted.Select(static request => request.CommandType).ShouldBe(
-            [
-                nameof(RequestOutboundSendApproval),
-                nameof(DecideOutboundApproval),
-                nameof(ExecuteApprovedOutboundDraft),
-            ]);
-        eventStore.Submitted.Select(static request => request.AggregateId).ShouldBe(["draft-001", "draft-001", "draft-001"]);
-        eventStore.Submitted[0].Payload.GetProperty("CommandName").GetString().ShouldBe(nameof(ExecuteApprovedOutboundDraft));
-        eventStore.Submitted[0].Payload.GetProperty("RecipientRefs").EnumerateArray()
-            .Select(static item => item.GetString()).ShouldBe(["recipient:party-001"]);
-        eventStore.Submitted[1].Payload.GetProperty("Decision").GetString().ShouldBe("approve");
-        eventStore.Submitted[2].Payload.GetProperty("AdapterMode").GetString().ShouldBe("approved");
-        eventStore.Submitted[2].Payload.GetProperty("AdapterStatus").GetString().ShouldBe("unavailable");
-
-        idempotencyStore.Records.Select(static record => record.OperationClass).Order(StringComparer.Ordinal).ShouldBe(
-            [
-                CoarseIdempotencyOperationClass.ApprovalDecision.Code,
-                CoarseIdempotencyOperationClass.CommandExecution.Code,
-                CoarseIdempotencyOperationClass.OutboundSend.Code,
-            ]);
-        auditWriter.AuthorizationFailures.ShouldBeEmpty();
-        auditWriter.Envelopes.Count.ShouldBe(6);
-        auditWriter.Envelopes.ShouldContain(envelope =>
-            envelope.CommandName == nameof(RequestOutboundSendApproval) &&
-            envelope.SourceEvidenceRefs.Contains("approval:approval-001") &&
-            envelope.SourceEvidenceRefs.Contains("outbound-draft:draft-001") &&
-            envelope.SourceEvidenceRefs.Contains("requester:actor-alpha") &&
-            envelope.SourceEvidenceRefs.Contains("project:project-001") &&
-            envelope.SourceEvidenceRefs.Contains("policy-snapshot:policy-snap-001") &&
-            envelope.SourceEvidenceRefs.Contains("recipient:party-001"));
-        auditWriter.Envelopes.ShouldContain(envelope =>
-            envelope.CommandName == nameof(DecideOutboundApproval) &&
-            envelope.SourceEvidenceRefs.Contains("approval:approval-001") &&
-            envelope.SourceEvidenceRefs.Contains("approval-decision:approve"));
-        auditWriter.Envelopes.ShouldContain(envelope =>
-            envelope.CommandName == nameof(ExecuteApprovedOutboundDraft) &&
-            envelope.SourceEvidenceRefs.Contains("outbound-send:send-001") &&
-            envelope.SourceEvidenceRefs.Contains("approval:approval-001") &&
-            envelope.SourceEvidenceRefs.Contains("outbound-draft:draft-001") &&
-            envelope.SourceEvidenceRefs.Contains("sender-authority:authenticated-user-send") &&
-            envelope.SourceEvidenceRefs.Contains("send-actor:actor-alpha") &&
-            envelope.SourceEvidenceRefs.Contains("adapter-mode:approved") &&
-            envelope.SourceEvidenceRefs.Contains("recipient:party-001"));
-
-        string publicArtifacts = JsonSerializer.Serialize(
-            new { auditWriter.Envelopes, eventStore.Submitted },
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        foreach (HttpResponseMessage denied in new[] { approvalDecision, send, replay }) { denied.StatusCode.ShouldBe(HttpStatusCode.Forbidden); }
+        eventStore.Submitted.ShouldHaveSingleItem().CommandType.ShouldBe(nameof(RequestOutboundSendApproval));
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(CoarseIdempotencyOperationClass.CommandExecution.Code);
+        auditWriter.AuthorizationFailures.Count.ShouldBe(2);
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        string publicArtifacts = JsonSerializer.Serialize(new { auditWriter.Envelopes, eventStore.Submitted }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         publicArtifacts.ShouldNotContain("provider payload", Case.Insensitive);
         publicArtifacts.ShouldNotContain("Graph", Case.Insensitive);
         publicArtifacts.ShouldNotContain("SMTP", Case.Insensitive);
     }
 
     [Fact]
-    public async Task CommandGatewayApi_ShouldRejectConflictingApprovedOutboundSendWithoutSecondDurableSubmission()
+    public async Task CommandGatewayApi_ShouldDenyRepeatedUnmappedOutboundSendWithoutDurableSubmission()
     {
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAuditWriter auditWriter = new();
@@ -1090,23 +992,13 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                 TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
-        first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        conflict.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-        eventStore.Submitted.ShouldHaveSingleItem().CommandType.ShouldBe(nameof(ExecuteApprovedOutboundDraft));
-        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(CoarseIdempotencyOperationClass.OutboundSend.Code);
-        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe([AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
-
-        string body = await conflict.Content
-            .ReadAsStringAsync(TestContext.Current.CancellationToken)
-            .ConfigureAwait(true);
-        using JsonDocument problem = JsonDocument.Parse(body);
-        JsonElement root = problem.RootElement;
-        root.GetProperty("category").GetString().ShouldBe("conflict");
-        root.GetProperty("code").GetString().ShouldBe(CoarseIdempotencyOperationClass.OutboundSend.ConflictCode);
-        root.GetProperty("retryable").GetBoolean().ShouldBeFalse();
-        root.GetProperty("clientAction").GetString().ShouldBe(ChatBotMessageNextActions.None);
-        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
-        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        first.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        conflict.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        eventStore.Submitted.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.Count.ShouldBe(2);
+        string body = await conflict.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         body.ShouldNotContain("Governed draft content.", Case.Insensitive);
         body.ShouldNotContain("Approved governed content.", Case.Insensitive);
         body.ShouldNotContain("recipient:party-001", Case.Insensitive);
@@ -2163,24 +2055,24 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     [Theory]
     [InlineData(
         ParticipantAuthorizationStage.UnresolvedValue,
-        ChatBotMessageCodes.UnresolvedParticipant,
-        ChatBotAuthorizationReasonCodes.UnresolvedParticipant,
+        ChatBotMessageCodes.AuthorizationDenied,
+        ChatBotAuthorizationReasonCodes.AuthorizationDenied,
         ChatBotMessageNextActions.RequestAccess)]
     [InlineData(
         ParticipantAuthorizationStage.EmailOnlyValue,
-        ChatBotMessageCodes.UnauthorizedParticipant,
-        ChatBotAuthorizationReasonCodes.UnauthorizedParticipant,
+        ChatBotMessageCodes.AuthorizationDenied,
+        ChatBotAuthorizationReasonCodes.AuthorizationDenied,
         ChatBotMessageNextActions.RequestAccess)]
     [InlineData(
         ParticipantAuthorizationStage.UnauthorizedValue,
-        ChatBotMessageCodes.UnauthorizedParticipant,
-        ChatBotAuthorizationReasonCodes.UnauthorizedParticipant,
+        ChatBotMessageCodes.AuthorizationDenied,
+        ChatBotAuthorizationReasonCodes.AuthorizationDenied,
         ChatBotMessageNextActions.RequestAccess)]
     [InlineData(
         ParticipantAuthorizationStage.DirectoryDegradedValue,
-        ChatBotMessageCodes.ParticipantDirectoryDegraded,
-        ChatBotAuthorizationReasonCodes.ParticipantDirectoryDegraded,
-        ChatBotMessageNextActions.RetryLater)]
+        ChatBotMessageCodes.AuthorizationDenied,
+        ChatBotAuthorizationReasonCodes.AuthorizationDenied,
+        ChatBotMessageNextActions.RequestAccess)]
     public async Task CommandGatewayApi_ShouldBlockUnsafeParticipantAuthoritiesBeforeDispatch(
         string authority,
         string expectedMessageCode,

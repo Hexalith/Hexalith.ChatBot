@@ -18,7 +18,7 @@ public sealed class ServiceClientRateLimitAuthorizationTests
     [Fact]
     public async Task RateLimitShouldRequireSingleHumanTenantAdminWithNoApprover()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         // A single authorized human tenant-admin applies it — no approver needed (service-client governance is a
         // TenantAdmin responsibility; there is no service-client AdminScope and no mailbox scope for it).
@@ -54,7 +54,7 @@ public sealed class ServiceClientRateLimitAuthorizationTests
     [Fact]
     public async Task RateLimitShouldRejectOutOfBoundsOrUndeclaredBudgetAtGateway()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (SubmitServiceClientRateLimit invalid in new[]
                  {
@@ -107,7 +107,7 @@ public sealed class ServiceClientRateLimitAuthorizationTests
 
     private static ChatBotCommandSubmission Submission(object command)
         => new(
-            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test"))),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")), bindTenant: true),
             new CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
@@ -127,7 +127,7 @@ public sealed class ServiceClientRateLimitAuthorizationTests
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
             ],
-            "test")));
+            "test")), bindTenant: true);
         return new ChatBotAuthenticatedActor("actor-alpha", principal);
     }
 }

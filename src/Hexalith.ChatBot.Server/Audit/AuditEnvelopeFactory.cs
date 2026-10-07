@@ -1041,15 +1041,7 @@ internal static class AuditEnvelopeFactory
 
     private static string ActorType(ChatBotGatewayContext context)
     {
-        string? actorType = context.Actor.Principal.Claims
-            .FirstOrDefault(static claim => string.Equals(claim.Type, ParticipantAuthorizationStage.ActorTypeClaim, StringComparison.Ordinal))?
-            .Value;
-
-        actorType ??= context.Actor.Principal.Claims
-            .FirstOrDefault(static claim => string.Equals(claim.Type, "actor_type", StringComparison.Ordinal))?
-            .Value;
-
-        return AuditMetadata.SafeActorType(actorType ?? context.Actor.ActorType);
+        return AuditMetadata.SafeActorType(context.Actor.RequestContext?.ActorClass ?? context.Actor.ActorType);
     }
 
     private static IReadOnlyList<string> SourceEvidenceRefs(ChatBotGatewayContext context, AuditCommitPhase phase)

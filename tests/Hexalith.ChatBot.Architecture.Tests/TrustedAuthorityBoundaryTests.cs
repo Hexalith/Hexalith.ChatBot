@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Queries;
+using Hexalith.ChatBot.Server.Lifecycle.AiExecution;
 using Hexalith.EventStore.DomainService;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -20,9 +21,11 @@ public sealed class TrustedAuthorityBoundaryTests
     {
         ChatBotAuthorityCatalog catalog = new();
         string[] commands = typeof(IChatBotCommand).Assembly.GetTypes().Where(static type => type.IsClass && !type.IsAbstract && typeof(IChatBotCommand).IsAssignableFrom(type)).Select(static type => type.Name).Order(StringComparer.Ordinal).ToArray();
-        catalog.Requirements.Where(static row => !row.IsQuery).Select(static row => row.Operation).Order(StringComparer.Ordinal).ShouldBe(commands);
+        catalog.Requirements.Where(static row => !row.IsQuery && row.Operation != AiExecutionRecoveryOperations.Recover).Select(static row => row.Operation).Order(StringComparer.Ordinal).ShouldBe(commands);
         string[] queries = typeof(ChatBotRequestAuthorizer).Assembly.GetTypes().Where(static type => type.IsClass && !type.IsAbstract && typeof(IDomainQueryHandler).IsAssignableFrom(type)).Select(type => (string)type.GetProperty("QueryType")!.GetValue(System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(type))!).Order(StringComparer.Ordinal).ToArray();
-        catalog.Requirements.Where(static row => row.IsQuery).Select(static row => row.Operation).Order(StringComparer.Ordinal).ShouldBe(queries);
+        catalog.Requirements.Where(static row => row.IsQuery && row.Operation != AiExecutionRecoveryOperations.List).Select(static row => row.Operation).Order(StringComparer.Ordinal).ShouldBe(queries);
+        catalog.Find(AiExecutionRecoveryOperations.List, true)!.AdminScope.ShouldBe("operate");
+        catalog.Find(AiExecutionRecoveryOperations.Recover, false)!.AdminScope.ShouldBe("operate");
         catalog.Find("unknown-command", false).ShouldBeNull();
         Should.Throw<InvalidOperationException>(() => new ChatBotAuthorityCatalog(catalog.Requirements.Concat([catalog.Requirements.First()])));
         Should.Throw<InvalidOperationException>(() => new ChatBotAuthorityCatalog(catalog.Requirements.Skip(1)));

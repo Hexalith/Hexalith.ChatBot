@@ -24,7 +24,7 @@ public sealed class CommandCapabilityQuarantineAuthorizationTests
     [Fact]
     public async Task QuarantineProposalShouldRequireHumanPolicyAdmin()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         // Command-capability governance is the policy-admin's domain (the "security engineer" persona maps to
         // AdminScope.Policy). A policy-admin is allowed; a tenant-admin is also allowed via the FR75a scope union.
@@ -66,7 +66,7 @@ public sealed class CommandCapabilityQuarantineAuthorizationTests
     [Fact]
     public async Task QuarantineApprovalShouldRequireHumanPolicyAdminAndDistinctApprover()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (ChatBotAuthenticatedActor allowedActor in new[]
                  {
@@ -112,7 +112,7 @@ public sealed class CommandCapabilityQuarantineAuthorizationTests
     [Fact]
     public async Task QuarantineCommandsShouldRejectInvalidMetadataOnlyPayloads()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (SubmitCommandCapabilityQuarantine invalid in new[]
                  {
@@ -136,7 +136,7 @@ public sealed class CommandCapabilityQuarantineAuthorizationTests
     [Fact]
     public async Task SelfLockoutGuardShouldRejectQuarantiningAnFr74GovernanceCommand()
     {
-        ParticipantAuthorizationStage stage = new();
+        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         // An admin cannot quarantine the very commands needed to govern/reverse a quarantine: a propose/approve whose
         // CommandCapabilityRef names an FR74 governance/two-person command — including the quarantine commands
@@ -180,7 +180,7 @@ public sealed class CommandCapabilityQuarantineAuthorizationTests
         provider.Quarantine(Tenant, QuarantinedCapability);
         ParticipantAuthorizationStage stage = new(
             serviceClientGrantValidator: new SentinelDenyingServiceClientGrantValidator(),
-            commandCapabilityControlStateProvider: provider);
+            commandCapabilityControlStateProvider: provider, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         foreach (ChatBotAuthenticatedActor actor in new[]
                  {
@@ -190,7 +190,7 @@ public sealed class CommandCapabilityQuarantineAuthorizationTests
                  })
         {
             ChatBotAuthorizationResult denied = await stage.AuthorizeAsync(
-                Submission(new object(), QuarantinedCapability),
+                Submission(new { AssociationId = "association-test", ProjectId = "project-test" }, QuarantinedCapability),
                 actor,
                 new ChatBotTenantBinding(Tenant),
                 TestContext.Current.CancellationToken);
@@ -216,11 +216,11 @@ public sealed class CommandCapabilityQuarantineAuthorizationTests
     {
         FakeCommandCapabilityControlStateProvider provider = new();
         provider.Quarantine(Tenant, QuarantinedCapability);
-        ParticipantAuthorizationStage stage = new(commandCapabilityControlStateProvider: provider);
+        ParticipantAuthorizationStage stage = new(commandCapabilityControlStateProvider: provider, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         // A sibling, still-Active command type for the same tenant is unaffected (isolation).
         ChatBotAuthorizationResult sibling = await stage.AuthorizeAsync(
-            Submission(new object(), nameof(Hexalith.ChatBot.Contracts.Commands.MarkEmailAssociationNeedsReview)),
+            Submission(new { AssociationId = "association-test", ProjectId = "project-test" }, nameof(Hexalith.ChatBot.Contracts.Commands.MarkEmailAssociationNeedsReview)),
             Actor("human", "tenant-admin"),
             new ChatBotTenantBinding(Tenant),
             TestContext.Current.CancellationToken);
@@ -228,8 +228,8 @@ public sealed class CommandCapabilityQuarantineAuthorizationTests
 
         // The SAME command type under a DIFFERENT tenant is unaffected (per-tenant isolation).
         ChatBotAuthorizationResult otherTenant = await stage.AuthorizeAsync(
-            Submission(new object(), QuarantinedCapability),
-            Actor("human", "tenant-admin"),
+            Submission(new { AssociationId = "association-test", ProjectId = "project-test" }, QuarantinedCapability),
+            Actor("human", "tenant-admin", "tenant-beta"),
             new ChatBotTenantBinding("tenant-beta"),
             TestContext.Current.CancellationToken);
         otherTenant.IsAllowed.ShouldBeTrue();
@@ -243,7 +243,7 @@ public sealed class CommandCapabilityQuarantineAuthorizationTests
         // SubmitCommandCapabilityQuarantine from a policy-admin therefore stays admittable.
         FakeCommandCapabilityControlStateProvider provider = new();
         provider.Quarantine(Tenant, nameof(SubmitCommandCapabilityQuarantine));
-        ParticipantAuthorizationStage stage = new(commandCapabilityControlStateProvider: provider);
+        ParticipantAuthorizationStage stage = new(commandCapabilityControlStateProvider: provider, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
             Submission(QuarantineSubmit()),
@@ -261,10 +261,10 @@ public sealed class CommandCapabilityQuarantineAuthorizationTests
         FakeCommandCapabilityControlStateProvider provider = new();
         provider.Disable(Tenant, nameof(Hexalith.ChatBot.Contracts.Commands.MarkEmailAssociationNeedsReview));
         provider.Quarantine(Tenant, QuarantinedCapability);
-        ParticipantAuthorizationStage stage = new(commandCapabilityControlStateProvider: provider);
+        ParticipantAuthorizationStage stage = new(commandCapabilityControlStateProvider: provider, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
 
         ChatBotAuthorizationResult disabled = await stage.AuthorizeAsync(
-            Submission(new object(), nameof(Hexalith.ChatBot.Contracts.Commands.MarkEmailAssociationNeedsReview)),
+            Submission(new { AssociationId = "association-test", ProjectId = "project-test" }, nameof(Hexalith.ChatBot.Contracts.Commands.MarkEmailAssociationNeedsReview)),
             Actor("human", "tenant-admin"),
             new ChatBotTenantBinding(Tenant),
             TestContext.Current.CancellationToken);
@@ -272,7 +272,7 @@ public sealed class CommandCapabilityQuarantineAuthorizationTests
         disabled.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.CommandCapabilityDisabled);
 
         ChatBotAuthorizationResult quarantined = await stage.AuthorizeAsync(
-            Submission(new object(), QuarantinedCapability),
+            Submission(new { AssociationId = "association-test", ProjectId = "project-test" }, QuarantinedCapability),
             Actor("human", "tenant-admin"),
             new ChatBotTenantBinding(Tenant),
             TestContext.Current.CancellationToken);
@@ -312,7 +312,7 @@ public sealed class CommandCapabilityQuarantineAuthorizationTests
 
     private static ChatBotCommandSubmission Submission(object command, string commandType)
         => new(
-            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test"))),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")), bindTenant: true),
             new CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
@@ -324,15 +324,17 @@ public sealed class CommandCapabilityQuarantineAuthorizationTests
             null,
             ChatBotSurfaceOrigin.Ui);
 
-    private static ChatBotAuthenticatedActor Actor(string actorType, string role)
+    private static ChatBotAuthenticatedActor Actor(string actorType, string role, string tenant = "tenant-alpha")
     {
         ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "actor-alpha"),
+                new Claim("eventstore:tenant", tenant),
+                new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-test"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
             ],
-            "test")));
+            "test")), bindTenant: true);
         return new ChatBotAuthenticatedActor("actor-alpha", principal);
     }
 

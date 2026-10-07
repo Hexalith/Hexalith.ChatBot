@@ -51,15 +51,8 @@ internal sealed class ComplianceAuditDetailQueryHandler(
             .Select(static reference => reference["project:".Length..])
             .Where(AuditMetadata.IsSafeStableIdentifier)
             .Distinct(StringComparer.Ordinal).ToArray();
-        bool hasPerProjectAuthority = projectRefs.Length > 0;
-        foreach (string project in projectRefs)
-        {
-            if (!await RequestAuthorizer.HasProjectAuthorityAsync(principal.Context, project, QueryType, cancellationToken).ConfigureAwait(false))
-            {
-                hasPerProjectAuthority = false;
-                break;
-            }
-        }
+        bool hasPerProjectAuthority = await RequestAuthorizer.HasProjectAuthoritiesAsync(principal.Context, projectRefs, QueryType, cancellationToken).ConfigureAwait(false) &&
+            RequestAuthorizer.IsCurrent(principal);
 
         ComplianceAuditDetail detail = ComplianceAuditReadPolicy.Detail(envelope, hasPerProjectAuthority);
         return QueryResult.FromPayload(ComplianceAuditHttpResults.DetailJsonElement(detail), "chatbot.compliance-audit-detail.v1");

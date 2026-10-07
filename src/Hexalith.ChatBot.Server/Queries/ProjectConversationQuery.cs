@@ -6,6 +6,4 @@ internal sealed record ProjectConversationQuery(
     string ProjectId,
     string? Cursor,
     int PageSize,
-    bool ProjectReadAuthorized,
-    bool HasProjectScopeClaims,
     string? TaskId);

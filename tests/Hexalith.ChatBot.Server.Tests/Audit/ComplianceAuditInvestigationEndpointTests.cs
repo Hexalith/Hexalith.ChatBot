@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Authorization;
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 
 using Microsoft.AspNetCore.Builder;
@@ -266,6 +268,53 @@ public sealed class ComplianceAuditInvestigationEndpointTests
         body.ShouldNotContain("project-alpha");
         body.ShouldNotContain("project-beta");
         body.ShouldNotContain("restricted-sentinel");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DetailRestrictsWhenProjectEvidenceExpiresDuringLaterCheckOrPredatesRequest(bool observedBeforeRequest)
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock)
+        {
+            Transform = evidence =>
+            {
+                if (evidence.Request.Owner != "Projects") { return evidence; }
+                if (observedBeforeRequest)
+                {
+                    return evidence with { ObservedAt = clock.UtcNow.AddSeconds(-1), RevocationCheckedAt = clock.UtcNow.AddSeconds(-1) };
+                }
+
+                if (evidence.Request.ResourceId == "project-alpha") { return evidence with { ExpiresAt = clock.UtcNow.AddSeconds(1) }; }
+                clock.UtcNow += TimeSpan.FromSeconds(2);
+                return evidence with { ObservedAt = clock.UtcNow, RevocationCheckedAt = clock.UtcNow, ExpiresAt = clock.UtcNow.AddMinutes(5) };
+            },
+        };
+        using WebApplicationFactory<Program> factory = ComplianceFactory("tenant-alpha").WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<ISystemClock>(clock);
+            services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
+        }));
+        using HttpClient client = factory.CreateClient();
+        AuditEnvelope envelope = Envelope("tenant-alpha", "audit-record-expiring-projects") with
+        {
+            SourceEvidenceRefs = ["project:project-alpha", "project:project-beta", "source-message:restricted-sentinel"],
+        };
+        await SeedAsync(factory.Services.GetRequiredService<IWormAuditStore>(), envelope);
+        using HttpResponseMessage response = await client.SendAsync(DetailRequest(envelope.ResourceId), TestContext.Current.CancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using JsonDocument detail = JsonDocument.Parse(body);
+        detail.RootElement.GetProperty("redactionState").GetString().ShouldBe("escalation-required");
+        detail.RootElement.GetProperty("redactionReasonCode").GetString().ShouldBe("restricted-detail");
+        detail.RootElement.GetProperty("safeNextAction").GetString().ShouldBe("request-access");
+        detail.RootElement.GetProperty("visibleMetadataRefs").EnumerateArray().ShouldBeEmpty();
+        body.ShouldNotContain("project-alpha");
+        body.ShouldNotContain("project-beta");
+        body.ShouldNotContain("restricted-sentinel");
+        owner.Requests.Where(static request => request.Owner == "Projects").Count().ShouldBe(observedBeforeRequest ? 1 : 2);
+        owner.Requests.Where(static request => request.Owner == "Projects").ShouldAllBe(static request => request.RequireCurrent);
     }
 
     private static async Task SeedAsync(IWormAuditStore store, AuditEnvelope envelope)

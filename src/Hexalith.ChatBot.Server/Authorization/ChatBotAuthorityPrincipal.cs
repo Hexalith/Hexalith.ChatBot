@@ -12,14 +12,16 @@ internal sealed class ChatBotAuthorityPrincipal : ClaimsPrincipal
     private readonly string[] _projects;
     private readonly string[] _adminScopes;
     private readonly AdminRole[] _adminRoles;
+    private readonly (ChatBotOwnerAuthorityEvidence Evidence, DateTimeOffset Started)[] _evidence;
+    private readonly ServiceClientGrantProjectionCache? _grants;
 
     /// <summary>Creates a narrow principal after exact evidence validation.</summary>
-    internal ChatBotAuthorityPrincipal(ChatBotRequestContext context, string? adminScope, IEnumerable<string> projects, IEnumerable<string>? scopedAdminGrants = null, IEnumerable<AdminRole>? scopedRoles = null)
-        : base(context.Principal.Identities.Select(static identity => new ClaimsIdentity(
-            identity.Claims.Where(static claim => claim.Type is not (ParticipantAuthorizationStage.TenantRoleClaim or ParticipantAuthorizationStage.ProjectOwnerClaim)),
-            identity.AuthenticationType)))
+    internal ChatBotAuthorityPrincipal(ChatBotRequestContext context, string? adminScope, IEnumerable<string> projects, IEnumerable<string>? scopedAdminGrants = null, IEnumerable<AdminRole>? scopedRoles = null, IEnumerable<(ChatBotOwnerAuthorityEvidence Evidence, DateTimeOffset Started)>? validatedEvidence = null, ServiceClientGrantProjectionCache? grants = null)
+        : base(new ClaimsIdentity(BindingClaims(context), "trusted-context"))
     {
         Context = context;
+        _evidence = validatedEvidence?.ToArray() ?? [];
+        _grants = grants;
         AdminScope = context.IsMachine ? null : adminScope;
         _adminScopes = context.IsMachine ? [] : (scopedAdminGrants ?? (adminScope is null ? [] : [adminScope])).Distinct(StringComparer.Ordinal).ToArray();
         _adminRoles = context.IsMachine ? [] : (scopedRoles ?? (AdminRoles.TryFromWireValue(
@@ -38,6 +40,28 @@ internal sealed class ChatBotAuthorityPrincipal : ClaimsPrincipal
 
         AddIdentity(authority);
     }
+
+    private static IEnumerable<Claim> BindingClaims(ChatBotRequestContext context)
+    {
+        yield return new("sub", context.SubjectId);
+        yield return new(ClaimTypes.NameIdentifier, context.SubjectId);
+        if (context.TenantId is not null)
+        {
+            yield return new("eventstore:tenant", context.TenantId);
+        }
+
+        yield return new(ParticipantAuthorizationStage.ActorTypeClaim, context.ActorClass);
+        if (context.ServiceClientId is not null)
+        {
+            yield return new(ClaimsServiceClientGrantResolver.ServiceClientIdClaim, context.ServiceClientId);
+        }
+    }
+
+    /// <summary>Revalidates all retained owner bounds and known revocation at a protected-effect boundary.</summary>
+    public bool IsCurrent(DateTimeOffset now)
+        => _evidence.All(item => ChatBotRequestAuthorizer.IsValidEvidence(item.Evidence, item.Evidence.Request, item.Started, now) &&
+            (item.Evidence.ServiceGrant is not { } grant || (grant.ExpiresAt > now && _grants is not null &&
+                !_grants.IsRevoked(item.Evidence.Request, grant.GrantId) && !_grants.PredatesClientRevocation(item.Evidence))));
 
     /// <summary>The immutable authenticated binding.</summary>
     public ChatBotRequestContext Context { get; }

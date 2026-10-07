@@ -86,7 +86,7 @@ public sealed class NotificationRoutingResolverTests
         IReadOnlyList<NotificationDelivery> deliveries = NotificationRoutingResolver.Resolve(
             Event(NotificationStateClass.ReviewNeeded),
             routing,
-            [Candidate("operator-owner", "operations-admin", projectRef: "*")]);
+            [Candidate("operator-owner", "operations-admin", projectRef: "*", scope: AdminScope.SeeOnly)]);
 
         NotificationDelivery delivery = deliveries.ShouldHaveSingleItem();
         delivery.Visibility.ShouldBe(NotificationContentVisibility.MetadataRedacted);
@@ -240,7 +240,7 @@ public sealed class NotificationRoutingResolverTests
             new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero),
             itemProjectRef);
 
-    private static NotificationRecipientCandidate Candidate(string recipientRef, string role, string? projectRef = null)
+    private static NotificationRecipientCandidate Candidate(string recipientRef, string role, string? projectRef = null, AdminScope scope = AdminScope.Operate)
     {
         List<Claim> claims =
         [
@@ -253,6 +253,6 @@ public sealed class NotificationRoutingResolverTests
             claims.Add(new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, projectRef));
         }
 
-        return new NotificationRecipientCandidate(recipientRef, Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test"))));
+        return new NotificationRecipientCandidate(recipientRef, Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.PolicyPrincipal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")), scope));
     }
 }

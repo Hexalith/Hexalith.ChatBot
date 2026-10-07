@@ -15,44 +15,93 @@ namespace Hexalith.ChatBot.Tests.TrustedAuthority;
 /// <summary>Synthetic owner records for existing unit personas. Raw labels are fixture inputs only.</summary>
 internal static class RegressionAuthorityFixture
 {
-    private static readonly AsyncLocal<ClaimsPrincipal?> Evidence = new();
-    /// <summary>The persona whose owner records are configured for the current test request.</summary>
-    public static ClaimsPrincipal? EvidencePrincipal => Evidence.Value;
-    /// <summary>Sets owner fixture metadata for a real request without changing its authenticated input.</summary>
+    private static readonly AsyncLocal<IReadOnlyDictionary<(string Subject, string Tenant), ClaimsPrincipal>?> Evidence = new();
+
+    /// <summary>Looks up an exact synthetic owner persona by the bound requester and tenant.</summary>
+    public static ClaimsPrincipal? EvidenceFor(string subject, string tenant)
+        => Evidence.Value?.GetValueOrDefault((subject, tenant));
+
+    /// <summary>Registers a copied test owner persona under its exact bound identity.</summary>
     public static ClaimsPrincipal SetEvidence(ClaimsPrincipal principal)
     {
-        Evidence.Value = principal;
+        if (ChatBotRequestContextResolver.TryResolve(principal, ChatBotSurfaceOrigin.Api, out ChatBotRequestContext? context, out _) && context?.TenantId is { } tenant)
+        {
+            Dictionary<(string, string), ClaimsPrincipal> records = Evidence.Value is { } existing ? new(existing) : [];
+            records[(context.SubjectId, tenant)] = new(principal.Identities.Select(static identity => identity.Clone()));
+            Evidence.Value = records;
+        }
+
         return principal;
     }
 
-    /// <summary>Supplies synthetic owner-proven scopes to lower-level tests that isolate the downstream policy.</summary>
-    public static ClaimsPrincipal Principal(ClaimsPrincipal principal)
+    /// <summary>Retains raw authenticated gateway input and registers separate exact owner fixture records.</summary>
+    public static ClaimsPrincipal Principal(ClaimsPrincipal principal, bool bindTenant = false)
     {
-        SetEvidence(principal);
-        if (!principal.Identities.Any(static identity => identity.IsAuthenticated))
+        ClaimsPrincipal prepared = bindTenant ? PreparePolicyIdentity(principal) : principal;
+        if (bindTenant)
         {
-            return principal;
+            string personaKey = string.Join("|", prepared.Claims.OrderBy(static claim => claim.Type, StringComparer.Ordinal).ThenBy(static claim => claim.Value, StringComparer.Ordinal).Select(static claim => $"{claim.Type}:{claim.Value}"));
+            string subject = "synthetic-stage-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(personaKey)))[..20];
+            foreach (ClaimsIdentity identity in prepared.Identities)
+            {
+                foreach (Claim claim in identity.Claims.Where(static claim => claim.Type is "sub" or ClaimTypes.NameIdentifier).ToArray())
+                {
+                    identity.RemoveClaim(claim);
+                    identity.AddClaim(new(claim.Type, subject));
+                }
+            }
         }
 
-        string subject = principal.FindFirstValue("sub") ?? "actor-alpha";
-        string tenant = principal.FindFirstValue("eventstore:tenant") ?? principal.FindFirstValue("tenant") ?? "tenant-alpha";
-        string actor = principal.FindFirstValue(ParticipantAuthorizationStage.ActorTypeClaim) ?? "human";
-        string? client = principal.FindFirstValue(ClaimsServiceClientGrantResolver.ServiceClientIdClaim);
-        actor = actor == "user" ? "human" : actor;
-        ChatBotRequestContext context = new(subject, tenant, actor, client, ChatBotSurfaceOrigin.Api, principal);
-        AdminRole[] roles = principal.FindAll(ParticipantAuthorizationStage.TenantRoleClaim).Select(static claim => AdminRoles.TryFromWireValue(claim.Value, out AdminRole role) ? (AdminRole?)role : null).Where(static role => role.HasValue).Select(static role => role!.Value).ToArray();
-        string[] scopes = roles.SelectMany(AdminScopes.ScopesForRole).Select(AdminScopes.ToWireValue).Concat(roles.Contains(AdminRole.TenantAdmin) ? ["tenant"] : []).ToArray();
-        string[] projects = principal.FindAll(ParticipantAuthorizationStage.ProjectOwnerClaim).Select(static claim => claim.Value).Where(static value => value != "*").ToArray();
-        ChatBotAuthorityPrincipal snapshot = new(context, roles.Contains(AdminRole.TenantAdmin) ? "tenant" : scopes.FirstOrDefault(), projects, scopes, roles);
-        // Preserve test persona labels so the test-owned provider can map them to separate exact current grants.
-        ClaimsIdentity fixtureLabels = new("synthetic-owner-labels");
-        foreach (Claim claim in principal.FindAll(ParticipantAuthorizationStage.TenantRoleClaim))
+        return SetEvidence(prepared);
+    }
+
+    /// <summary>Constructs an isolated downstream policy fixture with one exact hypothetical owner scope.</summary>
+    public static ClaimsPrincipal PolicyPrincipal(ClaimsPrincipal principal, AdminScope scope)
+    {
+        ClaimsPrincipal prepared = PreparePolicyIdentity(principal);
+        if (!ChatBotRequestContextResolver.TryResolve(prepared, ChatBotSurfaceOrigin.Api, out ChatBotRequestContext? context, out _))
         {
-            fixtureLabels.AddClaim(claim);
+            return prepared;
         }
 
-        snapshot.AddIdentity(fixtureLabels);
-        return SetEvidence(snapshot);
+        AdminRole[] roles = prepared.FindAll(ParticipantAuthorizationStage.TenantRoleClaim)
+            .Select(static claim => AdminRoles.TryFromWireValue(claim.Value, out AdminRole role) ? (AdminRole?)role : null)
+            .Where(static role => role.HasValue).Select(static role => role!.Value).Distinct().ToArray();
+        bool granted = !context!.IsMachine && roles.Length == 1 && AdminScopes.ScopesForRole(roles[0]).Contains(scope);
+        string[] projects = prepared.FindAll(ParticipantAuthorizationStage.ProjectOwnerClaim).Select(static claim => claim.Value).Where(static project => project != "*").ToArray();
+        return new ChatBotAuthorityPrincipal(context, granted ? AdminScopes.ToWireValue(scope) : null, projects,
+            granted ? [AdminScopes.ToWireValue(scope)] : [], granted ? roles : []);
+    }
+
+    private static ClaimsPrincipal PreparePolicyIdentity(ClaimsPrincipal principal)
+    {
+        ClaimsPrincipal prepared = new(principal.Identities.Select(static identity => identity.Clone()));
+        ClaimsIdentity? identity = prepared.Identities.FirstOrDefault(static value => value.IsAuthenticated);
+        if (identity is null)
+        {
+            return prepared;
+        }
+
+        if (!prepared.Claims.Any(static claim => claim.Type is "tenant" or "eventstore:tenant"))
+        {
+            identity.AddClaim(new("eventstore:tenant", "tenant-alpha"));
+        }
+
+        if (prepared.Claims.Any(static claim => (claim.Type is "actor_type" or ParticipantAuthorizationStage.ActorTypeClaim) && claim.Value is "service" or "ai") &&
+            !prepared.HasClaim(static claim => claim.Type == ClaimsServiceClientGrantResolver.ServiceClientIdClaim) &&
+            !prepared.Claims.Any(static claim => claim.Type == "preferred_username" && claim.Value.StartsWith("service-account-", StringComparison.Ordinal)))
+        {
+            identity.AddClaim(new(ClaimsServiceClientGrantResolver.ServiceClientIdClaim, "synthetic-client"));
+        }
+
+        return prepared;
+    }
+
+    /// <summary>Authorizes an isolated downstream stage using current synthetic owner evidence and independent machine grants.</summary>
+    public static ChatBotRequestAuthorizer StageAuthorizer()
+    {
+        ISystemClock clock = new SystemClock();
+        return TrustedAuthorityFixture.Authorizer(clock, new RegressionOwnerAuthorityProvider(clock, independentMachineGrants: true));
     }
 
     /// <summary>The current synthetic authority gate used by legacy direct gateway fixtures.</summary>

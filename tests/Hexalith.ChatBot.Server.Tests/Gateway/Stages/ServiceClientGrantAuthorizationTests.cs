@@ -26,7 +26,7 @@ public sealed class ServiceClientGrantAuthorizationTests
                 new Claim("sub", "service-account-cli"),
                 new Claim("preferred_username", "service-account-cli-automation-client"),
             ],
-            "test")));
+            "test")), bindTenant: true);
 
         ChatBotAuthenticationResult result = await stage.AuthenticateAsync(
             Submission(principal, ChatBotSurfaceOrigin.Cli),
@@ -47,7 +47,7 @@ public sealed class ServiceClientGrantAuthorizationTests
                 new Claim(ClaimsServiceClientGrantResolver.ServiceClientIdClaim, "cli-automation-client"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
             ],
-            "test")));
+            "test")), bindTenant: true);
 
         ChatBotAuthenticationResult result = await stage.AuthenticateAsync(
             Submission(principal, ChatBotSurfaceOrigin.Cli),
@@ -106,7 +106,7 @@ public sealed class ServiceClientGrantAuthorizationTests
     [InlineData("wrong-surface", ChatBotAuthorizationReasonCodes.ServiceClientWrongSurface)]
     [InlineData("under-scoped-command", ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped)]
     [InlineData("over-scoped-command", ChatBotAuthorizationReasonCodes.ServiceClientGrantOverScoped)]
-    [InlineData("tenant-mismatch", ChatBotAuthorizationReasonCodes.ServiceClientGrantTenantMismatch)]
+    [InlineData("tenant-mismatch", ChatBotAuthorizationReasonCodes.AuthorizationDenied)]
     public async Task InvalidServiceClientGrantShouldDenyBeforeDurableWork(string caseName, string expectedReason)
     {
         ParticipantAuthorizationStage stage = Stage();
@@ -164,7 +164,7 @@ public sealed class ServiceClientGrantAuthorizationTests
             TestContext.Current.CancellationToken);
 
         result.IsAllowed.ShouldBeFalse();
-        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantOverScoped);
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized);
     }
 
     [Fact]
@@ -649,6 +649,7 @@ public sealed class ServiceClientGrantAuthorizationTests
         ChatBotAuthenticatedActor tenantAlphaActor = Actor(
             Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
         ChatBotAuthenticatedActor tenantBetaActor = Actor(
+            Claim("eventstore:tenant", "tenant-beta"),
             Claim(ClaimsServiceClientGrantResolver.GrantTenantClaim, "tenant-beta"),
             Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
 
@@ -1095,7 +1096,7 @@ public sealed class ServiceClientGrantAuthorizationTests
                 commandHistory,
                 aiActorControlStateProvider,
                 aiActorRateLimitProvider,
-                aiActorProposalHistory));
+                aiActorProposalHistory), requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
     }
 
     private sealed class FakeControlStateProvider(
@@ -1229,7 +1230,7 @@ public sealed class ServiceClientGrantAuthorizationTests
         string commandType = nameof(RecordGovernedNote),
         object? command = null)
         => Submission(
-            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "service-account-cli")], "test"))),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "service-account-cli")], "test")), bindTenant: true),
             origin,
             commandType,
             command);
@@ -1252,7 +1253,7 @@ public sealed class ServiceClientGrantAuthorizationTests
 
         RemoveOverriddenClaims(claims, overrides);
         claims.AddRange(overrides);
-        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")), bindTenant: true);
         return new ChatBotAuthenticatedActor(
             "service-account-cli",
             principal,
@@ -1266,6 +1267,7 @@ public sealed class ServiceClientGrantAuthorizationTests
         [
             new("sub", "service-account-cli"),
             new(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.AiActorValue),
+            new(ParticipantAuthorizationStage.ProjectOwnerClaim, "01ARZ3NDEKTSV4RRFFQ69G5PRJ"),
             new(ClaimsServiceClientGrantResolver.ServiceClientIdClaim, "cli-automation-client"),
             new(ClaimsServiceClientGrantResolver.ServiceClientClassClaim, "cli-automation"),
             new(ClaimsServiceClientGrantResolver.GrantIdClaim, "01ARZ3NDEKTSV4RRFFQ69G5FAV"),
@@ -1278,7 +1280,7 @@ public sealed class ServiceClientGrantAuthorizationTests
 
         RemoveOverriddenClaims(claims, overrides);
         claims.AddRange(overrides);
-        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")), bindTenant: true);
         return new ChatBotAuthenticatedActor(
             "service-account-cli",
             principal,
@@ -1293,7 +1295,7 @@ public sealed class ServiceClientGrantAuthorizationTests
                 new Claim("sub", "service-account-cli"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.ServiceActorValue),
             ],
-            "test")));
+            "test")), bindTenant: true);
         return new ChatBotAuthenticatedActor(
             "service-account-cli",
             principal,

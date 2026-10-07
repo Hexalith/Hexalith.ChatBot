@@ -9,10 +9,14 @@ using Hexalith.ChatBot.Server.Gateway.Stages;
 namespace Hexalith.ChatBot.Server.Authorization;
 
 /// <summary>Authorizes exact operations against current owner evidence before any protected access.</summary>
-internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, IChatBotOwnerAuthorityProvider owners, ISystemClock clock, ServiceClientGrantProjectionCache grants)
+internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, IChatBotOwnerAuthorityProvider owners, ISystemClock clock, ServiceClientGrantProjectionCache grants, ILogger<ChatBotRequestAuthorizer>? logger = null)
 {
+    private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     /// <summary>Recognizes only operations covered by the closed catalog.</summary>
     public bool IsKnownOperation(string operation, bool isQuery) => catalog.Find(operation, isQuery) is not null;
+
+    /// <summary>Checks retained authority immediately before protected effects or disclosure.</summary>
+    public bool IsCurrent(ChatBotAuthorityPrincipal principal) => principal.IsCurrent(clock.UtcNow);
 
     /// <summary>Checks current project evidence before releasing project-specific detail.</summary>
     public async ValueTask<bool> HasProjectAuthorityAsync(ChatBotRequestContext context, string project, string operation, CancellationToken cancellationToken)
@@ -22,8 +26,29 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
             return false;
         }
 
+        return await HasProjectAuthoritiesAsync(context, [project], operation, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Collects current project evidence and jointly validates its complete set before disclosure.</summary>
+    public async ValueTask<bool> HasProjectAuthoritiesAsync(ChatBotRequestContext context, IEnumerable<string> projects, string operation, CancellationToken cancellationToken)
+    {
+        string[] exactProjects = projects.Distinct(StringComparer.Ordinal).ToArray();
+        if (context.TenantId is null || exactProjects.Length == 0 || exactProjects.Any(static project => !AuditMetadata.IsSafeStableIdentifier(project) || project == "*") || catalog.Find(operation, true) is null)
+        {
+            return false;
+        }
+
         DateTimeOffset started = clock.UtcNow;
-        return await GetEvidenceAsync(Request(context, "Projects", project, operation, "project", true), started, cancellationToken).ConfigureAwait(false) is not null;
+        List<ChatBotOwnerAuthorityEvidence> evidence = [];
+        foreach (string project in exactProjects)
+        {
+            ChatBotOwnerAuthorityEvidence? current = await GetEvidenceAsync(Request(context, "Projects", project, operation, "project", true), started, cancellationToken).ConfigureAwait(false);
+            if (current is null) { return false; }
+            evidence.Add(current);
+        }
+
+        DateTimeOffset decidedAt = clock.UtcNow;
+        return evidence.All(item => IsValidEvidence(item, item.Request, started, decidedAt));
     }
 
     /// <summary>Checks the closed operation row and every bound owner scope.</summary>
@@ -33,35 +58,33 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
         ChatBotAuthorityRequirement? row = catalog.Find(operation, isQuery);
         if (row is null || context.TenantId is null)
         {
-            return Denied();
+            return Denied(operation);
         }
 
         if (context.IsMachine && row.AdminScope is not null)
         {
-            return new ChatBotAuthorityDecision(null, operation is nameof(Hexalith.ChatBot.Contracts.Commands.AssignTenantAdminRole)
-                or nameof(Hexalith.ChatBot.Contracts.Commands.SetAssociationConfidenceThresholds)
-                ? ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized : ChatBotAuthorizationReasonCodes.AuthorizationDenied, []);
+            return Denied(operation);
         }
 
         JsonElement json;
         try
         {
-            json = payload is JsonElement element ? element : JsonSerializer.SerializeToElement(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            json = payload is JsonElement element ? element : JsonSerializer.SerializeToElement(payload, _jsonOptions);
         }
         catch (JsonException)
         {
-            return Denied();
+            return Denied(operation);
         }
 
         if (json.ValueKind != JsonValueKind.Object || !ValidTenantTargets(json, context.TenantId))
         {
-            return Denied();
+            return Denied(operation);
         }
 
         string? resource = row.ResourceProperty is null ? context.TenantId : ReadString(json, row.ResourceProperty);
         if (!AuditMetadata.IsSafeStableIdentifier(resource) || resource == "*")
         {
-            return Denied();
+            return Denied(operation);
         }
 
         DateTimeOffset started = clock.UtcNow;
@@ -77,7 +100,7 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
             string? failedEvent = ReadString(json, "FailedEventId");
             if (!AuditMetadata.IsSafeStableIdentifier(failedEvent) || failedEvent == "*")
             {
-                return Denied();
+                return Denied(operation);
             }
 
             requests.Add(Request(context, "ChatBot", failedEvent!, operation, "operation", true));
@@ -97,12 +120,12 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
         CollectReferences(json, ["ProjectId", "ProjectRef", "TargetProjectId", "PriorProjectId", "ProjectScopeRef", "ProjectIds", "ProjectRefs", "ProjectScopeRefs"], projects);
         if (row.RequiresProject && projects.Count == 0)
         {
-            return Denied();
+            return Denied(operation);
         }
 
         if (projects.Any(static project => !AuditMetadata.IsSafeStableIdentifier(project) || project == "*"))
         {
-            return Denied();
+            return Denied(operation);
         }
 
         foreach (string project in projects.Distinct(StringComparer.Ordinal))
@@ -112,12 +135,12 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
 
         {
             List<string> parties = [];
-            CollectReferences(json, ["PartyId", "RequesterPartyId", "TargetActorId", "RequesterId", "SourceActorId", "RecipientRefs", "RecipientPartyIds", "RecipientPartyRefs", "RequesterRef", "ApproverRef", "ResolvedPartyRef", "RecipientReferences"], parties);
+            CollectReferences(json, ["PartyId", "RequesterPartyId", "TargetActorId", "RequesterId", "SourceActorId", "RecipientRefs", "RecipientPartyIds", "RecipientPartyRefs", "RequesterRef", "ApproverRef", "ResolvedPartyRef", "RecipientReferences", "AssigneeRef", "ReviewerRef", "PreviousAssigneeRef"], parties);
             foreach (string party in parties.Distinct(StringComparer.Ordinal))
             {
                 if (!AuditMetadata.IsSafeStableIdentifier(party))
                 {
-                    return Denied();
+                    return Denied(operation);
                 }
 
                 requests.Add(Request(context, "Parties", party, operation, "identity", !isQuery));
@@ -133,7 +156,7 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
                 {
                     nameof(Hexalith.ChatBot.Contracts.Commands.CorrectEmailProjectAssociation) when request.Owner == "Projects" => ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized,
                     nameof(Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft) when request.Owner == "Projects" => Hexalith.ChatBot.Contracts.Messages.ChatBotDisabledActionReasons.InsufficientAuthority,
-                    _ => ChatBotAuthorizationReasonCodes.AuthorizationDenied,
+                    _ => Denied(operation).ReasonCode,
                 }, []);
             }
 
@@ -148,16 +171,18 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
             {
                 return new ChatBotAuthorityDecision(null, resolution.ReasonCode, []);
             }
+            ChatBotOwnerAuthorityEvidence machineEvidence = collectedEvidence.Last().Evidence;
+            references.Add($"{machineEvidence.Request.Owner}:{machineEvidence.EvidenceId}:{machineEvidence.Version}");
         }
 
         DateTimeOffset decidedAt = clock.UtcNow;
         if (collectedEvidence.Any(item => !IsValidEvidence(item.Evidence, item.Evidence.Request, item.Started, decidedAt) ||
-            (item.Evidence.ServiceGrant is { } grant && (grant.ExpiresAt <= decidedAt || grants.IsRevoked(item.Evidence.Request, grant.GrantId)))))
+            (item.Evidence.ServiceGrant is { } grant && (grant.ExpiresAt <= decidedAt || grants.IsRevoked(item.Evidence.Request, grant.GrantId) || grants.PredatesClientRevocation(item.Evidence)))))
         {
-            return Denied();
+            return Denied(operation);
         }
 
-        return new ChatBotAuthorityDecision(new ChatBotAuthorityPrincipal(context, row.AdminScope, projects), string.Empty, references.ToArray());
+        return new ChatBotAuthorityDecision(new ChatBotAuthorityPrincipal(context, row.AdminScope, projects, validatedEvidence: collectedEvidence, grants: grants), string.Empty, references.ToArray());
     }
 
     /// <summary>Resolves machine scope from current owner evidence; token grant claims cannot refresh it.</summary>
@@ -202,7 +227,11 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
             return ServiceClientGrantResolution.Denied(ChatBotAuthorizationReasonCodes.ServiceClientGrantExpired);
         }
 
-        if (grant.IsRevoked || grants.IsRevoked(request, grant.GrantId))
+        if (HasValidGrantScopes(grant) && (isQuery ? grant.AllowedQueryNames : grant.AllowedCommandNames).Contains(operation, StringComparer.Ordinal))
+        {
+            grants.ObserveAllowedEvidence(evidence);
+        }
+        if (grant.IsRevoked || grants.IsRevoked(request, grant.GrantId) || grants.PredatesClientRevocation(evidence))
         {
             return ServiceClientGrantResolution.Denied(ChatBotAuthorizationReasonCodes.ServiceClientGrantRevoked);
         }
@@ -221,7 +250,7 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
         grant = grant with { Scopes = Array.AsReadOnly(grant.Scopes.ToArray()), AllowedCommandNames = Array.AsReadOnly(grant.AllowedCommandNames.ToArray()), AllowedQueryNames = Array.AsReadOnly(grant.AllowedQueryNames.ToArray()) };
         ChatBotOwnerAuthorityEvidence frozenEvidence = evidence with { ServiceGrant = grant };
         grants.Upsert(frozenEvidence);
-        if (grants.IsRevoked(request, grant.GrantId))
+        if (grants.IsRevoked(request, grant.GrantId) || grants.PredatesClientRevocation(frozenEvidence))
         {
             return ServiceClientGrantResolution.Denied(ChatBotAuthorizationReasonCodes.ServiceClientGrantRevoked);
         }
@@ -239,6 +268,7 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
+            ChatBotAuthorityLog.OwnerUnavailable(logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<ChatBotRequestAuthorizer>.Instance, request.Owner, request.Operation, exception.GetType().Name);
             return null;
         }
 
@@ -267,7 +297,8 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
             grant.AllowedCommandNames.All(name => AuditMetadata.IsSafeStableIdentifier(name) && name != "*" && catalog.Find(name, false) is not null) &&
             grant.AllowedQueryNames.All(name => AuditMetadata.IsSafeStableIdentifier(name) && name != "*" && catalog.Find(name, true) is not null);
 
-    private static bool IsValidEvidence(ChatBotOwnerAuthorityEvidence evidence, ChatBotOwnerAuthorityRequest request, DateTimeOffset started, DateTimeOffset now)
+    /// <summary>Checks the original request binding, observation, revocation freshness, and expiry bounds.</summary>
+    internal static bool IsValidEvidence(ChatBotOwnerAuthorityEvidence evidence, ChatBotOwnerAuthorityRequest request, DateTimeOffset started, DateTimeOffset now)
         => evidence.Request == request && evidence.IsAllowed && !evidence.IsRevoked &&
             AuditMetadata.IsSafeStableIdentifier(evidence.EvidenceId) && !evidence.EvidenceId.Contains('@', StringComparison.Ordinal) &&
             AuditMetadata.IsSafeStableIdentifier(evidence.Version) && !evidence.Version.Contains('@', StringComparison.Ordinal) &&
@@ -279,7 +310,14 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
     private static ChatBotOwnerAuthorityRequest Request(ChatBotRequestContext context, string owner, string resource, string operation, string authority, bool current)
         => new(owner, context.SubjectId, context.TenantId!, resource, operation, authority, context.ActorClass, context.Origin, current);
 
-    private static ChatBotAuthorityDecision Denied() => new(null, ChatBotAuthorizationReasonCodes.AuthorizationDenied, []);
+    private static ChatBotAuthorityDecision Denied(string operation) => new(null, operation switch
+    {
+        nameof(Hexalith.ChatBot.Contracts.Commands.AssignTenantAdminRole) or nameof(Hexalith.ChatBot.Contracts.Commands.SetAssociationConfidenceThresholds)
+            or nameof(Hexalith.ChatBot.Contracts.Commands.SubmitTenantPolicyChange) => ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized,
+        nameof(Hexalith.ChatBot.Contracts.Commands.SubmitEscalationPolicyChange) => ChatBotAuthorizationReasonCodes.EscalationPolicyUnauthorized,
+        nameof(Hexalith.ChatBot.Contracts.Commands.SubmitNotificationRoutingChange) => ChatBotAuthorizationReasonCodes.NotificationRoutingUnauthorized,
+        _ => ChatBotAuthorizationReasonCodes.AuthorizationDenied,
+    }, []);
 
     private static string? ReadString(JsonElement element, string name)
     {
@@ -302,7 +340,7 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
             {
                 if (names.Contains(property.Name, StringComparer.OrdinalIgnoreCase))
                 {
-                    if (string.Equals(property.Name, "ResolvedPartyRef", StringComparison.OrdinalIgnoreCase) && property.Value.ValueKind == JsonValueKind.Null)
+                    if (property.Value.ValueKind == JsonValueKind.Null && new[] { "ResolvedPartyRef", "AssigneeRef", "ReviewerRef", "PreviousAssigneeRef" }.Contains(property.Name, StringComparer.OrdinalIgnoreCase))
                     {
                         continue;
                     }

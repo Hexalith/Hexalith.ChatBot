@@ -117,6 +117,16 @@ public sealed partial class CommandGatewayTests
             new Claim(OutboundSendAuthorityEvaluator.OwnMailboxMailSendClaim, "true")), command);
         ChatBotGatewayResult first = await Gateway(dispatcher, clock: clock,
             idempotencyStore: new DaprCoarseIdempotencyStore(state, clock, eventStore: platform)).SubmitAsync(submission, TestContext.Current.CancellationToken);
+        if (writer == "mailbox")
+        {
+            first.IsAccepted.ShouldBeFalse();
+            platform.SubmissionCount.ShouldBe(0);
+            writers.Attempts.ShouldBe(0);
+            state.IdentityRecords.ShouldBeEmpty();
+            state.DomainRecords.ShouldBeEmpty();
+
+            return;
+        }
         first.IsAccepted.ShouldBeFalse();
         first.Problem.ShouldNotBeNull().Status.ShouldBe(503);
         platform.SubmissionCount.ShouldBe(0);

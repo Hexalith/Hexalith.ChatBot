@@ -161,12 +161,12 @@ public sealed class CrossActorTypeIsolationParityTests
                 controlStateProvider,
                 rateLimitProvider,
                 commandHistory,
-                aiActorControlStateProvider));
+                aiActorControlStateProvider), requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
     }
 
     private static ChatBotCommandSubmission Submission(string surface)
         => new(
-            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "service-account")], "test"))),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "service-account")], "test")), bindTenant: true),
             new Hexalith.ChatBot.Client.Generated.CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
@@ -207,7 +207,7 @@ public sealed class CrossActorTypeIsolationParityTests
         }
 
         claims.AddRange(overrides);
-        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")), bindTenant: true);
         return new ChatBotAuthenticatedActor("service-account", principal, actorType, clientId);
     }
 

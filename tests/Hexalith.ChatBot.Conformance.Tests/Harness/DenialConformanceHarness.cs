@@ -162,10 +162,10 @@ internal static class DenialConformanceHarness
             origin);
 
     private static ClaimsPrincipal Principal()
-        => new(
+        => Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(
             new ClaimsIdentity(
                 [new Claim("sub", ActorId), new Claim("eventstore:tenant", Tenant)],
-                "test"));
+                "test")));
 
     private sealed class DenyingAuthenticationStage : IAuthenticationStage
     {
