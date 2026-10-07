@@ -96,6 +96,6 @@ public sealed class ReviewerBacklogDependencyInjectionTests
             new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
             new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
         ];
-        return new NotificationRecipientCandidate(recipientRef, new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
+        return new NotificationRecipientCandidate(recipientRef, Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test"))));
     }
 }

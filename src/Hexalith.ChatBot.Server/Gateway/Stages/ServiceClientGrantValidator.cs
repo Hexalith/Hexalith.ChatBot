@@ -93,7 +93,7 @@ internal sealed class ServiceClientGrantValidator(
         // `ai_actor_disabled` reason rather than falling through to `service_client_disabled`. Distinct from the Epic 5
         // grant-lifecycle revocation above; each AI actor's control state is independent (isolation). The control
         // state is read from a metadata-only seam — no credential/OAuth fingerprint or model prompt is read or exposed.
-        if (string.Equals(actor.ActorType, ParticipantAuthorizationStage.AiActorValue, StringComparison.Ordinal))
+        if (string.Equals(actor.RequestContext?.ActorClass ?? actor.ActorType, ParticipantAuthorizationStage.AiActorValue, StringComparison.Ordinal))
         {
             AiActorControlState aiActorControlState = await _aiActorControlStateProvider
                 .GetControlStateAsync(grant.TenantId, grant.ServiceClientId, cancellationToken)
@@ -154,7 +154,7 @@ internal sealed class ServiceClientGrantValidator(
         // budget, and vice versa (NFR30 isolation).
         bool recordAiActorAdmission = false;
         bool recordServiceClientAdmission = false;
-        if (string.Equals(actor.ActorType, ParticipantAuthorizationStage.AiActorValue, StringComparison.Ordinal))
+        if (string.Equals(actor.RequestContext?.ActorClass ?? actor.ActorType, ParticipantAuthorizationStage.AiActorValue, StringComparison.Ordinal))
         {
             AiActorRateLimitState? aiRateLimit = await _aiActorRateLimitProvider
                 .GetRateLimitAsync(grant.TenantId, grant.ServiceClientId, cancellationToken)
@@ -222,8 +222,9 @@ internal sealed class ServiceClientGrantValidator(
     }
 
     private static bool RequiresGrant(ChatBotAuthenticatedActor actor)
-        => string.Equals(actor.ActorType, ParticipantAuthorizationStage.ServiceActorValue, StringComparison.Ordinal) ||
-            string.Equals(actor.ActorType, ParticipantAuthorizationStage.AiActorValue, StringComparison.Ordinal);
+        => actor.RequestContext?.IsMachine ??
+            (string.Equals(actor.ActorType, ParticipantAuthorizationStage.ServiceActorValue, StringComparison.Ordinal) ||
+                string.Equals(actor.ActorType, ParticipantAuthorizationStage.AiActorValue, StringComparison.Ordinal));
 
     private bool IsOverScoped(ServiceClientGrant grant)
         => grant.AllowedCommandNames.Any(commandName =>

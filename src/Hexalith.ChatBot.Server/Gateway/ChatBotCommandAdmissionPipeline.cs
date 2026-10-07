@@ -1,4 +1,6 @@
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Server.Authentication;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
@@ -6,6 +8,7 @@ using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Observability;
+using Hexalith.EventStore.Contracts.Commands;
 
 namespace Hexalith.ChatBot.Server.Gateway;
 
@@ -23,10 +26,21 @@ internal sealed class ChatBotCommandAdmissionPipeline(
     ISystemClock clock,
     ILifecycleTransitionGuard lifecycleTransitionGuard,
     ISpineCommandAllowlist commandAllowlist,
+    ChatBotRequestAuthorizer requestAuthorizer,
     IChatBotMetrics? metrics = null,
     IAuthorizationFailureCounter? authorizationFailureCounter = null)
 {
     private readonly IChatBotMetrics _metrics = metrics ?? NullChatBotMetrics.Instance;
+
+    /// <summary>Audits a denied SDK transport binding without admitting caller-controlled envelope authority.</summary>
+    public ValueTask<ChatBotCommandAdmissionDecision> RejectTransportAsync(CommandEnvelope command, ChatBotRequestContext? context, string reasonCode, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ChatBotCommandSubmission metadata = new(context?.Principal ?? new System.Security.Claims.ClaimsPrincipal(),
+            new CommandSubmissionRequest { CommandId = AuditMetadata.SafeOptionalToken(command.MessageId) ?? "unavailable", CommandType = AuditMetadata.SafeCommandName(command.CommandType) },
+            AuditMetadata.SafeOptionalToken(command.CorrelationId) ?? "unavailable", AuditMetadata.SafeOptionalToken(command.Extensions?.GetValueOrDefault("taskId")), context?.Origin ?? ChatBotSurfaceOrigin.Api);
+        return DenyAsync(metadata, context?.TenantId ?? "unavailable", context?.SubjectId ?? "anonymous", reasonCode, cancellationToken);
+    }
 
     public async ValueTask<ChatBotCommandAdmissionDecision> AdmitAsync(
         ChatBotCommandSubmission submission,
@@ -71,6 +85,33 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         }
 
         ChatBotTenantBinding binding = bindingResult.Binding!;
+        ChatBotRequestContext? trusted = actor.RequestContext;
+        if (trusted is null && !ChatBotRequestContextResolver.TryResolve(actor.Principal, submission.Origin, out trusted, out _))
+        {
+            return await DenyAsync(submission, binding.TenantId, actor.ActorId, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (trusted?.TenantId != binding.TenantId || trusted.SubjectId != actor.ActorId || trusted.Origin != submission.Origin)
+        {
+            return await DenyAsync(submission, binding.TenantId, actor.ActorId, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!requestAuthorizer.IsKnownOperation(submission.Request.CommandType ?? string.Empty, false))
+        {
+            await auditWriter.RecordAuthorizationFailureAsync(new ChatBotAuthorizationFailureAuditFact(binding.TenantId, actor.ActorId,
+                AuditMetadata.SafeCommandName(submission.Request.CommandType), ChatBotAuthorizationReasonCodes.CommandNotAllowlisted,
+                submission.CorrelationId, submission.TaskId, ChatBotSurfaceOrigins.ToWireValue(submission.Origin)), cancellationToken).ConfigureAwait(false);
+            authorizationFailureCounter?.Record(binding.TenantId, clock.UtcNow);
+            return ChatBotCommandAdmissionDecision.Rejected(ChatBotAuthorizationReasonCodes.CommandNotAllowlisted, submission.CorrelationId, submission.TaskId);
+        }
+
+        ChatBotAuthorityDecision authority = await requestAuthorizer.AuthorizeAsync(trusted, submission.Request.CommandType ?? string.Empty, false, submission.Request.Command, cancellationToken).ConfigureAwait(false);
+        if (!authority.IsAllowed)
+        {
+            return await DenyAsync(submission, binding.TenantId, actor.ActorId, authority.ReasonCode, cancellationToken).ConfigureAwait(false);
+        }
+
+        actor = actor with { Principal = authority.Principal!, RequestContext = trusted };
         ChatBotAuthorizationResult authorizationResult = await authorization
             .AuthorizeAsync(submission, actor, binding, cancellationToken)
             .ConfigureAwait(false);
@@ -108,7 +149,7 @@ internal sealed class ChatBotCommandAdmissionPipeline(
                 submission.TaskId);
         }
 
-        ChatBotGatewayContext context = new(submission, actor, binding, authorizationResult.ServiceClientGrantEvidence);
+        ChatBotGatewayContext context = new(submission, actor, binding, authorizationResult.ServiceClientGrantEvidence, authority.EvidenceReferences);
         ChatBotRiskClassification riskClassification = await riskClassifier.ClassifyAsync(context, cancellationToken).ConfigureAwait(false);
         context.SetRiskClassification(riskClassification);
         if (riskClassification.Rejected)

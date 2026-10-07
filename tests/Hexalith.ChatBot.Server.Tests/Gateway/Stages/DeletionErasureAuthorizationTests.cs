@@ -113,7 +113,7 @@ public sealed class DeletionErasureAuthorizationTests
 
     private static ChatBotCommandSubmission Submission(object command, string? commandType = null)
         => new(
-            new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test"))),
             new CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
@@ -127,13 +127,13 @@ public sealed class DeletionErasureAuthorizationTests
 
     private static ChatBotAuthenticatedActor Actor(string actorType, string role)
     {
-        ClaimsPrincipal principal = new(new ClaimsIdentity(
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "actor-alpha"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
             ],
-            "test"));
+            "test")));
         return new ChatBotAuthenticatedActor("actor-alpha", principal);
     }
 }

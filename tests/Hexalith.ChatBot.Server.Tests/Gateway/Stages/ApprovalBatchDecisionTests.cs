@@ -215,7 +215,7 @@ public sealed class ApprovalBatchDecisionTests
         });
 
         ChatBotCommandSubmission submission = new(
-            new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test"))),
             new CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FA" + approvalId[^1],

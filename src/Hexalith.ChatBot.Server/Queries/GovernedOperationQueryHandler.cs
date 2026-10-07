@@ -1,13 +1,14 @@
-using System.Security.Claims;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Audit;
-using Hexalith.ChatBot.Server.Gateway;
-using Hexalith.ChatBot.Server.Gateway.Status;
+using Hexalith.ChatBot.Server.Authentication;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Gateway.Status;
+using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Projections;
@@ -17,12 +18,15 @@ using Hexalith.EventStore.DomainService;
 
 namespace Hexalith.ChatBot.Server.Queries;
 
-internal sealed class GovernedOperationQueryHandler(IGovernedOperationProjectionStore projectionStore)
-    : ChatBotReadQueryHandler<GovernedOperationQuery>
+internal sealed class GovernedOperationQueryHandler(
+    ChatBotRequestContextResolver requestContextResolver,
+    ChatBotRequestAuthorizer requestAuthorizer,
+    IGovernedOperationProjectionStore projectionStore)
+    : ChatBotReadQueryHandler<GovernedOperationQuery>(requestContextResolver, requestAuthorizer)
 {
     public override string QueryType => ChatBotReadQueryTypes.GovernedOperation;
 
-    protected override async Task<QueryResult> ExecuteAsync(QueryEnvelope query, GovernedOperationQuery request, CancellationToken cancellationToken)
+    protected override async Task<QueryResult> ExecuteAsync(QueryEnvelope query, GovernedOperationQuery request, ChatBotAuthorityPrincipal principal, CancellationToken cancellationToken)
     {
         if (!ChatBotIdentity.IsValidUlid(request.NoteId))
         {

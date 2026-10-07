@@ -1,13 +1,14 @@
-using System.Security.Claims;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Audit;
-using Hexalith.ChatBot.Server.Gateway;
-using Hexalith.ChatBot.Server.Gateway.Status;
+using Hexalith.ChatBot.Server.Authentication;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Gateway.Status;
+using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Projections;
@@ -18,17 +19,18 @@ using Hexalith.EventStore.DomainService;
 namespace Hexalith.ChatBot.Server.Queries;
 
 internal sealed class TaskIntentReviewQueryHandler(
+    ChatBotRequestContextResolver requestContextResolver,
+    ChatBotRequestAuthorizer requestAuthorizer,
     IProjectConversationProjectionStore projectionStore,
     IMailboxMessageContentSource messageContentSource)
-    : ChatBotReadQueryHandler<TaskIntentReviewQuery>
+    : ChatBotReadQueryHandler<TaskIntentReviewQuery>(requestContextResolver, requestAuthorizer)
 {
     public override string QueryType => ChatBotReadQueryTypes.TaskIntentReview;
 
-    protected override async Task<QueryResult> ExecuteAsync(QueryEnvelope query, TaskIntentReviewQuery request, CancellationToken cancellationToken)
+    protected override async Task<QueryResult> ExecuteAsync(QueryEnvelope query, TaskIntentReviewQuery request, ChatBotAuthorityPrincipal principal, CancellationToken cancellationToken)
     {
         if (!AuditMetadata.IsSafeStableIdentifier(request.ProjectId) ||
-            !AuditMetadata.IsSafeStableIdentifier(request.TaskIntentId) ||
-            !request.ProjectReadAuthorized)
+            !AuditMetadata.IsSafeStableIdentifier(request.TaskIntentId))
         {
             return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);
         }

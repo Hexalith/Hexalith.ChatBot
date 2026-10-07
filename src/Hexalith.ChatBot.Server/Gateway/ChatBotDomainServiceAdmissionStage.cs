@@ -1,9 +1,8 @@
-using System.Security.Claims;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Client.Generated;
-using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
@@ -16,7 +15,8 @@ namespace Hexalith.ChatBot.Server.Gateway;
 internal sealed class ChatBotDomainServiceAdmissionStage(
     ChatBotCommandAdmissionPipeline admission,
     IIdempotencyStore idempotencyStore,
-    IChatBotAdmissionMarker admissionMarker) : IDomainServiceAdmissionStage
+    IChatBotAdmissionMarker admissionMarker,
+    ChatBotRequestContextResolver requestContextResolver) : IDomainServiceAdmissionStage
 {
     public string Name => "chatbot-command-gateway";
 
@@ -31,7 +31,18 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
             return DomainServiceAdmissionResult.Accepted();
         }
 
-        if (!TryCreateSubmission(context.Command, out ChatBotCommandSubmission? submission, out string reasonCode))
+        ChatBotRequestContext? requestContext = requestContextResolver.ResolveCurrent();
+        if (requestContext is null || !string.Equals(context.Command.UserId, requestContext.SubjectId, StringComparison.Ordinal))
+        {
+            return await RejectTransportAsync(context.Command, requestContext, ChatBotAuthorizationReasonCodes.AuthenticationDenied, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!string.Equals(context.Command.TenantId, requestContext.TenantId, StringComparison.Ordinal))
+        {
+            return await RejectTransportAsync(context.Command, requestContext, ChatBotAuthorizationReasonCodes.TenantMismatch, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!TryCreateSubmission(context.Command, requestContext, out ChatBotCommandSubmission? submission, out string reasonCode))
         {
             return Rejected(context.Command, reasonCode);
         }
@@ -66,8 +77,15 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
         return Rejected(context.Command, decision.ReasonCode ?? ChatBotAuthorizationReasonCodes.AuthorizationDenied);
     }
 
+    private async Task<DomainServiceAdmissionResult> RejectTransportAsync(CommandEnvelope command, ChatBotRequestContext? context, string reasonCode, CancellationToken cancellationToken)
+    {
+        await admission.RejectTransportAsync(command, context, reasonCode, cancellationToken).ConfigureAwait(false);
+        return Rejected(command, reasonCode);
+    }
+
     private static bool TryCreateSubmission(
         CommandEnvelope command,
+        ChatBotRequestContext requestContext,
         out ChatBotCommandSubmission? submission,
         out string reasonCode)
     {
@@ -81,10 +99,9 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
         }
 
         string? taskId = SafeExtension(command, "taskId");
-        ChatBotSurfaceOrigin origin = ChatBotSurfaceOrigins.FromWireValueOrDefault(SafeExtension(command, "surfaceOrigin"));
         string? replayRunId = SafeExtension(command, "replayRunId");
         submission = new ChatBotCommandSubmission(
-            PrincipalFromEnvelope(command),
+            requestContext.Principal,
             new CommandSubmissionRequest
             {
                 CommandId = command.MessageId,
@@ -94,7 +111,7 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
             },
             command.CorrelationId,
             ChatBotTaskId.TryParse(taskId, out ChatBotTaskId parsedTaskId) ? parsedTaskId.Value : null,
-            origin,
+            requestContext.Origin,
             replayRunId);
         return true;
     }
@@ -111,62 +128,6 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
         catch (JsonException)
         {
             return false;
-        }
-    }
-
-    private static ClaimsPrincipal PrincipalFromEnvelope(CommandEnvelope command)
-    {
-        List<Claim> claims =
-        [
-            new("sub", command.UserId),
-            new("eventstore:tenant", command.TenantId),
-        ];
-
-        AddClaimIfSafe(claims, command, ParticipantAuthorizationStage.ActorTypeClaim);
-        AddClaimIfSafe(claims, command, ParticipantAuthorizationStage.TenantRoleClaim);
-        AddClaimIfSafe(claims, command, ParticipantAuthorizationStage.ProjectOwnerClaim);
-        AddRepeatedClaimsIfSafe(claims, command, ParticipantAuthorizationStage.ParticipantAuthorityClaim);
-
-        AddClaimIfSafe(claims, command, ClaimsServiceClientGrantResolver.ServiceClientIdClaim);
-        AddClaimIfSafe(claims, command, ClaimsServiceClientGrantResolver.ServiceClientClassClaim);
-        AddClaimIfSafe(claims, command, ClaimsServiceClientGrantResolver.GrantIdClaim);
-        AddClaimIfSafe(claims, command, ClaimsServiceClientGrantResolver.GrantTenantClaim);
-        AddClaimIfSafe(claims, command, ClaimsServiceClientGrantResolver.GrantExpiryClaim);
-        AddClaimIfSafe(claims, command, ClaimsServiceClientGrantResolver.GrantRevokedClaim);
-        AddRepeatedClaimsIfSafe(claims, command, ClaimsServiceClientGrantResolver.GrantScopeClaim);
-        AddRepeatedClaimsIfSafe(claims, command, ClaimsServiceClientGrantResolver.GrantCommandClaim);
-        AddRepeatedClaimsIfSafe(claims, command, ClaimsServiceClientGrantResolver.GrantQueryClaim);
-        AddClaimIfSafe(claims, command, ClaimsServiceClientGrantResolver.GrantSurfaceClaim);
-        AddClaimIfSafe(claims, command, ClaimsServiceClientGrantResolver.DelegatedUserIdClaim);
-        AddClaimIfSafe(claims, command, ClaimsServiceClientGrantResolver.OAuthGrantEvidenceFingerprintClaim);
-        AddClaimIfSafe(claims, command, ClaimsServiceClientGrantResolver.CommandSetVersionClaim);
-
-        return new ClaimsPrincipal(new ClaimsIdentity(claims, "eventstore-domain-service"));
-    }
-
-    private static void AddClaimIfSafe(List<Claim> claims, CommandEnvelope command, string claimType)
-    {
-        string? value = SafeExtension(command, claimType);
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            claims.Add(new Claim(claimType, value));
-        }
-    }
-
-    private static void AddRepeatedClaimsIfSafe(List<Claim> claims, CommandEnvelope command, string claimType)
-    {
-        string? value = SafeExtension(command, claimType);
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return;
-        }
-
-        foreach (string item in value.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            if (AuditMetadata.SafeOptionalToken(item) is { } safe)
-            {
-                claims.Add(new Claim(claimType, safe));
-            }
         }
     }
 

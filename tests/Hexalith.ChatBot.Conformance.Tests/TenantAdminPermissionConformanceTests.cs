@@ -110,7 +110,8 @@ public sealed class TenantAdminPermissionConformanceTests
             new CommandSubmissionLifecycleTransitionGuard(),
             dispatcher,
             new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry()),
-            new ChatBotSpineCommandAllowlist());
+            new ChatBotSpineCommandAllowlist(),
+            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock));
 
         ChatBotCommandSubmission submission = new(
             principal,
@@ -140,14 +141,17 @@ public sealed class TenantAdminPermissionConformanceTests
     }
 
     private static ClaimsPrincipal Principal(string actorType, string role)
-        => new(new ClaimsIdentity(
+        => Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", CrossTenantIsolationHarness.BoundActorId),
                 new Claim("eventstore:tenant", CrossTenantLeakageCorpus.BoundTenant),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
+                .. (actorType is "service" or "ai"
+                    ? new[] { new Claim(ClaimsServiceClientGrantResolver.ServiceClientIdClaim, "automation-client") }
+                    : Array.Empty<Claim>()),
             ],
-            "test"));
+            "test")));
 
     private static object Command(string commandType)
         => commandType switch

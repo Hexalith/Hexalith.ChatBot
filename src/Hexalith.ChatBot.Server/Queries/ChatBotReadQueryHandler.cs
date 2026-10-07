@@ -1,41 +1,63 @@
-using System.Security.Claims;
 using System.Text.Json;
 
-using Hexalith.ChatBot.Contracts.Commands;
-using Hexalith.ChatBot.Contracts.Identities;
-using Hexalith.ChatBot.Contracts.Queries;
-using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Authentication;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Gateway;
-using Hexalith.ChatBot.Server.Gateway.Status;
-using Hexalith.ChatBot.Server.Gateway.Stages;
-using Hexalith.ChatBot.Server.Governance.AiMediation;
-using Hexalith.ChatBot.Server.Lifecycle.Attachments;
-using Hexalith.ChatBot.Server.Projections;
-using Hexalith.EventStore.Client.Queries;
 using Hexalith.EventStore.Contracts.Queries;
 using Hexalith.EventStore.DomainService;
 
 namespace Hexalith.ChatBot.Server.Queries;
 
-internal abstract class ChatBotReadQueryHandler<TRequest> : IDomainQueryHandler
+/// <summary>Mandatory authorization boundary shared by HTTP and SDK reads.</summary>
+internal abstract class ChatBotReadQueryHandler<TRequest>(ChatBotRequestContextResolver contextResolver, ChatBotRequestAuthorizer authorizer) : IDomainQueryHandler
 {
+    /// <summary>Canonical query payload serializer.</summary>
     protected static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
+    /// <summary>The mandatory shared authority boundary for project-specific detail.</summary>
+    protected ChatBotRequestAuthorizer RequestAuthorizer => authorizer;
+    /// <inheritdoc/>
     public string Domain => ChatBotReadQueryTypes.Domain;
-
+    /// <inheritdoc/>
     public abstract string QueryType { get; }
 
+    /// <inheritdoc/>
     public async Task<QueryResult> ExecuteAsync(QueryEnvelope query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        TRequest? request = JsonSerializer.Deserialize<TRequest>(query.Payload, JsonOptions);
-        return request is null
-            ? QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound)
-            : await ExecuteAsync(query, request, cancellationToken).ConfigureAwait(false);
+        ChatBotRequestContext? context = contextResolver.ResolveCurrent();
+        if (context is null || query.Domain != Domain || query.QueryType != QueryType || query.TenantId != context.TenantId || query.UserId != context.SubjectId)
+        {
+            return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);
+        }
+
+        TRequest? request;
+        try
+        {
+            request = JsonSerializer.Deserialize<TRequest>(query.Payload, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);
+        }
+
+        if (request is null)
+        {
+            return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);
+        }
+
+        ChatBotAuthorityDecision decision = await authorizer.AuthorizeAsync(context, QueryType, true, request, cancellationToken).ConfigureAwait(false);
+        if (!decision.IsAllowed)
+        {
+            return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);
+        }
+
+        QueryEnvelope bound = new(context.TenantId!, Domain, query.AggregateId, QueryType, query.Payload, query.CorrelationId, context.SubjectId);
+        return await ExecuteAsync(bound, request, decision.Principal!, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Serializes a successfully authorized response.</summary>
     protected static QueryResult Payload<T>(T payload, string projectionType)
         => QueryResult.FromPayload(JsonSerializer.SerializeToElement(payload, JsonOptions), projectionType);
-
-    protected abstract Task<QueryResult> ExecuteAsync(QueryEnvelope query, TRequest request, CancellationToken cancellationToken);
+    /// <summary>Executes only after trusted binding and current owner authorization.</summary>
+    protected abstract Task<QueryResult> ExecuteAsync(QueryEnvelope query, TRequest request, ChatBotAuthorityPrincipal principal, CancellationToken cancellationToken);
 }

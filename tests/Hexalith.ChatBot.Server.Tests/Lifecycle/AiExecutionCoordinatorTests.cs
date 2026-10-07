@@ -897,7 +897,7 @@ public sealed class AiExecutionCoordinatorTests
             {
                 app.Use(async (context, continuation) =>
                 {
-                    context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "operator-alpha")], "test"));
+                    context.User = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "operator-alpha")], "test")));
                     await continuation().ConfigureAwait(false);
                 });
                 next(app);

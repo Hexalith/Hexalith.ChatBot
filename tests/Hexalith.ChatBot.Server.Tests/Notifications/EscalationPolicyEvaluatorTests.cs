@@ -295,7 +295,7 @@ public sealed class EscalationPolicyEvaluatorTests
             claims.Add(new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, projectRef));
         }
 
-        return new NotificationRecipientCandidate(recipientRef, new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
+        return new NotificationRecipientCandidate(recipientRef, Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test"))));
     }
 
     private sealed class FixedClock(DateTimeOffset now) : ISystemClock

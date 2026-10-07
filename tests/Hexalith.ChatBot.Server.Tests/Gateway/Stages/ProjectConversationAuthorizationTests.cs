@@ -97,13 +97,13 @@ public sealed class ProjectConversationAuthorizationTests
 
     private static ChatBotAuthenticatedActor Actor(string projectId)
     {
-        ClaimsPrincipal principal = new(new ClaimsIdentity(
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "actor-alpha"),
                 new Claim("eventstore:tenant", "tenant-alpha"),
                 new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, projectId),
             ],
-            "test"));
+            "test")));
         return new ChatBotAuthenticatedActor("actor-alpha", principal);
     }
 }

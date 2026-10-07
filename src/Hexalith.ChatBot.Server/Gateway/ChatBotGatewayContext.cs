@@ -8,7 +8,8 @@ internal sealed record ChatBotGatewayContext(
     ChatBotCommandSubmission Submission,
     ChatBotAuthenticatedActor Actor,
     ChatBotTenantBinding TenantBinding,
-    ServiceClientGrantEvidence? ServiceClientGrantEvidence = null)
+    ServiceClientGrantEvidence? ServiceClientGrantEvidence = null,
+    IReadOnlyList<string>? AuthorityEvidenceReferences = null)
 {
     private Func<string, CancellationToken, ValueTask<bool>>? _dispatchTargetBinding;
 

@@ -511,6 +511,7 @@ public sealed class AssociationProjectionTests
         => new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                 services.AddSingleton<IAssociationProjectionStore>(store);
                 if (authenticated)
                 {
@@ -579,13 +580,13 @@ public sealed class AssociationProjectionTests
             {
                 app.Use(async (context, continuation) =>
                 {
-                    context.User = new ClaimsPrincipal(new ClaimsIdentity(
+                    context.User = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
                         [
                             new Claim("sub", "actor-001"),
                             new Claim("eventstore:tenant", Tenant),
                             new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "*"),
                         ],
-                        "test"));
+                        "test")));
                     await continuation().ConfigureAwait(false);
                 });
                 next(app);

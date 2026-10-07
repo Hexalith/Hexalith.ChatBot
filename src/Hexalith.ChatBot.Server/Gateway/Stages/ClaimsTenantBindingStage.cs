@@ -1,5 +1,7 @@
 using System.Text.Json;
 
+using Hexalith.ChatBot.Server.Authentication;
+
 using Hexalith.ChatBot.Server.Gateway;
 
 namespace Hexalith.ChatBot.Server.Gateway.Stages;
@@ -29,19 +31,17 @@ internal sealed class ClaimsTenantBindingStage : ITenantBindingStage
         ArgumentNullException.ThrowIfNull(submission);
         ArgumentNullException.ThrowIfNull(actor);
 
-        string[] tenantClaims = TenantClaimTypes
-            .SelectMany(type => actor.Principal.FindAll(type))
-            .Select(static claim => claim.Value)
-            .Where(static value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-
-        if (tenantClaims.Length != 1 || !IsTenantIdentifierSafe(tenantClaims[0]))
+        ChatBotRequestContext? context = actor.RequestContext;
+        if (context is null && !ChatBotRequestContextResolver.TryResolve(actor.Principal, submission.Origin, out context, out _))
         {
             return ValueTask.FromResult(ChatBotTenantBindingResult.Denied(ChatBotAuthorizationReasonCodes.TenantMissing));
         }
 
-        string boundTenant = tenantClaims[0];
+        if (context?.TenantId is not { } boundTenant)
+        {
+            return ValueTask.FromResult(ChatBotTenantBindingResult.Denied(ChatBotAuthorizationReasonCodes.TenantMissing));
+        }
+
         if (CommandTenantTargets(submission.Request.Command).Any(target => !string.Equals(target, boundTenant, StringComparison.Ordinal)))
         {
             return ValueTask.FromResult(ChatBotTenantBindingResult.Denied(new ChatBotTenantBinding(boundTenant), ChatBotAuthorizationReasonCodes.TenantMismatch));

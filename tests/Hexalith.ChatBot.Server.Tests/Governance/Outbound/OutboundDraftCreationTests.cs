@@ -99,6 +99,6 @@ public static class OutboundDraftCreationTests
             claims.Add(new Claim(OutboundDraftAuthorityEvaluator.TenantOutboundPolicyClaim, "draft-only"));
         }
 
-        return new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
+        return Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
     }
 }

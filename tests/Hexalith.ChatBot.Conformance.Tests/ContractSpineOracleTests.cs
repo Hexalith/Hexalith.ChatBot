@@ -49,9 +49,10 @@ public static class ContractSpineOracleTests
             new CommandSubmissionLifecycleTransitionGuard(),
             dispatcher,
             new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry()),
-            new OracleAllowlist());
-        ClaimsPrincipal principal = new(new ClaimsIdentity(
-            [new Claim("sub", "actor-alpha"), new Claim("eventstore:tenant", "tenant-alpha")], "oracle"));
+            new OracleAllowlist(),
+            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock));
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim("sub", "actor-alpha"), new Claim("eventstore:tenant", "tenant-alpha")], "oracle")));
         ChatBotCommandSubmission submission = Submission(principal, "allowed-resource");
 
         ChatBotGatewayResult accepted = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
@@ -59,7 +60,7 @@ public static class ContractSpineOracleTests
         ChatBotGatewayResult conflict = await gateway.SubmitAsync(
             Submission(principal, "different-resource"), TestContext.Current.CancellationToken);
         ChatBotGatewayResult denied = await gateway.SubmitAsync(
-            Submission(new ClaimsPrincipal(new ClaimsIdentity()), "allowed-resource"),
+            Submission(Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity())), "allowed-resource"),
             TestContext.Current.CancellationToken);
 
         dispatcher.Count.ShouldBe(1);
@@ -193,7 +194,7 @@ public static class ContractSpineOracleTests
             new CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
-                CommandType = "TenantScopedAction",
+                CommandType = "RecordGovernedNote",
                 Command = new OracleCommand("tenant-alpha", resource),
                 RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
             },
@@ -236,11 +237,14 @@ public static class ContractSpineOracleTests
             .ShouldBe(expected.GetProperty("visibility").GetString());
     }
 
-    private sealed record OracleCommand(string TenantId, string ResourceName);
+    private sealed record OracleCommand(string TenantId, string ResourceName)
+    {
+        public string NoteId { get; } = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+    }
 
     private sealed class OracleAllowlist : ISpineCommandAllowlist
     {
-        public bool IsAllowed(string? commandType) => commandType == "TenantScopedAction";
+        public bool IsAllowed(string? commandType) => commandType == "RecordGovernedNote";
     }
 
     private sealed class FixedClock(DateTimeOffset now) : ISystemClock

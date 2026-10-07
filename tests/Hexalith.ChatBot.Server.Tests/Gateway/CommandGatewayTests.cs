@@ -87,7 +87,8 @@ public sealed partial class CommandGatewayTests
             new RecordingLifecycleTransitionGuard(stages),
             dispatcher,
             DefaultProblemDetailsFactory(),
-            new PermissiveSpineCommandAllowlist());
+            new PermissiveSpineCommandAllowlist(),
+            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(new FixedClock()));
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
             Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed-resource")),
@@ -1412,7 +1413,7 @@ public sealed partial class CommandGatewayTests
         auditWriter.Envelopes.Count.ShouldBe(2);
         foreach (AuditEnvelope envelope in auditWriter.Envelopes)
         {
-            envelope.SourceEvidenceRefs.ShouldContain("admin-role:tenant-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:operations-admin");
             envelope.SourceEvidenceRefs.ShouldContain("admin-operation:retry");
             envelope.SourceEvidenceRefs.ShouldContain("admin-scope:operate");
             envelope.SourceEvidenceRefs.ShouldContain("admin-queue:queue:failure");
@@ -1759,7 +1760,7 @@ public sealed partial class CommandGatewayTests
         auditWriter.Envelopes.Count.ShouldBe(2);
         foreach (AuditEnvelope envelope in auditWriter.Envelopes)
         {
-            envelope.SourceEvidenceRefs.ShouldContain("admin-role:tenant-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:policy-admin");
             envelope.SourceEvidenceRefs.ShouldContain("admin-operation:submit-policy-change");
             envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
             envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-current");
@@ -1825,7 +1826,7 @@ public sealed partial class CommandGatewayTests
         auditWriter.Envelopes.Count.ShouldBe(2);
         foreach (AuditEnvelope envelope in auditWriter.Envelopes)
         {
-            envelope.SourceEvidenceRefs.ShouldContain("admin-role:tenant-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:mailbox-admin");
             envelope.SourceEvidenceRefs.ShouldContain("admin-operation:mailbox-config-change");
             envelope.SourceEvidenceRefs.ShouldContain("admin-scope:mailbox");
             envelope.SourceEvidenceRefs.ShouldContain("mailbox-config:mailbox-config-current");
@@ -3463,7 +3464,7 @@ public sealed partial class CommandGatewayTests
         {
             envelope.TenantId.ShouldBe(BoundTenant);
             envelope.ActorId.ShouldBe(ActorId);
-            envelope.ActorType.ShouldBe("user");
+            envelope.ActorType.ShouldBe("human");
             envelope.CommandName.ShouldBe(nameof(TenantScopedCommand));
             envelope.ResourceId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
             envelope.Decision.ShouldNotBeNullOrWhiteSpace();
@@ -3538,7 +3539,7 @@ public sealed partial class CommandGatewayTests
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
-            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "payload-sentinel project-alpha")),
+            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "payload-sentinel project-alpha"), commandType: nameof(TenantScopedCommand)),
             TestContext.Current.CancellationToken);
 
         result.IsAccepted.ShouldBeFalse();
@@ -3586,7 +3587,8 @@ public sealed partial class CommandGatewayTests
             new CommandSubmissionLifecycleTransitionGuard(),
             new RecordingDispatcher(),
             DefaultProblemDetailsFactory(),
-            new PermissiveSpineCommandAllowlist());
+            new PermissiveSpineCommandAllowlist(),
+            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(new FixedClock()));
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
             Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed-resource"), origin: ChatBotSurfaceOrigin.Ui),
@@ -3610,7 +3612,7 @@ public sealed partial class CommandGatewayTests
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
-            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "payload-sentinel"), origin: ChatBotSurfaceOrigin.Ui),
+            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "payload-sentinel"), origin: ChatBotSurfaceOrigin.Ui, commandType: nameof(TenantScopedCommand)),
             TestContext.Current.CancellationToken);
 
         result.IsAccepted.ShouldBeFalse();
@@ -3935,7 +3937,7 @@ public sealed partial class CommandGatewayTests
             dispatcher,
             authorizationStage: new ParticipantAuthorizationStage(
                 serviceClientGrantValidator: new ServiceClientGrantValidator(
-                    new ClaimsServiceClientGrantResolver(),
+                    new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticServiceClientGrantResolver(),
                     new FixedClock(),
                     new ChatBotSpineCommandAllowlist())),
             auditWriter: auditWriter,
@@ -4139,7 +4141,7 @@ public sealed partial class CommandGatewayTests
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
             Submission(
-                Principal(BoundTenant, new Claim("requester_authority_class", "project-contributor")),
+                Principal(BoundTenant, new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "unrelated-project"), new Claim("requester_authority_class", "project-contributor")),
                 LowRiskExecutionCommand()),
             TestContext.Current.CancellationToken);
 
@@ -4168,7 +4170,7 @@ public sealed partial class CommandGatewayTests
 
             ChatBotGatewayResult result = await gateway.SubmitAsync(
                 Submission(
-                    Principal(BoundTenant, new Claim("requester_authority_class", "project-approver")),
+                    Principal(BoundTenant, new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "unrelated-project"), new Claim("requester_authority_class", "project-approver")),
                     command),
                 TestContext.Current.CancellationToken);
 
@@ -4834,12 +4836,13 @@ public sealed partial class CommandGatewayTests
             """
             {
               "tenantId": "tenant-alpha",
+              "noteId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
               "resourceName": "payload-sentinel raw exception /home/administrator/project-secret.txt"
             }
             """);
         ClaimsPrincipal principal = Principal(
             BoundTenant,
-            new Claim("actor_type", "raw exception /home/administrator/project-secret.txt"),
+            new Claim("untrusted_actor_display", nameof(RecordGovernedNote)),
             new Claim("idempotency_key", "secret-token-/home/administrator/project-secret.txt"));
         CommandGateway gateway = Gateway(new RecordingDispatcher(), auditWriter: auditWriter);
 
@@ -4847,14 +4850,14 @@ public sealed partial class CommandGatewayTests
             Submission(
                 principal,
                 command.RootElement.Clone(),
-                "raw exception /home/administrator/project-secret.txt"),
+                nameof(RecordGovernedNote)),
             TestContext.Current.CancellationToken);
 
         result.IsAccepted.ShouldBeTrue();
         auditWriter.Envelopes.Count.ShouldBe(2);
-        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.ActorType == "user");
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.ActorType == "human");
         auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.IdempotencyKey != null && envelope.IdempotencyKey.Length == 64);
-        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.CommandName == AuditMetadata.UnknownCommandName);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.CommandName == nameof(RecordGovernedNote));
 
         string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         serialized.ShouldNotContain("payload-sentinel", Case.Insensitive);
@@ -4905,7 +4908,7 @@ public sealed partial class CommandGatewayTests
         CommandGateway gateway = Gateway(dispatcher, auditWriter: auditWriter);
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
-            Submission(new ClaimsPrincipal(new ClaimsIdentity()), new TenantScopedCommand(BoundTenant, "payload-sentinel")),
+            Submission(Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity())), new TenantScopedCommand(BoundTenant, "payload-sentinel")),
             TestContext.Current.CancellationToken);
 
         result.IsAccepted.ShouldBeFalse();
@@ -5012,7 +5015,7 @@ public sealed partial class CommandGatewayTests
         ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures[0];
         fact.TenantId.ShouldBe(BoundTenant);
         fact.ActorId.ShouldBe(ActorId);
-        fact.CommandType.ShouldBe(nameof(TenantScopedCommand));
+        fact.CommandType.ShouldBe(nameof(RecordGovernedNote));
         fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.TenantMismatch);
         fact.CorrelationId.ShouldBe(CorrelationId);
         fact.TaskId.ShouldBe(TaskId);
@@ -5044,7 +5047,7 @@ public sealed partial class CommandGatewayTests
         ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures[0];
         fact.TenantId.ShouldBe(BoundTenant);
         fact.ActorId.ShouldBe(ActorId);
-        fact.CommandType.ShouldBe(nameof(TenantScopedIdentifierCommand));
+        fact.CommandType.ShouldBe(nameof(RecordGovernedNote));
         fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.TenantMismatch);
         fact.CorrelationId.ShouldBe(CorrelationId);
         fact.TaskId.ShouldBe(TaskId);
@@ -5289,7 +5292,7 @@ public sealed partial class CommandGatewayTests
             dispatcher,
             authorizationStage: new ParticipantAuthorizationStage(
                 serviceClientGrantValidator: new ServiceClientGrantValidator(
-                    new ClaimsServiceClientGrantResolver(),
+                    new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticServiceClientGrantResolver(),
                     new FixedClock(),
                     new ChatBotSpineCommandAllowlist())),
             auditWriter: auditWriter,
@@ -5900,7 +5903,8 @@ public sealed partial class CommandGatewayTests
             problemDetailsFactory ?? DefaultProblemDetailsFactory(),
             commandAllowlist ?? new PermissiveSpineCommandAllowlist(),
             metrics,
-            authorizationFailureCounter);
+            authorizationFailureCounter,
+            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock ?? new FixedClock()));
 
     private static IChatBotProblemDetailsFactory DefaultProblemDetailsFactory()
         => new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry());
@@ -5916,7 +5920,7 @@ public sealed partial class CommandGatewayTests
             new CommandSubmissionRequest
             {
                 CommandId = commandId,
-                CommandType = commandType ?? command.GetType().Name,
+                CommandType = commandType ?? (command is TenantScopedCommand or TenantScopedIdentifierCommand ? nameof(RecordGovernedNote) : command.GetType().Name),
                 Command = command,
                 RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
             },
@@ -6556,8 +6560,14 @@ public sealed partial class CommandGatewayTests
             claims.Add(new Claim("eventstore:tenant", tenantId));
         }
 
+        if (!additionalClaims.Any(static claim => claim.Type is ParticipantAuthorizationStage.ProjectOwnerClaim or OutboundDraftAuthorityEvaluator.ProjectScopeClaim))
+        {
+            claims.AddRange(new[] { "project-001", "project-002", "project-003", "project-authorized-001", "project-alpha" }
+                .Select(static project => new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, project)));
+        }
+
         claims.AddRange(additionalClaims);
-        return new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
+        return Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
     }
 
     private static ClaimsPrincipal AdminPrincipal(string role)
@@ -6570,7 +6580,7 @@ public sealed partial class CommandGatewayTests
     {
         List<Claim> claims = [new("sub", ActorId)];
         claims.AddRange(tenantIds.Select(static tenantId => new Claim("eventstore:tenant", tenantId)));
-        return new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
+        return Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
     }
 
     private static ClaimsPrincipal ServiceClientPrincipal(params Claim[] overrides)
@@ -6596,13 +6606,16 @@ public sealed partial class CommandGatewayTests
         }
 
         claims.AddRange(overrides);
-        return new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
+        return Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
     }
 
     private static string Serialized(ProblemDetails problem)
         => JsonSerializer.Serialize(problem, new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
-    private sealed record TenantScopedCommand(string TenantId, string ResourceName);
+    private sealed record TenantScopedCommand(string TenantId, string ResourceName)
+    {
+        public string NoteId { get; } = "01ARZ3NDEKTSV4RRFFQ69G5FAZ";
+    }
 
     // Default allowlist for the stage tests, which exercise admission/audit/idempotency/lifecycle paths
     // with a generic command. Allowlist enforcement itself is covered by the dedicated allowlist tests

@@ -1,13 +1,14 @@
-using System.Security.Claims;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Audit;
-using Hexalith.ChatBot.Server.Gateway;
-using Hexalith.ChatBot.Server.Gateway.Status;
+using Hexalith.ChatBot.Server.Authentication;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Gateway.Status;
+using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Projections;
@@ -17,17 +18,20 @@ using Hexalith.EventStore.DomainService;
 
 namespace Hexalith.ChatBot.Server.Queries;
 
-internal sealed class ComplianceAuditDetailQueryHandler(IWormAuditStore wormAuditStore)
-    : ChatBotReadQueryHandler<ComplianceAuditDetailQuery>
+internal sealed class ComplianceAuditDetailQueryHandler(
+    ChatBotRequestContextResolver requestContextResolver,
+    ChatBotRequestAuthorizer requestAuthorizer,
+    IWormAuditStore wormAuditStore)
+    : ChatBotReadQueryHandler<ComplianceAuditDetailQuery>(requestContextResolver, requestAuthorizer)
 {
     public override string QueryType => ChatBotReadQueryTypes.ComplianceAuditDetail;
 
-    protected override Task<QueryResult> ExecuteAsync(QueryEnvelope query, ComplianceAuditDetailQuery request, CancellationToken cancellationToken)
+    protected override async Task<QueryResult> ExecuteAsync(QueryEnvelope query, ComplianceAuditDetailQuery request, ChatBotAuthorityPrincipal principal, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!request.CanSearchTenantAudit || !ComplianceAdministrationSchema.IsSafeComplianceToken(request.AuditRecordRef))
+        if (!ComplianceAdministrationSchema.IsSafeComplianceToken(request.AuditRecordRef))
         {
-            return Task.FromResult(QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound));
+            return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);
         }
 
         AuditEnvelope? envelope = wormAuditStore.EnumerateChain(query.TenantId)
@@ -39,15 +43,25 @@ internal sealed class ComplianceAuditDetailQueryHandler(IWormAuditStore wormAudi
 
         if (envelope is null)
         {
-            return Task.FromResult(QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound));
+            return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);
         }
 
-        bool hasPerProjectAuthority = envelope.SourceEvidenceRefs
+        string[] projectRefs = envelope.SourceEvidenceRefs
             .Where(static reference => reference.StartsWith("project:", StringComparison.Ordinal))
             .Select(static reference => reference["project:".Length..])
             .Where(AuditMetadata.IsSafeStableIdentifier)
-            .Any(projectRef => request.ExplicitProjectGrants.Contains(projectRef, StringComparer.Ordinal));
+            .Distinct(StringComparer.Ordinal).ToArray();
+        bool hasPerProjectAuthority = projectRefs.Length > 0;
+        foreach (string project in projectRefs)
+        {
+            if (!await RequestAuthorizer.HasProjectAuthorityAsync(principal.Context, project, QueryType, cancellationToken).ConfigureAwait(false))
+            {
+                hasPerProjectAuthority = false;
+                break;
+            }
+        }
+
         ComplianceAuditDetail detail = ComplianceAuditReadPolicy.Detail(envelope, hasPerProjectAuthority);
-        return Task.FromResult(QueryResult.FromPayload(ComplianceAuditHttpResults.DetailJsonElement(detail), "chatbot.compliance-audit-detail.v1"));
+        return QueryResult.FromPayload(ComplianceAuditHttpResults.DetailJsonElement(detail), "chatbot.compliance-audit-detail.v1");
     }
 }

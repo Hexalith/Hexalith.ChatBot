@@ -235,7 +235,7 @@ internal static class CrossTenantIsolationHarness
         List<Claim> claims = [new("sub", BoundActorId)];
         claims.AddRange(tenantIds.Select(static tenantId => new Claim("eventstore:tenant", tenantId)));
         claims.AddRange(persona.RoleMetadataClaims.Select(static claim => new Claim(claim.Key, claim.Value)));
-        return new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
+        return Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
     }
 
     private static CommandGateway BuildGateway(
@@ -259,5 +259,6 @@ internal static class CrossTenantIsolationHarness
             new CommandSubmissionLifecycleTransitionGuard(),
             dispatcher,
             new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry()),
-            new ChatBotSpineCommandAllowlist());
+            new ChatBotSpineCommandAllowlist(),
+            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock));
 }

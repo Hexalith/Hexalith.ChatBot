@@ -341,14 +341,15 @@ internal static class GovernedCommandConformanceHarness
             new CommandSubmissionLifecycleTransitionGuard(),
             dispatcher,
             new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry()),
-            new ChatBotSpineCommandAllowlist());
+            new ChatBotSpineCommandAllowlist(),
+            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock));
 
     private static ChatBotCommandSubmission Submission(object command, string commandType, ChatBotSurfaceOrigin origin)
         => new(
-            new ClaimsPrincipal(
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(
                 new ClaimsIdentity(
                     [new Claim("sub", ActorId), new Claim("eventstore:tenant", Tenant)],
-                    "test")),
+                    "test"))),
             new CommandSubmissionRequest
             {
                 CommandId = CommandId,

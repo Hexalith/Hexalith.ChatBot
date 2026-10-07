@@ -1,7 +1,6 @@
-using Hexalith.ChatBot.Contracts.Enums;
-using Hexalith.ChatBot.Contracts.Identities;
-using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 
 using Shouldly;
 
@@ -9,53 +8,42 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway.Stages;
 
 public sealed class ServiceClientGrantProjectionCacheTests
 {
-    [Fact]
-    public void NormalGrantCacheShouldBoundStalenessToFiveMinutes()
+    [Theory]
+    [InlineData(300, 0)]
+    [InlineData(0, 60)]
+    [InlineData(-1, -1)]
+    public async Task CacheCannotExtendOwnerObservationOrRevocationBounds(int observedAge, int revocationAge)
     {
-        MutableClock clock = new(new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero));
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock);
         ServiceClientGrantProjectionCache cache = new(clock);
-        cache.Upsert(Grant("tenant-alpha", "cli-automation-client", ChatBotSurfaceOrigin.Cli, "grant-alpha"));
-
-        cache.TryGet("tenant-alpha", "cli-automation-client", "cli", "grant-alpha").ShouldNotBeNull();
-
-        clock.UtcNow = clock.UtcNow.Add(ServiceClientGrantProjectionCache.NormalGrantStaleness);
-
-        cache.TryGet("tenant-alpha", "cli-automation-client", "cli", "grant-alpha").ShouldBeNull();
+        ChatBotOwnerAuthorityRequest request = Request("tenant-alpha", "client-alpha", "operation-alpha");
+        ChatBotOwnerAuthorityEvidence evidence = (await owner.GetAuthorityAsync(request, TestContext.Current.CancellationToken))!;
+        cache.Upsert(evidence with { ObservedAt = clock.UtcNow.AddSeconds(-observedAge), RevocationCheckedAt = clock.UtcNow.AddSeconds(-revocationAge) });
+        cache.TryGetEvidence(request).ShouldBeNull();
     }
 
     [Fact]
-    public void RevocationInvalidationShouldAffectOnlyTargetedTenantServiceClientAndSurfaceWithinSixtySeconds()
+    public async Task KnownRevocationImmediatelyDeniesOnlyItsExactGrantScope()
     {
-        MutableClock clock = new(new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero));
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock);
         ServiceClientGrantProjectionCache cache = new(clock);
-        cache.Upsert(Grant("tenant-alpha", "cli-automation-client", ChatBotSurfaceOrigin.Cli, "grant-alpha"));
-        cache.Upsert(Grant("tenant-alpha", "mcp-tool-client", ChatBotSurfaceOrigin.Mcp, "grant-mcp"));
-        cache.Upsert(Grant("tenant-beta", "cli-automation-client", ChatBotSurfaceOrigin.Cli, "grant-beta"));
-
-        cache.InvalidateRevocation("tenant-alpha", "cli-automation-client", "cli", "grant-alpha");
-        clock.UtcNow = clock.UtcNow.Add(ServiceClientGrantProjectionCache.RevocationStaleness).AddSeconds(1);
-
-        cache.TryGet("tenant-alpha", "cli-automation-client", "cli", "grant-alpha").ShouldBeNull();
-        cache.TryGet("tenant-alpha", "mcp-tool-client", "mcp", "grant-mcp").ShouldNotBeNull();
-        cache.TryGet("tenant-beta", "cli-automation-client", "cli", "grant-beta").ShouldNotBeNull();
+        ChatBotOwnerAuthorityRequest request = Request("tenant-alpha", "client-alpha", "operation-alpha");
+        ChatBotOwnerAuthorityRequest foreign = Request("tenant-beta", "client-alpha", "operation-alpha");
+        ChatBotOwnerAuthorityEvidence evidence = (await owner.GetAuthorityAsync(request, TestContext.Current.CancellationToken))!;
+        cache.Upsert(evidence);
+        cache.Upsert((await owner.GetAuthorityAsync(foreign, TestContext.Current.CancellationToken))!);
+        cache.TryGetEvidence(request).ShouldNotBeNull();
+        cache.InvalidateRevocation(request.TenantId, request.ResourceId, "api", evidence.ServiceGrant!.GrantId);
+        cache.TryGetEvidence(request).ShouldBeNull();
+        cache.Upsert(evidence);
+        cache.TryGetEvidence(request).ShouldBeNull();
+        cache.TryGetEvidence(foreign).ShouldNotBeNull();
+        cache.TryGetEvidence(request with { Operation = "operation-beta" }).ShouldBeNull();
+        cache.TryGetEvidence(request with { PrincipalId = "actor-other" }).ShouldBeNull();
     }
 
-    private static ServiceClientGrant Grant(string tenantId, string serviceClientId, ChatBotSurfaceOrigin origin, string grantId)
-        => new(
-            grantId,
-            tenantId,
-            serviceClientId,
-            origin == ChatBotSurfaceOrigin.Mcp ? ServiceClientClass.McpTool : ServiceClientClass.CliAutomation,
-            [nameof(Hexalith.ChatBot.Contracts.Commands.RecordGovernedNote)],
-            [],
-            origin,
-            new DateTimeOffset(2026, 6, 1, 13, 0, 0, TimeSpan.Zero),
-            false,
-            ["notes.write"],
-            "command-set-v1");
-
-    private sealed class MutableClock(DateTimeOffset now) : ISystemClock
-    {
-        public DateTimeOffset UtcNow { get; set; } = now;
-    }
+    private static ChatBotOwnerAuthorityRequest Request(string tenant, string client, string operation)
+        => new("ChatBot", "actor-alpha", tenant, client, operation, "service-grant", "service", Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigin.Api, false);
 }

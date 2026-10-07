@@ -155,7 +155,7 @@ public sealed class CrossActorTypeIsolationParityTests
         FixedClock clock = new(Now);
         return new ParticipantAuthorizationStage(
             serviceClientGrantValidator: new ServiceClientGrantValidator(
-                new ClaimsServiceClientGrantResolver(),
+                new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticServiceClientGrantResolver(),
                 clock,
                 new ChatBotSpineCommandAllowlist(),
                 controlStateProvider,
@@ -166,7 +166,7 @@ public sealed class CrossActorTypeIsolationParityTests
 
     private static ChatBotCommandSubmission Submission(string surface)
         => new(
-            new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "service-account")], "test")),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "service-account")], "test"))),
             new Hexalith.ChatBot.Client.Generated.CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
@@ -207,7 +207,7 @@ public sealed class CrossActorTypeIsolationParityTests
         }
 
         claims.AddRange(overrides);
-        ClaimsPrincipal principal = new(new ClaimsIdentity(claims, "test"));
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
         return new ChatBotAuthenticatedActor("service-account", principal, actorType, clientId);
     }
 

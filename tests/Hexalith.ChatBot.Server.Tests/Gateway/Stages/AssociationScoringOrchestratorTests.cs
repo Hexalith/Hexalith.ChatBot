@@ -123,7 +123,7 @@ public sealed class AssociationScoringOrchestratorTests
 
     private static ChatBotGatewayContext Context()
     {
-        ClaimsPrincipal principal = new(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test"));
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")));
         ChatBotCommandSubmission submission = new(
             principal,
             new GeneratedCommandSubmissionRequest

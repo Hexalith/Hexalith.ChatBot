@@ -1,13 +1,14 @@
-using System.Security.Claims;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Audit;
-using Hexalith.ChatBot.Server.Gateway;
-using Hexalith.ChatBot.Server.Gateway.Status;
+using Hexalith.ChatBot.Server.Authentication;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Gateway.Status;
+using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Projections;
@@ -18,13 +19,15 @@ using Hexalith.EventStore.DomainService;
 namespace Hexalith.ChatBot.Server.Queries;
 
 internal sealed class OperationAuditHistoryQueryHandler(
+    ChatBotRequestContextResolver requestContextResolver,
+    ChatBotRequestAuthorizer requestAuthorizer,
     IOperationStatusStore statusStore,
     IAuditHistoryReader auditHistoryReader)
-    : ChatBotReadQueryHandler<OperationAuditHistoryQuery>
+    : ChatBotReadQueryHandler<OperationAuditHistoryQuery>(requestContextResolver, requestAuthorizer)
 {
     public override string QueryType => ChatBotReadQueryTypes.OperationAuditHistory;
 
-    protected override async Task<QueryResult> ExecuteAsync(QueryEnvelope query, OperationAuditHistoryQuery request, CancellationToken cancellationToken)
+    protected override async Task<QueryResult> ExecuteAsync(QueryEnvelope query, OperationAuditHistoryQuery request, ChatBotAuthorityPrincipal principal, CancellationToken cancellationToken)
     {
         if (!ChatBotIdentity.IsValidUlid(request.OperationId))
         {

@@ -12,6 +12,7 @@ using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Adapters.Projects;
 using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Association.Scoring;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
@@ -26,6 +27,7 @@ using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.ChatBot.Server.Queries;
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Client.Queries;
 using Hexalith.EventStore.Contracts.Commands;
@@ -84,7 +86,11 @@ public sealed class ServerBootstrapApiTests
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(
                 builder => builder.ConfigureServices(
-                    services => services.AddSingleton<IAssociationProjectionStore>(associationStore)));
+                    services =>
+                    {
+                        Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                        services.AddSingleton<IAssociationProjectionStore>(associationStore);
+                    }));
 
         using IServiceScope scope = factory.Services.CreateScope();
         IEnumerable<IDomainQueryHandler> handlers = scope.ServiceProvider.GetServices<IDomainQueryHandler>();
@@ -98,6 +104,12 @@ public sealed class ServerBootstrapApiTests
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             "actor-alpha");
 
+        Microsoft.AspNetCore.Http.IHttpContextAccessor accessor = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Http.IHttpContextAccessor>();
+        accessor.HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
+        {
+            User = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.SetEvidence(
+                Hexalith.ChatBot.Tests.TrustedAuthority.TrustedAuthorityFixture.Principal("tenant-alpha")),
+        };
         QueryResult result = await DomainQueryDispatcher
             .ExecuteAsync(scope.ServiceProvider, envelope, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
@@ -548,6 +560,103 @@ public sealed class ServerBootstrapApiTests
         AdmissionReason(result).ShouldBe(ChatBotAuthorizationReasonCodes.AuthenticationDenied);
         result.Events.ShouldNotContain(static item => item.EventTypeName.EndsWith("GovernedNoteRecorded", StringComparison.Ordinal));
         auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthenticationDenied);
+        auditWriter.Envelopes.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("tenant-alpha", "actor-other", ChatBotAuthorizationReasonCodes.AuthenticationDenied)]
+    [InlineData("tenant-beta", "actor-alpha", ChatBotAuthorizationReasonCodes.TenantMismatch)]
+    public async Task ProcessEndpointShouldRejectForgedTransportBindingBeforeAdmission(string tenant, string user, string reason)
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock);
+        IIdempotencyStore protectedStore = System.Reflection.DispatchProxy.Create<IIdempotencyStore, ProtectedAccessProbe>();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha", services =>
+        {
+            services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
+            services.AddSingleton(protectedStore);
+        });
+        using HttpClient client = factory.CreateClient();
+        using HttpResponseMessage response = await client.PostAsJsonAsync("/process", DomainServiceRequest("RecordGovernedNote", tenantId: tenant, userId: user), TestContext.Current.CancellationToken);
+        DomainServiceWireResult result = await ReadDomainServiceResultAsync(response);
+        result.IsRejection.ShouldBeTrue();
+        AdmissionReason(result).ShouldBe(reason);
+        owner.Requests.ShouldBeEmpty();
+        ((ProtectedAccessProbe)(object)protectedStore).Calls.ShouldBe(0);
+        factory.Services.GetRequiredService<InMemoryAuditWriter>().Envelopes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ProcessEndpointShouldRejectUnauthenticatedTransportWithValidEnvelope()
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock);
+        IIdempotencyStore protectedStore = System.Reflection.DispatchProxy.Create<IIdempotencyStore, ProtectedAccessProbe>();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
+            services.AddSingleton(protectedStore);
+        }));
+        using HttpClient client = factory.CreateClient();
+        using HttpResponseMessage response = await client.PostAsJsonAsync("/process", DomainServiceRequest("RecordGovernedNote"), TestContext.Current.CancellationToken);
+        DomainServiceWireResult result = await ReadDomainServiceResultAsync(response);
+        result.IsRejection.ShouldBeTrue();
+        AdmissionReason(result).ShouldBe(ChatBotAuthorizationReasonCodes.AuthenticationDenied);
+        owner.Requests.ShouldBeEmpty();
+        ((ProtectedAccessProbe)(object)protectedStore).Calls.ShouldBe(0);
+        factory.Services.GetRequiredService<InMemoryAuditWriter>().Envelopes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ProcessEndpointShouldUseBoundTransportAndIgnoreCallerAuthorityExtensions()
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock);
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha", services =>
+        {
+            services.AddSingleton<ISystemClock>(clock);
+            services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
+        });
+        using HttpClient client = factory.CreateClient();
+        DomainServiceRequest request = DomainServiceRequest("RecordGovernedNote");
+        Dictionary<string, string> extensions = new(request.Command.Extensions!, StringComparer.Ordinal)
+        {
+            [ParticipantAuthorizationStage.ActorTypeClaim] = "ai",
+            [ParticipantAuthorizationStage.TenantRoleClaim] = "tenant-admin",
+            [ClaimsServiceClientGrantResolver.ServiceClientIdClaim] = "forged-client",
+            [ClaimsServiceClientGrantResolver.GrantScopeClaim] = "*",
+            ["surfaceOrigin"] = "ai",
+        };
+        using HttpResponseMessage response = await client.PostAsJsonAsync("/process", request with { Command = request.Command with { Extensions = extensions } }, TestContext.Current.CancellationToken);
+        DomainServiceWireResult result = await ReadDomainServiceResultAsync(response);
+        result.IsRejection.ShouldBeFalse();
+        result.Events.ShouldContain(static item => item.EventTypeName.EndsWith("GovernedNoteRecorded", StringComparison.Ordinal));
+        owner.Requests.ShouldNotBeEmpty();
+        owner.Requests.ShouldAllBe(static request => request.PrincipalId == "actor-alpha" && request.TenantId == "tenant-alpha" && request.ActorClass == "human" && request.Origin == Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigin.Api);
+        owner.Requests.ShouldNotContain(static request => request.Authority == "service-grant");
+    }
+
+    [Fact]
+    public async Task ProcessEndpointShouldPreserveValidAdmissionMarkerWithoutTransportAuthentication()
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock) { Allows = static _ => false };
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services => services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner)));
+        using HttpClient client = factory.CreateClient();
+        DomainServiceRequest request = DomainServiceRequest("RecordGovernedNote");
+        CommandEnvelope command = request.Command;
+        using JsonDocument payload = JsonDocument.Parse(command.Payload);
+        IChatBotAdmissionMarker marker = factory.Services.GetRequiredService<IChatBotAdmissionMarker>();
+        Dictionary<string, string> extensions = new(command.Extensions!, StringComparer.Ordinal)
+        {
+            ["actorId"] = command.UserId,
+            [DataProtectionChatBotAdmissionMarker.ExtensionKey] = marker.Create(command.MessageId, command.TenantId, command.AggregateId, command.CommandType, payload.RootElement, command.CorrelationId, command.UserId, "api", command.Extensions!["taskId"]),
+        };
+        using HttpResponseMessage response = await client.PostAsJsonAsync("/process", request with { Command = command with { Extensions = extensions } }, TestContext.Current.CancellationToken);
+        DomainServiceWireResult result = await ReadDomainServiceResultAsync(response);
+        result.IsRejection.ShouldBeFalse();
+        result.Events.ShouldContain(static item => item.EventTypeName.EndsWith("GovernedNoteRecorded", StringComparison.Ordinal));
+        owner.Requests.ShouldBeEmpty();
     }
 
     [Fact]
@@ -2756,7 +2865,7 @@ public sealed class ServerBootstrapApiTests
         using HttpClient client = factory.CreateClient();
 
         using HttpResponseMessage response = await client
-            .SendAsync(CommandSubmissionRequest("tenant-alpha", "payload-sentinel"), TestContext.Current.CancellationToken)
+            .SendAsync(CommandSubmissionRequest("tenant-alpha", "payload-sentinel", "UnknownAction"), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
@@ -3053,6 +3162,7 @@ public sealed class ServerBootstrapApiTests
                 builder => builder.ConfigureServices(
                     services =>
                     {
+                        Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                         services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
                         services.AddSingleton<IIdempotencyStore>(_ => new InMemoryCoarseIdempotencyStore(new SystemClock()));
 
@@ -3076,6 +3186,7 @@ public sealed class ServerBootstrapApiTests
                 builder => builder.ConfigureServices(
                     services =>
                     {
+                        Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                         services.AddSingleton<IProjectConversationProjectionStore>(conversationStore);
                         services.AddSingleton<IStartupFilter>(new ProjectConversationPrincipalStartupFilter());
                     }));
@@ -3301,15 +3412,16 @@ public sealed class ServerBootstrapApiTests
         }
     }
 
-    private static HttpRequestMessage CommandSubmissionRequest(string tenantId, string resourceName)
+    private static HttpRequestMessage CommandSubmissionRequest(string tenantId, string resourceName, string commandType = "RecordGovernedNote")
     {
         string payload =
             $$"""
             {
               "commandId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
-              "commandType": "TenantScopedAction",
+              "commandType": "{{commandType}}",
               "command": {
                 "tenantId": "{{tenantId}}",
+                "noteId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
                 "resourceName": "{{resourceName}}"
               },
               "requestSchemaVersion": "v1"
@@ -3988,7 +4100,7 @@ public sealed class ServerBootstrapApiTests
                             new("requester_authority_class", "project-contributor"),
                             new(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"),
                         ];
-                        context.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
+                        context.User = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
                         await continuation().ConfigureAwait(false);
                     });
                 next(app);
@@ -4003,13 +4115,13 @@ public sealed class ServerBootstrapApiTests
                 app.Use(
                     async (context, continuation) =>
                     {
-                        context.User = new ClaimsPrincipal(new ClaimsIdentity(
+                        context.User = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
                             [
                                 new Claim("sub", "actor-alpha"),
                                 new Claim("eventstore:tenant", "tenant-alpha"),
                                 new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-alpha"),
                             ],
-                            "test"));
+                            "test")));
                         await continuation().ConfigureAwait(false);
                     });
                 next(app);

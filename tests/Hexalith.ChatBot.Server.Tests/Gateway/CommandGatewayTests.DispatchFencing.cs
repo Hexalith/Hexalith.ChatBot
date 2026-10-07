@@ -56,7 +56,7 @@ public sealed partial class CommandGatewayTests
         DurableRecoveryEventStoreClient platform = new();
         AcceptedCommandDispatcher dispatcher = new(platform, null!, null!, clock);
         RecordingAuditWriter audit = new() { OnPreCommit = () => state.RejectDeletes = cleanupUnavailable ? 3 : 0 };
-        ChatBotCommandSubmission bad = Submission(Principal(BoundTenant), new RecordGovernedNote(""));
+        ChatBotCommandSubmission bad = Submission(Principal(BoundTenant), AssociationScoringCommand("planning-kernel") with { SourceMailboxId = string.Empty });
         ChatBotGatewayResult failure = await Gateway(dispatcher, clock: clock, idempotencyStore: store, auditWriter: audit)
             .SubmitAsync(bad, TestContext.Current.CancellationToken);
         failure.IsAccepted.ShouldBeFalse();

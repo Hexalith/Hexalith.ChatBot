@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Client.Generated;
@@ -51,7 +52,7 @@ public sealed partial class CommandGatewayTests
         platform.SubmissionFailure = failure == "before-arrival" ? new HttpRequestException("B never reached EventStore.") : null;
         platform.SubmissionUncertain = failure == "lost-sdk-ack";
         platform.OnReceivedSubmission = failure == "receipt-failure" ? _ => state.ThrowOutcomeWrites = 100 : null;
-        ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), changedCommand, commandId: commandId);
+        ChatBotCommandSubmission submission = Submission(operation == "policy" ? AdminPrincipal("policy-admin") : Principal(BoundTenant, new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, aggregate)), changedCommand, commandId: commandId);
         ChatBotGatewayResult first = await Gateway(new AcceptedCommandDispatcher(platform, null!, null!, clock), clock: clock,
             idempotencyStore: new DaprCoarseIdempotencyStore(state, clock, eventStore: platform),
             auditWriter: new RecordingAuditWriter { PostCommitResult = AuditWriteResult.Unavailable() })

@@ -527,6 +527,7 @@ public sealed class ProjectConversationProjectionTests
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
                     new MailboxMessageContentResult(true, "available", "authorized body for review", "text/plain", "metadata_only")));
@@ -555,6 +556,7 @@ public sealed class ProjectConversationProjectionTests
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
                     new MailboxMessageContentResult(false, "task_intent_source_unavailable")));
@@ -586,6 +588,7 @@ public sealed class ProjectConversationProjectionTests
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
                     new MailboxMessageContentResult(
@@ -626,6 +629,7 @@ public sealed class ProjectConversationProjectionTests
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
                     new MailboxMessageContentResult(true, "available", "authorized body for review", "text/plain", "metadata_only")));
@@ -655,6 +659,7 @@ public sealed class ProjectConversationProjectionTests
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
                     new MailboxMessageContentResult(true, "available", "raw provider payload graph-message-001 tenant-beta restricted@example.com", "text/plain", "metadata_only")));
@@ -687,6 +692,7 @@ public sealed class ProjectConversationProjectionTests
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
                     new MailboxMessageContentResult(true, "available", "raw provider payload graph-message-001 tenant-beta restricted@example.com", "text/plain", "metadata_only")));
@@ -2410,6 +2416,7 @@ public sealed class ProjectConversationProjectionTests
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(conversationStore);
                 services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(projectId));
             }));
@@ -2485,13 +2492,13 @@ public sealed class ProjectConversationProjectionTests
             {
                 app.Use(async (context, continuation) =>
                 {
-                    context.User = new ClaimsPrincipal(new ClaimsIdentity(
+                    context.User = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
                         [
                             new Claim("sub", "actor-001"),
                             new Claim("eventstore:tenant", Tenant),
                             new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, projectId),
                         ],
-                        "test"));
+                        "test")));
                     await continuation().ConfigureAwait(false);
                 });
                 next(app);

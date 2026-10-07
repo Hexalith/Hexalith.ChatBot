@@ -310,11 +310,11 @@ public sealed class AdminQueueSummaryProjectorTests
             CandidateEvidence: "candidate evidence");
 
     private static ClaimsPrincipal Principal(string role, string actorType = "human")
-        => new(new ClaimsIdentity(
+        => Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "actor-alpha"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
             ],
-            "test"));
+            "test")));
 }

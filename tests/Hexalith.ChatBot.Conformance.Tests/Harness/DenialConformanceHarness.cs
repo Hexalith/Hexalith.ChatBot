@@ -117,7 +117,8 @@ internal static class DenialConformanceHarness
             new CommandSubmissionLifecycleTransitionGuard(),
             dispatcher,
             new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry()),
-            new ChatBotSpineCommandAllowlist());
+            new ChatBotSpineCommandAllowlist(),
+            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock));
 
         ChatBotGatewayResult result = await gateway
             .SubmitAsync(Submission(command, commandType, arm.Origin), cancellationToken)

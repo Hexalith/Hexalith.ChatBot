@@ -245,6 +245,29 @@ public sealed class ComplianceAuditInvestigationEndpointTests
         restricted.RootElement.GetProperty("safeNextAction").GetString().ShouldBe("request-access");
     }
 
+    [Fact]
+    public async Task DetailShouldRequireCurrentAuthorityForEveryReferencedProject()
+    {
+        using WebApplicationFactory<Program> factory = ComplianceFactory("tenant-alpha", projectOwner: "project-alpha");
+        using HttpClient client = factory.CreateClient();
+        AuditEnvelope twoProjects = Envelope("tenant-alpha", "audit-record-two-projects") with
+        {
+            SourceEvidenceRefs = ["project:project-alpha", "project:project-beta", "source-message:restricted-sentinel"],
+        };
+        await SeedAsync(factory.Services.GetRequiredService<IWormAuditStore>(), twoProjects);
+        using HttpResponseMessage response = await client.SendAsync(DetailRequest("audit-record-two-projects"), TestContext.Current.CancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using JsonDocument detail = JsonDocument.Parse(body);
+        detail.RootElement.GetProperty("redactionState").GetString().ShouldBe("escalation-required");
+        detail.RootElement.GetProperty("redactionReasonCode").GetString().ShouldBe("restricted-detail");
+        detail.RootElement.GetProperty("safeNextAction").GetString().ShouldBe("request-access");
+        detail.RootElement.GetProperty("visibleMetadataRefs").EnumerateArray().ShouldBeEmpty();
+        body.ShouldNotContain("project-alpha");
+        body.ShouldNotContain("project-beta");
+        body.ShouldNotContain("restricted-sentinel");
+    }
+
     private static async Task SeedAsync(IWormAuditStore store, AuditEnvelope envelope)
         => await store.AppendAsync(envelope, CancellationToken.None);
 
@@ -316,7 +339,10 @@ public sealed class ComplianceAuditInvestigationEndpointTests
         bool includeTenant = true)
         => new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
-                services.AddSingleton<IStartupFilter>(new CompliancePrincipalStartupFilter(tenantId, projectOwner, role, actorType, includeTenant))));
+                {
+                    Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                    services.AddSingleton<IStartupFilter>(new CompliancePrincipalStartupFilter(tenantId, projectOwner, role, actorType, includeTenant));
+                }));
 
     private sealed class CompliancePrincipalStartupFilter(
         string tenantId,
@@ -339,6 +365,11 @@ public sealed class ComplianceAuditInvestigationEndpointTests
                         new(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
                         new(ParticipantAuthorizationStage.TenantRoleClaim, role),
                     ];
+                    if (actorType is "ai" or "service")
+                    {
+                        claims.Add(new Claim(ClaimsServiceClientGrantResolver.ServiceClientIdClaim, "synthetic-machine"));
+                    }
+
                     if (includeTenant)
                     {
                         claims.Add(new Claim("eventstore:tenant", effectiveTenantId));
@@ -349,7 +380,7 @@ public sealed class ComplianceAuditInvestigationEndpointTests
                         claims.Add(new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, projectOwner));
                     }
 
-                    context.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
+                    context.User = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
                     await continuation().ConfigureAwait(false);
                 });
                 next(app);

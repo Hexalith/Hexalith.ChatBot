@@ -94,12 +94,9 @@ public sealed class NotificationRoutingResolverTests
     }
 
     [Fact]
-    public void WildcardProjectOwnerShouldReceiveItemContextForItemSpecificEvents()
+    public void WildcardProjectOwnerShouldReceiveMetadataOnlyForItemSpecificEvents()
     {
-        // The notification-routing audience intentionally honors the tenant-wide "*" project-owner wildcard (matching
-        // the gateway/outbound convention), unlike the compliance full-detail path which requires an explicit grant.
-        // This pins that divergence so the shared AdminAuthorityEvaluator.HasProjectAuthority helper cannot silently
-        // drop wildcard support for routing.
+        // A wildcard never replaces exact current Projects owner evidence.
         NotificationRoutingChangeSet routing = new(
         [
             new NotificationRoutingEntry(NotificationStateClass.Failure, AdminScope.Operate, AdminRole.OperationsAdmin, NotificationChannel.OperatorAlert),
@@ -111,8 +108,8 @@ public sealed class NotificationRoutingResolverTests
             [Candidate("operator-wildcard", "operations-admin", projectRef: "*")]);
 
         NotificationDelivery delivery = deliveries.ShouldHaveSingleItem();
-        delivery.Visibility.ShouldBe(NotificationContentVisibility.ItemContext);
-        delivery.ItemRef.ShouldBe("item-77");
+        delivery.Visibility.ShouldBe(NotificationContentVisibility.MetadataRedacted);
+        delivery.ItemRef.ShouldBeNull();
     }
 
     [Fact]
@@ -256,6 +253,6 @@ public sealed class NotificationRoutingResolverTests
             claims.Add(new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, projectRef));
         }
 
-        return new NotificationRecipientCandidate(recipientRef, new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
+        return new NotificationRecipientCandidate(recipientRef, Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test"))));
     }
 }

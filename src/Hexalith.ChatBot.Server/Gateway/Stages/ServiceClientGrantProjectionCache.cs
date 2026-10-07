@@ -1,57 +1,67 @@
+using System.Collections.Concurrent;
+
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Authorization;
 
 namespace Hexalith.ChatBot.Server.Gateway.Stages;
 
+/// <summary>Exact scoped owner evidence cache with immediate known-revocation tombstones.</summary>
 internal sealed class ServiceClientGrantProjectionCache(ISystemClock clock)
 {
+    /// <summary>The maximum ordinary evidence age.</summary>
     public static readonly TimeSpan NormalGrantStaleness = TimeSpan.FromMinutes(5);
+    /// <summary>The maximum time since a current revocation check.</summary>
     public static readonly TimeSpan RevocationStaleness = TimeSpan.FromSeconds(60);
+    private readonly ConcurrentDictionary<ChatBotOwnerAuthorityRequest, ChatBotOwnerAuthorityEvidence> _entries = new();
+    private readonly ConcurrentDictionary<(string, string, string, string), byte> _revocations = new();
 
-    private readonly Dictionary<string, CacheEntry> _entries = new(StringComparer.Ordinal);
-
-    public void Upsert(ServiceClientGrant grant)
+    /// <summary>Stores owner-observed evidence; supplied token grants cannot refresh authority.</summary>
+    public void Upsert(ChatBotOwnerAuthorityEvidence evidence)
     {
-        ArgumentNullException.ThrowIfNull(grant);
-        _entries[Key(grant.TenantId, grant.ServiceClientId, ChatBotSurfaceOrigins.ToWireValue(grant.SurfaceOrigin), grant.GrantId)] =
-            new CacheEntry(grant, clock.UtcNow, RevocationInvalidatedAt: null);
+        ArgumentNullException.ThrowIfNull(evidence);
+        if (evidence.ServiceGrant is not { } grant || evidence.Request.Authority != "service-grant")
+        {
+            return;
+        }
+
+        if (evidence.IsRevoked || grant.IsRevoked)
+        {
+            InvalidateRevocation(grant.TenantId, grant.ServiceClientId, ChatBotSurfaceOrigins.ToWireValue(grant.SurfaceOrigin), grant.GrantId);
+        }
+        else if (!IsRevoked(evidence.Request, grant.GrantId))
+        {
+            _entries[evidence.Request] = evidence;
+        }
     }
 
-    public ServiceClientGrant? TryGet(string tenantId, string serviceClientId, string surfaceOrigin, string grantId)
+    /// <summary>Returns exact evidence only within both observation and revocation bounds.</summary>
+    public ChatBotOwnerAuthorityEvidence? TryGetEvidence(ChatBotOwnerAuthorityRequest request)
     {
-        if (!_entries.TryGetValue(Key(tenantId, serviceClientId, surfaceOrigin, grantId), out CacheEntry? entry))
+        if (!_entries.TryGetValue(request, out ChatBotOwnerAuthorityEvidence? evidence) || evidence.ServiceGrant is not { } grant)
         {
             return null;
         }
 
         DateTimeOffset now = clock.UtcNow;
-        if (entry.RevocationInvalidatedAt is { } revokedAt && now - revokedAt >= RevocationStaleness)
+        if (evidence.IsRevoked || grant.IsRevoked || IsRevoked(request, grant.GrantId) ||
+            evidence.ObservedAt > now || evidence.RevocationCheckedAt > now || evidence.ExpiresAt <= now || grant.ExpiresAt <= now ||
+            now - evidence.ObservedAt >= NormalGrantStaleness || now - evidence.RevocationCheckedAt >= RevocationStaleness)
         {
-            _ = _entries.Remove(Key(tenantId, serviceClientId, surfaceOrigin, grantId));
+            _entries.TryRemove(request, out _);
             return null;
         }
 
-        if (now - entry.CachedAt >= NormalGrantStaleness)
-        {
-            _ = _entries.Remove(Key(tenantId, serviceClientId, surfaceOrigin, grantId));
-            return null;
-        }
-
-        return entry.Grant;
+        return evidence;
     }
 
+    /// <summary>Immediately denies known revocation, scoped by tenant, client, origin and grant.</summary>
     public void InvalidateRevocation(string tenantId, string serviceClientId, string surfaceOrigin, string grantId)
-    {
-        string key = Key(tenantId, serviceClientId, surfaceOrigin, grantId);
-        if (_entries.TryGetValue(key, out CacheEntry? entry))
-        {
-            _entries[key] = entry with { RevocationInvalidatedAt = clock.UtcNow };
-        }
-    }
+        => _revocations[(tenantId, serviceClientId, surfaceOrigin, grantId)] = 0;
 
-    private static string Key(string tenantId, string serviceClientId, string surfaceOrigin, string grantId)
-        => string.Join('|', tenantId, serviceClientId, surfaceOrigin, grantId);
-
-    private sealed record CacheEntry(ServiceClientGrant Grant, DateTimeOffset CachedAt, DateTimeOffset? RevocationInvalidatedAt);
+    /// <summary>Checks revocation without extending the cache.</summary>
+    public bool IsRevoked(ChatBotOwnerAuthorityRequest request, string? grantId = null)
+        => _revocations.ContainsKey((request.TenantId, request.ResourceId, ChatBotSurfaceOrigins.ToWireValue(request.Origin), grantId ?? string.Empty)) ||
+            _revocations.ContainsKey((request.TenantId, request.ResourceId, ChatBotSurfaceOrigins.ToWireValue(request.Origin), string.Empty));
 }

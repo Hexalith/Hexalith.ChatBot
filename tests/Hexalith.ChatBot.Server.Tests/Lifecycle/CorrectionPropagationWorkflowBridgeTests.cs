@@ -1,3 +1,4 @@
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 using System.Text.Json;
 
 using Dapr.Workflow;
@@ -275,7 +276,7 @@ public sealed class CorrectionPropagationWorkflowBridgeTests
         QueryEnvelope query = new("tenant-alpha", "chatbot", operationId, ChatBotReadQueryTypes.OperationStatus,
             JsonSerializer.SerializeToUtf8Bytes(new OperationStatusQuery(operationId, null), new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             correlationId, "actor-alpha");
-        QueryResult result = await new OperationStatusQueryHandler(store, context, context).ExecuteAsync(query, TestContext.Current.CancellationToken).ConfigureAwait(false);
+        QueryResult result = await new OperationStatusQueryHandler(TrustedAuthorityFixture.Resolver(TrustedAuthorityFixture.Principal()), TrustedAuthorityFixture.Authorizer(context, new SyntheticOwnerAuthorityProvider(context)), store, context, context).ExecuteAsync(query, TestContext.Current.CancellationToken).ConfigureAwait(false);
         result.Success.ShouldBeTrue();
         return result.GetPayload();
     }

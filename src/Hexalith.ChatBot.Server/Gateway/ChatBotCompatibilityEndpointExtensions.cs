@@ -215,19 +215,9 @@ internal static class ChatBotCompatibilityEndpointExtensions
                             correlationContext.TaskId)));
                 }
 
-                bool projectReadAuthorized = ChatBotReadAuthorization.TryAuthorizeProjectRead(httpContext.User, projectId, out bool hasProjectScopeClaims);
-                if (!projectReadAuthorized)
-                {
-                    return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
-                        problemDetailsFactory.CreateAuthorizationProblem(
-                            ChatBotAuthorizationReasonCodes.SafeNotFound,
-                            correlationContext.CorrelationId,
-                            correlationContext.TaskId)));
-                }
-
                 return await ExecuteProjectConversationQueryAsync(
                     projectId,
-                    new ProjectConversationQuery(projectId, cursor, Math.Clamp(pageSize ?? 25, 1, 100), projectReadAuthorized, hasProjectScopeClaims, correlationContext.TaskId),
+                    new ProjectConversationQuery(projectId, cursor, Math.Clamp(pageSize ?? 25, 1, 100), false, false, correlationContext.TaskId),
                     httpContext,
                     serviceProvider,
                     problemDetailsFactory,
@@ -263,20 +253,10 @@ internal static class ChatBotCompatibilityEndpointExtensions
                             correlationContext.TaskId)));
                 }
 
-                bool projectReadAuthorized = ChatBotReadAuthorization.TryAuthorizeProjectRead(httpContext.User, projectId, out _);
-                if (!projectReadAuthorized)
-                {
-                    return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
-                        problemDetailsFactory.CreateAuthorizationProblem(
-                            ChatBotAuthorizationReasonCodes.SafeNotFound,
-                            correlationContext.CorrelationId,
-                            correlationContext.TaskId)));
-                }
-
                 return await ExecuteReadQueryAsync(
                     projectId,
                     ChatBotReadQueryTypes.TaskIntentReview,
-                    new TaskIntentReviewQuery(projectId, taskIntentId, projectReadAuthorized, correlationContext.TaskId),
+                    new TaskIntentReviewQuery(projectId, taskIntentId, false, correlationContext.TaskId),
                     httpContext,
                     serviceProvider,
                     problemDetailsFactory,
@@ -379,7 +359,7 @@ internal static class ChatBotCompatibilityEndpointExtensions
                 return await ExecuteReadQueryAsync(
                     query?.QueryRef ?? ChatBotReadQueryTypes.ComplianceAuditSearch,
                     ChatBotReadQueryTypes.ComplianceAuditSearch,
-                    new ComplianceAuditSearchQuery(query, ChatBotReadAuthorization.CanSearchTenantAudit(httpContext.User), correlationContext.TaskId),
+                    new ComplianceAuditSearchQuery(query, false, correlationContext.TaskId),
                     httpContext,
                     serviceProvider,
                     problemDetailsFactory,
@@ -409,8 +389,8 @@ internal static class ChatBotCompatibilityEndpointExtensions
                     ChatBotReadQueryTypes.ComplianceAuditDetail,
                     new ComplianceAuditDetailQuery(
                         auditRecordRef,
-                        ChatBotReadAuthorization.CanSearchTenantAudit(httpContext.User),
-                        ChatBotReadAuthorization.ExplicitProjectGrants(httpContext.User),
+                        false,
+                        [],
                         correlationContext.TaskId),
                     httpContext,
                     serviceProvider,

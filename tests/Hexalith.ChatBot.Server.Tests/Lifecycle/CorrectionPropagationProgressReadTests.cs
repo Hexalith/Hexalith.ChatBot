@@ -1,3 +1,4 @@
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 using System.Text.Json;
 
 using Dapr.DurableTask.Protobuf;
@@ -120,7 +121,7 @@ public sealed class CorrectionPropagationProgressReadTests
             "non-authoritative-runtime" => new AvailableNonAuthoritativeWorkflowRuntime(),
             _ => runtime,
         };
-        QueryResult result = await new OperationStatusQueryHandler(store, clock, selectedRuntime)
+        QueryResult result = await new OperationStatusQueryHandler(TrustedAuthorityFixture.Resolver(TrustedAuthorityFixture.Principal()), TrustedAuthorityFixture.Authorizer(clock, new SyntheticOwnerAuthorityProvider(clock)), store, clock, selectedRuntime)
             .ExecuteAsync(query, TestContext.Current.CancellationToken);
         result.Success.ShouldBeTrue();
         JsonElement status = result.GetPayload();

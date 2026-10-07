@@ -216,12 +216,12 @@ public sealed class ChatBotProjectConversationHubE2ETests
             {
                 _ = app.Use(async (context, continuation) =>
                 {
-                    context.User = new ClaimsPrincipal(new ClaimsIdentity(
+                    context.User = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
                         [
                             new Claim("sub", "actor-001"),
                             new Claim("eventstore:tenant", tenantId),
                         ],
-                        "test"));
+                        "test")));
                     await continuation().ConfigureAwait(false);
                 });
                 next(app);

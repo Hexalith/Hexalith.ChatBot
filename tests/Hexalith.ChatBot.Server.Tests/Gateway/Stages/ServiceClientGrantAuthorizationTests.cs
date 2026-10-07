@@ -21,12 +21,12 @@ public sealed class ServiceClientGrantAuthorizationTests
     public async Task ClaimsAuthenticationStageShouldClassifyKeycloakServiceAccountPosture()
     {
         ClaimsAuthenticationStage stage = new();
-        ClaimsPrincipal principal = new(new ClaimsIdentity(
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "service-account-cli"),
                 new Claim("preferred_username", "service-account-cli-automation-client"),
             ],
-            "test"));
+            "test")));
 
         ChatBotAuthenticationResult result = await stage.AuthenticateAsync(
             Submission(principal, ChatBotSurfaceOrigin.Cli),
@@ -41,21 +41,21 @@ public sealed class ServiceClientGrantAuthorizationTests
     public async Task ClaimsAuthenticationStageShouldNotLetServiceAccountClaimHumanPosture()
     {
         ClaimsAuthenticationStage stage = new();
-        ClaimsPrincipal principal = new(new ClaimsIdentity(
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "service-account-cli"),
                 new Claim(ClaimsServiceClientGrantResolver.ServiceClientIdClaim, "cli-automation-client"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
             ],
-            "test"));
+            "test")));
 
         ChatBotAuthenticationResult result = await stage.AuthenticateAsync(
             Submission(principal, ChatBotSurfaceOrigin.Cli),
             TestContext.Current.CancellationToken);
 
-        result.IsAuthenticated.ShouldBeTrue();
-        result.Actor.ShouldNotBeNull().ActorType.ShouldBe(ParticipantAuthorizationStage.ServiceActorValue);
-        result.Actor.ServiceClientId.ShouldBe("cli-automation-client");
+        result.IsAuthenticated.ShouldBeFalse();
+        result.Actor.ShouldBeNull();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthenticationDenied);
     }
 
     [Fact]
@@ -1087,7 +1087,7 @@ public sealed class ServiceClientGrantAuthorizationTests
         FixedClock clock = new(Now);
         return new ParticipantAuthorizationStage(
             serviceClientGrantValidator: new ServiceClientGrantValidator(
-                new ClaimsServiceClientGrantResolver(),
+                new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticServiceClientGrantResolver(),
                 clock,
                 new ChatBotSpineCommandAllowlist(),
                 controlStateProvider,
@@ -1229,7 +1229,7 @@ public sealed class ServiceClientGrantAuthorizationTests
         string commandType = nameof(RecordGovernedNote),
         object? command = null)
         => Submission(
-            new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "service-account-cli")], "test")),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "service-account-cli")], "test"))),
             origin,
             commandType,
             command);
@@ -1252,7 +1252,7 @@ public sealed class ServiceClientGrantAuthorizationTests
 
         RemoveOverriddenClaims(claims, overrides);
         claims.AddRange(overrides);
-        ClaimsPrincipal principal = new(new ClaimsIdentity(claims, "test"));
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
         return new ChatBotAuthenticatedActor(
             "service-account-cli",
             principal,
@@ -1278,7 +1278,7 @@ public sealed class ServiceClientGrantAuthorizationTests
 
         RemoveOverriddenClaims(claims, overrides);
         claims.AddRange(overrides);
-        ClaimsPrincipal principal = new(new ClaimsIdentity(claims, "test"));
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
         return new ChatBotAuthenticatedActor(
             "service-account-cli",
             principal,
@@ -1288,12 +1288,12 @@ public sealed class ServiceClientGrantAuthorizationTests
 
     private static ChatBotAuthenticatedActor ActorWithoutGrant()
     {
-        ClaimsPrincipal principal = new(new ClaimsIdentity(
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "service-account-cli"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.ServiceActorValue),
             ],
-            "test"));
+            "test")));
         return new ChatBotAuthenticatedActor(
             "service-account-cli",
             principal,

@@ -42,4 +42,7 @@
   <ItemGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
     <PackageReference Include="Hexalith.EventStore.Contracts" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\TrustedAuthority\*.cs" Link="TrustedAuthority\%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

@@ -64,6 +64,7 @@ internal static class IsolationHttpHost
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                 services.AddSingleton<IStartupFilter>(new IsolationPrincipalStartupFilter(CrossTenantLeakageCorpus.BoundTenant));
                 services.AddSingleton<IGovernedOperationProjectionStore>(projectionStore);
                 services.AddSingleton<IOperationStatusStore>(statusStore);
@@ -304,7 +305,7 @@ internal static class IsolationHttpHost
                             new(ParticipantAuthorizationStage.ProjectOwnerClaim, ProjectScopeFor(effectiveTenantId)),
                         ],
                     };
-                    context.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
+                    context.User = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
                     await continuation().ConfigureAwait(false);
                 });
                 next(app);

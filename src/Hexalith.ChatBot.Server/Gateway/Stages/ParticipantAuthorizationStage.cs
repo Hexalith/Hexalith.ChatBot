@@ -1,6 +1,9 @@
 using System.Security.Claims;
 using System.Text.Json;
 
+using Hexalith.ChatBot.Server.Authentication;
+using Hexalith.ChatBot.Server.Authorization;
+
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
@@ -19,7 +22,8 @@ internal sealed class ParticipantAuthorizationStage(
     ICommandCapabilityControlStateProvider? commandCapabilityControlStateProvider = null,
     ISystemClock? clock = null,
     ICommandCapabilityRateLimitProvider? rateLimitProvider = null,
-    ICommandCapabilityCommandHistory? commandHistory = null) : IAuthorizationStage
+    ICommandCapabilityCommandHistory? commandHistory = null,
+    ChatBotRequestAuthorizer? requestAuthorizer = null) : IAuthorizationStage
 {
     private readonly IAssociationCorrectionDependencyReadiness _correctionDependencyReadiness =
         correctionDependencyReadiness ?? new StaticAssociationCorrectionDependencyReadiness(AssociationCorrectionDependencyReadinessStatus.Ready);
@@ -91,6 +95,24 @@ internal sealed class ParticipantAuthorizationStage(
         ArgumentNullException.ThrowIfNull(actor);
         ArgumentNullException.ThrowIfNull(tenantBinding);
         cancellationToken.ThrowIfCancellationRequested();
+
+        // Direct stage invocation also fails closed; production admission supplies this already-proven principal.
+        if (actor.Principal is not ChatBotAuthorityPrincipal)
+        {
+            if (!ChatBotRequestContextResolver.TryResolve(actor.Principal, submission.Origin, out ChatBotRequestContext? context, out _) || context?.TenantId != tenantBinding.TenantId)
+            {
+                return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+            }
+
+            ChatBotRequestAuthorizer authorizer = requestAuthorizer ?? new ChatBotRequestAuthorizer(new ChatBotAuthorityCatalog(), new UnavailableChatBotOwnerAuthorityProvider(), _clock, new ServiceClientGrantProjectionCache(_clock));
+            ChatBotAuthorityDecision decision = await authorizer.AuthorizeAsync(context, submission.Request.CommandType ?? string.Empty, false, submission.Request.Command, cancellationToken).ConfigureAwait(false);
+            if (!decision.IsAllowed)
+            {
+                return ChatBotAuthorizationResult.Denied(decision.ReasonCode);
+            }
+
+            actor = actor with { Principal = decision.Principal!, RequestContext = context };
+        }
 
         // Story 7.21/7.22 (FR74): a disabled OR quarantined command CAPABILITY (command TYPE) fails closed for EVERY
         // actor — human, service, and AI — at this actor-agnostic seam, BEFORE the grant validator (which runs only
@@ -2509,27 +2531,14 @@ internal sealed class ParticipantAuthorizationStage(
 
     private static bool CanCorrectAssociation(ClaimsPrincipal principal, object? command)
     {
-        if (!principal.HasClaim(ActorTypeClaim, HumanActorValue))
+        if (principal is not ChatBotAuthorityPrincipal authority || authority.Context.ActorClass != HumanActorValue)
         {
             return false;
         }
 
         (string? PriorProjectId, string? TargetProjectId) projects = CorrectionProjects(command);
-        if (string.IsNullOrWhiteSpace(projects.PriorProjectId) ||
-            string.IsNullOrWhiteSpace(projects.TargetProjectId))
-        {
-            return false;
-        }
-
-        string[] ownedProjects = principal
-            .FindAll(ProjectOwnerClaim)
-            .Select(static claim => claim.Value)
-            .Where(static value => !string.IsNullOrWhiteSpace(value))
-            .ToArray();
-
-        return ownedProjects.Contains("*", StringComparer.Ordinal) ||
-            (ownedProjects.Contains(projects.PriorProjectId, StringComparer.Ordinal) &&
-                ownedProjects.Contains(projects.TargetProjectId, StringComparer.Ordinal));
+        return projects.PriorProjectId is not null && projects.TargetProjectId is not null &&
+            authority.HasProject(projects.PriorProjectId) && authority.HasProject(projects.TargetProjectId);
     }
 
     private static (string? PriorProjectId, string? TargetProjectId) CorrectionProjects(object? command)

@@ -57,21 +57,21 @@ public static class TenantExportAuthorizationPolicyTests
     }
 
     private static ClaimsPrincipal ProjectOwner(string role, params string[] projects)
-        => new(new ClaimsIdentity(
+        => Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "actor-alpha"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, "human"),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
                 .. projects.Select(static project => new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, project)),
             ],
-            "test"));
+            "test")));
 
     private static ClaimsPrincipal Actor(string actorType, string role)
-        => new(new ClaimsIdentity(
+        => Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "actor-alpha"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, actorType),
                 new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
             ],
-            "test"));
+            "test")));
 }

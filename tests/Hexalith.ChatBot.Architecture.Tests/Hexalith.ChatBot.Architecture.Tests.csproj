@@ -39,4 +39,7 @@
     <PackageReference Include="Hexalith.EventStore.Client" />
     <PackageReference Include="Hexalith.EventStore.DomainService" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\TrustedAuthority\*.cs" Link="TrustedAuthority\%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

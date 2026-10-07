@@ -1,3 +1,5 @@
+using Hexalith.ChatBot.Server.Authentication;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Adapters.Conversations;
 using Hexalith.ChatBot.Server.Adapters.Folders;
@@ -69,6 +71,13 @@ internal static class CommandGatewayServiceCollectionExtensions
     public static IServiceCollection AddChatBotCommandGateway(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+        services.AddHttpContextAccessor();
+        services.TryAddSingleton<ChatBotAuthorityCatalog>();
+        services.TryAddSingleton<ServiceClientGrantProjectionCache>();
+        services.TryAddScoped<ChatBotRequestContextResolver>();
+        services.TryAddScoped<IChatBotOwnerAuthorityProvider, UnavailableChatBotOwnerAuthorityProvider>();
+        services.TryAddScoped<ChatBotRequestAuthorizer>();
+
 
         // The section MUST be bound: without it the validator only ever sees the disabled defaults, the named section
         // is never read, and a deployment that sets ChatBot:LiveRecoveryValidation:Enabled=true (or a Production

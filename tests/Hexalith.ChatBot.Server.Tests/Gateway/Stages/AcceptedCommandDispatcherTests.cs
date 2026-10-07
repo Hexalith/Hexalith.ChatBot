@@ -1659,7 +1659,7 @@ public sealed class AcceptedCommandDispatcherTests
         string? taskId = TaskId,
         string commandType = nameof(RecordGovernedNote))
     {
-        ClaimsPrincipal principal = new(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test"));
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test")));
         ChatBotCommandSubmission submission = new(
             principal,
             new CommandSubmissionRequest
@@ -1851,7 +1851,7 @@ public sealed class AcceptedCommandDispatcherTests
         Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedOutboundDraft command,
         string tenant = Tenant)
     {
-        ClaimsPrincipal principal = new(new ClaimsIdentity(
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "actor-alpha"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
@@ -1862,7 +1862,7 @@ public sealed class AcceptedCommandDispatcherTests
                 new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundSendAuthorityEvaluator.MailboxOwnerClaim, "mailbox-001"),
                 new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundSendAuthorityEvaluator.OwnMailboxMailSendClaim, "true"),
             ],
-            "test"));
+            "test")));
         ChatBotCommandSubmission submission = new(
             principal,
             new CommandSubmissionRequest
@@ -1885,7 +1885,7 @@ public sealed class AcceptedCommandDispatcherTests
         string tenant,
         string replayRunId)
     {
-        ClaimsPrincipal principal = new(new ClaimsIdentity(
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "actor-alpha"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
@@ -1896,7 +1896,7 @@ public sealed class AcceptedCommandDispatcherTests
                 new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundSendAuthorityEvaluator.MailboxOwnerClaim, "mailbox-001"),
                 new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundSendAuthorityEvaluator.OwnMailboxMailSendClaim, "true"),
             ],
-            "test"));
+            "test")));
         ChatBotCommandSubmission submission = new(
             principal,
             new CommandSubmissionRequest
@@ -1936,7 +1936,7 @@ public sealed class AcceptedCommandDispatcherTests
         Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft command,
         string tenant = Tenant)
     {
-        ClaimsPrincipal principal = new(new ClaimsIdentity(
+        ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim("sub", "actor-alpha"),
                 new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
@@ -1944,7 +1944,7 @@ public sealed class AcceptedCommandDispatcherTests
                 new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundDraftAuthorityEvaluator.ProjectScopeClaim, "project-001:outbound-draft"),
                 new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundDraftAuthorityEvaluator.TenantOutboundPolicyClaim, "draft-only"),
             ],
-            "test"));
+            "test")));
         ChatBotCommandSubmission submission = new(
             principal,
             new CommandSubmissionRequest

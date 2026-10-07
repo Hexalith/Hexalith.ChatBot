@@ -32,4 +32,7 @@
     <PackageReference Include="Hexalith.Parties.Contracts" />
     <PackageReference Include="Hexalith.Projects.Client" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\TrustedAuthority\*.cs" Link="TrustedAuthority\%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

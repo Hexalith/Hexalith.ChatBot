@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Status;
@@ -36,7 +37,8 @@ internal sealed class CommandGateway(
         IChatBotProblemDetailsFactory problemDetailsFactory,
         ISpineCommandAllowlist commandAllowlist,
         IChatBotMetrics? metrics = null,
-        IAuthorizationFailureCounter? authorizationFailureCounter = null)
+        IAuthorizationFailureCounter? authorizationFailureCounter = null,
+        ChatBotRequestAuthorizer? requestAuthorizer = null)
         : this(
             new ChatBotCommandAdmissionPipeline(
                 authentication,
@@ -52,6 +54,7 @@ internal sealed class CommandGateway(
                 clock,
                 lifecycleTransitionGuard,
                 commandAllowlist,
+                requestAuthorizer ?? new ChatBotRequestAuthorizer(new ChatBotAuthorityCatalog(), new UnavailableChatBotOwnerAuthorityProvider(), clock, new ServiceClientGrantProjectionCache(clock)),
                 metrics,
                 authorizationFailureCounter),
             idempotencyStore,

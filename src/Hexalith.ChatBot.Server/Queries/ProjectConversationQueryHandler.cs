@@ -1,13 +1,14 @@
-using System.Security.Claims;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Audit;
-using Hexalith.ChatBot.Server.Gateway;
-using Hexalith.ChatBot.Server.Gateway.Status;
+using Hexalith.ChatBot.Server.Authentication;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Gateway.Status;
+using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Projections;
@@ -18,16 +19,18 @@ using Hexalith.EventStore.DomainService;
 namespace Hexalith.ChatBot.Server.Queries;
 
 internal sealed class ProjectConversationQueryHandler(
+    ChatBotRequestContextResolver requestContextResolver,
+    ChatBotRequestAuthorizer requestAuthorizer,
     IProjectConversationProjectionStore projectionStore,
     IProjectAiContextPackageAssembler aiContextPackageAssembler,
     IQueryCursorCodec cursorCodec)
-    : ChatBotReadQueryHandler<ProjectConversationQuery>
+    : ChatBotReadQueryHandler<ProjectConversationQuery>(requestContextResolver, requestAuthorizer)
 {
     public override string QueryType => ChatBotReadQueryTypes.ProjectConversation;
 
-    protected override async Task<QueryResult> ExecuteAsync(QueryEnvelope query, ProjectConversationQuery request, CancellationToken cancellationToken)
+    protected override async Task<QueryResult> ExecuteAsync(QueryEnvelope query, ProjectConversationQuery request, ChatBotAuthorityPrincipal principal, CancellationToken cancellationToken)
     {
-        if (!AuditMetadata.IsSafeStableIdentifier(request.ProjectId) || !request.ProjectReadAuthorized)
+        if (!AuditMetadata.IsSafeStableIdentifier(request.ProjectId))
         {
             return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);
         }
@@ -54,11 +57,6 @@ internal sealed class ProjectConversationQueryHandler(
                 new ProjectAiContextPackageAssemblyRequest(query.TenantId, request.ProjectId, aiContextPackageItems, query.CorrelationId),
                 cancellationToken)
             .ConfigureAwait(false);
-
-        if (page.Items.Count == 0 && !request.HasProjectScopeClaims)
-        {
-            return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);
-        }
 
         string? nextCursor = ChatBotReadQueryResultMapper.EncodeNextCursor(
             page,
