@@ -263,7 +263,8 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
         string? afterKey,
         int maximumCount,
         CancellationToken cancellationToken,
-        string? tenantId = null)
+        string? tenantId = null,
+        Func<bool>? authorityIsCurrent = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<AiExecutionWorkItem> items = _items.Values
@@ -275,11 +276,12 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
         return ValueTask.FromResult(items);
     }
 
-    public ValueTask<bool> RecoverExhaustedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken, string? tenantId = null)
+    public ValueTask<bool> RecoverExhaustedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken, string? tenantId = null, Func<bool>? authorityIsCurrent = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         while (_items.TryGetValue(key, out AiExecutionWorkItem? current))
         {
+            if (authorityIsCurrent is not null && !authorityIsCurrent()) { return ValueTask.FromResult(false); }
             if (current.Status is not AiExecutionWorkStatus.Exhausted || (tenantId is not null && current.TenantId != tenantId))
             {
                 return ValueTask.FromResult(false);

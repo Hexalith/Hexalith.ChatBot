@@ -54,13 +54,16 @@ public sealed class TrustedAuthorityReviewTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ProductionMachineAdmissionAndAuditUseOwnerGrantInsteadOfCallerLabels(bool fakeTokenGrant)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task ProductionMachineAdmissionAndAuditUseOwnerGrantInsteadOfCallerLabels(bool fakeTokenGrant, bool longReferences)
     {
         TrustedAuthorityClock clock = new();
-        SyntheticOwnerAuthorityProvider owner = new(clock) { Transform = static evidence => evidence.ServiceGrant is { } grant
-            ? evidence with { EvidenceId = "machine-owner-evidence", Version = "owner-version", ServiceGrant = grant with { GrantId = "owner-only-v2", Scopes = ["owner-exact"] } } : evidence };
+        string evidenceId = longReferences ? new string('e', 200) : "machine-owner-evidence";
+        string evidenceVersion = longReferences ? new string('v', 200) : "owner-version";
+        SyntheticOwnerAuthorityProvider owner = new(clock) { Transform = evidence => evidence.ServiceGrant is { } grant
+            ? evidence with { EvidenceId = evidenceId, Version = evidenceVersion, ServiceGrant = grant with { GrantId = "owner-only-v2", Scopes = ["owner-exact"] } } : evidence };
         InMemoryAuditWriter audit = new();
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
@@ -85,10 +88,11 @@ public sealed class TrustedAuthorityReviewTests
             }, "correlation-alpha", null, ChatBotSurfaceOrigin.Api), TestContext.Current.CancellationToken);
         decision.IsAccepted.ShouldBeTrue(decision.ReasonCode);
         decision.Context!.ServiceClientGrantEvidence!.GrantId.ShouldBe("owner-only-v2");
-        decision.Context.AuthorityEvidenceReferences!.ShouldContain("ChatBot:machine-owner-evidence:owner-version");
+        decision.Context.AuthorityEvidenceReferences!.ShouldContain($"ChatBot:{evidenceId}:{evidenceVersion}");
         AuditEnvelope envelope = audit.Envelopes.ShouldHaveSingleItem();
         envelope.ActorType.ShouldBe("service");
         envelope.SourceEvidenceRefs.ShouldContain("grant:owner-only-v2");
+        envelope.SourceEvidenceRefs.ShouldContain($"ChatBot:{evidenceId}:{evidenceVersion}");
         envelope.SourceEvidenceRefs.ShouldContain("grant-scope:owner-exact");
         string.Join('|', envelope.SourceEvidenceRefs).ShouldNotContain("token-forged-grant");
         decision.Context.Actor.Principal.Claims.ShouldNotContain(static claim => claim.Type == ClaimsServiceClientGrantResolver.GrantScopeClaim);

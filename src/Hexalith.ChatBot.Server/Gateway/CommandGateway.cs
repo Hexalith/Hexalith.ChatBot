@@ -124,7 +124,7 @@ internal sealed class CommandGateway(
         if (context.Actor.Principal is Hexalith.ChatBot.Server.Authorization.ChatBotAuthorityPrincipal authority && !authority.IsCurrent(clock.UtcNow))
         {
             await AbortSafelyAsync(idempotency, cancellationToken).ConfigureAwait(false);
-            return Denied(ChatBotCommandAdmissionDecision.Rejected(ChatBotAuthorizationReasonCodes.AuthorizationDenied, submission.CorrelationId, submission.TaskId));
+            return Denied(await admission.RejectAuthorityLapseAsync(context, cancellationToken).ConfigureAwait(false));
         }
 
         context.SetPreparedAcceptedAt(response.AcceptedAt);
@@ -156,7 +156,7 @@ internal sealed class CommandGateway(
         if (context.Actor.Principal is Hexalith.ChatBot.Server.Authorization.ChatBotAuthorityPrincipal preparedAuthority && !preparedAuthority.IsCurrent(clock.UtcNow))
         {
             await AbortUndispatchedIndependentlyAsync(idempotency, response).ConfigureAwait(false);
-            return Denied(ChatBotCommandAdmissionDecision.Rejected(ChatBotAuthorizationReasonCodes.AuthorizationDenied, submission.CorrelationId, submission.TaskId));
+            return Denied(await admission.RejectAuthorityLapseAsync(context, cancellationToken).ConfigureAwait(false));
         }
 
         ChatBotDispatchResult dispatchResult;
@@ -164,6 +164,11 @@ internal sealed class CommandGateway(
         {
             cancellationToken.ThrowIfCancellationRequested();
             dispatchResult = await dispatcher.DispatchAsync(context, cancellationToken).ConfigureAwait(false);
+        }
+        catch (ChatBotAuthorityLapsedException) when (!context.ExternalEffectAttempted)
+        {
+            await AbortUndispatchedIndependentlyAsync(idempotency, response).ConfigureAwait(false);
+            return Denied(await admission.RejectAuthorityLapseAsync(context, cancellationToken).ConfigureAwait(false));
         }
         catch (OperationCanceledException)
         {

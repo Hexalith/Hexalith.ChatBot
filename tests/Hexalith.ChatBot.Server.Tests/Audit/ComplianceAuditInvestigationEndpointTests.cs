@@ -317,6 +317,48 @@ public sealed class ComplianceAuditInvestigationEndpointTests
         owner.Requests.Where(static request => request.Owner == "Projects").ShouldAllBe(static request => request.RequireCurrent);
     }
 
+    /// <summary>Current project grants do not extend expired compliance or tenant-owner authority.</summary>
+    [Theory]
+    [InlineData("ChatBot")]
+    [InlineData("Tenants")]
+    public async Task DetailRestrictsWhenComplianceOwnerEvidenceExpiresDuringProjectChecks(string expiringOwner)
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock)
+        {
+            Transform = evidence =>
+            {
+                if (evidence.Request.Owner == expiringOwner) { return evidence with { ExpiresAt = clock.UtcNow.AddSeconds(1) }; }
+                if (evidence.Request.Owner == "Projects")
+                {
+                    clock.UtcNow += TimeSpan.FromSeconds(2);
+                    return evidence with { ObservedAt = clock.UtcNow, RevocationCheckedAt = clock.UtcNow, ExpiresAt = clock.UtcNow.AddMinutes(5) };
+                }
+                return evidence;
+            },
+        };
+        using WebApplicationFactory<Program> factory = ComplianceFactory("tenant-alpha").WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<ISystemClock>(clock);
+            services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
+        }));
+        using HttpClient client = factory.CreateClient();
+        AuditEnvelope envelope = Envelope("tenant-alpha", "audit-record-expiring-compliance") with { SourceEvidenceRefs = ["project:restricted-project", "source-message:restricted-sentinel"] };
+        await SeedAsync(factory.Services.GetRequiredService<IWormAuditStore>(), envelope);
+        using HttpResponseMessage response = await client.SendAsync(DetailRequest(envelope.ResourceId), TestContext.Current.CancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using JsonDocument detail = JsonDocument.Parse(body);
+        detail.RootElement.GetProperty("redactionState").GetString().ShouldBe("escalation-required");
+        detail.RootElement.GetProperty("redactionReasonCode").GetString().ShouldBe("restricted-detail");
+        detail.RootElement.GetProperty("safeNextAction").GetString().ShouldBe("request-access");
+        detail.RootElement.GetProperty("visibleMetadataRefs").EnumerateArray().ShouldBeEmpty();
+        body.ShouldNotContain("restricted-project");
+        body.ShouldNotContain("restricted-sentinel");
+        owner.Requests.ShouldContain(request => request.Owner == expiringOwner);
+        owner.Requests.ShouldContain(static request => request.Owner == "Projects" && request.RequireCurrent);
+    }
+
     private static async Task SeedAsync(IWormAuditStore store, AuditEnvelope envelope)
         => await store.AppendAsync(envelope, CancellationToken.None);
 

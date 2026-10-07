@@ -150,28 +150,6 @@ internal sealed class ParticipantAuthorizationStage(
             return grantResult;
         }
 
-        string[] authorities = actor.Principal
-            .FindAll(ParticipantAuthorityClaim)
-            .Select(static claim => claim.Value)
-            .Where(static value => !string.IsNullOrWhiteSpace(value))
-            .ToArray();
-
-        if (authorities.Contains(DirectoryDegradedValue, StringComparer.Ordinal))
-        {
-            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ParticipantDirectoryDegraded);
-        }
-
-        if (authorities.Contains(UnresolvedValue, StringComparer.Ordinal))
-        {
-            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.UnresolvedParticipant);
-        }
-
-        if (authorities.Contains(EmailOnlyValue, StringComparer.Ordinal) ||
-            authorities.Contains(UnauthorizedValue, StringComparer.Ordinal))
-        {
-            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.UnauthorizedParticipant);
-        }
-
         if (string.Equals(submission.Request.CommandType, nameof(SetAssociationConfidenceThresholds), StringComparison.Ordinal) &&
             !AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy))
         {
@@ -228,7 +206,7 @@ internal sealed class ParticipantAuthorizationStage(
         }
 
         // FR74 AI-actor disable is gated on the policy-admin scope (not tenant-admin): AI-action governance is the
-        // policy-admin's domain (Story 7.2). A tenant-admin still passes via the FR75a scope union. Service/AI
+        // policy-admin's domain (Story 7.2). The owner must grant this exact scope. Service/AI
         // actors are denied by HasHumanAdminScope's human-actor gate.
         if (string.Equals(submission.Request.CommandType, nameof(SubmitAiActorDisable), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
@@ -245,8 +223,7 @@ internal sealed class ParticipantAuthorizationStage(
         }
 
         // Story 7.21 FR74 command-capability disable is gated on the policy-admin scope (the "security engineer"
-        // persona maps to AdminScope.Policy — there is no AdminScope.Security). A tenant-admin still passes via the
-        // FR75a scope union. Service/AI actors are denied by HasHumanAdminScope's human-actor gate. The validators
+        // persona maps to AdminScope.Policy — there is no AdminScope.Security). The owner must grant this exact scope. Service/AI actors are denied by HasHumanAdminScope's human-actor gate. The validators
         // enforce safe tokens, the Active->Disabled state shape, the distinct-approver rule on the approval, and the
         // self-lockout guard (reject a ref naming an FR74 governance command).
         if (string.Equals(submission.Request.CommandType, nameof(SubmitCommandCapabilityDisable), StringComparison.Ordinal) &&
@@ -265,7 +242,7 @@ internal sealed class ParticipantAuthorizationStage(
 
         // Story 7.24 FR74 outbound-channel disable is gated on the policy-admin scope identically to the
         // command-capability disable pair above (the "policy administrator" persona maps to AdminScope.Policy — there
-        // is no AdminScope.Security). A tenant-admin still passes via the FR75a scope union. Service/AI actors are
+        // is no AdminScope.Security). The owner must grant this exact scope. Service/AI actors are
         // denied by HasHumanAdminScope's human-actor gate. The validators enforce safe tokens (the channel ref is a
         // SafeStableIdentifier), the Active->Disabled state shape, and the distinct-approver rule on the approval.
         // Divergence from 7.21: there is NO self-lockout guard / Fr74GovernanceCommandTypes membership check — the
@@ -308,7 +285,7 @@ internal sealed class ParticipantAuthorizationStage(
         // SubmitCommandCapabilityRateLimit gating shape and the 7.24/7.25 outbound-channel subject). Outbound-channel
         // governance is a security-sensitive policy concern, so gate on HasHumanAdminScope(AdminScope.Policy) — the same
         // scope as the disable/quarantine pairs (the "policy administrator" persona maps to AdminScope.Policy; there is
-        // no AdminScope.Security). A tenant-admin still passes via the FR75a scope union. Service/AI actors are denied by
+        // no AdminScope.Security). The owner must grant this exact scope. Service/AI actors are denied by
         // HasHumanAdminScope's human-actor gate. There is NO approver/distinct-approver guard (single actor). Unlike the
         // 7.23 command-capability rate-limit, there is NO self-lockout guard and the command is NOT added to
         // Fr74GovernanceCommandTypes — the subject is an outbound channel, not a governance command type, so rate-limiting
@@ -324,8 +301,7 @@ internal sealed class ParticipantAuthorizationStage(
         }
 
         // Story 7.22 FR74 command-capability quarantine is gated on the policy-admin scope identically to the disable
-        // pair above (the "security engineer" persona maps to AdminScope.Policy — there is no AdminScope.Security). A
-        // tenant-admin still passes via the FR75a scope union. Service/AI actors are denied by HasHumanAdminScope's
+        // pair above (the "security engineer" persona maps to AdminScope.Policy — there is no AdminScope.Security). The owner must grant this exact scope. Service/AI actors are denied by HasHumanAdminScope's
         // human-actor gate. The validators enforce safe tokens, the Active->Quarantined state shape, the
         // distinct-approver rule on the approval, and the self-lockout guard (reject a ref naming an FR74 governance
         // command — including the two quarantine commands themselves).
@@ -345,7 +321,7 @@ internal sealed class ParticipantAuthorizationStage(
 
         // FR74 AI-actor quarantine is gated on the policy-admin scope (not tenant-admin), exactly like the disable
         // pair above and unlike the 7.16 service-client quarantine: AI-action governance is the policy-admin's domain
-        // (Story 7.2). A tenant-admin still passes via the FR75a scope union. Service/AI actors are denied by
+        // (Story 7.2). The owner must grant this exact scope. Service/AI actors are denied by
         // HasHumanAdminScope's human-actor gate.
         if (string.Equals(submission.Request.CommandType, nameof(SubmitAiActorQuarantine), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
@@ -388,8 +364,7 @@ internal sealed class ParticipantAuthorizationStage(
 
         // Story 7.20: AI-actor rate-limit is a single-actor standard policy mutation (mirror SubmitServiceClientRateLimit) —
         // but AI-action governance is the policy-admin's domain (Story 7.2), so gate on HasHumanAdminScope(AdminScope.Policy)
-        // (the AI-actor disable/quarantine divergence), NOT HasHumanTenantAdmin. A tenant-admin still passes via the FR75a
-        // scope union. No approver/distinct-approver guard. Service/AI actors are denied via the human-actor gate inside
+        // (the AI-actor disable/quarantine divergence), NOT HasHumanTenantAdmin. The owner must grant this exact scope. No approver/distinct-approver guard. Service/AI actors are denied via the human-actor gate inside
         // HasHumanAdminScope.
         if (string.Equals(submission.Request.CommandType, nameof(SubmitAiActorRateLimit), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
@@ -401,7 +376,7 @@ internal sealed class ParticipantAuthorizationStage(
         // Story 7.23: command-capability rate-limit is a single-actor standard policy mutation (mirror
         // SubmitAiActorRateLimit) — command-capability/command-allowlist governance is a security-sensitive policy
         // concern, so gate on HasHumanAdminScope(AdminScope.Policy) (the same scope as the 7.21/7.22 disable/quarantine
-        // pairs). A tenant-admin still passes via the FR75a scope union. No approver/distinct-approver guard. Service/AI
+        // pairs). The owner must grant this exact scope. No approver/distinct-approver guard. Service/AI
         // actors are denied via the human-actor gate inside HasHumanAdminScope. The validator enforces safe tokens,
         // bounds, a known schema version, AND the self-lockout guard (reject a CommandCapabilityRef naming an FR74
         // governance command, including the rate-limit command itself).
@@ -593,7 +568,7 @@ internal sealed class ParticipantAuthorizationStage(
 
         // Story 7.23: command-capability rate-limit is the FINAL admission gate — placed after EVERY prior check
         // (the top-of-stage Disabled/Quarantined control-state switch, the grant validator, and the
-        // participant-authority + per-command admin-scope branches) so only otherwise-fully-admissible commands count
+        // per-command owner-granted admin-scope branches) so only otherwise-fully-admissible commands count
         // against the budget and a disabled/quarantined/under-scoped/unauthorized command keeps its precise reason
         // (rate-limit never masks a security denial). It is the 7.20 "final gate" doctrine relocated to this
         // actor-agnostic stage so a HUMAN submission of the rate-limited command TYPE is throttled too. The FR74
@@ -2580,8 +2555,7 @@ internal sealed class ParticipantAuthorizationStage(
             .Select(static claim => claim.Value)
             .Where(static value => !string.IsNullOrWhiteSpace(value))
             .ToArray();
-        return projectClaims.Contains("*", StringComparer.Ordinal) ||
-            projectClaims.Contains(projectId, StringComparer.Ordinal);
+        return projectId != "*" && projectClaims.Contains(projectId, StringComparer.Ordinal);
     }
 
     private static string? CommandProjectId(object? command)

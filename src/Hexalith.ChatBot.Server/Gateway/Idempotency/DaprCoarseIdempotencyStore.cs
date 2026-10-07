@@ -403,7 +403,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         {
             identityStored = await EnsureIdentityOutcomeAsync(metadata.IdentityKeyHash, metadata, stored, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (exception is not OperationCanceledException and not ChatBotAuthorityLapsedException)
         {
             firstFailure = exception;
         }
@@ -414,7 +414,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             {
                 receiptStored = await EnsureDomainReceiptAsync(receiptKey, metadata, stored, cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (Exception exception) when (exception is not OperationCanceledException and not ChatBotAuthorityLapsedException)
             {
                 firstFailure ??= exception;
             }
@@ -424,7 +424,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
         {
             domainStored = await EnsurePrimaryDomainOutcomeAsync(metadata, stored, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (exception is not OperationCanceledException and not ChatBotAuthorityLapsedException)
         {
             firstFailure ??= exception;
         }
@@ -576,12 +576,19 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             reservation.CreatedAt == metadata.CreatedAt;
 
     /// <summary>Reconciles a post-dispatch, metadata-only receipt from the independent audit replay queue.</summary>
+    /// <summary>Restores an accepted receipt, optionally guarding each request-driven reconciliation state boundary.</summary>
     internal async ValueTask<bool> ReconcileOutcomeAsync(
         AuditReplayIntent intent,
         CancellationToken cancellationToken,
-        CoarseIdempotencyMetadata? retry = null)
+        CoarseIdempotencyMetadata? retry = null,
+        Func<bool>? authorityIsCurrent = null)
     {
         ArgumentNullException.ThrowIfNull(intent);
+        if (authorityIsCurrent is not null)
+        {
+            DaprCoarseIdempotencyStore guarded = new(new AuthorityBoundCoarseIdempotencyStateClient(_state, authorityIsCurrent), clock, _auditHistory, _eventStore);
+            return await guarded.ReconcileOutcomeAsync(intent, cancellationToken, retry).ConfigureAwait(false);
+        }
         if (intent.AcceptedOutcome is not { } outcome || intent.IdentityKeyHash is not { } identityKey ||
             intent.CoarseKeyHash is not { } domainKey ||
             intent.Kind != AuditReplayIntentKind.PostCommitAuditReconciliation)

@@ -30,7 +30,7 @@ using Shouldly;
 
 namespace Hexalith.ChatBot.Server.Tests.Lifecycle;
 
-public sealed class AiExecutionCoordinatorTests
+public sealed partial class AiExecutionCoordinatorTests
 {
     [ThreadStatic]
     private static bool _insideCancellationProjectionCall;
@@ -1184,6 +1184,14 @@ public sealed class AiExecutionCoordinatorTests
         private readonly Dictionary<string, object> _values = new(StringComparer.Ordinal);
         private readonly Dictionary<string, long> _versions = new(StringComparer.Ordinal);
         public List<string> ReadKeys { get; } = [];
+        /// <summary>Injects authority changes after a real durable read.</summary>
+        public Action<string>? AfterRead { get; set; }
+        /// <summary>Injects a failed CAS attempt without altering persisted contents.</summary>
+        public Func<string, bool>? RejectSave { get; set; }
+        /// <summary>Injects authority changes after a successful irreversible write.</summary>
+        public Action<string>? AfterSave { get; set; }
+        /// <summary>Records attempted compare-and-save boundaries.</summary>
+        public List<string> SaveAttempts { get; } = [];
 
         public Task<ReadModelEntry<TValue>> GetAsync<TValue>(
             string storeName,
@@ -1195,6 +1203,7 @@ public sealed class AiExecutionCoordinatorTests
             lock (_gate)
             {
                 ReadKeys.Add(key);
+                AfterRead?.Invoke(key);
                 return Task.FromResult(_values.TryGetValue(key, out object? value)
                     ? new ReadModelEntry<TValue>((TValue)value, _versions[key].ToString(System.Globalization.CultureInfo.InvariantCulture))
                     : new ReadModelEntry<TValue>(null, null));
@@ -1229,6 +1238,8 @@ public sealed class AiExecutionCoordinatorTests
             cancellationToken.ThrowIfCancellationRequested();
             lock (_gate)
             {
+                SaveAttempts.Add(key);
+                if (RejectSave?.Invoke(key) == true) { return Task.FromResult(false); }
                 string current = _versions.TryGetValue(key, out long version)
                     ? version.ToString(System.Globalization.CultureInfo.InvariantCulture)
                     : string.Empty;
@@ -1239,6 +1250,7 @@ public sealed class AiExecutionCoordinatorTests
 
                 _values[key] = value;
                 _versions[key] = version + 1;
+                AfterSave?.Invoke(key);
                 return Task.FromResult(true);
             }
         }

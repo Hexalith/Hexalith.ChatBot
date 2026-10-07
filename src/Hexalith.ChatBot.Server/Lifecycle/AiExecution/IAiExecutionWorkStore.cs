@@ -60,11 +60,14 @@ internal interface IAiExecutionWorkStore
         string reason,
         CancellationToken cancellationToken);
 
+    /// <summary>Lists tenant-scoped exhausted work with an optional internal retained-authority guard.</summary>
     ValueTask<IReadOnlyList<AiExecutionWorkItem>> ListExhaustedAsync(
         string? afterKey,
         int maximumCount,
         CancellationToken cancellationToken,
-        string? tenantId = null);
+        string? tenantId = null,
+        Func<bool>? authorityIsCurrent = null);
 
-    ValueTask<bool> RecoverExhaustedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken, string? tenantId = null);
+    /// <summary>Guards each recovery attempt before persisting the reset; successful writes retain their result.</summary>
+    ValueTask<bool> RecoverExhaustedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken, string? tenantId = null, Func<bool>? authorityIsCurrent = null);
 }

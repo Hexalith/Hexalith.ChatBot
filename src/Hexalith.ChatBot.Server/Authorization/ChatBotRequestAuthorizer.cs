@@ -30,7 +30,7 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
     }
 
     /// <summary>Collects current project evidence and jointly validates its complete set before disclosure.</summary>
-    public async ValueTask<bool> HasProjectAuthoritiesAsync(ChatBotRequestContext context, IEnumerable<string> projects, string operation, CancellationToken cancellationToken)
+    public async ValueTask<bool> HasProjectAuthoritiesAsync(ChatBotRequestContext context, IEnumerable<string> projects, string operation, CancellationToken cancellationToken, Func<bool>? authorityIsCurrent = null)
     {
         string[] exactProjects = projects.Distinct(StringComparer.Ordinal).ToArray();
         if (context.TenantId is null || exactProjects.Length == 0 || exactProjects.Any(static project => !AuditMetadata.IsSafeStableIdentifier(project) || project == "*") || catalog.Find(operation, true) is null)
@@ -42,13 +42,14 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
         List<ChatBotOwnerAuthorityEvidence> evidence = [];
         foreach (string project in exactProjects)
         {
+            if (authorityIsCurrent is not null && !authorityIsCurrent()) { return false; }
             ChatBotOwnerAuthorityEvidence? current = await GetEvidenceAsync(Request(context, "Projects", project, operation, "project", true), started, cancellationToken).ConfigureAwait(false);
             if (current is null) { return false; }
             evidence.Add(current);
         }
 
         DateTimeOffset decidedAt = clock.UtcNow;
-        return evidence.All(item => IsValidEvidence(item, item.Request, started, decidedAt));
+        return (authorityIsCurrent is null || authorityIsCurrent()) && evidence.All(item => ValidateEvidence(item, item.Request, started, decidedAt));
     }
 
     /// <summary>Checks the closed operation row and every bound owner scope.</summary>
@@ -95,6 +96,18 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
         [
             Request(context, "ChatBot", resource!, operation, row.AdminScope is null ? "operation" : $"admin:{row.AdminScope}", !isQuery),
         ];
+        if (!isQuery && ChatBotCanonicalDispatchTarget.IsSupported(operation))
+        {
+            if (!ChatBotCanonicalDispatchTarget.TryResolve(operation, json, out string? target))
+            {
+                return Denied(operation);
+            }
+
+            if (!string.Equals(target, resource, StringComparison.Ordinal))
+            {
+                requests.Add(Request(context, "ChatBot", target!, operation, "operation", true));
+            }
+        }
         if (operation == nameof(Hexalith.ChatBot.Contracts.Commands.RequestFailedWorkflowRetry))
         {
             string? failedEvent = ReadString(json, "FailedEventId");
@@ -118,6 +131,10 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
         }
 
         CollectReferences(json, ["ProjectId", "ProjectRef", "TargetProjectId", "PriorProjectId", "ProjectScopeRef", "ProjectIds", "ProjectRefs", "ProjectScopeRefs"], projects);
+        List<string> affectedResources = [];
+        CollectReferences(json, ["AffectedResourceReferences"], affectedResources);
+        projects.AddRange(affectedResources.Where(static reference => reference.StartsWith("project:", StringComparison.Ordinal))
+            .Select(static reference => reference["project:".Length..]));
         if (row.RequiresProject && projects.Count == 0)
         {
             return Denied(operation);
@@ -176,7 +193,7 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
         }
 
         DateTimeOffset decidedAt = clock.UtcNow;
-        if (collectedEvidence.Any(item => !IsValidEvidence(item.Evidence, item.Evidence.Request, item.Started, decidedAt) ||
+        if (collectedEvidence.Any(item => !ValidateEvidence(item.Evidence, item.Evidence.Request, item.Started, decidedAt) ||
             (item.Evidence.ServiceGrant is { } grant && (grant.ExpiresAt <= decidedAt || grants.IsRevoked(item.Evidence.Request, grant.GrantId) || grants.PredatesClientRevocation(item.Evidence)))))
         {
             return Denied(operation);
@@ -206,7 +223,7 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
         DateTimeOffset started = clock.UtcNow;
         evidence ??= await GetEvidenceAsync(request, started, cancellationToken).ConfigureAwait(false);
         ServiceClientGrant? grant = evidence?.ServiceGrant;
-        if (evidence is null || grant is null || !IsValidEvidence(evidence, request, started, clock.UtcNow) ||
+        if (evidence is null || grant is null || !ValidateEvidence(evidence, request, started, clock.UtcNow) ||
             grant.ServiceClientId != context.ServiceClientId || !HasValidGrantMetadata(grant))
         {
             return ServiceClientGrantResolution.Denied(ChatBotAuthorizationReasonCodes.ServiceClientGrantMissing);
@@ -281,7 +298,21 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
             grants.InvalidateRevocation(request.TenantId, request.ResourceId, Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigins.ToWireValue(request.Origin), evidence!.ServiceGrant?.GrantId ?? string.Empty);
         }
 
-        return evidence is not null && IsValidEvidence(evidence, request, started, clock.UtcNow) ? evidence : null;
+        if (evidence is null)
+        {
+            ChatBotAuthorityLog.EvidenceRejected(logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<ChatBotRequestAuthorizer>.Instance, request.Owner, request.Operation, "absent");
+            return null;
+        }
+
+        return ValidateEvidence(evidence, request, started, clock.UtcNow) ? evidence : null;
+    }
+
+    private bool ValidateEvidence(ChatBotOwnerAuthorityEvidence evidence, ChatBotOwnerAuthorityRequest request, DateTimeOffset started, DateTimeOffset now)
+    {
+        string? reason = EvidenceRejectionReason(evidence, request, started, now);
+        if (reason is null) { return true; }
+        ChatBotAuthorityLog.EvidenceRejected(logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<ChatBotRequestAuthorizer>.Instance, request.Owner, request.Operation, reason);
+        return false;
     }
 
     private static bool HasValidGrantMetadata(ServiceClientGrant grant)
@@ -299,13 +330,24 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
 
     /// <summary>Checks the original request binding, observation, revocation freshness, and expiry bounds.</summary>
     internal static bool IsValidEvidence(ChatBotOwnerAuthorityEvidence evidence, ChatBotOwnerAuthorityRequest request, DateTimeOffset started, DateTimeOffset now)
-        => evidence.Request == request && evidence.IsAllowed && !evidence.IsRevoked &&
-            AuditMetadata.IsSafeStableIdentifier(evidence.EvidenceId) && !evidence.EvidenceId.Contains('@', StringComparison.Ordinal) &&
-            AuditMetadata.IsSafeStableIdentifier(evidence.Version) && !evidence.Version.Contains('@', StringComparison.Ordinal) &&
-            evidence.ObservedAt.Offset == TimeSpan.Zero && evidence.RevocationCheckedAt.Offset == TimeSpan.Zero && evidence.ExpiresAt.Offset == TimeSpan.Zero &&
-            evidence.ObservedAt <= now && evidence.RevocationCheckedAt <= now && evidence.RevocationCheckedAt >= evidence.ObservedAt &&
-            now - evidence.ObservedAt < TimeSpan.FromMinutes(5) && now - evidence.RevocationCheckedAt < TimeSpan.FromSeconds(60) &&
-            evidence.ExpiresAt > now && (!request.RequireCurrent || (evidence.ObservedAt >= started && evidence.RevocationCheckedAt >= started));
+        => EvidenceRejectionReason(evidence, request, started, now) is null;
+
+    private static string? EvidenceRejectionReason(ChatBotOwnerAuthorityEvidence evidence, ChatBotOwnerAuthorityRequest request, DateTimeOffset started, DateTimeOffset now)
+    {
+        if (evidence.Request != request) { return "request-mismatch"; }
+        if (!evidence.IsAllowed) { return "not-allowed"; }
+        if (evidence.IsRevoked) { return "revoked"; }
+        if (!AuditMetadata.IsSafeStableIdentifier(evidence.EvidenceId) || evidence.EvidenceId.Contains('@', StringComparison.Ordinal)) { return "invalid-evidence-reference"; }
+        if (!AuditMetadata.IsSafeStableIdentifier(evidence.Version) || evidence.Version.Contains('@', StringComparison.Ordinal)) { return "invalid-version-reference"; }
+        if (evidence.ObservedAt.Offset != TimeSpan.Zero || evidence.RevocationCheckedAt.Offset != TimeSpan.Zero || evidence.ExpiresAt.Offset != TimeSpan.Zero) { return "non-utc-timestamp"; }
+        if (evidence.ObservedAt > now || evidence.RevocationCheckedAt > now) { return "future-observation"; }
+        if (evidence.RevocationCheckedAt < evidence.ObservedAt) { return "invalid-revocation-order"; }
+        if (now - evidence.ObservedAt >= TimeSpan.FromMinutes(5)) { return "observation-expired"; }
+        if (now - evidence.RevocationCheckedAt >= TimeSpan.FromSeconds(60)) { return "revocation-expired"; }
+        if (evidence.ExpiresAt <= now) { return "evidence-expired"; }
+        if (request.RequireCurrent && (evidence.ObservedAt < started || evidence.RevocationCheckedAt < started)) { return "not-current"; }
+        return null;
+    }
 
     private static ChatBotOwnerAuthorityRequest Request(ChatBotRequestContext context, string owner, string resource, string operation, string authority, bool current)
         => new(owner, context.SubjectId, context.TenantId!, resource, operation, authority, context.ActorClass, context.Origin, current);

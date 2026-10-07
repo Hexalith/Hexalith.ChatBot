@@ -33,6 +33,10 @@ internal sealed class ChatBotCommandAdmissionPipeline(
     /// <summary>Revalidates retained owner bounds immediately before SDK admission effects.</summary>
     public bool IsCurrent(ChatBotAuthorityPrincipal principal) => requestAuthorizer.IsCurrent(principal);
 
+    /// <summary>Records the same safe authorization denial after admission as before admission.</summary>
+    public ValueTask<ChatBotCommandAdmissionDecision> RejectAuthorityLapseAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
+        => DenyAsync(context.Submission, context.TenantBinding.TenantId, context.Actor.ActorId, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken);
+
     private readonly IChatBotMetrics _metrics = metrics ?? NullChatBotMetrics.Instance;
 
     /// <summary>Audits a denied SDK transport binding without admitting caller-controlled envelope authority.</summary>
@@ -181,18 +185,32 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         CoarseIdempotencyDecision idempotencyDecision = await idempotencyStore
             .RecordAdmissionAsync(context, cancellationToken)
             .ConfigureAwait(false);
-        if (idempotencyDecision.Kind == CoarseIdempotencyDecisionKind.RecoveryPending &&
-            idempotencyStore is DaprCoarseIdempotencyStore daprStore)
+        if (!authority.Principal!.IsCurrent(clock.UtcNow) && idempotencyDecision.Kind != CoarseIdempotencyDecisionKind.Proceed)
         {
-            idempotencyDecision = await RestoreQueuedOutcomeAsync(
-                daprStore, context, binding.TenantId, idempotencyDecision, cancellationToken).ConfigureAwait(false);
+            return await DenyAsync(submission, binding.TenantId, actor.ActorId, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken).ConfigureAwait(false);
         }
 
-        if (idempotencyDecision.Kind == CoarseIdempotencyDecisionKind.ReplayPriorOutcome)
+        try
         {
-            await RecordDuplicateReplaySideEffectsAsync(context, idempotencyDecision, cancellationToken)
-                .ConfigureAwait(false);
-            return ChatBotCommandAdmissionDecision.ReplayPriorOutcome(idempotencyDecision.PriorOutcome!);
+            if (idempotencyDecision.Kind == CoarseIdempotencyDecisionKind.RecoveryPending &&
+                idempotencyStore is DaprCoarseIdempotencyStore daprStore)
+            {
+                idempotencyDecision = await RestoreQueuedOutcomeAsync(
+                    daprStore, context, binding.TenantId, idempotencyDecision, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (idempotencyDecision.Kind == CoarseIdempotencyDecisionKind.ReplayPriorOutcome)
+            {
+                RequireCurrentAuthority(context);
+                await RecordDuplicateReplaySideEffectsAsync(context, idempotencyDecision, cancellationToken)
+                    .ConfigureAwait(false);
+                RequireCurrentAuthority(context);
+                return ChatBotCommandAdmissionDecision.ReplayPriorOutcome(idempotencyDecision.PriorOutcome!);
+            }
+        }
+        catch (ChatBotAuthorityLapsedException)
+        {
+            return await DenyAsync(submission, binding.TenantId, actor.ActorId, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken).ConfigureAwait(false);
         }
 
         if (idempotencyDecision.Kind == CoarseIdempotencyDecisionKind.Conflict)
@@ -307,6 +325,7 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         CoarseIdempotencyDecision idempotencyDecision,
         CancellationToken cancellationToken)
     {
+        RequireCurrentAuthority(context);
         CommandSubmissionResponse priorOutcome = idempotencyDecision.PriorOutcome!;
 
         if (string.Equals(idempotencyDecision.Metadata.OperationClass, CoarseIdempotencyOperationClass.MessageIntake.Code, StringComparison.Ordinal))
@@ -322,9 +341,11 @@ internal sealed class ChatBotCommandAdmissionPipeline(
             _metrics.RecordDuplicateSuppressed(context.TenantBinding.TenantId);
         }
 
+        RequireCurrentAuthority(context);
         OperationStatusRecord? existingStatus = await operationStatusStore
             .TryGetAsync(context.TenantBinding.TenantId, OperationStatusRecord.OperationIdFor(priorOutcome), cancellationToken)
             .ConfigureAwait(false);
+        RequireCurrentAuthority(context);
         OperationStatusRecord replayStatus = existingStatus is not null
             ? existingStatus with { LastUpdatedAt = clock.UtcNow }
             : OperationStatusRecord.Accepted(context.TenantBinding.TenantId, priorOutcome, true, clock.UtcNow,
@@ -346,6 +367,14 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         await operationStatusStore
             .UpsertAsync(replayStatus, cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    private void RequireCurrentAuthority(ChatBotGatewayContext context)
+    {
+        if (context.Actor.Principal is ChatBotAuthorityPrincipal principal && !principal.IsCurrent(clock.UtcNow))
+        {
+            throw new ChatBotAuthorityLapsedException();
+        }
     }
 
     private async ValueTask QueueReplayIntentAsync(
@@ -502,15 +531,19 @@ internal sealed class ChatBotCommandAdmissionPipeline(
 
             try
             {
-                if (!await store.ReconcileOutcomeAsync(intent, cancellationToken, pending.Metadata).ConfigureAwait(false))
+                RequireCurrentAuthority(context);
+                bool reconciled = await store.ReconcileOutcomeAsync(intent, cancellationToken, pending.Metadata,
+                    () => context.Actor.Principal is ChatBotAuthorityPrincipal principal && principal.IsCurrent(clock.UtcNow)).ConfigureAwait(false);
+                RequireCurrentAuthority(context);
+                if (!reconciled)
                 {
                     continue;
                 }
-
                 await replayIntentQueue.AcknowledgeAsync(intent, cancellationToken).ConfigureAwait(false);
+                RequireCurrentAuthority(context);
                 return await idempotencyStore.RecordAdmissionAsync(context, cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (Exception exception) when (exception is not OperationCanceledException and not ChatBotAuthorityLapsedException)
             {
                 // One failed reconciliation cannot hide a later valid intent or replace the safe response.
             }

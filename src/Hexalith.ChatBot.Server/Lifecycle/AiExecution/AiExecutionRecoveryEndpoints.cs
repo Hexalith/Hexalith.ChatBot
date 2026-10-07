@@ -2,6 +2,7 @@ using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Gateway.Stages;
 
 using Hexalith.EventStore.Client.Queries;
 
@@ -27,7 +28,8 @@ internal static class AiExecutionRecoveryEndpoints
                 CancellationToken cancellationToken) =>
             {
                 ChatBotRequestContext? context = contextResolver.ResolveCurrent();
-                if (context is null || !(await authorizer.AuthorizeAsync(context, QueryType, true, new { }, cancellationToken).ConfigureAwait(false)).IsAllowed)
+                ChatBotAuthorityDecision? decision = context is null ? null : await authorizer.AuthorizeAsync(context, QueryType, true, new { }, cancellationToken).ConfigureAwait(false);
+                if (context is null || decision?.IsAllowed != true)
                 {
                     return SafeNotFound();
                 }
@@ -40,14 +42,20 @@ internal static class AiExecutionRecoveryEndpoints
                 }
 
                 int take = Math.Clamp(pageSize ?? 50, 1, 100);
-                IReadOnlyList<AiExecutionWorkItem> rows = await workStore
-                    .ListExhaustedAsync(afterKey, take + 1, cancellationToken, context.TenantId)
-                    .ConfigureAwait(false);
+                IReadOnlyList<AiExecutionWorkItem> rows;
+                try
+                {
+                    rows = await workStore.ListExhaustedAsync(afterKey, take + 1, cancellationToken, context.TenantId,
+                        () => authorizer.IsCurrent(decision.Principal!)).ConfigureAwait(false);
+                }
+                catch (ChatBotAuthorityLapsedException) { return SafeNotFound(); }
+                if (!authorizer.IsCurrent(decision.Principal!)) { return SafeNotFound(); }
                 bool hasMore = rows.Count > take;
                 AiExecutionWorkItem[] visible = rows.Take(take).ToArray();
                 string? nextCursor = hasMore
                     ? cursorCodec.Encode(QueryType, scope, visible[^1].Key)
                     : null;
+                if (!authorizer.IsCurrent(decision.Principal!)) { return SafeNotFound(); }
                 return Results.Ok(new AiExecutionExhaustedPage(
                     visible.Select(ToOperatorRow).ToArray(),
                     nextCursor,
@@ -72,14 +80,19 @@ internal static class AiExecutionRecoveryEndpoints
                 }
 
                 ChatBotRequestContext? context = contextResolver.ResolveCurrent();
-                if (context is null || !(await authorizer.AuthorizeAsync(context, AiExecutionRecoveryOperations.Recover, false, request, cancellationToken).ConfigureAwait(false)).IsAllowed)
+                ChatBotAuthorityDecision? decision = context is null ? null : await authorizer.AuthorizeAsync(context, AiExecutionRecoveryOperations.Recover, false, request, cancellationToken).ConfigureAwait(false);
+                if (context is null || decision?.IsAllowed != true)
                 {
                     return SafeNotFound();
                 }
 
-                bool recovered = await workStore
-                    .RecoverExhaustedAsync(request.Key, clock.UtcNow, cancellationToken, context.TenantId)
-                    .ConfigureAwait(false);
+                bool recovered;
+                try
+                {
+                    recovered = await workStore.RecoverExhaustedAsync(request.Key, clock.UtcNow, cancellationToken, context.TenantId,
+                        () => authorizer.IsCurrent(decision.Principal!)).ConfigureAwait(false);
+                }
+                catch (ChatBotAuthorityLapsedException) { return SafeNotFound(); }
                 return recovered
                     ? Results.Ok(new { status = "recovered", key = request.Key })
                     : SafeNotFound();

@@ -42,6 +42,7 @@ internal sealed class OperationAuditHistoryQueryHandler(
             return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);
         }
 
+        RequireCurrentAuthority(principal);
         IReadOnlyList<AuditEnvelope> postCommitEnvelopes = auditHistoryReader.GetPostCommitEnvelopes(query.TenantId, record.CommandId);
         return QueryResult.FromPayload(
             OperationAuditHistoryHttpResults.ToJsonElement(record.OperationId, record.AuditStatus, postCommitEnvelopes),

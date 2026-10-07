@@ -6,4 +6,8 @@ internal static partial class ChatBotAuthorityLog
     /// <summary>Records a normalized owner failure using metadata only.</summary>
     [LoggerMessage(1301, LogLevel.Warning, "Owner {Owner} unavailable for {Operation}: {ExceptionType}")]
     public static partial void OwnerUnavailable(ILogger logger, string owner, string operation, string exceptionType);
+
+    /// <summary>Records a closed validation reason without identifiers, timestamps or owner data.</summary>
+    [LoggerMessage(1302, LogLevel.Warning, "Owner {Owner} evidence rejected for {Operation}: {Reason}")]
+    public static partial void EvidenceRejected(ILogger logger, string owner, string operation, string reason);
 }

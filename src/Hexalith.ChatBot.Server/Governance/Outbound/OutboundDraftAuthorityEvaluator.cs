@@ -90,7 +90,7 @@ internal static class OutboundDraftAuthorityEvaluator
         => principal
             .FindAll(ParticipantAuthorizationStage.ProjectOwnerClaim)
             .Select(static claim => claim.Value)
-            .Any(value => string.Equals(value, "*", StringComparison.Ordinal) || string.Equals(value, projectId, StringComparison.Ordinal));
+            .Any(value => projectId != "*" && string.Equals(value, projectId, StringComparison.Ordinal));
 
     private static bool HasProjectScope(string projectId, ClaimsPrincipal principal, string scope)
         => ProjectScopes(projectId, principal).Contains(scope, StringComparer.Ordinal);
@@ -102,7 +102,7 @@ internal static class OutboundDraftAuthorityEvaluator
             .Where(static value => !string.IsNullOrWhiteSpace(value))
             .Select(value => value.Split(':', 2, StringSplitOptions.TrimEntries))
             .Where(parts => parts.Length == 2 &&
-                (string.Equals(parts[0], "*", StringComparison.Ordinal) || string.Equals(parts[0], projectId, StringComparison.Ordinal)))
+                parts[0] != "*" && string.Equals(parts[0], projectId, StringComparison.Ordinal))
             .Select(static parts => parts[1])
             .Distinct(StringComparer.Ordinal)
             .ToArray();

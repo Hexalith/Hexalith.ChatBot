@@ -350,10 +350,11 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
         string? afterKey,
         int maximumCount,
         CancellationToken cancellationToken,
-        string? tenantId = null)
+        string? tenantId = null,
+        Func<bool>? authorityIsCurrent = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumCount);
-        IReadOnlyList<AiExecutionWorkItem> indexed = await ListIndexedAsync(cancellationToken, tenantId).ConfigureAwait(false);
+        IReadOnlyList<AiExecutionWorkItem> indexed = await ListIndexedAsync(cancellationToken, tenantId, authorityIsCurrent).ConfigureAwait(false);
         return indexed
             .Where(item => item.Status is AiExecutionWorkStatus.Exhausted && (tenantId is null || item.TenantId == tenantId))
             .Where(item => afterKey is null || string.CompareOrdinal(item.Key, afterKey) > 0)
@@ -366,24 +367,28 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
         string key,
         DateTimeOffset now,
         CancellationToken cancellationToken,
-        string? tenantId = null)
+        string? tenantId = null,
+        Func<bool>? authorityIsCurrent = null)
     {
         if (tenantId is not null && !KeyBelongsToTenant(key, tenantId))
         {
             return false;
         }
 
+        RequireCurrentAuthority(authorityIsCurrent);
         AiExecutionWorkItem? existing = await GetAsync(key, cancellationToken).ConfigureAwait(false);
         if (existing is null || (tenantId is not null && existing.TenantId != tenantId))
         {
             return false;
         }
 
+        RequireCurrentAuthority(authorityIsCurrent);
         bool recovered = false;
         _ = await UpdateAsync(
             key,
             current =>
             {
+                RequireCurrentAuthority(authorityIsCurrent);
                 recovered = current is not null && current.Status is AiExecutionWorkStatus.Exhausted && (tenantId is null || current.TenantId == tenantId);
                 return recovered
                     ? current! with
@@ -464,14 +469,16 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
         return false;
     }
 
-    private async Task<IReadOnlyList<AiExecutionWorkItem>> ListIndexedAsync(CancellationToken cancellationToken, string? tenantId = null)
+    private async Task<IReadOnlyList<AiExecutionWorkItem>> ListIndexedAsync(CancellationToken cancellationToken, string? tenantId = null, Func<bool>? authorityIsCurrent = null)
     {
+        RequireCurrentAuthority(authorityIsCurrent);
         AiExecutionWorkIndex index = (await _store
             .GetAsync<AiExecutionWorkIndex>(ChatBotReadModelStoreNames.StateStoreName, IndexKey, cancellationToken)
             .ConfigureAwait(false)).Value ?? new AiExecutionWorkIndex([]);
         List<AiExecutionWorkItem> items = [];
         foreach (string indexEntry in index.Keys)
         {
+            RequireCurrentAuthority(authorityIsCurrent);
             IReadOnlyList<string> workKeys = indexEntry.StartsWith(IndexPagePrefix, StringComparison.Ordinal)
                 ? (await _store.GetAsync<AiExecutionWorkIndex>(ChatBotReadModelStoreNames.StateStoreName, indexEntry, cancellationToken)
                     .ConfigureAwait(false)).Value?.Keys ?? []
@@ -483,6 +490,7 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
                     continue;
                 }
 
+                RequireCurrentAuthority(authorityIsCurrent);
                 AiExecutionWorkItem? item = await GetAsync(workKey, cancellationToken).ConfigureAwait(false);
                 if (item is not null)
                 {
@@ -492,6 +500,14 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
         }
 
         return items;
+    }
+
+    private static void RequireCurrentAuthority(Func<bool>? authorityIsCurrent)
+    {
+        if (authorityIsCurrent is not null && !authorityIsCurrent())
+        {
+            throw new Hexalith.ChatBot.Server.Gateway.Stages.ChatBotAuthorityLapsedException();
+        }
     }
 
     private static bool KeyBelongsToTenant(string key, string tenantId)

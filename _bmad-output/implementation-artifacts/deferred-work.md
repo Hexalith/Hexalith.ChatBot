@@ -1341,3 +1341,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
   summary: Define owner-backed authority and runtime revocation behavior for tenant activity SignalR subscriptions.
   evidence: C-B8 is a pre-existing ownerless subscription path that broadcasts a tenant-only advisory nudge. Shared tenant binding now rejects ambiguity, but current owner membership/service-grant subscription semantics need a separate catalog and owner-mapping decision.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
+  summary: Specify a bounded owner-client deadline and caller-cancellation behavior for accepted production authority mappings (medium if true, unverified).
+  evidence: R-B9 identifies that ChatBotRequestAuthorizer awaits provider calls with caller cancellation only; the shipped unavailable provider completes synchronously, so no production hang is established. Settle the question in A13 by inspecting each accepted provider/client deadline and proving timeout returns metadata-only unavailable denial while caller cancellation still propagates.

@@ -52,6 +52,7 @@ internal sealed class TaskIntentReviewQueryHandler(
                 "chatbot.task-intent-review.v1");
         }
 
+        RequireCurrentAuthority(principal);
         MailboxMessageContentResult source = await messageContentSource
             .GetAsync(query.TenantId, request.ProjectId, record.SourceMessageId, cancellationToken)
             .ConfigureAwait(false);

@@ -51,10 +51,27 @@ internal sealed class ComplianceAuditDetailQueryHandler(
             .Select(static reference => reference["project:".Length..])
             .Where(AuditMetadata.IsSafeStableIdentifier)
             .Distinct(StringComparer.Ordinal).ToArray();
-        bool hasPerProjectAuthority = await RequestAuthorizer.HasProjectAuthoritiesAsync(principal.Context, projectRefs, QueryType, cancellationToken).ConfigureAwait(false) &&
+        bool hasPerProjectAuthority = RequestAuthorizer.IsCurrent(principal) && await RequestAuthorizer.HasProjectAuthoritiesAsync(principal.Context, projectRefs, QueryType, cancellationToken,
+            () => RequestAuthorizer.IsCurrent(principal)).ConfigureAwait(false) &&
             RequestAuthorizer.IsCurrent(principal);
 
         ComplianceAuditDetail detail = ComplianceAuditReadPolicy.Detail(envelope, hasPerProjectAuthority);
         return QueryResult.FromPayload(ComplianceAuditHttpResults.DetailJsonElement(detail), "chatbot.compliance-audit-detail.v1");
+    }
+
+    /// <summary>Preserves the established restricted-detail refusal if final compliance authority lapses.</summary>
+    protected override QueryResult FinalizeResult(QueryResult result, ChatBotAuthorityPrincipal principal)
+    {
+        if (RequestAuthorizer.IsCurrent(principal) || !result.Success) { return result; }
+        Dictionary<string, JsonElement>? wire = result.PayloadBytes is null
+            ? null
+            : JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(result.PayloadBytes, JsonOptions);
+        if (wire is null) { return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound); }
+        wire["redactionState"] = JsonSerializer.SerializeToElement("escalation-required");
+        wire["escalationStatus"] = JsonSerializer.SerializeToElement("requested");
+        wire["visibleMetadataRefs"] = JsonSerializer.SerializeToElement(Array.Empty<string>());
+        wire["safeNextAction"] = JsonSerializer.SerializeToElement("request-access");
+        wire["redactionReasonCode"] = JsonSerializer.SerializeToElement("restricted-detail");
+        return Payload(wire, "chatbot.compliance-audit-detail.v1");
     }
 }

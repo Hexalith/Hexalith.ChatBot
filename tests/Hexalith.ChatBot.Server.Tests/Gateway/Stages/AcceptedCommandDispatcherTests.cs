@@ -34,7 +34,7 @@ using OutboundChannelRateLimitWindow = Hexalith.ChatBot.Contracts.Enums.Outbound
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway.Stages;
 
-public sealed class AcceptedCommandDispatcherTests
+public sealed partial class AcceptedCommandDispatcherTests
 {
     private const string CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
     private const string NoteId = "01ARZ3NDEKTSV4RRFFQ69G5FAZ";
@@ -67,7 +67,7 @@ public sealed class AcceptedCommandDispatcherTests
             else { clock.UtcNow += TimeSpan.FromSeconds(2); }
             return true;
         });
-        await Should.ThrowAsync<CommandNotSubmittedException>(() => dispatcher.DispatchAsync(context, TestContext.Current.CancellationToken).AsTask());
+        await Should.ThrowAsync<ChatBotAuthorityLapsedException>(() => dispatcher.DispatchAsync(context, TestContext.Current.CancellationToken).AsTask());
         gateway.Submitted.ShouldBeEmpty();
         context.ExternalEffectAttempted.ShouldBeFalse();
         context.SdkSubmissionAccepted.ShouldBeFalse();
@@ -82,6 +82,54 @@ public sealed class AcceptedCommandDispatcherTests
         _ = await dispatcher.DispatchAsync(retry, TestContext.Current.CancellationToken);
         gateway.Submitted.ShouldHaveSingleItem().AggregateId.ShouldBe(NoteId);
         retry.SdkSubmissionAccepted.ShouldBeTrue();
+    }
+
+    /// <summary>A newer client grant cannot restore an already invalidated retained dispatch principal.</summary>
+    [Fact]
+    public async Task ClientRegrantCannotRevivePreviouslyAuthorizedDispatch()
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock);
+        ServiceClientGrantProjectionCache cache = new(clock);
+        ChatBotRequestAuthorizer authorizer = new(new(), owner, clock, cache);
+        Hexalith.ChatBot.Server.Authentication.ChatBotRequestContext bound = TrustedAuthorityFixture.Context(actorClass: "service", origin: ChatBotSurfaceOrigin.Ui);
+        ChatBotAuthorityDecision decision = await authorizer.AuthorizeAsync(bound, nameof(RecordGovernedNote), false, new RecordGovernedNote(NoteId), TestContext.Current.CancellationToken);
+        decision.IsAllowed.ShouldBeTrue();
+        decision.Principal!.IsCurrent(clock.UtcNow).ShouldBeTrue();
+        ChatBotOwnerAuthorityRequest originalGrantRequest = owner.Requests.Single(static request => request.Authority == "service-grant");
+        cache.InvalidateRevocation(Tenant, bound.ServiceClientId!, "ui", "");
+        clock.UtcNow += TimeSpan.FromSeconds(1);
+        owner.Transform = evidence => evidence.ServiceGrant is { } grant
+            ? evidence with { ServiceGrant = grant with { GrantId = "new-other-operation-grant" } }
+            : evidence;
+        (await authorizer.ResolveServiceGrantAsync(bound, nameof(RecordProjectConversationMessage), false, true, TestContext.Current.CancellationToken)).ShouldNotBeNull();
+        cache.IsRevoked(originalGrantRequest, "synthetic-grant-v1").ShouldBeFalse();
+        decision.Principal.IsCurrent(clock.UtcNow).ShouldBeFalse();
+        RecordingEventStoreGatewayClient gateway = new();
+        ChatBotGatewayContext context = Context(WireCommand(NoteId)) with
+        {
+            Actor = new ChatBotAuthenticatedActor(bound.SubjectId, decision.Principal, bound.ActorClass, bound.ServiceClientId, bound),
+        };
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), clock);
+        await Should.ThrowAsync<ChatBotAuthorityLapsedException>(() => dispatcher.DispatchAsync(context, TestContext.Current.CancellationToken).AsTask());
+        gateway.Submitted.ShouldBeEmpty();
+        context.ExternalEffectAttempted.ShouldBeFalse();
+    }
+
+    /// <summary>The persisted audit retains safe owner provenance and excludes unsafe caller-style metadata.</summary>
+    [Fact]
+    public async Task RecordedAuditFiltersUnsafeOwnerEvidenceReferences()
+    {
+        ChatBotGatewayContext context = Context(WireCommand(NoteId)) with
+        {
+            AuthorityEvidenceReferences = ["ChatBot:owner-evidence:owner-version", "ChatBot:secret-value:v1", "ChatBot:owner@example.test:v1", "ChatBot:raw content:v1"],
+        };
+        InMemoryAuditWriter audit = new();
+        _ = await audit.RecordPreCommitAsync(AuditEnvelopeFactory.PreCommit(context,
+            new Hexalith.ChatBot.Server.Lifecycle.StateModel.LifecycleTransitionDefinition("Received", "Proposed"), FixedClock.FixedUtcNow), TestContext.Current.CancellationToken);
+        AuditEnvelope recorded = audit.Envelopes.ShouldHaveSingleItem();
+        recorded.SourceEvidenceRefs.ShouldContain("ChatBot:owner-evidence:owner-version");
+        recorded.SourceEvidenceRefs.ShouldNotContain(reference => reference.Contains("secret-value", StringComparison.Ordinal) || reference.Contains('@', StringComparison.Ordinal) || reference.Contains("raw content", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -2431,12 +2479,16 @@ public sealed class AcceptedCommandDispatcherTests
     {
         private readonly List<SubmitCommandRequest> _submitted = [];
 
+        /// <summary>Runs after the SDK accepts the recorded submission.</summary>
+        public Action? OnSubmission { get; init; }
+
         public IReadOnlyList<SubmitCommandRequest> Submitted => _submitted;
 
         public Task<SubmitCommandResponse> SubmitCommandAsync(SubmitCommandRequest request, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(request);
             _submitted.Add(request);
+            OnSubmission?.Invoke();
             return Task.FromResult(new SubmitCommandResponse(request.CorrelationId ?? request.MessageId));
         }
 
@@ -2516,6 +2568,8 @@ public sealed class AcceptedCommandDispatcherTests
 
     private sealed class RecordingConversationWriter : IConversationWriter
     {
+        /// <summary>Runs after the conversation writer attempts the append.</summary>
+        public Action? OnPrepared { get; init; }
         public int PrepareCount { get; private set; }
 
         public ApprovedAiConversationAppendRequest? LastRequest { get; private set; }
@@ -2526,6 +2580,7 @@ public sealed class AcceptedCommandDispatcherTests
         {
             PrepareCount++;
             LastRequest = request;
+            OnPrepared?.Invoke();
             return ValueTask.FromResult(new ConversationAppendResult(
                 "success",
                 "available",

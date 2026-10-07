@@ -135,7 +135,7 @@ internal sealed class AcceptedCommandDispatcher(
 
             return new ChatBotDispatchResult(context.PreparedAcceptedAt ?? clock.UtcNow.ToUniversalTime(), plan.AggregateId);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException && !context.ExternalEffectAttempted)
+        catch (Exception exception) when (exception is not OperationCanceledException and not ChatBotAuthorityLapsedException && !context.ExternalEffectAttempted)
         {
             throw new CommandNotSubmittedException(exception);
         }
@@ -147,9 +147,9 @@ internal sealed class AcceptedCommandDispatcher(
 
     private void RequireCurrentAuthority(ChatBotGatewayContext context)
     {
-        if (context.Actor.Principal is Hexalith.ChatBot.Server.Authorization.ChatBotAuthorityPrincipal authority && !authority.IsCurrent(clock.UtcNow))
+        if (!context.ExternalEffectAttempted && context.Actor.Principal is Hexalith.ChatBot.Server.Authorization.ChatBotAuthorityPrincipal authority && !authority.IsCurrent(clock.UtcNow))
         {
-            throw new InvalidOperationException("The bound authority is no longer current.");
+            throw new ChatBotAuthorityLapsedException();
         }
     }
 

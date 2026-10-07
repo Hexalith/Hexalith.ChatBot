@@ -49,9 +49,11 @@ internal sealed class ProjectConversationQueryHandler(
         ProjectConversationPage page = await projectionStore
             .ReadPageAsync(query.TenantId, request.ProjectId, cursorPosition, request.PageSize, cancellationToken)
             .ConfigureAwait(false);
+        RequireCurrentAuthority(principal);
         IReadOnlyList<ProjectConversationItemView> aiContextPackageItems = await projectionStore
             .ReadAiContextPackageItemsAsync(query.TenantId, request.ProjectId, cancellationToken)
             .ConfigureAwait(false);
+        RequireCurrentAuthority(principal);
         ProjectAiContextPackage aiContextPackage = await aiContextPackageAssembler
             .AssembleAsync(
                 new ProjectAiContextPackageAssemblyRequest(query.TenantId, request.ProjectId, aiContextPackageItems, query.CorrelationId),

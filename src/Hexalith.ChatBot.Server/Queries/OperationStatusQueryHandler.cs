@@ -42,6 +42,7 @@ internal sealed class OperationStatusQueryHandler(
 
         if (record?.NextRetryAt is not null && record.WorkflowInstanceId is { } instanceId)
         {
+            RequireCurrentAuthority(principal);
             CorrectionPropagationWorkflowProgress? progress = workflowRuntime is { IsAvailable: true, HasAuthoritativeProgress: true }
                 ? await workflowRuntime.ReadProgressAsync(instanceId, cancellationToken).ConfigureAwait(false)
                 : null;

@@ -8,10 +8,30 @@ namespace Hexalith.ChatBot.Server.Gateway;
 /// <summary>The closed, side-effect-free target mappings established by AcceptedCommandDispatcher.</summary>
 internal static class ChatBotCanonicalDispatchTarget
 {
+    /// <summary>Identifies operations with an established canonical dispatch target.</summary>
+    public static bool IsSupported(string operation) => ResourceProperty(operation) is not null;
+
     /// <summary>Resolves only an established dispatch target without reading protected state.</summary>
     public static bool TryResolve(string operation, JsonElement payload, out string? target)
     {
-        string? property = operation switch
+        string? property = ResourceProperty(operation);
+        target = null;
+        if (property is null || payload.ValueKind != JsonValueKind.Object || !TryRead(payload, property, false, out target))
+        {
+            return false;
+        }
+
+        if (operation is nameof(ProposeAIAction) or nameof(ExecuteLowRiskAIAssistance) or nameof(DecideAiActionApproval)
+            or nameof(ExecuteApprovedAIAction) or nameof(MarkAiActionProposalInvalidatedByCorrection))
+        {
+            if (!TryRead(payload, "StateOwnerAggregateId", true, out string? stateOwner)) { return false; }
+            target = stateOwner ?? target;
+        }
+
+        return AuditMetadata.IsSafeStableIdentifier(target) && target != "*";
+    }
+
+    private static string? ResourceProperty(string operation) => operation switch
         {
             nameof(RecordGovernedNote) => "NoteId",
             nameof(CaptureMailboxMessageIntake) => "IntakeId",
@@ -34,21 +54,6 @@ internal static class ChatBotCanonicalDispatchTarget
             nameof(CreateOutboundDraft) or nameof(RequestOutboundSendApproval) or nameof(DecideOutboundApproval) or nameof(ExecuteApprovedOutboundDraft) => "DraftId",
             _ => null,
         };
-        target = null;
-        if (property is null || payload.ValueKind != JsonValueKind.Object || !TryRead(payload, property, false, out target))
-        {
-            return false;
-        }
-
-        if (operation is nameof(ProposeAIAction) or nameof(ExecuteLowRiskAIAssistance) or nameof(DecideAiActionApproval)
-            or nameof(ExecuteApprovedAIAction) or nameof(MarkAiActionProposalInvalidatedByCorrection))
-        {
-            if (!TryRead(payload, "StateOwnerAggregateId", true, out string? stateOwner)) { return false; }
-            target = stateOwner ?? target;
-        }
-
-        return AuditMetadata.IsSafeStableIdentifier(target) && target != "*";
-    }
 
     private static bool TryRead(JsonElement payload, string name, bool optional, out string? value)
     {

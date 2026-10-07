@@ -2,16 +2,20 @@ using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Contracts.Commands;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
+/// <summary>Submits trusted correction invalidations with an envelope-bound admission marker.</summary>
 internal sealed class AiActionProposalInvalidationCoordinator(
     IProjectConversationProjectionStore conversationStore,
-    IEventStoreGatewayClient eventStore) : IAiActionProposalInvalidationCoordinator
+    IEventStoreGatewayClient eventStore,
+    IChatBotAdmissionMarker admissionMarker) : IAiActionProposalInvalidationCoordinator
 {
+    /// <inheritdoc/>
     public async Task InvalidateAsync(AssociationCandidateView correctedAssociation, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(correctedAssociation);
@@ -50,18 +54,25 @@ internal sealed class AiActionProposalInvalidationCoordinator(
                 StateOwnerAggregateId = proposal.StateOwnerAggregateId ?? projectId,
             };
 
+            string messageId = $"{correctedAssociation.CorrectionId}:{proposal.ProposalId}:invalidated-by-correction";
+            const string actorId = "ai-action-proposal-invalidation-coordinator";
+            JsonElement payload = JsonSerializer.SerializeToElement(command);
             SubmitCommandRequest request = new(
-                MessageId: $"{correctedAssociation.CorrectionId}:{proposal.ProposalId}:invalidated-by-correction",
+                MessageId: messageId,
                 Tenant: correctedAssociation.TenantId,
                 Domain: ChatBotEventStore.DomainName,
                 AggregateId: command.StateOwnerAggregateId,
                 CommandType: nameof(MarkAiActionProposalInvalidatedByCorrection),
-                Payload: JsonSerializer.SerializeToElement(command),
+                Payload: payload,
                 CorrelationId: correctedAssociation.CorrelationId,
                 Extensions: new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     ["surfaceOrigin"] = "workflow",
                     ["actorType"] = "system",
+                    ["actorId"] = actorId,
+                    [DataProtectionChatBotAdmissionMarker.ExtensionKey] = admissionMarker.Create(messageId, correctedAssociation.TenantId,
+                        command.StateOwnerAggregateId, nameof(MarkAiActionProposalInvalidatedByCorrection), payload,
+                        correctedAssociation.CorrelationId, actorId, "workflow", null),
                     ["workflowInstanceId"] = correctedAssociation.WorkflowInstanceId ?? correctedAssociation.CorrectionId,
                 });
 

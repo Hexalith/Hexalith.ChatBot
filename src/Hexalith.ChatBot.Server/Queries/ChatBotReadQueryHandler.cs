@@ -3,6 +3,7 @@ using System.Text.Json;
 using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.EventStore.Contracts.Queries;
 using Hexalith.EventStore.DomainService;
 
@@ -55,8 +56,27 @@ internal abstract class ChatBotReadQueryHandler<TRequest>(ChatBotRequestContextR
         }
 
         QueryEnvelope bound = new(context.TenantId!, Domain, query.AggregateId, QueryType, query.Payload, query.CorrelationId, context.SubjectId);
-        return await ExecuteAsync(bound, request, decision.Principal!, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            RequireCurrentAuthority(decision.Principal!);
+            QueryResult result = await ExecuteAsync(bound, request, decision.Principal!, cancellationToken).ConfigureAwait(false);
+            return FinalizeResult(result, decision.Principal!);
+        }
+        catch (ChatBotAuthorityLapsedException)
+        {
+            return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);
+        }
     }
+
+    /// <summary>Stops subsequent protected reads when retained authority lapses.</summary>
+    protected void RequireCurrentAuthority(ChatBotAuthorityPrincipal principal)
+    {
+        if (!authorizer.IsCurrent(principal)) { throw new ChatBotAuthorityLapsedException(); }
+    }
+
+    /// <summary>Revalidates retained authority at final disclosure.</summary>
+    protected virtual QueryResult FinalizeResult(QueryResult result, ChatBotAuthorityPrincipal principal)
+        => authorizer.IsCurrent(principal) ? result : QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);
 
     /// <summary>Serializes a successfully authorized response.</summary>
     protected static QueryResult Payload<T>(T payload, string projectionType)

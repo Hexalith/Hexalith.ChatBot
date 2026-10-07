@@ -1066,7 +1066,16 @@ internal static class AuditEnvelopeFactory
         refs.AddRange(MailboxIntakeEvidenceRefs(context));
         refs.AddRange(AdminEvidenceRefs(context));
         refs.AddRange(ServiceClientGrantEvidenceRefs(context));
+        refs.AddRange((context.AuthorityEvidenceReferences ?? []).Where(IsSafeOwnerAuthorityReference));
         return refs;
+    }
+
+    private static bool IsSafeOwnerAuthorityReference(string reference)
+    {
+        string[] parts = reference.Split(':');
+        return parts.Length >= 3 && parts[0] is "ChatBot" or "Tenants" or "Parties" or "Projects" or "Documents" &&
+            reference.Length <= parts[0].Length + 402 && !reference.Contains('@', StringComparison.Ordinal) &&
+            parts.Skip(1).Where(static part => part.Length > 0).All(static part => AuditMetadata.SafeOptionalToken(part) is not null);
     }
 
     private static string PhaseName(AuditCommitPhase phase)
