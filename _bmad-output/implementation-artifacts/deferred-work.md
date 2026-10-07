@@ -1324,3 +1324,12 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-2-publish-the-openapi-contract-spine-and-typed-client.md`
   summary: Qualify SDK-confirmed receipt recovery through a real Redis/Dapr ChatBot process replacement after controlled receipt loss (medium, unverified).
   evidence: Confirmation review BH10 identified the absent fault-injected process-restart lane but demonstrated no current recovery defect. Serialized production-adapter/fresh-service controls and ordinary required live replay pass. Settle the remaining process-boundary question by retaining actual SDK confirmation, losing ChatBot receipt persistence, replacing the process, proving exact canonical recovery without another submission, and separately retaining pending behavior for missing historical confirmation; current fixture checks are not this independent qualification.
+
+## Deferred from: code review of spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context (2026-10-07)
+
+- source_spec: `spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
+  summary: Owner authority evidence validation tolerates zero clock skew: `IsValidEvidence` requires `ObservedAt <= now` and, for current requests, `ObservedAt >= started` (same for `RevocationCheckedAt`), so a real provider stamping owner-clock times denies every request (owner ahead) or every mutation (owner behind).
+  evidence: Edge-case-hunter EC5 at `src/Hexalith.ChatBot.Server/Authorization/ChatBotRequestAuthorizer.cs:270-277`; high if true, unverified because only the unavailable and synthetic providers exist and both stamp ChatBot's `ISystemClock`. Settle in A13 provider design by stating in the `IChatBotOwnerAuthorityProvider` contract which clock stamps evidence, or by adding a bounded skew allowance.
+- source_spec: `spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
+  summary: Creation commands authorize against their new client-generated identifier (`NoteId`, `DraftId`, `IntakeId`, `*ChangeId`), so a real ChatBot owner mapping must either accept any not-yet-existing id (making the check meaningless) or reject every creation.
+  evidence: Blind-hunter BH12 at `src/Hexalith.ChatBot.Server/Authorization/ChatBotAuthorityCatalog.cs` resource-property column; medium if true, unverified because owner-mapping semantics for `ChatBot`/`operation` requests are unspecified until A13. Settle by defining whether create rows need a parent/target scope separate from the new id.
