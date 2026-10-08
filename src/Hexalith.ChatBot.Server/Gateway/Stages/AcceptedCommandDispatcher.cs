@@ -1047,8 +1047,11 @@ internal sealed class AcceptedCommandDispatcher(
                 propagation);
         }
 
-        // Defensive fallback: the spine allowlist admits only first-party commands in production, so this branch
-        // is reached only by bootstrap tests that submit a generic command through a permissive allowlist.
+        // Production fallback target: every allowlisted command without an established canonical mapping in
+        // ChatBotCanonicalDispatchTarget (for example SubmitServiceClientRateLimit and AssignTenantAdminRole) dispatches
+        // to the caller's CommandId stream here. ChatBotRequestAuthorizer therefore requires exact current ChatBot
+        // `operation` owner evidence for that stream (its fallbackAggregateId check) before admission; neither this
+        // branch nor that check is dead code. Bootstrap tests also reach it through a permissive allowlist.
         return new EventStoreDispatchPlan(context.Submission.Request.CommandId, commandType, command);
     }
 

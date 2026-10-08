@@ -333,9 +333,11 @@ paths:
       summary: Read authorized task-intent review metadata and source content.
       description: >
         Returns complete task-intent metadata plus the full source message only
-        for an authorized review surface. Unknown, foreign, stale, redacted,
-        quarantined, or unavailable source state collapses to a safe unavailable
-        review response without confirming restricted resource existence.
+        for an authorized review surface. Unknown, invalid, or foreign
+        task-intent identifiers collapse to the same safe authorization denial
+        without confirming restricted resource existence. Stale, redacted,
+        quarantined, or unavailable source state of an authorized task intent
+        returns a safe unavailable review response.
       parameters:
         - name: projectId
           in: path
@@ -365,7 +367,7 @@ paths:
       x-hexalith-task-intent-review:
         tenantAuthority: authenticated-context
         responseVisibility: authorized-review-only
-        unknownOrCrossTenantResult: safe_unavailable
+        unknownOrCrossTenantResult: safe_not_found
         uiSurface: S1
 components:
   securitySchemes:

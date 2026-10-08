@@ -377,8 +377,9 @@ public sealed class ComplianceAuditInvestigationEndpointTests
     [InlineData("Projects")]
     public async Task DetailOverrideRestrictsReleasedDetailWhenAuthorityLapsesAfterTheHandlerCheck(string expiringOwner)
     {
-        // Clock reads after the Projects owner response: evidence validation, the decision instant, the in-loop
-        // authority callback, the handler's trailing authority check, then the override's final check.
+        // Clock reads after the Projects owner response: evidence validation, the decision instant, the post-loop
+        // IsCurrent(principal) check in HasProjectAuthoritiesAsync, the handler's trailing authority check, then the
+        // override's final check.
         const int FinalDisclosureRead = 5;
         (string baseline, int readsAfterProjects) = await SendDetailWithLapseAsync(expiringOwner, lapseOnRead: null);
         using (JsonDocument released = JsonDocument.Parse(baseline))

@@ -18,17 +18,6 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
     /// <summary>Checks retained authority immediately before protected effects or disclosure.</summary>
     public bool IsCurrent(ChatBotAuthorityPrincipal principal) => principal.IsCurrent(clock.UtcNow);
 
-    /// <summary>Checks current project evidence before releasing project-specific detail.</summary>
-    public async ValueTask<bool> HasProjectAuthorityAsync(ChatBotRequestContext context, string project, string operation, CancellationToken cancellationToken)
-    {
-        if (context.TenantId is null || !AuditMetadata.IsSafeStableIdentifier(project) || project == "*" || catalog.Find(operation, true) is null)
-        {
-            return false;
-        }
-
-        return await HasProjectAuthoritiesAsync(context, [project], operation, cancellationToken).ConfigureAwait(false);
-    }
-
     /// <summary>Collects current project evidence and jointly validates its complete set before disclosure.</summary>
     public async ValueTask<bool> HasProjectAuthoritiesAsync(ChatBotRequestContext context, IEnumerable<string> projects, string operation, CancellationToken cancellationToken, ChatBotAuthorityPrincipal? principal = null)
     {

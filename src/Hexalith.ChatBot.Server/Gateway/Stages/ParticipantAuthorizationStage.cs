@@ -105,7 +105,7 @@ internal sealed class ParticipantAuthorizationStage(
             }
 
             ChatBotRequestAuthorizer authorizer = requestAuthorizer ?? new ChatBotRequestAuthorizer(new ChatBotAuthorityCatalog(), new UnavailableChatBotOwnerAuthorityProvider(), _clock, new ServiceClientGrantProjectionCache(_clock));
-            ChatBotAuthorityDecision decision = await authorizer.AuthorizeAsync(context, submission.Request.CommandType ?? string.Empty, false, submission.Request.Command, cancellationToken).ConfigureAwait(false);
+            ChatBotAuthorityDecision decision = await authorizer.AuthorizeAsync(context, submission.Request.CommandType ?? string.Empty, false, submission.Request.Command, cancellationToken, fallbackAggregateId: submission.Request.CommandId ?? string.Empty).ConfigureAwait(false);
             if (!decision.IsAllowed)
             {
                 return ChatBotAuthorizationResult.Denied(decision.ReasonCode);

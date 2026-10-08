@@ -224,7 +224,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Read authorized task-intent review metadata and source content.
         /// </summary>
         /// <remarks>
-        /// Returns complete task-intent metadata plus the full source message only for an authorized review surface. Unknown, foreign, stale, redacted, quarantined, or unavailable source state collapses to a safe unavailable review response without confirming restricted resource existence.
+        /// Returns complete task-intent metadata plus the full source message only for an authorized review surface. Unknown, invalid, or foreign task-intent identifiers collapse to the same safe authorization denial without confirming restricted resource existence. Stale, redacted, quarantined, or unavailable source state of an authorized task intent returns a safe unavailable review response.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
@@ -237,7 +237,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Read authorized task-intent review metadata and source content.
         /// </summary>
         /// <remarks>
-        /// Returns complete task-intent metadata plus the full source message only for an authorized review surface. Unknown, foreign, stale, redacted, quarantined, or unavailable source state collapses to a safe unavailable review response without confirming restricted resource existence.
+        /// Returns complete task-intent metadata plus the full source message only for an authorized review surface. Unknown, invalid, or foreign task-intent identifiers collapse to the same safe authorization denial without confirming restricted resource existence. Stale, redacted, quarantined, or unavailable source state of an authorized task intent returns a safe unavailable review response.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
@@ -1295,7 +1295,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Read authorized task-intent review metadata and source content.
         /// </summary>
         /// <remarks>
-        /// Returns complete task-intent metadata plus the full source message only for an authorized review surface. Unknown, foreign, stale, redacted, quarantined, or unavailable source state collapses to a safe unavailable review response without confirming restricted resource existence.
+        /// Returns complete task-intent metadata plus the full source message only for an authorized review surface. Unknown, invalid, or foreign task-intent identifiers collapse to the same safe authorization denial without confirming restricted resource existence. Stale, redacted, quarantined, or unavailable source state of an authorized task intent returns a safe unavailable review response.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
@@ -1311,7 +1311,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Read authorized task-intent review metadata and source content.
         /// </summary>
         /// <remarks>
-        /// Returns complete task-intent metadata plus the full source message only for an authorized review surface. Unknown, foreign, stale, redacted, quarantined, or unavailable source state collapses to a safe unavailable review response without confirming restricted resource existence.
+        /// Returns complete task-intent metadata plus the full source message only for an authorized review surface. Unknown, invalid, or foreign task-intent identifiers collapse to the same safe authorization denial without confirming restricted resource existence. Stale, redacted, quarantined, or unavailable source state of an authorized task intent returns a safe unavailable review response.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>

@@ -48,6 +48,91 @@ public sealed partial class CommandGatewayTests
             request.Operation == operation && request.Authority == "operation" && request.RequireCurrent);
     }
 
+    /// <summary>Enumerates every fallback command with a caller CommandId distinct from, and equal to, the payload resource.</summary>
+    public static IEnumerable<object[]> FallbackTargetDecisionCases()
+        => FallbackHttpCommands().SelectMany(static row => new[] { new object[] { row[0], false }, new object[] { row[0], true } });
+
+    /// <summary>
+    /// The authorizer itself issues and honors exact current ChatBot <c>operation</c> evidence for the dispatched
+    /// fallback stream, including an admin-scoped row whose caller CommandId equals the payload resource. Only the
+    /// fallback evidence differs between the allowed control and the denial.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(FallbackTargetDecisionCases))]
+    public async Task FallbackTargetDecisionRequiresExactOperationEvidenceForTheDispatchedStream(string operation, bool commandIdEqualsPayloadResource)
+    {
+        ChatBotAuthorityRequirement row = new ChatBotAuthorityCatalog().Find(operation, false)!;
+        row.AdminScope.ShouldNotBeNull();
+        row.ResourceProperty.ShouldNotBeNull();
+        string target = commandIdEqualsPayloadResource ? "payload-resource" : "fallback-target";
+        Dictionary<string, object?> payload = new() { [row.ResourceProperty] = "payload-resource", ["ProjectId"] = "project-alpha" };
+
+        (ChatBotAuthorityDecision allowed, SyntheticOwnerAuthorityProvider allowedOwner) = await DecideFallbackTargetAsync(operation, payload, target, denyFallbackEvidence: false);
+        (ChatBotAuthorityDecision denied, SyntheticOwnerAuthorityProvider deniedOwner) = await DecideFallbackTargetAsync(operation, payload, target, denyFallbackEvidence: true);
+
+        allowed.IsAllowed.ShouldBeTrue();
+        allowed.ReasonCode.ShouldBeEmpty();
+        denied.IsAllowed.ShouldBeFalse();
+        denied.EvidenceReferences.ShouldBeEmpty();
+        denied.ReasonCode.ShouldBe(operation switch
+        {
+            nameof(AssignTenantAdminRole) => ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized,
+            nameof(SubmitEscalationPolicyChange) => ChatBotAuthorizationReasonCodes.EscalationPolicyUnauthorized,
+            _ => ChatBotAuthorizationReasonCodes.AuthorizationDenied,
+        });
+        allowedOwner.Requests.Where(request => IsFallbackTargetRequest(request, operation, target)).ShouldHaveSingleItem().RequireCurrent.ShouldBeTrue();
+        deniedOwner.Requests.Where(request => IsFallbackTargetRequest(request, operation, target)).ShouldHaveSingleItem().RequireCurrent.ShouldBeTrue();
+    }
+
+    /// <summary>A direct stage invocation without a pipeline-installed authority principal also authorizes the fallback stream.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DirectStageInvocationAuthorizesTheFallbackCommandIdStream(bool denyFallbackEvidence)
+    {
+        const string operation = nameof(SubmitMailboxSourceRateLimit);
+        ChatBotCanonicalDispatchTarget.IsSupported(operation).ShouldBeFalse();
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock)
+        {
+            Allows = request => !(denyFallbackEvidence && IsFallbackTargetRequest(request, operation, "forbidden-target")),
+        };
+        ParticipantAuthorizationStage stage = new(clock: clock, requestAuthorizer: TrustedAuthorityFixture.Authorizer(clock, owner));
+        SubmitMailboxSourceRateLimit command = new("mailbox-rate-limit-001", "mailbox-source:controlled-mailbox-001", "mailbox-source-noisy-intake",
+            "policy-snapshot:mailbox:v1", OldBudget: 0, NewBudget: 200, Hexalith.ChatBot.Contracts.Enums.MailboxRateLimitWindow.RollingHour, 4,
+            "admin-requester", MailboxSourceRateLimitSchemaVersions.V1, "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            Submission(TrustedAuthorityFixture.Principal(), command, commandType: operation, commandId: "forbidden-target"),
+            new ChatBotAuthenticatedActor("actor-alpha", TrustedAuthorityFixture.Principal()),
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBe(!denyFallbackEvidence);
+        if (denyFallbackEvidence)
+        {
+            result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        owner.Requests.Where(request => IsFallbackTargetRequest(request, operation, "forbidden-target")).ShouldHaveSingleItem().RequireCurrent.ShouldBeTrue();
+    }
+
+    private static async Task<(ChatBotAuthorityDecision Decision, SyntheticOwnerAuthorityProvider Owner)> DecideFallbackTargetAsync(
+        string operation, Dictionary<string, object?> payload, string target, bool denyFallbackEvidence)
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock)
+        {
+            Allows = request => !(denyFallbackEvidence && IsFallbackTargetRequest(request, operation, target)),
+        };
+        ChatBotAuthorityDecision decision = await TrustedAuthorityFixture.Authorizer(clock, owner).AuthorizeAsync(
+            TrustedAuthorityFixture.Context(), operation, false, payload, TestContext.Current.CancellationToken, fallbackAggregateId: target).ConfigureAwait(false);
+        return (decision, owner);
+    }
+
+    private static bool IsFallbackTargetRequest(ChatBotOwnerAuthorityRequest request, string operation, string target)
+        => request.Owner == "ChatBot" && request.ResourceId == target && request.Operation == operation && request.Authority == "operation";
+
     /// <summary>Provider awaits cannot turn lapsed authority or a selected expired grant into admitted history.</summary>
     [Theory]
     [InlineData("service", "machine", false)]

@@ -1372,3 +1372,9 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
   summary: Bound exhausted AI-execution recovery listing by tenant and page before loading the complete indexed work inventory.
   evidence: Workflow review W-B8; ReadModelAiExecutionWorkStore.ListExhaustedAsync/ListIndexedAsync scan index pages and tenant items before status/cursor/maximumCount filtering. The same global-scan shape exists at original baseline a8b421b6690ab9c0e66d7274ee5745b26a9e117c. Large inventories impose avoidable operator storage work; settle with tenant/page indexed access and storage-read-count tests without weakening authority expiry checks.
+
+## Deferred from: code review of spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context (2026-10-08 fifth review)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
+  summary: The W-B1 HTTP fallback-target check asks the ChatBot owner for current `operation` authority on the caller-generated `CommandId` stream, which does not exist yet when one of the 17 allowlisted commands without a canonical dispatch target is admitted.
+  evidence: Fifth review (acceptance-auditor) at `src/Hexalith.ChatBot.Server/Authorization/ChatBotRequestAuthorizer.cs:113-120`, with the dispatcher fallback at `src/Hexalith.ChatBot.Server/Gateway/Stages/AcceptedCommandDispatcher.cs:1052`. Medium if true, unverified. This is the same create-semantics question as the 2026-10-07 `NoteId`/`DraftId`/`IntakeId`/`*ChangeId` deferral, which does not name `CommandId` fallback targets. Settle it in A13 owner-mapping design by defining whether a fallback create needs parent/target scope separate from the new stream id. Production denies meanwhile through the unavailable owner provider.
