@@ -2,7 +2,7 @@
 title: 'Story 1.3: Bind Every Request to Trusted Tenant and Actor Context'
 type: 'feature'
 created: '2026-10-07'
-status: 'in-review'
+status: 'review'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: a8b421b6690ab9c0e66d7274ee5745b26a9e117c
@@ -389,7 +389,60 @@ All three layers returned before triage. Fourteen findings were individually ass
 | W-E2 | low | reject | The SDK CAS retry does perform a tenant-bound reread before the guarded update callback after a failed save. The callback denies before any further write and the endpoint discloses no protected result. Adding a store/policy wrapper for this internal reread is beyond a direct correction with negligible end-user harm; accepted R-B2 mutation and disclosure guards remain intact. |
 | W-V1 | maybe-false | defer (carried) | Same internal-producer transport qualification as W-B11; pre-verified existing test gap, already recorded once in the ledger. No new entry or duplicate work is created. |
 
+### Workflow independent review after fifth-review resolution (2026-10-08)
+
+Full story diff `a8b421b..` working tree, excluding `_bmad-output/`. All three layers returned before triage. Twenty-one findings were individually assessed before grouping: four patch entries, one deferral, sixteen rejections. Frozen intent, baseline and accepted relay/owner boundaries are unchanged.
+
+| Finding | Verdict | Route | Verified evidence |
+| --- | --- | --- | --- |
+| S-B1 | medium | patch | The stage still denies `ApproveTenantPolicyChange` with `threshold_policy_unauthorized` (`ParticipantAuthorizationStage.cs:166`, unchanged from baseline). However, the authorizer now runs first, and its `Denied` map (`ChatBotRequestAuthorizer.cs:354`) leaves this command out. Owner-denied and machine callers therefore get `authorization_denied`, which changes an established Story 1.2 typed refusal. Every other stage-specific code is mapped. |
+| S-B2 | medium | patch | This story newly checks machine reads against grants that must match `SurfaceOrigin` exactly; baseline never enforced `AllowedQueryNames`. Read origin comes only from the `X-Hexalith-Surface-Origin` header (`ChatBotRequestContextResolver.ResolveCurrent`), but the CLI and MCP adapters declare origin only in command bodies (`Cli/Program.cs`, `Mcp/Program.cs`). Once owner mappings exist, a grant surfaced for `cli` or `mcp` denies the adapter's own reads with `service_client_wrong_surface`. The parity tests set the header explicitly, which hides this. |
+| S-B3 | low | reject | Baseline already ran the authorization stage before the allowlist check (pipeline `:75` vs `:88` at `a8b421b`), so the authority-dependent reason code predates this story. The only new cost is extra owner calls for two non-allowlisted commands. Reordering would change established refusal precedence, which is more than a direct correction. |
+| S-B4 | low | patch | The human Parties identity request for the subject (`ChatBotRequestAuthorizer.cs:129`) is added again by the payload party loop when `RequesterId`, `SourceActorId` or `RequesterRef` equals the caller, which is normal for drafts and proposals. The value-record requests are never de-duplicated. The owner is called twice, and the duplicate `Parties:` reference reaches the decision and the audit `SourceEvidenceRefs`, because `AuditEnvelopeFactory.cs:1069` does not de-duplicate either. |
+| S-B5 | low | patch | `EvidenceRejectionReason` hard-codes 5 minutes and 60 seconds (`ChatBotRequestAuthorizer.cs:344-345`). `ServiceClientGrantProjectionCache` defines the same acceptance-criterion bounds as `NormalGrantStaleness`/`RevocationStaleness`. Changing one would leave the authorizer and the cache enforcing different limits. Referencing the existing constants is a direct correction. |
+| S-B6 | false | reject | `AddIdentity` is called only inside `ChatBotAuthorityPrincipal`'s own constructor (`:42`). No code adds identities after construction, so the claim-based readers cannot be widened in the way the finding describes. |
+| S-B7 | low | reject | The binding stage did not detect a cross-tenant `TenantRef` at baseline either. The authorizer now denies it with the uniform safe denial, so the only difference is the reason code instead of `tenant_mismatch`. Nothing is admitted or disclosed, and merging the two detectors is a refactor. |
+| S-B8 | false | reject | The only production actor producer is `ClaimsAuthenticationStage`, which always passes the bound context (`:14`). The `ChatBotAuthenticationResult.Authenticated(...)` overloads have no production callers, so the `?? ActorType` fallback cannot emit `user` in production. |
+| S-B9 | low | reject | Metadata-only reason logs were the approved diagnostic. Counters and activities would be new observability features, not a direct correction, and the unavailable production provider denies every request regardless. |
+| S-B10 | low | reject | Carried from the first review ("Owner/authority/actor names are plain strings"): a refactor with no concrete divergence shown. The unused `Documents` audit allowance admits nothing extra, because the authorizer never emits `Documents` references. |
+| S-B11 | low | reject | No mis-set catalog flag was shown. Switching to named arguments or a mapping helper is a refactor, not a direct correction. |
+| S-B12 | false | reject | Carried from the re-review rejection of "Explicit JSON null on non-whitelisted reference properties". `ProjectScopeRefs` is still a non-null contract list. The validator's `?? []` is defensive and does not make null contract-valid. |
+| S-B13 | low | reject | Cloning a few claims per request costs a negligible amount, and no cost was measured. Consolidating the snapshots is a refactor. |
+| S-E1 | false | reject | Non-project `AffectedResourceReferences`/`EvidenceReferences` are stored as opaque safe metadata tokens (`GovernedOperationAggregate` `AllSafeMetadataTokens`). Only `project:` entries derive scope (`ProjectIdFromResources`), and those already require Projects evidence. Citing another resource id leads to no read, content resolution or authority. |
+| S-E2 | low | reject | Carried from B8/R-B8/W-B7: cache retention is unbounded, but the unavailable production provider cannot populate entries, and eviction could weaken permanent revocation. |
+| S-E3 | maybe-false | defer | Baseline `ClaimsAuthenticationStage` already mapped `preferred_username` `service-account-<id>` to a service client (`a8b421b` `:72-76`). This story kept that convention and added conflict checks. Whether it can be abused depends on whether the configured IdP lets a human hold such a username, and machine grants still need owner evidence for that client. Medium if true. |
+| S-E4 | low | reject | Minimal-API body binding runs before the token check, so a malformed unauthenticated body gets 400 instead of 401. DTO deserialization is not a protected effect, and nothing is disclosed. Moving the binding behind a filter is more than a direct correction. |
+| S-E5 | false | reject | Only two test producers add `ParticipantAuthorityClaim`, each exactly once per persona (`CommandGatewayAdmissionApiE2ETests.cs:3951`, `CommandGatewayTests.cs:5256`). No persona carries several values, so `FindFirst` cannot hide a deny value. |
+| S-E6 | false | reject | Every revocation producer uses lowercase `true` (`ServiceClientGrantAuthorizationTests.cs:129`, `RegressionAuthorityFixture.cs:143`). No persona uses other casing, so the exact `HasClaim` match cannot misread a revoked grant. |
+| S-E7 | false | reject | Baseline also defaulted unmarked tokens to the human/user class. The class itself confers no authority: human access still needs current Parties identity, Tenants TenantOwner and ChatBot grant evidence for that exact subject, and only the configured issuer authenticates. |
+| S-V1 | low | reject | Pre-verified: admission-time `RecoverPendingOutcomeAsync` restores identity and domain receipts without the authority guard, and no test covers a lapse there. Those writes mirror committed EventStore/audit evidence that the restart reconciler also writes with no caller at all, and the post-admission check still denies and discloses nothing. Hitting it needs a millisecond lapse during replay recovery, and the fix threads the guard through three internal methods. |
+
 ## Verification
+
+### Workflow review patch verification (2026-10-08)
+
+- Applied the four routed patches from the post-fifth-review workflow triage:
+  - **S-B1:** `ApproveTenantPolicyChange` keeps `threshold_policy_unauthorized`; `MissingRequiredOwnerDeniesAdministration` now asserts the reason code for every row.
+  - **S-B2:** the CLI and MCP adapters send their own surface in the `X-Hexalith-Surface-Origin` header on every request. No public Client API changed.
+  - **S-B4:** owner requests are de-duplicated; `PayloadReferenceToTheCallerIssuesASingleSubjectPartiesRequest` is the new test.
+  - **S-B5:** the authorizer evidence bounds reuse the cache's staleness constants.
+- S-E3 is recorded in the deferred-work ledger. The adapter header has no dedicated test, because both composition roots build their `HttpClient` inline.
+- Release builds of Server, Conformance, Architecture, Client, Contracts, Cli and Mcp tests, plus RecoverySandbox, finished with zero warnings and errors (`dotnet build tests/<project>/<project>.csproj -c Release -m:1 /nr:false`).
+- Native lanes ran with `XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh <runner> <ctrf>`:
+
+| Lane | Result |
+| --- | --- |
+| Server | **2,536/2,536** |
+| Conformance | **149/149** |
+| Client | **91/91** |
+| Contracts | **501/501** |
+| Cli | **24/24** |
+| Mcp | **30/30** |
+| Architecture | **122/123** |
+
+- The only failure is the unchanged `RootDeclaredSiblingPackageWrappersShouldDelegateVersionsToSharedBuildsCatalog`. It comes from the Conversations submodule's local `Aspire.Hosting` 13.6.1 `PackageVersion Update`, which is still present at the user-committed gitlink `cf485f1` (`1f2fca1`).
+- `git -c core.whitespace=cr-at-eol diff --check -- src tests` passed, and every submodule matches its committed gitlink.
+- The Debug/source and Aspire/runtime blockers from the fifth-review verification still apply. The spec and sprint entry stay at `review` under `docs/story-evidence-integrity.md`.
 
 ### Fifth-review patch verification (2026-10-08)
 

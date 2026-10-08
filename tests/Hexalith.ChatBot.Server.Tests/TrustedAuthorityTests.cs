@@ -44,17 +44,32 @@ public sealed class TrustedAuthorityTests
     }
 
     [Theory]
-    [InlineData("ChatBot")]
-    [InlineData("Tenants")]
-    [InlineData("Parties")]
-    public async Task MissingRequiredOwnerDeniesAdministration(string deniedOwner)
+    [InlineData("ChatBot", nameof(SubmitTenantPolicyChange))]
+    [InlineData("Tenants", nameof(SubmitTenantPolicyChange))]
+    [InlineData("Parties", nameof(SubmitTenantPolicyChange))]
+    [InlineData("ChatBot", nameof(ApproveTenantPolicyChange))]
+    public async Task MissingRequiredOwnerDeniesAdministration(string deniedOwner, string operation)
     {
         TrustedAuthorityClock clock = new();
         SyntheticOwnerAuthorityProvider owner = new(clock) { Allows = request => request.Owner != deniedOwner };
         ChatBotAuthorityDecision decision = await TrustedAuthorityFixture.Authorizer(clock, owner).AuthorizeAsync(
-            TrustedAuthorityFixture.Context(), nameof(SubmitTenantPolicyChange), false, new { PolicyChangeId = "change-alpha" }, TestContext.Current.CancellationToken);
+            TrustedAuthorityFixture.Context(), operation, false, new { PolicyChangeId = "change-alpha" }, TestContext.Current.CancellationToken);
         decision.IsAllowed.ShouldBeFalse();
         decision.EvidenceReferences.ShouldBeEmpty();
+        // The authorizer keeps the established Story 1.2 typed refusal that the downstream policy stage also returns.
+        decision.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized);
+    }
+
+    [Fact]
+    public async Task PayloadReferenceToTheCallerIssuesASingleSubjectPartiesRequest()
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock);
+        ChatBotAuthorityDecision decision = await TrustedAuthorityFixture.Authorizer(clock, owner).AuthorizeAsync(
+            TrustedAuthorityFixture.Context(), nameof(SubmitTenantPolicyChange), false, new { PolicyChangeId = "change-alpha", RequesterRef = "actor-alpha" }, TestContext.Current.CancellationToken);
+        decision.IsAllowed.ShouldBeTrue();
+        owner.Requests.Where(static request => request.Owner == "Parties" && request.ResourceId == "actor-alpha").ShouldHaveSingleItem();
+        decision.EvidenceReferences.ShouldBeUnique();
     }
 
     [Theory]

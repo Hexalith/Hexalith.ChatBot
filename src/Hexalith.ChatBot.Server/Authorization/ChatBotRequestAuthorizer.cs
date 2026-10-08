@@ -163,7 +163,7 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
             }
         }
 
-        foreach (ChatBotOwnerAuthorityRequest request in requests)
+        foreach (ChatBotOwnerAuthorityRequest request in requests.Distinct())
         {
             ChatBotOwnerAuthorityEvidence? evidence = await GetEvidenceAsync(request, started, cancellationToken).ConfigureAwait(false);
             if (evidence is null)
@@ -341,8 +341,8 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
         if (evidence.ObservedAt.Offset != TimeSpan.Zero || evidence.RevocationCheckedAt.Offset != TimeSpan.Zero || evidence.ExpiresAt.Offset != TimeSpan.Zero) { return "non-utc-timestamp"; }
         if (evidence.ObservedAt > now || evidence.RevocationCheckedAt > now) { return "future-observation"; }
         if (evidence.RevocationCheckedAt < evidence.ObservedAt) { return "invalid-revocation-order"; }
-        if (now - evidence.ObservedAt >= TimeSpan.FromMinutes(5)) { return "observation-expired"; }
-        if (now - evidence.RevocationCheckedAt >= TimeSpan.FromSeconds(60)) { return "revocation-expired"; }
+        if (now - evidence.ObservedAt >= ServiceClientGrantProjectionCache.NormalGrantStaleness) { return "observation-expired"; }
+        if (now - evidence.RevocationCheckedAt >= ServiceClientGrantProjectionCache.RevocationStaleness) { return "revocation-expired"; }
         if (evidence.ExpiresAt <= now) { return "evidence-expired"; }
         if (request.RequireCurrent && (evidence.ObservedAt < started || evidence.RevocationCheckedAt < started)) { return "not-current"; }
         return null;
@@ -354,7 +354,7 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
     private static ChatBotAuthorityDecision Denied(string operation) => new(null, operation switch
     {
         nameof(Hexalith.ChatBot.Contracts.Commands.AssignTenantAdminRole) or nameof(Hexalith.ChatBot.Contracts.Commands.SetAssociationConfidenceThresholds)
-            or nameof(Hexalith.ChatBot.Contracts.Commands.SubmitTenantPolicyChange) => ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized,
+            or nameof(Hexalith.ChatBot.Contracts.Commands.SubmitTenantPolicyChange) or nameof(Hexalith.ChatBot.Contracts.Commands.ApproveTenantPolicyChange) => ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized,
         nameof(Hexalith.ChatBot.Contracts.Commands.SubmitEscalationPolicyChange) => ChatBotAuthorizationReasonCodes.EscalationPolicyUnauthorized,
         nameof(Hexalith.ChatBot.Contracts.Commands.SubmitNotificationRoutingChange) => ChatBotAuthorizationReasonCodes.NotificationRoutingUnauthorized,
         _ => ChatBotAuthorizationReasonCodes.AuthorizationDenied,

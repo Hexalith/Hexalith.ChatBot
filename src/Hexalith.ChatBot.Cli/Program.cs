@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Client;
+using Hexalith.ChatBot.Contracts.Enums;
 
 namespace Hexalith.ChatBot.Cli;
 
@@ -19,6 +20,8 @@ public static class Program
 
         using var httpClient = new HttpClient();
         httpClient.BaseAddress = new Uri(baseUrl, UriKind.Absolute);
+        // Reads bind their declared surface from this header; commands also declare it in their bodies.
+        httpClient.DefaultRequestHeaders.Add("X-Hexalith-Surface-Origin", ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Cli));
         var transport = new GeneratedClient(httpClient);
         var client = new ChatBotClient(transport);
         return await ChatBotCliCommands.InvokeAsync(args, client, Console.Out, Console.Error, CancellationToken.None)

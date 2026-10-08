@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Client;
+using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Mcp;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,8 @@ _ = builder.Services.AddSingleton(static _ =>
     }
 
     var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl, UriKind.Absolute) };
+    // Reads bind their declared surface from this header; commands also declare it in their bodies.
+    httpClient.DefaultRequestHeaders.Add("X-Hexalith-Surface-Origin", ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Mcp));
     string? accessToken = Environment.GetEnvironmentVariable("HEXALITH_CHATBOT_ACCESS_TOKEN");
     if (!string.IsNullOrWhiteSpace(accessToken))
     {
