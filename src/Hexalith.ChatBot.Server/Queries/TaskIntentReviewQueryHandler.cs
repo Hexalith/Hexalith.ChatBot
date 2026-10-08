@@ -40,9 +40,7 @@ internal sealed class TaskIntentReviewQueryHandler(
             .ConfigureAwait(false);
         if (record is null)
         {
-            return Payload(
-                ChatBotReadQueryResultMapper.TaskIntentReviewUnavailable(request.ProjectId, request.TaskIntentId, TaskIntentReasonCodes.MissingCapturedIntent, query.CorrelationId),
-                "chatbot.task-intent-review.v1");
+            return QueryResult.Failure(ChatBotAuthorizationReasonCodes.SafeNotFound);
         }
 
         if (record.ConversionReadinessBlocked)

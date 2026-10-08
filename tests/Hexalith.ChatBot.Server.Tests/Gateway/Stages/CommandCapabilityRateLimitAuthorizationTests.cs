@@ -24,13 +24,14 @@ public sealed class CommandCapabilityRateLimitAuthorizationTests
     private const string SiblingCapability = nameof(Hexalith.ChatBot.Contracts.Commands.MarkEmailAssociationNeedsReview);
 
     private static readonly DateTimeOffset FixedNow = new(2026, 6, 3, 12, 0, 0, TimeSpan.Zero);
+    private static readonly FixedClock Clock = new(FixedNow);
 
     // ----- Authorization of the SubmitCommandCapabilityRateLimit command itself (single human policy-admin) -----
 
     [Fact]
     public async Task RateLimitShouldRequireSingleHumanPolicyAdminWithNoApprover()
     {
-        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
+        ParticipantAuthorizationStage stage = new(clock: Clock, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer(Clock));
 
         // Command-capability governance is the policy-admin's domain (the "security engineer" persona maps to
         // AdminScope.Policy). A single authorized human policy-admin applies it — no approver needed. A tenant-admin is
@@ -73,7 +74,7 @@ public sealed class CommandCapabilityRateLimitAuthorizationTests
     [Fact]
     public async Task RateLimitShouldRejectOutOfBoundsOrUndeclaredBudgetAtGateway()
     {
-        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
+        ParticipantAuthorizationStage stage = new(clock: Clock, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer(Clock));
 
         foreach (SubmitCommandCapabilityRateLimit invalid in new[]
                  {
@@ -113,7 +114,7 @@ public sealed class CommandCapabilityRateLimitAuthorizationTests
     [Fact]
     public async Task SelfLockoutGuardShouldRejectRateLimitingAnFr74GovernanceCommand()
     {
-        ParticipantAuthorizationStage stage = new( requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
+        ParticipantAuthorizationStage stage = new(clock: Clock, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer(Clock));
 
         // An admin cannot rate-limit the very commands needed to govern/reverse a control — including the rate-limit
         // command itself — which would otherwise risk locking the tenant out of governance.
@@ -150,9 +151,9 @@ public sealed class CommandCapabilityRateLimitAuthorizationTests
         FakeCommandCapabilityCommandHistory history = new();
         history.Seed(Tenant, RateLimitedCapability, FixedNow.AddMinutes(-1), FixedNow.AddMinutes(-2), FixedNow.AddMinutes(-3));
         ParticipantAuthorizationStage stage = new(
-            clock: new FixedClock(FixedNow),
+            clock: Clock,
             rateLimitProvider: rateLimits,
-            commandHistory: history, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
+            commandHistory: history, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer(Clock));
 
         foreach (ChatBotAuthenticatedActor actor in new[]
                  {
@@ -196,9 +197,9 @@ public sealed class CommandCapabilityRateLimitAuthorizationTests
         FakeCommandCapabilityCommandHistory history = new();
         history.Seed(Tenant, RateLimitedCapability, FixedNow.AddMinutes(-1), FixedNow.AddMinutes(-2));
         ParticipantAuthorizationStage stage = new(
-            clock: new FixedClock(FixedNow),
+            clock: Clock,
             rateLimitProvider: rateLimits,
-            commandHistory: history, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
+            commandHistory: history, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer(Clock));
 
         ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
             Submission(new { AssociationId = "association-test", ProjectId = "project-test" }, RateLimitedCapability),
@@ -216,9 +217,9 @@ public sealed class CommandCapabilityRateLimitAuthorizationTests
         FakeCommandCapabilityCommandHistory history = new();
         history.Seed(Tenant, RateLimitedCapability, FixedNow.AddMinutes(-1));
         ParticipantAuthorizationStage stage = new(
-            clock: new FixedClock(FixedNow),
+            clock: Clock,
             rateLimitProvider: rateLimits,
-            commandHistory: history, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
+            commandHistory: history, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer(Clock));
 
         // The rate-limited type for this tenant is at budget → denied.
         ChatBotAuthorizationResult throttled = await stage.AuthorizeAsync(
@@ -257,9 +258,9 @@ public sealed class CommandCapabilityRateLimitAuthorizationTests
         FakeCommandCapabilityCommandHistory history = new();
         history.Seed(Tenant, nameof(SubmitCommandCapabilityRateLimit), FixedNow.AddMinutes(-1));
         ParticipantAuthorizationStage stage = new(
-            clock: new FixedClock(FixedNow),
+            clock: Clock,
             rateLimitProvider: rateLimits,
-            commandHistory: history, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
+            commandHistory: history, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer(Clock));
 
         ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
             Submission(RateLimitSubmit()),
@@ -287,9 +288,9 @@ public sealed class CommandCapabilityRateLimitAuthorizationTests
         disabled.Disable(Tenant, RateLimitedCapability);
         ParticipantAuthorizationStage disabledStage = new(
             commandCapabilityControlStateProvider: disabled,
-            clock: new FixedClock(FixedNow),
+            clock: Clock,
             rateLimitProvider: rateLimits,
-            commandHistory: history, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
+            commandHistory: history, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer(Clock));
 
         ChatBotAuthorizationResult disabledResult = await disabledStage.AuthorizeAsync(
             Submission(new { AssociationId = "association-test", ProjectId = "project-test" }, RateLimitedCapability),
@@ -303,9 +304,9 @@ public sealed class CommandCapabilityRateLimitAuthorizationTests
         quarantined.Quarantine(Tenant, RateLimitedCapability);
         ParticipantAuthorizationStage quarantinedStage = new(
             commandCapabilityControlStateProvider: quarantined,
-            clock: new FixedClock(FixedNow),
+            clock: Clock,
             rateLimitProvider: rateLimits,
-            commandHistory: history, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
+            commandHistory: history, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer(Clock));
 
         ChatBotAuthorizationResult quarantinedResult = await quarantinedStage.AuthorizeAsync(
             Submission(new { AssociationId = "association-test", ProjectId = "project-test" }, RateLimitedCapability),
@@ -339,9 +340,9 @@ public sealed class CommandCapabilityRateLimitAuthorizationTests
             FixedNow.AddHours(-3),      // aged out
             FixedNow.AddMinutes(30));   // future → ignored (negative age)
         ParticipantAuthorizationStage stage = new(
-            clock: new FixedClock(FixedNow),
+            clock: Clock,
             rateLimitProvider: rateLimits,
-            commandHistory: history, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
+            commandHistory: history, requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer(Clock));
 
         ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
             Submission(new { AssociationId = "association-test", ProjectId = "project-test" }, RateLimitedCapability),

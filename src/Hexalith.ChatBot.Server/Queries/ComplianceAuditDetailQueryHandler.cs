@@ -52,14 +52,14 @@ internal sealed class ComplianceAuditDetailQueryHandler(
             .Where(AuditMetadata.IsSafeStableIdentifier)
             .Distinct(StringComparer.Ordinal).ToArray();
         bool hasPerProjectAuthority = RequestAuthorizer.IsCurrent(principal) && await RequestAuthorizer.HasProjectAuthoritiesAsync(principal.Context, projectRefs, QueryType, cancellationToken,
-            () => RequestAuthorizer.IsCurrent(principal)).ConfigureAwait(false) &&
+            principal).ConfigureAwait(false) &&
             RequestAuthorizer.IsCurrent(principal);
 
         ComplianceAuditDetail detail = ComplianceAuditReadPolicy.Detail(envelope, hasPerProjectAuthority);
         return QueryResult.FromPayload(ComplianceAuditHttpResults.DetailJsonElement(detail), "chatbot.compliance-audit-detail.v1");
     }
 
-    /// <summary>Preserves the established restricted-detail refusal if final compliance authority lapses.</summary>
+    /// <summary>Preserves the restricted-detail refusal if any retained owner authority lapses before disclosure.</summary>
     protected override QueryResult FinalizeResult(QueryResult result, ChatBotAuthorityPrincipal principal)
     {
         if (RequestAuthorizer.IsCurrent(principal) || !result.Success) { return result; }

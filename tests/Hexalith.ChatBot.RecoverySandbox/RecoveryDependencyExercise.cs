@@ -583,7 +583,9 @@ internal sealed class RecoveryDependencyExercise(
                 string.Equals(owner.Operation, commandType, StringComparison.Ordinal) &&
                 owner.Owner switch
                 {
-                    "ChatBot" => string.Equals(owner.Authority, "operation", StringComparison.Ordinal),
+                    "ChatBot" => string.Equals(owner.Authority, "operation", StringComparison.Ordinal) &&
+                        (string.Equals(owner.ResourceId, correlationId, StringComparison.Ordinal) ||
+                            string.Equals(owner.ResourceId, "project-recovery", StringComparison.Ordinal)),
                     "Parties" => string.Equals(owner.ResourceId, "recovery-validator", StringComparison.Ordinal),
                     "Projects" => string.Equals(owner.ResourceId, "project-recovery", StringComparison.Ordinal),
                     _ => false,

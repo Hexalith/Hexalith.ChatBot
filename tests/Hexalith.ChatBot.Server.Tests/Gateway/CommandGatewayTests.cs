@@ -1372,7 +1372,7 @@ public sealed partial class CommandGatewayTests
         RecordingOperatorAlertSink alertSink = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             alertSink: alertSink,
@@ -1401,7 +1401,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -1437,7 +1437,7 @@ public sealed partial class CommandGatewayTests
         RecordingOperatorAlertSink alertSink = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             alertSink: alertSink,
@@ -1465,7 +1465,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -1521,7 +1521,7 @@ public sealed partial class CommandGatewayTests
         RecordingOperatorAlertSink alertSink = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             alertSink: alertSink,
@@ -1549,7 +1549,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -1602,7 +1602,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -1645,7 +1645,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -1689,7 +1689,7 @@ public sealed partial class CommandGatewayTests
         RecordingOperatorAlertSink alertSink = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             alertSink: alertSink,
@@ -1720,7 +1720,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -1748,7 +1748,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -1786,7 +1786,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -1814,7 +1814,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -1857,7 +1857,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -1886,7 +1886,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -1929,7 +1929,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -1958,7 +1958,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -2001,7 +2001,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -2030,7 +2030,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -2073,7 +2073,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -2102,7 +2102,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -2145,7 +2145,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -2174,7 +2174,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -2217,7 +2217,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -2246,7 +2246,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -2290,7 +2290,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -2319,7 +2319,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -2363,7 +2363,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -2392,7 +2392,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -2435,7 +2435,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -2464,7 +2464,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -2507,7 +2507,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -2536,7 +2536,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -2579,7 +2579,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -2608,7 +2608,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -2658,7 +2658,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -2687,7 +2687,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -2737,7 +2737,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -2766,7 +2766,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -2818,7 +2818,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -2847,7 +2847,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -2899,7 +2899,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -2928,7 +2928,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -2986,7 +2986,7 @@ public sealed partial class CommandGatewayTests
             RecordingReplayIntentQueue replayQueue = new();
             CommandGateway gateway = Gateway(
                 dispatcher,
-                authorizationStage: new ParticipantAuthorizationStage(),
+                authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
                 auditWriter: auditWriter,
                 replayQueue: replayQueue,
                 commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -3013,7 +3013,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -3037,7 +3037,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -3086,7 +3086,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -3110,7 +3110,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -3155,7 +3155,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -3180,7 +3180,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -3225,7 +3225,7 @@ public sealed partial class CommandGatewayTests
         RecordingReplayIntentQueue replayQueue = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -3250,7 +3250,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -3294,7 +3294,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
             new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
@@ -3792,7 +3792,7 @@ public sealed partial class CommandGatewayTests
         InMemoryOperationStatusStore statusStore = new();
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             idempotencyStore: idempotencyStore,
             operationStatusStore: statusStore,
@@ -3853,7 +3853,7 @@ public sealed partial class CommandGatewayTests
 
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             idempotencyStore: idempotencyStore,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -3887,7 +3887,7 @@ public sealed partial class CommandGatewayTests
         InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             idempotencyStore: idempotencyStore,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -3925,6 +3925,7 @@ public sealed partial class CommandGatewayTests
         CommandGateway gateway = Gateway(
             dispatcher,
             authorizationStage: new ParticipantAuthorizationStage(
+                clock: new FixedClock(),
                 serviceClientGrantValidator: new ServiceClientGrantValidator(
                     new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticServiceClientGrantResolver(),
                     new FixedClock(),
@@ -3972,7 +3973,7 @@ public sealed partial class CommandGatewayTests
         InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             idempotencyStore: idempotencyStore,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -4018,7 +4019,7 @@ public sealed partial class CommandGatewayTests
         InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             idempotencyStore: idempotencyStore,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -4112,7 +4113,7 @@ public sealed partial class CommandGatewayTests
         InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             idempotencyStore: idempotencyStore,
             riskClassifier: new DeterministicAiActionRiskClassifier(),
             approvalGate: new AiActionApprovalGate(
@@ -4143,7 +4144,7 @@ public sealed partial class CommandGatewayTests
             InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
             CommandGateway gateway = Gateway(
                 dispatcher,
-                authorizationStage: new ParticipantAuthorizationStage(),
+                authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
                 auditWriter: auditWriter,
                 idempotencyStore: idempotencyStore,
                 commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -5244,7 +5245,7 @@ public sealed partial class CommandGatewayTests
         InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             idempotencyStore: idempotencyStore);
 
@@ -5281,6 +5282,7 @@ public sealed partial class CommandGatewayTests
         CommandGateway gateway = Gateway(
             dispatcher,
             authorizationStage: new ParticipantAuthorizationStage(
+                clock: new FixedClock(),
                 serviceClientGrantValidator: new ServiceClientGrantValidator(
                     new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticServiceClientGrantResolver(),
                     new FixedClock(),
@@ -5333,7 +5335,7 @@ public sealed partial class CommandGatewayTests
         InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(),
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             idempotencyStore: idempotencyStore,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -5367,7 +5369,8 @@ public sealed partial class CommandGatewayTests
         CommandGateway gateway = Gateway(
             dispatcher,
             authorizationStage: new ParticipantAuthorizationStage(
-                new FixedCorrectionDependencyReadiness(
+                clock: new FixedClock(),
+                correctionDependencyReadiness: new FixedCorrectionDependencyReadiness(
                     new AssociationCorrectionDependencyReadinessStatus(
                         IsWorkflowRuntimeReady: true,
                         IsProjectionInvalidationReady: false,
@@ -5407,7 +5410,8 @@ public sealed partial class CommandGatewayTests
         CommandGateway gateway = Gateway(
             dispatcher,
             authorizationStage: new ParticipantAuthorizationStage(
-                new FixedCorrectionDependencyReadiness(
+                clock: new FixedClock(),
+                correctionDependencyReadiness: new FixedCorrectionDependencyReadiness(
                     new AssociationCorrectionDependencyReadinessStatus(
                         IsWorkflowRuntimeReady: false,
                         IsProjectionInvalidationReady: true,
@@ -5447,7 +5451,8 @@ public sealed partial class CommandGatewayTests
         CommandGateway gateway = Gateway(
             dispatcher,
             authorizationStage: new ParticipantAuthorizationStage(
-                new FixedCorrectionDependencyReadiness(
+                clock: new FixedClock(),
+                correctionDependencyReadiness: new FixedCorrectionDependencyReadiness(
                     new AssociationCorrectionDependencyReadinessStatus(
                         IsWorkflowRuntimeReady: true,
                         IsProjectionInvalidationReady: true,
@@ -5484,7 +5489,8 @@ public sealed partial class CommandGatewayTests
         CommandGateway gateway = Gateway(
             dispatcher,
             authorizationStage: new ParticipantAuthorizationStage(
-                new FixedCorrectionDependencyReadiness(
+                clock: new FixedClock(),
+                correctionDependencyReadiness: new FixedCorrectionDependencyReadiness(
                     new AssociationCorrectionDependencyReadinessStatus(
                         IsWorkflowRuntimeReady: true,
                         IsProjectionInvalidationReady: true,

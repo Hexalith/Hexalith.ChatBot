@@ -98,9 +98,9 @@ internal static class RegressionAuthorityFixture
     }
 
     /// <summary>Authorizes an isolated downstream stage using current synthetic owner evidence and independent machine grants.</summary>
-    public static ChatBotRequestAuthorizer StageAuthorizer()
+    public static ChatBotRequestAuthorizer StageAuthorizer(ISystemClock? clock = null)
     {
-        ISystemClock clock = new SystemClock();
+        clock ??= new SystemClock();
         return TrustedAuthorityFixture.Authorizer(clock, new RegressionOwnerAuthorityProvider(clock, independentMachineGrants: true));
     }
 

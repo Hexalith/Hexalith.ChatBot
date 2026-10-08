@@ -112,7 +112,7 @@ internal sealed class ChatBotCommandAdmissionPipeline(
             return ChatBotCommandAdmissionDecision.Rejected(ChatBotAuthorizationReasonCodes.CommandNotAllowlisted, submission.CorrelationId, submission.TaskId);
         }
 
-        ChatBotAuthorityDecision authority = await requestAuthorizer.AuthorizeAsync(trusted, submission.Request.CommandType ?? string.Empty, false, submission.Request.Command, cancellationToken).ConfigureAwait(false);
+        ChatBotAuthorityDecision authority = await requestAuthorizer.AuthorizeAsync(trusted, submission.Request.CommandType ?? string.Empty, false, submission.Request.Command, cancellationToken, fallbackAggregateId: submission.Request.CommandId ?? string.Empty).ConfigureAwait(false);
         if (!authority.IsAllowed)
         {
             return await DenyAsync(submission, binding.TenantId, actor.ActorId, authority.ReasonCode, cancellationToken).ConfigureAwait(false);

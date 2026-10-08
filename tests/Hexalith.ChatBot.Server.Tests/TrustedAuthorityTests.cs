@@ -373,7 +373,7 @@ public sealed class TrustedAuthorityTests
         CorrectEmailProjectAssociation correction = new(Note, "intake-alpha", "project-prior", "project-target", AssociationCorrectionKind.ProjectReassignment,
             null, "association-prior", "fingerprint-alpha", 1, "v1");
         ChatBotCommandSubmission submission = new(principal, new CommandSubmissionRequest { CommandType = nameof(CorrectEmailProjectAssociation), Command = correction }, "correlation-alpha", null);
-        ParticipantAuthorizationStage stage = new(requestAuthorizer: TrustedAuthorityFixture.Authorizer(clock, owner));
+        ParticipantAuthorizationStage stage = new(clock: clock, requestAuthorizer: TrustedAuthorityFixture.Authorizer(clock, owner));
         ChatBotAuthorizationResult result = await stage.AuthorizeAsync(submission, new("actor-alpha", principal, RequestContext: context), new("tenant-alpha"), TestContext.Current.CancellationToken);
         result.IsAllowed.ShouldBeTrue();
         owner.Requests.ShouldContain(static request => request.Owner == "Projects" && request.ResourceId == "project-prior" && request.RequireCurrent);

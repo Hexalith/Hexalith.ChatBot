@@ -125,10 +125,10 @@ _ = chatBot
     .WithEnvironment("ChatBot__Projection__Topic", $"tenant-alpha.{ChatBotAspireModule.PubSubTopicName}")
     .WithEnvironment("ChatBot__Projection__DeadLetterTopic", ChatBotAspireModule.GetTenantDeadLetterTopic("tenant-alpha"));
 
-// The association subscription route admits only deliveries that crossed the chatbot's own sidecar, proven by the
-// Dapr application-channel token (AD-28). Give a per-run token to both the app and its sidecar, as the canonical
-// EventStore AppHost does; without it every association delivery is refused. Publish targets supply APP_API_TOKEN
-// from their own secret store.
+// The Dapr application-channel token (AD-28) verifies deliveries through the chatbot's own sidecar for the
+// association subscription route and the SDK /process and /query routes. Give a per-run token to both the app
+// and its sidecar, as the canonical EventStore AppHost does; without it every association delivery is refused.
+// Publish targets supply APP_API_TOKEN from their own secret store.
 if (builder.ExecutionContext.IsRunMode)
 {
     _ = chatBot.WithGeneratedEventStoreAppChannelToken();

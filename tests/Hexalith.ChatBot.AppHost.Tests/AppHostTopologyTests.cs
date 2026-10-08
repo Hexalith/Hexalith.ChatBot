@@ -105,8 +105,9 @@ public static class AppHostTopologyTests
     }
 
     /// <summary>
-    /// The association subscription route compares the sidecar's <c>dapr-api-token</c> with the app's
-    /// <c>APP_API_TOKEN</c>; the local topology must give both the same per-run token after the sidecar exists.
+    /// The association subscription and SDK <c>/process</c>/<c>/query</c> routes verify the sidecar's
+    /// <c>dapr-api-token</c> against the app's <c>APP_API_TOKEN</c>. The topology must give both the same token
+    /// after the sidecar exists.
     /// </summary>
     [Fact]
     public static void AppHostShouldShareAGeneratedAppChannelTokenBetweenTheChatBotAndItsSidecar()
@@ -122,10 +123,12 @@ public static class AppHostTopologyTests
 
         endpoint.ShouldContain("configuration[\"APP_API_TOKEN\"]");
         endpoint.ShouldContain("Headers[\"dapr-api-token\"]");
+        const string SidecarAnchor = "builder.AddHexalithChatBot(";
+        appHost.ShouldContain(SidecarAnchor);
         const string Wiring = "_ = chatBot.WithGeneratedEventStoreAppChannelToken();";
         appHost.ShouldContain("if (builder.ExecutionContext.IsRunMode)\n{\n    " + Wiring + "\n}");
         appHost.IndexOf(Wiring, StringComparison.Ordinal)
-            .ShouldBeGreaterThan(appHost.IndexOf("builder.AddHexalithChatBot(", StringComparison.Ordinal));
+            .ShouldBeGreaterThan(appHost.IndexOf(SidecarAnchor, StringComparison.Ordinal));
     }
 
     [Fact]

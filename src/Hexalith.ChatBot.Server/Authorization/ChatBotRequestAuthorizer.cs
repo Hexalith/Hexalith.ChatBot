@@ -30,7 +30,7 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
     }
 
     /// <summary>Collects current project evidence and jointly validates its complete set before disclosure.</summary>
-    public async ValueTask<bool> HasProjectAuthoritiesAsync(ChatBotRequestContext context, IEnumerable<string> projects, string operation, CancellationToken cancellationToken, Func<bool>? authorityIsCurrent = null)
+    public async ValueTask<bool> HasProjectAuthoritiesAsync(ChatBotRequestContext context, IEnumerable<string> projects, string operation, CancellationToken cancellationToken, ChatBotAuthorityPrincipal? principal = null)
     {
         string[] exactProjects = projects.Distinct(StringComparer.Ordinal).ToArray();
         if (context.TenantId is null || exactProjects.Length == 0 || exactProjects.Any(static project => !AuditMetadata.IsSafeStableIdentifier(project) || project == "*") || catalog.Find(operation, true) is null)
@@ -42,18 +42,20 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
         List<ChatBotOwnerAuthorityEvidence> evidence = [];
         foreach (string project in exactProjects)
         {
-            if (authorityIsCurrent is not null && !authorityIsCurrent()) { return false; }
+            if (principal is not null && !IsCurrent(principal)) { return false; }
             ChatBotOwnerAuthorityEvidence? current = await GetEvidenceAsync(Request(context, "Projects", project, operation, "project", true), started, cancellationToken).ConfigureAwait(false);
             if (current is null) { return false; }
             evidence.Add(current);
         }
 
         DateTimeOffset decidedAt = clock.UtcNow;
-        return (authorityIsCurrent is null || authorityIsCurrent()) && evidence.All(item => ValidateEvidence(item, item.Request, started, decidedAt));
+        bool allowed = (principal is null || IsCurrent(principal)) && evidence.All(item => ValidateEvidence(item, item.Request, started, decidedAt));
+        if (allowed) { principal?.RetainValidatedEvidence(evidence.Select(item => (item, started))); }
+        return allowed;
     }
 
     /// <summary>Checks the closed operation row and every bound owner scope.</summary>
-    public async ValueTask<ChatBotAuthorityDecision> AuthorizeAsync(ChatBotRequestContext context, string operation, bool isQuery, object? payload, CancellationToken cancellationToken)
+    public async ValueTask<ChatBotAuthorityDecision> AuthorizeAsync(ChatBotRequestContext context, string operation, bool isQuery, object? payload, CancellationToken cancellationToken, string? fallbackAggregateId = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ChatBotAuthorityRequirement? row = catalog.Find(operation, isQuery);
@@ -106,6 +108,14 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
             if (!string.Equals(target, resource, StringComparison.Ordinal))
             {
                 requests.Add(Request(context, "ChatBot", target!, operation, "operation", true));
+            }
+        }
+        if (!isQuery && !ChatBotCanonicalDispatchTarget.IsSupported(operation) && fallbackAggregateId is not null)
+        {
+            if (!AuditMetadata.IsSafeStableIdentifier(fallbackAggregateId) || fallbackAggregateId == "*") { return Denied(operation); }
+            if (!string.Equals(fallbackAggregateId, resource, StringComparison.Ordinal) || row.AdminScope is not null)
+            {
+                requests.Add(Request(context, "ChatBot", fallbackAggregateId, operation, "operation", true));
             }
         }
         if (operation == nameof(Hexalith.ChatBot.Contracts.Commands.RequestFailedWorkflowRetry))
@@ -293,7 +303,7 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
             IsValidEvidence(evidence! with { Request = evidence.Request with { RequireCurrent = false }, IsAllowed = true, IsRevoked = false }, request with { RequireCurrent = false }, started, clock.UtcNow) &&
             (evidence!.ServiceGrant is null || (evidence.ServiceGrant.TenantId == request.TenantId &&
                 evidence.ServiceGrant.ServiceClientId == request.ResourceId && evidence.ServiceGrant.SurfaceOrigin == request.Origin &&
-                HasValidGrantMetadata(evidence.ServiceGrant) && HasValidGrantScopes(evidence.ServiceGrant))))
+                AuditMetadata.IsSafeStableIdentifier(evidence.ServiceGrant.GrantId) && !evidence.ServiceGrant.GrantId.Contains('@', StringComparison.Ordinal))))
         {
             grants.InvalidateRevocation(request.TenantId, request.ResourceId, Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigins.ToWireValue(request.Origin), evidence!.ServiceGrant?.GrantId ?? string.Empty);
         }

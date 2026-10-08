@@ -45,6 +45,24 @@ public sealed class TrustedAuthorityBoundaryTests
         typeof(ChatBotReadQueryHandler<>).GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Single().GetParameters().ShouldContain(static parameter => parameter.ParameterType == typeof(ChatBotRequestAuthorizer) && !parameter.IsOptional);
     }
 
+    /// <summary>Every concrete SDK query must inherit the mandatory trusted-read boundary.</summary>
+    [Fact]
+    public void EveryConcreteSdkQueryHandlerInheritsTheMandatoryAuthorityBoundary()
+    {
+        Type[] handlers = typeof(ChatBotRequestAuthorizer).Assembly.GetTypes()
+            .Where(static type => type.IsClass && !type.IsAbstract && typeof(IDomainQueryHandler).IsAssignableFrom(type)).ToArray();
+        handlers.ShouldNotBeEmpty();
+        foreach (Type handler in handlers)
+        {
+            Type? parent = handler.BaseType;
+            while (parent is not null && (!parent.IsGenericType || parent.GetGenericTypeDefinition() != typeof(ChatBotReadQueryHandler<>)))
+            {
+                parent = parent.BaseType;
+            }
+            parent.ShouldNotBeNull($"{handler.FullName} must inherit the mandatory trusted-read boundary.");
+        }
+    }
+
     [Fact]
     public void AuthoritySeamsRemainInternalAndAdaptersDependOnlyOnThePublicClient()
     {

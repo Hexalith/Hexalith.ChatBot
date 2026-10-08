@@ -600,10 +600,20 @@ internal sealed class ParticipantAuthorizationStage(
             }
         }
 
+        DateTimeOffset admittedAt = _clock.UtcNow;
+        if (actor.Principal is ChatBotAuthorityPrincipal authority && !authority.IsCurrent(admittedAt))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+        if (grantResult.ServiceClientGrantEvidence is { } selectedGrant && selectedGrant.ExpiresAt <= admittedAt)
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ServiceClientGrantExpired);
+        }
+
         if (recordCommandCapabilityAdmission)
         {
             await _commandHistory
-                .RecordAdmittedAsync(tenantBinding.TenantId, submission.Request.CommandType!, _clock.UtcNow, cancellationToken)
+                .RecordAdmittedAsync(tenantBinding.TenantId, submission.Request.CommandType!, admittedAt, cancellationToken)
                 .ConfigureAwait(false);
         }
 

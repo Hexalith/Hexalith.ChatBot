@@ -12,6 +12,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
 using Shouldly;
 
@@ -366,12 +368,13 @@ public sealed class ComplianceAuditInvestigationEndpointTests
     }
 
     /// <summary>
-    /// The final-disclosure override restricts detail the handler already decided to release when compliance or
-    /// tenant-owner authority lapses after the handler's last authority check.
+    /// The final-disclosure override restricts detail the handler already decided to release when compliance,
+    /// tenant or project owner authority lapses after the handler's last authority check.
     /// </summary>
     [Theory]
     [InlineData("ChatBot")]
     [InlineData("Tenants")]
+    [InlineData("Projects")]
     public async Task DetailOverrideRestrictsReleasedDetailWhenAuthorityLapsesAfterTheHandlerCheck(string expiringOwner)
     {
         // Clock reads after the Projects owner response: evidence validation, the decision instant, the in-loop
@@ -405,13 +408,15 @@ public sealed class ComplianceAuditInvestigationEndpointTests
         {
             Transform = evidence =>
             {
-                if (evidence.Request.Owner == expiringOwner) { return evidence with { ExpiresAt = clock.UtcNow.AddSeconds(1) }; }
+                if (evidence.Request.Owner == expiringOwner) { evidence = evidence with { ExpiresAt = clock.UtcNow.AddSeconds(1) }; }
                 if (evidence.Request.Owner == "Projects") { clock.Arm(lapseOnRead, TimeSpan.FromSeconds(2)); }
                 return evidence;
             },
         };
         using WebApplicationFactory<Program> factory = ComplianceFactory("tenant-alpha").WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
+            // Only this request may read the armed clock that pins the final-disclosure boundary.
+            services.RemoveAll<IHostedService>();
             services.AddSingleton<ISystemClock>(clock);
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
         }));

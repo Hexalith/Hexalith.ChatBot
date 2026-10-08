@@ -2,6 +2,7 @@ using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Notifications;
 
@@ -195,16 +196,26 @@ internal sealed class ServiceClientGrantValidator(
             }
         }
 
+        DateTimeOffset admittedAt = clock.UtcNow;
+        if (actor.Principal is ChatBotAuthorityPrincipal authority && !authority.IsCurrent(admittedAt))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+        if (grant.ExpiresAt <= admittedAt)
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ServiceClientGrantExpired);
+        }
+
         if (recordAiActorAdmission)
         {
             await _aiActorProposalHistory
-                .RecordAdmittedAsync(grant.TenantId, grant.ServiceClientId, clock.UtcNow, cancellationToken)
+                .RecordAdmittedAsync(grant.TenantId, grant.ServiceClientId, admittedAt, cancellationToken)
                 .ConfigureAwait(false);
         }
         else if (recordServiceClientAdmission)
         {
             await _commandHistory
-                .RecordAdmittedAsync(grant.TenantId, grant.ServiceClientId, clock.UtcNow, cancellationToken)
+                .RecordAdmittedAsync(grant.TenantId, grant.ServiceClientId, admittedAt, cancellationToken)
                 .ConfigureAwait(false);
         }
 

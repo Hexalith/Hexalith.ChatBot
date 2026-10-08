@@ -12,7 +12,8 @@ namespace Hexalith.ChatBot.IntegrationTests;
 /// Story 1.3 R-B5 topology guard: the association subscription route refuses every delivery whose
 /// <c>dapr-api-token</c> header does not match the app's <c>APP_API_TOKEN</c>. The local topology must give one
 /// per-run token to both the chatbot app and the sidecar that presents it; otherwise association scoring, decisions
-/// and corrections are refused and dead-lettered.
+/// and corrections are refused and dead-lettered. The same token enables SDK channel verification on
+/// <c>/process</c> and <c>/query</c>.
 /// </summary>
 public sealed class AssociationIngressAppChannelTokenTopologyTests
 {

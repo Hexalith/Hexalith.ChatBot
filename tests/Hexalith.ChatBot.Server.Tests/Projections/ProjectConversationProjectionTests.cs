@@ -652,32 +652,40 @@ public sealed class ProjectConversationProjectionTests
         json.ShouldNotContain("graph-message-001", Case.Insensitive);
     }
 
+    /// <summary>Authorized absence and a populated forbidden project share one denial without source-content reads.</summary>
     [Fact]
     public async Task TaskIntentReviewEndpointShouldFailClosedForUnknownTaskIntentWithoutSourceDisclosure()
     {
-        InMemoryProjectConversationProjectionStore store = new();
+        InMemoryProjectConversationProjectionStore real = new();
+        await real.UpsertTaskIntentAsync(TaskIntentRecord(8) with { ProjectId = "project-foreign" }, TestContext.Current.CancellationToken);
+        IProjectConversationProjectionStore store = TrustedAuthorityBoundaryProxy.Create<IProjectConversationProjectionStore>(real, static _ => { });
+        IMailboxMessageContentSource source = TrustedAuthorityBoundaryProxy.Create<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
+            new MailboxMessageContentResult(true, "available", "raw provider payload graph-message-001 tenant-beta restricted@example.com", "text/plain", "metadata_only")), static _ => { });
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
                 Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
-                services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
-                    new MailboxMessageContentResult(true, "available", "raw provider payload graph-message-001 tenant-beta restricted@example.com", "text/plain", "metadata_only")));
+                services.AddSingleton<IMailboxMessageContentSource>(source);
                 services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
             }));
-
-        HttpResponseMessage response = await factory
-            .CreateClient()
-            .GetAsync("/api/v1/projects/project-001/task-intents/task-intent:missing", TestContext.Current.CancellationToken)
-            .ConfigureAwait(true);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using HttpClient client = factory.CreateClient();
+        using HttpRequestMessage missing = new(HttpMethod.Get, "/api/v1/projects/project-001/task-intents/task-intent:missing");
+        using HttpRequestMessage forbidden = new(HttpMethod.Get, "/api/v1/projects/project-foreign/task-intents/task-intent:abc");
+        missing.Headers.Add("X-Correlation-Id", CorrelationId);
+        forbidden.Headers.Add("X-Correlation-Id", CorrelationId);
+        using HttpResponseMessage response = await client.SendAsync(missing, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        int readsAfterMissing = ((TrustedAuthorityBoundaryProxy)(object)store).Calls.Count(static call => call == "GetTaskIntentAsync");
+        readsAfterMissing.ShouldBe(1);
+        using HttpResponseMessage denied = await client.SendAsync(forbidden, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        denied.StatusCode.ShouldBe(response.StatusCode);
         string json = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
-        TaskIntentReview review = JsonSerializer.Deserialize<TaskIntentReview>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull();
-        review.Available.ShouldBeFalse();
-        review.Record.ShouldBeNull();
-        review.SourceMessage.ShouldBeNull();
-        review.ReasonCode.ShouldBe(TaskIntentReasonCodes.MissingCapturedIntent);
+        (await denied.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true)).ShouldBe(json);
+        ((TrustedAuthorityBoundaryProxy)(object)store).Calls.Count(static call => call == "GetTaskIntentAsync").ShouldBe(readsAfterMissing);
+        ((TrustedAuthorityBoundaryProxy)(object)source).Calls.ShouldBeEmpty();
+        json.ShouldContain("authorization-denied");
+        json.ShouldNotContain("task-intent:", Case.Insensitive);
         json.ShouldNotContain("raw provider payload", Case.Insensitive);
         json.ShouldNotContain("graph-message-001", Case.Insensitive);
         json.ShouldNotContain("tenant-beta", Case.Insensitive);

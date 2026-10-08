@@ -14,6 +14,7 @@ internal sealed class ChatBotAuthorityPrincipal : ClaimsPrincipal
     private readonly AdminRole[] _adminRoles;
     private readonly (ChatBotOwnerAuthorityEvidence Evidence, DateTimeOffset Started)[] _evidence;
     private readonly ServiceClientGrantProjectionCache? _grants;
+    private (ChatBotOwnerAuthorityEvidence Evidence, DateTimeOffset Started)[] _supplementalEvidence = [];
 
     /// <summary>Creates a narrow principal after exact evidence validation.</summary>
     internal ChatBotAuthorityPrincipal(ChatBotRequestContext context, string? adminScope, IEnumerable<string> projects, IEnumerable<string>? scopedAdminGrants = null, IEnumerable<AdminRole>? scopedRoles = null, IEnumerable<(ChatBotOwnerAuthorityEvidence Evidence, DateTimeOffset Started)>? validatedEvidence = null, ServiceClientGrantProjectionCache? grants = null)
@@ -59,9 +60,21 @@ internal sealed class ChatBotAuthorityPrincipal : ClaimsPrincipal
 
     /// <summary>Revalidates all retained owner bounds and known revocation at a protected-effect boundary.</summary>
     public bool IsCurrent(DateTimeOffset now)
-        => _evidence.All(item => ChatBotRequestAuthorizer.IsValidEvidence(item.Evidence, item.Evidence.Request, item.Started, now) &&
+        => _evidence.Concat(_supplementalEvidence).All(item => ChatBotRequestAuthorizer.IsValidEvidence(item.Evidence, item.Evidence.Request, item.Started, now) &&
             (item.Evidence.ServiceGrant is not { } grant || (grant.ExpiresAt > now && _grants is not null &&
                 !_grants.IsRevoked(item.Evidence.Request, grant.GrantId) && !_grants.PredatesClientRevocation(item.Evidence))));
+
+    /// <summary>Retains supplemental validated bounds, which can only restrict this request's authority.</summary>
+    internal void RetainValidatedEvidence(IEnumerable<(ChatBotOwnerAuthorityEvidence Evidence, DateTimeOffset Started)> evidence)
+    {
+        (ChatBotOwnerAuthorityEvidence Evidence, DateTimeOffset Started)[] additional = evidence.ToArray();
+        (ChatBotOwnerAuthorityEvidence Evidence, DateTimeOffset Started)[] before;
+        do
+        {
+            before = _supplementalEvidence;
+        }
+        while (!ReferenceEquals(Interlocked.CompareExchange(ref _supplementalEvidence, [.. before, .. additional], before), before));
+    }
 
     /// <summary>The immutable authenticated binding.</summary>
     public ChatBotRequestContext Context { get; }

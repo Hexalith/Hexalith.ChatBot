@@ -208,6 +208,32 @@ public sealed class TrustedAuthorityReviewTests
         store.Reads.ShouldBe(0);
     }
 
+    /// <summary>Cleared permission lists cannot hide a valid revocation of previously cached operations.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RevokedGrantWithEmptyPermissionsImmediatelyInvalidatesCachedQueries(bool evidenceRevoked)
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock);
+        ServiceClientGrantProjectionCache cache = new(clock);
+        ChatBotRequestAuthorizer authorizer = new(new(), owner, clock, cache);
+        ChatBotRequestContext context = TrustedAuthorityFixture.Context(actorClass: "service");
+        (await authorizer.ResolveServiceGrantAsync(context, ChatBotReadQueryTypes.GovernedOperation, true, false, TestContext.Current.CancellationToken)).ShouldNotBeNull();
+        ChatBotOwnerAuthorityRequest cached = owner.Requests.Single();
+        owner.Transform = evidence => evidence.ServiceGrant is { } grant
+            ? evidence with { IsAllowed = !evidenceRevoked, IsRevoked = evidenceRevoked,
+                ServiceGrant = grant with { IsRevoked = !evidenceRevoked, Scopes = [], AllowedCommandNames = [], AllowedQueryNames = [] } }
+            : evidence;
+        (await authorizer.ResolveServiceGrantAsync(context, nameof(RecordGovernedNote), false, true, TestContext.Current.CancellationToken)).ShouldBeNull();
+        cache.IsRevoked(cached, "synthetic-grant-v1").ShouldBeTrue();
+        owner.Transform = static evidence => evidence;
+        CountingGovernedOperationStore store = new();
+        GovernedOperationQueryHandler handler = new(TrustedAuthorityFixture.Resolver(TrustedAuthorityFixture.Principal(actorClass: "service")), authorizer, store);
+        (await handler.ExecuteAsync(Query(), TestContext.Current.CancellationToken)).ErrorMessage.ShouldBe(ChatBotAuthorizationReasonCodes.SafeNotFound);
+        store.Reads.ShouldBe(0);
+    }
+
     [Fact]
     public async Task ClientWideRevocationDeniesCachedReadThenOnlyNewerOwnerGrantReopensIt()
     {

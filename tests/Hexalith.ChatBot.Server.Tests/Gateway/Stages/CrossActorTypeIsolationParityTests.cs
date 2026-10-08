@@ -154,6 +154,7 @@ public sealed class CrossActorTypeIsolationParityTests
     {
         FixedClock clock = new(Now);
         return new ParticipantAuthorizationStage(
+            clock: clock,
             serviceClientGrantValidator: new ServiceClientGrantValidator(
                 new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticServiceClientGrantResolver(),
                 clock,
@@ -161,7 +162,7 @@ public sealed class CrossActorTypeIsolationParityTests
                 controlStateProvider,
                 rateLimitProvider,
                 commandHistory,
-                aiActorControlStateProvider), requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer());
+                aiActorControlStateProvider), requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.StageAuthorizer(clock));
     }
 
     private static ChatBotCommandSubmission Submission(string surface)

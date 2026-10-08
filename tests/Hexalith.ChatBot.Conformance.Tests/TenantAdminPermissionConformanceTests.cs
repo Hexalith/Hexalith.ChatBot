@@ -98,7 +98,7 @@ public sealed class TenantAdminPermissionConformanceTests
         CommandGateway gateway = new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),
-            new ParticipantAuthorizationStage(),
+            new ParticipantAuthorizationStage(clock: clock),
             new PassThroughRiskClassifier(),
             new PassThroughApprovalGate(),
             idempotencyStore,
