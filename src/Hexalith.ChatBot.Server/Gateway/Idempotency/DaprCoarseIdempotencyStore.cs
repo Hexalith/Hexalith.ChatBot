@@ -575,8 +575,10 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             string.Equals(reservation.CanonicalEquivalenceHash, metadata.CanonicalEquivalenceHash, StringComparison.Ordinal) &&
             reservation.CreatedAt == metadata.CreatedAt;
 
-    /// <summary>Reconciles a post-dispatch, metadata-only receipt from the independent audit replay queue.</summary>
-    /// <summary>Restores an accepted receipt, optionally guarding each request-driven reconciliation state boundary.</summary>
+    /// <summary>
+    /// Reconciles a post-dispatch, metadata-only accepted receipt from the independent audit replay queue, optionally
+    /// guarding each request-driven reconciliation state boundary with the caller's current authority.
+    /// </summary>
     internal async ValueTask<bool> ReconcileOutcomeAsync(
         AuditReplayIntent intent,
         CancellationToken cancellationToken,

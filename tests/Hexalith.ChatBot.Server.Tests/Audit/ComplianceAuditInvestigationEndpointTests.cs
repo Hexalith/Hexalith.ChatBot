@@ -317,11 +317,16 @@ public sealed class ComplianceAuditInvestigationEndpointTests
         owner.Requests.Where(static request => request.Owner == "Projects").ShouldAllBe(static request => request.RequireCurrent);
     }
 
-    /// <summary>Current project grants do not extend expired compliance or tenant-owner authority.</summary>
+    /// <summary>
+    /// Current project grants do not extend expired compliance or tenant-owner authority, and the remaining project
+    /// checks stop at the first lapse.
+    /// </summary>
     [Theory]
-    [InlineData("ChatBot")]
-    [InlineData("Tenants")]
-    public async Task DetailRestrictsWhenComplianceOwnerEvidenceExpiresDuringProjectChecks(string expiringOwner)
+    [InlineData("ChatBot", 1)]
+    [InlineData("ChatBot", 2)]
+    [InlineData("Tenants", 1)]
+    [InlineData("Tenants", 2)]
+    public async Task DetailRestrictsWhenComplianceOwnerEvidenceExpiresDuringProjectChecks(string expiringOwner, int projectCount)
     {
         TrustedAuthorityClock clock = new();
         SyntheticOwnerAuthorityProvider owner = new(clock)
@@ -343,7 +348,8 @@ public sealed class ComplianceAuditInvestigationEndpointTests
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
         }));
         using HttpClient client = factory.CreateClient();
-        AuditEnvelope envelope = Envelope("tenant-alpha", "audit-record-expiring-compliance") with { SourceEvidenceRefs = ["project:restricted-project", "source-message:restricted-sentinel"] };
+        string[] projectRefs = [.. Enumerable.Range(1, projectCount).Select(static index => $"project:restricted-project-{index}")];
+        AuditEnvelope envelope = Envelope("tenant-alpha", "audit-record-expiring-compliance") with { SourceEvidenceRefs = [.. projectRefs, "source-message:restricted-sentinel"] };
         await SeedAsync(factory.Services.GetRequiredService<IWormAuditStore>(), envelope);
         using HttpResponseMessage response = await client.SendAsync(DetailRequest(envelope.ResourceId), TestContext.Current.CancellationToken);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -356,7 +362,66 @@ public sealed class ComplianceAuditInvestigationEndpointTests
         body.ShouldNotContain("restricted-project");
         body.ShouldNotContain("restricted-sentinel");
         owner.Requests.ShouldContain(request => request.Owner == expiringOwner);
-        owner.Requests.ShouldContain(static request => request.Owner == "Projects" && request.RequireCurrent);
+        owner.Requests.Where(static request => request.Owner == "Projects").ShouldHaveSingleItem().RequireCurrent.ShouldBeTrue();
+    }
+
+    /// <summary>
+    /// The final-disclosure override restricts detail the handler already decided to release when compliance or
+    /// tenant-owner authority lapses after the handler's last authority check.
+    /// </summary>
+    [Theory]
+    [InlineData("ChatBot")]
+    [InlineData("Tenants")]
+    public async Task DetailOverrideRestrictsReleasedDetailWhenAuthorityLapsesAfterTheHandlerCheck(string expiringOwner)
+    {
+        // Clock reads after the Projects owner response: evidence validation, the decision instant, the in-loop
+        // authority callback, the handler's trailing authority check, then the override's final check.
+        const int FinalDisclosureRead = 5;
+        (string baseline, int readsAfterProjects) = await SendDetailWithLapseAsync(expiringOwner, lapseOnRead: null);
+        using (JsonDocument released = JsonDocument.Parse(baseline))
+        {
+            released.RootElement.GetProperty("redactionState").GetString().ShouldBe("detail-available");
+            released.RootElement.GetProperty("visibleMetadataRefs").EnumerateArray().Select(static item => item.GetString())
+                .ShouldContain("project:restricted-project");
+        }
+
+        readsAfterProjects.ShouldBe(FinalDisclosureRead);
+
+        (string body, _) = await SendDetailWithLapseAsync(expiringOwner, lapseOnRead: FinalDisclosureRead);
+        using JsonDocument detail = JsonDocument.Parse(body);
+        detail.RootElement.GetProperty("redactionState").GetString().ShouldBe("escalation-required");
+        detail.RootElement.GetProperty("escalationStatus").GetString().ShouldBe("requested");
+        detail.RootElement.GetProperty("redactionReasonCode").GetString().ShouldBe("restricted-detail");
+        detail.RootElement.GetProperty("safeNextAction").GetString().ShouldBe("request-access");
+        detail.RootElement.GetProperty("visibleMetadataRefs").EnumerateArray().ShouldBeEmpty();
+        body.ShouldNotContain("restricted-project");
+        body.ShouldNotContain("restricted-sentinel");
+    }
+
+    private static async Task<(string Body, int ReadsAfterProjects)> SendDetailWithLapseAsync(string expiringOwner, int? lapseOnRead)
+    {
+        ArmedAdvancingClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock)
+        {
+            Transform = evidence =>
+            {
+                if (evidence.Request.Owner == expiringOwner) { return evidence with { ExpiresAt = clock.UtcNow.AddSeconds(1) }; }
+                if (evidence.Request.Owner == "Projects") { clock.Arm(lapseOnRead, TimeSpan.FromSeconds(2)); }
+                return evidence;
+            },
+        };
+        using WebApplicationFactory<Program> factory = ComplianceFactory("tenant-alpha").WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<ISystemClock>(clock);
+            services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
+        }));
+        using HttpClient client = factory.CreateClient();
+        AuditEnvelope envelope = Envelope("tenant-alpha", "audit-record-final-lapse") with { SourceEvidenceRefs = ["project:restricted-project", "source-message:restricted-sentinel"] };
+        await SeedAsync(factory.Services.GetRequiredService<IWormAuditStore>(), envelope);
+        using HttpResponseMessage response = await client.SendAsync(DetailRequest(envelope.ResourceId), TestContext.Current.CancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        owner.Requests.Where(static request => request.Owner == "Projects").ShouldHaveSingleItem();
+        return (await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), clock.ReadsSinceArmed);
     }
 
     private static async Task SeedAsync(IWormAuditStore store, AuditEnvelope envelope)
@@ -476,6 +541,34 @@ public sealed class ComplianceAuditInvestigationEndpointTests
                 });
                 next(app);
             };
+    }
+
+    /// <summary>Counts clock reads after arming and advances once on a chosen read.</summary>
+    private sealed class ArmedAdvancingClock : ISystemClock
+    {
+        private DateTimeOffset _now = new(2026, 10, 7, 10, 0, 0, TimeSpan.Zero);
+        private bool _armed;
+        private int? _advanceOnRead;
+        private TimeSpan _advanceBy;
+
+        public int ReadsSinceArmed { get; private set; }
+
+        public DateTimeOffset UtcNow
+        {
+            get
+            {
+                if (_armed && ++ReadsSinceArmed == _advanceOnRead) { _now += _advanceBy; }
+                return _now;
+            }
+        }
+
+        public void Arm(int? advanceOnRead, TimeSpan advanceBy)
+        {
+            _armed = true;
+            ReadsSinceArmed = 0;
+            _advanceOnRead = advanceOnRead;
+            _advanceBy = advanceBy;
+        }
     }
 }
 #pragma warning restore CA2007

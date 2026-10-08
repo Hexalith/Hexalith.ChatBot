@@ -8,6 +8,7 @@ using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Adapters.Mailbox;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
@@ -18,6 +19,7 @@ using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Results;
 
@@ -569,6 +571,24 @@ internal sealed class RecoveryDependencyExercise(
         };
         ChatBotCommandSubmission submission = new(principal, request, correlationId, correlationId);
 
+        // Token claims confer no authority (Story 1.3). This test-only host grants its single synthetic requester
+        // exact synthetic owner evidence for its own tenant, project, party and the one admitted operation; it never
+        // grants tenant administration or any other subject, tenant or resource.
+        SystemClock clock = new();
+        SyntheticOwnerAuthorityProvider owners = new(clock)
+        {
+            Allows = owner => string.Equals(owner.TenantId, tenantRef, StringComparison.Ordinal) &&
+                string.Equals(owner.PrincipalId, "recovery-validator", StringComparison.Ordinal) &&
+                string.Equals(owner.Operation, commandType, StringComparison.Ordinal) &&
+                owner.Owner switch
+                {
+                    "ChatBot" => string.Equals(owner.Authority, "operation", StringComparison.Ordinal),
+                    "Parties" => string.Equals(owner.ResourceId, "recovery-validator", StringComparison.Ordinal),
+                    "Projects" => string.Equals(owner.ResourceId, "project-recovery", StringComparison.Ordinal),
+                    _ => false,
+                },
+        };
+
         ChatBotCommandAdmissionPipeline pipeline = new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),
@@ -580,9 +600,10 @@ internal sealed class RecoveryDependencyExercise(
             new InMemoryAuditReplayIntentQueue(),
             new InMemoryOperatorAlertSink(),
             new InMemoryOperationStatusStore(),
-            new SystemClock(),
+            clock,
             new CommandSubmissionLifecycleTransitionGuard(),
-            new ChatBotSpineCommandAllowlist());
+            new ChatBotSpineCommandAllowlist(),
+            new ChatBotRequestAuthorizer(new ChatBotAuthorityCatalog(), owners, clock, new ServiceClientGrantProjectionCache(clock)));
         return await pipeline.AdmitAsync(submission, cancellationToken).ConfigureAwait(false);
     }
 }

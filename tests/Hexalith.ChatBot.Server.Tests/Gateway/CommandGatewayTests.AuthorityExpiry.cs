@@ -139,9 +139,14 @@ public sealed partial class CommandGatewayTests
         (await realStatus.TryGetAsync("tenant-alpha", beforeStatus.OperationId, TestContext.Current.CancellationToken)).ShouldBe(beforeStatus);
     }
 
-    /// <summary>Authority expiry in a real reconciliation read prevents recovery writes and queue acknowledgement.</summary>
-    [Fact]
-    public async Task ReplayReconciliationRechecksBeforeEveryDurableFollowup()
+    /// <summary>
+    /// Authority expiry in a real reconciliation read, either before or inside the guarded receipt restore, prevents
+    /// recovery writes and queue acknowledgement and is denied rather than swallowed as a receipt failure.
+    /// </summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task ReplayReconciliationRechecksBeforeEveryDurableFollowup(int lapseOnCall)
     {
         TrustedAuthorityClock clock = new();
         SyntheticOwnerAuthorityProvider owner = new(clock) { Transform = evidence => evidence with { ExpiresAt = clock.UtcNow.AddSeconds(1) } };
@@ -160,20 +165,26 @@ public sealed partial class CommandGatewayTests
         List<string> followups = [];
         ICoarseIdempotencyStateClient client = TrustedAuthorityBoundaryProxy.Create<ICoarseIdempotencyStateClient>(state, method =>
         {
-            if (reconcile) { followups.Add(method); clock.UtcNow += TimeSpan.FromSeconds(2); }
+            if (!reconcile) { return; }
+            followups.Add(method);
+            if (followups.Count == lapseOnCall) { clock.UtcNow += TimeSpan.FromSeconds(2); }
         });
         queue.OnSnapshot = () => reconcile = true;
         RecordingAuditWriter audit = new();
+        InMemoryAuthorizationFailureCounter counter = new(clock);
         RecordingDispatcher retryDispatcher = new();
         ChatBotGatewayResult replay = await Gateway(retryDispatcher, clock: clock, idempotencyStore: new DaprCoarseIdempotencyStore(client, clock), replayQueue: queue,
-            auditWriter: audit, requestAuthorizer: TrustedAuthorityFixture.Authorizer(clock, owner)).SubmitAsync(submission, TestContext.Current.CancellationToken);
+            auditWriter: audit, authorizationFailureCounter: counter, requestAuthorizer: TrustedAuthorityFixture.Authorizer(clock, owner)).SubmitAsync(submission, TestContext.Current.CancellationToken);
         replay.Problem!.Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
         retryDispatcher.DispatchCount.ShouldBe(0);
-        followups.ShouldBe(["ReadIdentityAsync"]);
+
+        // The second identity read belongs to the guarded RecordOutcomeAsync receipt restore.
+        followups.ShouldBe(Enumerable.Repeat("ReadIdentityAsync", lapseOnCall));
         queue.Intents.ShouldBe([prior]);
         state.DomainRecords.ShouldHaveSingleItem().ShouldBe(beforeDomain);
         state.IdentityRecords.ShouldHaveSingleItem().ShouldBe(beforeIdentity);
         audit.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        counter.ReadAndReset().ShouldHaveSingleItem().FailureCount.ShouldBe(1);
     }
 
     private sealed class AuthorityExpiryPreparationStore(IIdempotencyStore real, Action advance) : IIdempotencyStore

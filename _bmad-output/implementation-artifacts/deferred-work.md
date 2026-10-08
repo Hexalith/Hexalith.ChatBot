@@ -1345,3 +1345,24 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
   summary: Specify a bounded owner-client deadline and caller-cancellation behavior for accepted production authority mappings (medium if true, unverified).
   evidence: R-B9 identifies that ChatBotRequestAuthorizer awaits provider calls with caller cancellation only; the shipped unavailable provider completes synchronously, so no production hang is established. Settle the question in A13 by inspecting each accepted provider/client deadline and proving timeout returns metadata-only unavailable denial while caller cancellation still propagates.
+
+## Deferred from: code review of spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context (2026-10-07 third review, ledgered 2026-10-08)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
+  summary: Seven of eight Dapr subscription routes (AiOutcome, Approval, GovernedOperation, MailboxIntake, ParticipantResolution, TaskIntent, DeadLetter) accept unauthenticated HTTP with any tenant id; only the association route checks the app-channel token.
+  evidence: Third review, pre-existing, at `src/Hexalith.ChatBot.Server/Gateway/ChatBotCompatibilityEndpointExtensions.cs:143`. MailboxIntake's `AssociationProjectionHandler` overload never reaches the invalidation coordinator, so R-B5's narrow scope holds for marker minting. Settle in the shared subscription-ingress follow-up.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
+  summary: All seven projection routes subscribe to the same pubsub/topic without `Match` rules, so the Dapr .NET SDK may keep only the first-mapped route (GovernedOperation) as the topic's default route.
+  evidence: Third review, pre-existing; high if true, not verified at runtime (`ChatBotCompatibilityEndpointExtensions.cs:142`). The SDK logs "A default subscription to topic … already exists". Settle by inspecting `/dapr/subscribe` and live delivery in a running sidecar topology.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
+  summary: Internal-producer admission markers expire after 5 minutes while workflow message ids are deterministic, so one late `/process` callback could leave a correction-propagation or invalidation command permanently rejected.
+  evidence: Third review; medium if true, not verified (`src/Hexalith.ChatBot.Server/Gateway/DataProtectionChatBotAdmissionMarker.cs:18`). EventStore replays a cached rejection for a reused messageId; `AiExecutionCoordinator` shares the pattern. Settle by measuring submit→`/process` latency bounds and checking whether a retried submission with a fresh marker escapes the cached rejection.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
+  summary: The internal-producer marker path has no proof through the real EventStore relay.
+  evidence: Third review; medium if true, not verified. `TrustedAuthorityInternalProducerTests.cs:66` builds the `CommandEnvelope` by hand and calls `stage.EvaluateAsync` directly. Settle with a live dispatch→`/process` round trip once the Aspire runtime blocker clears, checking that extensions and the payload digest survive the relay.
+
+## Deferred from: code review of spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context (2026-10-08 resolution pass)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
+  summary: The recovery sandbox `ai-provider` exercise and the live recovery validation's ai-provider dependency cannot observe a provider fault, because stripped `requester_authority_class` labels route every `ExecuteLowRiskAIAssistance` to approval.
+  evidence: Found while fixing the sandbox `CS7036` build break; a known blocker by Jerome's decision (2026-10-08). `DeterministicAiActionRiskClassifier` (`src/Hexalith.ChatBot.Server/Gateway/Stages/DeterministicAiActionRiskClassifier.cs:162`) reads the label from the binding-only authority principal, so the policy returns `risk_not_low_risk` and the dispatcher records `pending-approval`. A scratch harness running the real `RecoveryDependencyExerciseTests` passed command-execution, audit-store and attachment-processing and failed only ai-provider. Settle with owner-backed requester authority (A13) or a deliberately re-scoped exercise.

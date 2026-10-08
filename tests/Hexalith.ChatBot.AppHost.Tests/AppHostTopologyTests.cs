@@ -104,6 +104,30 @@ public static class AppHostTopologyTests
         source.ShouldNotContain("Memories:Testing:UseInMemoryCommandStore");
     }
 
+    /// <summary>
+    /// The association subscription route compares the sidecar's <c>dapr-api-token</c> with the app's
+    /// <c>APP_API_TOKEN</c>; the local topology must give both the same per-run token after the sidecar exists.
+    /// </summary>
+    [Fact]
+    public static void AppHostShouldShareAGeneratedAppChannelTokenBetweenTheChatBotAndItsSidecar()
+    {
+        string appHost = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"))
+            .Replace("\r\n", "\n", StringComparison.Ordinal);
+        string endpoint = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "src",
+            "Hexalith.ChatBot.Server",
+            "Projections",
+            "AssociationProjectionEndpoints.cs"));
+
+        endpoint.ShouldContain("configuration[\"APP_API_TOKEN\"]");
+        endpoint.ShouldContain("Headers[\"dapr-api-token\"]");
+        const string Wiring = "_ = chatBot.WithGeneratedEventStoreAppChannelToken();";
+        appHost.ShouldContain("if (builder.ExecutionContext.IsRunMode)\n{\n    " + Wiring + "\n}");
+        appHost.IndexOf(Wiring, StringComparison.Ordinal)
+            .ShouldBeGreaterThan(appHost.IndexOf("builder.AddHexalithChatBot(", StringComparison.Ordinal));
+    }
+
     [Fact]
     public static void AppHostShouldInitializeSecurityThroughEventStoreAspireHelpers()
     {

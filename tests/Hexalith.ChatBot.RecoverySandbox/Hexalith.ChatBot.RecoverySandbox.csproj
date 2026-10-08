@@ -16,4 +16,9 @@
   <ItemGroup>
     <Using Remove="Xunit" />
   </ItemGroup>
+  <!-- Token claims confer no authority, so the sandbox admission uses the test-owned synthetic owner provider for its
+       one exact synthetic scope. Production composition keeps the unavailable owner provider. -->
+  <ItemGroup>
+    <Compile Include="..\TrustedAuthority\SyntheticOwnerAuthorityProvider.cs" Link="TrustedAuthority\%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

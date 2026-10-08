@@ -98,6 +98,47 @@ public sealed class TrustedAuthorityReviewTests
         decision.Context.Actor.Principal.Claims.ShouldNotContain(static claim => claim.Type == ClaimsServiceClientGrantResolver.GrantScopeClaim);
     }
 
+    [Fact]
+    public async Task HumanProjectAdmissionPersistsIdentityAndProjectOwnerReferences()
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock) { Transform = evidence => evidence with
+        {
+            EvidenceId = $"{evidence.Request.Owner.ToLowerInvariant()}-owner-evidence",
+            Version = $"{evidence.Request.Owner.ToLowerInvariant()}-v3",
+        } };
+        InMemoryAuditWriter audit = new();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.AddSingleton<ISystemClock>(clock);
+            services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
+            services.AddSingleton<IIdempotencyStore>(new InMemoryCoarseIdempotencyStore(clock));
+            services.AddSingleton<IAuditWriter>(audit);
+        }));
+        AssociateEmailToProject command = new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+            "project-001",
+            AssociationDecisionKind.Associate,
+            "Reviewed safe metadata.",
+            "hash-project",
+            1,
+            "chatbot.association-decision-command.v1");
+        using IServiceScope scope = factory.Services.CreateScope();
+        ChatBotCommandAdmissionDecision decision = await scope.ServiceProvider.GetRequiredService<ChatBotCommandAdmissionPipeline>().AdmitAsync(
+            new ChatBotCommandSubmission(TrustedAuthorityFixture.Principal(), new Hexalith.ChatBot.Client.Generated.CommandSubmissionRequest
+            {
+                CommandId = Note, CommandType = nameof(AssociateEmailToProject), Command = command,
+                RequestSchemaVersion = Hexalith.ChatBot.Client.Generated.CommandSubmissionRequestRequestSchemaVersion.V1,
+            }, "correlation-alpha", null, ChatBotSurfaceOrigin.Api), TestContext.Current.CancellationToken);
+        decision.IsAccepted.ShouldBeTrue(decision.ReasonCode);
+        owner.Requests.ShouldContain(static request => request.Owner == "Parties" && request.ResourceId == "actor-alpha");
+        owner.Requests.ShouldContain(static request => request.Owner == "Projects" && request.ResourceId == "project-001");
+        AuditEnvelope envelope = audit.Envelopes.ShouldHaveSingleItem();
+        envelope.SourceEvidenceRefs.ShouldContain("Parties:parties-owner-evidence:parties-v3");
+        envelope.SourceEvidenceRefs.ShouldContain("Projects:projects-owner-evidence:projects-v3");
+    }
+
     [Theory]
     [InlineData("USER", false)]
     [InlineData("invented", false)]

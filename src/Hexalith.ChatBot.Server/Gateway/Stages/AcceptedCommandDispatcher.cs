@@ -119,7 +119,6 @@ internal sealed class AcceptedCommandDispatcher(
 
             if (plan.CorrectionPropagation is not null && correctionPropagation?.IsReady is true)
             {
-                RequireCurrentAuthority(context);
                 await correctionPropagation
                     .StartAsync(plan.CorrectionPropagation, cancellationToken)
                     .ConfigureAwait(false);
@@ -127,7 +126,6 @@ internal sealed class AcceptedCommandDispatcher(
 
             if (plan.IngestionBinding is not null && ingestionBinding?.IsReady is true)
             {
-                RequireCurrentAuthority(context);
                 await ingestionBinding
                     .StartAsync(plan.IngestionBinding, cancellationToken)
                     .ConfigureAwait(false);
