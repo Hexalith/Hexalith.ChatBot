@@ -5,6 +5,7 @@ using System.Text.Json;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Server.Acceptance;
 using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Adapters.Mailbox;
 using Hexalith.ChatBot.Server.Audit;
@@ -589,11 +590,15 @@ internal sealed class RecoveryDependencyExercise(
                 },
         };
 
+        // The production classifier reads requester authority from the stripped token label, so it routes every
+        // ExecuteLowRiskAIAssistance to approval and the provider seam is never reached. Like the owner evidence
+        // above, this test-only host supplies fixed synthetic project-contributor requester authority for that one
+        // command; every other command uses the production classifier.
         ChatBotCommandAdmissionPipeline pipeline = new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),
             new ParticipantAuthorizationStage(),
-            new DeterministicAiActionRiskClassifier(),
+            new Story132AcceptanceRiskClassifier(),
             new AiActionApprovalGate(new DefaultAiActionPolicyEvaluator(aiPolicySnapshots)),
             _idempotencyStore,
             auditWriter,
