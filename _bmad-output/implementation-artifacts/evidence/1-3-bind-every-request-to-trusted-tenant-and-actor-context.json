@@ -11,7 +11,7 @@
   "bootstrap": false,
   "scope": {
     "mode": "diff",
-    "implementationDigest": "22bd2c901db8f73075429b462bb8ede338082a6fbcf0247856333364269ba536",
+    "implementationDigest": "85cbb5fe310a790333969c4a11ac0fe5bdf67f0b2ec493229036f0ec8ee7d476",
     "transitionPaths": [
       "_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md",
       "_bmad-output/implementation-artifacts/evidence/1-3-bind-every-request-to-trusted-tenant-and-actor-context.json",
@@ -247,6 +247,18 @@
       "primaryPathClass": null
     },
     {
+      "lane": "hosting-assets-primary",
+      "trx": "hosting-assets-primary/hosting-assets-primary.trx",
+      "provenance": "hosting-assets-primary/hosting-assets-primary.provenance.json",
+      "artifactLocator": "file:hosting-assets-primary/hosting-assets-primary.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.UI.E2E.Tests.FrontComposerShellIntegrationE2ETests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": "hosting-assets"
+    },
+    {
       "lane": "aspire-dapr-primary",
       "trx": "topology-primary/topology-acceptance.trx",
       "provenance": "topology-primary/topology-acceptance.provenance.json",
@@ -260,6 +272,10 @@
     }
   ],
   "primaryPaths": [
+    {
+      "class": "hosting-assets",
+      "lane": "hosting-assets-primary"
+    },
     {
       "class": "aspire-dapr",
       "lane": "aspire-dapr-primary"
