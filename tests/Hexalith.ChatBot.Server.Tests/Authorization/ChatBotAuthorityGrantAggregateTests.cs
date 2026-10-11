@@ -80,6 +80,95 @@ public static class ChatBotAuthorityGrantAggregateTests
         ChatBotGrantSourceEvidence.FromStream(request, revoked, now).ShouldBeNull();
     }
 
+    [Fact]
+    public static void PersistedRejectionDoesNotRemoveCurrentGrantDuringReplay()
+    {
+        GrantChatBotAuthority grant = Grant("grant-001");
+        ChatBotAuthorityGranted issued = GovernedOperationAggregate.Handle(grant, null, Envelope(grant, grant.AuthorityKey))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<ChatBotAuthorityGranted>();
+        var rejection = new ChatBotAuthorityChangeRejected(grant.AuthorityKey, "authority_grant_active");
+        GovernedOperationState state = new();
+        state.Apply(issued);
+        state.Apply(rejection);
+        state.CurrentAuthorityGrant.ShouldBe(issued);
+        state.AuthorityGrantRevoked.ShouldBeFalse();
+
+        ChatBotOwnerAuthorityRequest request = new("ChatBot", grant.PrincipalId, TenantId, grant.ResourceId,
+            grant.Operation, grant.Authority, grant.ActorClass, grant.Origin, true);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        AuthoritativeEventStream source = new(new AggregateIdentity(TenantId, "chatbot", grant.AuthorityKey),
+            2, now, [Event(1, issued), Event(2, rejection)], "observation-002");
+        ChatBotGrantSourceEvidence.FromStream(request, source, now)!.IsAllowed.ShouldBeTrue();
+        ChatBotGrantSourceEvidence.FromStream(request, source with
+        {
+            Events = [Event(1, issued), Event(2, rejection with { AuthorityKey = "other-stream" })],
+        }, now).ShouldBeNull();
+        ChatBotGrantSourceEvidence.FromStream(request, source with
+        {
+            Events = [Event(1, issued), Event(2, rejection with { Reason = "unknown_reason" })],
+        }, now).ShouldBeNull();
+    }
+
+    [Fact]
+    public static void ExpiredIssuanceCanBeReplacedButItsIdCannotBeReused()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        GrantChatBotAuthority first = Grant("grant-001");
+        ChatBotAuthorityGranted expired = GovernedOperationAggregate.Handle(first, null, Envelope(first, first.AuthorityKey))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<ChatBotAuthorityGranted>() with
+        {
+            ExpiresAt = now.AddSeconds(-1),
+        };
+        GovernedOperationState state = new();
+        state.Apply(expired);
+        GrantChatBotAuthority second = Grant("grant-002");
+        ChatBotAuthorityGranted replacement = GovernedOperationAggregate.Handle(second, state, Envelope(second, second.AuthorityKey))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<ChatBotAuthorityGranted>();
+        state.Apply(replacement);
+        GovernedOperationAggregate.Handle(first, state, Envelope(first, first.AuthorityKey)).IsRejection.ShouldBeTrue();
+
+        ChatBotOwnerAuthorityRequest request = new("ChatBot", first.PrincipalId, TenantId, first.ResourceId,
+            first.Operation, first.Authority, first.ActorClass, first.Origin, true);
+        AuthoritativeEventStream source = new(new AggregateIdentity(TenantId, "chatbot", first.AuthorityKey),
+            2, now, [Event(1, expired) with { Timestamp = now.AddMinutes(-2) },
+                Event(2, replacement) with { Timestamp = now }], "observation-002");
+        ChatBotGrantSourceEvidence.FromStream(request, source, now)!.IsAllowed.ShouldBeTrue();
+        ChatBotGrantSourceEvidence.FromStream(request, source with
+        {
+            Events = [Event(1, expired) with { Timestamp = now.AddMinutes(-2) },
+                Event(2, replacement) with { Timestamp = now.AddMinutes(-1) }],
+        }, now).ShouldBeNull();
+    }
+
+    [Fact]
+    public static void SourceFoldRejectsNestedServiceGrantMismatches()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DateTimeOffset expiresAt = now.AddMinutes(15);
+        string key = ChatBotAuthorityGrantKey.For(TenantId, "client-alpha", "client-alpha",
+            nameof(RecordGovernedNote), "service-grant", "service", ChatBotSurfaceOrigin.Api);
+        var nested = new ServiceClientGrant("grant-001", TenantId, "client-alpha",
+            ServiceClientClass.BackgroundWorker, [nameof(RecordGovernedNote)], [],
+            ChatBotSurfaceOrigin.Api, expiresAt, false, [TenantId], "v1");
+        var granted = new ChatBotAuthorityGranted("grant-001", TenantId, "client-alpha", "client-alpha",
+            nameof(RecordGovernedNote), "service-grant", "service", ChatBotSurfaceOrigin.Api, expiresAt, nested);
+        ChatBotOwnerAuthorityRequest request = new("ChatBot", "client-alpha", TenantId, "client-alpha",
+            nameof(RecordGovernedNote), "service-grant", "service", ChatBotSurfaceOrigin.Api, true);
+
+        ChatBotOwnerAuthorityEvidence? Read(ChatBotAuthorityGranted value)
+            => ChatBotGrantSourceEvidence.FromStream(request,
+                new AuthoritativeEventStream(new AggregateIdentity(TenantId, "chatbot", key), 1, now,
+                    [Event(1, value)], "observation-001"), now);
+
+        Read(granted)!.ServiceGrant!.GrantId.ShouldBe(nested.GrantId);
+        Read(granted with { ServiceGrant = nested with { GrantId = "other" } }).ShouldBeNull();
+        Read(granted with { ServiceGrant = nested with { TenantId = "tenant-beta" } }).ShouldBeNull();
+        Read(granted with { ServiceGrant = nested with { ServiceClientId = "other" } }).ShouldBeNull();
+        Read(granted with { ServiceGrant = nested with { SurfaceOrigin = ChatBotSurfaceOrigin.Ui } }).ShouldBeNull();
+        Read(granted with { ServiceGrant = nested with { ExpiresAt = expiresAt.AddMinutes(1) } }).ShouldBeNull();
+        Read(granted with { ServiceGrant = null }).ShouldBeNull();
+    }
+
     private static GrantChatBotAuthority Grant(string grantId)
     {
         string key = ChatBotAuthorityGrantKey.For(TenantId, "actor-alpha", TenantId, nameof(RecordGovernedNote), "operation", "human", ChatBotSurfaceOrigin.Api);

@@ -65,7 +65,7 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             return DomainResult.Rejection([new ChatBotAuthorityChangeRejected(command.AuthorityKey, "authority_issuance_reused")]);
         }
 
-        if (state?.CurrentAuthorityGrant is not null && !state.AuthorityGrantRevoked)
+        if (state?.CurrentAuthorityGrant is { } current && !state.AuthorityGrantRevoked && current.ExpiresAt > now)
         {
             return DomainResult.Rejection([new ChatBotAuthorityChangeRejected(command.AuthorityKey, "authority_grant_active")]);
         }

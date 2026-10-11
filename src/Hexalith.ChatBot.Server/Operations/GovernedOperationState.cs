@@ -308,6 +308,12 @@ public sealed class GovernedOperationState
         }
     }
 
+    /// <summary>A rejected authority change records an attempt without changing current authority.</summary>
+    public void Apply(ChatBotAuthorityChangeRejected e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+    }
+
     /// <summary>
     /// Applies the recorded-note event. Idempotent on replay: a duplicate event leaves state unchanged.
     /// </summary>

@@ -354,6 +354,39 @@ public sealed class TrustedAuthorityTests
         owner.Requests.ShouldContain(request => request.Owner == ownerName && request.ResourceId == "foreign-resource" && request.RequireCurrent);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task TooManyDistinctOwnerReferencesDenyBeforeAnyOwnerRead(bool projects)
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock);
+        string[] references = Enumerable.Range(0, 33).Select(index => $"reference-{index}").ToArray();
+        object nested = projects ? new { ProjectScopeRefs = references } : (object)new { RecipientRefs = references };
+
+        ChatBotAuthorityDecision decision = await TrustedAuthorityFixture.Authorizer(clock, owner).AuthorizeAsync(
+            TrustedAuthorityFixture.Context(), nameof(RecordGovernedNote), false,
+            new { NoteId = Note, Nested = nested }, TestContext.Current.CancellationToken);
+
+        decision.IsAllowed.ShouldBeFalse();
+        owner.Requests.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task TooManyProjectAuthoritiesDenyBeforeAnyOwnerRead()
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock);
+        string[] projects = Enumerable.Range(0, 33).Select(index => $"project-{index}").ToArray();
+
+        bool allowed = await TrustedAuthorityFixture.Authorizer(clock, owner).HasProjectAuthoritiesAsync(
+            TrustedAuthorityFixture.Context(), projects, ChatBotReadQueryTypes.ProjectConversation,
+            TestContext.Current.CancellationToken);
+
+        allowed.ShouldBeFalse();
+        owner.Requests.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task ForeignRevokedGrantObservationCannotPoisonTheBoundTenant()
     {

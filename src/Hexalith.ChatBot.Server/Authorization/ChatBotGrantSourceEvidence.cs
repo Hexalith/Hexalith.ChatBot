@@ -52,7 +52,8 @@ internal static class ChatBotGrantSourceEvidence
                         granted.Authority != request.Authority || granted.ActorClass != request.ActorClass ||
                         granted.Origin != request.Origin || granted.ExpiresAt.Offset != TimeSpan.Zero ||
                         string.IsNullOrWhiteSpace(granted.GrantId) || !issuanceIds.Add(granted.GrantId) ||
-                        current is not null && !revoked)
+                        current is not null && !revoked && current.ExpiresAt > item.Timestamp ||
+                        !ValidNestedServiceGrant(granted))
                     {
                         return null;
                     }
@@ -69,6 +70,16 @@ internal static class ChatBotGrantSourceEvidence
                     }
 
                     revoked = true;
+                }
+                else if (eventType == typeof(ChatBotAuthorityChangeRejected).FullName)
+                {
+                    ChatBotAuthorityChangeRejected? rejection = JsonSerializer.Deserialize<ChatBotAuthorityChangeRejected>(item.Payload, JsonOptions);
+                    if (rejection is null || rejection.AuthorityKey != stream.Identity.AggregateId ||
+                        rejection.Reason is not ("invalid_authority_grant" or "authority_issuance_reused" or
+                            "authority_grant_active" or "authority_grant_mismatch"))
+                    {
+                        return null;
+                    }
                 }
                 else
                 {
@@ -88,5 +99,19 @@ internal static class ChatBotGrantSourceEvidence
 
         return new(request, stream.Identity.AggregateId, stream.Head.ToString(System.Globalization.CultureInfo.InvariantCulture),
             stream.ObservedAt, stream.ObservedAt, current.ExpiresAt, true, false, current.ServiceGrant);
+    }
+
+    private static bool ValidNestedServiceGrant(ChatBotAuthorityGranted granted)
+    {
+        if (granted.ServiceGrant is not { } serviceGrant)
+        {
+            return granted.Authority != "service-grant";
+        }
+
+        return granted.Authority == "service-grant" && granted.ActorClass is ("service" or "ai") &&
+            granted.PrincipalId == granted.ResourceId && serviceGrant.GrantId == granted.GrantId &&
+            serviceGrant.TenantId == granted.TenantId && serviceGrant.ServiceClientId == granted.PrincipalId &&
+            serviceGrant.SurfaceOrigin == granted.Origin && serviceGrant.ExpiresAt == granted.ExpiresAt &&
+            !serviceGrant.IsRevoked;
     }
 }

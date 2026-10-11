@@ -172,6 +172,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     private async Task SeedCurrentGovernedNoteAuthorityAsync(
         DistributedApplication app, HttpClient eventStore, HttpClient chatBot, string chatBotToken,
         string tenantId, string principalId, string noteId, string taskId, bool bootstrapGlobalAdmin,
+        string? projectId,
         CancellationToken cancellationToken)
     {
         string adminToken = await AcquireTenantBoundAccessTokenAsync(app, "admin-user", "admin-pass",
@@ -199,7 +200,8 @@ public sealed class TrivialGovernedCommandAspireE2eTests
 
         (string Operation, string Resource)[] scopes = principalId == "actor-alpha"
             ? [(nameof(RecordGovernedNote), noteId), ("operation-status", taskId),
-                ("governed-operation", noteId), ("operation-audit-history", taskId)]
+                ("governed-operation", noteId), ("operation-audit-history", taskId),
+                ("project-conversation", projectId!)]
             : [(nameof(RecordGovernedNote), noteId)];
         foreach ((string operation, string resource) in scopes)
         {
@@ -250,6 +252,65 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 tenantId, principalId, operation, resource, accepted = true,
             }));
         }
+    }
+
+    private async Task AssertConnectedProjectGrantLifecycleAsync(
+        DistributedApplication app, HttpClient eventStore, HttpClient chatBot, string chatBotToken,
+        string projectId, string correlationId, CancellationToken cancellationToken)
+    {
+        const string tenantId = "tenant-alpha";
+        const string principalId = "actor-alpha";
+        const string operation = "project-conversation";
+        string eventStoreToken = await AcquireTenantBoundAccessTokenAsync(app, principalId,
+            "actor-alpha-pass", "hexalith-eventstore", cancellationToken).ConfigureAwait(false);
+
+        await SubmitOwnerCommandAndWaitAsync(eventStore, eventStoreToken, tenantId, "projects", projectId,
+            "Hexalith.Projects.Commands.CreateProject", new { name = "Connected authority project" },
+            cancellationToken).ConfigureAwait(false);
+
+        string grantId = ChatBotCommandId.New().ToString();
+        await SubmitOwnerCommandAndWaitAsync(eventStore, eventStoreToken, tenantId, "projects", projectId,
+            "Hexalith.Projects.Contracts.Commands.GrantProjectChatBotAuthority",
+            new { principalId, operation, actorClass = "human", origin = "Ui", grantId,
+                expiresAt = DateTimeOffset.UtcNow.AddHours(1) }, cancellationToken).ConfigureAwait(false);
+
+        Stopwatch allowedWait = Stopwatch.StartNew();
+        bool allowed = false;
+        while (allowedWait.Elapsed < ProjectionTimeout)
+        {
+            using HttpResponseMessage response = await GetAuthorizedAsync(chatBot, chatBotToken,
+                $"/api/v1/projects/{projectId}/conversation", correlationId, cancellationToken).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.OK)
+            {
+                allowed = true;
+                break;
+            }
+
+            response.StatusCode.ShouldBe(HttpStatusCode.Forbidden,
+                "A connected project read may fail closed while its current owner evidence catches up.");
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
+
+        allowed.ShouldBeTrue("The exact current Projects and ChatBot grants must authorize the project read.");
+
+        await SubmitOwnerCommandAndWaitAsync(eventStore, eventStoreToken, tenantId, "projects", projectId,
+            "Hexalith.Projects.Contracts.Commands.RevokeProjectChatBotAuthority",
+            new { principalId, operation, actorClass = "human", origin = "Ui", grantId },
+            cancellationToken).ConfigureAwait(false);
+
+        // A fresh request must deny after Projects revocation. The exact ChatBot grant issued above is
+        // still within its one-hour lease and is never revoked in this test.
+        using HttpResponseMessage denied = await GetAuthorizedAsync(chatBot, chatBotToken,
+            $"/api/v1/projects/{projectId}/conversation", correlationId, cancellationToken).ConfigureAwait(false);
+        denied.StatusCode.ShouldBe(HttpStatusCode.Forbidden,
+            "Revoking the Projects grant must remove read admission while the ChatBot grant remains current.");
+        string deniedBody = await denied.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        deniedBody.ShouldNotContain(tenantId, Case.Insensitive);
+        deniedBody.ShouldNotContain(projectId, Case.Insensitive);
+        _output.WriteLine("LIVE_PROJECT_GRANT_LIFECYCLE {0}", JsonSerializer.Serialize(new
+        {
+            projectId, grantedRead = true, revokedReadStatus = (int)denied.StatusCode,
+        }));
     }
 
     private static async Task WaitForCurrentGlobalAdministratorAsync(
@@ -399,6 +460,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         string commandId = ChatBotCommandId.New().ToString();
         string taskId = ChatBotCommandId.New().ToString();
         string correlationId = ChatBotCommandId.New().ToString();
+        string projectId = ChatBotCommandId.New().ToString();
 
         string betaNoteId = GovernedNoteId.New().ToString();
         string betaCommandId = ChatBotCommandId.New().ToString();
@@ -467,9 +529,12 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             string betaAccessToken = await AcquireTenantBoundAccessTokenAsync(
                 app, "actor-beta", "actor-beta-pass", cancellationToken).ConfigureAwait(true);
             await SeedCurrentGovernedNoteAuthorityAsync(app, eventStoreClient, client,
-                accessToken, "tenant-alpha", "actor-alpha", noteId, taskId, true, cancellationToken).ConfigureAwait(true);
+                accessToken, "tenant-alpha", "actor-alpha", noteId, taskId, true, projectId, cancellationToken).ConfigureAwait(true);
             await SeedCurrentGovernedNoteAuthorityAsync(app, eventStoreClient, client,
-                betaAccessToken, "tenant-beta", "actor-beta", betaNoteId, betaTaskId, false, cancellationToken).ConfigureAwait(true);
+                betaAccessToken, "tenant-beta", "actor-beta", betaNoteId, betaTaskId, false, null, cancellationToken).ConfigureAwait(true);
+
+            await AssertConnectedProjectGrantLifecycleAsync(app, eventStoreClient, client, accessToken,
+                projectId, correlationId, cancellationToken).ConfigureAwait(true);
 
             // 1) Authenticated submit of the allowlisted trivial command declaring origin=ui → 202 Accepted. The
             //    durable spine (EventStore actor host + chatbot domain processor) finishes starting after the
@@ -2826,7 +2891,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
         }
 
-        successfulReads.ShouldBeGreaterThan(0, "The stable replay view must remain readable under current owner authority.");
+        successfulReads.ShouldBeGreaterThan(1, "The stable replay view must have another authorized read after the first despite transient owner-read denials.");
     }
 
     internal static async Task WaitForChatBotListeningAsync(HttpClient client, CancellationToken cancellationToken)

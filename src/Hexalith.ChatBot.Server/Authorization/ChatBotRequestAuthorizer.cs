@@ -12,6 +12,7 @@ namespace Hexalith.ChatBot.Server.Authorization;
 /// <summary>Authorizes exact operations against current owner evidence before any protected access.</summary>
 internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, IChatBotOwnerAuthorityProvider owners, ISystemClock clock, ServiceClientGrantProjectionCache grants, ILogger<ChatBotRequestAuthorizer>? logger = null)
 {
+    private const int MaxDistinctOwnerReferences = 32;
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     /// <summary>Recognizes only operations covered by the closed catalog.</summary>
     public bool IsKnownOperation(string operation, bool isQuery) => catalog.Find(operation, isQuery) is not null;
@@ -22,8 +23,10 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
     /// <summary>Collects current project evidence and jointly validates its complete set before disclosure.</summary>
     public async ValueTask<bool> HasProjectAuthoritiesAsync(ChatBotRequestContext context, IEnumerable<string> projects, string operation, CancellationToken cancellationToken, ChatBotAuthorityPrincipal? principal = null)
     {
-        string[] exactProjects = projects.Distinct(StringComparer.Ordinal).ToArray();
-        if (context.TenantId is null || exactProjects.Length == 0 || exactProjects.Any(static project => !AuditMetadata.IsSafeStableIdentifier(project) || project == "*") || catalog.Find(operation, true) is null)
+        string[] exactProjects = projects.Distinct(StringComparer.Ordinal).Take(MaxDistinctOwnerReferences + 1).ToArray();
+        if (context.TenantId is null || exactProjects.Length is 0 or > MaxDistinctOwnerReferences ||
+            exactProjects.Any(static project => !AuditMetadata.IsSafeStableIdentifier(project) || project == "*") ||
+            catalog.Find(operation, true) is null)
         {
             return false;
         }
@@ -150,7 +153,13 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
             return Denied(operation);
         }
 
-        foreach (string project in projects.Distinct(StringComparer.Ordinal))
+        string[] exactProjectReferences = projects.Distinct(StringComparer.Ordinal).Take(MaxDistinctOwnerReferences + 1).ToArray();
+        if (exactProjectReferences.Length > MaxDistinctOwnerReferences)
+        {
+            return Denied(operation);
+        }
+
+        foreach (string project in exactProjectReferences)
         {
             requests.Add(Request(context, "Projects", project, operation, "project", !isQuery));
         }
@@ -158,7 +167,13 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
         {
             List<string> parties = [];
             CollectReferences(json, ["PartyId", "RequesterPartyId", "TargetActorId", "RequesterId", "SourceActorId", "RecipientRefs", "RecipientPartyIds", "RecipientPartyRefs", "RequesterRef", "ApproverRef", "ResolvedPartyRef", "RecipientReferences", "AssigneeRef", "ReviewerRef", "PreviousAssigneeRef"], parties);
-            foreach (string party in parties.Distinct(StringComparer.Ordinal))
+            string[] exactPartyReferences = parties.Distinct(StringComparer.Ordinal).Take(MaxDistinctOwnerReferences + 1).ToArray();
+            if (exactPartyReferences.Length > MaxDistinctOwnerReferences)
+            {
+                return Denied(operation);
+            }
+
+            foreach (string party in exactPartyReferences)
             {
                 if (!AuditMetadata.IsSafeStableIdentifier(party))
                 {
