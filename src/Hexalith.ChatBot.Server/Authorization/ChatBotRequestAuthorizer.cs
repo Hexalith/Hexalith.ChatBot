@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Audit;
@@ -71,6 +72,11 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
         if (json.ValueKind != JsonValueKind.Object || !ValidTenantTargets(json, context.TenantId))
         {
             return Denied(operation);
+        }
+
+        if (!isQuery && operation is (nameof(GrantChatBotAuthority) or nameof(RevokeChatBotAuthority)))
+        {
+            return await AuthorizeGrantChangeAsync(context, operation, json, cancellationToken).ConfigureAwait(false);
         }
 
         string? resource = row.ResourceProperty is null ? context.TenantId : ReadString(json, row.ResourceProperty);
@@ -208,6 +214,79 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
     /// <summary>Retains the established safe grant denial codes while checking owner evidence.</summary>
     public ValueTask<ServiceClientGrantResolution> ResolveServiceGrantResolutionAsync(ChatBotRequestContext context, string operation, bool isQuery, bool requireCurrent, CancellationToken cancellationToken)
         => ResolveServiceGrantResolutionCoreAsync(context, operation, isQuery, requireCurrent, cancellationToken, null);
+
+    private async ValueTask<ChatBotAuthorityDecision> AuthorizeGrantChangeAsync(ChatBotRequestContext context, string operation, JsonElement payload, CancellationToken cancellationToken)
+    {
+        if (context.IsMachine || context.TenantId is null ||
+            !AuditMetadata.IsSafeStableIdentifier(ReadString(payload, "AuthorityKey")) ||
+            !AuditMetadata.IsSafeStableIdentifier(ReadString(payload, "GrantId")))
+        {
+            return Denied(operation);
+        }
+
+        if (operation == nameof(GrantChatBotAuthority))
+        {
+            GrantChatBotAuthority? grant;
+            try { grant = payload.Deserialize<GrantChatBotAuthority>(_jsonOptions); }
+            catch (JsonException) { return Denied(operation); }
+            if (grant is null || !AuditMetadata.IsSafeStableIdentifier(grant.PrincipalId) ||
+                !AuditMetadata.IsSafeStableIdentifier(grant.ResourceId) ||
+                !AuditMetadata.IsSafeStableIdentifier(grant.Operation) ||
+                !AuditMetadata.IsSafeStableIdentifier(grant.Authority) ||
+                grant.ActorClass is not ("human" or "service" or "ai") ||
+                !Enum.IsDefined(grant.Origin) ||
+                grant.AuthorityKey != ChatBotAuthorityGrantKey.For(context.TenantId, grant.PrincipalId,
+                    grant.ResourceId, grant.Operation, grant.Authority, grant.ActorClass, grant.Origin))
+            {
+                return Denied(operation);
+            }
+
+            ChatBotAuthorityRequirement? target = catalog.Find(grant.Operation, false) ?? catalog.Find(grant.Operation, true);
+            if (target is null || target.Operation is nameof(GrantChatBotAuthority) or nameof(RevokeChatBotAuthority) ||
+                (target.AdminScope is not null && grant.ActorClass != "human") ||
+                grant.Authority != (grant.ServiceGrant is null ? target.AdminScope is null ? "operation" : $"admin:{target.AdminScope}" : "service-grant") ||
+                (grant.ServiceGrant is not null && (grant.ActorClass is not ("service" or "ai") ||
+                    grant.ResourceId != grant.PrincipalId ||
+                    grant.ServiceGrant.TenantId != context.TenantId ||
+                    grant.ServiceGrant.ServiceClientId != grant.PrincipalId ||
+                    grant.ServiceGrant.SurfaceOrigin != grant.Origin ||
+                    grant.ServiceGrant.GrantId != grant.GrantId ||
+                    grant.ServiceGrant.ExpiresAt != grant.ExpiresAt ||
+                    grant.ServiceGrant.IsRevoked ||
+                    !HasValidGrantMetadata(grant.ServiceGrant) || !HasValidGrantScopes(grant.ServiceGrant) ||
+                    grant.ServiceGrant.AllowedCommandNames.Concat(grant.ServiceGrant.AllowedQueryNames).Count() != 1 ||
+                    !(target.IsQuery ? grant.ServiceGrant.AllowedQueryNames : grant.ServiceGrant.AllowedCommandNames).Contains(grant.Operation, StringComparer.Ordinal))))
+            {
+                return Denied(operation);
+            }
+        }
+
+        DateTimeOffset started = clock.UtcNow;
+        ChatBotOwnerAuthorityRequest[] requests =
+        [
+            Request(context, "Tenants", context.TenantId, operation, "TenantOwner", true),
+            Request(context, "Parties", context.SubjectId, operation, "identity", true),
+        ];
+        List<(ChatBotOwnerAuthorityEvidence Evidence, DateTimeOffset Started)> evidence = [];
+        foreach (ChatBotOwnerAuthorityRequest request in requests)
+        {
+            ChatBotOwnerAuthorityEvidence? current = await GetEvidenceAsync(request, started, cancellationToken).ConfigureAwait(false);
+            if (current is null)
+            {
+                return Denied(operation);
+            }
+            evidence.Add((current, started));
+        }
+
+        DateTimeOffset decidedAt = clock.UtcNow;
+        if (evidence.Any(item => !ValidateEvidence(item.Evidence, item.Evidence.Request, item.Started, decidedAt)))
+        {
+            return Denied(operation);
+        }
+
+        return new ChatBotAuthorityDecision(new ChatBotAuthorityPrincipal(context, null, [], validatedEvidence: evidence, grants: grants),
+            string.Empty, evidence.Select(item => $"{item.Evidence.Request.Owner}:{item.Evidence.EvidenceId}:{item.Evidence.Version}").ToArray());
+    }
 
     private async ValueTask<ServiceClientGrantResolution> ResolveServiceGrantResolutionCoreAsync(ChatBotRequestContext context, string operation, bool isQuery, bool requireCurrent, CancellationToken cancellationToken,
         List<(ChatBotOwnerAuthorityEvidence Evidence, DateTimeOffset Started)>? collectedEvidence)

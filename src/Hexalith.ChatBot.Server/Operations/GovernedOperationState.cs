@@ -4,6 +4,7 @@ using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Governance.AiActor;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.CommandCapability;
@@ -33,6 +34,7 @@ public sealed class GovernedOperationState
     private readonly HashSet<string> _projectConversationMessageIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _aiResponseCancellationIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _lowRiskAiExecutionIds = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _authorityGrantIds = new(StringComparer.Ordinal);
 
     // In-flight AI response generations, keyed "{responseId}:{generationId}" (proposal id : execution id -- the same
     // pair the project-conversation projection exposes as AiResponseProgress.ResponseId / .GenerationId). Populated when
@@ -86,6 +88,15 @@ public sealed class GovernedOperationState
     /// Gets a value indicating whether a governed note has already been recorded for this aggregate.
     /// </summary>
     public bool IsRecorded { get; private set; }
+
+    /// <summary>The latest persisted authority issuance on this exact stream.</summary>
+    public ChatBotAuthorityGranted? CurrentAuthorityGrant { get; private set; }
+
+    /// <summary>Whether the latest authority issuance has been revoked.</summary>
+    public bool AuthorityGrantRevoked { get; private set; }
+
+    /// <summary>All issuance identifiers ever used on this exact authority stream.</summary>
+    public IReadOnlySet<string> AuthorityGrantIds => _authorityGrantIds;
 
     /// <summary>
     /// Gets the ULID of the recorded governed note, or <see langword="null"/> before recording.
@@ -277,6 +288,25 @@ public sealed class GovernedOperationState
     public double AssociationTLow => _associationTLow;
 
     public string AssociationThresholdPolicyVersion => _associationThresholdPolicyVersion;
+
+    /// <summary>Applies an exact owner grant from EventStore replay.</summary>
+    public void Apply(ChatBotAuthorityGranted e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _authorityGrantIds.Add(e.GrantId);
+        CurrentAuthorityGrant = e;
+        AuthorityGrantRevoked = false;
+    }
+
+    /// <summary>Applies revocation only to the current matching issuance.</summary>
+    public void Apply(ChatBotAuthorityRevoked e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (string.Equals(CurrentAuthorityGrant?.GrantId, e.GrantId, StringComparison.Ordinal))
+        {
+            AuthorityGrantRevoked = true;
+        }
+    }
 
     /// <summary>
     /// Applies the recorded-note event. Idempotent on replay: a duplicate event leaves state unchanged.

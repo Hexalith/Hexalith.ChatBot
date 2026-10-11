@@ -8,6 +8,7 @@ using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
@@ -15,6 +16,8 @@ using Aspire.Hosting.Testing;
 
 using CommunityToolkit.Aspire.Hosting.Dapr;
 
+using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -55,6 +58,8 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     private const string ChatBotResourceName = "chatbot";
     private const string EventStoreResourceName = "eventstore";
     private const string TenantsResourceName = "tenants";
+    private const string PartiesResourceName = "parties";
+    private const string ProjectsResourceName = "projects";
     private const string MemoriesResourceName = "memories";
     private const string MemoriesProbeIssuer = "chatbot-topology-probe";
     private const string MemoriesProbeAudience = "memories-topology-probe";
@@ -81,6 +86,8 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         "security",
         EventStoreResourceName,
         TenantsResourceName,
+        PartiesResourceName,
+        ProjectsResourceName,
         ChatBotResourceName,
         "chatbot-ui",
         "eventstore-admin",
@@ -102,6 +109,8 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     [
         EventStoreResourceName,
         TenantsResourceName,
+        PartiesResourceName,
+        ProjectsResourceName,
         ChatBotResourceName,
         "eventstore-admin",
         "eventstore-admin-ui",
@@ -121,6 +130,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
 
     private static readonly TimeSpan ProjectionTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan ProjectionStabilityWindow = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan AuthorizedViewRecoveryWindow = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(3);
 
     /// <summary>
@@ -159,6 +169,213 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             {"commandId":"{{commandId}}","commandType":"RecordGovernedNote","command":{"noteId":"{{noteId}}"},"origin":"{{origin}}","requestSchemaVersion":"v1"}
             """;
 
+    private async Task SeedCurrentGovernedNoteAuthorityAsync(
+        DistributedApplication app, HttpClient eventStore, HttpClient chatBot, string chatBotToken,
+        string tenantId, string principalId, string noteId, string taskId, bool bootstrapGlobalAdmin,
+        CancellationToken cancellationToken)
+    {
+        string adminToken = await AcquireTenantBoundAccessTokenAsync(app, "admin-user", "admin-pass",
+            "hexalith-eventstore", cancellationToken).ConfigureAwait(false);
+        if (bootstrapGlobalAdmin)
+        {
+            await SubmitOwnerCommandAndWaitAsync(eventStore, adminToken, "system", "global-administrators",
+                "global-administrators", "BootstrapGlobalAdmin", new { userId = "admin-user" }, cancellationToken,
+                alreadySatisfiedReasonCode: "global-admin-already-bootstrapped-rejection").ConfigureAwait(false);
+        }
+        await WaitForCurrentGlobalAdministratorAsync(eventStore, adminToken, cancellationToken).ConfigureAwait(false);
+        await SubmitOwnerCommandAndWaitAsync(eventStore, adminToken, "system", "tenants", tenantId,
+            "CreateTenant", new { tenantId, name = $"Authority {tenantId}", description = "Live owner authority evidence" },
+            cancellationToken, alreadySatisfiedReasonCode: "tenant-already-exists-rejection").ConfigureAwait(false);
+        await SubmitOwnerCommandAndWaitAsync(eventStore, adminToken, "system", "tenants", tenantId,
+            "AddUserToTenant", new { tenantId, userId = principalId, role = "TenantOwner" },
+            cancellationToken, alreadySatisfiedReasonCode: "user-already-in-tenant-rejection").ConfigureAwait(false);
+
+        string eventStoreActorToken = await AcquireTenantBoundAccessTokenAsync(app, principalId,
+            $"{principalId}-pass", "hexalith-eventstore", cancellationToken).ConfigureAwait(false);
+        await SubmitOwnerCommandAndWaitAsync(eventStore, eventStoreActorToken, tenantId, "party", principalId,
+            "Hexalith.Parties.Contracts.Commands.CreateParty",
+            new { partyId = principalId, type = 1, personDetails = new { firstName = "Live", lastName = principalId } },
+            cancellationToken).ConfigureAwait(false);
+
+        (string Operation, string Resource)[] scopes = principalId == "actor-alpha"
+            ? [(nameof(RecordGovernedNote), noteId), ("operation-status", taskId),
+                ("governed-operation", noteId), ("operation-audit-history", taskId)]
+            : [(nameof(RecordGovernedNote), noteId)];
+        foreach ((string operation, string resource) in scopes)
+        {
+            string authorityKey = ChatBotAuthorityGrantKey.For(tenantId, principalId, resource,
+                operation, "operation", "human", ChatBotSurfaceOrigin.Ui);
+            var grant = new GrantChatBotAuthority(authorityKey, ChatBotCommandId.New().ToString(),
+                principalId, resource, operation, "operation", "human", ChatBotSurfaceOrigin.Ui,
+                DateTimeOffset.UtcNow.AddHours(1));
+            string commandId = ChatBotCommandId.New().ToString();
+            bool accepted = false;
+            for (int attempt = 1; attempt <= 5 && !accepted; attempt++)
+            {
+                using HttpRequestMessage message = new(HttpMethod.Post, "/api/v1/commands")
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        commandId,
+                        commandType = nameof(GrantChatBotAuthority),
+                        command = grant,
+                        origin = "ui",
+                        requestSchemaVersion = "v1",
+                    }),
+                };
+                message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", chatBotToken);
+                try
+                {
+                    using HttpResponseMessage response = await chatBot.SendAsync(message, cancellationToken).ConfigureAwait(false);
+                    string body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    accepted = response.StatusCode == HttpStatusCode.Accepted;
+                    if (!accepted && attempt < 5 && response.StatusCode is (HttpStatusCode.Forbidden or
+                        HttpStatusCode.ServiceUnavailable or HttpStatusCode.InternalServerError or HttpStatusCode.GatewayTimeout))
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(5 * attempt), cancellationToken).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    response.StatusCode.ShouldBe(HttpStatusCode.Accepted,
+                        $"Exact {operation} authority issuance for {principalId} failed: {body}");
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && attempt < 5)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5 * attempt), cancellationToken).ConfigureAwait(false);
+                }
+            }
+            accepted.ShouldBeTrue($"Exact {operation} authority issuance for {principalId} did not complete after three current-owner attempts.");
+            _output.WriteLine("LIVE_OWNER_GRANT_EVIDENCE {0}", JsonSerializer.Serialize(new
+            {
+                tenantId, principalId, operation, resource, accepted = true,
+            }));
+        }
+    }
+
+    private static async Task WaitForCurrentGlobalAdministratorAsync(
+        HttpClient eventStore, string adminToken, CancellationToken cancellationToken)
+    {
+        Stopwatch timeout = Stopwatch.StartNew();
+        HttpStatusCode lastStatus = 0;
+        string lastReasonCode = "none";
+        while (timeout.Elapsed < ProjectionTimeout)
+        {
+            using HttpRequestMessage query = new(HttpMethod.Post, "/api/v1/queries")
+            {
+                Content = JsonContent.Create(new
+                {
+                    tenant = "system",
+                    domain = "global-administrators",
+                    aggregateId = "global-administrators",
+                    queryType = "get-global-administrators",
+                    projectionType = "global-administrators",
+                    payload = new { pageSize = 10 },
+                }),
+            };
+            query.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+            using HttpResponseMessage response = await eventStore.SendAsync(query, cancellationToken).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.OK) { return; }
+            lastStatus = response.StatusCode;
+            try
+            {
+                using JsonDocument problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                if (problem.RootElement.TryGetProperty("reasonCode", out JsonElement reason)
+                    && reason.GetString() is string code
+                    && Regex.IsMatch(code, "^[a-z][a-z0-9-]{0,63}$", RegexOptions.CultureInvariant))
+                {
+                    lastReasonCode = code;
+                }
+            }
+            catch (JsonException) { lastReasonCode = "unavailable"; }
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new TimeoutException($"Current global-administrator projection did not authorize admin-user within {ProjectionTimeout}; last status {(int)lastStatus}, reason {lastReasonCode}.");
+    }
+
+    private async Task SubmitOwnerCommandAndWaitAsync(
+        HttpClient eventStore, string accessToken, string tenant, string domain, string aggregateId,
+        string commandType, object payload, CancellationToken cancellationToken, string? alreadySatisfiedReasonCode = null)
+    {
+        string messageId = ChatBotCommandId.New().ToString();
+        string submissionBody = string.Empty;
+        HttpStatusCode submissionStatus = 0;
+        for (int attempt = 1; attempt <= 3; attempt++)
+        {
+            using HttpRequestMessage submit = new(HttpMethod.Post, "/api/v1/commands")
+            {
+                Content = JsonContent.Create(new
+                {
+                    messageId, tenant, domain, aggregateId, commandType,
+                    payload = JsonSerializer.SerializeToElement(payload),
+                }),
+            };
+            submit.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            try
+            {
+                using HttpResponseMessage response = await eventStore.SendAsync(submit, cancellationToken).ConfigureAwait(false);
+                submissionStatus = response.StatusCode;
+                submissionBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                if (submissionStatus == HttpStatusCode.Conflict && alreadySatisfiedReasonCode is not null)
+                {
+                    using JsonDocument conflict = JsonDocument.Parse(submissionBody);
+                    if (conflict.RootElement.TryGetProperty("reasonCode", out JsonElement reason)
+                        && string.Equals(reason.GetString(), alreadySatisfiedReasonCode, StringComparison.Ordinal))
+                    {
+                        return;
+                    }
+                }
+
+                if (submissionStatus == HttpStatusCode.Accepted) { break; }
+                if (attempt < 3 && submissionStatus is (HttpStatusCode.InternalServerError or
+                    HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout))
+                {
+                    await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                break;
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && attempt < 3)
+            {
+                await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        submissionStatus.ShouldBe(HttpStatusCode.Accepted,
+            $"Owner command {domain}/{commandType} was not accepted: {submissionBody}");
+        using JsonDocument submission = JsonDocument.Parse(submissionBody);
+        string? correlationId = submission.RootElement.GetProperty("correlationId").GetString();
+        correlationId.ShouldNotBeNullOrWhiteSpace();
+
+        Stopwatch timeout = Stopwatch.StartNew();
+        while (timeout.Elapsed < ProjectionTimeout)
+        {
+            using HttpRequestMessage statusRequest = new(HttpMethod.Get, $"/api/v1/commands/status/{correlationId}");
+            statusRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            using HttpResponseMessage statusResponse = await eventStore.SendAsync(statusRequest, cancellationToken).ConfigureAwait(false);
+            string statusBody = await statusResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            statusResponse.StatusCode.ShouldBe(HttpStatusCode.OK,
+                $"Owner command {domain}/{commandType} status was unavailable: {statusBody}");
+            using JsonDocument status = JsonDocument.Parse(statusBody);
+            string? state = status.RootElement.GetProperty("status").GetString();
+            if (state == "Completed")
+            {
+                int? eventCount = status.RootElement.TryGetProperty("eventCount", out JsonElement count)
+                    && count.ValueKind == JsonValueKind.Number ? count.GetInt32() : null;
+                _output.WriteLine("OWNER_COMMAND_COMPLETED {0}", JsonSerializer.Serialize(new { domain, commandType, eventCount }));
+                return;
+            }
+            if (state is "Rejected" or "PublishFailed" or "Failed")
+            {
+                throw new InvalidOperationException($"Owner command {domain}/{commandType} ended {state}: {statusBody}");
+            }
+
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new TimeoutException($"Owner command {domain}/{commandType} did not complete in {ProjectionTimeout}.");
+    }
+
     [Fact]
     public async Task TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology()
     {
@@ -194,11 +411,17 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             await WaitForAndRecordRequiredTopologyAsync(app, cancellationToken).ConfigureAwait(true);
 
             using HttpClient client = app.CreateHttpClient(ChatBotResourceName);
-            client.Timeout = TimeSpan.FromSeconds(30);
+            // Exact grant issuance rechecks Tenants and Parties both at the gateway and in the domain relay.
+            // The local 13-resource topology can serialize those owner reads behind projection traffic.
+            client.Timeout = TimeSpan.FromSeconds(120);
             using HttpClient eventStoreClient = app.CreateHttpClient(EventStoreResourceName, "http");
             eventStoreClient.Timeout = TimeSpan.FromSeconds(15);
             using HttpClient tenantsClient = app.CreateHttpClient(TenantsResourceName, "http");
             tenantsClient.Timeout = TimeSpan.FromSeconds(15);
+            using HttpClient partiesClient = app.CreateHttpClient(PartiesResourceName, "http");
+            partiesClient.Timeout = TimeSpan.FromSeconds(15);
+            using HttpClient projectsClient = app.CreateHttpClient(ProjectsResourceName, "http");
+            projectsClient.Timeout = TimeSpan.FromSeconds(15);
 
             // `WaitForResourceHealthyAsync` resolves when a resource is *Running* (process launched), NOT when its
             // Kestrel listener is accepting — and with the dapr app-port endpoint proxy disabled there is no DCP
@@ -207,6 +430,8 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             // dispatch hangs. Poll each spine app's /health until it answers (any response proves it is listening).
             await WaitForListenerAsync(eventStoreClient, cancellationToken).ConfigureAwait(true);
             await WaitForListenerAsync(tenantsClient, cancellationToken).ConfigureAwait(true);
+            await WaitForListenerAsync(partiesClient, cancellationToken).ConfigureAwait(true);
+            await WaitForListenerAsync(projectsClient, cancellationToken).ConfigureAwait(true);
             await WaitForChatBotListeningAsync(client, cancellationToken).ConfigureAwait(true);
 
             // Fail-closed proof through the real spine: an unauthenticated governed-command submission is
@@ -239,6 +464,13 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 unauthenticatedCorrelationId,
                 cancellationToken).ConfigureAwait(true);
 
+            string betaAccessToken = await AcquireTenantBoundAccessTokenAsync(
+                app, "actor-beta", "actor-beta-pass", cancellationToken).ConfigureAwait(true);
+            await SeedCurrentGovernedNoteAuthorityAsync(app, eventStoreClient, client,
+                accessToken, "tenant-alpha", "actor-alpha", noteId, taskId, true, cancellationToken).ConfigureAwait(true);
+            await SeedCurrentGovernedNoteAuthorityAsync(app, eventStoreClient, client,
+                betaAccessToken, "tenant-beta", "actor-beta", betaNoteId, betaTaskId, false, cancellationToken).ConfigureAwait(true);
+
             // 1) Authenticated submit of the allowlisted trivial command declaring origin=ui → 202 Accepted. The
             //    durable spine (EventStore actor host + chatbot domain processor) finishes starting after the
             //    chatbot adapter; while EventStore is not yet reachable the dispatch fails closed (503), so retry
@@ -250,11 +482,6 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             // derived-store probe draws its population from the union of the derived store and WORM audit store, then
             // seeds its own metadata-only sentinels. This command therefore creates real two-tenant pair coverage
             // without test-only product data or an empty-population exemption.
-            string betaAccessToken = await AcquireTenantBoundAccessTokenAsync(
-                app,
-                "actor-beta",
-                "actor-beta-pass",
-                cancellationToken).ConfigureAwait(true);
             CommandSubmissionOutcome beta = await SubmitGovernedNoteUntilAcceptedAsync(
                 client,
                 betaAccessToken,
@@ -2561,14 +2788,26 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         CancellationToken cancellationToken)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
-        while (stopwatch.Elapsed < ProjectionStabilityWindow)
+        int successfulReads = 0;
+        TimeSpan? firstAuthorizedReadAt = null;
+        while (firstAuthorizedReadAt is { } first
+            ? stopwatch.Elapsed - first < ProjectionStabilityWindow
+            : stopwatch.Elapsed < AuthorizedViewRecoveryWindow)
         {
-            JsonElement current = await ReadGovernedOperationViewAsync(
-                client,
-                accessToken,
-                noteId,
-                correlationId,
-                cancellationToken).ConfigureAwait(false);
+            using HttpResponseMessage response = await GetAuthorizedAsync(client, accessToken,
+                $"/api/v1/governed-operations/{noteId}", correlationId, cancellationToken).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                // An unavailable current-owner read remains fail closed; require a later authorized read.
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+            using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+            JsonElement current = document.RootElement;
+            successfulReads++;
+            firstAuthorizedReadAt ??= stopwatch.Elapsed;
             current.GetProperty("sourceVersion").GetInt64().ShouldBe(1);
             RequiredDerivedField(current, "noteId", "replay").ShouldBe(
                 noteId,
@@ -2586,6 +2825,8 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 + $"{string.Join(", ", expectedFields)}. Observed: {string.Join(", ", currentFields)}.");
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
         }
+
+        successfulReads.ShouldBeGreaterThan(0, "The stable replay view must remain readable under current owner authority.");
     }
 
     internal static async Task WaitForChatBotListeningAsync(HttpClient client, CancellationToken cancellationToken)
@@ -2804,25 +3045,26 @@ public sealed class TrivialGovernedCommandAspireE2eTests
 
     private static async Task<JsonElement> PollOperationStatusAsync(HttpClient client, string accessToken, string operationId, string correlationId, CancellationToken cancellationToken)
     {
-        JsonElement last = default;
+        HttpStatusCode lastStatus = 0;
         Stopwatch stopwatch = Stopwatch.StartNew();
         while (stopwatch.Elapsed < ProjectionTimeout)
         {
             using HttpResponseMessage response = await GetAuthorizedAsync(client, accessToken, $"/api/v1/operations/{operationId}", correlationId, cancellationToken).ConfigureAwait(false);
+            lastStatus = response.StatusCode;
             if (response.StatusCode == HttpStatusCode.OK)
             {
                 using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
-                last = document.RootElement.Clone();
-                if (!string.IsNullOrEmpty(last.GetProperty("completionStatus").GetString()))
+                JsonElement status = document.RootElement.Clone();
+                if (!string.IsNullOrEmpty(status.GetProperty("completionStatus").GetString()))
                 {
-                    return last;
+                    return status;
                 }
             }
 
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
         }
 
-        return last;
+        throw new TimeoutException($"Operation status did not become readable within {ProjectionTimeout}; last status {(int)lastStatus}.");
     }
 
     private static async Task<JsonElement> PollGovernedOperationViewAsync(HttpClient client, string accessToken, string noteId, string correlationId, CancellationToken cancellationToken)
@@ -2878,6 +3120,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         using HttpRequestMessage request = new(HttpMethod.Get, path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         request.Headers.Add("X-Correlation-Id", correlationId);
+        request.Headers.Add("X-Hexalith-Surface-Origin", "ui");
         return await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
     }
 
@@ -2907,10 +3150,20 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         string username,
         string password,
         CancellationToken cancellationToken)
+        => await AcquireTenantBoundAccessTokenAsync(app, username, password,
+            "hexalith-chatbot", cancellationToken).ConfigureAwait(false);
+
+    private static async Task<string> AcquireTenantBoundAccessTokenAsync(
+        DistributedApplication app,
+        string username,
+        string password,
+        string clientId,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(app);
         ArgumentException.ThrowIfNullOrWhiteSpace(username);
         ArgumentException.ThrowIfNullOrWhiteSpace(password);
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
 
         // Keycloak finishes its realm import + becomes ready asynchronously after the container reports Running,
         // so the token endpoint can hang or 503 briefly. Retry with a SHORT per-attempt timeout (so a not-ready
@@ -2919,7 +3172,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         using FormUrlEncodedContent form = new(new Dictionary<string, string>
         {
             ["grant_type"] = "password",
-            ["client_id"] = "hexalith-chatbot",
+            ["client_id"] = clientId,
             ["username"] = username,
             ["password"] = password,
             ["scope"] = "openid",

@@ -13,6 +13,8 @@ internal sealed class ChatBotSpineCommandAllowlist : ISpineCommandAllowlist
         new(StringComparer.Ordinal)
         {
             nameof(RecordGovernedNote),
+            nameof(GrantChatBotAuthority),
+            nameof(RevokeChatBotAuthority),
             nameof(CaptureMailboxMessageIntake),
             nameof(ResolveMailboxMessageParticipants),
             nameof(ScoreMailboxMessageAssociation),

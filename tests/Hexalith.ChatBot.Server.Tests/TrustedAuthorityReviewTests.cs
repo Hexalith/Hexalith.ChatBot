@@ -347,6 +347,34 @@ public sealed class TrustedAuthorityReviewTests
         resolver.ResolveCommand(command).ShouldBeNull();
     }
 
+    [Fact]
+    public void BoundGrantIssuerRequiresVerifiedGatewayActorAndKeepsOrdinaryRelayClosed()
+    {
+        ChatBotRequestContextResolver resolver = TrustedAuthorityFixture.Resolver(Relay("domain-service:process"));
+        Dictionary<string, string> extensions = new(StringComparer.Ordinal)
+        {
+            [EventStoreGatewayVerifiedOrigin.ExtensionKey] = "chatbot",
+            [EventStoreGatewayVerifiedOrigin.ActorExtensionKey] = "actor-alpha",
+            ["actorId"] = "actor-alpha",
+            ["actorType"] = "human",
+            ["surfaceOrigin"] = "api",
+        };
+        CommandEnvelope command = new(Note, "tenant-alpha", "chatbot", Note,
+            nameof(GrantChatBotAuthority), [], "correlation-alpha", null, "actor-alpha", extensions);
+
+        ChatBotRequestContext issuer = resolver.ResolveBoundGrantIssuer(command).ShouldNotBeNull();
+        issuer.SubjectId.ShouldBe("actor-alpha");
+        issuer.TenantId.ShouldBe("tenant-alpha");
+        issuer.ActorClass.ShouldBe("human");
+        resolver.ResolveCommand(command).ShouldBeNull();
+        resolver.ResolveBoundGrantIssuer(command with { Extensions = new(extensions)
+        {
+            [EventStoreGatewayVerifiedOrigin.ActorExtensionKey] = "actor-other",
+        } }).ShouldBeNull();
+        TrustedAuthorityFixture.Resolver(Relay("domain-service:query"))
+            .ResolveBoundGrantIssuer(command).ShouldBeNull();
+    }
+
     [Theory]
     [InlineData("domain-service:process")]
     [InlineData("wrong-operation")]

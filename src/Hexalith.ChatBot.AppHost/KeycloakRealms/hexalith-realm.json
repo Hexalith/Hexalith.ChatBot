@@ -57,6 +57,52 @@
       ]
     },
     {
+      "name": "eventstore-audience.parties",
+      "description": "Grants the Parties domain-service audience to one EventStore workload token",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "workload-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "parties",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eventstore-audience.projects",
+      "description": "Grants the Projects domain-service audience to one EventStore workload token",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "workload-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "projects",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
       "name": "eventstore-operation.domain-service.process",
       "description": "Story 5.5: grants the 'domain-service:process' operation to one EventStore workload token",
       "protocol": "openid-connect",
@@ -177,6 +223,91 @@
           "config": {
             "claim.name": "eventstore:operation",
             "claim.value": "domain-service:metadata",
+            "jsonType.label": "String",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eventstore-audience.eventstore",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true" },
+      "protocolMappers": [
+        {
+          "name": "workload-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "eventstore",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eventstore-operation.eventstore.stream-read",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true" },
+      "protocolMappers": [
+        {
+          "name": "workload-operation",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:operation",
+            "claim.value": "eventstore:stream-read",
+            "jsonType.label": "String",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eventstore-operation.eventstore.command-submit",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true" },
+      "protocolMappers": [
+        {
+          "name": "workload-operation",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:operation",
+            "claim.value": "eventstore:command-submit",
+            "jsonType.label": "String",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eventstore-operation.eventstore.owner-authority-query",
+      "protocol": "openid-connect",
+      "attributes": { "include.in.token.scope": "true" },
+      "protocolMappers": [
+        {
+          "name": "workload-operation",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:operation",
+            "claim.value": "eventstore:owner-authority-query",
             "jsonType.label": "String",
             "id.token.claim": "false",
             "access.token.claim": "true",
@@ -1352,6 +1483,15 @@
       ],
       "protocolMappers": [
         {
+          "name": "subject-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": {
+            "access.token.claim": "true"
+          }
+        },
+        {
           "name": "audience-mapper",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
@@ -1444,11 +1584,92 @@
       "optionalClientScopes": [
         "eventstore-audience.chatbot",
         "eventstore-audience.tenants",
+        "eventstore-audience.parties",
+        "eventstore-audience.projects",
         "eventstore-operation.domain-service.process",
         "eventstore-operation.domain-service.replay-state",
         "eventstore-operation.domain-service.query",
         "eventstore-operation.domain-service.project",
         "eventstore-operation.domain-service.metadata"
+      ]
+    },
+    {
+      "clientId": "chatbot",
+      "name": "ChatBot owner-evidence reader",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "__HEXALITH_CHATBOT_AUTHORITY_READER_SECRET__",
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": { "access.token.lifespan": "300" },
+      "defaultClientScopes": [],
+      "optionalClientScopes": [
+        "eventstore-audience.eventstore",
+        "eventstore-operation.eventstore.stream-read",
+        "eventstore-operation.eventstore.owner-authority-query",
+        "eventstore-operation.eventstore.command-submit"
+      ]
+    },
+    {
+      "clientId": "tenants",
+      "name": "Tenants current owner-evidence reader",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "__HEXALITH_TENANTS_AUTHORITY_READER_SECRET__",
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": { "access.token.lifespan": "300" },
+      "defaultClientScopes": [],
+      "optionalClientScopes": [
+        "eventstore-audience.eventstore",
+        "eventstore-operation.eventstore.stream-read"
+      ]
+    },
+    {
+      "clientId": "parties",
+      "name": "Parties current identity-evidence reader",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "__HEXALITH_PARTIES_AUTHORITY_READER_SECRET__",
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": { "access.token.lifespan": "300" },
+      "defaultClientScopes": [],
+      "optionalClientScopes": [
+        "eventstore-audience.eventstore",
+        "eventstore-operation.eventstore.stream-read"
+      ]
+    },
+    {
+      "clientId": "projects",
+      "name": "Projects current authority-evidence reader",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "__HEXALITH_PROJECTS_AUTHORITY_READER_SECRET__",
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": { "access.token.lifespan": "300" },
+      "defaultClientScopes": [],
+      "optionalClientScopes": [
+        "eventstore-audience.eventstore",
+        "eventstore-operation.eventstore.stream-read",
+        "eventstore-operation.eventstore.owner-authority-query"
       ]
     }
   ],

@@ -54,7 +54,6 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(submission);
-
         ChatBotAuthenticationResult authenticationResult = await authentication
             .AuthenticateAsync(submission, cancellationToken)
             .ConfigureAwait(false);

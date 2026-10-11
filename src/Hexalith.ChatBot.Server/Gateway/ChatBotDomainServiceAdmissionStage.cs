@@ -1,9 +1,11 @@
 using System.Text.Json;
 
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.EventStore.Contracts.Commands;
@@ -16,7 +18,8 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
     ChatBotCommandAdmissionPipeline admission,
     IIdempotencyStore idempotencyStore,
     IChatBotAdmissionMarker admissionMarker,
-    ChatBotRequestContextResolver requestContextResolver) : IDomainServiceAdmissionStage
+    ChatBotRequestContextResolver requestContextResolver,
+    ChatBotRequestAuthorizer? requestAuthorizer = null) : IDomainServiceAdmissionStage
 {
     public string Name => "chatbot-command-gateway";
 
@@ -28,6 +31,26 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
 
         if (admissionMarker.IsValid(context.Command))
         {
+            if (context.Command.CommandType is nameof(GrantChatBotAuthority) or nameof(RevokeChatBotAuthority))
+            {
+                ChatBotRequestContext? issuer = requestContextResolver.ResolveBoundGrantIssuer(context.Command);
+                if (requestAuthorizer is null || issuer is null ||
+                    context.Command.UserId != issuer.SubjectId || context.Command.TenantId != issuer.TenantId ||
+                    !TryReadPayload(context.Command.Payload, out JsonElement change) ||
+                    !ChatBotCanonicalDispatchTarget.TryResolve(context.Command.CommandType, change, out string? target) ||
+                    target != context.Command.AggregateId)
+                {
+                    return await RejectTransportAsync(context.Command, issuer, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken).ConfigureAwait(false);
+                }
+
+                ChatBotAuthorityDecision current = await requestAuthorizer.AuthorizeAsync(issuer, context.Command.CommandType,
+                    false, change, cancellationToken).ConfigureAwait(false);
+                if (!current.IsAllowed || !requestAuthorizer.IsCurrent(current.Principal!))
+                {
+                    return await RejectTransportAsync(context.Command, issuer, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
             return DomainServiceAdmissionResult.Accepted();
         }
 

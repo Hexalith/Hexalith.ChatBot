@@ -3,6 +3,7 @@ using System.Text.Json;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.ChatBot.Server.Gateway;
@@ -126,6 +127,13 @@ public sealed partial class AcceptedCommandDispatcherTests
     private static JsonElement TargetPayload(string operation) => operation switch
     {
         nameof(RecordGovernedNote) => WireCommand(NoteId),
+        nameof(GrantChatBotAuthority) => JsonSerializer.SerializeToElement(new GrantChatBotAuthority(
+            ChatBotAuthorityGrantKey.For("tenant-alpha", "actor-alpha", NoteId, nameof(RecordGovernedNote),
+                "operation", "human", ChatBotSurfaceOrigin.Ui), "grant-001", "actor-alpha", NoteId, nameof(RecordGovernedNote),
+            "operation", "human", ChatBotSurfaceOrigin.Ui, new DateTimeOffset(2030, 1, 1, 0, 0, 0, TimeSpan.Zero))),
+        nameof(RevokeChatBotAuthority) => JsonSerializer.SerializeToElement(new RevokeChatBotAuthority(
+            ChatBotAuthorityGrantKey.For("tenant-alpha", "actor-alpha", NoteId, nameof(RecordGovernedNote),
+                "operation", "human", ChatBotSurfaceOrigin.Ui), "grant-001")),
         nameof(CaptureMailboxMessageIntake) => JsonSerializer.SerializeToElement(MailboxIntake()),
         nameof(ResolveMailboxMessageParticipants) => WireParticipantResolutionCommand(),
         nameof(ScoreMailboxMessageAssociation) => WireAssociationScoringCommand(),

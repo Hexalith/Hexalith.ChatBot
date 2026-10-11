@@ -4,6 +4,7 @@ using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Authorization;
@@ -28,6 +29,50 @@ namespace Hexalith.ChatBot.Server.Tests;
 public sealed class TrustedAuthorityTests
 {
     private const string Note = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
+
+    [Fact]
+    public async Task BootstrapGrantRequiresOnlyCurrentTenantOwnerAndIssuerIdentity()
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock);
+        GrantChatBotAuthority command = new(
+            ChatBotAuthorityGrantKey.For("tenant-alpha", "actor-alpha", Note, nameof(RecordGovernedNote),
+                "operation", "human", ChatBotSurfaceOrigin.Ui), "grant-alpha", "actor-alpha", Note,
+            nameof(RecordGovernedNote), "operation", "human", ChatBotSurfaceOrigin.Ui,
+            clock.UtcNow.AddMinutes(15));
+
+        ChatBotAuthorityDecision decision = await TrustedAuthorityFixture.Authorizer(clock, owner).AuthorizeAsync(
+            TrustedAuthorityFixture.Context(), nameof(GrantChatBotAuthority), false, command,
+            TestContext.Current.CancellationToken);
+
+        decision.IsAllowed.ShouldBeTrue();
+        owner.Requests.Count.ShouldBe(2);
+        owner.Requests.ShouldContain(static request => request.Owner == "Tenants" && request.Authority == "TenantOwner" && request.RequireCurrent);
+        owner.Requests.ShouldContain(static request => request.Owner == "Parties" && request.Authority == "identity" && request.RequireCurrent);
+        owner.Requests.ShouldNotContain(static request => request.Owner == "ChatBot");
+        decision.Principal!.HasAdminScope("tenant").ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("Tenants")]
+    [InlineData("Parties")]
+    public async Task BootstrapGrantDeniesWhenCurrentOwnerEvidenceIsMissing(string deniedOwner)
+    {
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock) { Allows = request => request.Owner != deniedOwner };
+        GrantChatBotAuthority command = new(
+            ChatBotAuthorityGrantKey.For("tenant-alpha", "actor-alpha", Note, nameof(RecordGovernedNote),
+                "operation", "human", ChatBotSurfaceOrigin.Ui), "grant-alpha", "actor-alpha", Note,
+            nameof(RecordGovernedNote), "operation", "human", ChatBotSurfaceOrigin.Ui,
+            clock.UtcNow.AddMinutes(15));
+
+        ChatBotAuthorityDecision decision = await TrustedAuthorityFixture.Authorizer(clock, owner).AuthorizeAsync(
+            TrustedAuthorityFixture.Context(), nameof(GrantChatBotAuthority), false, command,
+            TestContext.Current.CancellationToken);
+
+        decision.IsAllowed.ShouldBeFalse();
+        owner.Requests.ShouldNotContain(static request => request.Owner == "ChatBot");
+    }
 
     [Fact]
     public async Task CurrentExactOwnerEvidenceAuthorizesWithoutTokenRoles()

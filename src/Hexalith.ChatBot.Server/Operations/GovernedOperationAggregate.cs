@@ -7,6 +7,8 @@ using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association.Scoring;
+using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Governance.AiActor;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.CommandCapability;
@@ -38,6 +40,76 @@ namespace Hexalith.ChatBot.Server.Operations;
 [EventStoreDomain(ChatBotEventStore.DomainName)]
 public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOperationState>
 {
+    /// <summary>Persists one bounded, exact owner grant after the admission stage has verified its issuer.</summary>
+    public static DomainResult Handle(GrantChatBotAuthority command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        if (!IsSafeGrantToken(envelope.TenantId) || !IsSafeGrantToken(command.AuthorityKey) ||
+            !IsSafeGrantToken(command.GrantId) || !IsSafeGrantToken(command.PrincipalId) ||
+            !IsSafeGrantToken(command.ResourceId) || !IsSafeGrantToken(command.Operation) ||
+            !IsSafeGrantToken(command.Authority) || command.ActorClass is not ("human" or "service" or "ai") ||
+            !Enum.IsDefined(command.Origin) || command.ExpiresAt.Offset != TimeSpan.Zero ||
+            command.ExpiresAt <= now || command.ExpiresAt > now.AddDays(30) ||
+            command.AuthorityKey != envelope.AggregateId ||
+            command.AuthorityKey != ChatBotAuthorityGrantKey.For(envelope.TenantId, command.PrincipalId,
+                command.ResourceId, command.Operation, command.Authority, command.ActorClass, command.Origin) ||
+            !ValidServiceGrant(command, envelope.TenantId))
+        {
+            return DomainResult.Rejection([new ChatBotAuthorityChangeRejected(command.AuthorityKey, "invalid_authority_grant")]);
+        }
+
+        if (state?.AuthorityGrantIds.Contains(command.GrantId) == true)
+        {
+            return DomainResult.Rejection([new ChatBotAuthorityChangeRejected(command.AuthorityKey, "authority_issuance_reused")]);
+        }
+
+        if (state?.CurrentAuthorityGrant is not null && !state.AuthorityGrantRevoked)
+        {
+            return DomainResult.Rejection([new ChatBotAuthorityChangeRejected(command.AuthorityKey, "authority_grant_active")]);
+        }
+
+        return DomainResult.Success([new ChatBotAuthorityGranted(command.GrantId, envelope.TenantId,
+            command.PrincipalId, command.ResourceId, command.Operation, command.Authority, command.ActorClass,
+            command.Origin, command.ExpiresAt, command.ServiceGrant)]);
+    }
+
+    /// <summary>Revokes only the current exact issuance; a later re-grant cannot be revoked by an old request.</summary>
+    public static DomainResult Handle(RevokeChatBotAuthority command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+        if (!IsSafeGrantToken(command.AuthorityKey) || !IsSafeGrantToken(command.GrantId) ||
+            command.AuthorityKey != envelope.AggregateId || state?.CurrentAuthorityGrant is not { } current ||
+            current.TenantId != envelope.TenantId || current.GrantId != command.GrantId)
+        {
+            return DomainResult.Rejection([new ChatBotAuthorityChangeRejected(command.AuthorityKey, "authority_grant_mismatch")]);
+        }
+
+        return state.AuthorityGrantRevoked
+            ? DomainResult.NoOp()
+            : DomainResult.Success([new ChatBotAuthorityRevoked(command.GrantId)]);
+    }
+
+    private static bool IsSafeGrantToken(string? value)
+        => AuditMetadata.IsSafeStableIdentifier(value) && !value!.Contains('@', StringComparison.Ordinal) && value != "*";
+
+    private static bool ValidServiceGrant(GrantChatBotAuthority command, string tenantId)
+    {
+        if (command.ActorClass == "human") { return command.ServiceGrant is null && command.Authority != "service-grant"; }
+        if (command.Authority != "service-grant") { return command.ServiceGrant is null; }
+        ServiceClientGrant? grant = command.ServiceGrant;
+        return grant is not null && grant.GrantId == command.GrantId && grant.TenantId == tenantId &&
+            grant.ServiceClientId == command.ResourceId && grant.SurfaceOrigin == command.Origin &&
+            grant.ExpiresAt == command.ExpiresAt && !grant.IsRevoked &&
+            grant.Scopes is { Count: > 0 } && grant.Scopes.All(IsSafeGrantToken) &&
+            grant.AllowedCommandNames is not null && grant.AllowedCommandNames.All(IsSafeGrantToken) &&
+            grant.AllowedQueryNames is not null && grant.AllowedQueryNames.All(IsSafeGrantToken) &&
+            (grant.AllowedCommandNames.Contains(command.Operation, StringComparer.Ordinal) ||
+             grant.AllowedQueryNames.Contains(command.Operation, StringComparer.Ordinal));
+    }
+
     /// <summary>
     /// Records a governed note. Fine-grained (aggregate-altitude) idempotency: recording a second note
     /// against an already-recorded aggregate yields a structured rejection rather than a duplicate event,

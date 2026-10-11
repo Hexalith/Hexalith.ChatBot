@@ -25,25 +25,79 @@ IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(ar
 string accessControlConfigPath = ResolveDaprConfigPath(builder.AppHostDirectory, "accesscontrol.local.yaml");
 
 string eventStoreWorkloadClientSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+string chatBotAuthorityReaderSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+string tenantsAuthorityReaderSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+string partiesAuthorityReaderSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+string projectsAuthorityReaderSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+using RSA authorityReadKey = RSA.Create(2048);
+string authorityReadPrivateKey = Convert.ToBase64String(authorityReadKey.ExportPkcs8PrivateKey());
+string authorityReadPublicKey = Convert.ToBase64String(authorityReadKey.ExportSubjectPublicKeyInfo());
+using RSA tenantsAuthorityReadKey = RSA.Create(2048);
+string tenantsAuthorityReadPrivateKey = Convert.ToBase64String(tenantsAuthorityReadKey.ExportPkcs8PrivateKey());
+string tenantsAuthorityReadPublicKey = Convert.ToBase64String(tenantsAuthorityReadKey.ExportSubjectPublicKeyInfo());
+using RSA partiesAuthorityReadKey = RSA.Create(2048);
+string partiesAuthorityReadPrivateKey = Convert.ToBase64String(partiesAuthorityReadKey.ExportPkcs8PrivateKey());
+string partiesAuthorityReadPublicKey = Convert.ToBase64String(partiesAuthorityReadKey.ExportSubjectPublicKeyInfo());
+using RSA projectsAuthorityReadKey = RSA.Create(2048);
+string projectsAuthorityReadPrivateKey = Convert.ToBase64String(projectsAuthorityReadKey.ExportPkcs8PrivateKey());
+string projectsAuthorityReadPublicKey = Convert.ToBase64String(projectsAuthorityReadKey.ExportSubjectPublicKeyInfo());
 string realmImportPath = PrepareKeycloakRealmImport(
     builder.AppHostDirectory,
     builder.Configuration,
-    eventStoreWorkloadClientSecret);
+    eventStoreWorkloadClientSecret,
+    chatBotAuthorityReaderSecret,
+    tenantsAuthorityReaderSecret,
+    partiesAuthorityReaderSecret,
+    projectsAuthorityReaderSecret);
 HexalithEventStoreSecurityResources? security = builder.AddHexalithEventStoreSecurity(
     new HexalithEventStoreSecurityOptions { RealmImportPath = realmImportPath });
 IResourceBuilder<ParameterResource> eventStoreWorkloadClientSecretParameter = builder.AddParameter(
     "eventstore-workload-client-secret",
     () => eventStoreWorkloadClientSecret,
     secret: true);
+IResourceBuilder<ParameterResource> chatBotAuthorityReaderSecretParameter = builder.AddParameter(
+    "chatbot-authority-reader-secret",
+    () => chatBotAuthorityReaderSecret,
+    secret: true);
+IResourceBuilder<ParameterResource> tenantsAuthorityReaderSecretParameter = builder.AddParameter(
+    "tenants-authority-reader-secret", () => tenantsAuthorityReaderSecret, secret: true);
+IResourceBuilder<ParameterResource> partiesAuthorityReaderSecretParameter = builder.AddParameter(
+    "parties-authority-reader-secret", () => partiesAuthorityReaderSecret, secret: true);
+IResourceBuilder<ParameterResource> projectsAuthorityReaderSecretParameter = builder.AddParameter(
+    "projects-authority-reader-secret", () => projectsAuthorityReaderSecret, secret: true);
+IResourceBuilder<ParameterResource> authorityReadPrivateKeyParameter = builder.AddParameter(
+    "chatbot-authority-read-private-key",
+    () => authorityReadPrivateKey,
+    secret: true);
+IResourceBuilder<ParameterResource> authorityReadPublicKeyParameter = builder.AddParameter(
+    "chatbot-authority-read-public-key",
+    () => authorityReadPublicKey,
+    secret: true);
+IResourceBuilder<ParameterResource> tenantsAuthorityReadPrivateKeyParameter = builder.AddParameter(
+    "tenants-authority-read-private-key", () => tenantsAuthorityReadPrivateKey, secret: true);
+IResourceBuilder<ParameterResource> tenantsAuthorityReadPublicKeyParameter = builder.AddParameter(
+    "tenants-authority-read-public-key", () => tenantsAuthorityReadPublicKey, secret: true);
+IResourceBuilder<ParameterResource> partiesAuthorityReadPrivateKeyParameter = builder.AddParameter(
+    "parties-authority-read-private-key", () => partiesAuthorityReadPrivateKey, secret: true);
+IResourceBuilder<ParameterResource> partiesAuthorityReadPublicKeyParameter = builder.AddParameter(
+    "parties-authority-read-public-key", () => partiesAuthorityReadPublicKey, secret: true);
+IResourceBuilder<ParameterResource> projectsAuthorityReadPrivateKeyParameter = builder.AddParameter(
+    "projects-authority-read-private-key", () => projectsAuthorityReadPrivateKey, secret: true);
+IResourceBuilder<ParameterResource> projectsAuthorityReadPublicKeyParameter = builder.AddParameter(
+    "projects-authority-read-public-key", () => projectsAuthorityReadPublicKey, secret: true);
 
 IResourceBuilder<ProjectResource> eventStore = builder.AddProject<Projects.Hexalith_EventStore>(
     ChatBotAspireModule.EventStoreServiceName);
 IResourceBuilder<ProjectResource> tenants = builder.AddProject<Projects.Hexalith_Tenants>(
     ChatBotAspireModule.TenantsAppId);
+IResourceBuilder<ProjectResource> parties = builder.AddProject<Projects.Hexalith_Parties>(
+    ChatBotAspireModule.PartiesAppId);
+IResourceBuilder<ProjectResource> projects = builder.AddProject<Projects.Hexalith_Projects_Server>(
+    ChatBotAspireModule.ProjectsAppId);
 IResourceBuilder<ProjectResource> chatBot = builder.AddProject<Projects.Hexalith_ChatBot_Server>(
     ChatBotAspireModule.AppId);
 
-HexalithChatBotResources resources = builder.AddHexalithChatBot(eventStore, tenants, chatBot, accessControlConfigPath);
+HexalithChatBotResources resources = builder.AddHexalithChatBot(eventStore, tenants, parties, projects, chatBot, accessControlConfigPath);
 
 // Memories owns its vector/graph infrastructure. The ChatBot topology supplies only the local component files and
 // receives the server endpoint; no Redis/FalkorDB connection string crosses the service boundary.
@@ -142,6 +196,8 @@ if (builder.ExecutionContext.IsRunMode)
 {
     _ = eventStore.WithGeneratedEventStoreAppChannelToken();
     _ = tenants.WithGeneratedEventStoreAppChannelToken();
+    _ = parties.WithGeneratedEventStoreAppChannelToken();
+    _ = projects.WithGeneratedEventStoreAppChannelToken();
     _ = chatBot.WithGeneratedEventStoreAppChannelToken();
 }
 
@@ -177,10 +233,47 @@ if (security is not null)
 {
     _ = eventStore.WithJwtBearerSecurity(security, "hexalith-eventstore");
     _ = eventStore.WithEventStoreWorkloadClientCredentials("eventstore", eventStoreWorkloadClientSecretParameter);
+    _ = eventStore.WithEnvironment("Authentication__BoundStreamRead__PublicKeys__chatbot", authorityReadPublicKeyParameter);
+    _ = eventStore.WithEnvironment("Authentication__BoundStreamRead__AllowedDomains__chatbot", "chatbot")
+        .WithEnvironment("Authentication__BoundCommand__AllowedDomains__chatbot", "chatbot")
+        .WithEnvironment("Authentication__BoundStreamRead__PublicKeys__tenants", tenantsAuthorityReadPublicKeyParameter)
+        .WithEnvironment("Authentication__BoundStreamRead__AllowedDomains__tenants", "tenants")
+        .WithEnvironment("Authentication__BoundStreamRead__PublicKeys__parties", partiesAuthorityReadPublicKeyParameter)
+        .WithEnvironment("Authentication__BoundStreamRead__AllowedDomains__parties", "party")
+        .WithEnvironment("Authentication__BoundStreamRead__PublicKeys__projects", projectsAuthorityReadPublicKeyParameter)
+        .WithEnvironment("Authentication__BoundStreamRead__AllowedDomains__projects", "projects")
+        .WithEnvironment("Authentication__BoundOwnerQuery__AllowedQueries__chatbot",
+            "Hexalith.Tenants.Contracts.Queries.ResolveTenantOwnerAuthority,Hexalith.Parties.Contracts.Queries.ResolveChatBotPartyAuthority,Hexalith.Projects.Contracts.Queries.ResolveProjectChatBotAuthority")
+        .WithEnvironment("Authentication__BoundOwnerQuery__AllowedQueries__projects",
+            "Hexalith.Tenants.Contracts.Queries.ResolveTenantOwnerAuthority,Hexalith.Parties.Contracts.Queries.ResolveChatBotPartyAuthority");
     _ = tenants.WithJwtBearerSecurity(security, "hexalith-tenants")
-        .WithEnvironment("Authentication__JwtBearer__ValidAudiences__0", "tenants");
+        .WithEnvironment("Authentication__JwtBearer__ValidAudiences__0", "tenants")
+        .WithEnvironment("EventStore__DomainService__AppId", "tenants")
+        .WithEnvironment("Authentication__Workload__Audience", "tenants")
+        .WithEnvironment("Authentication__Workload__AllowedCallers__0", "eventstore")
+        .WithEventStoreWorkloadClientCredentials("tenants", tenantsAuthorityReaderSecretParameter)
+        .WithEnvironment("Authentication__BoundStreamRead__PrivateKey", tenantsAuthorityReadPrivateKeyParameter);
+    _ = parties.WithJwtBearerSecurity(security, "hexalith-parties")
+        .WithEnvironment("Authentication__JwtBearer__ValidAudiences__0", "parties")
+        .WithEnvironment("EventStore__DomainService__AppId", "parties")
+        .WithEnvironment("Authentication__Workload__Audience", "parties")
+        .WithEnvironment("Authentication__Workload__AllowedCallers__0", "eventstore")
+        .WithEventStoreWorkloadClientCredentials("parties", partiesAuthorityReaderSecretParameter)
+        .WithEnvironment("Authentication__BoundStreamRead__PrivateKey", partiesAuthorityReadPrivateKeyParameter);
+    _ = projects.WithJwtBearerSecurity(security, "hexalith-eventstore")
+        .WithEnvironment("Authentication__JwtBearer__AllowAnonymousDevelopment", "false")
+        .WithEnvironment("EventStore__DomainService__AppId", "projects")
+        .WithEnvironment("Authentication__Workload__Audience", "projects")
+        .WithEnvironment("Authentication__Workload__AllowedCallers__0", "eventstore")
+        .WithEventStoreWorkloadClientCredentials("projects", projectsAuthorityReaderSecretParameter)
+        .WithEnvironment("Authentication__BoundStreamRead__PrivateKey", projectsAuthorityReadPrivateKeyParameter);
     _ = chatBot.WithJwtBearerSecurity(security, "hexalith-chatbot")
-        .WithEnvironment("Authentication__JwtBearer__ValidAudiences__0", ChatBotAspireModule.AppId);
+        .WithEnvironment("Authentication__JwtBearer__ValidAudiences__0", ChatBotAspireModule.AppId)
+        .WithEnvironment("EventStore__DomainService__AppId", ChatBotAspireModule.AppId)
+        .WithEnvironment("Authentication__Workload__Audience", ChatBotAspireModule.AppId)
+        .WithEnvironment("Authentication__Workload__AllowedCallers__0", "eventstore");
+    _ = chatBot.WithEventStoreWorkloadClientCredentials("chatbot", chatBotAuthorityReaderSecretParameter)
+        .WithEnvironment("Authentication__BoundStreamRead__PrivateKey", authorityReadPrivateKeyParameter);
     _ = chatBotUi
         .WithSecurityDependency(security)
         .WithEnvironment("Authentication__OpenIdConnect__Authority", security.RealmUrl)
@@ -244,12 +337,20 @@ static string ResolveDaprConfigPath(string appHostDirectory, string fileName)
 static string PrepareKeycloakRealmImport(
     string appHostDirectory,
     IConfiguration configuration,
-    string eventStoreWorkloadClientSecret)
+    string eventStoreWorkloadClientSecret,
+    string chatBotAuthorityReaderSecret,
+    string tenantsAuthorityReaderSecret,
+    string partiesAuthorityReaderSecret,
+    string projectsAuthorityReaderSecret)
 {
     const string expiryPlaceholder = "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__";
     const string grantExpiryMapperName = "chatbot-service-client-grant-expiry";
     const string recoveryClientSecretPlaceholder = "__HEXALITH_CHATBOT_RECOVERY_CLIENT_SECRET__";
     const string workloadClientSecretPlaceholder = "__HEXALITH_WORKLOAD_CLIENT_SECRET__";
+    const string authorityReaderSecretPlaceholder = "__HEXALITH_CHATBOT_AUTHORITY_READER_SECRET__";
+    const string tenantsAuthorityReaderSecretPlaceholder = "__HEXALITH_TENANTS_AUTHORITY_READER_SECRET__";
+    const string partiesAuthorityReaderSecretPlaceholder = "__HEXALITH_PARTIES_AUTHORITY_READER_SECRET__";
+    const string projectsAuthorityReaderSecretPlaceholder = "__HEXALITH_PROJECTS_AUTHORITY_READER_SECRET__";
     const int defaultLifetimeDays = 90;
     const int defaultMinimumRemainingDays = 30;
 
@@ -395,6 +496,28 @@ static string PrepareKeycloakRealmImport(
     }
 
     realm = realm.Replace(workloadClientSecretPlaceholder, eventStoreWorkloadClientSecret, StringComparison.Ordinal);
+    if (realm.Split(authorityReaderSecretPlaceholder, StringSplitOptions.None).Length - 1 != 1)
+    {
+        throw new InvalidOperationException("The ChatBot authority reader must have exactly one secret placeholder.");
+    }
+
+    realm = realm.Replace(authorityReaderSecretPlaceholder, chatBotAuthorityReaderSecret, StringComparison.Ordinal);
+    if (realm.Split(tenantsAuthorityReaderSecretPlaceholder, StringSplitOptions.None).Length - 1 != 1)
+    {
+        throw new InvalidOperationException("The Tenants authority reader must have exactly one secret placeholder.");
+    }
+
+    realm = realm.Replace(tenantsAuthorityReaderSecretPlaceholder, tenantsAuthorityReaderSecret, StringComparison.Ordinal);
+    if (realm.Split(partiesAuthorityReaderSecretPlaceholder, StringSplitOptions.None).Length - 1 != 1)
+    {
+        throw new InvalidOperationException("The Keycloak realm must contain exactly one Parties authority reader secret placeholder.");
+    }
+    realm = realm.Replace(partiesAuthorityReaderSecretPlaceholder, partiesAuthorityReaderSecret, StringComparison.Ordinal);
+    if (realm.Split(projectsAuthorityReaderSecretPlaceholder, StringSplitOptions.None).Length - 1 != 1)
+    {
+        throw new InvalidOperationException("The Keycloak realm must contain exactly one Projects authority reader secret placeholder.");
+    }
+    realm = realm.Replace(projectsAuthorityReaderSecretPlaceholder, projectsAuthorityReaderSecret, StringComparison.Ordinal);
 
     // Cleanup below is ProcessExit-only, which never fires on SIGKILL/OOM-kill/a hard container stop, so a killed
     // prior run can leave a secret-bearing directory behind (still owner-only per the mode set below — a

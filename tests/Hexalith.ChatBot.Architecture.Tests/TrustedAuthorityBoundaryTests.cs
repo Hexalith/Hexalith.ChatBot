@@ -40,7 +40,7 @@ public sealed class TrustedAuthorityBoundaryTests
         services.AddChatBotCommandGateway();
         services.ShouldContain(static descriptor => descriptor.ServiceType == typeof(ChatBotRequestAuthorizer));
         services.ShouldContain(static descriptor => descriptor.ServiceType == typeof(ChatBotRequestContextResolver));
-        services.ShouldContain(static descriptor => descriptor.ServiceType == typeof(IChatBotOwnerAuthorityProvider) && descriptor.ImplementationType == typeof(UnavailableChatBotOwnerAuthorityProvider));
+        services.ShouldContain(static descriptor => descriptor.ServiceType == typeof(IChatBotOwnerAuthorityProvider) && descriptor.ImplementationType == typeof(CurrentChatBotOwnerAuthorityProvider));
         typeof(ChatBotCommandAdmissionPipeline).GetConstructors().Single().GetParameters().Single(static parameter => parameter.ParameterType == typeof(ChatBotRequestAuthorizer)).IsOptional.ShouldBeFalse();
         typeof(ChatBotReadQueryHandler<>).GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Single().GetParameters().ShouldContain(static parameter => parameter.ParameterType == typeof(ChatBotRequestAuthorizer) && !parameter.IsOptional);
     }

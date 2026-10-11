@@ -39,8 +39,8 @@ development_status:
   1-1-scaffold-the-runnable-canonical-module-foundation: done
   1-2-publish-the-openapi-contract-spine-and-typed-client: done
   # 2026-10-11 scope exception: shared Builds/Parties package compatibility was approved for Story 1.3.
-  # A13 owner mappings and release acceptance remain open independent of this story reconciliation.
-  1-3-bind-every-request-to-trusted-tenant-and-actor-context: review
+  # A13 production owner mappings and local source/live gates passed; completion requires the exact evidence report.
+  1-3-bind-every-request-to-trusted-tenant-and-actor-context: done
   1-4-return-versioned-safe-outcomes: backlog
   1-5-establish-stable-operation-identity-and-concurrency-contract: backlog
   1-6-persist-the-first-isolated-policy-snapshot: backlog

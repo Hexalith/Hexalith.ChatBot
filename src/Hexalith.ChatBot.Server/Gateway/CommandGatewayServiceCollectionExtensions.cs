@@ -75,8 +75,9 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<ChatBotAuthorityCatalog>();
         services.TryAddSingleton<ServiceClientGrantProjectionCache>();
         services.TryAddScoped<ChatBotRequestContextResolver>();
-        services.TryAddScoped<IChatBotOwnerAuthorityProvider, UnavailableChatBotOwnerAuthorityProvider>();
+        services.TryAddScoped<IChatBotOwnerAuthorityProvider, CurrentChatBotOwnerAuthorityProvider>();
         services.TryAddScoped<ChatBotRequestAuthorizer>();
+        services.TryAddScoped<ChatBotStreamReadProofSource>();
 
 
         // The section MUST be bound: without it the validator only ever sees the disabled defaults, the named section
@@ -96,8 +97,8 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<IRecoveryValidationEvidenceRetentionFailureSink>(
             DiscardingRecoveryValidationEvidenceRetentionFailureSink.Instance);
 
-        // The real dispatcher routes admitted commands into EventStore through the public gateway client. The
-        // submission must authenticate WITHOUT a forged user JWT, so it goes through the chatbot's OWN DAPR
+        // The real dispatcher routes admitted commands into EventStore through the signed bound workload path.
+        // The submission authenticates without a forged user JWT and goes through the chatbot's OWN DAPR
         // sidecar via service invocation tagged `dapr-app-id: eventstore` (the DaprAppIdHandler) — the receiving
         // EventStore sidecar then injects the verified `dapr-caller-app-id: chatbot` header that EventStore's
         // DaprInternal scheme validates against its allow-list (the AppHost grants `chatbot`). BaseAddress is the
@@ -107,8 +108,15 @@ internal static class CommandGatewayServiceCollectionExtensions
         string daprHttpEndpoint = Ipv4Loopback(Environment.GetEnvironmentVariable("DAPR_HTTP_ENDPOINT")
             ?? $"http://127.0.0.1:{Environment.GetEnvironmentVariable("DAPR_HTTP_PORT") ?? "3500"}");
         string? daprApiToken = Environment.GetEnvironmentVariable("DAPR_API_TOKEN");
+        services.AddTransient<ChatBotBoundCommandHandler>();
         _ = services
             .AddEventStoreGatewayClient(options => options.BaseAddress = new Uri(daprHttpEndpoint))
+            .AddHttpMessageHandler<ChatBotBoundCommandHandler>()
+            .AddHttpMessageHandler(serviceProvider => new DaprAppIdHandler(
+                serviceProvider.GetRequiredService<IConfiguration>()["ChatBot:EventStoreDaprAppId"]
+                    ?? EventStoreDaprAppId,
+                daprApiToken));
+        _ = services.AddHttpClient<ChatBotBoundOwnerStreamGateway>(client => client.BaseAddress = new Uri(daprHttpEndpoint))
             .AddHttpMessageHandler(serviceProvider => new DaprAppIdHandler(
                 serviceProvider.GetRequiredService<IConfiguration>()["ChatBot:EventStoreDaprAppId"]
                     ?? EventStoreDaprAppId,

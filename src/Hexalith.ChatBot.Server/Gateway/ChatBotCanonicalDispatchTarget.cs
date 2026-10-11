@@ -34,6 +34,7 @@ internal static class ChatBotCanonicalDispatchTarget
     private static string? ResourceProperty(string operation) => operation switch
         {
             nameof(RecordGovernedNote) => "NoteId",
+            nameof(GrantChatBotAuthority) or nameof(RevokeChatBotAuthority) => "AuthorityKey",
             nameof(CaptureMailboxMessageIntake) => "IntakeId",
             nameof(ResolveMailboxMessageParticipants) => "ResolutionId",
             nameof(ScoreMailboxMessageAssociation) or nameof(AssociateEmailToProject) or nameof(RejectEmailProjectAssociation)

@@ -170,6 +170,20 @@ internal sealed class AcceptedCommandDispatcher(
         string commandType = context.Submission.Request.CommandType ?? string.Empty;
         JsonElement command = ToElement(context.Submission.Request.Command);
 
+        if (string.Equals(commandType, nameof(GrantChatBotAuthority), StringComparison.Ordinal))
+        {
+            GrantChatBotAuthority grant = command.Deserialize<GrantChatBotAuthority>(ReadOptions)
+                ?? throw new InvalidOperationException("The authority grant payload could not be read.");
+            return new EventStoreDispatchPlan(grant.AuthorityKey, commandType, JsonSerializer.SerializeToElement(grant));
+        }
+
+        if (string.Equals(commandType, nameof(RevokeChatBotAuthority), StringComparison.Ordinal))
+        {
+            RevokeChatBotAuthority revoke = command.Deserialize<RevokeChatBotAuthority>(ReadOptions)
+                ?? throw new InvalidOperationException("The authority revocation payload could not be read.");
+            return new EventStoreDispatchPlan(revoke.AuthorityKey, commandType, JsonSerializer.SerializeToElement(revoke));
+        }
+
         if (string.Equals(commandType, nameof(RecordGovernedNote), StringComparison.Ordinal))
         {
             RecordGovernedNote note = command.Deserialize<RecordGovernedNote>(ReadOptions)

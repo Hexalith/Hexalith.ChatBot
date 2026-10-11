@@ -2,7 +2,7 @@
 title: 'Story 1.3: Bind Every Request to Trusted Tenant and Actor Context'
 type: 'feature'
 created: '2026-10-07'
-status: 'review'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: a8b421b6690ab9c0e66d7274ee5745b26a9e117c
@@ -595,6 +595,14 @@ Mandatory evidence blockers:
 The repository's `docs/story-evidence-integrity.md` requires unavailable mandatory evidence to leave a story in review/in-progress. At that earlier checkpoint the spec remained `in-review` and its sprint entry was `review`; the automatic `done` transition was withheld. The resumed run remains non-complete while current mandatory blockers persist. At that checkpoint, no completion contract, provenance, passing TE-2 result, or release acceptance was asserted.
 
 
+## A13 production owner reconciliation — 2026-10-11
+
+The user approved extending Story 1.3 to production owner mappings and necessary owning-sibling changes. ChatBot now issues and revokes exact persisted grants, reads current source history, and resolves Tenants tenant-owner, Parties identity, and Projects project authority through requester-bound EventStore workload routes. Grant bootstrap is a distinct command requiring current persisted TenantOwner and Parties issuer evidence; it grants no ordinary ChatBot authority to that issuer. The AppHost starts the owner modules and Dapr sidecars. EventStore verifies signed, exact command/query/stream bindings. Missing, mismatched, revoked, stale, or unavailable evidence continues to deny before protected access.
+
+The source Debug Server.Tests build passed with zero warnings/errors and its native lane passed 2,546/2,546 with zero skips. Architecture passed 123/123; Release package-mode Conformance passed 149/149; EventStore bound workload command tests passed 7/7 and bound owner query test passed 1/1, all zero skips. Release package-mode IntegrationTests and Projects.Server builds passed with zero warnings/errors using local packages from the edited owning sources. The final post-catalog Aspire/Dapr primary passed 1/1 with zero skips in 107.119 seconds at `TestResults/topology-primary/topology-acceptance.trx`. It persisted both tenant/party chains, accepted five exact ChatBot grants, and exercised governed command, status, view, audit, and replay. Earlier local primary attempts saw retryable owner transport/503 and fail-closed 403 during current-owner reads; the final fixture preserves denial during outage and uses bounded same-command-ID grant retry and a separate bounded view recovery wait.
+
+The shared Builds catalog also pins SwaggerUI 10.3.0 for EventStore.Gateway 3.120.0. The Tenants Server.Tests package-mode Debug build passed with zero warnings/errors after that correction, its owner query test passed 1/1, the Parties owner query and Projects owner query/grant lifecycle tests each passed 1/1, and the Builds catalog validator passed all 304 entries. Builds revision is `3d931f3f0fd47708579e0ad644aad67df58420bc`. Owning-sibling local revisions are EventStore `819cc1223598f02eee510cfa751f37424936e1cf`, Tenants `6515be441763d368110fe042e16748b2ce2b8467`, Parties `7816099158bfb252658b78f69cecafecc853228f`, Projects `ffe1db5295d19f6637b62749f561d3ccb4266045`, and Conversations `a570783f589649e9ea884efd8ef48917d85032e6`. They were not pushed. The original story and sprint entry are the proposed `done` transition. The exact Story Evidence Gate report at `evidence/reports/1-3-bind-every-request-to-trusted-tenant-and-actor-context.json` is the authoritative result for this candidate; no remote publication is claimed.
+
 ## File List
 
 - `_bmad-output/implementation-artifacts/evidence/1-3-bind-every-request-to-trusted-tenant-and-actor-context.json`
@@ -603,14 +611,103 @@ The repository's `docs/story-evidence-integrity.md` requires unavailable mandato
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `references/Hexalith.Builds`
 - `references/Hexalith.Builds/Props/Directory.Packages.props`
+- `references/Hexalith.Conversations`
+- `references/Hexalith.Conversations/src/Hexalith.Conversations.Client/ConversationClient.cs`
+- `references/Hexalith.Conversations/src/Hexalith.Conversations.Client/IConversationClient.cs`
+- `references/Hexalith.EventStore`
+- `references/Hexalith.EventStore/src/Hexalith.EventStore.Client/Gateway/BoundOwnerQueryProof.cs`
+- `references/Hexalith.EventStore/src/Hexalith.EventStore.Client/Gateway/BoundStreamReadProof.cs`
+- `references/Hexalith.EventStore/src/Hexalith.EventStore.Client/Gateway/BoundWorkloadCommandProof.cs`
+- `references/Hexalith.EventStore/src/Hexalith.EventStore.Client/Gateway/EventStoreGatewayClient.cs`
+- `references/Hexalith.EventStore/src/Hexalith.EventStore.Client/Gateway/IEventStoreGatewayStreamReadProofSource.cs`
+- `references/Hexalith.EventStore/src/Hexalith.EventStore.Contracts/Commands/BoundWorkloadCommandRequest.cs`
+- `references/Hexalith.EventStore/src/Hexalith.EventStore.Contracts/Queries/BoundOwnerQueryRequest.cs`
+- `references/Hexalith.EventStore/src/Hexalith.EventStore.ServiceDefaults/Authentication/EventStoreWorkloadOperations.cs`
+- `references/Hexalith.EventStore/src/Hexalith.EventStore/Authentication/DaprInternalAuthenticationOptions.cs`
+- `references/Hexalith.EventStore/src/Hexalith.EventStore/Controllers/CommandsController.cs`
+- `references/Hexalith.EventStore/src/Hexalith.EventStore/Controllers/QueriesController.cs`
+- `references/Hexalith.EventStore/src/Hexalith.EventStore/Controllers/StreamsController.cs`
+- `references/Hexalith.EventStore/src/Hexalith.EventStore/Extensions/ServiceCollectionExtensions.cs`
+- `references/Hexalith.EventStore/src/Hexalith.EventStore/Pipeline/AuthorizationBehavior.cs`
+- `references/Hexalith.EventStore/tests/Hexalith.EventStore.Server.Tests/Controllers/BoundOwnerQueryControllerTests.cs`
+- `references/Hexalith.EventStore/tests/Hexalith.EventStore.Server.Tests/Controllers/WorkloadGatewayControllerTests.cs`
 - `references/Hexalith.Parties`
 - `references/Hexalith.Parties/Directory.Packages.props`
+- `references/Hexalith.Parties/src/Hexalith.Parties.Contracts/Queries/ResolveChatBotPartyAuthority.cs`
+- `references/Hexalith.Parties/src/Hexalith.Parties/Authorization/PartyChatBotSourceGateway.cs`
+- `references/Hexalith.Parties/src/Hexalith.Parties/Program.cs`
+- `references/Hexalith.Parties/src/Hexalith.Parties/Queries/ChatBotPartyAuthorityQueryHandler.cs`
+- `references/Hexalith.Parties/tests/Hexalith.Parties.Tests/Queries/ChatBotPartyAuthorityQueryHandlerTests.cs`
+- `references/Hexalith.Projects`
+- `references/Hexalith.Projects/_bmad-output/implementation-artifacts/spec-6-1-p1r-4.md`
+- `references/Hexalith.Projects/references/Hexalith.Conversations`
+- `references/Hexalith.Projects/references/Hexalith.EventStore`
+- `references/Hexalith.Projects/references/Hexalith.FrontComposer`
+- `references/Hexalith.Projects/references/Hexalith.Parties`
+- `references/Hexalith.Projects/references/Hexalith.Tenants`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Contracts/Commands/GrantProjectChatBotAuthority.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Contracts/Commands/RevokeProjectChatBotAuthority.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Contracts/Events/ProjectChatBotAuthorityGranted.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Contracts/Events/ProjectChatBotAuthorityRejected.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Contracts/Events/ProjectChatBotAuthorityRevoked.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Contracts/Queries/ProjectChatBotAuthorityResult.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Contracts/Queries/ResolveProjectChatBotAuthority.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Server/Authorization/PartyRequest.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Server/Authorization/PartyResult.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Server/Authorization/ProjectBoundOwnerQueryRequest.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Server/Authorization/ProjectBoundReadProofPayload.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Server/Authorization/ProjectChatBotAuthorityGateway.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Server/Authorization/ProjectOwnerBootstrapVerifier.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Server/Authorization/TenantOwnerRequest.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Server/Authorization/TenantOwnerResult.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Server/ProjectAuthorityRuntimeSecurity.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Server/ProjectsDomainProcessor.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Server/ProjectsServerModule.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Server/ProjectsServerServiceCollectionExtensions.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects.Server/Queries/ProjectChatBotAuthorityQueryHandler.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects/Aggregates/Project/ChatBotGrantScope.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects/Aggregates/Project/ProjectChatBotGrant.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects/Aggregates/Project/ProjectState.cs`
+- `references/Hexalith.Projects/src/Hexalith.Projects/Aggregates/Project/ProjectStateApply.cs`
+- `references/Hexalith.Projects/tests/Hexalith.Projects.Server.Tests/Authorization/ProjectAuthorityReaderFixture.cs`
+- `references/Hexalith.Projects/tests/Hexalith.Projects.Server.Tests/Authorization/ProjectChatBotAuthorityQueryHandlerTests.cs`
+- `references/Hexalith.Projects/tests/Hexalith.Projects.Tests/Aggregates/Project/ProjectChatBotGrantLifecycleTests.cs`
+- `references/Hexalith.Tenants`
+- `references/Hexalith.Tenants/src/Hexalith.Tenants.Contracts/Queries/ResolveTenantOwnerAuthority.cs`
+- `references/Hexalith.Tenants/src/Hexalith.Tenants/Authorization/TenantOwnerSourceGateway.cs`
+- `references/Hexalith.Tenants/src/Hexalith.Tenants/Program.cs`
+- `references/Hexalith.Tenants/src/Hexalith.Tenants/Queries/Handlers/TenantOwnerAuthorityQueryHandler.cs`
+- `references/Hexalith.Tenants/tests/Hexalith.Tenants.Server.Tests/Queries/TenantOwnerAuthorityQueryHandlerTests.cs`
+- `src/Hexalith.ChatBot.AppHost/Aspire/ChatBotAspireModule.cs`
+- `src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj`
 - `src/Hexalith.ChatBot.AppHost/KeycloakRealms/hexalith-realm.json`
 - `src/Hexalith.ChatBot.AppHost/Program.cs`
+- `src/Hexalith.ChatBot.Contracts/Commands/GrantChatBotAuthority.cs`
+- `src/Hexalith.ChatBot.Contracts/Commands/RevokeChatBotAuthority.cs`
+- `src/Hexalith.ChatBot.Contracts/Identities/ChatBotAuthorityGrantKey.cs`
 - `src/Hexalith.ChatBot.Server/Adapters/Folders/FoldersFolderStore.cs`
 - `src/Hexalith.ChatBot.Server/Authentication/ChatBotApplicationBoundaryPolicy.cs`
+- `src/Hexalith.ChatBot.Server/Authentication/ChatBotRequestContextResolver.cs`
+- `src/Hexalith.ChatBot.Server/Authorization/ChatBotAuthorityCatalog.cs`
+- `src/Hexalith.ChatBot.Server/Authorization/ChatBotBoundOwnerStreamGateway.cs`
+- `src/Hexalith.ChatBot.Server/Authorization/ChatBotGrantSourceEvidence.cs`
+- `src/Hexalith.ChatBot.Server/Authorization/ChatBotRequestAuthorizer.cs`
+- `src/Hexalith.ChatBot.Server/Authorization/ChatBotStreamReadProofSource.cs`
+- `src/Hexalith.ChatBot.Server/Authorization/CurrentChatBotOwnerAuthorityProvider.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/ChatBotBoundCommandHandler.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/ChatBotCanonicalDispatchTarget.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/ChatBotCommandAdmissionPipeline.cs`
 - `src/Hexalith.ChatBot.Server/Gateway/ChatBotCompatibilityEndpointExtensions.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/ChatBotDomainServiceAdmissionStage.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/ChatBotSpineCommandAllowlist.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/CommandGatewayServiceCollectionExtensions.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Stages/AcceptedCommandDispatcher.cs`
 - `src/Hexalith.ChatBot.Server/Lifecycle/AiExecution/AiExecutionRecoveryEndpoints.cs`
+- `src/Hexalith.ChatBot.Server/Operations/ChatBotAuthorityChangeRejected.cs`
+- `src/Hexalith.ChatBot.Server/Operations/ChatBotAuthorityGranted.cs`
+- `src/Hexalith.ChatBot.Server/Operations/ChatBotAuthorityRevoked.cs`
+- `src/Hexalith.ChatBot.Server/Operations/GovernedOperationAggregate.cs`
+- `src/Hexalith.ChatBot.Server/Operations/GovernedOperationState.cs`
 - `src/Hexalith.ChatBot.Server/Program.cs`
 - `src/Hexalith.ChatBot.Server/Projections/AiOutcomeProjectionEndpoints.cs`
 - `src/Hexalith.ChatBot.Server/Projections/ApprovalProjectionEndpoints.cs`
@@ -620,12 +717,17 @@ The repository's `docs/story-evidence-integrity.md` requires unavailable mandato
 - `src/Hexalith.ChatBot.Server/Projections/MailboxIntakeProjectionEndpoints.cs`
 - `src/Hexalith.ChatBot.Server/Projections/ParticipantResolutionProjectionEndpoints.cs`
 - `src/Hexalith.ChatBot.Server/Projections/TaskIntentProjectionEndpoints.cs`
+- `tests/Hexalith.ChatBot.Architecture.Tests/TrustedAuthorityBoundaryTests.cs`
 - `tests/Hexalith.ChatBot.IntegrationTests/MemoriesProbeCommandGateway.cs`
 - `tests/Hexalith.ChatBot.IntegrationTests/MemoriesProbeDomainTransport.cs`
 - `tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Adapters/Folders/FoldersFolderStoreTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Authorization/ChatBotAuthorityGrantAggregateTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Authorization/ChatBotBoundOwnerProofTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.CanonicalTargets.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/TrustedAuthority/SdkRouteFixtureAuthorization.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/TrustedAuthorityReReviewTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/TrustedAuthorityReviewTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/TrustedAuthorityTests.cs`

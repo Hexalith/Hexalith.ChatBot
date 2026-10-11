@@ -56,6 +56,8 @@ internal static class ChatBotAspireModule
     public const string DeadLetterTopicName = "deadletter.chatbot.events";
 
     public const string TenantsAppId = "tenants";
+    public const string PartiesAppId = "parties";
+    public const string ProjectsAppId = "projects";
 
     public static string GetTenantDeadLetterTopic(string tenantId)
     {
@@ -76,6 +78,8 @@ internal static class ChatBotAspireModule
     [
         EventStoreServiceName,
         TenantsAppId,
+        PartiesAppId,
+        ProjectsAppId,
         AppId,
         EventStoreAdminAppId,
         EventStoreAdminUiAppId,
@@ -181,12 +185,16 @@ internal static class ChatBotAspireModule
         this IDistributedApplicationBuilder builder,
         IResourceBuilder<ProjectResource> eventStore,
         IResourceBuilder<ProjectResource> tenants,
+        IResourceBuilder<ProjectResource> parties,
+        IResourceBuilder<ProjectResource> projects,
         IResourceBuilder<ProjectResource> chatBot,
         string? daprConfigPath = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(eventStore);
         ArgumentNullException.ThrowIfNull(tenants);
+        ArgumentNullException.ThrowIfNull(parties);
+        ArgumentNullException.ThrowIfNull(projects);
         ArgumentNullException.ThrowIfNull(chatBot);
 
         // Validated once per builder composition, from configuration alone (no static mutable state): two sidecars
@@ -243,6 +251,9 @@ internal static class ChatBotAspireModule
                 .WithReference(actorStateStore)
                 .WithReference(pubSub))
             .WithEnvironment("Authentication__DaprInternal__AllowedCallers__0", chatBotAppId)
+            .WithEnvironment("Authentication__DaprInternal__AllowedCallers__1", TenantsAppId)
+            .WithEnvironment("Authentication__DaprInternal__AllowedCallers__2", PartiesAppId)
+            .WithEnvironment("Authentication__DaprInternal__AllowedCallers__3", ProjectsAppId)
             // Keep EventStore's chatbot domain-service relay aligned with the effective DAPR app id. The explicit
             // registration is equivalent to the normal `domain == app-id` convention when no suffix is configured,
             // and prevents a validation topology from resolving a same-named app in another self-hosted DAPR run.
@@ -251,6 +262,27 @@ internal static class ChatBotAspireModule
             .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_chatbot_v1__TenantId", "*")
             .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_chatbot_v1__Domain", AppId)
             .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_chatbot_v1__Version", "v1")
+            .WithEnvironment("EventStore__DomainServices__Registrations__system|tenants|v1__AppId", TenantsAppId)
+            .WithEnvironment("EventStore__DomainServices__Registrations__system|tenants|v1__MethodName", "process")
+            .WithEnvironment("EventStore__DomainServices__Registrations__system|tenants|v1__TenantId", "system")
+            .WithEnvironment("EventStore__DomainServices__Registrations__system|tenants|v1__Domain", "tenants")
+            .WithEnvironment("EventStore__DomainServices__Registrations__system|tenants|v1__Version", "v1")
+            .WithEnvironment("EventStore__DomainServices__Registrations__system|global-administrators|v1__AppId", TenantsAppId)
+            .WithEnvironment("EventStore__DomainServices__Registrations__system|global-administrators|v1__MethodName", "process")
+            .WithEnvironment("EventStore__DomainServices__Registrations__system|global-administrators|v1__TenantId", "system")
+            .WithEnvironment("EventStore__DomainServices__Registrations__system|global-administrators|v1__Domain", "global-administrators")
+            .WithEnvironment("EventStore__DomainServices__Registrations__system|global-administrators|v1__Version", "v1")
+            .WithEnvironment("EventStore__Publisher__TopicOverrides__global-administrators", "tenants.events")
+            .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_party_v1__AppId", PartiesAppId)
+            .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_party_v1__MethodName", "process")
+            .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_party_v1__TenantId", "*")
+            .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_party_v1__Domain", "party")
+            .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_party_v1__Version", "v1")
+            .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_projects_v1__AppId", ProjectsAppId)
+            .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_projects_v1__MethodName", "process")
+            .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_projects_v1__TenantId", "*")
+            .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_projects_v1__Domain", "projects")
+            .WithEnvironment("EventStore__DomainServices__Registrations__wildcard_projects_v1__Version", "v1")
             .WithEnvironment("EventStore__Publisher__PubSubName", PubSubComponentName);
 
         // Tenants is an EventStore domain service sharing the same actor state store + pub/sub (mirrors the
@@ -262,6 +294,30 @@ internal static class ChatBotAspireModule
                 .WithReference(actorStateStore)
                 .WithReference(pubSub));
 
+        _ = parties
+            .WithEndpoint("http", endpoint =>
+            {
+                endpoint.Port = null;
+                endpoint.TargetPort = null;
+                endpoint.IsProxied = false;
+            })
+            .WithDaprSidecar(sidecar => sidecar
+                .WithOptions(SidecarOptions(builder, PartiesAppId, daprConfigPath))
+                .WithReference(actorStateStore)
+                .WithReference(pubSub));
+
+        _ = projects
+            .WithEndpoint("http", endpoint =>
+            {
+                endpoint.Port = null;
+                endpoint.TargetPort = null;
+                endpoint.IsProxied = false;
+            })
+            .WithDaprSidecar(sidecar => sidecar
+                .WithOptions(SidecarOptions(builder, ProjectsAppId, daprConfigPath))
+                .WithReference(actorStateStore)
+                .WithReference(pubSub));
+
         // The chatbot reaches EventStore over DAPR service invocation, projects its read model into chatbot-statestore,
         // and subscribes to chatbot-pubsub. It references exactly these three components (chatbot-statestore,
         // chatbot-workflow-statestore, chatbot-pubsub) and never the EventStore "statestore" actor component.
@@ -269,8 +325,12 @@ internal static class ChatBotAspireModule
             .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
             .WithReference(eventStore)
             .WithReference(tenants)
+            .WithReference(parties)
+            .WithReference(projects)
             .WaitFor(eventStore)
             .WaitFor(tenants)
+            .WaitFor(parties)
+            .WaitFor(projects)
             .WithEnvironment("ChatBot__EventStoreDaprAppId", eventStoreAppId)
             .WithDaprSidecar(sidecar => sidecar
                 .WithOptions(SidecarOptions(builder, AppId, daprConfigPath))

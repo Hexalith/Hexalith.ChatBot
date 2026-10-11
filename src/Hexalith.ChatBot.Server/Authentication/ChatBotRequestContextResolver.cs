@@ -44,6 +44,32 @@ internal sealed class ChatBotRequestContextResolver(IHttpContextAccessor httpCon
         return ResolveRelay(command.UserId, command.TenantId, origin, actor, client);
     }
 
+    /// <summary>Reconstructs a human grant issuer only after the caller has verified ChatBot admission.</summary>
+    public ChatBotRequestContext? ResolveBoundGrantIssuer(CommandEnvelope command)
+    {
+        if (!IsEventStoreRelay("domain-service:process") ||
+            !TryRelayExtension(command, EventStoreGatewayVerifiedOrigin.ExtensionKey, out string? gateway) || gateway != "chatbot" ||
+            !TryRelayExtension(command, EventStoreGatewayVerifiedOrigin.ActorExtensionKey, out string? boundActor) || boundActor != command.UserId ||
+            !TryRelayExtension(command, "actorId", out string? actorId) || actorId != command.UserId ||
+            !TryRelayExtension(command, "actorType", out string? actorType) || actorType != "human" ||
+            !TryRelayExtension(command, "serviceClientId", out string? client) || client is not null ||
+            !TryRelayExtension(command, "surfaceOrigin", out string? declaredOrigin) || declaredOrigin is null)
+        {
+            return null;
+        }
+
+        ChatBotSurfaceOrigin origin = ChatBotSurfaceOrigins.FromWireValueOrDefault(declaredOrigin);
+        if (ChatBotSurfaceOrigins.ToWireValue(origin) != declaredOrigin)
+        {
+            return null;
+        }
+
+        List<Claim> claims = [new("sub", command.UserId), new("eventstore:tenant", command.TenantId),
+            new(ParticipantAuthorizationStage.ActorTypeClaim, "human")];
+        return TryResolve(new(new ClaimsIdentity(claims, "eventstore-bound-grant")), origin,
+            out ChatBotRequestContext? context, out _) ? context : null;
+    }
+
     /// <summary>Binds an authenticated EventStore query relay; the existing envelope defaults to API provenance.</summary>
     public ChatBotRequestContext? ResolveQuery(QueryEnvelope query)
     {
