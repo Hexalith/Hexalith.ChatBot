@@ -603,8 +603,15 @@ The source Debug Server.Tests build passed with zero warnings/errors and its nat
 
 The shared Builds catalog also pins SwaggerUI 10.3.0 for EventStore.Gateway 3.120.0. The Tenants Server.Tests package-mode Debug build passed with zero warnings/errors after that correction, its owner query test passed 1/1, the Parties owner query and Projects owner query/grant lifecycle tests each passed 1/1, and the Builds catalog validator passed all 304 entries. Builds revision is `3d931f3f0fd47708579e0ad644aad67df58420bc`. Owning-sibling local revisions are EventStore `819cc1223598f02eee510cfa751f37424936e1cf`, Tenants `6515be441763d368110fe042e16748b2ce2b8467`, Parties `7816099158bfb252658b78f69cecafecc853228f`, Projects `ffe1db5295d19f6637b62749f561d3ccb4266045`, and Conversations `a570783f589649e9ea884efd8ef48917d85032e6`. They were not pushed. The original story and sprint entry are the proposed `done` transition. The exact Story Evidence Gate report at `evidence/reports/1-3-bind-every-request-to-trusted-tenant-and-actor-context.json` is the authoritative result for this candidate; no remote publication is claimed.
 
+## Final A13 reconciliation verification — 2026-10-11
+
+The completed owner mapping uses persisted exact ChatBot grants and requester-bound Tenants, Parties, and Projects evidence. A protected project-conversation read was allowed under a persisted Projects grant and denied with HTTP 403 after its revocation in the real Aspire/Dapr primary. Token roles, synthetic test providers, and operator credentials confer no production owner authority. Missing, stale, mismatched, revoked, and unavailable evidence continue to deny.
+
+Final local sibling revisions are EventStore `937d77df1fa473f091cc1099ad20240dbc500707` and Projects `7aef021a0c7cacd84962a1451b3956d94468e9dc`; the other owner revisions above are unchanged. The final Debug Server.Tests and Architecture.Tests builds and Release Conformance.Tests, UI.E2E.Tests, StoryEvidenceGate.Tests, and IntegrationTests builds passed with zero warnings/errors. Native suites passed Server **2,553/2,553**, Conformance **149/149**, Architecture **123/123**, hosting-assets **4/4**, and gate self tests **219/219**, all with zero skips. The final live primary passed **1/1**, zero skips, in **102.871 seconds** at `TestResults/topology-primary/topology-acceptance.trx`. Local grant seeding retries a new command ID only after EventStore reports a terminal infrastructure rejection with no stored event; uncertain or committed outcomes keep the original ID. The exact Story Evidence Gate report is the authoritative completion result. No push was performed.
+
 ## File List
 
+- `_bmad-output/implementation-artifacts/deferred-work.md`
 - `_bmad-output/implementation-artifacts/evidence/1-3-bind-every-request-to-trusted-tenant-and-actor-context.json`
 - `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context-2.md`
 - `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
@@ -627,8 +634,11 @@ The shared Builds catalog also pins SwaggerUI 10.3.0 for EventStore.Gateway 3.12
 - `references/Hexalith.EventStore/src/Hexalith.EventStore/Controllers/CommandsController.cs`
 - `references/Hexalith.EventStore/src/Hexalith.EventStore/Controllers/QueriesController.cs`
 - `references/Hexalith.EventStore/src/Hexalith.EventStore/Controllers/StreamsController.cs`
+- `references/Hexalith.EventStore/src/Hexalith.EventStore/Extensions/EventStoreRateLimitPartition.cs`
 - `references/Hexalith.EventStore/src/Hexalith.EventStore/Extensions/ServiceCollectionExtensions.cs`
 - `references/Hexalith.EventStore/src/Hexalith.EventStore/Pipeline/AuthorizationBehavior.cs`
+- `references/Hexalith.EventStore/tests/Hexalith.EventStore.IntegrationTests/EventStore/PerConsumerRateLimitingTests.cs`
+- `references/Hexalith.EventStore/tests/Hexalith.EventStore.Server.Tests/Authentication/EventStoreRateLimitPartitionTests.cs`
 - `references/Hexalith.EventStore/tests/Hexalith.EventStore.Server.Tests/Controllers/BoundOwnerQueryControllerTests.cs`
 - `references/Hexalith.EventStore/tests/Hexalith.EventStore.Server.Tests/Controllers/WorkloadGatewayControllerTests.cs`
 - `references/Hexalith.Parties`
@@ -671,6 +681,8 @@ The shared Builds catalog also pins SwaggerUI 10.3.0 for EventStore.Gateway 3.12
 - `references/Hexalith.Projects/src/Hexalith.Projects/Aggregates/Project/ProjectStateApply.cs`
 - `references/Hexalith.Projects/tests/Hexalith.Projects.Server.Tests/Authorization/ProjectAuthorityReaderFixture.cs`
 - `references/Hexalith.Projects/tests/Hexalith.Projects.Server.Tests/Authorization/ProjectChatBotAuthorityQueryHandlerTests.cs`
+- `references/Hexalith.Projects/tests/Hexalith.Projects.Server.Tests/Authorization/ProjectGrantLifecycleTests.cs`
+- `references/Hexalith.Projects/tests/Hexalith.Projects.Server.Tests/ProjectsServerModuleTests.cs`
 - `references/Hexalith.Projects/tests/Hexalith.Projects.Tests/Aggregates/Project/ProjectChatBotGrantLifecycleTests.cs`
 - `references/Hexalith.Tenants`
 - `references/Hexalith.Tenants/src/Hexalith.Tenants.Contracts/Queries/ResolveTenantOwnerAuthority.cs`
@@ -724,6 +736,7 @@ The shared Builds catalog also pins SwaggerUI 10.3.0 for EventStore.Gateway 3.12
 - `tests/Hexalith.ChatBot.Server.Tests/Adapters/Folders/FoldersFolderStoreTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Authorization/ChatBotAuthorityGrantAggregateTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Authorization/ChatBotBoundOwnerProofTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Authorization/CurrentChatBotOwnerAuthorityProviderTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.CanonicalTargets.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs`

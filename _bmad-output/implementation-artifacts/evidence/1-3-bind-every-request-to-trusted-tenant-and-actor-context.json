@@ -11,7 +11,7 @@
   "bootstrap": false,
   "scope": {
     "mode": "diff",
-    "implementationDigest": "85cbb5fe310a790333969c4a11ac0fe5bdf67f0b2ec493229036f0ec8ee7d476",
+    "implementationDigest": "eb283bfe0d423b80c822a20343f15660ef4b2aae1bd98a2b7934d2e731a3a6df",
     "transitionPaths": [
       "_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md",
       "_bmad-output/implementation-artifacts/evidence/1-3-bind-every-request-to-trusted-tenant-and-actor-context.json",
@@ -25,6 +25,7 @@
         "headCommit": "$HEAD",
         "includeWorkingTree": true,
         "includePaths": [
+          "_bmad-output/implementation-artifacts/deferred-work.md",
           "_bmad-output/implementation-artifacts/evidence/1-3-bind-every-request-to-trusted-tenant-and-actor-context.json",
           "_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context-2.md",
           "_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md",
@@ -81,6 +82,7 @@
           "tests/Hexalith.ChatBot.Server.Tests/Adapters/Folders/FoldersFolderStoreTests.cs",
           "tests/Hexalith.ChatBot.Server.Tests/Authorization/ChatBotAuthorityGrantAggregateTests.cs",
           "tests/Hexalith.ChatBot.Server.Tests/Authorization/ChatBotBoundOwnerProofTests.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Authorization/CurrentChatBotOwnerAuthorityProviderTests.cs",
           "tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.CanonicalTargets.cs",
           "tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs",
           "tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs",
@@ -115,7 +117,7 @@
         "name": "eventstore",
         "path": "references/Hexalith.EventStore",
         "baseCommit": "b57310fb44ef2231815f3c3cfea09714d942334d",
-        "headCommit": "819cc1223598f02eee510cfa751f37424936e1cf",
+        "headCommit": "937d77df1fa473f091cc1099ad20240dbc500707",
         "includeWorkingTree": false,
         "includePaths": [
           "src/Hexalith.EventStore.Client/Gateway/BoundOwnerQueryProof.cs",
@@ -130,8 +132,11 @@
           "src/Hexalith.EventStore/Controllers/CommandsController.cs",
           "src/Hexalith.EventStore/Controllers/QueriesController.cs",
           "src/Hexalith.EventStore/Controllers/StreamsController.cs",
+          "src/Hexalith.EventStore/Extensions/EventStoreRateLimitPartition.cs",
           "src/Hexalith.EventStore/Extensions/ServiceCollectionExtensions.cs",
           "src/Hexalith.EventStore/Pipeline/AuthorizationBehavior.cs",
+          "tests/Hexalith.EventStore.IntegrationTests/EventStore/PerConsumerRateLimitingTests.cs",
+          "tests/Hexalith.EventStore.Server.Tests/Authentication/EventStoreRateLimitPartitionTests.cs",
           "tests/Hexalith.EventStore.Server.Tests/Controllers/BoundOwnerQueryControllerTests.cs",
           "tests/Hexalith.EventStore.Server.Tests/Controllers/WorkloadGatewayControllerTests.cs"
         ]
@@ -155,7 +160,7 @@
         "name": "projects",
         "path": "references/Hexalith.Projects",
         "baseCommit": "b0b51aa8da9d63386b11b566737ee896a49d9a02",
-        "headCommit": "ffe1db5295d19f6637b62749f561d3ccb4266045",
+        "headCommit": "7aef021a0c7cacd84962a1451b3956d94468e9dc",
         "includeWorkingTree": false,
         "includePaths": [
           "_bmad-output/implementation-artifacts/spec-6-1-p1r-4.md",
@@ -190,6 +195,8 @@
           "src/Hexalith.Projects/Aggregates/Project/ProjectStateApply.cs",
           "tests/Hexalith.Projects.Server.Tests/Authorization/ProjectAuthorityReaderFixture.cs",
           "tests/Hexalith.Projects.Server.Tests/Authorization/ProjectChatBotAuthorityQueryHandlerTests.cs",
+          "tests/Hexalith.Projects.Server.Tests/Authorization/ProjectGrantLifecycleTests.cs",
+          "tests/Hexalith.Projects.Server.Tests/ProjectsServerModuleTests.cs",
           "tests/Hexalith.Projects.Tests/Aggregates/Project/ProjectChatBotGrantLifecycleTests.cs"
         ]
       },

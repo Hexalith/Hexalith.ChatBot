@@ -234,6 +234,16 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                     if (!accepted && attempt < 5 && response.StatusCode is (HttpStatusCode.Forbidden or
                         HttpStatusCode.ServiceUnavailable or HttpStatusCode.InternalServerError or HttpStatusCode.GatewayTimeout))
                     {
+                        if (response.StatusCode == HttpStatusCode.ServiceUnavailable &&
+                            await WasOwnerCommandDefinitivelyRejectedAsync(eventStore, eventStoreActorToken,
+                                commandId, cancellationToken).ConfigureAwait(false))
+                        {
+                            // EventStore has definitively rejected this command before storing an event.
+                            // A new message ID can retry the same exact grant; an uncertain or committed
+                            // outcome must retain the original ID to avoid duplicate effects.
+                            commandId = ChatBotCommandId.New().ToString();
+                            _output.WriteLine("LIVE_OWNER_GRANT_INFRASTRUCTURE_RETRY {0}", operation);
+                        }
                         await Task.Delay(TimeSpan.FromSeconds(5 * attempt), cancellationToken).ConfigureAwait(false);
                         continue;
                     }
@@ -246,11 +256,50 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                     await Task.Delay(TimeSpan.FromSeconds(5 * attempt), cancellationToken).ConfigureAwait(false);
                 }
             }
-            accepted.ShouldBeTrue($"Exact {operation} authority issuance for {principalId} did not complete after three current-owner attempts.");
+            accepted.ShouldBeTrue($"Exact {operation} authority issuance for {principalId} did not complete after five current-owner attempts.");
             _output.WriteLine("LIVE_OWNER_GRANT_EVIDENCE {0}", JsonSerializer.Serialize(new
             {
                 tenantId, principalId, operation, resource, accepted = true,
             }));
+        }
+    }
+
+    private static async Task<bool> WasOwnerCommandDefinitivelyRejectedAsync(
+        HttpClient eventStore, string accessToken, string commandId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using HttpRequestMessage request = new(HttpMethod.Get, $"/api/v1/commands/status/{commandId}");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            using HttpResponseMessage response = await eventStore.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            if (response.StatusCode != HttpStatusCode.OK)
+            {
+                return false;
+            }
+
+            using JsonDocument status = JsonDocument.Parse(
+                await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+            JsonElement root = status.RootElement;
+            return root.TryGetProperty("status", out JsonElement state) && state.GetString() == "Rejected" &&
+                root.TryGetProperty("eventCount", out JsonElement eventCount) &&
+                eventCount.ValueKind == JsonValueKind.Null &&
+                root.TryGetProperty("rejectionEventType", out JsonElement rejectionType) &&
+                rejectionType.ValueKind == JsonValueKind.Null &&
+                root.TryGetProperty("failureReason", out JsonElement failureReason) &&
+                failureReason.ValueKind == JsonValueKind.String &&
+                !string.IsNullOrWhiteSpace(failureReason.GetString());
+        }
+        catch (HttpRequestException)
+        {
+            return false;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
         }
     }
 
