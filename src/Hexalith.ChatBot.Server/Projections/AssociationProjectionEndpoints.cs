@@ -1,4 +1,5 @@
 using Dapr;
+using Hexalith.EventStore.DomainService;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -56,7 +57,8 @@ internal static class AssociationProjectionEndpoints
                 PubsubName = pubSubName,
                 Name = topicName,
                 DeadLetterTopic = deadLetterTopic,
-            });
+            })
+            .RequireEventStoreSidecarChannel();
 
         return endpoints;
     }

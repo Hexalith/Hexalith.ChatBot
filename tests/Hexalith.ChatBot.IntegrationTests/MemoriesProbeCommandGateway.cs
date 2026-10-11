@@ -9,6 +9,7 @@ using System.Text.Json;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
+using CommunityToolkit.Aspire.Hosting.Dapr;
 
 using Hexalith.EventStore.Contracts.Commands;
 
@@ -27,6 +28,19 @@ namespace Hexalith.ChatBot.IntegrationTests;
 /// </summary>
 internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
 {
+    private const string ProbeAppId = "story-memories-owner-probe";
+    private static readonly string ProbeRunId = Guid.NewGuid().ToString("N");
+
+    // The fixed tenants support ChatBot's live read paths. Two fresh tenants force the owner workflow and its
+    // EventStore registration/activation commands to execute even when a prior local run left the fixed ones active.
+    internal static IReadOnlyList<string> ProvisionedTenants { get; } =
+    [
+        "tenant-alpha",
+        "tenant-beta",
+        $"story-probe-a-{ProbeRunId}",
+        $"story-probe-b-{ProbeRunId}",
+    ];
+
     private readonly string _clientId = $"story-memories-provisioner-{Guid.NewGuid():N}";
     private readonly string _clientSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
     private readonly string _adminPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
@@ -54,6 +68,7 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
     public string? LastRequestDomain => Volatile.Read(ref _lastRequestDomain);
 
     public string? LastRequestType => Volatile.Read(ref _lastRequestType);
+
 
     public string OwnerModuleSha256 => _domain!.OwnerModuleSha256;
 
@@ -96,6 +111,21 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
 
     public void Configure(IDistributedApplicationTestingBuilder builder)
     {
+        // EventStore 3.120 invokes registered domains through Dapr service discovery. Keep the probe's
+        // in-process HTTP handler, but give it an Aspire-managed sidecar so the registration is a real app ID.
+        // The executable is only a lifecycle anchor; its sidecar forwards to the already-running handler.
+        int appPort = new Uri(BaseAddress).Port;
+        _ = builder.AddExecutable("story-memories-owner-probe-host", "sleep", builder.AppHostDirectory, "infinity")
+            .WithDaprSidecar(new DaprSidecarOptions
+            {
+                AppId = ProbeAppId,
+                AppPort = appPort,
+                AppProtocol = "http",
+                AppChannelAddress = "127.0.0.1",
+                Config = Path.Combine(builder.AppHostDirectory, "DaprComponents", "accesscontrol.local.yaml"),
+                PlacementHostAddress = builder.Configuration["Dapr:PlacementHostAddress"],
+                SchedulerHostAddress = builder.Configuration["Dapr:SchedulerHostAddress"],
+            });
         IResource security = builder.Resources.Single(resource => resource.Name == "security");
         security.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
         {
@@ -108,10 +138,10 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
         IResource eventStore = builder.Resources.Single(resource => resource.Name == "eventstore");
         eventStore.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
         {
-            foreach (string tenant in new[] { "tenant-alpha", "tenant-beta" })
+            foreach (string tenant in ProvisionedTenants)
             {
                 string registration = $"EventStore__DomainServices__Registrations__{tenant}|memories-tenants|v1__";
-                context.EnvironmentVariables[registration + "AppId"] = BaseAddress.TrimEnd('/');
+                context.EnvironmentVariables[registration + "AppId"] = ProbeAppId;
                 context.EnvironmentVariables[registration + "MethodName"] = "owner-process";
                 context.EnvironmentVariables[registration + "TenantId"] = tenant;
                 context.EnvironmentVariables[registration + "Domain"] = "memories-tenants";
@@ -169,7 +199,7 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
             {
                 ["included.client.audience"] = "hexalith-eventstore", ["access.token.claim"] = "true", ["id.token.claim"] = "false",
             } },
-            ClaimMapper("tenants", "tenant-alpha tenant-beta", "String"),
+            ClaimMapper("tenants", string.Join(' ', ProvisionedTenants), "String"),
             ClaimMapper("domains", "memories-tenants", "String"),
             ClaimMapper("permissions", "register-tenant update-tenant-lifecycle-status", "String"),
         ];
@@ -201,7 +231,7 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
         string encodedClaims = bearer.Split('.')[1].Replace('-', '+').Replace('_', '/');
         encodedClaims = encodedClaims.PadRight(encodedClaims.Length + ((4 - (encodedClaims.Length % 4)) % 4), '=');
         using JsonDocument claims = JsonDocument.Parse(Convert.FromBase64String(encodedClaims));
-        claims.RootElement.GetProperty("tenants").GetString().ShouldBe("tenant-alpha tenant-beta");
+        claims.RootElement.GetProperty("tenants").GetString().ShouldBe(string.Join(' ', ProvisionedTenants));
         claims.RootElement.GetProperty("domains").GetString().ShouldBe("memories-tenants");
         claims.RootElement.GetProperty("permissions").GetString().ShouldBe("register-tenant update-tenant-lifecycle-status");
         claims.RootElement.TryGetProperty("global_admin", out _).ShouldBeFalse();
@@ -304,7 +334,7 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
         string? type = command.GetProperty("commandType").GetString();
         Volatile.Write(ref _lastRequestDomain, domain);
         Volatile.Write(ref _lastRequestType, type);
-        if (tenant is not ("tenant-alpha" or "tenant-beta") || domain != "memories-tenants"
+        if (tenant is null || !ProvisionedTenants.Contains(tenant, StringComparer.Ordinal) || domain != "memories-tenants"
             || type is not ("register-tenant" or "update-tenant-lifecycle-status"))
         {
             Volatile.Write(ref _lastStatusCode, StatusCodes.Status403Forbidden);
@@ -336,4 +366,5 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
 
         return Results.Content(content, response.Content.Headers.ContentType?.ToString() ?? "application/json", statusCode: (int)response.StatusCode);
     }
+
 }

@@ -22,6 +22,7 @@ using OpenTelemetry.Metrics;
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 _ = builder.AddEventStoreDomainService(typeof(GovernedOperationAggregate).Assembly);
+_ = builder.Services.AddChatBotApplicationBoundaryPolicy();
 
 // Resolve the identity EventStore negotiates named projections against. The SDK derives an unconfigured AppId
 // from DAPR_APP_ID, falling back to the .NET application name ("Hexalith.ChatBot.Server"), which is never the DAPR
@@ -141,7 +142,8 @@ _ = app.MapAiExecutionRecoveryEndpoints();
 
 if (projectionChangeNotificationsEnabled)
 {
-    _ = app.MapHub<ChatBotProjectConversationHub>(ChatBotProjectConversationHub.HubPath);
+    _ = app.MapHub<ChatBotProjectConversationHub>(ChatBotProjectConversationHub.HubPath)
+        .RequireAuthorization(ChatBotApplicationBoundaryPolicy.Name);
 }
 
 app.Run();

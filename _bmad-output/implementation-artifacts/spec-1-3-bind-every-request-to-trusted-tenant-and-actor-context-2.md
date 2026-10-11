@@ -2,7 +2,8 @@
 title: 'Story 1.3: Reconcile Trusted Context Completion Evidence'
 type: 'bugfix'
 created: '2026-10-11'
-status: 'ready-for-dev'
+status: 'in-progress'
+baseline_commit: d29f7f28c128f86f7034caf4ca93453adc349673
 route: 'dispatch'
 review_loop_iteration: 0
 context:
@@ -43,9 +44,9 @@ context:
 
 **Execution:**
 
-- [ ] `references/Hexalith.Builds/Props/Directory.Packages.props` — align the central EventStore family to 3.120.0 and MessagePack to 3.1.11; validate Builds-owned catalog rules before updating the root gitlink.
-- [ ] `references/Hexalith.Parties/Directory.Packages.props` — remove the temporary 3.117.1 override so Parties follows the aligned shared catalog; validate the Parties package/source modes before updating its root gitlink.
-- [ ] `src/Hexalith.ChatBot.Server/Adapters/Folders/FoldersFolderStore.cs` and its focused tests — submit the generated add-file request accepted by both source and package clients; preserve payload, idempotency, and safe error behavior.
+- [x] `references/Hexalith.Builds/Props/Directory.Packages.props` — align the central EventStore family to 3.120.0 and MessagePack to 3.1.11; validate Builds-owned catalog rules before updating the root gitlink.
+- [x] `references/Hexalith.Parties/Directory.Packages.props` — remove the temporary 3.117.1 override so Parties follows the aligned shared catalog; validate the Parties package/source modes before updating its root gitlink.
+- [x] `src/Hexalith.ChatBot.Server/Adapters/Folders/FoldersFolderStore.cs` and its focused tests — submit the generated add-file request accepted by both source and package clients; preserve payload, idempotency, and safe error behavior.
 - [ ] `src/Hexalith.ChatBot.AppHost/Program.cs` and `tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs` — start the existing topology and run its live primary assertions after source builds pass.
 - [ ] `_bmad-output/implementation-artifacts/evidence/1-3-bind-every-request-to-trusted-tenant-and-actor-context.json` — define the exact completion contract, current-run results and provenance, and map the original story's tasks and acceptance criteria.
 - [ ] `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md` and `_bmad-output/implementation-artifacts/sprint-status.yaml` — record the user-approved scope exception and verification; transition to `done` only after the evidence gate passes.
@@ -59,11 +60,25 @@ context:
 
 ## Implementation Notes
 
+- The Builds catalog now pins the EventStore family at 3.120.0 and MessagePack at 3.1.11. Parties inherits that catalog without its former 3.117.1 override. Both inner revisions are local commits and the root gitlinks identify them; neither was pushed.
+- The Folders adapter uses the generated typed upload request in both source and package modes. Focused tests exercise payload bytes, operation and idempotency identity, and safe error conversion.
+- The AppHost supplies EventStore workload and channel credentials, and the live test starts an Aspire-managed Memories probe Dapr sidecar. The probe loads the live owner module with its own dependency context so that the runner's package-mode contracts do not replace the source-mode owner assembly.
+- The ChatBot boundary policy delegates ChatBot-owned endpoints to their existing authorization guards while preserving the SDK fallback for other routes. The live Keycloak realm uses Keycloak's `oidc-sub-mapper` for a human access-token subject claim; the first attempt with a `basic` default scope still emitted no `sub` and was replaced.
+- The production `UnavailableChatBotOwnerAuthorityProvider` still denies owner authority. A13 owner mappings and release acceptance remain open. No synthetic authority is installed for the primary acceptance path.
+
 ## Spec Change Log
 
 ## Review Triage Log
 
 ## Verification
+
+The Builds catalog validators and Parties package and source builds passed. Debug Server.Tests built without warnings or errors and its native lane passed 2,536/2,536 with zero skips. Release IntegrationTests and AppHost builds passed without warnings or errors. The Architecture native lane passed 123/123 with zero skips. Release Conformance built in package mode and its native lane passed 149/149 with zero skips. The focused Bootstrap and Folders tests passed 106/106 and 9/9 respectively.
+
+Standalone `aspire run --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --non-interactive` exited 134 because `ChatBot:LiveRecoveryValidation:MailboxClientSecret` was missing in that standalone environment (`/tmp/story13-reconcile-aspire.log`). The in-process primary test supplies its local secret and starts the topology.
+
+The exact native primary command is `HEXALITH_CHATBOT_TIER3=1 PATH="$HOME/.dapr/bin:$PATH" XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests TestResults/topology-primary/topology-acceptance.ctrf.json -result-trx TestResults/topology-primary/topology-acceptance.trx -method Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology -showLiveOutput`. It exited 1: one failed, zero skipped. Aspire/Dapr and four real persisted Memories owner commands passed their probes. `SubmitGovernedNoteUntilAcceptedAsync` then received HTTP 403 `authorization_denied` from ChatBot at line 2752 (`/tmp/story13-reconcile-topology-submapper.log`). The production owner provider remains unavailable until A13 maps the ChatBot resource authority; this is the exact acceptance blocker. The original story and sprint entry remain `review`.
+
+`dotnet run --project tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj --configuration Release -- attest --contract _bmad-output/implementation-artifacts/evidence/1-3-bind-every-request-to-trusted-tenant-and-actor-context.json --base d29f7f28c128f86f7034caf4ca93453adc349673 --head d29f7f28c128f86f7034caf4ca93453adc349673 --results TestResults` exited 2 with `machine_results_invalid` for `aspire-dapr-primary`; no provenance sidecars were written. The matching `validate --target-status done` command exited 1 with `status_mismatch` / `story-transition`, as required while story and sprint remain `review`. The draft contract's scope digest is calculated from the exact candidate; it is not an assertion that completion evidence passed.
 
 **Commands:**
 

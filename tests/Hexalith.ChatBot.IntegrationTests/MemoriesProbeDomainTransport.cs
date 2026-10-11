@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Reflection;
+using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Text.Json;
 
@@ -32,7 +33,11 @@ internal sealed class MemoriesProbeDomainTransport
         // Load only the owner module deployed alongside the exact live Aspire executable. No source fallback,
         // alternate build configuration, copied business rules, or compile-time sibling reference is allowed.
         OwnerModuleSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(OwnerModulePath))).ToLowerInvariant();
-        _owner = Assembly.LoadFrom(OwnerModulePath);
+        // The test runner carries the published Memories.Contracts package while this live server deploys its
+        // source-built owner/contracts pair. Resolve the exact server dependency graph in its own load context;
+        // loading only the owner DLL into the runner's default context mixes those versions at reflection time.
+        OwnerModuleLoadContext ownerContext = new(ServerAssemblyPath);
+        _owner = ownerContext.LoadFromAssemblyPath(OwnerModulePath);
         string.Equals(Path.GetFullPath(_owner.Location), OwnerModulePath,
             OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal).ShouldBeTrue();
         Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(_owner.Location))).ToLowerInvariant().ShouldBe(OwnerModuleSha256);
@@ -65,7 +70,8 @@ internal sealed class MemoriesProbeDomainTransport
     public DomainServiceWireResult Process(DomainServiceRequest request, string serviceSubject)
     {
         CommandEnvelope envelope = request.Command;
-        if (envelope.TenantId is not ("tenant-alpha" or "tenant-beta") || envelope.Domain != "memories-tenants"
+        if (!MemoriesProbeCommandGateway.ProvisionedTenants.Contains(envelope.TenantId, StringComparer.Ordinal)
+            || envelope.Domain != "memories-tenants"
             || envelope.UserId != serviceSubject || envelope.AggregateId != envelope.TenantId)
         {
             throw new UnauthorizedAccessException("The owner transport accepts only the scoped authenticated fixture envelope.");
@@ -107,4 +113,15 @@ internal sealed class MemoriesProbeDomainTransport
 
     private Type OwnerType(string name)
         => _owner.GetType("Hexalith.Memories.EventStore.Domain." + name, throwOnError: true)!;
+
+    private sealed class OwnerModuleLoadContext(string serverAssemblyPath) : AssemblyLoadContext(isCollectible: false)
+    {
+        private readonly AssemblyDependencyResolver _resolver = new(serverAssemblyPath);
+
+        protected override Assembly? Load(AssemblyName assemblyName)
+        {
+            string? path = _resolver.ResolveAssemblyToPath(assemblyName);
+            return path is null ? null : LoadFromAssemblyPath(path);
+        }
+    }
 }

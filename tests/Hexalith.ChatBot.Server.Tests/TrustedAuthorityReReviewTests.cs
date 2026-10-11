@@ -12,6 +12,7 @@ using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Queries;
+using Hexalith.ChatBot.Server.Tests.TrustedAuthority;
 using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Queries;
@@ -134,7 +135,11 @@ public sealed class TrustedAuthorityReReviewTests
         using WebApplicationFactory<Program> factory = Factory(clock, owner, store, audit).WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
             services.AddSingleton<IAuthorizationFailureCounter>(counter);
-            if (sdkAbort) { services.AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(Relay)); }
+            if (sdkAbort)
+            {
+                SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
+                services.AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(Relay));
+            }
         }));
         if (sdkAbort)
         {

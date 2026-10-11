@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "2.0",
+  "storyKey": "1-3-bind-every-request-to-trusted-tenant-and-actor-context",
+  "baseCommit": "d29f7f28c128f86f7034caf4ca93453adc349673",
+  "headCommit": "d29f7f28c128f86f7034caf4ca93453adc349673",
+  "implementationDigest": "",
+  "policyVersion": "2.1",
+  "passed": false,
+  "fileListCount": 0,
+  "scopedDiffCount": 0,
+  "eventPathCount": 0,
+  "checkedItemCount": 0,
+  "mappedItemCount": 0,
+  "repositoryScopes": [],
+  "lanes": [],
+  "primaryPaths": [],
+  "issues": [
+    {
+      "reasonCode": "status_mismatch",
+      "subject": "story-transition"
+    }
+  ],
+  "evaluatedAtUtc": "2026-10-11T12:24:46.2660582+00:00"
+}

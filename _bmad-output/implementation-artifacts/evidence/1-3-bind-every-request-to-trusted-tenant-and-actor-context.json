@@ -1,0 +1,248 @@
+{
+  "schemaVersion": "2.0",
+  "recordKind": "story",
+  "recordLedgerKey": "1-3-bind-every-request-to-trusted-tenant-and-actor-context",
+  "storyKey": "1-3-bind-every-request-to-trusted-tenant-and-actor-context",
+  "storyTitle": "Story 1.3: Bind Every Request to Trusted Tenant and Actor Context",
+  "storyPath": "_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md",
+  "targetStatus": "done",
+  "persistedStatus": "done",
+  "sprintStatusKey": "1-3-bind-every-request-to-trusted-tenant-and-actor-context",
+  "bootstrap": false,
+  "scope": {
+    "mode": "diff",
+    "implementationDigest": "9e21d0d90db7886462cd03718c0c73137d54a3cbbe507e42758ef3637711e2a0",
+    "transitionPaths": [
+      "_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md",
+      "_bmad-output/implementation-artifacts/evidence/1-3-bind-every-request-to-trusted-tenant-and-actor-context.json",
+      "_bmad-output/implementation-artifacts/sprint-status.yaml"
+    ],
+    "repositories": [
+      {
+        "name": "root",
+        "path": ".",
+        "baseCommit": "$BASE",
+        "headCommit": "$HEAD",
+        "includeWorkingTree": true,
+        "includePaths": [
+          "_bmad-output/implementation-artifacts/evidence/1-3-bind-every-request-to-trusted-tenant-and-actor-context.json",
+          "_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context-2.md",
+          "_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md",
+          "_bmad-output/implementation-artifacts/sprint-status.yaml",
+          "references/Hexalith.Builds",
+          "references/Hexalith.Parties",
+          "src/Hexalith.ChatBot.AppHost/KeycloakRealms/hexalith-realm.json",
+          "src/Hexalith.ChatBot.AppHost/Program.cs",
+          "src/Hexalith.ChatBot.Server/Adapters/Folders/FoldersFolderStore.cs",
+          "src/Hexalith.ChatBot.Server/Authentication/ChatBotApplicationBoundaryPolicy.cs",
+          "src/Hexalith.ChatBot.Server/Gateway/ChatBotCompatibilityEndpointExtensions.cs",
+          "src/Hexalith.ChatBot.Server/Lifecycle/AiExecution/AiExecutionRecoveryEndpoints.cs",
+          "src/Hexalith.ChatBot.Server/Program.cs",
+          "src/Hexalith.ChatBot.Server/Projections/AiOutcomeProjectionEndpoints.cs",
+          "src/Hexalith.ChatBot.Server/Projections/ApprovalProjectionEndpoints.cs",
+          "src/Hexalith.ChatBot.Server/Projections/AssociationProjectionEndpoints.cs",
+          "src/Hexalith.ChatBot.Server/Projections/ChatBotDeadLetterProjectionEndpoints.cs",
+          "src/Hexalith.ChatBot.Server/Projections/GovernedOperationProjectionEndpoints.cs",
+          "src/Hexalith.ChatBot.Server/Projections/MailboxIntakeProjectionEndpoints.cs",
+          "src/Hexalith.ChatBot.Server/Projections/ParticipantResolutionProjectionEndpoints.cs",
+          "src/Hexalith.ChatBot.Server/Projections/TaskIntentProjectionEndpoints.cs",
+          "tests/Hexalith.ChatBot.IntegrationTests/MemoriesProbeCommandGateway.cs",
+          "tests/Hexalith.ChatBot.IntegrationTests/MemoriesProbeDomainTransport.cs",
+          "tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Adapters/Folders/FoldersFolderStoreTests.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/TrustedAuthority/SdkRouteFixtureAuthorization.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/TrustedAuthorityReReviewTests.cs",
+          "tests/Hexalith.ChatBot.Server.Tests/TrustedAuthorityReviewTests.cs"
+        ]
+      },
+      {
+        "name": "builds",
+        "path": "references/Hexalith.Builds",
+        "baseCommit": "360a2b9c4e96809365a7de785be9a68152d5ac28",
+        "headCommit": "2e0614f39c942d7e741462825274ae30b83a87cf",
+        "includeWorkingTree": false,
+        "includePaths": [
+          "Props/Directory.Packages.props"
+        ]
+      },
+      {
+        "name": "parties",
+        "path": "references/Hexalith.Parties",
+        "baseCommit": "89b9a7b4e14f67a6e001eaf5ba638af85967388d",
+        "headCommit": "e746fa41f32567d350f9350808ec31217f5dc3e6",
+        "includeWorkingTree": false,
+        "includePaths": [
+          "Directory.Packages.props"
+        ]
+      }
+    ]
+  },
+  "results": [
+    {
+      "lane": "Hexalith.ChatBot.Server.Tests",
+      "trx": "merge-test-lanes/Hexalith.ChatBot.Server.Tests.trx",
+      "provenance": "merge-test-lanes/Hexalith.ChatBot.Server.Tests.provenance.json",
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Server.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Server.Tests.TrustedAuthorityTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Conformance.Tests",
+      "trx": "merge-test-lanes/Hexalith.ChatBot.Conformance.Tests.trx",
+      "provenance": "merge-test-lanes/Hexalith.ChatBot.Conformance.Tests.provenance.json",
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Conformance.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Conformance.Tests.TrustedAuthorityParityTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Architecture.Tests",
+      "trx": "merge-test-lanes/Hexalith.ChatBot.Architecture.Tests.trx",
+      "provenance": "merge-test-lanes/Hexalith.ChatBot.Architecture.Tests.provenance.json",
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Architecture.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Architecture.Tests.TrustedAuthorityBoundaryTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "aspire-dapr-primary",
+      "trx": "topology-primary/topology-acceptance.trx",
+      "provenance": "topology-primary/topology-acceptance.provenance.json",
+      "artifactLocator": "file:topology-primary/topology-acceptance.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": "aspire-dapr"
+    }
+  ],
+  "primaryPaths": [
+    {
+      "class": "aspire-dapr",
+      "lane": "aspire-dapr-primary"
+    }
+  ],
+  "mappings": [
+    {
+      "id": "task-1",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.TrustedAuthorityTests.ConflictingOrMalformedAuthenticatedEvidenceDenies"
+      ]
+    },
+    {
+      "id": "task-2",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.TrustedAuthorityTests.CurrentExactOwnerEvidenceAuthorizesWithoutTokenRoles"
+      ]
+    },
+    {
+      "id": "task-3",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.TrustedAuthorityTests.KnownServiceGrantRevocationDeniesImmediatelyAndCannotBeRefreshedByToken"
+      ]
+    },
+    {
+      "id": "task-4",
+      "kind": "task",
+      "paths": [
+        "src/Hexalith.ChatBot.Server/Gateway/ChatBotCompatibilityEndpointExtensions.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldRejectAuthenticatedCrossTenantSubmissionWithSafeProblemDetails"
+      ]
+    },
+    {
+      "id": "task-5",
+      "kind": "task",
+      "paths": [
+        "src/Hexalith.ChatBot.Server/Gateway/ChatBotCompatibilityEndpointExtensions.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldReturnAuthenticationDeniedForUnauthenticatedReads"
+      ]
+    },
+    {
+      "id": "task-6",
+      "kind": "task",
+      "paths": [
+        "tests/Hexalith.ChatBot.Server.Tests/TrustedAuthorityReviewTests.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.TrustedAuthorityReviewTests.WorkloadAuthenticatedSdkRelayBindsServiceAccountAndClosedOrigin"
+      ]
+    },
+    {
+      "id": "task-7",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Conformance.Tests.TrustedAuthorityParityTests.RealHttpActorsShareExactScopeExistenceNeutralityAndMetadataOnlyOutputs"
+      ]
+    },
+    {
+      "id": "task-8",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.TrustedAuthorityBoundaryTests.CatalogCoversEveryCommandAndRegisteredQueryExactlyOnce"
+      ]
+    },
+    {
+      "id": "ac-1",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.TrustedAuthorityTests.CurrentExactOwnerEvidenceAuthorizesWithoutTokenRoles",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
+      ]
+    },
+    {
+      "id": "ac-2",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.TrustedAuthorityTests.InvalidOwnerEvidenceDeniesBeforeProtectedRead",
+        "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.OperationStatusEndpointShouldCollapseCrossTenantAndUnknownOperations"
+      ]
+    },
+    {
+      "id": "ac-3",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Conformance.Tests.TrustedAuthorityParityTests.ProvenanceNeverChangesActorClassOrHumanAdminEligibility",
+        "Hexalith.ChatBot.Server.Tests.TrustedAuthorityTests.MachineCannotGainHumanAuthorityThroughRolesOriginOrGlobalAdmin"
+      ]
+    },
+    {
+      "id": "ac-4",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.TrustedAuthorityTests.KnownServiceGrantRevocationDeniesImmediatelyAndCannotBeRefreshedByToken",
+        "Hexalith.ChatBot.Server.Tests.TrustedAuthorityTests.SensitiveMutationRevalidatesWhileFreshOrdinaryReadMayUseObservedEvidence"
+      ]
+    }
+  ],
+  "outOfScopeDisclosures": [],
+  "reportPath": "_bmad-output/implementation-artifacts/evidence/reports/1-3-bind-every-request-to-trusted-tenant-and-actor-context.json"
+}

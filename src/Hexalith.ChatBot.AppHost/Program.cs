@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.Versioning;
 using System.Security.AccessControl;
+using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text.Json;
 using Aspire.Hosting;
@@ -23,9 +24,17 @@ IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(ar
 // production posture is the deny-by-default accesscontrol.yaml (conformance reference), enforced under mTLS.
 string accessControlConfigPath = ResolveDaprConfigPath(builder.AppHostDirectory, "accesscontrol.local.yaml");
 
-string realmImportPath = PrepareKeycloakRealmImport(builder.AppHostDirectory, builder.Configuration);
+string eventStoreWorkloadClientSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+string realmImportPath = PrepareKeycloakRealmImport(
+    builder.AppHostDirectory,
+    builder.Configuration,
+    eventStoreWorkloadClientSecret);
 HexalithEventStoreSecurityResources? security = builder.AddHexalithEventStoreSecurity(
     new HexalithEventStoreSecurityOptions { RealmImportPath = realmImportPath });
+IResourceBuilder<ParameterResource> eventStoreWorkloadClientSecretParameter = builder.AddParameter(
+    "eventstore-workload-client-secret",
+    () => eventStoreWorkloadClientSecret,
+    secret: true);
 
 IResourceBuilder<ProjectResource> eventStore = builder.AddProject<Projects.Hexalith_EventStore>(
     ChatBotAspireModule.EventStoreServiceName);
@@ -131,6 +140,8 @@ _ = chatBot
 // Publish targets supply APP_API_TOKEN from their own secret store.
 if (builder.ExecutionContext.IsRunMode)
 {
+    _ = eventStore.WithGeneratedEventStoreAppChannelToken();
+    _ = tenants.WithGeneratedEventStoreAppChannelToken();
     _ = chatBot.WithGeneratedEventStoreAppChannelToken();
 }
 
@@ -165,8 +176,11 @@ ReferenceExpression adminSwaggerUrl = ReferenceExpression.Create($"{adminServerH
 if (security is not null)
 {
     _ = eventStore.WithJwtBearerSecurity(security, "hexalith-eventstore");
-    _ = tenants.WithJwtBearerSecurity(security, "hexalith-tenants");
-    _ = chatBot.WithJwtBearerSecurity(security, "hexalith-chatbot");
+    _ = eventStore.WithEventStoreWorkloadClientCredentials("eventstore", eventStoreWorkloadClientSecretParameter);
+    _ = tenants.WithJwtBearerSecurity(security, "hexalith-tenants")
+        .WithEnvironment("Authentication__JwtBearer__ValidAudiences__0", "tenants");
+    _ = chatBot.WithJwtBearerSecurity(security, "hexalith-chatbot")
+        .WithEnvironment("Authentication__JwtBearer__ValidAudiences__0", ChatBotAspireModule.AppId);
     _ = chatBotUi
         .WithSecurityDependency(security)
         .WithEnvironment("Authentication__OpenIdConnect__Authority", security.RealmUrl)
@@ -227,11 +241,15 @@ static string ResolveDaprConfigPath(string appHostDirectory, string fileName)
 // to start the topology against a grant that is already expired or close to it, which is the failure mode a stale
 // checked-in realm actually produces. Production provisioning and rotation of service-client grants live outside
 // this AppHost, in deployment configuration; do not add them here. See README.md#local-development-seed-credential-policy.
-static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration configuration)
+static string PrepareKeycloakRealmImport(
+    string appHostDirectory,
+    IConfiguration configuration,
+    string eventStoreWorkloadClientSecret)
 {
     const string expiryPlaceholder = "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__";
     const string grantExpiryMapperName = "chatbot-service-client-grant-expiry";
     const string recoveryClientSecretPlaceholder = "__HEXALITH_CHATBOT_RECOVERY_CLIENT_SECRET__";
+    const string workloadClientSecretPlaceholder = "__HEXALITH_WORKLOAD_CLIENT_SECRET__";
     const int defaultLifetimeDays = 90;
     const int defaultMinimumRemainingDays = 30;
 
@@ -370,6 +388,13 @@ static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration
     }
 
     realm = realm.Replace(recoveryClientSecretPlaceholder, recoveryClientSecret, StringComparison.Ordinal);
+
+    if (realm.Split(workloadClientSecretPlaceholder, StringSplitOptions.None).Length - 1 != 1)
+    {
+        throw new InvalidOperationException("The EventStore workload client must have exactly one secret placeholder.");
+    }
+
+    realm = realm.Replace(workloadClientSecretPlaceholder, eventStoreWorkloadClientSecret, StringComparison.Ordinal);
 
     // Cleanup below is ProcessExit-only, which never fires on SIGKILL/OOM-kill/a hard container stop, so a killed
     // prior run can leave a secret-bearing directory behind (still owner-only per the mode set below — a

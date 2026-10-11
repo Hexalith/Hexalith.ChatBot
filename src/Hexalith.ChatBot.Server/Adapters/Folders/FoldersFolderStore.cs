@@ -58,7 +58,7 @@ internal sealed class FoldersFolderStore(FoldersClient folders) : IFolderStore
         try
         {
             AcceptedCommand accepted = await folders
-                .AddFileAsync(folderId, workspaceId, idempotencyKey, request.CorrelationId, taskId, mutation, cancellationToken)
+                .UploadFileAsync(descriptor, request.Content.Content, idempotencyKey, request.CorrelationId, taskId, cancellationToken)
                 .ConfigureAwait(false);
 
             return MailboxAttachmentStorageResult.Succeeded(new StoredMailboxAttachmentReference(

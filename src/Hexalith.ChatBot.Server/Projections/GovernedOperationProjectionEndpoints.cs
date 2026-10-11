@@ -1,4 +1,5 @@
 using Dapr;
+using Hexalith.EventStore.DomainService;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -69,7 +70,8 @@ internal static class GovernedOperationProjectionEndpoints
                 PubsubName = pubSubName,
                 Name = topicName,
                 DeadLetterTopic = deadLetterTopic,
-            });
+            })
+            .RequireEventStoreSidecarChannel();
 
         return endpoints;
     }

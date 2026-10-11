@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Server.Adapters.Folders;
@@ -14,9 +15,10 @@ public sealed class FoldersFolderStoreTests
     [Fact]
     public async Task StoreMailboxAttachmentShouldUseFoldersClientIdempotencyAndReturnStableReferences()
     {
-        RecordingFoldersClient client = new();
+        Hexalith.Folders.Client.Generated.IClient client = DispatchProxy.Create<Hexalith.Folders.Client.Generated.IClient, RecordingFoldersClient>();
+        RecordingFoldersClient recording = (RecordingFoldersClient)client;
         FoldersFolderStore store = new(client);
-        StoreMailboxAttachmentRequest request = Request("hashref_abc");
+        StoreMailboxAttachmentRequest request = Request("hashref_2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
 
         MailboxAttachmentStorageResult result = await store.StoreMailboxAttachmentAsync(request, TestContext.Current.CancellationToken);
         MailboxAttachmentStorageResult replay = await store.StoreMailboxAttachmentAsync(request, TestContext.Current.CancellationToken);
@@ -27,18 +29,20 @@ public sealed class FoldersFolderStoreTests
         stored.FileId.ShouldBe(replayed.FileId);
         stored.IdempotencyKey.ShouldBe(replayed.IdempotencyKey);
         stored.IdempotencyKey.ShouldStartWith("sha256:");
-        client.Requests.Count.ShouldBe(2);
-        client.Requests.ShouldAllBe(call => call.FolderId == stored.FolderId);
-        client.Requests.ShouldAllBe(call => call.IdempotencyKey == stored.IdempotencyKey);
-        client.Requests.ShouldAllBe(call => call.CorrelationId == "correlation-001");
-        client.Requests.ShouldAllBe(call => call.Body.PathMetadata!.NormalizedPath.Contains("invoice.pdf", StringComparison.Ordinal));
-        client.Requests.ShouldAllBe(call => call.Body.PathMetadata!.PathPolicyClass == PathMetadataPathPolicyClass.Metadata_only);
+        recording.Requests.Count.ShouldBe(2);
+        recording.Requests.ShouldAllBe(call => call.FolderId == stored.FolderId);
+        recording.Requests.ShouldAllBe(call => call.IdempotencyKey == stored.IdempotencyKey);
+        recording.Requests.ShouldAllBe(call => call.CorrelationId == "correlation-001");
+        recording.Requests.ShouldAllBe(call => call.Body.PathMetadata!.NormalizedPath.Contains("invoice.pdf", StringComparison.Ordinal));
+        recording.Requests.ShouldAllBe(call => call.Body.PathMetadata!.PathPolicyClass == PathMetadataPathPolicyClass.Metadata_only);
+        recording.Requests.ShouldAllBe(call => call.Body.OperationId == stored.StorageOperationId);
     }
 
     [Fact]
     public async Task StoreMailboxAttachmentShouldReturnRetryableForOversizedInlineContentWithoutCallingFolders()
     {
-        RecordingFoldersClient client = new();
+        Hexalith.Folders.Client.Generated.IClient client = DispatchProxy.Create<Hexalith.Folders.Client.Generated.IClient, RecordingFoldersClient>();
+        RecordingFoldersClient recording = (RecordingFoldersClient)client;
         FoldersFolderStore store = new(client);
         byte[] content = new byte[Hexalith.Folders.Client.Convenience.FileUpload.InlineTransportBoundaryBytes + 1];
 
@@ -51,7 +55,7 @@ public sealed class FoldersFolderStoreTests
 
         result.Failure.ShouldNotBeNull();
         result.Failure.Status.ShouldBe(ProjectConversationAttachmentStatus.Retryable);
-        client.Requests.ShouldBeEmpty();
+        recording.Requests.ShouldBeEmpty();
     }
 
     [Theory]
@@ -68,10 +72,12 @@ public sealed class FoldersFolderStoreTests
         string expectedRetryState,
         string expectedReasonCode)
     {
-        FoldersFolderStore store = new(new FailingFoldersClient(ApiException(statusCode)));
+        Hexalith.Folders.Client.Generated.IClient client = DispatchProxy.Create<Hexalith.Folders.Client.Generated.IClient, RecordingFoldersClient>();
+        ((RecordingFoldersClient)client).Failure = ApiException(statusCode);
+        FoldersFolderStore store = new(client);
 
         MailboxAttachmentStorageResult result = await store.StoreMailboxAttachmentAsync(
-            Request("hashref_abc"),
+            Request("hashref_2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"),
             TestContext.Current.CancellationToken);
 
         AttachmentStorageFailure failure = result.Failure.ShouldNotBeNull();
@@ -93,35 +99,36 @@ public sealed class FoldersFolderStoreTests
     [Fact]
     public async Task StoreMailboxAttachmentShouldMapUnavailableContentKindsWithoutCallingFolders()
     {
-        RecordingFoldersClient client = new();
+        Hexalith.Folders.Client.Generated.IClient client = DispatchProxy.Create<Hexalith.Folders.Client.Generated.IClient, RecordingFoldersClient>();
+        RecordingFoldersClient recording = (RecordingFoldersClient)client;
         FoldersFolderStore store = new(client);
 
         MailboxAttachmentStorageResult unavailable = await store.StoreMailboxAttachmentAsync(
-            Request("hashref_abc") with
+            Request("hashref_2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824") with
             {
                 Content = MailboxAttachmentContentResult.Unavailable("graph_attachment_unavailable"),
             },
             TestContext.Current.CancellationToken);
         MailboxAttachmentStorageResult retryable = await store.StoreMailboxAttachmentAsync(
-            Request("hashref_abc") with
+            Request("hashref_2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824") with
             {
                 Content = MailboxAttachmentContentResult.Retryable("graph_throttled"),
             },
             TestContext.Current.CancellationToken);
         MailboxAttachmentStorageResult tooLarge = await store.StoreMailboxAttachmentAsync(
-            Request("hashref_abc") with
+            Request("hashref_2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824") with
             {
                 Content = MailboxAttachmentContentResult.TooLarge(),
             },
             TestContext.Current.CancellationToken);
         MailboxAttachmentStorageResult unauthorized = await store.StoreMailboxAttachmentAsync(
-            Request("hashref_abc") with
+            Request("hashref_2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824") with
             {
                 Content = MailboxAttachmentContentResult.Unauthorized(),
             },
             TestContext.Current.CancellationToken);
 
-        client.Requests.ShouldBeEmpty();
+        recording.Requests.ShouldBeEmpty();
         AssertFailure(unavailable, ProjectConversationAttachmentStatus.Unavailable, "not-retryable", "graph_attachment_unavailable");
         AssertFailure(retryable, ProjectConversationAttachmentStatus.Retryable, "retryable", "graph_throttled");
         AssertFailure(tooLarge, ProjectConversationAttachmentStatus.Retryable, "retryable", "attachment_content_streaming_required");
@@ -168,54 +175,46 @@ public sealed class FoldersFolderStoreTests
             new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal),
             null!);
 
-    private sealed class RecordingFoldersClient : Hexalith.Folders.Client.Generated.Client
+    public class RecordingFoldersClient : DispatchProxy
     {
-        public RecordingFoldersClient()
-            : base(new HttpClient { BaseAddress = new Uri("http://folders.test") })
-        {
-        }
-
         public List<RecordedFoldersCall> Requests { get; } = [];
 
-        public override Task<AcceptedCommand> AddFileAsync(
-            string folderId,
-            string workspaceId,
-            string idempotency_Key,
-            string x_Correlation_Id,
-            string x_Hexalith_Task_Id,
-            FileMutationRequest body,
-            CancellationToken cancellationToken)
+        public Exception? Failure { get; set; }
+
+        protected override object Invoke(MethodInfo? targetMethod, object?[]? args)
         {
+            ArgumentNullException.ThrowIfNull(args);
+            if (targetMethod?.Name != "AddFileAsync" || args is not { Length: 7 })
+            {
+                throw new InvalidOperationException("Unexpected Folders client operation.");
+            }
+
+            string folderId = (string)args[0]!;
+            string workspaceId = (string)args[1]!;
+            string idempotencyKey = (string)args[2]!;
+            string correlationId = (string)args[3]!;
+            string taskId = (string)args[4]!;
+            FileMutationRequest body = (FileMutationRequest)args[5]!;
+            CancellationToken cancellationToken = (CancellationToken)args[6]!;
             cancellationToken.ThrowIfCancellationRequested();
-            Requests.Add(new RecordedFoldersCall(folderId, workspaceId, idempotency_Key, x_Correlation_Id, x_Hexalith_Task_Id, body));
+            Requests.Add(new RecordedFoldersCall(folderId, workspaceId, idempotencyKey, correlationId, taskId, body));
+            if (Failure is not null)
+            {
+                throw Failure;
+            }
+
             return Task.FromResult(new AcceptedCommand
             {
                 AcceptedAt = DateTimeOffset.UtcNow,
-                CorrelationId = x_Correlation_Id,
-                TaskId = x_Hexalith_Task_Id,
+                CorrelationId = correlationId,
+                TaskId = taskId,
                 Status = AcceptedCommandStatus.Accepted,
                 IdempotentReplay = false,
             });
         }
     }
 
-    private sealed class FailingFoldersClient(Exception exception) : Hexalith.Folders.Client.Generated.Client(new HttpClient { BaseAddress = new Uri("http://folders.test") })
-    {
-        public override Task<AcceptedCommand> AddFileAsync(
-            string folderId,
-            string workspaceId,
-            string idempotency_Key,
-            string x_Correlation_Id,
-            string x_Hexalith_Task_Id,
-            FileMutationRequest body,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            throw exception;
-        }
-    }
-
-    private sealed record RecordedFoldersCall(
+    public sealed record RecordedFoldersCall(
         string FolderId,
         string WorkspaceId,
         string IdempotencyKey,

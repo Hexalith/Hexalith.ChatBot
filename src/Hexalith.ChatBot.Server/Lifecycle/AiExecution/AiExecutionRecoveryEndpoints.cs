@@ -61,7 +61,8 @@ internal static class AiExecutionRecoveryEndpoints
                     nextCursor,
                     hasMore,
                     take));
-            });
+            })
+            .RequireAuthorization(ChatBotApplicationBoundaryPolicy.Name);
 
         _ = app.MapPost(
             "/api/v1/operations/ai-executions/exhausted/recover",
@@ -96,7 +97,8 @@ internal static class AiExecutionRecoveryEndpoints
                 return recovered
                     ? Results.Ok(new { status = "recovered", key = request.Key })
                     : SafeNotFound();
-            });
+            })
+            .RequireAuthorization(ChatBotApplicationBoundaryPolicy.Name);
 
         return app;
     }

@@ -27,6 +27,7 @@ using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.ChatBot.Server.Queries;
+using Hexalith.ChatBot.Server.Tests.TrustedAuthority;
 using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Client.Queries;
@@ -132,7 +133,7 @@ public sealed class ServerBootstrapApiTests
             [
                 new ProjectionEventDto(
                     GovernedOperationProjectionTranslator.GovernedNoteRecordedEventType,
-                    [],
+                    JsonSerializer.SerializeToUtf8Bytes(new GovernedNoteRecorded("note-alpha")),
                     "json",
                     1,
                     new DateTimeOffset(2026, 6, 12, 9, 0, 0, TimeSpan.Zero),
@@ -140,7 +141,7 @@ public sealed class ServerBootstrapApiTests
                     "message-alpha"),
             ]);
 
-        ProjectionResponse? response = DomainProjectionDispatcher.Project(scope.ServiceProvider, request);
+        ProjectionResponse? response = DomainProjectionDispatcher.Project(scope.ServiceProvider, request, TestContext.Current.CancellationToken);
 
         response.ShouldNotBeNull();
         response.ProjectionType.ShouldBe("chatbot");
@@ -214,7 +215,7 @@ public sealed class ServerBootstrapApiTests
                     "message-cancel-confirmed-alpha"),
             ]);
 
-        ProjectionResponse? response = DomainProjectionDispatcher.Project(scope.ServiceProvider, request);
+        ProjectionResponse? response = DomainProjectionDispatcher.Project(scope.ServiceProvider, request, TestContext.Current.CancellationToken);
 
         response.ShouldNotBeNull();
         response.State.GetProperty("appliedEventCount").GetInt32().ShouldBe(2);
@@ -293,7 +294,7 @@ public sealed class ServerBootstrapApiTests
                     "message-domain-wire"),
             ]);
 
-        ProjectionResponse response = DomainProjectionDispatcher.Project(scope.ServiceProvider, request).ShouldNotBeNull();
+        ProjectionResponse response = DomainProjectionDispatcher.Project(scope.ServiceProvider, request, TestContext.Current.CancellationToken).ShouldNotBeNull();
 
         response.State.GetProperty("appliedEventCount").GetInt32().ShouldBe(1);
         response.State.GetProperty("ignoredEventCount").GetInt32().ShouldBe(0);
@@ -351,7 +352,7 @@ public sealed class ServerBootstrapApiTests
                     "message-execution-domain-wire"),
             ]);
 
-        ProjectionResponse response = DomainProjectionDispatcher.Project(scope.ServiceProvider, request).ShouldNotBeNull();
+        ProjectionResponse response = DomainProjectionDispatcher.Project(scope.ServiceProvider, request, TestContext.Current.CancellationToken).ShouldNotBeNull();
 
         response.State.GetProperty("appliedEventCount").GetInt32().ShouldBe(1);
         response.State.GetProperty("ignoredEventCount").GetInt32().ShouldBe(0);
@@ -372,7 +373,7 @@ public sealed class ServerBootstrapApiTests
     [Fact]
     public async Task ProjectEndpointShouldDispatchRegisteredChatBotProjectionHandler()
     {
-        using WebApplicationFactory<Program> factory = new();
+        using WebApplicationFactory<Program> factory = DomainServiceEndpointFactory();
         using HttpClient client = factory.CreateClient();
 
         ProjectionRequest request = new(
@@ -382,7 +383,7 @@ public sealed class ServerBootstrapApiTests
             [
                 new ProjectionEventDto(
                     GovernedOperationProjectionTranslator.GovernedNoteRecordedEventType,
-                    [],
+                    JsonSerializer.SerializeToUtf8Bytes(new GovernedNoteRecorded("note-http")),
                     "json",
                     5,
                     new DateTimeOffset(2026, 6, 12, 9, 5, 0, TimeSpan.Zero),
@@ -412,7 +413,7 @@ public sealed class ServerBootstrapApiTests
     [Fact]
     public async Task ProjectEndpointShouldAcknowledgeUnsupportedEventsAsNoOp()
     {
-        using WebApplicationFactory<Program> factory = new();
+        using WebApplicationFactory<Program> factory = DomainServiceEndpointFactory();
         using HttpClient client = factory.CreateClient();
 
         ProjectionRequest request = new(
@@ -445,7 +446,7 @@ public sealed class ServerBootstrapApiTests
     [Fact]
     public async Task ProjectEndpointShouldReturnNotFoundForUnknownDomain()
     {
-        using WebApplicationFactory<Program> factory = new();
+        using WebApplicationFactory<Program> factory = DomainServiceEndpointFactory();
         using HttpClient client = factory.CreateClient();
 
         ProjectionRequest request = new(
@@ -493,7 +494,7 @@ public sealed class ServerBootstrapApiTests
     public async Task ProcessEndpointShouldRunChatBotAdmissionBeforeSdkProcessor()
     {
         InMemoryAuditWriter auditWriter = new();
-        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+        using WebApplicationFactory<Program> factory = DomainServiceAuthenticatedFactory(
             "tenant-alpha",
             services => services.AddSingleton<IAuditWriter>(auditWriter));
         using HttpClient client = factory.CreateClient();
@@ -515,7 +516,7 @@ public sealed class ServerBootstrapApiTests
     [Fact]
     public async Task ProcessEndpointShouldReturnTypedAdmissionRejectionAndSkipProcessorWhenAdmissionRejects()
     {
-        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+        using WebApplicationFactory<Program> factory = DomainServiceAuthenticatedFactory(
             "tenant-alpha",
             services => services.AddSingleton<ISpineCommandAllowlist>(_ => new DenyAllSpineCommandAllowlist()));
         using HttpClient client = factory.CreateClient();
@@ -541,7 +542,7 @@ public sealed class ServerBootstrapApiTests
     public async Task ProcessEndpointShouldRejectUnauthenticatedEnvelopeBeforeSdkProcessor()
     {
         InMemoryAuditWriter auditWriter = new();
-        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+        using WebApplicationFactory<Program> factory = DomainServiceAuthenticatedFactory(
             "tenant-alpha",
             services => services.AddSingleton<IAuditWriter>(auditWriter));
         using HttpClient client = factory.CreateClient();
@@ -571,7 +572,7 @@ public sealed class ServerBootstrapApiTests
         TrustedAuthorityClock clock = new();
         SyntheticOwnerAuthorityProvider owner = new(clock);
         IIdempotencyStore protectedStore = System.Reflection.DispatchProxy.Create<IIdempotencyStore, ProtectedAccessProbe>();
-        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha", services =>
+        using WebApplicationFactory<Program> factory = DomainServiceAuthenticatedFactory("tenant-alpha", services =>
         {
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
             services.AddSingleton(protectedStore);
@@ -592,11 +593,11 @@ public sealed class ServerBootstrapApiTests
         TrustedAuthorityClock clock = new();
         SyntheticOwnerAuthorityProvider owner = new(clock);
         IIdempotencyStore protectedStore = System.Reflection.DispatchProxy.Create<IIdempotencyStore, ProtectedAccessProbe>();
-        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        using WebApplicationFactory<Program> factory = DomainServiceEndpointFactory(services =>
         {
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
             services.AddSingleton(protectedStore);
-        }));
+        });
         using HttpClient client = factory.CreateClient();
         using HttpResponseMessage response = await client.PostAsJsonAsync("/process", DomainServiceRequest("RecordGovernedNote"), TestContext.Current.CancellationToken);
         DomainServiceWireResult result = await ReadDomainServiceResultAsync(response);
@@ -612,7 +613,7 @@ public sealed class ServerBootstrapApiTests
     {
         TrustedAuthorityClock clock = new();
         SyntheticOwnerAuthorityProvider owner = new(clock);
-        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha", services =>
+        using WebApplicationFactory<Program> factory = DomainServiceAuthenticatedFactory("tenant-alpha", services =>
         {
             services.AddSingleton<ISystemClock>(clock);
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
@@ -641,7 +642,7 @@ public sealed class ServerBootstrapApiTests
     {
         TrustedAuthorityClock clock = new();
         SyntheticOwnerAuthorityProvider owner = new(clock) { Allows = static _ => false };
-        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services => services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner)));
+        using WebApplicationFactory<Program> factory = DomainServiceEndpointFactory(services => services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner));
         using HttpClient client = factory.CreateClient();
         DomainServiceRequest request = DomainServiceRequest("RecordGovernedNote");
         CommandEnvelope command = request.Command;
@@ -663,7 +664,7 @@ public sealed class ServerBootstrapApiTests
     public async Task ProcessEndpointShouldRejectCrossTenantEnvelopeBeforeSdkProcessor()
     {
         InMemoryAuditWriter auditWriter = new();
-        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+        using WebApplicationFactory<Program> factory = DomainServiceAuthenticatedFactory(
             "tenant-alpha",
             services => services.AddSingleton<IAuditWriter>(auditWriter));
         using HttpClient client = factory.CreateClient();
@@ -690,7 +691,7 @@ public sealed class ServerBootstrapApiTests
     {
         InMemoryAuditWriter auditWriter = new();
         InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
-        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+        using WebApplicationFactory<Program> factory = DomainServiceAuthenticatedFactory(
             "tenant-alpha",
             services =>
             {
@@ -718,7 +719,7 @@ public sealed class ServerBootstrapApiTests
     [Fact]
     public async Task ProcessEndpointShouldRejectIdempotencyConflictBeforeSdkProcessor()
     {
-        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+        using WebApplicationFactory<Program> factory = DomainServiceAuthenticatedFactory(
             "tenant-alpha",
             services => services.AddSingleton<IIdempotencyStore>(new ConflictIdempotencyStore()));
         using HttpClient client = factory.CreateClient();
@@ -738,7 +739,7 @@ public sealed class ServerBootstrapApiTests
     public async Task ProcessEndpointShouldAbortAcceptedCoarseAdmissionWhenNoSdkPostProcessHookExists()
     {
         InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
-        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+        using WebApplicationFactory<Program> factory = DomainServiceAuthenticatedFactory(
             "tenant-alpha",
             services => services.AddSingleton<IIdempotencyStore>(idempotencyStore));
         using HttpClient client = factory.CreateClient();
@@ -767,7 +768,7 @@ public sealed class ServerBootstrapApiTests
         InMemoryAuditReplayIntentQueue replayQueue = new();
         InMemoryOperatorAlertSink alertSink = new();
         InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
-        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+        using WebApplicationFactory<Program> factory = DomainServiceAuthenticatedFactory(
             "tenant-alpha",
             services =>
             {
@@ -796,7 +797,7 @@ public sealed class ServerBootstrapApiTests
     [Fact]
     public async Task ProcessEndpointShouldRejectMalformedCommandPayloadWithoutEchoingPayload()
     {
-        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
+        using WebApplicationFactory<Program> factory = DomainServiceAuthenticatedFactory("tenant-alpha");
         using HttpClient client = factory.CreateClient();
 
         using HttpResponseMessage response = await client
@@ -963,20 +964,28 @@ public sealed class ServerBootstrapApiTests
     [Fact]
     public async Task M2ReleaseGateEndpointShouldNotBeMappedWithoutAToken()
     {
-        // Fail-closed by construction: with no configured token the endpoint does not exist, so the M2 breach state
-        // can never be reached anonymously even by a caller who knows the path.
+        // The SDK now denies anonymous requests to unknown routes through its fallback policy. Check the endpoint
+        // inventory as well as the response so this still proves the tokenless M2 route was not mapped.
         using WebApplicationFactory<Program> factory = new();
         using HttpClient client = factory.CreateClient();
+
+        factory.Services.GetServices<EndpointDataSource>()
+            .SelectMany(static source => source.Endpoints)
+            .OfType<RouteEndpoint>()
+            .ShouldNotContain(static endpoint => string.Equals(
+                endpoint.RoutePattern.RawText,
+                "/health/chatbot/periodic-enforcement/m2",
+                StringComparison.OrdinalIgnoreCase));
 
         using HttpResponseMessage response = await client
             .GetAsync("/health/chatbot/periodic-enforcement/m2", TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
-    public async Task UnknownEndpointShouldReturnNotFound()
+    public async Task UnknownEndpointShouldDenyAnonymousCallers()
     {
         using WebApplicationFactory<Program> factory = new();
         using HttpClient client = factory.CreateClient();
@@ -985,7 +994,7 @@ public sealed class ServerBootstrapApiTests
             .GetAsync("/health/missing", TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
@@ -2844,7 +2853,7 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
-    public async Task ChatBotCompatibilityHealthEndpointShouldRejectUnsupportedMethods()
+    public async Task ChatBotCompatibilityHealthEndpointShouldRejectAnonymousUnsupportedMethods()
     {
         using WebApplicationFactory<Program> factory = new();
         using HttpClient client = factory.CreateClient();
@@ -2853,7 +2862,7 @@ public sealed class ServerBootstrapApiTests
             .PostAsync("/health/chatbot", null, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.MethodNotAllowed);
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
@@ -3179,6 +3188,26 @@ public sealed class ServerBootstrapApiTests
                         services.AddSingleton<ISpineCommandAllowlist>(_ => new AllowAllSpineCommandAllowlist());
                         configureServices?.Invoke(services);
                     }));
+
+    // These in-process tests exercise ChatBot's admission and projection handlers behind the SDK's canonical
+    // routes. The SDK's workload assertion boundary is exercised by the live topology; bypass only its named
+    // route policies in this fixture so the request reaches the handler under test.
+    private static WebApplicationFactory<Program> DomainServiceAuthenticatedFactory(
+        string tenantId,
+        Action<IServiceCollection>? configureServices = null)
+        => AuthenticatedFactory(tenantId, services =>
+        {
+            SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
+            configureServices?.Invoke(services);
+        });
+
+    private static WebApplicationFactory<Program> DomainServiceEndpointFactory(
+        Action<IServiceCollection>? configureServices = null)
+        => new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
+            configureServices?.Invoke(services);
+        }));
 
     private static WebApplicationFactory<Program> ProjectConversationFactory(InMemoryProjectConversationProjectionStore conversationStore)
         => new WebApplicationFactory<Program>()

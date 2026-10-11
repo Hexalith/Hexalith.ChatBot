@@ -9,6 +9,7 @@ using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Correlation;
 using Hexalith.ChatBot.Server.Gateway.Status;
@@ -20,6 +21,7 @@ using Hexalith.ChatBot.Server.Projections;
 using Hexalith.ChatBot.Server.Queries;
 using Hexalith.EventStore.Contracts.Queries;
 using Hexalith.EventStore.DomainService;
+using Microsoft.AspNetCore.Routing;
 
 namespace Hexalith.ChatBot.Server.Gateway;
 
@@ -35,7 +37,8 @@ internal static class ChatBotCompatibilityEndpointExtensions
         _ = app.MapGet("/health/chatbot", () => Results.Ok(new ChatBotHealth(
             ChatBotClientDescriptor.Default.ModuleName,
             ChatBotClientDescriptor.Default.DaprAppId,
-            ChatBotHealthStatuses.ToWireValue(ChatBotHealthStatus.Healthy))));
+            ChatBotHealthStatuses.ToWireValue(ChatBotHealthStatus.Healthy))))
+            .AllowEventStorePublicEndpoint("/health/chatbot");
         _ = app.MapGet(
             "/health/chatbot/workflows",
             async (ICorrectionPropagationWorkflowRuntime runtime, CancellationToken cancellationToken) =>
@@ -46,22 +49,23 @@ internal static class ChatBotCompatibilityEndpointExtensions
                 return status.IsAvailable
                     ? Results.Ok(status)
                     : Results.Json(status, statusCode: StatusCodes.Status503ServiceUnavailable);
-            });
-        // Anonymous liveness only. This endpoint deliberately carries no M2 state: the server registers no
-        // authorization middleware and the Aspire topology publishes the service with WithExternalHttpEndpoints(), so
-        // anything here is world-readable. An earlier revision returned a per-job HasBreaches plus a 503, which told
+            })
+            .AllowEventStorePublicEndpoint("/health/chatbot/workflows");
+        // Anonymous liveness only. This endpoint deliberately carries no M2 state: the Aspire topology publishes
+        // the service with WithExternalHttpEndpoints(), so anything here is world-readable. An earlier revision
+        // returned a per-job HasBreaches plus a 503, which told
         // any unauthenticated caller whether cross-tenant isolation or the WORM chain was currently broken — the exact
         // confirmation someone probing those boundaries wants. The stop-ship signal moved to the gated endpoint below.
         _ = app.MapGet(
             "/health/chatbot/periodic-enforcement",
             (PeriodicEnforcementCoordinator coordinator)
-                => Results.Ok(PeriodicEnforcementHealthResponse.From(coordinator.Status)));
+                => Results.Ok(PeriodicEnforcementHealthResponse.From(coordinator.Status)))
+            .AllowEventStorePublicEndpoint("/health/chatbot/periodic-enforcement");
 
         // AC3: the M2 breach state must be a real stop-ship signal, not merely provable. This endpoint returns 503
         // whenever any sweep is not demonstrably clean, so a release job gates on the status code alone. It is
-        // protected by a shared secret rather than by authorization middleware, because JWT authentication is
-        // registered only conditionally (ChatBotJwtAuthentication.IsConfigured) — a blanket RequireAuthorization would
-        // 401 the release gate itself in any environment without JWT configured. When no token is configured the
+        // protected by a shared secret because JWT authentication is registered only conditionally
+        // (ChatBotJwtAuthentication.IsConfigured). When no token is configured the
         // endpoint is not mapped at all, so it can never be reached anonymously.
         string? releaseGateToken = app.Configuration["ChatBot:PeriodicEnforcement:M2ReleaseGateToken"];
         if (!string.IsNullOrWhiteSpace(releaseGateToken))
@@ -82,9 +86,15 @@ internal static class ChatBotCompatibilityEndpointExtensions
                     return gate.IsStopShip
                         ? Results.Json(gate, statusCode: StatusCodes.Status503ServiceUnavailable)
                         : Results.Ok(gate);
-                });
+                })
+                .AllowEventStorePublicEndpoint("/health/chatbot/periodic-enforcement/m2");
         }
-        _ = app.MapPost(
+
+        // These routes bind and authorize through ChatBot's own admission pipeline. An explicit endpoint policy
+        // keeps the SDK fallback on all unclaimed routes without preempting ChatBot's typed safe outcomes.
+        RouteGroupBuilder guardedRoutes = app.MapGroup("")
+            .RequireAuthorization(ChatBotApplicationBoundaryPolicy.Name);
+        _ = guardedRoutes.MapPost(
             "/api/v1/commands",
             async (
                 HttpContext httpContext,
@@ -124,7 +134,7 @@ internal static class ChatBotCompatibilityEndpointExtensions
                 return CommandGatewayHttpResults.ToHttpResult(result);
             });
 
-        MapReadCompatibilityEndpoints(app);
+        MapReadCompatibilityEndpoints(guardedRoutes);
         return app;
     }
 
@@ -139,7 +149,7 @@ internal static class ChatBotCompatibilityEndpointExtensions
         string pubSubName = binding.PubSubName;
         string topic = binding.Topic;
         string deadLetterTopic = binding.DeadLetterTopic;
-        _ = app.MapSubscribeHandler();
+        _ = app.MapSubscribeHandler().RequireEventStoreSidecarChannel();
         _ = app.MapGovernedOperationProjectionEndpoints(pubSubName, topic, deadLetterTopic);
         _ = app.MapMailboxIntakeProjectionEndpoints(pubSubName, topic, deadLetterTopic);
         _ = app.MapAssociationProjectionEndpoints(pubSubName, topic, deadLetterTopic);
@@ -155,7 +165,7 @@ internal static class ChatBotCompatibilityEndpointExtensions
         return app;
     }
 
-    private static void MapReadCompatibilityEndpoints(WebApplication app)
+    private static void MapReadCompatibilityEndpoints(IEndpointRouteBuilder app)
     {
         _ = app.MapGet(
             "/api/v1/associations/{associationId}/routing-status",

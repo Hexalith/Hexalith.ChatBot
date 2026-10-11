@@ -15,6 +15,7 @@ using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Lifecycle.AiExecution;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.ChatBot.Server.Queries;
+using Hexalith.ChatBot.Server.Tests.TrustedAuthority;
 using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Queries;
@@ -288,6 +289,7 @@ public sealed class TrustedAuthorityReviewTests
         CountingGovernedOperationStore store = new() { View = new("tenant-alpha", Note, GovernedOperationView.CurrentSchemaVersion, "synthetic", "v1", "metadata_only", "test", 1, clock.UtcNow, clock.UtcNow) };
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
+            SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
             services.AddSingleton<ISystemClock>(clock);
             services.AddSingleton<IIdempotencyStore>(new InMemoryCoarseIdempotencyStore(clock));
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
@@ -408,6 +410,7 @@ public sealed class TrustedAuthorityReviewTests
         InMemoryAuditWriter audit = new();
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
+            SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
             services.AddSingleton<ISystemClock>(clock);
             services.AddSingleton<IIdempotencyStore>(idempotency);
             services.AddSingleton<IAuditWriter>(audit);

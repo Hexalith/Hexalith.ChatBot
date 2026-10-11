@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 using Dapr;
+using Hexalith.EventStore.DomainService;
 
 using Hexalith.ChatBot.Server.Audit;
 
@@ -96,7 +97,8 @@ internal static partial class ChatBotDeadLetterProjectionEndpoints
             {
                 PubsubName = pubSubName,
                 Name = deadLetterTopic,
-            });
+            })
+            .RequireEventStoreSidecarChannel();
 
         return endpoints;
     }

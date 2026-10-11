@@ -419,6 +419,15 @@ Full story diff `a8b421b..` working tree, excluding `_bmad-output/`. All three l
 
 ## Verification
 
+### Story 1.3 reconciliation (2026-10-11)
+
+The user-approved sibling compatibility exception aligned Builds EventStore 3.120.0 and MessagePack 3.1.11, removed the Parties 3.117.1 override, and updated the typed Folders upload call. Builds catalog validation, Parties package/source builds, Debug Server.Tests (2,536 passed, zero skipped), Release Conformance (149 passed, zero skipped), Architecture (123 passed, zero skipped), focused Bootstrap (106 passed), focused Folders (9 passed), and StoryEvidenceGate self-tests (219 passed, zero skipped) succeeded. Release IntegrationTests and AppHost builds succeeded with zero warnings/errors.
+
+The exact live primary native run (`HEXALITH_CHATBOT_TIER3=1 PATH="$HOME/.dapr/bin:$PATH" XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests TestResults/topology-primary/topology-acceptance.ctrf.json -result-trx TestResults/topology-primary/topology-acceptance.trx -method Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology -showLiveOutput`) exited 1 with one failed and zero skipped tests. The full Aspire/Dapr topology ran, and the real Memories owner probe accepted and persisted four commands. The governed note command then returned HTTP 403 `authorization_denied` at `SubmitGovernedNoteUntilAcceptedAsync` line 2752. The production ChatBot owner provider remains unavailable pending A13 owner mappings, so no accepted ChatBot command or passing primary evidence is claimed. The run log is `/tmp/story13-reconcile-topology-submapper.log`; its canonical TRX is `TestResults/topology-primary/topology-acceptance.trx`.
+
+Standalone `aspire run --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --non-interactive` exited 134 because `ChatBot:LiveRecoveryValidation:MailboxClientSecret` was absent from that environment (`/tmp/story13-reconcile-aspire.log`). The primary in-process test supplied its local secret. The completion contract is a proposed draft with current-run lanes and exact scope. Its `attest` command (full base/head `d29f7f28c128f86f7034caf4ca93453adc349673`, results root `TestResults`) exited 2 with `machine_results_invalid` for `aspire-dapr-primary`; no provenance sidecars were written. Its `validate --target-status done` command exited 1 with `status_mismatch` / `story-transition`, as required while the story/sprint statuses remain `review`. A13 owner mapping and release acceptance remain open.
+
+
 ### Workflow review patch verification (2026-10-08)
 
 - Applied the four routed patches from the post-fifth-review workflow triage:
@@ -583,4 +592,40 @@ Mandatory evidence blockers:
 - `dotnet build Hexalith.ChatBot.slnx --configuration Debug -m:1 /nr:false` — failed with **1,586 errors / two warnings** in existing sibling/project-reference dependency wiring: Projects missing EventStore/Conversations/FrontComposer types, Conversations converter base/override failures, and duplicate `Hexalith.Commons.UniqueIds` package/project imports (`CS1704`). No sibling or dependency edit was made.
 - `dotnet build src/Hexalith.ChatBot.Server/Hexalith.ChatBot.Server.csproj --configuration Debug -m:1 /nr:false --no-restore` — blocked by duplicate Memories package/project assets (`CS1704`). Without `--no-restore`, duplicate EventStore.Contracts package/project imports fail (`CS1704`, `MSB3243`). Explicit source-reference diagnosis also exposed the existing `Adapters/Folders/FoldersFolderStore.cs:61` generated API mismatch (`FileMutationRequest` versus `AddFileRequest`, `CS1503`); that unrelated source was left untouched.
 
-The repository's `docs/story-evidence-integrity.md` requires unavailable mandatory evidence to leave a story in review/in-progress. At that earlier checkpoint the spec remained `in-review` and its sprint entry was `review`; the automatic `done` transition was withheld. The resumed run remains non-complete while current mandatory blockers persist. No completion contract, provenance, passing TE-2 result, or release acceptance is asserted.
+The repository's `docs/story-evidence-integrity.md` requires unavailable mandatory evidence to leave a story in review/in-progress. At that earlier checkpoint the spec remained `in-review` and its sprint entry was `review`; the automatic `done` transition was withheld. The resumed run remains non-complete while current mandatory blockers persist. At that checkpoint, no completion contract, provenance, passing TE-2 result, or release acceptance was asserted.
+
+
+## File List
+
+- `_bmad-output/implementation-artifacts/evidence/1-3-bind-every-request-to-trusted-tenant-and-actor-context.json`
+- `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context-2.md`
+- `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `references/Hexalith.Builds`
+- `references/Hexalith.Builds/Props/Directory.Packages.props`
+- `references/Hexalith.Parties`
+- `references/Hexalith.Parties/Directory.Packages.props`
+- `src/Hexalith.ChatBot.AppHost/KeycloakRealms/hexalith-realm.json`
+- `src/Hexalith.ChatBot.AppHost/Program.cs`
+- `src/Hexalith.ChatBot.Server/Adapters/Folders/FoldersFolderStore.cs`
+- `src/Hexalith.ChatBot.Server/Authentication/ChatBotApplicationBoundaryPolicy.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/ChatBotCompatibilityEndpointExtensions.cs`
+- `src/Hexalith.ChatBot.Server/Lifecycle/AiExecution/AiExecutionRecoveryEndpoints.cs`
+- `src/Hexalith.ChatBot.Server/Program.cs`
+- `src/Hexalith.ChatBot.Server/Projections/AiOutcomeProjectionEndpoints.cs`
+- `src/Hexalith.ChatBot.Server/Projections/ApprovalProjectionEndpoints.cs`
+- `src/Hexalith.ChatBot.Server/Projections/AssociationProjectionEndpoints.cs`
+- `src/Hexalith.ChatBot.Server/Projections/ChatBotDeadLetterProjectionEndpoints.cs`
+- `src/Hexalith.ChatBot.Server/Projections/GovernedOperationProjectionEndpoints.cs`
+- `src/Hexalith.ChatBot.Server/Projections/MailboxIntakeProjectionEndpoints.cs`
+- `src/Hexalith.ChatBot.Server/Projections/ParticipantResolutionProjectionEndpoints.cs`
+- `src/Hexalith.ChatBot.Server/Projections/TaskIntentProjectionEndpoints.cs`
+- `tests/Hexalith.ChatBot.IntegrationTests/MemoriesProbeCommandGateway.cs`
+- `tests/Hexalith.ChatBot.IntegrationTests/MemoriesProbeDomainTransport.cs`
+- `tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Adapters/Folders/FoldersFolderStoreTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/TrustedAuthority/SdkRouteFixtureAuthorization.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/TrustedAuthorityReReviewTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/TrustedAuthorityReviewTests.cs`

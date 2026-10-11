@@ -2722,7 +2722,7 @@ public static class GovernedOperationAggregateTests
         GovernedOperationAggregate aggregate = new();
         CommandEnvelope command = Envelope(new RecordGovernedNote(NoteId));
 
-        DomainResult result = await aggregate.ProcessAsync(command, currentState: null);
+        DomainResult result = await aggregate.ProcessAsync(command, currentState: null, TestContext.Current.CancellationToken);
 
         result.IsSuccess.ShouldBeTrue();
         result.Events[0].ShouldBeOfType<GovernedNoteRecorded>().NoteId.ShouldBe(NoteId);
@@ -2940,7 +2940,7 @@ public static class GovernedOperationAggregateTests
             UserId: "actor-alpha",
             Extensions: null);
 
-        DomainResult result = await aggregate.ProcessAsync(envelope, currentState: null);
+        DomainResult result = await aggregate.ProcessAsync(envelope, currentState: null, TestContext.Current.CancellationToken);
 
         result.IsSuccess.ShouldBeTrue();
         WorkflowRetryRequested retry = result.Events.ShouldHaveSingleItem().ShouldBeOfType<WorkflowRetryRequested>();

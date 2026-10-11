@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Dapr;
+using Hexalith.EventStore.DomainService;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -46,7 +47,8 @@ internal static class AiOutcomeProjectionEndpoints
                 PubsubName = pubSubName,
                 Name = topicName,
                 DeadLetterTopic = deadLetterTopic,
-            });
+            })
+            .RequireEventStoreSidecarChannel();
 
         return endpoints;
     }

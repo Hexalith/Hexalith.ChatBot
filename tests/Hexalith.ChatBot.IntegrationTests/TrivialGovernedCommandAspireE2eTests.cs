@@ -1683,6 +1683,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 {
                     selectedFailure.Data["TopologyLogEvidenceException"] = watcherException;
                 }
+
             }
 
             validationFailure = exception;
@@ -2005,7 +2006,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             sub = "chatbot-local-isolation-probe",
             // Both owners normalize the first source claim. A space-delimited scalar preserves both tenants
             // through JWT validation; a JSON claim array is expanded into multiple claims before normalization.
-            tenants = "tenant-alpha tenant-beta",
+            tenants = string.Join(' ', MemoriesProbeCommandGateway.ProvisionedTenants),
             iat = issuedAt,
             nbf = issuedAt,
             exp = issuedAt + 3600,
@@ -2035,7 +2036,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             forbidden.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         }
 
-        foreach (string tenant in new[] { "tenant-alpha", "tenant-beta" })
+        foreach (string tenant in MemoriesProbeCommandGateway.ProvisionedTenants)
         {
             // Use the owner's supported provisioning workflow. A raw Redis registry seed would conceal the
             // same owner guard that correctly rejected the previous incomplete isolation probe.
