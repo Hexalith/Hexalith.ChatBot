@@ -608,7 +608,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 replayed.GetProperty(field).GetRawText().ShouldBe(canonical.GetProperty(field).GetRawText());
                 prior.GetProperty(field).GetRawText().ShouldBe(canonical.GetProperty(field).GetRawText());
             }
-            JsonElement viewAfterReplay = await ReadGovernedOperationViewAsync(client, accessToken, noteId, correlationId, cancellationToken).ConfigureAwait(true);
+            JsonElement viewAfterReplay = await PollGovernedOperationViewAsync(client, accessToken, noteId, correlationId, cancellationToken).ConfigureAwait(true);
             viewAfterReplay.GetProperty("sourceVersion").GetInt64().ShouldBe(1);
             await AssertGovernedOperationViewRemainsStableAsync(
                 client,
@@ -3148,14 +3148,6 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         }
 
         throw new TimeoutException($"The governed-operation projection for note '{noteId}' did not materialize within {ProjectionTimeout}.");
-    }
-
-    private static async Task<JsonElement> ReadGovernedOperationViewAsync(HttpClient client, string accessToken, string noteId, string correlationId, CancellationToken cancellationToken)
-    {
-        using HttpResponseMessage response = await GetAuthorizedAsync(client, accessToken, $"/api/v1/governed-operations/{noteId}", correlationId, cancellationToken).ConfigureAwait(false);
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
-        return document.RootElement.Clone();
     }
 
     private static async Task<JsonElement> PollOperationAuditHistoryAsync(HttpClient client, string accessToken, string operationId, string correlationId, CancellationToken cancellationToken)
