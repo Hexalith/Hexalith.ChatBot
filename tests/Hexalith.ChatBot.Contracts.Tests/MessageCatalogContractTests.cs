@@ -47,6 +47,15 @@ public static partial class MessageCatalogContractTests
     }
 
     [Fact]
+    public static void AcceptedAssociationRejectionShouldBeCompletedTerminalOutcome()
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AssociationDecisionRejected);
+
+        entry.State.ShouldBe("completed");
+        entry.IsTerminal.ShouldBeTrue();
+    }
+
+    [Fact]
     public static void EveryCatalogEntryHasCompleteSafeMetadata()
     {
         foreach (ChatBotMessageCatalogEntry entry in ChatBotMessageCatalog.Entries)

@@ -1390,3 +1390,15 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context-2.md`
   summary: Long-lived tenant, party, or project streams that exceed EventStore's complete-read limits cannot provide current owner authority until a bounded source checkpoint or summary exists.
   evidence: `AuthoritativeEventStreamReader` has an existing 10,000-event and 16 MiB cap and returns `source-bound-exceeded` at the cap; the new owner queries use that reader and deny on this result. This preserves fail-closed behavior but can deny otherwise valid old streams. Resolve with a source-owned checkpoint or summary that retains contiguous provenance, exact request binding, and current revocation.
+
+## Deferred from: Story 1.4 versioned safe outcomes review (2026-10-12)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
+  summary: Failure conversation items can still expose sensitive token-shaped category, scope, dependency, or escalation metadata.
+  evidence: `ChatBotFailureStateConversationItem.razor` displays these projected fields; `FailureStateProjectionTranslator.SafeOptionalToken` checks shape only. This display existed at Story 1.4 baseline. Audit the producer provenance and replace any sensitive field with a fixed safe catalog value.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
+  summary: The gateway redaction stage copies correlation and task identifiers without validating their provenance.
+  evidence: `CoarseUserFacingRedactionStage.Apply` copied both fields at Story 1.4 baseline. HTTP middleware validates incoming identifiers, but internal callers should be traced before deciding whether the stage needs its own validation.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
+  summary: Operation status serialization throws when stored completion or audit enum text is unknown.
+  evidence: `OperationStatusHttpResults.Parse<T>` threw for unknown enum text at Story 1.4 baseline. Check store schema migration and forward compatibility before choosing a fallback completion or audit state.

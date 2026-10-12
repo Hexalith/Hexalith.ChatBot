@@ -97,6 +97,7 @@
                 @if (!review.HasAuthorizedCandidates)
                 {
                     <ChatBotBlockedState Reason="@ChatBotBlockedReason.UnresolvedAssociation"
+                                         UseLocalEmptyStateGuidance="true"
                                          ReasonText="@UiText[ChatBotUiTextKey.AssociationReviewEmpty]"
                                          SafeNextAction="@UiText[ChatBotUiTextKey.AssociationReviewSafeNextAction]"
                                          StableId="association-review-empty" />

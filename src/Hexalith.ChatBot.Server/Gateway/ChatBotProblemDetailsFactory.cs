@@ -5,10 +5,19 @@ using Hexalith.ChatBot.Server.Gateway.Redaction;
 
 namespace Hexalith.ChatBot.Server.Gateway;
 
-internal sealed class ChatBotProblemDetailsFactory(
-    IUserFacingRedactionStage redactionStage,
-    IUserFacingMessageTelemetry telemetry) : IChatBotProblemDetailsFactory
+internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFactory
 {
+    private readonly IUserFacingRedactionStage redactionStage;
+
+    public ChatBotProblemDetailsFactory(
+        IUserFacingRedactionStage redactionStage,
+        IUserFacingMessageTelemetry telemetry)
+    {
+        ArgumentNullException.ThrowIfNull(redactionStage);
+        this.redactionStage = redactionStage;
+        ArgumentNullException.ThrowIfNull(telemetry);
+    }
+
     public ProblemDetails CreateValidationProblem(string correlationId, string? taskId)
     {
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.CommandContractInvalid);
@@ -31,13 +40,9 @@ internal sealed class ChatBotProblemDetailsFactory(
     public ProblemDetails CreateAuthorizationProblem(string reasonCode, string correlationId, string? taskId)
     {
         bool known = IsKnownAuthorizationReason(reasonCode);
-        string catalogCode = known ? AuthorizationCatalogCode(reasonCode) : ChatBotMessageCodes.GenericDenial;
-        if (!known)
-        {
-            telemetry.RecordUncategorizedMessage(ChatBotMessageCatalogVersion.Current, ChatBotMessageCodes.GenericDenial);
-        }
-
-        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(catalogCode);
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(
+            known ? AuthorizationCatalogCode(reasonCode) : null);
+        string catalogCode = entry.Code;
         int status = string.Equals(catalogCode, ChatBotMessageCodes.AuthenticationDenied, StringComparison.Ordinal)
             ? StatusCodes.Status401Unauthorized
             : StatusCodes.Status403Forbidden;
@@ -189,6 +194,7 @@ internal sealed class ChatBotProblemDetailsFactory(
             ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized => ChatBotMessageCodes.AssociationCorrectionTargetUnauthorizedSuppressed,
             ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable => ChatBotMessageCodes.AssociationCorrectionProjectionUnavailable,
             ChatBotAuthorizationReasonCodes.AssociationCorrectionWorkflowUnavailable => ChatBotMessageCodes.AssociationCorrectionWorkflowUnavailable,
+            ChatBotRefusalReasonCodes.EvidenceExpired => ChatBotRefusalReasonCodes.CatalogCodeFor(ChatBotRefusalReasonCodes.EvidenceExpired),
             ChatBotMessageCodes.AssociationCorrectionAuditUnavailable => ChatBotMessageCodes.AssociationCorrectionAuditUnavailable,
             ChatBotMessageCodes.DependencyDegraded => ChatBotMessageCodes.DependencyDegraded,
             ChatBotAuthorizationReasonCodes.CommandNotAllowlisted => ChatBotRefusalReasonCodes.CatalogCodeFor(ChatBotRefusalReasonCodes.CommandNotAllowlisted),

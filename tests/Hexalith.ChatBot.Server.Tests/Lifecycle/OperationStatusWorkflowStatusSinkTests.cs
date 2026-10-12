@@ -42,7 +42,14 @@ public sealed class OperationStatusWorkflowStatusSinkTests
 
         wire.GetProperty("reasonCode").GetString().ShouldBe(expected);
         wire.GetProperty("failureReasonCode").GetString().ShouldBe(expected);
-        wire.GetProperty("workflowLastFailureCode").GetString().ShouldBe(expected);
+        if (expected == ChatBotMessageCodes.GenericDenial)
+        {
+            wire.TryGetProperty("workflowLastFailureCode", out _).ShouldBeFalse();
+        }
+        else
+        {
+            wire.GetProperty("workflowLastFailureCode").GetString().ShouldBe(expected);
+        }
         wire.GetRawText().ShouldNotContain("external-private-failure", Case.Sensitive);
     }
 
@@ -75,6 +82,39 @@ public sealed class OperationStatusWorkflowStatusSinkTests
         wire.GetProperty("safeNextActions").EnumerateArray().Single().GetString().ShouldBe("dismiss");
         wire.GetRawText().ShouldNotContain("private-unsafe-action");
         wire.GetRawText().ShouldNotContain("restricted private owner detail");
+    }
+
+    [Fact]
+    public void UnknownSecondaryReasonShouldTurnSuccessfulStoredStatusIntoTerminalDenial()
+    {
+        DateTimeOffset now = new(2026, 8, 9, 10, 0, 0, TimeSpan.Zero);
+        CommandSubmissionResponse accepted = new()
+        {
+            CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            OperationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+            LifecycleState = LifecycleState.Corrected,
+            AcceptedAt = now,
+        };
+        OperationStatusRecord record = OperationStatusRecord.Accepted("tenant-alpha", accepted, false, now) with
+        {
+            ReasonCode = ChatBotMessageCodes.CommandAccepted,
+            FailureReasonCode = "private-unknown-reason",
+            CompletionStatus = OperationStatusRecord.Completed,
+            SafeNextActions = ["retry-later"],
+            NextRetryAt = now.AddSeconds(-1),
+            MaxAttempts = 5,
+        };
+
+        JsonElement wire = OperationStatusHttpResults.ToJsonElement(record, now);
+
+        wire.GetProperty("reasonCode").GetString().ShouldBe(ChatBotMessageCodes.GenericDenial);
+        wire.GetProperty("failureReasonCode").GetString().ShouldBe(ChatBotMessageCodes.GenericDenial);
+        wire.GetProperty("completionStatus").GetString().ShouldBe(OperationStatusRecord.Failed);
+        wire.GetProperty("lifecycleState").GetString().ShouldBe("Failed");
+        wire.GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
+        wire.GetProperty("safeNextActions").EnumerateArray().Single().GetString().ShouldBe("dismiss");
+        wire.GetRawText().ShouldNotContain("private-unknown-reason");
     }
 
     [Theory]

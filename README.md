@@ -18,8 +18,15 @@ dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -p:UseHe
 ```
 
 Package versions come exclusively from `references/Hexalith.Builds/Props/Directory.Packages.props`; the repository
-wrapper adds no local versions. Debug builds may opt into sibling project references for local development, but Release
-restore/build and release automation deliberately use published package dependencies.
+wrapper adds no local versions. For a local Debug build against the checked-out sibling sources, pass the source mode
+to the entire solution so projects with package-mode defaults do not mix package and source assemblies:
+
+```bash
+dotnet restore Hexalith.ChatBot.slnx -p:Configuration=Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false
+dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false
+```
+
+Release restore/build and release automation use published package dependencies.
 
 The SDK version comes from `global.json` in both local and automated builds. The test projects are xUnit v3 assemblies
 hosted by the xUnit 4 in-process runner pinned in the shared Builds catalog. Run the repository boundary to

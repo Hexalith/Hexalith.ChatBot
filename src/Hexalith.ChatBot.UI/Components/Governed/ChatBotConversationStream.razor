@@ -9,6 +9,7 @@
         @if (Items.Count == 0)
         {
             <ChatBotBlockedState Reason="ChatBotBlockedReason.UnresolvedAssociation"
+                                 UseLocalEmptyStateGuidance="true"
                                  ReasonText="@EmptyText"
                                  SafeNextAction="@SafeNextAction"
                                  StableId="project-conversation-empty" />

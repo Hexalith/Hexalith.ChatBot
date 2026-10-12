@@ -371,23 +371,15 @@ public static class ChatBotCliOutputFormatter
     private static string ReasonCodeForStatus(int statusCode)
         => statusCode switch
         {
-            401 => "authentication-denied",
-            403 => "authorization-denied",
-            404 => "safe-not-found",
-            409 => "validation-error",
-            422 => "validation-error",
-            _ => "request-denied",
+            401 => ChatBotMessageCodes.AuthenticationDenied,
+            403 => ChatBotMessageCodes.AuthorizationDenied,
+            400 or 409 or 422 => ChatBotMessageCodes.CommandContractInvalid,
+            408 or 429 or >= 500 => ChatBotMessageCodes.DependencyDegraded,
+            _ => ChatBotMessageCodes.GenericDenial,
         };
 
     private static string SafeActionForReason(string reasonCode)
-        => reasonCode switch
-        {
-            "authentication-denied" => "authenticate",
-            "authorization-denied" => "request-access",
-            "safe-not-found" => "verify-identifier",
-            "validation-error" => "correct-request",
-            _ => "retry-later",
-        };
+        => ChatBotMessageCatalog.Resolve(reasonCode).NextAction;
 
     private static string WireName<TEnum>(TEnum value)
         where TEnum : struct, Enum
@@ -445,7 +437,7 @@ public static class ChatBotCliOutputFormatter
 
             if (exception is ArgumentException)
             {
-                const string code = "validation-error";
+                const string code = ChatBotMessageCodes.CommandContractInvalid;
                 return new SafeDenialMetadata(
                     code,
                     "validation_error",
@@ -458,14 +450,14 @@ public static class ChatBotCliOutputFormatter
             }
 
             return new SafeDenialMetadata(
-                "request-denied",
+                ChatBotMessageCodes.GenericDenial,
                 "request_denied",
                 null,
                 null,
                 null,
                 false,
                 "metadata-only",
-                "retry-later");
+                ChatBotMessageNextActions.Dismiss);
         }
 
         private static string Visibility(ProblemDetailsDetailsVisibility? visibility)

@@ -124,7 +124,7 @@
                 <ChatBotConversationStream Items="@conversation.Items"
                                            Title="@UiText[ChatBotUiTextKey.ProjectConversationStream]"
                                            EmptyText="@UiText[ChatBotUiTextKey.ProjectConversationEmpty]"
-                                           SafeNextAction="@conversation.SafeNextAction"
+                                           SafeNextAction="@UiText[ChatBotUiTextKey.ProjectConversationEmptySafeNextAction]"
                                            OnWhyThisProjectRequested="@OpenWhyThisProject" />
 
                 @if (conversation.HasMore && !string.IsNullOrWhiteSpace(conversation.NextCursor))

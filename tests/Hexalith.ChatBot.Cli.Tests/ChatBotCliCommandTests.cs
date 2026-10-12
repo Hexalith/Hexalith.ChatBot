@@ -233,7 +233,7 @@ public static class ChatBotCliCommandTests
         output.ToString().ShouldBeEmpty();
         string errorText = error.ToString();
         errorText.ShouldContain("outcome: denied");
-        errorText.ShouldContain("reason-code: generic_denial");
+        errorText.ShouldContain("reason-code: authorization_denied");
         errorText.ShouldContain("redaction-state: metadata-only");
         errorText.ShouldNotContain("restricted project");
         errorText.ShouldNotContain("bearer-token");
@@ -308,9 +308,9 @@ public static class ChatBotCliCommandTests
         output.ToString().ShouldBeEmpty();
         string errorText = error.ToString();
         errorText.ShouldContain("outcome: denied");
-        errorText.ShouldContain("reason-code: generic_denial");
+        errorText.ShouldContain("reason-code: command_contract_invalid");
         errorText.ShouldContain("redaction-state: metadata-only");
-        errorText.ShouldContain("safe-next-action: dismiss");
+        errorText.ShouldContain("safe-next-action: correct-request");
         errorText.ShouldNotContain("client_secret");
         errorText.ShouldNotContain("raw command json");
         await client.DidNotReceive().SubmitAsync(
@@ -371,6 +371,24 @@ public static class ChatBotCliCommandTests
         text.ShouldContain("terminal-reason-code: audit_unavailable");
     }
 
+    [Fact]
+    public static void OperationStatusFormatterShouldDenyUndefinedGeneratedCodesAndActions()
+    {
+        OperationStatus status = OperationStatus();
+        status.TerminalReason = (ChatBotMessageCode)999999;
+        status.FailureReasonCode = (ChatBotMessageCode)999999;
+        status.TerminalReasonCode = (ChatBotMessageCode)999999;
+        status.SafeNextActions = [(ChatBotMessageNextAction)999999];
+
+        string text = ChatBotCliOutputFormatter.FormatOperationStatus(status, json: false);
+
+        text.ShouldContain("terminal-reason: generic_denial");
+        text.ShouldContain("failure-reason-code: generic_denial");
+        text.ShouldContain("terminal-reason-code: generic_denial");
+        text.ShouldContain("safe-next-action: dismiss");
+        text.ShouldNotContain("999999");
+    }
+
     [Theory]
     [InlineData(401, "stale credential")]
     [InlineData(403, "revoked grant")]
@@ -391,6 +409,20 @@ public static class ChatBotCliCommandTests
         text.ShouldNotContain("provider-payload");
     }
 
+    [Theory]
+    [InlineData(401, "authentication_denied", "authenticate")]
+    [InlineData(403, "authorization_denied", "request-access")]
+    [InlineData(400, "command_contract_invalid", "correct-request")]
+    [InlineData(422, "command_contract_invalid", "correct-request")]
+    public static void HttpStatusBucketsShouldRetainSafeCatalogGuidance(int statusCode, string code, string action)
+    {
+        string text = ChatBotCliOutputFormatter.FormatSafeDenial(RestrictedPayloadException(statusCode, "restricted"), json: false);
+
+        text.ShouldContain($"reason-code: {code}");
+        text.ShouldContain($"safe-next-action: {action}");
+        text.ShouldNotContain("restricted project");
+    }
+
     [Fact]
     public static void ValidationDenialFormatterDoesNotPrintRawCommandPayload()
     {
@@ -398,8 +430,8 @@ public static class ChatBotCliCommandTests
             new ArgumentException("raw command json with client_secret"),
             json: false);
 
-        text.ShouldContain("reason-code: generic_denial");
-        text.ShouldContain("safe-next-action: dismiss");
+        text.ShouldContain("reason-code: command_contract_invalid");
+        text.ShouldContain("safe-next-action: correct-request");
         text.ShouldNotContain("client_secret");
         text.ShouldNotContain("raw command json");
     }

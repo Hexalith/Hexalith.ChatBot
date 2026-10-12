@@ -241,6 +241,7 @@
   <data name="ProjectConversation_Blocked" xml:space="preserve"><value>Conversation context is not current. Review the safe next action before using it.</value></data>
   <data name="ProjectConversation_EmailItem_Accessible" xml:space="preserve"><value>Mailbox item: {0}, {1}</value></data>
   <data name="ProjectConversation_Empty" xml:space="preserve"><value>No associated email-derived context is available for this project.</value></data>
+  <data name="ProjectConversation_EmptySafeNextAction" xml:space="preserve"><value>Review the authorized project association or wait for associated email.</value></data>
   <data name="ProjectConversation_Loading" xml:space="preserve"><value>Loading project conversation context.</value></data>
   <data name="ProjectConversation_Metadata" xml:space="preserve"><value>Conversation metadata</value></data>
   <data name="ProjectConversation_ParticipantItem_Accessible" xml:space="preserve"><value>{0}: {1}, {2}</value></data>

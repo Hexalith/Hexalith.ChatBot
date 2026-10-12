@@ -72,10 +72,20 @@ public static class ChatBotMcpResultFormatter
         ArgumentNullException.ThrowIfNull(exception);
 
         SafeDenialMetadata raw = SafeDenialMetadata.From(exception, correlationId, taskId, safeSuggestion);
-        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(raw.Code);
+        string catalogCode = raw.Code switch
+        {
+            "mcp.argument.unsupported" or
+            "mcp.argument.missing" or
+            "mcp.argument.invalid-number" or
+            "mcp.argument.invalid-string" or
+            "mcp.argument.invalid-list" or
+            "mcp.argument.invalid-enum" => ChatBotMessageCodes.CommandContractInvalid,
+            _ => raw.Code,
+        };
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(catalogCode);
         SafeDenialMetadata denial = raw with
         {
-            Category = ChatBotMessageCatalog.IsKnown(raw.Code) ? raw.Category : "authorization_denied",
+            Category = ChatBotMessageCatalog.IsKnown(catalogCode) ? raw.Category : "authorization_denied",
             Code = entry.Code,
             SafeMessage = entry.Reason,
             Retryable = !entry.IsTerminal && entry.NextAction == ChatBotMessageNextActions.RetryLater,

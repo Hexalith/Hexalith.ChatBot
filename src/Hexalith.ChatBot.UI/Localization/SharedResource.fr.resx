@@ -241,6 +241,7 @@
   <data name="ProjectConversation_Blocked" xml:space="preserve"><value>Le contexte de conversation n'est pas à jour. Consultez l'action sûre suivante avant de l'utiliser.</value></data>
   <data name="ProjectConversation_EmailItem_Accessible" xml:space="preserve"><value>Élément de messagerie : {0}, {1}</value></data>
   <data name="ProjectConversation_Empty" xml:space="preserve"><value>Aucun contexte dérivé d'email associé n'est disponible pour ce projet.</value></data>
+  <data name="ProjectConversation_EmptySafeNextAction" xml:space="preserve"><value>Vérifiez l'association autorisée du projet ou attendez un email associé.</value></data>
   <data name="ProjectConversation_Loading" xml:space="preserve"><value>Chargement du contexte de conversation du projet.</value></data>
   <data name="ProjectConversation_Metadata" xml:space="preserve"><value>Métadonnées de conversation</value></data>
   <data name="ProjectConversation_ParticipantItem_Accessible" xml:space="preserve"><value>{0} : {1}, {2}</value></data>

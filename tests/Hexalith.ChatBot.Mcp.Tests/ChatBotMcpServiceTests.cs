@@ -242,7 +242,7 @@ public static class ChatBotMcpServiceTests
 
     [Theory]
     [InlineData("chatbot.association.stats", "generic_denial")]
-    [InlineData("chatbot.association.associate", "generic_denial")]
+    [InlineData("chatbot.association.associate", "command_contract_invalid")]
     public static async Task BoundaryValidationReturnsSafeMetadataOnlyDenials(string toolName, string expectedCode)
     {
         var service = new ChatBotMcpService(Substitute.For<IChatBotClient>());
@@ -274,10 +274,22 @@ public static class ChatBotMcpServiceTests
             Invocation("chatbot.operation.status", WithTrace(("operationId", AssociationId), ("projectName", "restricted project"))),
             TestContext.Current.CancellationToken);
 
-        invalidEnum.GetProperty("code").GetString().ShouldBe("generic_denial");
-        invalidEnum.GetProperty("safeSuggestion").GetString().ShouldBe("dismiss");
-        unsupportedArgument.GetProperty("code").GetString().ShouldBe("generic_denial");
+        invalidEnum.GetProperty("code").GetString().ShouldBe("command_contract_invalid");
+        invalidEnum.GetProperty("safeSuggestion").GetString().ShouldBe("correct-request");
+        unsupportedArgument.GetProperty("code").GetString().ShouldBe("command_contract_invalid");
         unsupportedArgument.GetRawText().ShouldNotContain("restricted project");
+    }
+
+    [Fact]
+    public static void ArbitraryMcpArgumentCodeShouldRemainGenericDenial()
+    {
+        JsonElement result = ChatBotMcpResultFormatter.FormatSafeDenial(
+            McpToolDeniedException.InvalidArgument("mcp.argument.private", "restricted private reason", "unsafe-action"));
+
+        result.GetProperty("code").GetString().ShouldBe("generic_denial");
+        result.GetProperty("safeSuggestion").GetString().ShouldBe("dismiss");
+        result.GetRawText().ShouldNotContain("restricted private reason");
+        result.GetRawText().ShouldNotContain("unsafe-action");
     }
 
     [Fact]
@@ -293,9 +305,9 @@ public static class ChatBotMcpServiceTests
             Invocation("chatbot.ai_action.execute", ArgumentsFor("chatbot.ai_action.execute", ("sourceEvidenceReferences", 123))),
             TestContext.Current.CancellationToken);
 
-        invalidNumber.GetProperty("code").GetString().ShouldBe("generic_denial");
+        invalidNumber.GetProperty("code").GetString().ShouldBe("command_contract_invalid");
         invalidNumber.GetProperty("detailsVisibility").GetString().ShouldBe("metadata-only");
-        invalidList.GetProperty("code").GetString().ShouldBe("generic_denial");
+        invalidList.GetProperty("code").GetString().ShouldBe("command_contract_invalid");
         invalidList.GetProperty("detailsVisibility").GetString().ShouldBe("metadata-only");
         await client.DidNotReceive().SubmitAsync(
             Arg.Any<IChatBotCommand>(),
@@ -324,11 +336,11 @@ public static class ChatBotMcpServiceTests
                 ("sourceEvidenceReferences", listPayload.RootElement.Clone()))),
             TestContext.Current.CancellationToken);
 
-        invalidString.GetProperty("code").GetString().ShouldBe("generic_denial");
+        invalidString.GetProperty("code").GetString().ShouldBe("command_contract_invalid");
         invalidString.GetProperty("detailsVisibility").GetString().ShouldBe("metadata-only");
         invalidString.GetRawText().ShouldNotContain("restricted project");
         invalidString.GetRawText().ShouldNotContain("candidateEvidence");
-        invalidListMember.GetProperty("code").GetString().ShouldBe("generic_denial");
+        invalidListMember.GetProperty("code").GetString().ShouldBe("command_contract_invalid");
         invalidListMember.GetProperty("detailsVisibility").GetString().ShouldBe("metadata-only");
         invalidListMember.GetRawText().ShouldNotContain("restricted.pdf");
         await client.DidNotReceive().SubmitAsync(
@@ -428,6 +440,24 @@ public static class ChatBotMcpServiceTests
         result.GetRawText().ShouldNotContain("\"outcome\":\"success\"", Case.Insensitive);
         result.GetRawText().ShouldNotContain("\"completionStatus\":\"completed\"", Case.Insensitive);
         result.GetRawText().ShouldNotContain("done", Case.Insensitive);
+    }
+
+    [Fact]
+    public static void OperationStatusFormatterShouldDenyUndefinedGeneratedCodesAndActions()
+    {
+        OperationStatus status = OperationStatus();
+        status.TerminalReason = (ChatBotMessageCode)999999;
+        status.FailureReasonCode = (ChatBotMessageCode)999999;
+        status.TerminalReasonCode = (ChatBotMessageCode)999999;
+        status.SafeNextActions = [(ChatBotMessageNextAction)999999];
+
+        JsonElement result = ChatBotMcpResultFormatter.FormatOperationStatus(status);
+
+        result.GetProperty("terminalReason").GetString().ShouldBe("generic_denial");
+        result.GetProperty("failureReasonCode").GetString().ShouldBe("generic_denial");
+        result.GetProperty("terminalReasonCode").GetString().ShouldBe("generic_denial");
+        result.GetProperty("safeNextActions")[0].GetString().ShouldBe("dismiss");
+        result.GetRawText().ShouldNotContain("999999");
     }
 
     [Fact]

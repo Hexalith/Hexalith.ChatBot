@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Acceptance;
 using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Gateway;
@@ -70,7 +71,7 @@ _ = builder.Services.AddChatBotMemoriesDerivedStores(builder.Configuration, buil
 _ = builder.Services.AddStory132AcceptanceFixture(builder.Configuration, builder.Environment);
 _ = builder.Services.AddChatBotAiExecutionCoordinatorHostedService();
 _ = builder.AddEventStoreDomainTelemetry("chatbot");
-_ = builder.Services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddMeter(ChatBotMetrics.MeterName));
+_ = builder.Services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddMeter(ChatBotMetrics.MeterName, ChatBotMessageCatalog.FallbackMeterName));
 _ = builder.Services
     .AddHealthChecks()
     .AddEventStoreDomainStateStoreHealthCheck(

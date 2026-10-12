@@ -1,4 +1,43 @@
 <Solution>
+  <Folder Name="/references/" />
+  <Folder Name="/references/Hexalith.Commons/" />
+  <Folder Name="/references/Hexalith.Commons/src/" />
+  <Folder Name="/references/Hexalith.Commons/src/libraries/">
+    <Project Path="references/Hexalith.Commons/src/libraries/Hexalith.Commons.Http/Hexalith.Commons.Http.csproj" />
+    <Project Path="references/Hexalith.Commons/src/libraries/Hexalith.Commons.Serialization/Hexalith.Commons.Serialization.csproj" />
+  </Folder>
+  <Folder Name="/references/Hexalith.Conversations/" />
+  <Folder Name="/references/Hexalith.Conversations/src/">
+    <Project Path="references/Hexalith.Conversations/src/Hexalith.Conversations.Contracts/Hexalith.Conversations.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/references/Hexalith.EventStore/" />
+  <Folder Name="/references/Hexalith.EventStore/src/">
+    <Project Path="references/Hexalith.EventStore/src/Hexalith.EventStore.Admin.Abstractions/Hexalith.EventStore.Admin.Abstractions.csproj" />
+    <Project Path="references/Hexalith.EventStore/src/Hexalith.EventStore.Admin.Server/Hexalith.EventStore.Admin.Server.csproj" />
+    <Project Path="references/Hexalith.EventStore/src/Hexalith.EventStore.Contracts/Hexalith.EventStore.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/references/Hexalith.FrontComposer/" />
+  <Folder Name="/references/Hexalith.FrontComposer/src/">
+    <Project Path="references/Hexalith.FrontComposer/src/Hexalith.FrontComposer.Contracts.UI/Hexalith.FrontComposer.Contracts.UI.csproj" />
+    <Project Path="references/Hexalith.FrontComposer/src/Hexalith.FrontComposer.Contracts/Hexalith.FrontComposer.Contracts.csproj" />
+    <Project Path="references/Hexalith.FrontComposer/src/Hexalith.FrontComposer.Shell/Hexalith.FrontComposer.Shell.csproj" />
+    <Project Path="references/Hexalith.FrontComposer/src/Hexalith.FrontComposer.SourceTools/Hexalith.FrontComposer.SourceTools.csproj" />
+  </Folder>
+  <Folder Name="/references/Hexalith.Parties/" />
+  <Folder Name="/references/Hexalith.Parties/src/">
+    <Project Path="references/Hexalith.Parties/src/Hexalith.Parties.Client/Hexalith.Parties.Client.csproj" />
+    <Project Path="references/Hexalith.Parties/src/Hexalith.Parties.Contracts/Hexalith.Parties.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/references/Hexalith.Projects/" />
+  <Folder Name="/references/Hexalith.Projects/src/">
+    <Project Path="references/Hexalith.Projects/src/Hexalith.Projects.Contracts/Hexalith.Projects.Contracts.csproj" />
+    <Project Path="references/Hexalith.Projects/src/Hexalith.Projects.Infrastructure/Hexalith.Projects.Infrastructure.csproj" />
+    <Project Path="references/Hexalith.Projects/src/Hexalith.Projects/Hexalith.Projects.csproj" />
+  </Folder>
+  <Folder Name="/references/Hexalith.Tenants/" />
+  <Folder Name="/references/Hexalith.Tenants/src/">
+    <Project Path="references/Hexalith.Tenants/src/Hexalith.Tenants.Contracts/Hexalith.Tenants.Contracts.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path=".gitmodules" />

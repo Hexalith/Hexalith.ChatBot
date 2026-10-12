@@ -12,6 +12,16 @@ internal sealed class CoarseUserFacingRedactionStage : IUserFacingRedactionStage
         ArgumentNullException.ThrowIfNull(problem);
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(problem.Code);
         bool known = ChatBotMessageCatalog.IsKnown(problem.Code);
+        ProblemDetailsClientAction catalogAction = entry.NextAction switch
+        {
+            ChatBotMessageNextActions.Authenticate => ProblemDetailsClientAction.Authenticate,
+            ChatBotMessageNextActions.CorrectRequest => ProblemDetailsClientAction.CorrectRequest,
+            ChatBotMessageNextActions.RetryLater => ProblemDetailsClientAction.RetryLater,
+            ChatBotMessageNextActions.RequestAccess => ProblemDetailsClientAction.RequestAccess,
+            ChatBotMessageNextActions.Escalate => ProblemDetailsClientAction.Escalate,
+            ChatBotMessageNextActions.Dismiss => ProblemDetailsClientAction.Dismiss,
+            _ => ProblemDetailsClientAction.None,
+        };
 
         return new ProblemDetails
         {
@@ -27,17 +37,14 @@ internal sealed class CoarseUserFacingRedactionStage : IUserFacingRedactionStage
             Message = entry.Reason,
             CorrelationId = problem.CorrelationId,
             TaskId = problem.TaskId,
-            Retryable = known && !entry.IsTerminal && entry.NextAction == ChatBotMessageNextActions.RetryLater,
-            ClientAction = entry.NextAction switch
-            {
-                ChatBotMessageNextActions.Authenticate => ProblemDetailsClientAction.Authenticate,
-                ChatBotMessageNextActions.CorrectRequest => ProblemDetailsClientAction.CorrectRequest,
-                ChatBotMessageNextActions.RetryLater => ProblemDetailsClientAction.RetryLater,
-                ChatBotMessageNextActions.RequestAccess => ProblemDetailsClientAction.RequestAccess,
-                ChatBotMessageNextActions.Escalate => ProblemDetailsClientAction.Escalate,
-                ChatBotMessageNextActions.Dismiss => ProblemDetailsClientAction.Dismiss,
-                _ => ProblemDetailsClientAction.None,
-            },
+            Retryable = known && problem.Retryable && !entry.IsTerminal &&
+                catalogAction == ProblemDetailsClientAction.RetryLater &&
+                problem.ClientAction == ProblemDetailsClientAction.RetryLater,
+            ClientAction = !known ? ProblemDetailsClientAction.Dismiss
+                : problem.ClientAction == catalogAction &&
+                    (catalogAction != ProblemDetailsClientAction.RetryLater || problem.Retryable)
+                    ? catalogAction
+                    : ProblemDetailsClientAction.None,
             Details = new ProblemDetailsDetails
             {
                 Visibility = ProblemDetailsDetailsVisibility.Metadata_only,

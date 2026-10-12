@@ -23,6 +23,7 @@ public sealed record ChatBotMessageCatalogEntry(
         ChatBotMessageCodes.RetryQueued or
         ChatBotMessageCodes.RetryAccepted => "waiting",
         ChatBotMessageCodes.DuplicateSuppressed or
+        ChatBotMessageCodes.AssociationDecisionRejected or
         ChatBotMessageCodes.AssociationCorrectionPropagationComplete or
         ChatBotMessageCodes.ReprocessCreated => "completed",
         ChatBotMessageCodes.RefusalBlockedAction or

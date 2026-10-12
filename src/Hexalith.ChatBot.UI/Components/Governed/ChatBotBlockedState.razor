@@ -20,7 +20,7 @@
     <h2 class="chatbot-section-title">@UiText.BlockedReasonLabel(Reason)</h2>
     <p class="chatbot-body">@ResolvedReasonText</p>
     <p class="chatbot-body"><strong>@UiText[ChatBotUiTextKey.NextActionLabel]</strong> @ResolvedSafeNextAction</p>
-    @if (CatalogEntry.NextAction is not ChatBotMessageNextActions.None)
+    @if (!IsLocalEmptyState && CatalogEntry.NextAction is not ChatBotMessageNextActions.None)
     {
         <ChatBotGovernedAction Label="@ResolvedSafeNextAction"
                                  StableId="@($"{StableId}-safe-action")"
@@ -40,6 +40,9 @@
 
     [Parameter]
     public string? MessageCatalogCode { get; set; }
+
+    [Parameter]
+    public bool UseLocalEmptyStateGuidance { get; set; }
 
     [Parameter]
     public string SafeNextAction { get; set; } = string.Empty;
@@ -73,6 +76,9 @@
             _ => ChatBotMessageCodes.GenericDenial,
         }));
 
+    private bool IsLocalEmptyState => UseLocalEmptyStateGuidance &&
+        Reason is ChatBotBlockedReason.UnresolvedAssociation && MessageCatalogCode is null;
+
     private bool _announce;
 
     protected override void OnParametersSet()
@@ -81,10 +87,10 @@
     private string AriaLive => _announce ? FeedbackContract.AriaLive : "off";
 
     private string ResolvedReasonText
-        => UiText.FailureCatalogReason(CatalogEntry.Code);
+        => IsLocalEmptyState ? ReasonText : UiText.FailureCatalogReason(CatalogEntry.Code);
 
     private string ResolvedSafeNextAction
-        => UiText.FailureNextActionLabel(CatalogEntry.NextAction);
+        => IsLocalEmptyState ? SafeNextAction : UiText.FailureNextActionLabel(CatalogEntry.NextAction);
 
     private string AccessibleLabel => UiText.BlockedStateAccessibleLabel(Reason, ResolvedReasonText, ResolvedSafeNextAction);
 }

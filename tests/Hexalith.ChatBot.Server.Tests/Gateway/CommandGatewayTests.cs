@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using System.Security.Claims;
 using System.Text.Json;
 
@@ -4041,6 +4042,7 @@ public sealed partial class CommandGatewayTests
 
         result.IsAccepted.ShouldBeFalse();
         result.Problem.ShouldNotBeNull();
+        auditWriter.AuthorizationFailures.Single().ReasonCode.ShouldBe(ChatBotDisabledActionReasons.InsufficientAuthority);
         result.Problem.Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
         dispatcher.DispatchCount.ShouldBe(0);
         auditWriter.Envelopes.ShouldBeEmpty();
@@ -5163,21 +5165,67 @@ public sealed partial class CommandGatewayTests
         InMemoryUserFacingMessageTelemetry telemetry = new();
         ChatBotProblemDetailsFactory factory = new(new CoarseUserFacingRedactionStage(), telemetry);
         string rawReason = "tenant-alpha project-alpha file-secret.txt party-alpha audit detail payload secret C:\\temp\\raw.txt /home/raw InvalidOperationException";
+        int testThread = Environment.CurrentManagedThreadId;
+        long fallbackCount = 0;
+        using MeterListener listener = new();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == ChatBotMessageCatalog.FallbackMeterName &&
+                instrument.Name == ChatBotMessageCatalog.FallbackCounterName)
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, value, tags, _) =>
+        {
+            if (Environment.CurrentManagedThreadId == testThread)
+            {
+                fallbackCount += value;
+                tags.Length.ShouldBe(0);
+            }
+        });
+        listener.Start();
 
         ProblemDetails problem = factory.CreateAuthorizationProblem(rawReason, CorrelationId, TaskId);
 
         problem.Code.ShouldBe(ChatBotMessageCodes.GenericDenial);
         problem.Message.ShouldBe(ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.GenericDenial).Reason);
         problem.Retryable.ShouldBeFalse();
-        telemetry.Counts.ShouldContainKey((ChatBotMessageCatalogVersion.Current, ChatBotMessageCodes.GenericDenial));
-        telemetry.Counts[(ChatBotMessageCatalogVersion.Current, ChatBotMessageCodes.GenericDenial)].ShouldBe(1);
-
-        string serializedTelemetry = string.Join(
-            "|",
-            telemetry.Counts.Keys.Select(static key => $"{key.CatalogVersion}:{key.FallbackCode}"));
-        serializedTelemetry.ShouldNotContain(rawReason, Case.Insensitive);
+        fallbackCount.ShouldBe(1);
+        telemetry.Counts.ShouldBeEmpty();
         Serialized(problem).ShouldNotContain("project-alpha", Case.Insensitive);
         Serialized(problem).ShouldNotContain("InvalidOperationException", Case.Insensitive);
+    }
+
+    [Fact]
+    public static void NonAuthorizationCatalogCodeShouldBecomeGenericAuthorizationDenial()
+    {
+        IChatBotProblemDetailsFactory factory = DefaultProblemDetailsFactory();
+
+        ProblemDetails problem = factory.CreateAuthorizationProblem(
+            ChatBotMessageCodes.CommandAccepted, CorrelationId, TaskId);
+
+        problem.Status.ShouldBe(403);
+        problem.Code.ShouldBe(ChatBotMessageCodes.GenericDenial);
+        problem.Message.ShouldBe(ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.GenericDenial).Reason);
+        problem.Retryable.ShouldBeFalse();
+        problem.ClientAction.ShouldBe(ProblemDetailsClientAction.Dismiss);
+        Serialized(problem).ShouldNotContain(ChatBotMessageCodes.CommandAccepted);
+    }
+
+    [Fact]
+    public static void EvidenceExpiredAuthorizationReasonShouldUseSpecificCatalogEntry()
+    {
+        IChatBotProblemDetailsFactory factory = DefaultProblemDetailsFactory();
+
+        ProblemDetails problem = factory.CreateAuthorizationProblem(
+            ChatBotRefusalReasonCodes.EvidenceExpired, CorrelationId, TaskId);
+
+        problem.Status.ShouldBe(403);
+        problem.Code.ShouldBe(ChatBotMessageCodes.AssociationEvidenceExpired);
+        problem.Message.ShouldBe(ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AssociationEvidenceExpired).Reason);
+        problem.Retryable.ShouldBeFalse();
+        Serialized(problem).ShouldNotContain(ChatBotRefusalReasonCodes.EvidenceExpired);
     }
 
     [Fact]
@@ -5204,6 +5252,22 @@ public sealed partial class CommandGatewayTests
         safe.Retryable.ShouldBeFalse();
         safe.ClientAction.ShouldBe(ProblemDetailsClientAction.Dismiss);
         Serialized(safe).ShouldNotContain(sentinel);
+    }
+
+    [Fact]
+    public static void RedactionStageShouldRespectExplicitNonretryableRestriction()
+    {
+        ProblemDetails safe = new CoarseUserFacingRedactionStage().Apply(new ProblemDetails
+        {
+            Code = ChatBotMessageCodes.AuditUnavailable,
+            Status = 503,
+            Retryable = false,
+            ClientAction = ProblemDetailsClientAction.RetryLater,
+        });
+
+        safe.Code.ShouldBe(ChatBotMessageCodes.AuditUnavailable);
+        safe.Retryable.ShouldBeFalse();
+        safe.ClientAction.ShouldBe(ProblemDetailsClientAction.None);
     }
 
     [Fact]

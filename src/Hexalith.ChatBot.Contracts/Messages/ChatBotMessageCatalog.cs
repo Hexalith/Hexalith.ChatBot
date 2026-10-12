@@ -1,7 +1,15 @@
+using System.Diagnostics.Metrics;
+
 namespace Hexalith.ChatBot.Contracts.Messages;
 
 public static class ChatBotMessageCatalog
 {
+    public const string FallbackMeterName = "Hexalith.ChatBot.MessageCatalog";
+    public const string FallbackCounterName = "chatbot.message_catalog.fallbacks";
+
+    private static readonly Meter FallbackMeter = new(FallbackMeterName);
+    private static readonly Counter<long> FallbackCounter = FallbackMeter.CreateCounter<long>(FallbackCounterName);
+
     public static IReadOnlyList<ChatBotMessageCatalogEntry> Entries { get; } =
     [
         new(ChatBotMessageCodes.GenericDenial, "Request unavailable.", "The requested action is unavailable.", ChatBotMessageNextActions.Dismiss, ChatBotDisabledActionReasons.StateNotPermitted, ChatBotDetailVisibility.MetadataOnly),
@@ -551,9 +559,19 @@ public static class ChatBotMessageCatalog
 
     public static ChatBotMessageCatalogEntry Resolve(string? code)
     {
-        return Entries.FirstOrDefault(entry => string.Equals(entry.Code, code, StringComparison.Ordinal))
-            ?? Entries[0];
+        ChatBotMessageCatalogEntry? entry = Entries.FirstOrDefault(
+            candidate => string.Equals(candidate.Code, code, StringComparison.Ordinal));
+        if (entry is not null)
+        {
+            return entry;
+        }
+
+        RecordFallback();
+        return Entries[0];
     }
+
+    /// <summary>Counts a deny-safe fallback without recording the caller's code or prose.</summary>
+    public static void RecordFallback() => FallbackCounter.Add(1);
 
     /// <summary>Indicates whether a code belongs to this version of the catalog.</summary>
     public static bool IsKnown(string? code)

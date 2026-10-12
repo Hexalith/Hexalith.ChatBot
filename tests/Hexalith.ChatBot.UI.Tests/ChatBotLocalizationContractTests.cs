@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics.Metrics;
 using System.Resources;
 
 using Hexalith.ChatBot.Contracts.Enums;
@@ -82,6 +83,35 @@ public sealed class ChatBotLocalizationContractTests
             text.FailureCatalogReason(ChatBotMessageCodes.AuditUnavailable)
                 .ShouldBe(text.FailureCatalogReason(ChatBotMessageCodes.GenericDenial));
         }
+    }
+
+    [Fact]
+    public void UntranslatedCatalogEntryShouldCountInputFreeFallback()
+    {
+        long count = 0;
+        using MeterListener listener = new();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == ChatBotMessageCatalog.FallbackMeterName &&
+                instrument.Name == ChatBotMessageCatalog.FallbackCounterName)
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, measurement, tags, _) =>
+        {
+            tags.Length.ShouldBe(0);
+            count += measurement;
+        });
+        listener.Start();
+
+        using (UseCulture("de"))
+        {
+            ChatBotUiTextLocalizer text = CreateProvider().GetRequiredService<ChatBotUiTextLocalizer>();
+            text.FailureCatalogEntry(ChatBotMessageCodes.AuditUnavailable).Code.ShouldBe(ChatBotMessageCodes.GenericDenial);
+        }
+
+        count.ShouldBe(1);
     }
 
     [Fact]

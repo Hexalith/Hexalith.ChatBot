@@ -379,10 +379,19 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
                 createIfNotExists: true,
                 tryParents: false)
             : null;
-        return resourceSet?.GetString(ChatBotUiTextKey.FailureCatalogHeadlinePrefix + entry.Code) is not null &&
-            resourceSet.GetString(ChatBotUiTextKey.FailureCatalogReasonPrefix + entry.Code) is not null
-            ? entry
-            : ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.GenericDenial);
+        string? headline = resourceSet?.GetString(ChatBotUiTextKey.FailureCatalogHeadlinePrefix + entry.Code);
+        string? reason = resourceSet?.GetString(ChatBotUiTextKey.FailureCatalogReasonPrefix + entry.Code);
+        if (!string.IsNullOrWhiteSpace(headline) && !string.IsNullOrWhiteSpace(reason))
+        {
+            return entry;
+        }
+
+        if (ChatBotMessageCatalog.IsKnown(code))
+        {
+            ChatBotMessageCatalog.RecordFallback();
+        }
+
+        return ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.GenericDenial);
     }
 
     private string CatalogText(string? code, bool reason)
