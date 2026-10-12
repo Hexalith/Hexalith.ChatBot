@@ -53,10 +53,11 @@
             {
                 <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Danger"
                                      Message="@UiText[ChatBotUiTextKey.OperationalDashboardsLoadFailed]"
+                                     MessageCatalogCode="@error"
                                      AccessibleLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsLoadFailed]"
                                      StableId="operational-dashboards-failed"
                                      StateFamily="@ChatBotFeedbackStateFamily.RetryableFailure"
-                                     AnnouncementKey="@($"operational-dashboards-failed-{error}")">
+                                     AnnouncementKey="@($"operational-dashboards-failed-{UiText.FailureCatalogEntry(error).Code}")">
                     <code class="chatbot-code">@error</code>
                 </ChatBotStatusBanner>
             }

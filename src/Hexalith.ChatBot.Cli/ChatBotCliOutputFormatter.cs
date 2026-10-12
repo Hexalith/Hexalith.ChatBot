@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Messages;
 
 namespace Hexalith.ChatBot.Cli;
 
@@ -64,10 +65,10 @@ public static class ChatBotCliOutputFormatter
             retryCount = status.RetryCount,
             completionStatus = completion,
             auditStatus = WireName(status.AuditStatus),
-            safeNextActions = status.SafeNextActions.Select(WireName).ToArray(),
-            terminalReason = status.TerminalReason is null ? null : WireName(status.TerminalReason.Value),
-            failureReasonCode = status.FailureReasonCode is null ? null : WireName(status.FailureReasonCode.Value),
-            terminalReasonCode = status.TerminalReasonCode is null ? null : WireName(status.TerminalReasonCode.Value),
+            safeNextActions = status.SafeNextActions.Select(SafeAction).ToArray(),
+            terminalReason = status.TerminalReason is null ? null : SafeCode(status.TerminalReason.Value),
+            failureReasonCode = status.FailureReasonCode is null ? null : SafeCode(status.FailureReasonCode.Value),
+            terminalReasonCode = status.TerminalReasonCode is null ? null : SafeCode(status.TerminalReasonCode.Value),
             acceptedAt = status.AcceptedAt,
             lastUpdatedAt = status.LastUpdatedAt,
             partialSuccess = completion == "accepted-projection-pending",
@@ -96,22 +97,22 @@ public static class ChatBotCliOutputFormatter
 
         foreach (ChatBotMessageNextAction action in status.SafeNextActions)
         {
-            lines.Add($"safe-next-action: {WireName(action)}");
+            lines.Add($"safe-next-action: {SafeAction(action)}");
         }
 
         if (status.TerminalReason is not null)
         {
-            lines.Add($"terminal-reason: {WireName(status.TerminalReason.Value)}");
+            lines.Add($"terminal-reason: {SafeCode(status.TerminalReason.Value)}");
         }
 
         if (status.FailureReasonCode is not null)
         {
-            lines.Add($"failure-reason-code: {WireName(status.FailureReasonCode.Value)}");
+            lines.Add($"failure-reason-code: {SafeCode(status.FailureReasonCode.Value)}");
         }
 
         if (status.TerminalReasonCode is not null)
         {
-            lines.Add($"terminal-reason-code: {WireName(status.TerminalReasonCode.Value)}");
+            lines.Add($"terminal-reason-code: {SafeCode(status.TerminalReasonCode.Value)}");
         }
 
         return Lines(lines);
@@ -280,13 +281,24 @@ public static class ChatBotCliOutputFormatter
     {
         ArgumentNullException.ThrowIfNull(exception);
 
-        SafeDenialMetadata denial = SafeDenialMetadata.From(exception);
+        SafeDenialMetadata raw = SafeDenialMetadata.From(exception);
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(raw.Code);
+        SafeDenialMetadata denial = raw with
+        {
+            Code = entry.Code,
+            Retryable = !entry.IsTerminal && entry.NextAction == ChatBotMessageNextActions.RetryLater,
+            SafeNextAction = entry.NextAction,
+            RedactionState = "metadata-only",
+        };
 
         object shape = new
         {
             outcome = "denied",
             reasonCode = denial.Code,
             code = denial.Code,
+            headline = entry.Headline,
+            message = entry.Reason,
+            catalogVersion = entry.Version,
             denial.Category,
             denial.StatusCode,
             denial.CorrelationId,
@@ -306,6 +318,9 @@ public static class ChatBotCliOutputFormatter
             "outcome: denied",
             $"category: {denial.Category ?? "request_denied"}",
             $"reason-code: {denial.Code}",
+            $"headline: {entry.Headline}",
+            $"message: {entry.Reason}",
+            $"catalog-version: {entry.Version}",
             $"redaction-state: {denial.RedactionState}",
             $"retryable: {denial.Retryable.ToString().ToLowerInvariant()}",
             $"safe-next-action: {denial.SafeNextAction}",
@@ -381,6 +396,12 @@ public static class ChatBotCliOutputFormatter
         FieldInfo? field = typeof(TEnum).GetField(name);
         return field?.GetCustomAttribute<EnumMemberAttribute>()?.Value ?? name;
     }
+
+    private static string SafeCode(ChatBotMessageCode value)
+        => ChatBotMessageCatalog.Resolve(WireName(value)).Code;
+
+    private static string SafeAction(ChatBotMessageNextAction value)
+        => Enum.IsDefined(value) ? WireName(value) : ChatBotMessageNextActions.Dismiss;
 
     private sealed record SafeDenialMetadata(
         string Code,

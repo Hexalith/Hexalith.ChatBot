@@ -1,10 +1,15 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
+@using Hexalith.ChatBot.Contracts.Messages
 @inject ChatBotUiTextLocalizer UiText
+@inject ChatBotAnnouncementDeduplicationState AnnouncementDeduplication
 
 <article class="chatbot-failure-conversation-item"
          data-chatbot-conversation-item-kind="@Item.Kind"
          data-chatbot-conversation-item-id="@Item.ItemId"
          tabindex="0"
+         role="@(IsTerminal ? "alert" : "status")"
+         aria-live="@AriaLive"
+         aria-atomic="true"
          aria-label="@AccessibleLabel">
     <FluentCard Class="chatbot-failure-conversation-item__surface">
         <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.75rem">
@@ -33,13 +38,13 @@
     <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-failure-conversation-item__metadata">
         @MetadataLabelValueRow(ChatBotUiTextKey.FailureStateKindLabel, UiText.FailureStateKindLabel(Item.FailureStateKind), Item.FailureStateKind)
         @MetadataLabelValueRow(ChatBotUiTextKey.FailureStatusLabel, UiText.FailureStatusLabel(Item.FailureStatus), Item.FailureStatus)
-        @MetadataLabelValueRow(ChatBotUiTextKey.FailureCatalogCodeLabel, UiText.FailureCatalogHeadline(Item.MessageCatalogCode), Item.MessageCatalogCode)
-        @MetadataRow(ChatBotUiTextKey.FailureCatalogVersionLabel, Item.MessageCatalogVersion)
+        @MetadataLabelValueRow(ChatBotUiTextKey.FailureCatalogCodeLabel, UiText.FailureCatalogHeadline(CatalogEntry.Code), CatalogEntry.Code)
+        @MetadataRow(ChatBotUiTextKey.FailureCatalogVersionLabel, CatalogEntry.Version)
         @MetadataLabelValueRow(ChatBotUiTextKey.FailureDetailVisibilityLabel, UiText.RedactionStateLabel(Item.MessageDetailVisibility), Item.MessageDetailVisibility)
         @MetadataLabelValueRow(ChatBotUiTextKey.FailureBlockedReasonLabel, UiText.FailureBlockedReasonLabel(Item.BlockedReason), Item.BlockedReason)
         @MetadataRow(ChatBotUiTextKey.FailureCategoryLabel, Item.FailureCategory)
         @MetadataRow(ChatBotUiTextKey.FailureScopeLabel, Item.FailureScope)
-        @MetadataRow(ChatBotUiTextKey.FailureReasonCodeLabel, Item.FailureReasonCode)
+        @MetadataRow(ChatBotUiTextKey.FailureReasonCodeLabel, CatalogEntry.Code)
         @MetadataRow(ChatBotUiTextKey.OperationIdLabel, Item.OperationId)
         @MetadataRow(ChatBotUiTextKey.TaskIdLabel, Item.TaskId)
         @MetadataRow(ChatBotUiTextKey.WorkflowInstanceIdLabel, Item.WorkflowInstanceId)
@@ -68,6 +73,15 @@
     <p class="chatbot-failure-conversation-item__reason" tabindex="0">
         <strong>@UiText[ChatBotUiTextKey.FailureNextActionLabel]</strong> @UiText.FailureNextActionLabel(ResolvedSafeNextAction)
     </p>
+    @if (CatalogEntry.NextAction is not ChatBotMessageNextActions.None)
+    {
+        <ChatBotGovernedAction Label="@UiText.FailureNextActionLabel(CatalogEntry.NextAction)"
+                                 StableId="@($"{Item.ItemId}-safe-action")"
+                                 CriticalAction="false"
+                                 State="@(OnNextAction.HasDelegate ? ChatBotGovernedActionState.Enabled : ChatBotGovernedActionState.DisabledWithReason)"
+                                 DisabledReason="@UiText.FailureBlockedReasonLabel(CatalogEntry.DisabledActionReason)"
+                                 OnActivate="@OnNextAction" />
+    }
     <p class="chatbot-failure-conversation-item__reason" tabindex="0">
         <strong>@UiText[ChatBotUiTextKey.FailureDuplicateSafetyLabel]</strong> @UiText[ChatBotUiTextKey.FailureDuplicateSafetyReason]
     </p>
@@ -93,11 +107,23 @@
     [Parameter]
     public ProjectConversationItemModel Item { get; set; } = default!;
 
+    [Parameter]
+    public EventCallback OnNextAction { get; set; }
+
+    private ChatBotMessageCatalogEntry CatalogEntry => UiText.FailureCatalogEntry(Item.MessageCatalogCode);
+
+    private bool _announce;
+
+    protected override void OnParametersSet()
+        => _announce = AnnouncementDeduplication.ShouldAnnounce($"{Item.ItemId}-{CatalogEntry.Code}-{CatalogEntry.State}", ChatBotAnnouncementDedupRule.OncePerStableOperationKey);
+
+    private string AriaLive => _announce ? (IsTerminal ? "assertive" : "polite") : "off";
+
     private string ResolvedSafeNextAction
-        => string.IsNullOrWhiteSpace(Item.SafeNextAction) ? "none" : Item.SafeNextAction;
+        => CatalogEntry.NextAction;
 
     private string ResolvedClientAction
-        => string.IsNullOrWhiteSpace(Item.ClientAction) ? ResolvedSafeNextAction : Item.ClientAction;
+        => CatalogEntry.NextAction;
 
     private string? DisplayAuditOperationId
         => IsUnavailableReferenceStatus(Item.AuditStatus) ? null : Item.AuditOperationId;
@@ -119,9 +145,7 @@
         => IsUnavailableReferenceStatus(Item.AuditStatus);
 
     private bool IsTerminal
-        => string.Equals(Item.FailureStatus, "terminal", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(Item.FailureStateKind, "terminal-failure", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(Item.FailureStateKind, "reprocess-created", StringComparison.OrdinalIgnoreCase);
+        => CatalogEntry.IsTerminal;
 
     private string AccessibleLabel
         => UiText.Get(

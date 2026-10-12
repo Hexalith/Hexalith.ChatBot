@@ -1,4 +1,5 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
+@using Hexalith.ChatBot.Contracts.Messages
 @inherits FluxorComponent
 @implements IAsyncDisposable
 @inject IState<ProjectConversationState> State
@@ -62,6 +63,7 @@
             {
                 <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Danger"
                                      Message="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateUnauthorizedRedacted]"
+                                     MessageCatalogCode="@AuthorizationMessageCatalogCode"
                                      AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateUnauthorizedRedacted]"
                                      StableId="project-conversation-failed"
                                      StateFamily="ChatBotFeedbackStateFamily.BlockedAction"
@@ -69,6 +71,7 @@
                     @UiText[ChatBotUiTextKey.ProjectWorkspaceUnauthorizedSafeMessage]
                 </ChatBotStatusBanner>
                 <ChatBotBlockedState Reason="ChatBotBlockedReason.Denial"
+                                     MessageCatalogCode="@AuthorizationMessageCatalogCode"
                                      ReasonText="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateUnauthorizedRedacted]"
                                      SafeNextAction="@UiText[ChatBotUiTextKey.ProjectWorkspaceUnauthorizedNextAction]"
                                      StableId="project-workspace-unauthorized" />
@@ -77,6 +80,7 @@
             {
                 <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Warning"
                                      Message="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateDependencyDegraded]"
+                                     MessageCatalogCode="@State.Value.ErrorCode"
                                      AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateDependencyDegraded]"
                                      StableId="project-conversation-retryable"
                                      StateFamily="ChatBotFeedbackStateFamily.RetryableFailure"
@@ -84,6 +88,7 @@
                     <code class="chatbot-code">@State.Value.ErrorCode</code>
                 </ChatBotStatusBanner>
                 <ChatBotBlockedState Reason="ChatBotBlockedReason.FailedDependency"
+                                     MessageCatalogCode="@State.Value.ErrorCode"
                                      ReasonText="@UiText[ChatBotUiTextKey.FailureStatusRetryable]"
                                      SafeNextAction="@UiText[ChatBotUiTextKey.FailureNextActionRetryLater]"
                                      StableId="project-workspace-retryable" />
@@ -100,6 +105,7 @@
             {
                 <ChatBotStatusBanner Kind="@StatusKind"
                                      Message="@WorkspaceStateText"
+                                     MessageCatalogCode="@(conversation.Status == "Degraded" ? ChatBotMessageCodes.DependencyDegraded : null)"
                                      AccessibleLabel="@WorkspaceStateText"
                                      StableId="project-conversation-status"
                                      StateFamily="@FeedbackState"
@@ -193,6 +199,7 @@
         {
             <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Warning"
                                  Message="@UiText[ChatBotUiTextKey.WhyProjectUnavailable]"
+                                     MessageCatalogCode="@State.Value.WhyPanelErrorCode"
                                  AccessibleLabel="@UiText[ChatBotUiTextKey.WhyProjectUnavailable]"
                                  StableId="why-project-unavailable"
                                  StateFamily="ChatBotFeedbackStateFamily.RetryableFailure"
@@ -561,6 +568,14 @@
     private bool IsUnauthorizedError
         => State.Value.ErrorCode is { } code &&
             AuthorizationDenialCodes.Contains(code);
+
+    private string AuthorizationMessageCatalogCode
+        => State.Value.ErrorCode switch
+        {
+            ChatBotMessageCodes.AuthenticationDenied => ChatBotMessageCodes.AuthenticationDenied,
+            ChatBotMessageCodes.UnauthorizedParticipant => ChatBotMessageCodes.UnauthorizedParticipant,
+            _ => ChatBotMessageCodes.AuthorizationDenied,
+        };
 
     private static bool IsStopVerified(ProjectConversationAiResponseProgressModel progress)
         => progress.IsTerminal && ProjectConversationAiResponseProgressStates.IsVerifiedStop(progress.State);

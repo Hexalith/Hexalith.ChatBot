@@ -1,4 +1,7 @@
+using System.Text.Json;
+
 using Hexalith.ChatBot.Conformance.Tests.Harness;
+using Hexalith.ChatBot.Contracts.Messages;
 
 using Shouldly;
 
@@ -77,5 +80,27 @@ public sealed class CrossTenantLeakageScannerTests
         const string cleanProblem = "{\"code\":\"authorization_denied\",\"correlationId\":\"01ARZ3NDEKTSV4RRFFQ69G5FAW\"}";
 
         Should.NotThrow(() => CrossTenantLeakageScanner.ScanAll("human-user", "clean-problem", cleanProblem));
+    }
+
+    [Fact]
+    public void EverySafeCatalogEntryShouldPassTheRestrictedSentinelCorpus()
+    {
+        foreach (ChatBotMessageCatalogEntry entry in ChatBotMessageCatalog.Entries)
+        {
+            string artifact = JsonSerializer.Serialize(new
+            {
+                entry.Code,
+                entry.Version,
+                entry.State,
+                entry.IsTerminal,
+                entry.Headline,
+                entry.Reason,
+                entry.NextAction,
+                entry.DisabledActionReason,
+                entry.AccessibleDescription,
+            });
+
+            Should.NotThrow(() => CrossTenantLeakageScanner.ScanAll("public-surface", entry.Code, artifact));
+        }
     }
 }

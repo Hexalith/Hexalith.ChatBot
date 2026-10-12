@@ -4,7 +4,8 @@ public static class ChatBotMessageCatalog
 {
     public static IReadOnlyList<ChatBotMessageCatalogEntry> Entries { get; } =
     [
-        new(ChatBotMessageCodes.CommandAccepted, "Command accepted.", "The command was accepted for processing.", ChatBotMessageNextActions.None, null, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.GenericDenial, "Request unavailable.", "The requested action is unavailable.", ChatBotMessageNextActions.Dismiss, ChatBotDisabledActionReasons.StateNotPermitted, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.CommandAccepted, "Command accepted.", "The command was accepted for processing.", ChatBotMessageNextActions.None, ChatBotDisabledActionReasons.ProjectionPending, ChatBotDetailVisibility.MetadataOnly),
         new(ChatBotMessageCodes.CommandContractInvalid, "Validation failed.", "Correct the request metadata and retry.", ChatBotMessageNextActions.CorrectRequest, ChatBotDisabledActionReasons.StateNotPermitted, ChatBotDetailVisibility.MetadataOnly),
         new(ChatBotMessageCodes.AssociationCorrectionCaseResolutionUnavailable, "Correction case unavailable.", "The correction case cannot be resolved yet.", ChatBotMessageNextActions.RetryLater, ChatBotDisabledActionReasons.DependencyDegraded, ChatBotDetailVisibility.MetadataOnly),
         new(ChatBotMessageCodes.AssociationCorrectionStoreUnavailable, "Correction store unavailable.", "The correction store is temporarily unavailable.", ChatBotMessageNextActions.RetryLater, ChatBotDisabledActionReasons.DependencyDegraded, ChatBotDetailVisibility.MetadataOnly),
@@ -548,10 +549,13 @@ public static class ChatBotMessageCatalog
             ChatBotDetailVisibility.MetadataOnly),
     ];
 
-    public static ChatBotMessageCatalogEntry Resolve(string code)
+    public static ChatBotMessageCatalogEntry Resolve(string? code)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(code);
-
-        return Entries.First(entry => string.Equals(entry.Code, code, StringComparison.Ordinal));
+        return Entries.FirstOrDefault(entry => string.Equals(entry.Code, code, StringComparison.Ordinal))
+            ?? Entries[0];
     }
+
+    /// <summary>Indicates whether a code belongs to this version of the catalog.</summary>
+    public static bool IsKnown(string? code)
+        => Entries.Any(entry => string.Equals(entry.Code, code, StringComparison.Ordinal));
 }

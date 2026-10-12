@@ -1,9 +1,10 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
+@using Hexalith.ChatBot.Contracts.Messages
 @inject ChatBotUiTextLocalizer UiText
 
 <section class="chatbot-governed-composer composer-action-entry"
          aria-labelledby="project-conversation-composer-title"
-         data-chatbot-submission-error-code="@SubmissionErrorCode"
+         data-chatbot-submission-error-code="@(SubmissionErrorCode is null ? null : UiText.FailureCatalogEntry(SubmissionErrorCode).Code)"
          data-chatbot-pending-correlation-id="@PendingSubmission?.CorrelationId">
     <h2 id="project-conversation-composer-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ProjectConversationComposerTitle]</h2>
 
@@ -11,6 +12,7 @@
     {
         <ChatBotStatusBanner Kind="@StatusKind"
                              Message="@StatusMessage"
+                             MessageCatalogCode="@StatusCatalogCode"
                              AccessibleLabel="@StatusMessage"
                              StableId="project-conversation-composer-status"
                              StateFamily="@StatusFamily">
@@ -146,6 +148,16 @@
         => HasSubmissionError
             ? SubmissionErrorCode
             : PendingSubmission?.CommandId ?? DisabledReasonCode;
+
+    private string? StatusCatalogCode
+        => HasSubmissionError
+            ? SubmissionErrorCode
+            : DisabledReasonCode switch
+            {
+                "unauthorized" => ChatBotMessageCodes.AuthorizationDenied,
+                "degraded" => ChatBotMessageCodes.DependencyDegraded,
+                _ => null,
+            };
 
     private ChatBotFeedbackKind StatusKind
         => HasSubmissionError || (PendingSubmission is null && DisabledReasonCode is not null)

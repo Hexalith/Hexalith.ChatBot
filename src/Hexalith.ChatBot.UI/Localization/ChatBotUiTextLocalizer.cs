@@ -1,3 +1,5 @@
+using System.Globalization;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.UI.Design;
 
@@ -361,54 +363,31 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
         });
 
     public string FailureCatalogHeadline(string? code)
-        => Get(code switch
-        {
-            "authorization_denied" => ChatBotUiTextKey.FailureCatalogAuthorizationDenied,
-            "refusal_blocked_action" => ChatBotUiTextKey.FailureCatalogRefusalBlockedAction,
-            "unresolved_participant" => ChatBotUiTextKey.FailureCatalogUnresolvedParticipant,
-            "association_evidence_expired" => ChatBotUiTextKey.FailureCatalogAssociationEvidenceExpired,
-            "association_stale_evidence" => ChatBotUiTextKey.FailureCatalogAssociationStaleEvidence,
-            "association_correction_audit_unavailable" => ChatBotUiTextKey.FailureCatalogAssociationCorrectionAuditUnavailable,
-            "association_correction_propagation_delayed" => ChatBotUiTextKey.FailureCatalogAssociationCorrectionPropagationDelayed,
-            "duplicate_suppressed" => ChatBotUiTextKey.FailureCatalogDuplicateSuppressed,
-            "retry_queued" => ChatBotUiTextKey.FailureCatalogRetryQueued,
-            "retry_accepted" => ChatBotUiTextKey.FailureCatalogRetryAccepted,
-            "retry_exhausted" => ChatBotUiTextKey.FailureCatalogRetryExhausted,
-            "terminal_failure" => ChatBotUiTextKey.FailureCatalogTerminalFailure,
-            "audit_unavailable" => ChatBotUiTextKey.FailureCatalogAuditUnavailable,
-            "dependency_degraded" => ChatBotUiTextKey.FailureCatalogDependencyDegraded,
-            "failed_attachment" => ChatBotUiTextKey.FailureCatalogFailedAttachment,
-            "failed_command" => ChatBotUiTextKey.FailureCatalogFailedCommand,
-            "recoverable_mailbox_degradation" => ChatBotUiTextKey.FailureCatalogRecoverableMailboxDegradation,
-            "projection_retryable" => ChatBotUiTextKey.FailureCatalogProjectionRetryable,
-            "reprocess_created" => ChatBotUiTextKey.FailureCatalogReprocessCreated,
-            _ => ChatBotUiTextKey.DecisionUnavailableValue,
-        });
+        => Get(CatalogText(code, reason: false));
 
     public string FailureCatalogReason(string? code)
-        => Get(code switch
-        {
-            "authorization_denied" => ChatBotUiTextKey.FailureCatalogReasonAuthorizationDenied,
-            "refusal_blocked_action" => ChatBotUiTextKey.FailureCatalogReasonRefusalBlockedAction,
-            "unresolved_participant" => ChatBotUiTextKey.FailureCatalogReasonUnresolvedParticipant,
-            "association_evidence_expired" => ChatBotUiTextKey.FailureCatalogReasonAssociationEvidenceExpired,
-            "association_stale_evidence" => ChatBotUiTextKey.FailureCatalogReasonAssociationStaleEvidence,
-            "association_correction_audit_unavailable" => ChatBotUiTextKey.FailureCatalogReasonAssociationCorrectionAuditUnavailable,
-            "association_correction_propagation_delayed" => ChatBotUiTextKey.FailureCatalogReasonAssociationCorrectionPropagationDelayed,
-            "duplicate_suppressed" => ChatBotUiTextKey.FailureCatalogReasonDuplicateSuppressed,
-            "retry_queued" => ChatBotUiTextKey.FailureCatalogReasonRetryQueued,
-            "retry_accepted" => ChatBotUiTextKey.FailureCatalogReasonRetryAccepted,
-            "retry_exhausted" => ChatBotUiTextKey.FailureCatalogReasonRetryExhausted,
-            "terminal_failure" => ChatBotUiTextKey.FailureCatalogReasonTerminalFailure,
-            "audit_unavailable" => ChatBotUiTextKey.FailureCatalogReasonAuditUnavailable,
-            "dependency_degraded" => ChatBotUiTextKey.FailureCatalogReasonDependencyDegraded,
-            "failed_attachment" => ChatBotUiTextKey.FailureCatalogReasonFailedAttachment,
-            "failed_command" => ChatBotUiTextKey.FailureCatalogReasonFailedCommand,
-            "recoverable_mailbox_degradation" => ChatBotUiTextKey.FailureCatalogReasonRecoverableMailboxDegradation,
-            "projection_retryable" => ChatBotUiTextKey.FailureCatalogReasonProjectionRetryable,
-            "reprocess_created" => ChatBotUiTextKey.FailureCatalogReasonReprocessCreated,
-            _ => ChatBotUiTextKey.DecisionUnavailableReason,
-        });
+        => Get(CatalogText(code, reason: true));
+
+    /// <summary>Resolves a catalog entry only when both phrases exist in the active locale.</summary>
+    public ChatBotMessageCatalogEntry FailureCatalogEntry(string? code)
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(code);
+        string locale = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+        var resourceSet = locale is "en" or "fr"
+            ? SharedResource.ResourceManager.GetResourceSet(
+                locale == "en" ? CultureInfo.InvariantCulture : CultureInfo.GetCultureInfo("fr"),
+                createIfNotExists: true,
+                tryParents: false)
+            : null;
+        return resourceSet?.GetString(ChatBotUiTextKey.FailureCatalogHeadlinePrefix + entry.Code) is not null &&
+            resourceSet.GetString(ChatBotUiTextKey.FailureCatalogReasonPrefix + entry.Code) is not null
+            ? entry
+            : ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.GenericDenial);
+    }
+
+    private string CatalogText(string? code, bool reason)
+        => (reason ? ChatBotUiTextKey.FailureCatalogReasonPrefix : ChatBotUiTextKey.FailureCatalogHeadlinePrefix)
+            + FailureCatalogEntry(code).Code;
 
     public string FailureNextActionLabel(string? action)
         => Get(action switch
@@ -416,6 +395,9 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
             "retry-later" or "RetryLater" => ChatBotUiTextKey.FailureNextActionRetryLater,
             "request-access" or "RequestAccess" => ChatBotUiTextKey.FailureNextActionRequestAccess,
             "escalate" or "Escalate" => ChatBotUiTextKey.FailureNextActionEscalate,
+            "dismiss" or "Dismiss" => ChatBotUiTextKey.FailureNextActionDismiss,
+            "authenticate" or "Authenticate" => ChatBotUiTextKey.FailureNextActionAuthenticate,
+            "correct-request" or "CorrectRequest" => ChatBotUiTextKey.FailureNextActionCorrectRequest,
             "none" or "None" => ChatBotUiTextKey.FailureNextActionNone,
             _ => ChatBotUiTextKey.SafeNextActionDefault,
         });

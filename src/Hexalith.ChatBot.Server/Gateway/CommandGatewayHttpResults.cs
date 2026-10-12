@@ -14,9 +14,8 @@ internal static class CommandGatewayHttpResults
             return Results.Text(Newtonsoft.Json.JsonConvert.SerializeObject(accepted), "application/json", statusCode: StatusCodes.Status202Accepted);
         }
 
-        ProblemDetails problem = result.Problem ?? throw new InvalidOperationException("Denied gateway results must include Problem Details.");
-        problem.SchemaVersion = ChatBotMessageCatalogVersion.Current;
-        problem.Details ??= new ProblemDetailsDetails { Visibility = ProblemDetailsDetailsVisibility.Metadata_only };
+        ProblemDetails problem = new Redaction.CoarseUserFacingRedactionStage().Apply(
+            result.Problem ?? throw new InvalidOperationException("Denied gateway results must include Problem Details."));
         return Results.Text(Newtonsoft.Json.JsonConvert.SerializeObject(problem), "application/problem+json", statusCode: problem.Status);
     }
 }

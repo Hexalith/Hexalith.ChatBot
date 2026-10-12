@@ -19,7 +19,7 @@ public sealed class OperationStatusWorkflowStatusSinkTests
     [InlineData("vector_reindex_failed", "vector_reindex_failed")]
     [InlineData("memories_correction_invalid_status", "memories_correction_invalid_status")]
     [InlineData("memories_correction_timed_out", "memories_correction_timed_out")]
-    [InlineData("external-private-failure", "dependency_degraded")]
+    [InlineData("external-private-failure", "generic_denial")]
     public void StatusWireShouldPreserveKnownWorkflowCausesAndBoundUnknownExternalCause(string cause, string expected)
     {
         DateTimeOffset now = new(2026, 8, 9, 10, 0, 0, TimeSpan.Zero);
@@ -44,6 +44,69 @@ public sealed class OperationStatusWorkflowStatusSinkTests
         wire.GetProperty("failureReasonCode").GetString().ShouldBe(expected);
         wire.GetProperty("workflowLastFailureCode").GetString().ShouldBe(expected);
         wire.GetRawText().ShouldNotContain("external-private-failure", Case.Sensitive);
+    }
+
+    [Fact]
+    public void UnknownStoredActionShouldResolveToTerminalDismissWithoutRawToken()
+    {
+        DateTimeOffset now = new(2026, 8, 9, 10, 0, 0, TimeSpan.Zero);
+        CommandSubmissionResponse accepted = new()
+        {
+            CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            OperationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+            LifecycleState = LifecycleState.Correcting,
+            AcceptedAt = now,
+        };
+        OperationStatusRecord record = OperationStatusRecord.Accepted("tenant-alpha", accepted, false, now) with
+        {
+            ReasonCode = "private_unknown_code",
+            SafeNextActions = ["retry-later", "private-unsafe-action"],
+            DuplicateSafetyNote = "restricted private owner detail",
+            NextRetryAt = now.AddSeconds(-1),
+            MaxAttempts = 5,
+        };
+
+        JsonElement wire = OperationStatusHttpResults.ToJsonElement(record, now);
+
+        wire.GetProperty("reasonCode").GetString().ShouldBe(ChatBotMessageCodes.GenericDenial);
+        wire.GetProperty("completionStatus").GetString().ShouldBe(OperationStatusRecord.Failed);
+        wire.GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
+        wire.GetProperty("safeNextActions").EnumerateArray().Single().GetString().ShouldBe("dismiss");
+        wire.GetRawText().ShouldNotContain("private-unsafe-action");
+        wire.GetRawText().ShouldNotContain("restricted private owner detail");
+    }
+
+    [Theory]
+    [InlineData(new string[] { "none" }, false)]
+    [InlineData(new string[] { "retry-later", "private-unsafe-action", "escalate" }, true)]
+    public void KnownCodeShouldOnlyExposeStoredActionsAllowedByCatalog(string[] storedActions, bool retryAllowed)
+    {
+        DateTimeOffset now = new(2026, 8, 9, 10, 0, 0, TimeSpan.Zero);
+        CommandSubmissionResponse accepted = new()
+        {
+            CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            OperationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+            LifecycleState = LifecycleState.Correcting,
+            AcceptedAt = now,
+        };
+        OperationStatusRecord record = OperationStatusRecord.Accepted("tenant-alpha", accepted, false, now) with
+        {
+            ReasonCode = ChatBotMessageCodes.AuditUnavailable,
+            SafeNextActions = storedActions,
+            NextRetryAt = now.AddSeconds(-1),
+            MaxAttempts = 5,
+        };
+
+        JsonElement wire = OperationStatusHttpResults.ToJsonElement(record, now);
+
+        wire.GetProperty("reasonCode").GetString().ShouldBe(ChatBotMessageCodes.AuditUnavailable);
+        wire.GetProperty("retryEligible").GetBoolean().ShouldBe(retryAllowed);
+        string[] actions = wire.GetProperty("safeNextActions").EnumerateArray()
+            .Select(action => action.GetString()!).ToArray();
+        actions.ShouldBe(retryAllowed ? ["retry-later"] : []);
+        wire.GetRawText().ShouldNotContain("private-unsafe-action");
     }
 
     [Fact]

@@ -923,4 +923,181 @@
   <data name="ProjectConversation_Streaming_Stale" xml:space="preserve"><value>Response progress is stale; refreshing.</value></data>
   <data name="ProjectConversation_Streaming_Stopped" xml:space="preserve"><value>Response stopped.</value></data>
   <data name="ProjectConversation_Streaming_Unavailable" xml:space="preserve"><value>Response progress is unavailable.</value></data>
+  <data name="Failure_Catalog_generic_denial" xml:space="preserve"><value>Request unavailable.</value></data>
+  <data name="Failure_CatalogReason_generic_denial" xml:space="preserve"><value>The requested action is unavailable.</value></data>
+  <data name="Failure_Catalog_command_accepted" xml:space="preserve"><value>Command accepted.</value></data>
+  <data name="Failure_CatalogReason_command_accepted" xml:space="preserve"><value>The command was accepted for processing.</value></data>
+  <data name="Failure_Catalog_command_contract_invalid" xml:space="preserve"><value>Validation failed.</value></data>
+  <data name="Failure_CatalogReason_command_contract_invalid" xml:space="preserve"><value>Correct the request metadata and retry.</value></data>
+  <data name="Failure_Catalog_association_correction_case_resolution_unavailable" xml:space="preserve"><value>Correction case unavailable.</value></data>
+  <data name="Failure_CatalogReason_association_correction_case_resolution_unavailable" xml:space="preserve"><value>The correction case cannot be resolved yet.</value></data>
+  <data name="Failure_Catalog_association_correction_store_unavailable" xml:space="preserve"><value>Correction store unavailable.</value></data>
+  <data name="Failure_CatalogReason_association_correction_store_unavailable" xml:space="preserve"><value>The correction store is temporarily unavailable.</value></data>
+  <data name="Failure_Catalog_memories_correction_failed" xml:space="preserve"><value>Memory correction failed.</value></data>
+  <data name="Failure_CatalogReason_memories_correction_failed" xml:space="preserve"><value>The memory correction could not be completed.</value></data>
+  <data name="Failure_Catalog_memories_correction_invalid_status" xml:space="preserve"><value>Memory correction needs review.</value></data>
+  <data name="Failure_CatalogReason_memories_correction_invalid_status" xml:space="preserve"><value>The memory correction returned an invalid status.</value></data>
+  <data name="Failure_Catalog_memories_correction_timed_out" xml:space="preserve"><value>Memory correction delayed.</value></data>
+  <data name="Failure_CatalogReason_memories_correction_timed_out" xml:space="preserve"><value>The memory correction did not complete in time.</value></data>
+  <data name="Failure_Catalog_m0_store_invalidation_failed" xml:space="preserve"><value>Store invalidation delayed.</value></data>
+  <data name="Failure_CatalogReason_m0_store_invalidation_failed" xml:space="preserve"><value>The corrected source is awaiting store invalidation.</value></data>
+  <data name="Failure_Catalog_vector_reindex_failed" xml:space="preserve"><value>Vector reindex failed.</value></data>
+  <data name="Failure_CatalogReason_vector_reindex_failed" xml:space="preserve"><value>The vector index correction could not be completed.</value></data>
+  <data name="Failure_Catalog_vector_reindex_slo_exceeded" xml:space="preserve"><value>Vector reindex delayed.</value></data>
+  <data name="Failure_CatalogReason_vector_reindex_slo_exceeded" xml:space="preserve"><value>The vector index is awaiting correction.</value></data>
+  <data name="Failure_Catalog_authentication_denied" xml:space="preserve"><value>Authentication required.</value></data>
+  <data name="Failure_CatalogReason_authentication_denied" xml:space="preserve"><value>Authentication is required before this operation can continue.</value></data>
+  <data name="Failure_Catalog_authorization_denied" xml:space="preserve"><value>Authorization denied.</value></data>
+  <data name="Failure_CatalogReason_authorization_denied" xml:space="preserve"><value>The operation is not available to this caller.</value></data>
+  <data name="Failure_Catalog_audit_unavailable" xml:space="preserve"><value>Audit is unavailable.</value></data>
+  <data name="Failure_CatalogReason_audit_unavailable" xml:space="preserve"><value>The command cannot be accepted until audit recording is available.</value></data>
+  <data name="Failure_Catalog_idempotency_conflict_command_execution" xml:space="preserve"><value>Idempotency conflict.</value></data>
+  <data name="Failure_CatalogReason_idempotency_conflict_command_execution" xml:space="preserve"><value>The command conflicts with an existing submission record.</value></data>
+  <data name="Failure_Catalog_idempotency_conflict_message_intake" xml:space="preserve"><value>Message already captured.</value></data>
+  <data name="Failure_CatalogReason_idempotency_conflict_message_intake" xml:space="preserve"><value>The mailbox message has already been accepted for intake.</value></data>
+  <data name="Failure_Catalog_idempotency_conflict_correction" xml:space="preserve"><value>Correction already submitted.</value></data>
+  <data name="Failure_CatalogReason_idempotency_conflict_correction" xml:space="preserve"><value>This association correction matches an existing correction record.</value></data>
+  <data name="Failure_Catalog_idempotency_conflict_retry" xml:space="preserve"><value>Retry already submitted.</value></data>
+  <data name="Failure_CatalogReason_idempotency_conflict_retry" xml:space="preserve"><value>This retry conflicts with an existing retry request.</value></data>
+  <data name="Failure_Catalog_idempotency_conflict_outbound_draft_creation" xml:space="preserve"><value>Draft already submitted.</value></data>
+  <data name="Failure_CatalogReason_idempotency_conflict_outbound_draft_creation" xml:space="preserve"><value>This draft creation conflicts with an existing draft submission.</value></data>
+  <data name="Failure_Catalog_invalid_lifecycle_transition" xml:space="preserve"><value>Invalid lifecycle transition.</value></data>
+  <data name="Failure_CatalogReason_invalid_lifecycle_transition" xml:space="preserve"><value>The requested lifecycle transition is not allowed for this state.</value></data>
+  <data name="Failure_Catalog_refusal_blocked_action" xml:space="preserve"><value>Action blocked.</value></data>
+  <data name="Failure_CatalogReason_refusal_blocked_action" xml:space="preserve"><value>The requested action is blocked by policy.</value></data>
+  <data name="Failure_Catalog_dependency_degraded" xml:space="preserve"><value>Dependency degraded.</value></data>
+  <data name="Failure_CatalogReason_dependency_degraded" xml:space="preserve"><value>A required dependency is temporarily degraded.</value></data>
+  <data name="Failure_Catalog_failed_attachment" xml:space="preserve"><value>Attachment failed.</value></data>
+  <data name="Failure_CatalogReason_failed_attachment" xml:space="preserve"><value>The attachment could not be processed safely.</value></data>
+  <data name="Failure_Catalog_failed_command" xml:space="preserve"><value>Command failed.</value></data>
+  <data name="Failure_CatalogReason_failed_command" xml:space="preserve"><value>The command could not be completed safely.</value></data>
+  <data name="Failure_Catalog_degraded_mailbox" xml:space="preserve"><value>Mailbox degraded.</value></data>
+  <data name="Failure_CatalogReason_degraded_mailbox" xml:space="preserve"><value>Mailbox processing is temporarily degraded.</value></data>
+  <data name="Failure_Catalog_unresolved_participant" xml:space="preserve"><value>Participant needs review.</value></data>
+  <data name="Failure_CatalogReason_unresolved_participant" xml:space="preserve"><value>The operation is unavailable until participant identity is reviewed.</value></data>
+  <data name="Failure_Catalog_unauthorized_participant" xml:space="preserve"><value>Participant not authorized.</value></data>
+  <data name="Failure_CatalogReason_unauthorized_participant" xml:space="preserve"><value>The operation is not available to this participant.</value></data>
+  <data name="Failure_Catalog_participant_directory_degraded" xml:space="preserve"><value>Participant directory degraded.</value></data>
+  <data name="Failure_CatalogReason_participant_directory_degraded" xml:space="preserve"><value>Participant authority cannot be verified until the directory recovers.</value></data>
+  <data name="Failure_Catalog_invalid_threshold_policy" xml:space="preserve"><value>Invalid threshold policy.</value></data>
+  <data name="Failure_CatalogReason_invalid_threshold_policy" xml:space="preserve"><value>The threshold policy values are outside the accepted bounds.</value></data>
+  <data name="Failure_Catalog_unauthorized_threshold_update" xml:space="preserve"><value>Threshold update denied.</value></data>
+  <data name="Failure_CatalogReason_unauthorized_threshold_update" xml:space="preserve"><value>The threshold policy update is not available to this caller.</value></data>
+  <data name="Failure_Catalog_association_ambiguous_routed" xml:space="preserve"><value>Association needs review.</value></data>
+  <data name="Failure_CatalogReason_association_ambiguous_routed" xml:space="preserve"><value>Association evidence matched more than one safe routing option.</value></data>
+  <data name="Failure_Catalog_association_scorer_failed_closed" xml:space="preserve"><value>Association needs review.</value></data>
+  <data name="Failure_CatalogReason_association_scorer_failed_closed" xml:space="preserve"><value>Association scoring could not safely select a project.</value></data>
+  <data name="Failure_Catalog_association_scorer_unavailable" xml:space="preserve"><value>Association review required.</value></data>
+  <data name="Failure_CatalogReason_association_scorer_unavailable" xml:space="preserve"><value>Association scoring is unavailable for this item.</value></data>
+  <data name="Failure_Catalog_association_conflicting_deterministic_evidence" xml:space="preserve"><value>Association review required.</value></data>
+  <data name="Failure_CatalogReason_association_conflicting_deterministic_evidence" xml:space="preserve"><value>Association evidence contains conflicting project signals.</value></data>
+  <data name="Failure_Catalog_association_context_unavailable" xml:space="preserve"><value>Association review required.</value></data>
+  <data name="Failure_CatalogReason_association_context_unavailable" xml:space="preserve"><value>Association context is unavailable for this item.</value></data>
+  <data name="Failure_Catalog_association_candidate_suppressed" xml:space="preserve"><value>Candidate unavailable.</value></data>
+  <data name="Failure_CatalogReason_association_candidate_suppressed" xml:space="preserve"><value>One or more candidates cannot be shown for this operation.</value></data>
+  <data name="Failure_Catalog_idempotency_conflict_association_decision" xml:space="preserve"><value>Decision already submitted.</value></data>
+  <data name="Failure_CatalogReason_idempotency_conflict_association_decision" xml:space="preserve"><value>This association decision matches a recent accepted submission.</value></data>
+  <data name="Failure_Catalog_association_decision_accepted" xml:space="preserve"><value>Association decision accepted.</value></data>
+  <data name="Failure_CatalogReason_association_decision_accepted" xml:space="preserve"><value>The association decision was accepted and projection may still be pending.</value></data>
+  <data name="Failure_Catalog_association_decision_rejected" xml:space="preserve"><value>Association rejected.</value></data>
+  <data name="Failure_CatalogReason_association_decision_rejected" xml:space="preserve"><value>The association rejection was accepted for durable recording.</value></data>
+  <data name="Failure_Catalog_association_decision_deferred" xml:space="preserve"><value>Association deferred.</value></data>
+  <data name="Failure_CatalogReason_association_decision_deferred" xml:space="preserve"><value>The association deferral was accepted for durable recording.</value></data>
+  <data name="Failure_Catalog_association_decision_needs_review" xml:space="preserve"><value>Association remains in review.</value></data>
+  <data name="Failure_CatalogReason_association_decision_needs_review" xml:space="preserve"><value>The association was marked for continued review.</value></data>
+  <data name="Failure_Catalog_association_already_decided" xml:space="preserve"><value>Association already decided.</value></data>
+  <data name="Failure_CatalogReason_association_already_decided" xml:space="preserve"><value>A durable decision already exists for this association.</value></data>
+  <data name="Failure_Catalog_association_evidence_expired" xml:space="preserve"><value>Evidence expired.</value></data>
+  <data name="Failure_CatalogReason_association_evidence_expired" xml:space="preserve"><value>The association evidence must be refreshed before deciding.</value></data>
+  <data name="Failure_Catalog_association_stale_evidence" xml:space="preserve"><value>Evidence changed.</value></data>
+  <data name="Failure_CatalogReason_association_stale_evidence" xml:space="preserve"><value>The association evidence changed before the decision was accepted.</value></data>
+  <data name="Failure_Catalog_association_unauthorized_project_suppressed" xml:space="preserve"><value>Candidate unavailable.</value></data>
+  <data name="Failure_CatalogReason_association_unauthorized_project_suppressed" xml:space="preserve"><value>The selected candidate is not available to this caller.</value></data>
+  <data name="Failure_Catalog_association_correction_accepted" xml:space="preserve"><value>Correction accepted.</value></data>
+  <data name="Failure_CatalogReason_association_correction_accepted" xml:space="preserve"><value>The association correction was accepted and projection may still be pending.</value></data>
+  <data name="Failure_Catalog_association_already_corrected" xml:space="preserve"><value>Association already corrected.</value></data>
+  <data name="Failure_CatalogReason_association_already_corrected" xml:space="preserve"><value>A matching association correction already exists.</value></data>
+  <data name="Failure_Catalog_association_correction_stale_evidence" xml:space="preserve"><value>Correction evidence changed.</value></data>
+  <data name="Failure_CatalogReason_association_correction_stale_evidence" xml:space="preserve"><value>The association evidence changed before the correction was accepted.</value></data>
+  <data name="Failure_Catalog_association_correction_target_unauthorized_suppressed" xml:space="preserve"><value>Correction target unavailable.</value></data>
+  <data name="Failure_CatalogReason_association_correction_target_unauthorized_suppressed" xml:space="preserve"><value>The corrected target is not available to this caller.</value></data>
+  <data name="Failure_Catalog_association_correction_projection_unavailable" xml:space="preserve"><value>Correction dependency unavailable.</value></data>
+  <data name="Failure_CatalogReason_association_correction_projection_unavailable" xml:space="preserve"><value>Correction cannot be accepted until projection invalidation is available.</value></data>
+  <data name="Failure_Catalog_association_correction_audit_unavailable" xml:space="preserve"><value>Correction audit unavailable.</value></data>
+  <data name="Failure_CatalogReason_association_correction_audit_unavailable" xml:space="preserve"><value>Correction cannot be accepted until audit recording is available.</value></data>
+  <data name="Failure_Catalog_association_correction_policy_blocked" xml:space="preserve"><value>Correction blocked.</value></data>
+  <data name="Failure_CatalogReason_association_correction_policy_blocked" xml:space="preserve"><value>The association correction is blocked by policy.</value></data>
+  <data name="Failure_Catalog_association_correction_invalid_lifecycle" xml:space="preserve"><value>Correction unavailable.</value></data>
+  <data name="Failure_CatalogReason_association_correction_invalid_lifecycle" xml:space="preserve"><value>The association lifecycle does not allow correction now.</value></data>
+  <data name="Failure_Catalog_association_correction_propagation_pending" xml:space="preserve"><value>Correction propagation pending.</value></data>
+  <data name="Failure_CatalogReason_association_correction_propagation_pending" xml:space="preserve"><value>Corrected project context is not ready until required stores acknowledge propagation.</value></data>
+  <data name="Failure_Catalog_association_correction_propagation_complete" xml:space="preserve"><value>Correction propagation complete.</value></data>
+  <data name="Failure_CatalogReason_association_correction_propagation_complete" xml:space="preserve"><value>Required stores acknowledged the corrected association context.</value></data>
+  <data name="Failure_Catalog_association_correction_propagation_delayed" xml:space="preserve"><value>Correction propagation delayed.</value></data>
+  <data name="Failure_CatalogReason_association_correction_propagation_delayed" xml:space="preserve"><value>Propagation exceeded the target and needs operator attention.</value></data>
+  <data name="Failure_Catalog_association_correction_propagation_failed" xml:space="preserve"><value>Correction propagation failed.</value></data>
+  <data name="Failure_CatalogReason_association_correction_propagation_failed" xml:space="preserve"><value>A required store could not acknowledge corrected context.</value></data>
+  <data name="Failure_Catalog_association_correction_workflow_unavailable" xml:space="preserve"><value>Correction workflow unavailable.</value></data>
+  <data name="Failure_CatalogReason_association_correction_workflow_unavailable" xml:space="preserve"><value>Correction cannot be accepted until the propagation coordinator is available.</value></data>
+  <data name="Failure_Catalog_association_correction_stale_source_version" xml:space="preserve"><value>Correction source version stale.</value></data>
+  <data name="Failure_CatalogReason_association_correction_stale_source_version" xml:space="preserve"><value>The correction must be retried from the latest association status.</value></data>
+  <data name="Failure_Catalog_association_ai_context_blocked" xml:space="preserve"><value>AI context blocked.</value></data>
+  <data name="Failure_CatalogReason_association_ai_context_blocked" xml:space="preserve"><value>AI actions cannot use corrected project context until propagation completes.</value></data>
+  <data name="Failure_Catalog_project_ai_context_package_unavailable" xml:space="preserve"><value>AI context package unavailable.</value></data>
+  <data name="Failure_CatalogReason_project_ai_context_package_unavailable" xml:space="preserve"><value>The AI context package cannot be inspected until authorized metadata is available.</value></data>
+  <data name="Failure_Catalog_duplicate_suppressed" xml:space="preserve"><value>Duplicate suppressed.</value></data>
+  <data name="Failure_CatalogReason_duplicate_suppressed" xml:space="preserve"><value>A duplicate delivery was suppressed and linked to the original operation.</value></data>
+  <data name="Failure_Catalog_retry_queued" xml:space="preserve"><value>Retry queued.</value></data>
+  <data name="Failure_CatalogReason_retry_queued" xml:space="preserve"><value>The retry request was queued through the governed command spine.</value></data>
+  <data name="Failure_Catalog_retry_accepted" xml:space="preserve"><value>Retry accepted.</value></data>
+  <data name="Failure_CatalogReason_retry_accepted" xml:space="preserve"><value>The retry request was accepted without creating duplicate artifacts.</value></data>
+  <data name="Failure_Catalog_retry_exhausted" xml:space="preserve"><value>Retry exhausted.</value></data>
+  <data name="Failure_CatalogReason_retry_exhausted" xml:space="preserve"><value>Retry attempts were exhausted and the item needs operator recovery.</value></data>
+  <data name="Failure_Catalog_terminal_failure" xml:space="preserve"><value>Terminal failure.</value></data>
+  <data name="Failure_CatalogReason_terminal_failure" xml:space="preserve"><value>The item reached a terminal failure state and requires recovery.</value></data>
+  <data name="Failure_Catalog_recoverable_mailbox_degradation" xml:space="preserve"><value>Mailbox recovery pending.</value></data>
+  <data name="Failure_CatalogReason_recoverable_mailbox_degradation" xml:space="preserve"><value>Mailbox intake is recoverable and will follow retry policy.</value></data>
+  <data name="Failure_Catalog_projection_retryable" xml:space="preserve"><value>Projection retryable.</value></data>
+  <data name="Failure_CatalogReason_projection_retryable" xml:space="preserve"><value>Projection status is retryable and remains metadata-only.</value></data>
+  <data name="Failure_Catalog_reprocess_created" xml:space="preserve"><value>Reprocess created.</value></data>
+  <data name="Failure_CatalogReason_reprocess_created" xml:space="preserve"><value>A new workflow instance was created with audit links to the terminal item.</value></data>
+  <data name="Failure_Catalog_notification_routing_unauthorized" xml:space="preserve"><value>Routing edit not available.</value></data>
+  <data name="Failure_CatalogReason_notification_routing_unauthorized" xml:space="preserve"><value>Editing notification routing requires a human policy administrator.</value></data>
+  <data name="Failure_Catalog_escalation_policy_unauthorized" xml:space="preserve"><value>Escalation edit not available.</value></data>
+  <data name="Failure_CatalogReason_escalation_policy_unauthorized" xml:space="preserve"><value>Editing escalation policy requires a human policy administrator.</value></data>
+  <data name="Failure_Catalog_mailbox_source_disabled" xml:space="preserve"><value>Mailbox source disabled.</value></data>
+  <data name="Failure_CatalogReason_mailbox_source_disabled" xml:space="preserve"><value>Intake is blocked for this mailbox source until a mailbox administrator re-enables it.</value></data>
+  <data name="Failure_Catalog_mailbox_source_quarantined" xml:space="preserve"><value>Mailbox source quarantined.</value></data>
+  <data name="Failure_CatalogReason_mailbox_source_quarantined" xml:space="preserve"><value>New mail is held for review; reviewers see safe metadata only until a mailbox administrator releases it.</value></data>
+  <data name="Failure_Catalog_mailbox_source_rate_limited" xml:space="preserve"><value>Mailbox source rate limited.</value></data>
+  <data name="Failure_CatalogReason_mailbox_source_rate_limited" xml:space="preserve"><value>Intake is temporarily deferred to protect other sources and will retry automatically.</value></data>
+  <data name="Failure_Catalog_service_client_disabled" xml:space="preserve"><value>Service client disabled.</value></data>
+  <data name="Failure_CatalogReason_service_client_disabled" xml:space="preserve"><value>This automation's commands and queries are blocked until a tenant administrator re-enables it.</value></data>
+  <data name="Failure_Catalog_service_client_quarantined" xml:space="preserve"><value>Service client quarantined.</value></data>
+  <data name="Failure_CatalogReason_service_client_quarantined" xml:space="preserve"><value>This automation is contained for review; its commands and queries are held until a tenant administrator reviews and releases it.</value></data>
+  <data name="Failure_Catalog_service_client_rate_limited" xml:space="preserve"><value>Service client rate limited.</value></data>
+  <data name="Failure_CatalogReason_service_client_rate_limited" xml:space="preserve"><value>This automation's command capacity is temporarily limited to protect other automation; retry shortly.</value></data>
+  <data name="Failure_Catalog_ai_actor_disabled" xml:space="preserve"><value>AI actor disabled.</value></data>
+  <data name="Failure_CatalogReason_ai_actor_disabled" xml:space="preserve"><value>This AI actor's proposals are blocked until a policy administrator re-enables it.</value></data>
+  <data name="Failure_Catalog_ai_actor_quarantined" xml:space="preserve"><value>AI actor quarantined.</value></data>
+  <data name="Failure_CatalogReason_ai_actor_quarantined" xml:space="preserve"><value>This AI actor is contained for review; its proposals are held until a policy administrator reviews and releases it.</value></data>
+  <data name="Failure_Catalog_ai_actor_rate_limited" xml:space="preserve"><value>AI actor rate limited.</value></data>
+  <data name="Failure_CatalogReason_ai_actor_rate_limited" xml:space="preserve"><value>This AI actor's proposal capacity is temporarily limited to protect reviewers; retry shortly.</value></data>
+  <data name="Failure_Catalog_command_capability_disabled" xml:space="preserve"><value>Command disabled by policy.</value></data>
+  <data name="Failure_CatalogReason_command_capability_disabled" xml:space="preserve"><value>This command is blocked for the tenant until a policy administrator re-enables it.</value></data>
+  <data name="Failure_Catalog_command_capability_quarantined" xml:space="preserve"><value>Command quarantined for review.</value></data>
+  <data name="Failure_CatalogReason_command_capability_quarantined" xml:space="preserve"><value>This command is contained for review and is held until a policy administrator reviews and releases it.</value></data>
+  <data name="Failure_Catalog_outbound_channel_disabled" xml:space="preserve"><value>Outbound channel disabled by policy.</value></data>
+  <data name="Failure_CatalogReason_outbound_channel_disabled" xml:space="preserve"><value>Outbound sending through this channel is blocked for the tenant until a policy administrator re-enables it.</value></data>
+  <data name="Failure_Catalog_outbound_channel_quarantined" xml:space="preserve"><value>Outbound channel held for review.</value></data>
+  <data name="Failure_CatalogReason_outbound_channel_quarantined" xml:space="preserve"><value>Outbound sending through this channel is held for review until a policy administrator reviews and releases it.</value></data>
+  <data name="Failure_Catalog_command_capability_rate_limited" xml:space="preserve"><value>Command rate limited.</value></data>
+  <data name="Failure_CatalogReason_command_capability_rate_limited" xml:space="preserve"><value>This command's capacity is temporarily limited to protect the tenant workflow; retry shortly.</value></data>
+  <data name="Failure_Catalog_outbound_channel_rate_limited" xml:space="preserve"><value>Outbound channel rate limited.</value></data>
+  <data name="Failure_CatalogReason_outbound_channel_rate_limited" xml:space="preserve"><value>This channel's send capacity is temporarily limited to keep external volume within tenant policy; retry shortly.</value></data>
+  <data name="Failure_Catalog_idempotency_conflict_outbound_send" xml:space="preserve"><value>Outbound send already submitted.</value></data>
+  <data name="Failure_CatalogReason_idempotency_conflict_outbound_send" xml:space="preserve"><value>This approved outbound send was already submitted for the draft and actor; no second send was created.</value></data>
+  <data name="Failure_NextAction_Dismiss" xml:space="preserve"><value>Dismiss this message.</value></data>
+  <data name="Failure_NextAction_Authenticate" xml:space="preserve"><value>Authenticate to continue.</value></data>
+  <data name="Failure_NextAction_CorrectRequest" xml:space="preserve"><value>Correct the request and try again.</value></data>
 </root>

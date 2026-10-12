@@ -30,10 +30,11 @@ internal sealed class ChatBotProblemDetailsFactory(
 
     public ProblemDetails CreateAuthorizationProblem(string reasonCode, string correlationId, string? taskId)
     {
-        string catalogCode = AuthorizationCatalogCode(reasonCode);
-        if (!IsKnownAuthorizationReason(reasonCode))
+        bool known = IsKnownAuthorizationReason(reasonCode);
+        string catalogCode = known ? AuthorizationCatalogCode(reasonCode) : ChatBotMessageCodes.GenericDenial;
+        if (!known)
         {
-            telemetry.RecordUncategorizedMessage(ChatBotMessageCatalogVersion.Current, catalogCode);
+            telemetry.RecordUncategorizedMessage(ChatBotMessageCatalogVersion.Current, ChatBotMessageCodes.GenericDenial);
         }
 
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(catalogCode);
@@ -53,7 +54,7 @@ internal sealed class ChatBotProblemDetailsFactory(
             Message = entry.Reason,
             CorrelationId = correlationId,
             TaskId = taskId,
-            Retryable = IsTransientAuthorizationReason(reasonCode),
+            Retryable = known && IsTransientAuthorizationReason(reasonCode),
             ClientAction = ClientAction(entry.NextAction),
         });
     }
@@ -226,7 +227,10 @@ internal sealed class ChatBotProblemDetailsFactory(
             ChatBotAuthorizationReasonCodes.ServiceClientGrantTenantMismatch or
             ChatBotAuthorizationReasonCodes.ServiceClientWrongSurface or
             ChatBotAuthorizationReasonCodes.AiActorRateLimited or
-            ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited;
+            ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited or
+            ChatBotDisabledActionReasons.InsufficientAuthority or
+            ChatBotDisabledActionReasons.PolicyBlocked or
+            ChatBotRefusalReasonCodes.EvidenceExpired;
 
     private static ProblemDetailsClientAction ClientAction(string action)
         => action switch

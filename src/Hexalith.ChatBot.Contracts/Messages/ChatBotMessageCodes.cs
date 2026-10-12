@@ -4,6 +4,7 @@ namespace Hexalith.ChatBot.Contracts.Messages;
 
 public static class ChatBotMessageCodes
 {
+    public const string GenericDenial = "generic_denial";
     public const string CommandAccepted = "command_accepted";
     public const string CommandContractInvalid = "command_contract_invalid";
     public const string AssociationCorrectionCaseResolutionUnavailable = "association_correction_case_resolution_unavailable";

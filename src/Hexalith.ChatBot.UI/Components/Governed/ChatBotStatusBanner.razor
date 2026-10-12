@@ -1,4 +1,5 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
+@using Hexalith.ChatBot.Contracts.Messages
 @inject ChatBotAnnouncementDeduplicationState AnnouncementDeduplication
 @inject ChatBotUiTextLocalizer UiText
 
@@ -8,7 +9,7 @@
                   Class="chatbot-status"
                   Intent="@Intent"
                   AllowDismiss="false"
-                  Title="@UiText.FeedbackKindLabel(Kind)"
+                  Title="@(HasCatalogFailure ? UiText.FailureCatalogHeadline(MessageCatalogCode) : UiText.FeedbackKindLabel(Kind))"
                   data-chatbot-status="@StatusSlot"
                   data-chatbot-feedback-state="@FeedbackStateValue"
                   data-chatbot-live="@AriaLive"
@@ -20,13 +21,23 @@
                   aria-live="@AriaLive"
                   aria-atomic="true"
                   aria-label="@ResolvedAccessibleLabel">
-    @if (ChildContent is not null)
+    @if (ChildContent is not null && !HasCatalogFailure)
     {
         @ChildContent
     }
     else
     {
-        @Message
+        @ResolvedMessage
+    }
+    @if (HasCatalogFailure && StateFamily is not ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate &&
+        CatalogEntry.NextAction is not ChatBotMessageNextActions.None)
+    {
+        <ChatBotGovernedAction Label="@UiText.FailureNextActionLabel(CatalogEntry.NextAction)"
+                                 StableId="@($"{StableId}-safe-action")"
+                                 CriticalAction="false"
+                                 State="@(OnNextAction.HasDelegate ? ChatBotGovernedActionState.Enabled : ChatBotGovernedActionState.DisabledWithReason)"
+                                 DisabledReason="@UiText.FailureBlockedReasonLabel(CatalogEntry.DisabledActionReason)"
+                                 OnActivate="@OnNextAction" />
     }
 </FluentMessageBar>
 
@@ -36,6 +47,12 @@
 
     [Parameter]
     public string Message { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? MessageCatalogCode { get; set; }
+
+    [Parameter]
+    public EventCallback OnNextAction { get; set; }
 
     [Parameter]
     public string? AccessibleLabel { get; set; }
@@ -64,7 +81,7 @@
 
     protected override void OnParametersSet()
     {
-        _feedbackContract = StateFamily is { } stateFamily ? ChatBotStateFeedbackMatrix.For(stateFamily) : null;
+        _feedbackContract = ResolvedStateFamily is { } stateFamily ? ChatBotStateFeedbackMatrix.For(stateFamily) : null;
 
         ChatBotAnnouncementDedupRule repeatRule = _feedbackContract?.DedupRule ?? ChatBotAnnouncementDedupRule.OncePerStableOperationKey;
         _shouldAnnounceLiveRegion = _feedbackContract is null
@@ -109,13 +126,30 @@
             ? StableId
             : AnnouncementKey;
 
-    private string? FeedbackStateValue => StateFamily?.ToString();
+    private ChatBotFeedbackStateFamily? ResolvedStateFamily
+        => HasCatalogFailure && CatalogEntry.IsTerminal &&
+            (StateFamily is ChatBotFeedbackStateFamily.RetryableFailure or ChatBotFeedbackStateFamily.DependencyDegraded)
+            ? ChatBotFeedbackStateFamily.TerminalPolicyFailure
+            : StateFamily;
+
+    private string? FeedbackStateValue => ResolvedStateFamily?.ToString();
 
     private string? RepeatRuleValue => _feedbackContract?.DedupRule.ToString();
 
     private string LiveAnnouncedValue => _shouldAnnounceLiveRegion ? "true" : "false";
 
     private string StatusSlot => ChatBotGovernedUiText.GetFeedbackKindSlot(Kind);
+
+    private bool HasCatalogFailure
+        => (MessageCatalogCode is not null && Kind is ChatBotFeedbackKind.Danger or ChatBotFeedbackKind.Warning) ||
+            (Kind is ChatBotFeedbackKind.Danger &&
+                StateFamily is not ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate);
+
+    private ChatBotMessageCatalogEntry CatalogEntry => UiText.FailureCatalogEntry(MessageCatalogCode);
+
+    private string ResolvedMessage => HasCatalogFailure
+        ? UiText.FailureCatalogReason(MessageCatalogCode)
+        : Message;
 
     private MessageBarIntent Intent
         => Kind switch
@@ -128,7 +162,7 @@
         };
 
     private string ResolvedAccessibleLabel
-        => string.IsNullOrWhiteSpace(AccessibleLabel)
-            ? UiText.StatusAccessibleLabel(Kind, Message)
+        => HasCatalogFailure || string.IsNullOrWhiteSpace(AccessibleLabel)
+            ? UiText.StatusAccessibleLabel(Kind, ResolvedMessage)
             : AccessibleLabel;
 }

@@ -27,6 +27,39 @@ public static partial class MessageCatalogContractTests
         entry.DisabledActionReason.ShouldBe(ChatBotDisabledActionReasons.DependencyDegraded);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("unknown_secret_path_C:\\private")]
+    public static void UnknownCatalogCodesResolveToTerminalGenericDenial(string? code)
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(code);
+
+        entry.Code.ShouldBe(ChatBotMessageCodes.GenericDenial);
+        entry.Version.ShouldBe(ChatBotMessageCatalogVersion.Current);
+        entry.State.ShouldBe("denied");
+        entry.IsTerminal.ShouldBeTrue();
+        entry.NextAction.ShouldBe(ChatBotMessageNextActions.Dismiss);
+        if (!string.IsNullOrWhiteSpace(code))
+        {
+            entry.AccessibleDescription.ShouldNotContain(code, Case.Insensitive);
+        }
+    }
+
+    [Fact]
+    public static void EveryCatalogEntryHasCompleteSafeMetadata()
+    {
+        foreach (ChatBotMessageCatalogEntry entry in ChatBotMessageCatalog.Entries)
+        {
+            entry.Version.ShouldBe(ChatBotMessageCatalogVersion.Current);
+            new[] { "waiting", "completed", "retryable", "denied", "blocked", "failed", "degraded" }.ShouldContain(entry.State);
+            entry.Headline.Length.ShouldBeLessThanOrEqualTo(80);
+            entry.AccessibleDescription.ShouldContain(entry.Headline);
+            entry.AccessibleDescription.ShouldContain(entry.Reason);
+            entry.DisabledActionReason.ShouldNotBeNullOrWhiteSpace();
+        }
+    }
+
     [Fact]
     public static void CatalogShouldExposeStableVersionAndRequiredEntries()
     {

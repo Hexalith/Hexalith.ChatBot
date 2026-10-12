@@ -241,8 +241,8 @@ public static class ChatBotMcpServiceTests
     }
 
     [Theory]
-    [InlineData("chatbot.association.stats", "mcp.tool.unknown")]
-    [InlineData("chatbot.association.associate", "mcp.argument.missing")]
+    [InlineData("chatbot.association.stats", "generic_denial")]
+    [InlineData("chatbot.association.associate", "generic_denial")]
     public static async Task BoundaryValidationReturnsSafeMetadataOnlyDenials(string toolName, string expectedCode)
     {
         var service = new ChatBotMcpService(Substitute.For<IChatBotClient>());
@@ -274,9 +274,9 @@ public static class ChatBotMcpServiceTests
             Invocation("chatbot.operation.status", WithTrace(("operationId", AssociationId), ("projectName", "restricted project"))),
             TestContext.Current.CancellationToken);
 
-        invalidEnum.GetProperty("code").GetString().ShouldBe("mcp.argument.invalid-enum");
-        invalidEnum.GetProperty("safeSuggestion").GetString().ShouldBe("Use approve, reject, request-revision, or cancel.");
-        unsupportedArgument.GetProperty("code").GetString().ShouldBe("mcp.argument.unsupported");
+        invalidEnum.GetProperty("code").GetString().ShouldBe("generic_denial");
+        invalidEnum.GetProperty("safeSuggestion").GetString().ShouldBe("dismiss");
+        unsupportedArgument.GetProperty("code").GetString().ShouldBe("generic_denial");
         unsupportedArgument.GetRawText().ShouldNotContain("restricted project");
     }
 
@@ -293,9 +293,9 @@ public static class ChatBotMcpServiceTests
             Invocation("chatbot.ai_action.execute", ArgumentsFor("chatbot.ai_action.execute", ("sourceEvidenceReferences", 123))),
             TestContext.Current.CancellationToken);
 
-        invalidNumber.GetProperty("code").GetString().ShouldBe("mcp.argument.invalid-number");
+        invalidNumber.GetProperty("code").GetString().ShouldBe("generic_denial");
         invalidNumber.GetProperty("detailsVisibility").GetString().ShouldBe("metadata-only");
-        invalidList.GetProperty("code").GetString().ShouldBe("mcp.argument.invalid-list");
+        invalidList.GetProperty("code").GetString().ShouldBe("generic_denial");
         invalidList.GetProperty("detailsVisibility").GetString().ShouldBe("metadata-only");
         await client.DidNotReceive().SubmitAsync(
             Arg.Any<IChatBotCommand>(),
@@ -324,11 +324,11 @@ public static class ChatBotMcpServiceTests
                 ("sourceEvidenceReferences", listPayload.RootElement.Clone()))),
             TestContext.Current.CancellationToken);
 
-        invalidString.GetProperty("code").GetString().ShouldBe("mcp.argument.invalid-string");
+        invalidString.GetProperty("code").GetString().ShouldBe("generic_denial");
         invalidString.GetProperty("detailsVisibility").GetString().ShouldBe("metadata-only");
         invalidString.GetRawText().ShouldNotContain("restricted project");
         invalidString.GetRawText().ShouldNotContain("candidateEvidence");
-        invalidListMember.GetProperty("code").GetString().ShouldBe("mcp.argument.invalid-list");
+        invalidListMember.GetProperty("code").GetString().ShouldBe("generic_denial");
         invalidListMember.GetProperty("detailsVisibility").GetString().ShouldBe("metadata-only");
         invalidListMember.GetRawText().ShouldNotContain("restricted.pdf");
         await client.DidNotReceive().SubmitAsync(
@@ -387,7 +387,7 @@ public static class ChatBotMcpServiceTests
         result.GetProperty("outcome").GetString().ShouldBe("denied");
         result.GetProperty("category").GetString().ShouldBe("authorization_denied");
         result.GetProperty("code").GetString().ShouldBe("authorization_denied");
-        result.GetProperty("message").GetString().ShouldBe("Access is denied.");
+        result.GetProperty("message").GetString().ShouldBe("The operation is not available to this caller.");
         result.GetProperty("correlationId").GetString().ShouldBe(CorrelationId);
         result.GetProperty("taskId").GetString().ShouldBe(TaskId);
         result.GetProperty("clientAction").GetString().ShouldBe("request-access");
@@ -471,7 +471,7 @@ public static class ChatBotMcpServiceTests
 
         result.GetProperty("outcome").GetString().ShouldBe("denied");
         result.GetProperty("detailsVisibility").GetString().ShouldBe("metadata-only");
-        result.GetProperty("message").GetString().ShouldBe("Request denied.");
+        result.GetProperty("message").GetString().ShouldBe("The requested action is unavailable.");
         // The raw transport message (endpoint topology, fabricated secrets) must never reach the MCP client.
         result.GetRawText().ShouldNotContain("chatbot-backend");
         result.GetRawText().ShouldNotContain("bearer-token");
@@ -804,7 +804,7 @@ public static class ChatBotMcpServiceTests
                 Status = 403,
                 Category = ProblemDetailsCategory.Authorization_denied,
                 Code = "authorization_denied",
-                Message = "Access is denied.",
+                Message = "The operation is not available to this caller.",
                 CorrelationId = CorrelationId,
                 TaskId = TaskId,
                 Retryable = false,

@@ -3247,6 +3247,28 @@ components:
         - recoverable_mailbox_degradation
         - projection_retryable
         - reprocess_created
+        - generic_denial
+        - idempotency_conflict_outbound_draft_creation
+        - idempotency_conflict_association_decision
+        - project_ai_context_package_unavailable
+        - notification_routing_unauthorized
+        - escalation_policy_unauthorized
+        - mailbox_source_disabled
+        - mailbox_source_quarantined
+        - mailbox_source_rate_limited
+        - service_client_disabled
+        - service_client_quarantined
+        - service_client_rate_limited
+        - ai_actor_disabled
+        - ai_actor_quarantined
+        - ai_actor_rate_limited
+        - command_capability_disabled
+        - command_capability_quarantined
+        - outbound_channel_disabled
+        - outbound_channel_quarantined
+        - command_capability_rate_limited
+        - outbound_channel_rate_limited
+        - idempotency_conflict_outbound_send
     ProblemDetails:
       type: object
       additionalProperties: false

@@ -4343,6 +4343,72 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"reprocess_created")]
         Reprocess_created = 64,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"generic_denial")]
+        Generic_denial = 65,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_outbound_draft_creation")]
+        Idempotency_conflict_outbound_draft_creation = 66,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_association_decision")]
+        Idempotency_conflict_association_decision = 67,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"project_ai_context_package_unavailable")]
+        Project_ai_context_package_unavailable = 68,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"notification_routing_unauthorized")]
+        Notification_routing_unauthorized = 69,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"escalation_policy_unauthorized")]
+        Escalation_policy_unauthorized = 70,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox_source_disabled")]
+        Mailbox_source_disabled = 71,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox_source_quarantined")]
+        Mailbox_source_quarantined = 72,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox_source_rate_limited")]
+        Mailbox_source_rate_limited = 73,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"service_client_disabled")]
+        Service_client_disabled = 74,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"service_client_quarantined")]
+        Service_client_quarantined = 75,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"service_client_rate_limited")]
+        Service_client_rate_limited = 76,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ai_actor_disabled")]
+        Ai_actor_disabled = 77,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ai_actor_quarantined")]
+        Ai_actor_quarantined = 78,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ai_actor_rate_limited")]
+        Ai_actor_rate_limited = 79,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"command_capability_disabled")]
+        Command_capability_disabled = 80,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"command_capability_quarantined")]
+        Command_capability_quarantined = 81,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"outbound_channel_disabled")]
+        Outbound_channel_disabled = 82,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"outbound_channel_quarantined")]
+        Outbound_channel_quarantined = 83,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"command_capability_rate_limited")]
+        Command_capability_rate_limited = 84,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"outbound_channel_rate_limited")]
+        Outbound_channel_rate_limited = 85,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_outbound_send")]
+        Idempotency_conflict_outbound_send = 86,
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]

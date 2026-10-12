@@ -28,7 +28,20 @@ internal static class OperationStatusHttpResults
     {
         OperationCompletionStatus completion = Parse<OperationCompletionStatus>(record.CompletionStatus);
         OperationAuditStatus audit = Parse<OperationAuditStatus>(record.AuditStatus);
+        bool knownReason = ChatBotMessageCatalog.IsKnown(record.ReasonCode);
+        if (!knownReason)
+        {
+            completion = OperationCompletionStatus.Failed;
+        }
         CommandSubmissionResponse? previous = record.PriorOutcome;
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(record.ReasonCode);
+        List<ChatBotMessageNextAction> safeNextActions = knownReason
+            ? (record.SafeNextActions ?? [])
+                .Where(action => string.Equals(action, entry.NextAction, StringComparison.Ordinal))
+                .Select(ParseAction)
+                .Distinct()
+                .ToList()
+            : [ChatBotMessageNextAction.Dismiss];
         return new OperationStatus
         {
             OperationId = record.OperationId,
@@ -36,8 +49,9 @@ internal static class OperationStatusHttpResults
             CorrelationId = record.CorrelationId,
             LifecycleState = record.LifecycleState,
             ReasonCode = ParseCode(record.ReasonCode),
-            RetryEligible = record.NextRetryAt is { } due && due <= now && record.RetryCount < record.MaxAttempts,
-            PriorOutcome = previous is null ? null : new PriorCommandOutcome
+            RetryEligible = safeNextActions.Contains(ChatBotMessageNextAction.RetryLater) &&
+                record.NextRetryAt is { } due && due <= now && record.RetryCount < record.MaxAttempts,
+            PriorOutcome = !knownReason || previous is null ? null : new PriorCommandOutcome
             {
                 CommandId = previous.CommandId,
                 CorrelationId = previous.CorrelationId,
@@ -57,19 +71,19 @@ internal static class OperationStatusHttpResults
                 CompletionStatus = completion,
                 AuditStatus = audit,
             },
-            SafeNextActions = record.SafeNextActions.Select(Parse<ChatBotMessageNextAction>).ToList(),
+            SafeNextActions = safeNextActions,
             TerminalReason = ParseCodeOrNull(record.TerminalReason),
             OperationClass = record.OperationClass,
             MaxAttempts = record.MaxAttempts,
-            NextRetryAt = record.NextRetryAt?.ToUniversalTime(),
-            DuplicateSafetyNote = record.DuplicateSafetyNote,
-            OwnerRole = record.OwnerRole,
+            NextRetryAt = knownReason ? record.NextRetryAt?.ToUniversalTime() : null,
+            DuplicateSafetyNote = knownReason ? record.DuplicateSafetyNote : null,
+            OwnerRole = knownReason ? record.OwnerRole : null,
             FailureReasonCode = ParseCodeOrNull(record.FailureReasonCode),
             TerminalReasonCode = ParseCodeOrNull(record.TerminalReasonCode),
-            OriginalOperationId = record.OriginalOperationId,
+            OriginalOperationId = knownReason ? record.OriginalOperationId : null,
             DuplicateAttemptCount = record.DuplicateAttemptCount,
-            WorkflowInstanceId = record.WorkflowInstanceId,
-            WorkflowStatus = record.WorkflowStatus,
+            WorkflowInstanceId = knownReason ? record.WorkflowInstanceId : null,
+            WorkflowStatus = knownReason ? record.WorkflowStatus : null,
             WorkflowRetryCount = record.WorkflowRetryCount,
             WorkflowLastFailureCode = ParseCodeOrNull(record.WorkflowLastFailureCode),
             AcceptedAt = record.AcceptedAt.ToUniversalTime(),
@@ -78,9 +92,10 @@ internal static class OperationStatusHttpResults
     }
 
     private static ChatBotMessageCode ParseCode(string code)
-        // External derived stores may return a safe but unrecognized failure token.
-        // Keep GET available and report a bounded dependency cause instead of a fabricated command failure.
-        => TryParse(code, out ChatBotMessageCode value) ? value : ChatBotMessageCode.Dependency_degraded;
+        => TryParse(code, out ChatBotMessageCode value) ? value : ChatBotMessageCode.Generic_denial;
+
+    private static ChatBotMessageNextAction ParseAction(string code)
+        => TryParse(code, out ChatBotMessageNextAction value) ? value : ChatBotMessageNextAction.Dismiss;
 
     private static ChatBotMessageCode? ParseCodeOrNull(string? code)
         => string.IsNullOrWhiteSpace(code) ? null : ParseCode(code);

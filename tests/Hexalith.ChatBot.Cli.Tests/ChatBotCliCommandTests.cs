@@ -233,7 +233,7 @@ public static class ChatBotCliCommandTests
         output.ToString().ShouldBeEmpty();
         string errorText = error.ToString();
         errorText.ShouldContain("outcome: denied");
-        errorText.ShouldContain("reason-code: authorization-denied");
+        errorText.ShouldContain("reason-code: generic_denial");
         errorText.ShouldContain("redaction-state: metadata-only");
         errorText.ShouldNotContain("restricted project");
         errorText.ShouldNotContain("bearer-token");
@@ -308,9 +308,9 @@ public static class ChatBotCliCommandTests
         output.ToString().ShouldBeEmpty();
         string errorText = error.ToString();
         errorText.ShouldContain("outcome: denied");
-        errorText.ShouldContain("reason-code: validation-error");
+        errorText.ShouldContain("reason-code: generic_denial");
         errorText.ShouldContain("redaction-state: metadata-only");
-        errorText.ShouldContain("safe-next-action: correct-request");
+        errorText.ShouldContain("safe-next-action: dismiss");
         errorText.ShouldNotContain("client_secret");
         errorText.ShouldNotContain("raw command json");
         await client.DidNotReceive().SubmitAsync(
@@ -398,8 +398,8 @@ public static class ChatBotCliCommandTests
             new ArgumentException("raw command json with client_secret"),
             json: false);
 
-        text.ShouldContain("reason-code: validation-error");
-        text.ShouldContain("safe-next-action: correct-request");
+        text.ShouldContain("reason-code: generic_denial");
+        text.ShouldContain("safe-next-action: dismiss");
         text.ShouldNotContain("client_secret");
         text.ShouldNotContain("raw command json");
     }

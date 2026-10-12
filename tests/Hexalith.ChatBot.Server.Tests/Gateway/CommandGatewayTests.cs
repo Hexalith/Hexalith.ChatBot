@@ -5166,10 +5166,11 @@ public sealed partial class CommandGatewayTests
 
         ProblemDetails problem = factory.CreateAuthorizationProblem(rawReason, CorrelationId, TaskId);
 
-        problem.Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
-        problem.Message.ShouldBe(ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AuthorizationDenied).Reason);
-        telemetry.Counts.ShouldContainKey((ChatBotMessageCatalogVersion.Current, ChatBotMessageCodes.AuthorizationDenied));
-        telemetry.Counts[(ChatBotMessageCatalogVersion.Current, ChatBotMessageCodes.AuthorizationDenied)].ShouldBe(1);
+        problem.Code.ShouldBe(ChatBotMessageCodes.GenericDenial);
+        problem.Message.ShouldBe(ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.GenericDenial).Reason);
+        problem.Retryable.ShouldBeFalse();
+        telemetry.Counts.ShouldContainKey((ChatBotMessageCatalogVersion.Current, ChatBotMessageCodes.GenericDenial));
+        telemetry.Counts[(ChatBotMessageCatalogVersion.Current, ChatBotMessageCodes.GenericDenial)].ShouldBe(1);
 
         string serializedTelemetry = string.Join(
             "|",
@@ -5177,6 +5178,32 @@ public sealed partial class CommandGatewayTests
         serializedTelemetry.ShouldNotContain(rawReason, Case.Insensitive);
         Serialized(problem).ShouldNotContain("project-alpha", Case.Insensitive);
         Serialized(problem).ShouldNotContain("InvalidOperationException", Case.Insensitive);
+    }
+
+    [Fact]
+    public static void RedactionStageShouldReplaceUntrustedProblemProseAndActions()
+    {
+        const string sentinel = "restricted-project-secret C:\\private\\raw.txt InvalidOperationException";
+        ProblemDetails safe = new CoarseUserFacingRedactionStage().Apply(new ProblemDetails
+        {
+            Type = sentinel,
+            Title = sentinel,
+            Status = 200,
+            Category = ProblemDetailsCategory.Internal_error,
+            Code = sentinel,
+            Message = sentinel,
+            Detail = sentinel,
+            Instance = sentinel,
+            Retryable = true,
+            ClientAction = ProblemDetailsClientAction.RetryLater,
+        });
+
+        safe.Code.ShouldBe(ChatBotMessageCodes.GenericDenial);
+        safe.Title.ShouldBe(ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.GenericDenial).Headline);
+        safe.Status.ShouldBe(403);
+        safe.Retryable.ShouldBeFalse();
+        safe.ClientAction.ShouldBe(ProblemDetailsClientAction.Dismiss);
+        Serialized(safe).ShouldNotContain(sentinel);
     }
 
     [Fact]

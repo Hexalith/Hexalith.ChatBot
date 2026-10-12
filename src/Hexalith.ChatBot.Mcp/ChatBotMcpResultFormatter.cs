@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Messages;
 
 namespace Hexalith.ChatBot.Mcp;
 
@@ -56,10 +57,10 @@ public static class ChatBotMcpResultFormatter
             status.RetryCount,
             completionStatus,
             auditStatus = WireName(status.AuditStatus),
-            safeNextActions = status.SafeNextActions.Select(WireName).ToArray(),
-            terminalReason = status.TerminalReason is null ? null : WireName(status.TerminalReason.Value),
-            failureReasonCode = status.FailureReasonCode is null ? null : WireName(status.FailureReasonCode.Value),
-            terminalReasonCode = status.TerminalReasonCode is null ? null : WireName(status.TerminalReasonCode.Value),
+            safeNextActions = status.SafeNextActions.Select(SafeAction).ToArray(),
+            terminalReason = status.TerminalReason is null ? null : SafeCode(status.TerminalReason.Value),
+            failureReasonCode = status.FailureReasonCode is null ? null : SafeCode(status.FailureReasonCode.Value),
+            terminalReasonCode = status.TerminalReasonCode is null ? null : SafeCode(status.TerminalReasonCode.Value),
             status.AcceptedAt,
             status.LastUpdatedAt,
             partialSuccess = string.Equals(completionStatus, "accepted-projection-pending", StringComparison.Ordinal),
@@ -70,13 +71,26 @@ public static class ChatBotMcpResultFormatter
     {
         ArgumentNullException.ThrowIfNull(exception);
 
-        SafeDenialMetadata denial = SafeDenialMetadata.From(exception, correlationId, taskId, safeSuggestion);
+        SafeDenialMetadata raw = SafeDenialMetadata.From(exception, correlationId, taskId, safeSuggestion);
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(raw.Code);
+        SafeDenialMetadata denial = raw with
+        {
+            Category = ChatBotMessageCatalog.IsKnown(raw.Code) ? raw.Category : "authorization_denied",
+            Code = entry.Code,
+            SafeMessage = entry.Reason,
+            Retryable = !entry.IsTerminal && entry.NextAction == ChatBotMessageNextActions.RetryLater,
+            ClientAction = entry.NextAction,
+            DetailsVisibility = "metadata-only",
+            SafeSuggestion = entry.NextAction,
+        };
         return ToElement(new
         {
             outcome = "denied",
             denial.Category,
             denial.Code,
             message = denial.SafeMessage,
+            headline = entry.Headline,
+            catalogVersion = entry.Version,
             denial.CorrelationId,
             denial.TaskId,
             denial.Retryable,
@@ -99,6 +113,12 @@ public static class ChatBotMcpResultFormatter
         FieldInfo? field = typeof(TEnum).GetField(name);
         return field?.GetCustomAttribute<EnumMemberAttribute>()?.Value ?? name;
     }
+
+    private static string SafeCode(ChatBotMessageCode value)
+        => ChatBotMessageCatalog.Resolve(WireName(value)).Code;
+
+    private static string SafeAction(ChatBotMessageNextAction value)
+        => Enum.IsDefined(value) ? WireName(value) : ChatBotMessageNextActions.Dismiss;
 
     private sealed class EnumMemberJsonConverterFactory : JsonConverterFactory
     {

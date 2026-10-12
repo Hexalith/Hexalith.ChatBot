@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Resources;
 
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Tests;
 using Hexalith.ChatBot.UI.Design;
 using Hexalith.ChatBot.UI.Localization;
@@ -38,6 +39,48 @@ public sealed class ChatBotLocalizationContractTests
         {
             manager.GetString(key, CultureInfo.GetCultureInfo("en")).ShouldNotBeNullOrWhiteSpace($"Missing English resource {key}.");
             manager.GetString(key, CultureInfo.GetCultureInfo("fr")).ShouldNotBeNullOrWhiteSpace($"Missing French resource {key}.");
+        }
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("fr")]
+    public void EveryCatalogCodeShouldHaveCompleteLocaleSpecificCopy(string locale)
+    {
+        using (UseCulture(locale))
+        {
+            var resourceSet = SharedResource.ResourceManager.GetResourceSet(
+                locale == "en" ? CultureInfo.InvariantCulture : CultureInfo.GetCultureInfo("fr"), true, false);
+            resourceSet.ShouldNotBeNull();
+            ChatBotUiTextLocalizer text = CreateProvider().GetRequiredService<ChatBotUiTextLocalizer>();
+            foreach (ChatBotMessageCatalogEntry entry in ChatBotMessageCatalog.Entries)
+            {
+                string headlineKey = ChatBotUiTextKey.FailureCatalogHeadlinePrefix + entry.Code;
+                string reasonKey = ChatBotUiTextKey.FailureCatalogReasonPrefix + entry.Code;
+                resourceSet.GetString(headlineKey).ShouldNotBeNullOrWhiteSpace(headlineKey);
+                resourceSet.GetString(reasonKey).ShouldNotBeNullOrWhiteSpace(reasonKey);
+                text.FailureCatalogHeadline(entry.Code).Length.ShouldBeLessThanOrEqualTo(80, entry.Code);
+                text.FailureCatalogReason(entry.Code).ShouldEndWith(".");
+                text.FailureNextActionLabel(entry.NextAction).ShouldNotBeNullOrWhiteSpace(entry.Code);
+            }
+
+            text.FailureCatalogHeadline("restricted/path/secret")
+                .ShouldBe(text.FailureCatalogHeadline(ChatBotMessageCodes.GenericDenial));
+            text.FailureCatalogReason(null)
+                .ShouldBe(text.FailureCatalogReason(ChatBotMessageCodes.GenericDenial));
+        }
+    }
+
+    [Fact]
+    public void UnavailableLocaleShouldResolveToGenericTerminalCopy()
+    {
+        using (UseCulture("de"))
+        {
+            ChatBotUiTextLocalizer text = CreateProvider().GetRequiredService<ChatBotUiTextLocalizer>();
+            text.FailureCatalogHeadline(ChatBotMessageCodes.AuditUnavailable)
+                .ShouldBe(text.FailureCatalogHeadline(ChatBotMessageCodes.GenericDenial));
+            text.FailureCatalogReason(ChatBotMessageCodes.AuditUnavailable)
+                .ShouldBe(text.FailureCatalogReason(ChatBotMessageCodes.GenericDenial));
         }
     }
 
@@ -124,9 +167,9 @@ public sealed class ChatBotLocalizationContractTests
             text.ApprovalEvidenceFreshnessLabel("expired").ShouldBe("Expired");
             text.ApprovalDisabledReasonLabel("evidence-expired").ShouldBe("Evidence expired");
             text.ApprovalDisabledReasonLabel("corrected-context-invalidated").ShouldBe("Corrected context invalidated");
-            text.FailureCatalogHeadline("refusal_blocked_action").ShouldBe("Refused action");
+            text.FailureCatalogHeadline("refusal_blocked_action").ShouldBe("Action blocked.");
             text.FailureCatalogReason("authorization_denied").ShouldBe("The operation is not available to this caller.");
-            text.FailureCatalogHeadline("recoverable_mailbox_degradation").ShouldBe("Mailbox recovery pending");
+            text.FailureCatalogHeadline("recoverable_mailbox_degradation").ShouldBe("Mailbox recovery pending.");
             text.FailureBlockedReasonLabel("retry-exhausted").ShouldBe("Retry exhausted");
             text.FailureBlockedReasonLabel("already-decided").ShouldBe("Already decided");
             text.ClassificationKindLabel("actionable").ShouldBe("Actionable");
@@ -402,8 +445,8 @@ public sealed class ChatBotLocalizationContractTests
         blocked.ShouldContain("UiText.BlockedStateAccessibleLabel");
         status.ShouldContain("UiText.StatusAccessibleLabel");
         risk.ShouldContain("ChatBotUiTextKey.RiskPolicyReasonDefault");
-        blocked.ShouldContain("ChatBotUiTextKey.BlockedReasonTextDefault");
-        blocked.ShouldContain("ChatBotUiTextKey.SafeNextActionDefault");
+        blocked.ShouldContain("UiText.FailureCatalogReason");
+        blocked.ShouldContain("UiText.FailureNextActionLabel");
         action.ShouldContain("ChatBotUiTextKey.DisabledReasonDefault");
         participant.ShouldContain("UiText.ParticipantStatusLabel");
         participant.ShouldContain("UiText.ParticipantBlockedReasonLabel");

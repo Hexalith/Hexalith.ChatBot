@@ -51,10 +51,11 @@
             {
                 <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Danger"
                                      Message="@UiText[ChatBotUiTextKey.SubmissionFailed]"
+                                     MessageCatalogCode="@error"
                                      AccessibleLabel="@UiText[ChatBotUiTextKey.SubmissionFailedAccessible]"
                                      StableId="governed-note-failed"
                                      StateFamily="@ChatBotFeedbackStateFamily.RetryableFailure"
-                                     AnnouncementKey="@($"governed-note-failed-{error}-{_failureSequence.ToString(System.Globalization.CultureInfo.InvariantCulture)}")">
+                                     AnnouncementKey="@($"governed-note-failed-{UiText.FailureCatalogEntry(error).Code}-{_failureSequence.ToString(System.Globalization.CultureInfo.InvariantCulture)}")">
                     @UiText.Get(ChatBotUiTextKey.SubmissionFailedBodyTemplate, error)
                 </ChatBotStatusBanner>
             }

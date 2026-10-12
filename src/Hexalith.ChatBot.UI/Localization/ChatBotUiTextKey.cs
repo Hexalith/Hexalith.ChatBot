@@ -5,6 +5,11 @@ namespace Hexalith.ChatBot.UI.Localization;
 /// </summary>
 public static class ChatBotUiTextKey
 {
+    public const string FailureCatalogHeadlinePrefix = "Failure_Catalog_";
+    public const string FailureCatalogReasonPrefix = "Failure_CatalogReason_";
+    public const string FailureNextActionDismiss = "Failure_NextAction_Dismiss";
+    public const string FailureNextActionAuthenticate = "Failure_NextAction_Authenticate";
+    public const string FailureNextActionCorrectRequest = "Failure_NextAction_CorrectRequest";
     public const string ActorCategoryAiActor = "ActorCategory_AiActor";
     public const string ActorCategoryBackgroundWorker = "ActorCategory_BackgroundWorker";
     public const string ActorCategoryCli = "ActorCategory_Cli";
@@ -1250,6 +1255,9 @@ public static class ChatBotUiTextKey
         FailureDuplicateSuppressionLabel,
         FailureEscalationTargetLabel,
         FailureNextActionEscalate,
+        FailureNextActionDismiss,
+        FailureNextActionAuthenticate,
+        FailureNextActionCorrectRequest,
         FailureNextActionLabel,
         FailureNextActionNone,
         FailureNextActionRequestAccess,
