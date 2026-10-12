@@ -92,13 +92,15 @@
                                      ReasonText="@UiText[ChatBotUiTextKey.FailureStatusRetryable]"
                                      SafeNextAction="@UiText[ChatBotUiTextKey.FailureNextActionRetryLater]"
                                      StableId="project-workspace-retryable" />
-                <FluentButton Type="ButtonType.Button"
-                              Appearance="ButtonAppearance.Outline"
-                              Class="chatbot-touch-target-primary"
-                              OnClick="@RetryLoad"
-                              data-chatbot-stable-id="project-conversation-retry">
-                    @UiText[ChatBotUiTextKey.FailureNextActionRetryLater]
-                </FluentButton>
+                @if (UiText.FailureCatalogEntry(State.Value.ErrorCode).NextAction == ChatBotMessageNextActions.RetryLater)
+                {
+                    <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.FailureNextActionRetryLater]"
+                                           StableId="project-conversation-retry"
+                                           State="@(State.Value.IsLoading ? ChatBotGovernedActionState.DisabledWithReason : ChatBotGovernedActionState.Enabled)"
+                                           DisabledReason="@UiText[ChatBotUiTextKey.ProjectConversationLoading]"
+                                           Appearance="ButtonAppearance.Outline"
+                                           OnActivate="@RetryLoad" />
+                }
             }
 
             @if (Conversation is { } conversation)
@@ -116,6 +118,7 @@
                 @if (conversation.IsBlockedOrStale)
                 {
                     <ChatBotBlockedState Reason="@BlockedReason"
+                                         UseLocalStateGuidance="true"
                                          ReasonText="@UiText[ChatBotUiTextKey.ProjectConversationBlocked]"
                                          SafeNextAction="@conversation.SafeNextAction"
                                          StableId="project-conversation-blocked" />
@@ -227,7 +230,7 @@
                         <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
                             @CodeRow(UiText[ChatBotUiTextKey.ProjectLabel], conversation.ProjectId)
                             @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], conversation.ConversationState)
-                            @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], conversation.SafeNextAction)
+                            @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], UiText.FailureNextActionLabel(conversation.SafeNextAction))
                             @CodeRow(UiText[ChatBotUiTextKey.AssociationReviewMetadata], $"{conversation.SourceProvenance} · {conversation.SchemaVersion}")
                         </FluentStack>
                     </section>
@@ -497,7 +500,7 @@
 
     private string? ComposerDisabledReasonCode
         => State.Value.ErrorCode is not null
-            ? IsUnauthorizedError ? "unauthorized" : "degraded"
+            ? State.Value.ErrorCode
             : Conversation?.Status is "Blocked" or "Stale" or "Degraded"
                 ? "degraded"
                 : Conversation is null

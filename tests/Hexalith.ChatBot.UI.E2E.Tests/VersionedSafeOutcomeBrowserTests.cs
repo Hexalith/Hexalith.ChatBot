@@ -12,6 +12,38 @@ namespace Hexalith.ChatBot.UI.E2E.Tests;
 /// <summary>Exercises safe catalog failures in the real Blazor UI with Fluent UI v5 and a Chromium browser.</summary>
 public sealed class VersionedSafeOutcomeBrowserTests
 {
+    /// <summary>Distinct user submissions must announce even when their safe rejection code is unchanged.</summary>
+    [Fact]
+    public async Task TwoSameCodeSubmissionsShouldUseDistinctAnnouncementKeys()
+    {
+        LiveChatBotUiHost host = new("authorization_denied");
+        await using var hostLifetime = host.ConfigureAwait(true);
+        _ = host.Server;
+        using IPlaywright playwright = await Playwright.CreateAsync().ConfigureAwait(true);
+        string? chrome = Environment.GetEnvironmentVariable("CHROME_EXECUTABLE_PATH");
+        IBrowser browser = await playwright.Chromium.LaunchAsync(new()
+        {
+            Headless = true, ExecutablePath = string.IsNullOrWhiteSpace(chrome) ? null : chrome,
+            Args = ["--no-sandbox", "--disable-dev-shm-usage"],
+        }).ConfigureAwait(true);
+        await using var browserLifetime = browser.ConfigureAwait(true);
+        IBrowserContext context = await browser.NewContextAsync().ConfigureAwait(true);
+        await using var contextLifetime = context.ConfigureAwait(true);
+        await context.AddCookiesAsync([new Cookie { Name = ".AspNetCore.Culture", Value = "c=en|uic=en", Url = host.BaseUri }]).ConfigureAwait(true);
+        IPage page = await context.NewPageAsync().ConfigureAwait(true);
+        await page.GotoAsync($"{host.BaseUri}/projects/project-alpha/conversation").ConfigureAwait(true);
+        ILocator composer = page.Locator(".chatbot-governed-composer");
+        await composer.Locator("textarea").FillAsync("Repeated safe submission").ConfigureAwait(true);
+        ILocator banner = composer.Locator("#project-conversation-composer-status");
+        for (int attempt = 1; attempt <= 2; attempt++)
+        {
+            await composer.Locator(".chatbot-governed-composer__actions fluent-button").ClickAsync().ConfigureAwait(true);
+            await Assertions.Expect(banner).ToHaveAttributeAsync("data-chatbot-announcement-key",
+                $"project-conversation-composer-attempt-{attempt}-authorization_denied").ConfigureAwait(true);
+            await Assertions.Expect(banner).ToContainTextAsync("The operation is not available to this caller.").ConfigureAwait(true);
+        }
+    }
+
     /// <summary>Checks localized denial text, semantic state and keyboard reachable unavailable actions in each visual mode.</summary>
     /// <param name="culture">The UI culture.</param>
     /// <param name="colorScheme">The preferred color scheme.</param>

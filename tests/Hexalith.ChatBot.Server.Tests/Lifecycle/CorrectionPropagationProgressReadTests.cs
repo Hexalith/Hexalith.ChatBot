@@ -8,6 +8,7 @@ using Google.Protobuf.WellKnownTypes;
 
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Queries;
@@ -106,6 +107,7 @@ public sealed class CorrectionPropagationProgressReadTests
         };
         OperationStatusRecord record = OperationStatusRecord.Accepted("tenant-alpha", accepted, false, clock.UtcNow) with
         {
+            ReasonCode = ChatBotMessageCodes.AuditUnavailable, SafeNextActions = [ChatBotMessageNextActions.RetryLater],
             NextRetryAt = due, RetryCount = 1, MaxAttempts = 5, WorkflowRetryCount = 1,
             WorkflowInstanceId = clock.InstanceId, WorkflowStatus = CorrectionPropagationWorkflowStatuses.Retrying,
         };

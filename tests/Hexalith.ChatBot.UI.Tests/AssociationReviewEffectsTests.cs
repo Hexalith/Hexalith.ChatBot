@@ -55,7 +55,7 @@ public sealed class AssociationReviewEffectsTests
 
         dispatcher.Actions.OfType<AssociationDecisionValidationRejectedAction>()
             .Single()
-            .ValidationErrorCode.ShouldBe("association-review-unavailable");
+            .ValidationErrorCode.ShouldBe("generic_denial");
     }
 
     /// <summary>
@@ -170,7 +170,7 @@ public sealed class AssociationReviewEffectsTests
 
         dispatcher.Actions.OfType<AssociationReviewFailedAction>()
             .Single()
-            .ErrorCode.ShouldBe("association-review-unavailable");
+            .ErrorCode.ShouldBe("generic_denial");
     }
 
     private static AssociationReviewEffects EffectsThatThrow(Exception exception)

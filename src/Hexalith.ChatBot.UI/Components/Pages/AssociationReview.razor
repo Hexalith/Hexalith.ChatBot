@@ -51,11 +51,12 @@
                    failure summary is reached before the fields it is about. *@
                 <div @ref="_errorSummary" tabindex="-1" class="chatbot-association-review__summary">
                 <ChatBotStatusBanner Kind="@FailureKind(error)"
+                                     MessageCatalogCode="@AssociationReviewFailureCatalog.CatalogCode(error)"
                                      Message="@FailureMessage(error)"
                                      AccessibleLabel="@FailureMessage(error)"
                                      StableId="association-review-failed"
                                      StateFamily="@AssociationReviewFailureCatalog.StateFamily(error)"
-                                     AnnouncementKey="@($"association-review-failed-{error}")">
+                                     AnnouncementKey="association-review-failed">
                     @FailureBody(error)
                 </ChatBotStatusBanner>
                 </div>

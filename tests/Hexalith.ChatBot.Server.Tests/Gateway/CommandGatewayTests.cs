@@ -5125,10 +5125,10 @@ public sealed partial class CommandGatewayTests
     {
         ProblemDetails problem = DefaultProblemDetailsFactory().CreateAuthorizationProblem(reasonCode, CorrelationId, TaskId);
 
-        problem.Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        problem.Code.ShouldBe(reasonCode);
         problem.ClientAction.ShouldBe(ProblemDetailsClientAction.RequestAccess);
         problem.Retryable.ShouldBeFalse();
-        problem.Message.ShouldBe("The operation is not available to this caller.");
+        problem.Message.ShouldBe(ChatBotMessageCatalog.Resolve(reasonCode).Reason);
         problem.Message.ShouldNotContain(reasonCode);
     }
 
@@ -5225,7 +5225,8 @@ public sealed partial class CommandGatewayTests
         problem.Message.ShouldBe(ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.GenericDenial).Reason);
         problem.Retryable.ShouldBeFalse();
         fallbackCount.ShouldBe(1);
-        telemetry.Counts.ShouldBeEmpty();
+        telemetry.Counts.ShouldHaveSingleItem().ShouldBe(new KeyValuePair<(string CatalogVersion, string FallbackCode), int>(
+            (ChatBotMessageCatalogVersion.Current, ChatBotMessageCodes.GenericDenial), 1));
         Serialized(problem).ShouldNotContain("project-alpha", Case.Insensitive);
         Serialized(problem).ShouldNotContain("InvalidOperationException", Case.Insensitive);
     }

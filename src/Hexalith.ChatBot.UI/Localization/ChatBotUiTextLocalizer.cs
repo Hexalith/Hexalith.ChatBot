@@ -359,6 +359,7 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
             "reprocess-created" or "ReprocessCreated" => ChatBotUiTextKey.FailureBlockedReasonReprocessCreated,
             "correction-delayed" or "CorrectionDelayed" => ChatBotUiTextKey.FailureBlockedReasonCorrectionDelayed,
             "unsafe-context" or "UnsafeContext" => ChatBotUiTextKey.FailureBlockedReasonUnsafeContext,
+            "disabled-action" or "DisabledAction" => ChatBotUiTextKey.FailureBlockedReasonDisabledAction,
             _ => ChatBotUiTextKey.DecisionUnavailableValue,
         });
 

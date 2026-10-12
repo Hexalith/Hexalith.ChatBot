@@ -118,6 +118,152 @@ public sealed class OperationStatusWorkflowStatusSinkTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExplicitGenericDenialShouldSuppressSuccessfulStateAndOperationCounts(bool secondary)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        OperationStatusRecord record = OperationStatusRecord.Accepted("tenant-alpha", new CommandSubmissionResponse
+        {
+            CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            OperationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+            LifecycleState = LifecycleState.Corrected,
+            AcceptedAt = now,
+        }, false, now) with
+        {
+            ReasonCode = secondary ? ChatBotMessageCodes.CommandAccepted : ChatBotMessageCodes.GenericDenial,
+            FailureReasonCode = secondary ? ChatBotMessageCodes.GenericDenial : null,
+            CompletionStatus = OperationStatusRecord.Completed,
+            RetryCount = 2,
+            MaxAttempts = 5,
+            WorkflowRetryCount = 3,
+            DuplicateAttemptCount = 4,
+            SafeNextActions = ["retry-later"],
+            NextRetryAt = now.AddSeconds(-1),
+        };
+        JsonElement wire = OperationStatusHttpResults.ToJsonElement(record, now);
+        wire.GetProperty("completionStatus").GetString().ShouldBe("failed");
+        wire.GetProperty("lifecycleState").GetString().ShouldBe("Failed");
+        wire.GetProperty("safeNextActions")[0].GetString().ShouldBe("dismiss");
+        wire.GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
+        foreach (string field in new[] { "retryCount", "maxAttempts", "workflowRetryCount", "duplicateAttemptCount" })
+        {
+            wire.GetProperty(field).GetInt32().ShouldBe(0);
+        }
+    }
+
+    [Theory]
+    [InlineData(ChatBotMessageCodes.CommandAccepted)]
+    [InlineData(ChatBotMessageCodes.AssociationCorrectionPropagationPending)]
+    [InlineData(ChatBotMessageCodes.RetryQueued)]
+    public void WaitingOutcomeShouldNotInventRetryPermission(string code)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        OperationStatusRecord record = OperationStatusRecord.Accepted("tenant", new CommandSubmissionResponse
+        {
+            CommandId = "command", OperationId = "operation", CorrelationId = "correlation", AcceptedAt = now,
+        }, false, now) with
+        {
+            ReasonCode = code,
+            SafeNextActions = [ChatBotMessageNextActions.None],
+            NextRetryAt = now.AddSeconds(-1),
+            MaxAttempts = 5,
+        };
+        JsonElement wire = OperationStatusHttpResults.ToJsonElement(record, now);
+        wire.GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
+        wire.GetProperty("safeNextActions").EnumerateArray().ShouldNotContain(action => action.GetString() == "retry-later");
+    }
+
+    /// <summary>Each optional reason guard independently denies malformed stored metadata.</summary>
+    /// <param name="field">The optional reason field to invalidate.</param>
+    [Theory]
+    [InlineData("terminal")]
+    [InlineData("failure")]
+    [InlineData("terminal-code")]
+    [InlineData("workflow")]
+    public void EachUnknownOptionalReasonShouldIndependentlyDenyOutcome(string field)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        OperationStatusRecord record = RetryableRecord(now);
+        const string unknown = "private-optional-reason";
+        record = field switch
+        {
+            "terminal" => record with { TerminalReason = unknown },
+            "failure" => record with { FailureReasonCode = unknown },
+            "terminal-code" => record with { TerminalReasonCode = unknown },
+            _ => record with { WorkflowLastFailureCode = unknown },
+        };
+        JsonElement wire = OperationStatusHttpResults.ToJsonElement(record, now);
+        wire.GetProperty("reasonCode").GetString().ShouldBe(ChatBotMessageCodes.GenericDenial);
+        wire.GetProperty("completionStatus").GetString().ShouldBe("failed");
+        wire.GetProperty("lifecycleState").GetString().ShouldBe("Failed");
+        wire.GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
+        wire.GetProperty("safeNextActions").EnumerateArray().ShouldHaveSingleItem().GetString().ShouldBe("dismiss");
+        wire.GetRawText().ShouldNotContain(unknown);
+    }
+
+    /// <summary>Malformed nested reasons and lifecycle values deny the whole status.</summary>
+    /// <param name="field">The nested field to invalidate.</param>
+    [Theory]
+    [InlineData("reason")]
+    [InlineData("lifecycle")]
+    [InlineData("generic")]
+    public void NestedOnlyMalformedOutcomeShouldDenyWholeStatus(string field)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        CommandSubmissionResponse previous = new()
+        {
+            CommandId = "previous-command", OperationId = "previous-operation", CorrelationId = "previous-correlation",
+            ReasonCode = field == "reason" ? (ChatBotMessageCode)999999 : field == "generic" ? ChatBotMessageCode.Generic_denial : ChatBotMessageCode.Command_accepted,
+            LifecycleState = field == "lifecycle" ? (LifecycleState)999999 : LifecycleState.Proposed,
+            RetryEligible = true,
+            AcceptedAt = now,
+        };
+        JsonElement wire = OperationStatusHttpResults.ToJsonElement(RetryableRecord(now) with { PriorOutcome = previous }, now);
+        wire.GetProperty("reasonCode").GetString().ShouldBe(ChatBotMessageCodes.GenericDenial);
+        wire.GetProperty("completionStatus").GetString().ShouldBe("failed");
+        wire.GetProperty("lifecycleState").GetString().ShouldBe("Failed");
+        wire.GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
+        wire.GetProperty("safeNextActions").EnumerateArray().ShouldHaveSingleItem().GetString().ShouldBe("dismiss");
+        wire.TryGetProperty("priorOutcome", out _).ShouldBeFalse();
+        wire.GetRawText().ShouldNotContain("999999");
+    }
+
+    /// <summary>Nested retry permission cannot exceed the catalog action permission.</summary>
+    /// <param name="reason">The nested catalog reason.</param>
+    /// <param name="permitted">Whether that reason permits retry.</param>
+    [Theory]
+    [InlineData(ChatBotMessageCode.Command_accepted, false)]
+    [InlineData(ChatBotMessageCode.Authentication_denied, false)]
+    [InlineData(ChatBotMessageCode.Audit_unavailable, true)]
+    public void NestedRetryEligibilityShouldIntersectCatalogPermission(ChatBotMessageCode reason, bool permitted)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        CommandSubmissionResponse previous = new()
+        {
+            CommandId = "previous-command", OperationId = "previous-operation", CorrelationId = "previous-correlation",
+            ReasonCode = reason, LifecycleState = LifecycleState.Proposed, RetryEligible = true, AcceptedAt = now,
+        };
+        JsonElement wire = OperationStatusHttpResults.ToJsonElement(RetryableRecord(now) with { PriorOutcome = previous }, now);
+        wire.GetProperty("priorOutcome").GetProperty("retryEligible").GetBoolean().ShouldBe(permitted);
+        wire.GetProperty("reasonCode").GetString().ShouldBe(ChatBotMessageCodes.AuditUnavailable);
+    }
+
+    private static OperationStatusRecord RetryableRecord(DateTimeOffset now)
+        => OperationStatusRecord.Accepted("tenant", new CommandSubmissionResponse
+        {
+            CommandId = "command", OperationId = "operation", CorrelationId = "correlation", AcceptedAt = now,
+            LifecycleState = LifecycleState.Proposed,
+        }, false, now) with
+        {
+            ReasonCode = ChatBotMessageCodes.AuditUnavailable,
+            SafeNextActions = [ChatBotMessageNextActions.RetryLater],
+            NextRetryAt = now.AddSeconds(-1),
+            MaxAttempts = 5,
+        };
+
+    [Theory]
     [InlineData(new string[] { "none" }, false)]
     [InlineData(new string[] { "retry-later", "private-unsafe-action", "escalate" }, true)]
     public void KnownCodeShouldOnlyExposeStoredActionsAllowedByCatalog(string[] storedActions, bool retryAllowed)

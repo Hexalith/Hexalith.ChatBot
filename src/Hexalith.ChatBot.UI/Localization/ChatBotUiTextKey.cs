@@ -351,6 +351,7 @@ public static class ChatBotUiTextKey
     public const string FailureNextActionEscalate = "Failure_NextAction_Escalate";
     public const string FailureNextActionLabel = "Failure_NextAction_Label";
     public const string FailureNextActionNone = "Failure_NextAction_None";
+    public const string FailureBlockedReasonDisabledAction = "Failure_BlockedReason_DisabledAction";
     public const string FailureNextActionRequestAccess = "Failure_NextAction_RequestAccess";
     public const string FailureNextActionRetryLater = "Failure_NextAction_RetryLater";
     public const string FailureNextRetryAtLabel = "Failure_NextRetryAt_Label";
@@ -1261,6 +1262,7 @@ public static class ChatBotUiTextKey
         FailureNextActionCorrectRequest,
         FailureNextActionLabel,
         FailureNextActionNone,
+        FailureBlockedReasonDisabledAction,
         FailureNextActionRequestAccess,
         FailureNextActionRetryLater,
         FailureNextRetryAtLabel,

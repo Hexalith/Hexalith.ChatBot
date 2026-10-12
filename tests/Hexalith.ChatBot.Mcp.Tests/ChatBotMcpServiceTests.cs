@@ -84,7 +84,7 @@ public static class ChatBotMcpServiceTests
         JsonElement result = ChatBotMcpResultFormatter.FormatOperationStatus(status);
 
         result.GetProperty("completionStatus").GetString().ShouldBe("failed");
-        result.GetProperty("lifecycleState").GetString().ShouldBe("failed");
+        result.GetProperty("lifecycleState").GetString().ShouldBe("Failed");
         result.GetProperty("partialSuccess").GetBoolean().ShouldBeFalse();
         result.GetProperty("safeNextActions").EnumerateArray().Select(action => action.GetString()).ShouldBe(["dismiss"]);
         result.GetProperty("terminalReason").GetString().ShouldBe("generic_denial");
@@ -378,6 +378,7 @@ public static class ChatBotMcpServiceTests
             McpToolDeniedException.InvalidArgument("mcp.argument.private", "restricted private reason", "unsafe-action"));
 
         result.GetProperty("code").GetString().ShouldBe("generic_denial");
+        result.GetProperty("category").GetString().ShouldBe("authorization_denied");
         result.GetProperty("safeSuggestion").GetString().ShouldBe("dismiss");
         result.GetRawText().ShouldNotContain("restricted private reason");
         result.GetRawText().ShouldNotContain("unsafe-action");
@@ -547,6 +548,59 @@ public static class ChatBotMcpServiceTests
         result.GetProperty("terminalReason").GetString().ShouldBe("generic_denial");
         result.GetProperty("failureReasonCode").GetString().ShouldBe("generic_denial");
         result.GetProperty("terminalReasonCode").GetString().ShouldBe("generic_denial");
+        result.GetProperty("safeNextActions")[0].GetString().ShouldBe("dismiss");
+        result.GetRawText().ShouldNotContain("999999");
+    }
+
+    /// <summary>Rejects acceptance codes and malformed categories in denied problem output.</summary>
+    /// <param name="code">The supplied catalog code.</param>
+    /// <param name="category">The supplied category.</param>
+    [Theory]
+    [InlineData("command_accepted", ProblemDetailsCategory.Authorization_denied)]
+    [InlineData("audit_unavailable", (ProblemDetailsCategory)999999)]
+    public static void RefusedProblemShouldDenyIncompatibleMetadata(string code, ProblemDetailsCategory category)
+    {
+        var exception = new HexalithChatBotApiException<ProblemDetails>("restricted", 403, "restricted", null!,
+            new ProblemDetails { Code = code, Category = category, Retryable = true, ClientAction = ProblemDetailsClientAction.RetryLater }, null);
+        JsonElement result = ChatBotMcpResultFormatter.FormatSafeDenial(exception);
+        result.GetProperty("code").GetString().ShouldBe("generic_denial");
+        result.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        result.GetProperty("retryable").GetBoolean().ShouldBeFalse();
+        result.GetProperty("clientAction").GetString().ShouldBe("dismiss");
+        result.GetProperty("message").GetString().ShouldBe("The requested action is unavailable.");
+        result.GetRawText().ShouldNotContain("accepted");
+        result.GetRawText().ShouldNotContain("999999");
+    }
+
+    /// <summary>Exercises action normalization with otherwise valid status metadata.</summary>
+    [Fact]
+    public static void OtherwiseValidStatusShouldDismissOnlyUndefinedAction()
+    {
+        OperationStatus status = OperationStatus();
+        status.ReasonCode = ChatBotMessageCode.Command_accepted;
+        status.SafeNextActions = [(ChatBotMessageNextAction)999999];
+        JsonElement result = ChatBotMcpResultFormatter.FormatOperationStatus(status);
+        result.GetProperty("safeNextActions")[0].GetString().ShouldBe("dismiss");
+        result.GetProperty("completionStatus").GetString().ShouldBe("accepted-projection-pending");
+        result.GetRawText().ShouldNotContain("999999");
+        result.GetRawText().ShouldNotContain("generic_denial");
+    }
+
+    [Theory]
+    [InlineData("lifecycle")]
+    [InlineData("completion")]
+    [InlineData("audit")]
+    public static void UndefinedStatusStateShouldProduceTerminalSafeOutput(string field)
+    {
+        OperationStatus status = OperationStatus();
+        if (field == "lifecycle") status.LifecycleState = (Hexalith.ChatBot.Client.Generated.LifecycleState)999999;
+        if (field == "completion") status.CompletionStatus = (OperationCompletionStatus)999999;
+        if (field == "audit") status.AuditStatus = (OperationAuditStatus)999999;
+
+        JsonElement result = ChatBotMcpResultFormatter.FormatOperationStatus(status);
+        result.GetProperty("lifecycleState").GetString().ShouldBe("Failed");
+        result.GetProperty("completionStatus").GetString().ShouldBe("failed");
+        result.GetProperty("partialSuccess").GetBoolean().ShouldBeFalse();
         result.GetProperty("safeNextActions")[0].GetString().ShouldBe("dismiss");
         result.GetRawText().ShouldNotContain("999999");
     }

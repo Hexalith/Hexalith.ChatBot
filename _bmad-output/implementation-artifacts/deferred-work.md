@@ -1412,3 +1412,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - Unknown completion or audit text still throws before the generic-denial path (`OperationStatusHttpResults.cs:29`). Pre-existing parser. The fallback state still needs the schema and forward-compatibility decision already recorded above.
 - Failure items still render category, scope, dependency, and escalation fields (`ChatBotFailureStateConversationItem.razor:45`). Pre-existing projected fields; same exposure as the earlier Story 1.4 deferral.
 - Story commit `abcb637` advances the EventStore, FrontComposer, and Memories gitlinks. Maybe-false, medium if those pointer moves are unnecessary. Settle by building this story against the previous commits `1b7b8ce`, `c7491c7`, and `b16ab01`.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
+  summary: Unverified medium risk: unconditional solution sibling entries may expand the Release package-mode build beyond the existing AppHost source closure.
+  evidence: Compare exact Release project graphs at the story baseline and current revision with UseHexalithProjectReferences=false; the source inventory alone does not establish which additional projects would newly build. The existing AppHost already carries direct sibling resource references.

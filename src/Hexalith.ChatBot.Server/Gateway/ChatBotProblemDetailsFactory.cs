@@ -8,6 +8,7 @@ namespace Hexalith.ChatBot.Server.Gateway;
 internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFactory
 {
     private readonly IUserFacingRedactionStage redactionStage;
+    private readonly IUserFacingMessageTelemetry _telemetry;
 
     public ChatBotProblemDetailsFactory(
         IUserFacingRedactionStage redactionStage,
@@ -16,6 +17,7 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
         ArgumentNullException.ThrowIfNull(redactionStage);
         this.redactionStage = redactionStage;
         ArgumentNullException.ThrowIfNull(telemetry);
+        _telemetry = telemetry;
     }
 
     public ProblemDetails CreateValidationProblem(string correlationId, string? taskId)
@@ -42,6 +44,10 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
         bool known = IsKnownAuthorizationReason(reasonCode);
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(
             known ? AuthorizationCatalogCode(reasonCode) : null);
+        if (!known)
+        {
+            _telemetry.RecordUncategorizedMessage(entry.Version, entry.Code);
+        }
         string catalogCode = entry.Code;
         int status = string.Equals(catalogCode, ChatBotMessageCodes.AuthenticationDenied, StringComparison.Ordinal)
             ? StatusCodes.Status401Unauthorized
@@ -59,8 +65,7 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
             Message = entry.Reason,
             CorrelationId = correlationId,
             TaskId = taskId,
-            Retryable = known && reasonCode != ChatBotRefusalReasonCodes.EvidenceExpired &&
-                !entry.IsTerminal && entry.NextAction == ChatBotMessageNextActions.RetryLater,
+            Retryable = known && !entry.IsTerminal && entry.NextAction == ChatBotMessageNextActions.RetryLater,
             ClientAction = ClientAction(entry.NextAction),
         });
     }
@@ -202,6 +207,7 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
             ChatBotAuthorizationReasonCodes.ServiceClientRateLimited => ChatBotMessageCodes.ServiceClientRateLimited,
             ChatBotAuthorizationReasonCodes.AiActorRateLimited => ChatBotMessageCodes.AiActorRateLimited,
             ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited => ChatBotMessageCodes.CommandCapabilityRateLimited,
+            _ when ChatBotMessageCatalog.IsKnown(reasonCode) => reasonCode,
             _ => ChatBotMessageCodes.AuthorizationDenied,
         };
 
@@ -217,6 +223,8 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
             ChatBotAuthorizationReasonCodes.ParticipantDirectoryDegraded or
             ChatBotAuthorizationReasonCodes.CommandNotAllowlisted or
             ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized or
+            ChatBotAuthorizationReasonCodes.NotificationRoutingUnauthorized or
+            ChatBotAuthorizationReasonCodes.EscalationPolicyUnauthorized or
             ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized or
             ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable or
             ChatBotAuthorizationReasonCodes.AssociationCorrectionWorkflowUnavailable or

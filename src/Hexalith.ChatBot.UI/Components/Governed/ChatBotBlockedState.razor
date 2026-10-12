@@ -17,10 +17,10 @@
                   aria-live="@AriaLive"
                   aria-atomic="true"
                   aria-label="@AccessibleLabel">
-    <h2 class="chatbot-section-title">@UiText.BlockedReasonLabel(Reason)</h2>
+    <h2 class="chatbot-section-title">@ResolvedHeadline</h2>
     <p class="chatbot-body">@ResolvedReasonText</p>
     <p class="chatbot-body"><strong>@UiText[ChatBotUiTextKey.NextActionLabel]</strong> @ResolvedSafeNextAction</p>
-    @if (!IsLocalEmptyState && CatalogEntry.NextAction is not ChatBotMessageNextActions.None)
+    @if (!IsLocalEmptyState && ResolvedNextAction is not ChatBotMessageNextActions.None)
     {
         <ChatBotGovernedAction Label="@ResolvedSafeNextAction"
                                  StableId="@($"{StableId}-safe-action")"
@@ -43,6 +43,10 @@
 
     [Parameter]
     public bool UseLocalEmptyStateGuidance { get; set; }
+
+    /// <summary>Uses caller-owned localized guidance while guarding the supplied action token.</summary>
+    [Parameter]
+    public bool UseLocalStateGuidance { get; set; }
 
     [Parameter]
     public string SafeNextAction { get; set; } = string.Empty;
@@ -73,6 +77,8 @@
         {
             ChatBotBlockedReason.Denial => ChatBotMessageCodes.AuthorizationDenied,
             ChatBotBlockedReason.FailedDependency => ChatBotMessageCodes.DependencyDegraded,
+            ChatBotBlockedReason.Quarantine => ChatBotMessageCodes.RefusalBlockedAction,
+            ChatBotBlockedReason.UnsafeContext => ChatBotMessageCodes.AssociationAiContextBlocked,
             _ => ChatBotMessageCodes.GenericDenial,
         }));
 
@@ -87,10 +93,29 @@
     private string AriaLive => _announce ? FeedbackContract.AriaLive : "off";
 
     private string ResolvedReasonText
-        => IsLocalEmptyState ? ReasonText : UiText.FailureCatalogReason(CatalogEntry.Code);
+        => IsLocalEmptyState || IsLocalState ? ReasonText : UiText.FailureCatalogReason(CatalogEntry.Code);
+
+    private bool IsLocalState => UseLocalStateGuidance && MessageCatalogCode is null;
+
+    private string ResolvedHeadline => IsLocalEmptyState || IsLocalState
+        ? UiText.BlockedReasonLabel(Reason)
+        : UiText.FailureCatalogHeadline(CatalogEntry.Code);
 
     private string ResolvedSafeNextAction
-        => IsLocalEmptyState ? SafeNextAction : UiText.FailureNextActionLabel(CatalogEntry.NextAction);
+        => IsLocalEmptyState ? SafeNextAction : UiText.FailureNextActionLabel(ResolvedNextAction);
+
+    private string ResolvedNextAction
+        => IsLocalState ? SafeNextAction switch
+            {
+                ChatBotMessageNextActions.Authenticate or
+                ChatBotMessageNextActions.CorrectRequest or
+                ChatBotMessageNextActions.RetryLater or
+                ChatBotMessageNextActions.RequestAccess or
+                ChatBotMessageNextActions.Escalate or
+                ChatBotMessageNextActions.Dismiss or
+                ChatBotMessageNextActions.None => SafeNextAction,
+                _ => ChatBotMessageNextActions.Dismiss,
+            } : CatalogEntry.NextAction;
 
     private string AccessibleLabel => UiText.BlockedStateAccessibleLabel(Reason, ResolvedReasonText, ResolvedSafeNextAction);
 }

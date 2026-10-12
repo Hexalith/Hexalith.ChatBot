@@ -65,6 +65,41 @@ public static partial class MessageCatalogContractTests
         entry.IsTerminal.ShouldBeTrue();
     }
 
+    /// <summary>Processing failures convey failed state while refused outbound sends retain denied state.</summary>
+    /// <param name="code">The terminal processing failure.</param>
+    [Theory]
+    [InlineData(ChatBotMessageCodes.MemoriesCorrectionFailed)]
+    [InlineData(ChatBotMessageCodes.VectorReindexFailed)]
+    public static void TerminalProcessingFailureShouldHaveFailedState(string code)
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(code);
+        entry.State.ShouldBe("failed");
+        entry.IsTerminal.ShouldBeTrue();
+        ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.IdempotencyConflictOutboundSend).State.ShouldBe("denied");
+    }
+
+    [Theory]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictMessageIntake)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictCorrection)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictAssociationDecision)]
+    public static void AlreadyRecordedOutcomeShouldBeCompleted(string code)
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(code);
+        entry.State.ShouldBe("completed");
+        entry.IsTerminal.ShouldBeTrue();
+    }
+
+    [Fact]
+    public static void AccessibleDescriptionsShouldUsePhrasesInsteadOfActionTokens()
+    {
+        foreach (ChatBotMessageCatalogEntry entry in ChatBotMessageCatalog.Entries)
+        {
+            entry.AccessibleDescription.ShouldNotContain("Next action: " + entry.NextAction + ".");
+        }
+        ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AuthorizationDenied).AccessibleDescription
+            .ShouldEndWith("Next action: Request access.");
+    }
+
     [Fact]
     public static void EveryCatalogEntryHasCompleteSafeMetadata()
     {

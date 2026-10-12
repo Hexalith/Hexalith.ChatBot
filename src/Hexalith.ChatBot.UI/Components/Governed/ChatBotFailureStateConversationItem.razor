@@ -22,7 +22,7 @@
                                      StableId="@Item.ItemId" />
                 <ChatBotRiskChip RiskClass="ChatBotRiskActionClass.ProjectMutating"
                                  PolicyReason="@UiText.FailureBlockedReasonLabel(Item.BlockedReason)" />
-                <FluentText As="TextTag.Span" Class="chatbot-failure-conversation-item__status">@UiText.FailureStatusLabel(Item.FailureStatus)</FluentText>
+                <FluentText As="TextTag.Span" Class="chatbot-failure-conversation-item__status">@UiText.FailureStatusLabel(ResolvedFailureStatus)</FluentText>
                 <ChatBotActorBadge Category="ChatBotActorCategory.BackgroundWorker"
                                    DisplayLabel="@Item.ActorLabel" />
                 <time datetime="@FormatUtc(Item.OccurredAt)"
@@ -30,14 +30,17 @@
                     @FormatDisplayUtc(Item.OccurredAt)
                 </time>
             </FluentStack>
+    @if (!IsGenericDenial)
+    {
     <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
                                           Summary="@Item.StatusSummary" />
+    }
     <ChatBotConversationItemClassificationBadge ItemId="@Item.ItemId"
                                                 Classification="@Item.Classification"
                                                 DetectedIntent="@Item.DetectedIntent" />
     <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-failure-conversation-item__metadata">
-        @MetadataLabelValueRow(ChatBotUiTextKey.FailureStateKindLabel, UiText.FailureStateKindLabel(Item.FailureStateKind), Item.FailureStateKind)
-        @MetadataLabelValueRow(ChatBotUiTextKey.FailureStatusLabel, UiText.FailureStatusLabel(Item.FailureStatus), Item.FailureStatus)
+        @MetadataLabelValueRow(ChatBotUiTextKey.FailureStateKindLabel, UiText.FailureStateKindLabel(ResolvedFailureStateKind), ResolvedFailureStateKind)
+        @MetadataLabelValueRow(ChatBotUiTextKey.FailureStatusLabel, UiText.FailureStatusLabel(ResolvedFailureStatus), ResolvedFailureStatus)
         @MetadataLabelValueRow(ChatBotUiTextKey.FailureCatalogCodeLabel, UiText.FailureCatalogHeadline(CatalogEntry.Code), CatalogEntry.Code)
         @MetadataRow(ChatBotUiTextKey.FailureCatalogVersionLabel, CatalogEntry.Version)
         @MetadataLabelValueRow(ChatBotUiTextKey.FailureDetailVisibilityLabel, UiText.RedactionStateLabel(Item.MessageDetailVisibility), Item.MessageDetailVisibility)
@@ -50,11 +53,11 @@
         @MetadataRow(ChatBotUiTextKey.WorkflowInstanceIdLabel, Item.WorkflowInstanceId)
         @MetadataRow(ChatBotUiTextKey.FailureSupersedesWorkflowLabel, Item.SupersedesWorkflowInstanceId)
         @MetadataRow(ChatBotUiTextKey.FailureSupersededByWorkflowLabel, Item.SupersededByWorkflowInstanceId)
-        @MetadataRow(ChatBotUiTextKey.FailureRetryOperationLabel, Item.RetryOperationId)
+        @MetadataRow(ChatBotUiTextKey.FailureRetryOperationLabel, IsGenericDenial ? null : Item.RetryOperationId)
         @MetadataRow(ChatBotUiTextKey.FailureRetryableLabel, RetryableText)
         @MetadataRow(ChatBotUiTextKey.FailureRetryCountLabel, RetryCountText)
-        @TimestampRow(ChatBotUiTextKey.FailureNextRetryAtLabel, Item.NextRetryAtUtc)
-        @TimestampRow(ChatBotUiTextKey.FailureLastRetryAtLabel, Item.LastRetryAtUtc)
+        @TimestampRow(ChatBotUiTextKey.FailureNextRetryAtLabel, IsGenericDenial ? null : Item.NextRetryAtUtc)
+        @TimestampRow(ChatBotUiTextKey.FailureLastRetryAtLabel, IsGenericDenial ? null : Item.LastRetryAtUtc)
         @MetadataRow(ChatBotUiTextKey.FailureDuplicateSafetyLabel, Item.DuplicateSafetyState)
         @MetadataRow(ChatBotUiTextKey.FailureDuplicateSuppressionLabel, Item.DuplicateSuppressionId)
         @MetadataRow(ChatBotUiTextKey.FailureDependencyNameLabel, Item.DependencyName)
@@ -71,7 +74,7 @@
         <strong>@UiText[ChatBotUiTextKey.FailureReasonLabel]</strong> @UiText.FailureCatalogReason(Item.MessageCatalogCode)
     </p>
     <p class="chatbot-failure-conversation-item__reason" tabindex="0">
-        <strong>@UiText[ChatBotUiTextKey.FailureNextActionLabel]</strong> @UiText.FailureNextActionLabel(ResolvedSafeNextAction)
+        <strong>@UiText[ChatBotUiTextKey.FailureNextActionLabel]</strong> @UiText.FailureNextActionLabel(CatalogEntry.NextAction)
     </p>
     @if (CatalogEntry.NextAction is not ChatBotMessageNextActions.None)
     {
@@ -79,7 +82,7 @@
                                  StableId="@($"{Item.ItemId}-safe-action")"
                                  CriticalAction="false"
                                  State="@(OnNextAction.HasDelegate && ActionPermitted ? ChatBotGovernedActionState.Enabled : ChatBotGovernedActionState.DisabledWithReason)"
-                                 DisabledReason="@UiText.FailureBlockedReasonLabel(CatalogEntry.DisabledActionReason)"
+                                 DisabledReason="@UiText.FailureBlockedReasonLabel(ActionPermitted ? CatalogEntry.DisabledActionReason : ChatBotDisabledActionReasons.StateNotPermitted)"
                                  OnActivate="@OnNextAction" />
     }
     <p class="chatbot-failure-conversation-item__reason" tabindex="0">
@@ -112,17 +115,23 @@
 
     private ChatBotMessageCatalogEntry CatalogEntry => UiText.FailureCatalogEntry(Item.MessageCatalogCode);
 
+    private bool IsGenericDenial => CatalogEntry.Code == ChatBotMessageCodes.GenericDenial;
+
+    private string? ResolvedFailureStatus => IsGenericDenial ? "terminal" : Item.FailureStatus;
+
+    private string? ResolvedFailureStateKind => IsGenericDenial ? "terminal-failure" : Item.FailureStateKind;
+
     private bool _announce;
 
     protected override void OnParametersSet()
-        => _announce = AnnouncementDeduplication.ShouldAnnounce($"{Item.ItemId}-{CatalogEntry.Code}-{CatalogEntry.State}", ChatBotAnnouncementDedupRule.OncePerStableOperationKey);
+        => _announce = OnNextAction.HasDelegate && AnnouncementDeduplication.ShouldAnnounce($"{Item.ItemId}-{CatalogEntry.Code}-{CatalogEntry.State}", ChatBotAnnouncementDedupRule.OncePerStableOperationKey);
 
     private string AriaLive => _announce ? (IsTerminal ? "assertive" : "polite") : "off";
 
     private bool ActionPermitted
         => CatalogEntry.Code == ChatBotMessageCodes.GenericDenial ||
             (Item.SafeNextAction == CatalogEntry.NextAction && Item.ClientAction == CatalogEntry.NextAction &&
-                (CatalogEntry.NextAction != ChatBotMessageNextActions.RetryLater || Item.Retryable is true));
+                (CatalogEntry.NextAction != ChatBotMessageNextActions.RetryLater || (Item.Retryable is true && !IsTerminal)));
 
     private string ResolvedSafeNextAction
         => ActionPermitted ? CatalogEntry.NextAction : ChatBotMessageNextActions.None;
@@ -134,10 +143,11 @@
         => IsUnavailableReferenceStatus(Item.AuditStatus) ? null : Item.AuditOperationId;
 
     private string? RetryableText
-        => Item.Retryable is null ? null : (Item.Retryable.Value ? UiText[ChatBotUiTextKey.YesLabel] : UiText[ChatBotUiTextKey.NoLabel]);
+        => IsGenericDenial ? UiText[ChatBotUiTextKey.NoLabel]
+            : Item.Retryable is null ? null : (Item.Retryable.Value && !IsTerminal ? UiText[ChatBotUiTextKey.YesLabel] : UiText[ChatBotUiTextKey.NoLabel]);
 
     private string? RetryCountText
-        => Item.RetryCount is null && Item.MaxRetryCount is null
+        => IsGenericDenial || (Item.RetryCount is null && Item.MaxRetryCount is null)
             ? null
             : UiText.Get(ChatBotUiTextKey.FailureRetryCountTemplate, Item.RetryCount ?? 0, Item.MaxRetryCount ?? 0);
 
@@ -150,13 +160,14 @@
         => IsUnavailableReferenceStatus(Item.AuditStatus);
 
     private bool IsTerminal
-        => CatalogEntry.IsTerminal;
+        => CatalogEntry.IsTerminal || string.Equals(Item.FailureStatus, "terminal", StringComparison.OrdinalIgnoreCase) ||
+            Item.FailureStateKind is "terminal-failure" or "TerminalFailure";
 
     private string AccessibleLabel
         => UiText.Get(
             ChatBotUiTextKey.FailureStateAccessible,
             UiText.FailureCatalogHeadline(Item.MessageCatalogCode),
-            UiText.FailureStatusLabel(Item.FailureStatus),
+            UiText.FailureStatusLabel(ResolvedFailureStatus),
             FormatDisplayUtc(Item.OccurredAt));
 
     private static bool IsUnavailableReferenceStatus(string? status)

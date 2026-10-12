@@ -550,7 +550,7 @@ public sealed class AiOutcomeProjectionTests
         item.AiOutcomeStatus.ShouldBe(AiOutcomeStatus.Blocked);
         item.AiFailureCode.ShouldBe(ChatBotRefusalReasonCodes.EvidenceExpired);
         item.AiExecutionOutcomeCode.ShouldBe(ChatBotRefusalReasonCodes.EvidenceExpired);
-        item.AiSafeNextAction.ShouldBe(ChatBotMessageNextActions.RetryLater);
+        item.AiSafeNextAction.ShouldBe(ChatBotMessageNextActions.Dismiss);
         item.AiPolicySnapshotId.ShouldBe("policy-snap-001");
         item.AiRequesterId.ShouldBe("requester-001");
         item.AiSourceMessageId.ShouldBe("graph-message-001");

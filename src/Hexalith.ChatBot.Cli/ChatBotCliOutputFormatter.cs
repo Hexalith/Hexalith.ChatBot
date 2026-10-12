@@ -55,13 +55,15 @@ public static class ChatBotCliOutputFormatter
     {
         ArgumentNullException.ThrowIfNull(status);
 
-        bool knownOutcome = KnownStatusCode(status.ReasonCode) &&
+        bool knownOutcome = Enum.IsDefined(status.LifecycleState) &&
+            Enum.IsDefined(status.CompletionStatus) && Enum.IsDefined(status.AuditStatus) &&
+            KnownStatusCode(status.ReasonCode) &&
             KnownStatusCode(status.TerminalReason) &&
             KnownStatusCode(status.FailureReasonCode) &&
             KnownStatusCode(status.TerminalReasonCode) &&
             KnownStatusCode(status.WorkflowLastFailureCode);
         string completion = knownOutcome ? WireName(status.CompletionStatus) : "failed";
-        string lifecycle = knownOutcome ? WireName(status.LifecycleState) : "failed";
+        string lifecycle = knownOutcome ? WireName(status.LifecycleState) : WireName(LifecycleState.Failed);
         string[] actions = knownOutcome
             ? status.SafeNextActions.Select(SafeAction).ToArray()
             : [ChatBotMessageNextActions.Dismiss];
@@ -82,7 +84,7 @@ public static class ChatBotCliOutputFormatter
             lifecycleState = lifecycle,
             retryCount = status.RetryCount,
             completionStatus = completion,
-            auditStatus = WireName(status.AuditStatus),
+            auditStatus = Enum.IsDefined(status.AuditStatus) ? WireName(status.AuditStatus) : "unavailable",
             safeNextActions = actions,
             terminalReason,
             failureReasonCode,
@@ -104,7 +106,7 @@ public static class ChatBotCliOutputFormatter
             $"correlation-id: {status.CorrelationId}",
             $"lifecycle-state: {lifecycle}",
             $"completion-status: {completion}",
-            $"audit-status: {WireName(status.AuditStatus)}",
+            $"audit-status: {(Enum.IsDefined(status.AuditStatus) ? WireName(status.AuditStatus) : "unavailable")}",
             $"retry-count: {status.RetryCount}",
         ];
 
@@ -300,7 +302,10 @@ public static class ChatBotCliOutputFormatter
         ArgumentNullException.ThrowIfNull(exception);
 
         SafeDenialMetadata raw = SafeDenialMetadata.From(exception);
-        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(raw.Code);
+        bool compatible = raw.Code != ChatBotMessageCodes.CommandAccepted &&
+            (raw.Category is null or "request_denied" || Enum.GetValues<ProblemDetailsCategory>()
+                .Any(category => WireName(category) == raw.Category));
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(compatible ? raw.Code : null);
         bool retryable = raw.Retryable && !entry.IsTerminal &&
             entry.NextAction == ChatBotMessageNextActions.RetryLater && raw.SafeNextAction == entry.NextAction;
         string action = entry.Code == ChatBotMessageCodes.GenericDenial ? ChatBotMessageNextActions.Dismiss
@@ -309,6 +314,7 @@ public static class ChatBotCliOutputFormatter
                 ? entry.NextAction : ChatBotMessageNextActions.None;
         SafeDenialMetadata denial = raw with
         {
+            Category = entry.Code == ChatBotMessageCodes.GenericDenial ? "authorization_denied" : raw.Category,
             Code = entry.Code,
             Retryable = retryable,
             SafeNextAction = action,
@@ -436,9 +442,8 @@ public static class ChatBotCliOutputFormatter
     {
         public static SafeDenialMetadata From(Exception exception)
         {
-            if (exception is HexalithChatBotApiException<ProblemDetails> problemException)
+            if (exception is HexalithChatBotApiException<ProblemDetails> { Result: { } problem })
             {
-                ProblemDetails problem = problemException.Result;
                 return new SafeDenialMetadata(
                     SafeValue(problem.Code),
                     WireName(problem.Category),

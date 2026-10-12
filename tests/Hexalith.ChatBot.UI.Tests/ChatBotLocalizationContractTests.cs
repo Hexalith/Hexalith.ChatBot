@@ -89,6 +89,7 @@ public sealed class ChatBotLocalizationContractTests
     public void UntranslatedCatalogEntryShouldCountInputFreeFallback()
     {
         long count = 0;
+        int initiatingThread = Environment.CurrentManagedThreadId;
         using MeterListener listener = new();
         listener.InstrumentPublished = (instrument, meterListener) =>
         {
@@ -100,8 +101,11 @@ public sealed class ChatBotLocalizationContractTests
         };
         listener.SetMeasurementEventCallback<long>((_, measurement, tags, _) =>
         {
-            tags.Length.ShouldBe(0);
-            count += measurement;
+            if (Environment.CurrentManagedThreadId == initiatingThread)
+            {
+                tags.Length.ShouldBe(0);
+                count += measurement;
+            }
         });
         listener.Start();
 

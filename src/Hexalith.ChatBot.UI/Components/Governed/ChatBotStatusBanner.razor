@@ -122,9 +122,9 @@
         => _shouldAnnounceLiveRegion ? ResolvedPoliteness : ChatBotLiveRegionPoliteness.None;
 
     private string ResolvedAnnouncementKey
-        => string.IsNullOrWhiteSpace(AnnouncementKey)
-            ? MessageCatalogCode is null ? StableId : $"{StableId}-{CatalogEntry.Code}"
-            : AnnouncementKey;
+        => MessageCatalogCode is null
+            ? string.IsNullOrWhiteSpace(AnnouncementKey) ? StableId : AnnouncementKey
+            : $"{(string.IsNullOrWhiteSpace(AnnouncementKey) ? StableId : AnnouncementKey)}-{CatalogEntry.Code}";
 
     private ChatBotFeedbackStateFamily? ResolvedStateFamily
         => HasCatalogFailure && StateFamily is not ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate

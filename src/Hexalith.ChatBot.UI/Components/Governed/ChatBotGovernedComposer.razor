@@ -15,6 +15,7 @@
                              MessageCatalogCode="@StatusCatalogCode"
                              AccessibleLabel="@StatusMessage"
                              StableId="project-conversation-composer-status"
+                             AnnouncementKey="@($"project-conversation-composer-attempt-{_attemptSequence}")"
                              StateFamily="@StatusFamily">
             @if (!string.IsNullOrWhiteSpace(StatusCode))
             {
@@ -87,6 +88,7 @@
     private string? _focusedValidationErrorCode;
     private string? _focusedPendingCommandId;
     private bool _awaitingSubmissionReceipt;
+    private long _attemptSequence;
 
     [Parameter]
     public ProjectConversationComposerMode Mode { get; set; }
@@ -156,7 +158,8 @@
             {
                 "unauthorized" => ChatBotMessageCodes.AuthorizationDenied,
                 "degraded" => ChatBotMessageCodes.DependencyDegraded,
-                _ => null,
+                "loading" or null => null,
+                _ => DisabledReasonCode,
             };
 
     private ChatBotFeedbackKind StatusKind
@@ -230,6 +233,7 @@
             return;
         }
 
+        _attemptSequence++;
         _awaitingSubmissionReceipt = true;
         await OnSubmit.InvokeAsync(Text).ConfigureAwait(false);
     }

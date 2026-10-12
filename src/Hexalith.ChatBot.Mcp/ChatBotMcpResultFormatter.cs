@@ -47,7 +47,9 @@ public static class ChatBotMcpResultFormatter
     {
         ArgumentNullException.ThrowIfNull(status);
 
-        bool knownOutcome = KnownStatusCode(status.ReasonCode) &&
+        bool knownOutcome = Enum.IsDefined(status.LifecycleState) &&
+            Enum.IsDefined(status.CompletionStatus) && Enum.IsDefined(status.AuditStatus) &&
+            KnownStatusCode(status.ReasonCode) &&
             KnownStatusCode(status.TerminalReason) &&
             KnownStatusCode(status.FailureReasonCode) &&
             KnownStatusCode(status.TerminalReasonCode) &&
@@ -59,10 +61,10 @@ public static class ChatBotMcpResultFormatter
             status.OperationId,
             status.CommandId,
             status.CorrelationId,
-            lifecycleState = knownOutcome ? WireName(status.LifecycleState) : "failed",
+            lifecycleState = knownOutcome ? WireName(status.LifecycleState) : WireName(LifecycleState.Failed),
             status.RetryCount,
             completionStatus,
-            auditStatus = WireName(status.AuditStatus),
+            auditStatus = Enum.IsDefined(status.AuditStatus) ? WireName(status.AuditStatus) : "unavailable",
             safeNextActions = knownOutcome ? status.SafeNextActions.Select(SafeAction).ToArray() : [ChatBotMessageNextActions.Dismiss],
             terminalReason = !knownOutcome ? fallbackCode : status.TerminalReason is null ? null : SafeCode(status.TerminalReason.Value),
             failureReasonCode = !knownOutcome ? fallbackCode : status.FailureReasonCode is null ? null : SafeCode(status.FailureReasonCode.Value),
@@ -88,7 +90,10 @@ public static class ChatBotMcpResultFormatter
             "mcp.argument.invalid-enum" => ChatBotMessageCodes.CommandContractInvalid,
             _ => raw.Code,
         };
-        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(catalogCode);
+        bool compatible = catalogCode != ChatBotMessageCodes.CommandAccepted &&
+            (raw.Category == "request_denied" || Enum.GetValues<ProblemDetailsCategory>()
+                .Any(category => WireName(category) == raw.Category));
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(compatible ? catalogCode : null);
         bool retryable = raw.Retryable && !entry.IsTerminal &&
             entry.NextAction == ChatBotMessageNextActions.RetryLater && raw.ClientAction == entry.NextAction;
         string action = entry.Code == ChatBotMessageCodes.GenericDenial ? ChatBotMessageNextActions.Dismiss
@@ -97,7 +102,7 @@ public static class ChatBotMcpResultFormatter
                 ? entry.NextAction : ChatBotMessageNextActions.None;
         SafeDenialMetadata denial = raw with
         {
-            Category = ChatBotMessageCatalog.IsKnown(catalogCode) ? raw.Category : "authorization_denied",
+            Category = entry.Code == ChatBotMessageCodes.GenericDenial ? "authorization_denied" : raw.Category,
             Code = entry.Code,
             SafeMessage = entry.Reason,
             Retryable = retryable,
@@ -239,9 +244,8 @@ public static class ChatBotMcpResultFormatter
                     mcp.SafeSuggestion);
             }
 
-            if (exception is HexalithChatBotApiException<ProblemDetails> problemException)
+            if (exception is HexalithChatBotApiException<ProblemDetails> { Result: { } problem })
             {
-                ProblemDetails problem = problemException.Result;
                 string action = WireName(problem.ClientAction);
                 return new SafeDenialMetadata(
                     WireName(problem.Category),

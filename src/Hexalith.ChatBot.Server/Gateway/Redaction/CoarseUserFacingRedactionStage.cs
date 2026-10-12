@@ -10,8 +10,9 @@ internal sealed class CoarseUserFacingRedactionStage : IUserFacingRedactionStage
     public ProblemDetails Apply(ProblemDetails problem)
     {
         ArgumentNullException.ThrowIfNull(problem);
-        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(problem.Code);
-        bool known = ChatBotMessageCatalog.IsKnown(problem.Code);
+        bool known = problem.Code != ChatBotMessageCodes.CommandAccepted &&
+            ChatBotMessageCatalog.IsKnown(problem.Code) && Enum.IsDefined(problem.Category);
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(known ? problem.Code : null);
         ProblemDetailsClientAction catalogAction = entry.NextAction switch
         {
             ChatBotMessageNextActions.Authenticate => ProblemDetailsClientAction.Authenticate,

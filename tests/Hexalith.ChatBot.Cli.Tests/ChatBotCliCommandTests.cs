@@ -144,7 +144,7 @@ public static class ChatBotCliCommandTests
         JsonElement result = JsonDocument.Parse(ChatBotCliOutputFormatter.FormatOperationStatus(status, json: true)).RootElement.Clone();
 
         result.GetProperty("completionStatus").GetString().ShouldBe("failed");
-        result.GetProperty("lifecycleState").GetString().ShouldBe("failed");
+        result.GetProperty("lifecycleState").GetString().ShouldBe("Failed");
         result.GetProperty("partialSuccess").GetBoolean().ShouldBeFalse();
         result.GetProperty("safeNextActions").EnumerateArray().Select(action => action.GetString()).ShouldBe(["dismiss"]);
         result.GetProperty("terminalReason").GetString().ShouldBe("generic_denial");
@@ -153,7 +153,7 @@ public static class ChatBotCliCommandTests
         result.GetRawText().ShouldNotContain("999999");
         string text = ChatBotCliOutputFormatter.FormatOperationStatus(status, json: false);
         text.ShouldContain("completion-status: failed");
-        text.ShouldContain("lifecycle-state: failed");
+        text.ShouldContain("lifecycle-state: Failed");
         text.ShouldContain("safe-next-action: dismiss");
         text.ShouldNotContain("partial-success");
         text.ShouldNotContain("retry-later");
@@ -452,6 +452,81 @@ public static class ChatBotCliCommandTests
         text.ShouldContain("terminal-reason-code: generic_denial");
         text.ShouldContain("safe-next-action: dismiss");
         text.ShouldNotContain("999999");
+    }
+
+    /// <summary>Rejects acceptance codes and malformed categories in denied problem output.</summary>
+    /// <param name="code">The supplied catalog code.</param>
+    /// <param name="category">The supplied category.</param>
+    [Theory]
+    [InlineData("command_accepted", ProblemDetailsCategory.Authorization_denied)]
+    [InlineData("audit_unavailable", (ProblemDetailsCategory)999999)]
+    public static void RefusedProblemShouldDenyIncompatibleMetadata(string code, ProblemDetailsCategory category)
+    {
+        var exception = new HexalithChatBotApiException<ProblemDetails>("restricted", 403, "restricted", null!,
+            new ProblemDetails { Code = code, Category = category, Retryable = true, ClientAction = ProblemDetailsClientAction.RetryLater }, null);
+        string text = ChatBotCliOutputFormatter.FormatSafeDenial(exception, false);
+        using JsonDocument json = JsonDocument.Parse(ChatBotCliOutputFormatter.FormatSafeDenial(exception, true));
+        JsonElement result = json.RootElement;
+        result.GetProperty("code").GetString().ShouldBe("generic_denial");
+        result.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        result.GetProperty("retryable").GetBoolean().ShouldBeFalse();
+        result.GetProperty("safeNextActions")[0].GetString().ShouldBe("dismiss");
+        result.GetProperty("message").GetString().ShouldBe("The requested action is unavailable.");
+        text.ShouldContain("safe-next-action: dismiss");
+        text.ShouldNotContain("accepted");
+        text.ShouldNotContain("999999");
+    }
+
+    /// <summary>Exercises action normalization with otherwise valid status metadata in text and JSON.</summary>
+    [Fact]
+    public static void OtherwiseValidStatusShouldDismissOnlyUndefinedAction()
+    {
+        OperationStatus status = OperationStatus();
+        status.ReasonCode = ChatBotMessageCode.Command_accepted;
+        status.SafeNextActions = [(ChatBotMessageNextAction)999999];
+        string text = ChatBotCliOutputFormatter.FormatOperationStatus(status, false);
+        using JsonDocument json = JsonDocument.Parse(ChatBotCliOutputFormatter.FormatOperationStatus(status, true));
+        text.ShouldContain("completion-status: accepted-projection-pending");
+        text.ShouldContain("safe-next-action: dismiss");
+        text.ShouldNotContain("999999");
+        json.RootElement.GetProperty("safeNextActions")[0].GetString().ShouldBe("dismiss");
+        json.RootElement.GetProperty("completionStatus").GetString().ShouldBe("accepted-projection-pending");
+        json.RootElement.GetRawText().ShouldNotContain("999999");
+        json.RootElement.GetRawText().ShouldNotContain("generic_denial");
+    }
+
+    [Theory]
+    [InlineData("lifecycle")]
+    [InlineData("completion")]
+    [InlineData("audit")]
+    public static void UndefinedStatusStateShouldProduceTerminalSafeOutput(string field)
+    {
+        OperationStatus status = OperationStatus();
+        if (field == "lifecycle") status.LifecycleState = (GeneratedLifecycleState)999999;
+        if (field == "completion") status.CompletionStatus = (GeneratedOperationCompletionStatus)999999;
+        if (field == "audit") status.AuditStatus = (GeneratedOperationAuditStatus)999999;
+
+        string text = ChatBotCliOutputFormatter.FormatOperationStatus(status, false);
+        text.ShouldContain("lifecycle-state: Failed");
+        text.ShouldContain("completion-status: failed");
+        text.ShouldContain("safe-next-action: dismiss");
+        text.ShouldNotContain("999999");
+        using JsonDocument json = JsonDocument.Parse(ChatBotCliOutputFormatter.FormatOperationStatus(status, true));
+        json.RootElement.GetProperty("lifecycleState").GetString().ShouldBe("Failed");
+        json.RootElement.GetProperty("partialSuccess").GetBoolean().ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(401, "authentication_denied")]
+    [InlineData(403, "authorization_denied")]
+    [InlineData(503, "dependency_degraded")]
+    public static void NullProblemBodyShouldUseStatusCatalogFallback(int status, string code)
+    {
+        var error = new HexalithChatBotApiException<ProblemDetails>("restricted-secret", status, "restricted-secret", null!, null!, null);
+        string text = ChatBotCliOutputFormatter.FormatSafeDenial(error, false);
+        text.ShouldContain($"reason-code: {code}");
+        text.ShouldContain("redaction-state: metadata-only");
+        text.ShouldNotContain("restricted-secret");
     }
 
     [Theory]

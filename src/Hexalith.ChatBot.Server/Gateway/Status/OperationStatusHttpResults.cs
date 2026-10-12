@@ -28,17 +28,20 @@ internal static class OperationStatusHttpResults
     {
         OperationCompletionStatus completion = Parse<OperationCompletionStatus>(record.CompletionStatus);
         OperationAuditStatus audit = Parse<OperationAuditStatus>(record.AuditStatus);
-        bool knownReason = ChatBotMessageCatalog.IsKnown(record.ReasonCode) &&
+        CommandSubmissionResponse? previous = record.PriorOutcome;
+        bool knownReason = KnownCode(record.ReasonCode) && Enum.IsDefined(record.LifecycleState) &&
             KnownOptionalCode(record.TerminalReason) &&
             KnownOptionalCode(record.FailureReasonCode) &&
             KnownOptionalCode(record.TerminalReasonCode) &&
-            KnownOptionalCode(record.WorkflowLastFailureCode);
+            KnownOptionalCode(record.WorkflowLastFailureCode) &&
+            (previous is null || (Enum.IsDefined(previous.LifecycleState) && KnownCode(CodeValue(previous.ReasonCode))));
         if (!knownReason)
         {
             completion = OperationCompletionStatus.Failed;
         }
-        CommandSubmissionResponse? previous = record.PriorOutcome;
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(knownReason ? record.ReasonCode : null);
+        ChatBotMessageCatalogEntry? previousEntry = knownReason && previous is not null
+            ? ChatBotMessageCatalog.Resolve(CodeValue(previous.ReasonCode)) : null;
         List<ChatBotMessageNextAction> safeNextActions = knownReason
             ? (record.SafeNextActions ?? [])
                 .Where(action => string.Equals(action, entry.NextAction, StringComparison.Ordinal))
@@ -54,7 +57,7 @@ internal static class OperationStatusHttpResults
             LifecycleState = knownReason ? record.LifecycleState : LifecycleState.Failed,
             ReasonCode = knownReason ? ParseCode(record.ReasonCode) : ChatBotMessageCode.Generic_denial,
             RetryEligible = knownReason && !entry.IsTerminal &&
-                (entry.State == "waiting" || safeNextActions.Contains(ChatBotMessageNextAction.RetryLater)) &&
+                safeNextActions.Contains(ChatBotMessageNextAction.RetryLater) &&
                 record.NextRetryAt is { } due && due <= now && record.RetryCount < record.MaxAttempts,
             PriorOutcome = !knownReason || previous is null ? null : new PriorCommandOutcome
             {
@@ -65,9 +68,9 @@ internal static class OperationStatusHttpResults
                 LifecycleState = previous.LifecycleState,
                 AcceptedAt = previous.AcceptedAt.ToUniversalTime(),
                 ReasonCode = previous.ReasonCode,
-                RetryEligible = previous.RetryEligible,
+                RetryEligible = previous.RetryEligible && previousEntry is { IsTerminal: false, NextAction: ChatBotMessageNextActions.RetryLater },
             },
-            RetryCount = record.RetryCount,
+            RetryCount = knownReason ? record.RetryCount : 0,
             CompletionStatus = completion,
             AuditStatus = audit,
             PartialOutputs = new OperationStatusPartialOutputs
@@ -79,17 +82,17 @@ internal static class OperationStatusHttpResults
             SafeNextActions = safeNextActions,
             TerminalReason = knownReason ? ParseCodeOrNull(record.TerminalReason) : ChatBotMessageCode.Generic_denial,
             OperationClass = record.OperationClass,
-            MaxAttempts = record.MaxAttempts,
+            MaxAttempts = knownReason ? record.MaxAttempts : 0,
             NextRetryAt = knownReason ? record.NextRetryAt?.ToUniversalTime() : null,
             DuplicateSafetyNote = knownReason ? record.DuplicateSafetyNote : null,
             OwnerRole = knownReason ? record.OwnerRole : null,
             FailureReasonCode = knownReason ? ParseCodeOrNull(record.FailureReasonCode) : ChatBotMessageCode.Generic_denial,
             TerminalReasonCode = knownReason ? ParseCodeOrNull(record.TerminalReasonCode) : ChatBotMessageCode.Generic_denial,
             OriginalOperationId = knownReason ? record.OriginalOperationId : null,
-            DuplicateAttemptCount = record.DuplicateAttemptCount,
+            DuplicateAttemptCount = knownReason ? record.DuplicateAttemptCount : 0,
             WorkflowInstanceId = knownReason ? record.WorkflowInstanceId : null,
             WorkflowStatus = knownReason ? record.WorkflowStatus : null,
-            WorkflowRetryCount = record.WorkflowRetryCount,
+            WorkflowRetryCount = knownReason ? record.WorkflowRetryCount : 0,
             WorkflowLastFailureCode = knownReason ? ParseCodeOrNull(record.WorkflowLastFailureCode) : null,
             AcceptedAt = record.AcceptedAt.ToUniversalTime(),
             LastUpdatedAt = record.LastUpdatedAt.ToUniversalTime(),
@@ -99,6 +102,9 @@ internal static class OperationStatusHttpResults
     private static ChatBotMessageCode ParseCode(string code)
         => TryParse(code, out ChatBotMessageCode value) ? value : ChatBotMessageCode.Generic_denial;
 
+    private static string? CodeValue(ChatBotMessageCode code)
+        => typeof(ChatBotMessageCode).GetField(code.ToString())?.GetCustomAttribute<EnumMemberAttribute>()?.Value;
+
     private static ChatBotMessageNextAction ParseAction(string code)
         => TryParse(code, out ChatBotMessageNextAction value) ? value : ChatBotMessageNextAction.Dismiss;
 
@@ -106,7 +112,10 @@ internal static class OperationStatusHttpResults
         => string.IsNullOrWhiteSpace(code) ? null : ParseCode(code);
 
     private static bool KnownOptionalCode(string? code)
-        => string.IsNullOrWhiteSpace(code) || ChatBotMessageCatalog.IsKnown(code);
+        => string.IsNullOrWhiteSpace(code) || KnownCode(code);
+
+    private static bool KnownCode(string? code)
+        => code != ChatBotMessageCodes.GenericDenial && ChatBotMessageCatalog.IsKnown(code);
 
     private static T Parse<T>(string code) where T : struct, Enum
         => TryParse(code, out T value) ? value : throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown contract enum value.");

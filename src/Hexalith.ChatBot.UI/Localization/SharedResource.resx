@@ -528,6 +528,7 @@
   <data name="Failure_BlockedReason_ReprocessCreated" xml:space="preserve"><value>Reprocess created</value></data>
   <data name="Failure_BlockedReason_CorrectionDelayed" xml:space="preserve"><value>Correction delayed</value></data>
   <data name="Failure_BlockedReason_UnsafeContext" xml:space="preserve"><value>Unsafe context</value></data>
+  <data name="Failure_BlockedReason_DisabledAction" xml:space="preserve"><value>This action is disabled pending an authorized review.</value></data>
   <data name="Failure_CatalogCode_Label" xml:space="preserve"><value>Catalog code</value></data>
   <data name="Failure_CatalogVersion_Label" xml:space="preserve"><value>Catalog version</value></data>
   <data name="Failure_DetailVisibility_Label" xml:space="preserve"><value>Detail visibility</value></data>

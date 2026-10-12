@@ -1745,6 +1745,8 @@ public sealed class ServerBootstrapApiTests
         };
         await store.UpsertAsync(OperationStatusRecord.Accepted("tenant-alpha", accepted, false, acceptedAt) with
         {
+            ReasonCode = ChatBotMessageCodes.AuditUnavailable,
+            SafeNextActions = [ChatBotMessageNextActions.RetryLater],
             RetryCount = 1,
             MaxAttempts = 5,
             NextRetryAt = dueAt,

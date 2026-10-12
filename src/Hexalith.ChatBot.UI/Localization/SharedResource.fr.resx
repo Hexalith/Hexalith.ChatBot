@@ -528,6 +528,7 @@
   <data name="Failure_BlockedReason_ReprocessCreated" xml:space="preserve"><value>Retraitement créé</value></data>
   <data name="Failure_BlockedReason_CorrectionDelayed" xml:space="preserve"><value>Correction retardée</value></data>
   <data name="Failure_BlockedReason_UnsafeContext" xml:space="preserve"><value>Contexte non sûr</value></data>
+  <data name="Failure_BlockedReason_DisabledAction" xml:space="preserve"><value>Cette action est désactivée dans l'attente d'un examen autorisé.</value></data>
   <data name="Failure_CatalogCode_Label" xml:space="preserve"><value>Code catalogue</value></data>
   <data name="Failure_CatalogVersion_Label" xml:space="preserve"><value>Version du catalogue</value></data>
   <data name="Failure_DetailVisibility_Label" xml:space="preserve"><value>Visibilité du détail</value></data>

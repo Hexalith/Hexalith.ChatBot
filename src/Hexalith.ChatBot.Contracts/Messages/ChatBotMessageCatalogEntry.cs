@@ -23,6 +23,9 @@ public sealed record ChatBotMessageCatalogEntry(
         ChatBotMessageCodes.RetryQueued or
         ChatBotMessageCodes.RetryAccepted => "waiting",
         ChatBotMessageCodes.DuplicateSuppressed or
+        ChatBotMessageCodes.IdempotencyConflictMessageIntake or
+        ChatBotMessageCodes.IdempotencyConflictCorrection or
+        ChatBotMessageCodes.IdempotencyConflictAssociationDecision or
         ChatBotMessageCodes.AssociationDecisionRejected or
         ChatBotMessageCodes.AssociationCorrectionPropagationComplete or
         ChatBotMessageCodes.ReprocessCreated => "completed",
@@ -31,6 +34,8 @@ public sealed record ChatBotMessageCatalogEntry(
         ChatBotMessageCodes.AssociationAiContextBlocked => "blocked",
         ChatBotMessageCodes.TerminalFailure or
         ChatBotMessageCodes.FailedCommand or
+        ChatBotMessageCodes.MemoriesCorrectionFailed or
+        ChatBotMessageCodes.VectorReindexFailed or
         ChatBotMessageCodes.FailedAttachment or
         ChatBotMessageCodes.AssociationCorrectionPropagationFailed => "failed",
         ChatBotMessageCodes.DependencyDegraded or
@@ -44,5 +49,14 @@ public sealed record ChatBotMessageCatalogEntry(
     public bool IsTerminal => State != "waiting" && NextAction != ChatBotMessageNextActions.RetryLater;
 
     /// <summary>Complete text for assistive technology.</summary>
-    public string AccessibleDescription => $"{Headline} {Reason} Next action: {NextAction}.";
+    public string AccessibleDescription => $"{Headline} {Reason} Next action: {NextAction switch
+    {
+        ChatBotMessageNextActions.Authenticate => "Authenticate to continue",
+        ChatBotMessageNextActions.CorrectRequest => "Correct the request",
+        ChatBotMessageNextActions.RetryLater => "Retry later",
+        ChatBotMessageNextActions.RequestAccess => "Request access",
+        ChatBotMessageNextActions.Escalate => "Escalate for review",
+        ChatBotMessageNextActions.Dismiss => "Dismiss this message",
+        _ => "No action is available",
+    }}.";
 }

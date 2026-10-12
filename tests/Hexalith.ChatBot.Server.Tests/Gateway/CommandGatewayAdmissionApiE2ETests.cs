@@ -1310,7 +1310,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         using JsonDocument problem = JsonDocument.Parse(disabledBody);
         JsonElement problemRoot = problem.RootElement;
         problemRoot.GetProperty("category").GetString().ShouldBe("authorization_denied");
-        problemRoot.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        problemRoot.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.ServiceClientDisabled);
         problemRoot.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
         disabledBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
         disabledBody.ShouldNotContain("cli-automation-client", Case.Insensitive);
@@ -1746,7 +1746,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         using JsonDocument problem = JsonDocument.Parse(quarantinedBody);
         JsonElement problemRoot = problem.RootElement;
         problemRoot.GetProperty("category").GetString().ShouldBe("authorization_denied");
-        problemRoot.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        problemRoot.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.ServiceClientQuarantined);
         problemRoot.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
         quarantinedBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
         quarantinedBody.ShouldNotContain("cli-automation-client", Case.Insensitive);
@@ -1874,7 +1874,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         using JsonDocument problem = JsonDocument.Parse(quarantinedBody);
         JsonElement problemRoot = problem.RootElement;
         problemRoot.GetProperty("category").GetString().ShouldBe("authorization_denied");
-        problemRoot.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        problemRoot.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.AiActorQuarantined);
         problemRoot.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
         quarantinedBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
         quarantinedBody.ShouldNotContain("gpt-mediation-actor", Case.Insensitive);
