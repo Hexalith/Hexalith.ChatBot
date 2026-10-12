@@ -2,23 +2,95 @@
   "schemaVersion": "2.0",
   "storyKey": "1-3-bind-every-request-to-trusted-tenant-and-actor-context",
   "baseCommit": "d29f7f28c128f86f7034caf4ca93453adc349673",
-  "headCommit": "d29f7f28c128f86f7034caf4ca93453adc349673",
-  "implementationDigest": "",
+  "headCommit": "10c973d56fb3648b00d43376335384cf84a74dc0",
+  "implementationDigest": "eb283bfe0d423b80c822a20343f15660ef4b2aae1bd98a2b7934d2e731a3a6df",
   "policyVersion": "2.1",
-  "passed": false,
-  "fileListCount": 0,
-  "scopedDiffCount": 0,
-  "eventPathCount": 0,
-  "checkedItemCount": 0,
-  "mappedItemCount": 0,
-  "repositoryScopes": [],
-  "lanes": [],
-  "primaryPaths": [],
-  "issues": [
+  "passed": true,
+  "fileListCount": 133,
+  "scopedDiffCount": 133,
+  "eventPathCount": 134,
+  "checkedItemCount": 12,
+  "mappedItemCount": 12,
+  "repositoryScopes": [
+    ".",
+    "references/Hexalith.Builds",
+    "references/Hexalith.Conversations",
+    "references/Hexalith.EventStore",
+    "references/Hexalith.Parties",
+    "references/Hexalith.Projects",
+    "references/Hexalith.Tenants"
+  ],
+  "lanes": [
     {
-      "reasonCode": "status_mismatch",
-      "subject": "story-transition"
+      "lane": "Hexalith.ChatBot.Server.Tests",
+      "source": "current-run",
+      "total": 2553,
+      "executed": 2553,
+      "passed": 2553,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Server.Tests.trx",
+      "checksumSha256": "0fbdb0f124090f7b60537428540faade468ea43cff8cab393b9587a4c2ca96bf"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Conformance.Tests",
+      "source": "current-run",
+      "total": 149,
+      "executed": 149,
+      "passed": 149,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Conformance.Tests.trx",
+      "checksumSha256": "084fd165abdb9795a16f4ad0b587f6f215adb03c89583d7a2a15d8d68749ce28"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Architecture.Tests",
+      "source": "current-run",
+      "total": 123,
+      "executed": 123,
+      "passed": 123,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Architecture.Tests.trx",
+      "checksumSha256": "d221895ca6b646dce8a5fa4ca3e02579d0f873d014aad8c00f3904fd4aaae091"
+    },
+    {
+      "lane": "hosting-assets-primary",
+      "primaryPathClass": "hosting-assets",
+      "source": "current-run",
+      "total": 4,
+      "executed": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:hosting-assets-primary/hosting-assets-primary.trx",
+      "checksumSha256": "c98ca2a53e19b09ed32a1008d7a26ce5a8948d5baff223b3fc83d05091de2ff6"
+    },
+    {
+      "lane": "aspire-dapr-primary",
+      "primaryPathClass": "aspire-dapr",
+      "source": "current-run",
+      "total": 1,
+      "executed": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:topology-primary/topology-acceptance.trx",
+      "checksumSha256": "eec7d70aa04251aeca4bab89093537a0fa3b7be58c3f1296d4a5c6b35d91f7d5"
     }
   ],
-  "evaluatedAtUtc": "2026-10-11T12:24:46.2660582+00:00"
+  "primaryPaths": [
+    {
+      "pathClass": "aspire-dapr",
+      "executed": true,
+      "lane": "aspire-dapr-primary"
+    },
+    {
+      "pathClass": "hosting-assets",
+      "executed": true,
+      "lane": "hosting-assets-primary"
+    }
+  ],
+  "issues": [],
+  "evaluatedAtUtc": "2026-10-11T20:03:27.9466212+00:00"
 }
