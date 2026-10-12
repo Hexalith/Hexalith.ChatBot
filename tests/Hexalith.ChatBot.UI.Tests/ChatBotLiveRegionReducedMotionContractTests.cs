@@ -222,7 +222,7 @@ public sealed class ChatBotLiveRegionReducedMotionContractTests
         component.ShouldContain("data-chatbot-feedback-state");
         component.ShouldContain("data-chatbot-announcement-key");
         component.ShouldContain("data-chatbot-repeat-rule");
-        component.ShouldContain("aria-live=\"@FeedbackContract.AriaLive\"");
+        component.ShouldContain("aria-live=\"@AriaLive\"");
         component.ShouldContain("ChatBotFeedbackStateFamily.BlockedAction");
         component.ShouldContain("ChatBotFeedbackStateFamily.TerminalPolicyFailure");
         component.ShouldNotContain("IsTerminalForCurrentUser ? \"alert\" : \"status\"");

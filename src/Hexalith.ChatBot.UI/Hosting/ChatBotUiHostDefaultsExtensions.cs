@@ -1,3 +1,5 @@
+using Hexalith.ChatBot.Contracts.Messages;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +28,7 @@ internal static class ChatBotUiHostDefaultsExtensions
 
         _ = builder.Services.AddOpenTelemetry()
             .WithMetrics(metrics => _ = metrics
+                .AddMeter(ChatBotMessageCatalog.FallbackMeterName)
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation())

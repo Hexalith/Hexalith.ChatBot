@@ -78,7 +78,7 @@
         <ChatBotGovernedAction Label="@UiText.FailureNextActionLabel(CatalogEntry.NextAction)"
                                  StableId="@($"{Item.ItemId}-safe-action")"
                                  CriticalAction="false"
-                                 State="@(OnNextAction.HasDelegate ? ChatBotGovernedActionState.Enabled : ChatBotGovernedActionState.DisabledWithReason)"
+                                 State="@(OnNextAction.HasDelegate && ActionPermitted ? ChatBotGovernedActionState.Enabled : ChatBotGovernedActionState.DisabledWithReason)"
                                  DisabledReason="@UiText.FailureBlockedReasonLabel(CatalogEntry.DisabledActionReason)"
                                  OnActivate="@OnNextAction" />
     }
@@ -119,11 +119,16 @@
 
     private string AriaLive => _announce ? (IsTerminal ? "assertive" : "polite") : "off";
 
+    private bool ActionPermitted
+        => CatalogEntry.Code == ChatBotMessageCodes.GenericDenial ||
+            (Item.SafeNextAction == CatalogEntry.NextAction && Item.ClientAction == CatalogEntry.NextAction &&
+                (CatalogEntry.NextAction != ChatBotMessageNextActions.RetryLater || Item.Retryable is true));
+
     private string ResolvedSafeNextAction
-        => CatalogEntry.NextAction;
+        => ActionPermitted ? CatalogEntry.NextAction : ChatBotMessageNextActions.None;
 
     private string ResolvedClientAction
-        => CatalogEntry.NextAction;
+        => ResolvedSafeNextAction;
 
     private string? DisplayAuditOperationId
         => IsUnavailableReferenceStatus(Item.AuditStatus) ? null : Item.AuditOperationId;

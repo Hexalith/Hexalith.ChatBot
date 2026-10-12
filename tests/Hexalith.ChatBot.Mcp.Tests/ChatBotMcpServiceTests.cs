@@ -33,6 +33,97 @@ public static class ChatBotMcpServiceTests
     private const string CorrelationId = "01HX0000000000000000000003";
     private const string TaskId = "01HX0000000000000000000004";
 
+
+    [Theory]
+    [InlineData(false, ProblemDetailsClientAction.RetryLater, false, "none")]
+    [InlineData(true, ProblemDetailsClientAction.None, false, "none")]
+    [InlineData(false, ProblemDetailsClientAction.None, false, "none")]
+    [InlineData(true, ProblemDetailsClientAction.RetryLater, true, "retry-later")]
+    public static void SafeDenialShouldPreserveBackendRetryPermissions(
+        bool retryable, ProblemDetailsClientAction clientAction, bool expectedRetryable, string expectedAction)
+    {
+        var exception = new HexalithChatBotApiException<ProblemDetails>(
+            "restricted exception", 503, "restricted payload", new Dictionary<string, IEnumerable<string>>(),
+            new ProblemDetails
+            {
+                Code = "audit_unavailable",
+                Retryable = retryable,
+                ClientAction = clientAction,
+                Message = "restricted message",
+            }, null);
+        JsonElement result = ChatBotMcpResultFormatter.FormatSafeDenial(exception);
+
+        result.GetProperty("retryable").GetBoolean().ShouldBe(expectedRetryable);
+        result.GetProperty("clientAction").GetString().ShouldBe(expectedAction);
+        result.GetProperty("safeSuggestion").GetString().ShouldBe(expectedAction);
+        result.GetProperty("code").GetString().ShouldBe("audit_unavailable");
+        result.GetRawText().ShouldNotContain("restricted");
+    }
+
+    [Theory]
+    [InlineData("primary")]
+    [InlineData("terminal")]
+    [InlineData("failure")]
+    [InlineData("terminal-code")]
+    [InlineData("workflow")]
+    [InlineData("generic")]
+    public static void UnknownStatusReasonShouldDenyEntireOutcome(string field)
+    {
+        OperationStatus status = OperationStatus();
+        ChatBotMessageCode unknown = (ChatBotMessageCode)999999;
+        switch (field)
+        {
+            case "primary": status.ReasonCode = unknown; break;
+            case "terminal": status.TerminalReason = unknown; break;
+            case "failure": status.FailureReasonCode = unknown; break;
+            case "terminal-code": status.TerminalReasonCode = unknown; break;
+            case "workflow": status.WorkflowLastFailureCode = unknown; break;
+            case "generic": status.ReasonCode = ChatBotMessageCode.Generic_denial; break;
+        }
+
+        JsonElement result = ChatBotMcpResultFormatter.FormatOperationStatus(status);
+
+        result.GetProperty("completionStatus").GetString().ShouldBe("failed");
+        result.GetProperty("lifecycleState").GetString().ShouldBe("failed");
+        result.GetProperty("partialSuccess").GetBoolean().ShouldBeFalse();
+        result.GetProperty("safeNextActions").EnumerateArray().Select(action => action.GetString()).ShouldBe(["dismiss"]);
+        result.GetProperty("terminalReason").GetString().ShouldBe("generic_denial");
+        result.GetProperty("failureReasonCode").GetString().ShouldBe("generic_denial");
+        result.GetProperty("terminalReasonCode").GetString().ShouldBe("generic_denial");
+        result.GetRawText().ShouldNotContain("999999");
+    }
+
+    [Theory]
+    [InlineData(401, "authentication_denied", "authenticate", false)]
+    [InlineData(403, "authorization_denied", "request-access", false)]
+    [InlineData(400, "command_contract_invalid", "correct-request", false)]
+    [InlineData(409, "command_contract_invalid", "correct-request", false)]
+    [InlineData(422, "command_contract_invalid", "correct-request", false)]
+    [InlineData(408, "dependency_degraded", "retry-later", true)]
+    [InlineData(429, "dependency_degraded", "retry-later", true)]
+    [InlineData(503, "dependency_degraded", "retry-later", true)]
+    [InlineData(404, "generic_denial", "dismiss", false)]
+    public static void HttpDenialShouldKeepCatalogGuidance(int statusCode, string code, string action, bool retryable)
+    {
+        JsonElement result = ChatBotMcpResultFormatter.FormatSafeDenial(RestrictedPayloadException(statusCode, "restricted"));
+
+        result.GetProperty("code").GetString().ShouldBe(code);
+        result.GetProperty("clientAction").GetString().ShouldBe(action);
+        result.GetProperty("retryable").GetBoolean().ShouldBe(retryable);
+        result.GetRawText().ShouldNotContain("restricted");
+    }
+
+    [Fact]
+    public static void LocalValidationShouldKeepCorrectionGuidance()
+    {
+        JsonElement result = ChatBotMcpResultFormatter.FormatSafeDenial(new ArgumentException("restricted"));
+
+        result.GetProperty("code").GetString().ShouldBe("command_contract_invalid");
+        result.GetProperty("clientAction").GetString().ShouldBe("correct-request");
+        result.GetProperty("retryable").GetBoolean().ShouldBeFalse();
+        result.GetRawText().ShouldNotContain("restricted");
+    }
+
     [Fact]
     public static void ToolCatalogShouldExposeOnlyGovernedMcpToolsWithExplicitMetadata()
     {

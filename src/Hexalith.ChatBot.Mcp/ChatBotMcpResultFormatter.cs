@@ -47,20 +47,26 @@ public static class ChatBotMcpResultFormatter
     {
         ArgumentNullException.ThrowIfNull(status);
 
-        string completionStatus = WireName(status.CompletionStatus);
+        bool knownOutcome = KnownStatusCode(status.ReasonCode) &&
+            KnownStatusCode(status.TerminalReason) &&
+            KnownStatusCode(status.FailureReasonCode) &&
+            KnownStatusCode(status.TerminalReasonCode) &&
+            KnownStatusCode(status.WorkflowLastFailureCode);
+        string completionStatus = knownOutcome ? WireName(status.CompletionStatus) : "failed";
+        string? fallbackCode = knownOutcome ? null : ChatBotMessageCatalog.Resolve(null).Code;
         return ToElement(new
         {
             status.OperationId,
             status.CommandId,
             status.CorrelationId,
-            lifecycleState = WireName(status.LifecycleState),
+            lifecycleState = knownOutcome ? WireName(status.LifecycleState) : "failed",
             status.RetryCount,
             completionStatus,
             auditStatus = WireName(status.AuditStatus),
-            safeNextActions = status.SafeNextActions.Select(SafeAction).ToArray(),
-            terminalReason = status.TerminalReason is null ? null : SafeCode(status.TerminalReason.Value),
-            failureReasonCode = status.FailureReasonCode is null ? null : SafeCode(status.FailureReasonCode.Value),
-            terminalReasonCode = status.TerminalReasonCode is null ? null : SafeCode(status.TerminalReasonCode.Value),
+            safeNextActions = knownOutcome ? status.SafeNextActions.Select(SafeAction).ToArray() : [ChatBotMessageNextActions.Dismiss],
+            terminalReason = !knownOutcome ? fallbackCode : status.TerminalReason is null ? null : SafeCode(status.TerminalReason.Value),
+            failureReasonCode = !knownOutcome ? fallbackCode : status.FailureReasonCode is null ? null : SafeCode(status.FailureReasonCode.Value),
+            terminalReasonCode = !knownOutcome ? fallbackCode : status.TerminalReasonCode is null ? null : SafeCode(status.TerminalReasonCode.Value),
             status.AcceptedAt,
             status.LastUpdatedAt,
             partialSuccess = string.Equals(completionStatus, "accepted-projection-pending", StringComparison.Ordinal),
@@ -83,15 +89,21 @@ public static class ChatBotMcpResultFormatter
             _ => raw.Code,
         };
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(catalogCode);
+        bool retryable = raw.Retryable && !entry.IsTerminal &&
+            entry.NextAction == ChatBotMessageNextActions.RetryLater && raw.ClientAction == entry.NextAction;
+        string action = entry.Code == ChatBotMessageCodes.GenericDenial ? ChatBotMessageNextActions.Dismiss
+            : raw.ClientAction == entry.NextAction &&
+                (entry.NextAction != ChatBotMessageNextActions.RetryLater || retryable)
+                ? entry.NextAction : ChatBotMessageNextActions.None;
         SafeDenialMetadata denial = raw with
         {
             Category = ChatBotMessageCatalog.IsKnown(catalogCode) ? raw.Category : "authorization_denied",
             Code = entry.Code,
             SafeMessage = entry.Reason,
-            Retryable = !entry.IsTerminal && entry.NextAction == ChatBotMessageNextActions.RetryLater,
-            ClientAction = entry.NextAction,
+            Retryable = retryable,
+            ClientAction = action,
             DetailsVisibility = "metadata-only",
-            SafeSuggestion = entry.NextAction,
+            SafeSuggestion = action,
         };
         return ToElement(new
         {
@@ -123,6 +135,10 @@ public static class ChatBotMcpResultFormatter
         FieldInfo? field = typeof(TEnum).GetField(name);
         return field?.GetCustomAttribute<EnumMemberAttribute>()?.Value ?? name;
     }
+
+    private static bool KnownStatusCode(ChatBotMessageCode? value)
+        => value is null || (ChatBotMessageCatalog.IsKnown(WireName(value.Value)) &&
+            value != ChatBotMessageCode.Generic_denial);
 
     private static string SafeCode(ChatBotMessageCode value)
         => ChatBotMessageCatalog.Resolve(WireName(value)).Code;
@@ -185,23 +201,15 @@ public static class ChatBotMcpResultFormatter
     private static string ReasonCodeForStatus(int statusCode)
         => statusCode switch
         {
-            401 => "authentication-denied",
-            403 => "authorization-denied",
-            404 => "safe-not-found",
-            409 => "validation-error",
-            422 => "validation-error",
-            _ => "request-denied",
+            401 => ChatBotMessageCodes.AuthenticationDenied,
+            403 => ChatBotMessageCodes.AuthorizationDenied,
+            400 or 409 or 422 => ChatBotMessageCodes.CommandContractInvalid,
+            408 or 429 or >= 500 => ChatBotMessageCodes.DependencyDegraded,
+            _ => ChatBotMessageCodes.GenericDenial,
         };
 
     private static string SafeActionForReason(string reasonCode)
-        => reasonCode switch
-        {
-            "authentication-denied" => "authenticate",
-            "authorization-denied" => "request-access",
-            "safe-not-found" => "verify-identifier",
-            "validation-error" => "correct-request",
-            _ => "retry-later",
-        };
+        => ChatBotMessageCatalog.Resolve(reasonCode).NextAction;
 
     private sealed record SafeDenialMetadata(
         string Category,
@@ -264,7 +272,7 @@ public static class ChatBotMcpResultFormatter
 
             if (exception is ArgumentException or InvalidOperationException)
             {
-                const string code = "validation-error";
+                const string code = ChatBotMessageCodes.CommandContractInvalid;
                 return new SafeDenialMetadata(
                     "validation_error",
                     code,

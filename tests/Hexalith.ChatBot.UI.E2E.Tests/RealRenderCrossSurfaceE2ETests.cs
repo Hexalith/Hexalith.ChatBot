@@ -223,10 +223,10 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
             headingBox.Y.ShouldBeGreaterThanOrEqualTo(ShellHeaderBandPx, $"[{surface.Key}] heading top must clear the 48px header band.");
 
             // AC4 — control-anchored non-intersection: the route heading must not intersect the header action cluster
-            // (FcThemeToggle / palette / settings). ChatBot intentionally suppresses the account menu until it has
-            // working authentication endpoints, so anchor on the always-present, right-most settings button.
+            // (FcThemeToggle / palette / settings). The authenticated render host has one caller account menu;
+            // anchor geometry on the always-present settings button.
             (await page.Locator("[data-testid=\"fc-account-menu\"]").CountAsync())
-                .ShouldBe(0, $"[{surface.Key}] ChatBot must not expose an account control without working authentication endpoints.");
+                .ShouldBe(1, $"[{surface.Key}] The authenticated shell must expose exactly one caller account control.");
             LocatorBoundingBoxResult settingsBox = await BoundingBoxWhenReadyAsync(
                 page,
                 page.Locator("[data-testid=\"fc-settings-button\"]"),

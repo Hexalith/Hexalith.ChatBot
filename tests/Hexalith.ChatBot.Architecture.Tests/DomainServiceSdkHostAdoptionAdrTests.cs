@@ -125,7 +125,7 @@ public static class DomainServiceSdkHostAdoptionAdrTests
         program.ShouldContain("AddEventStoreDomainService(typeof(GovernedOperationAggregate).Assembly)");
         program.ShouldContain("UseEventStoreDomainService()");
         program.ShouldContain("AddChatBotCommandGateway()");
-        program.ShouldContain("ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddMeter(ChatBotMetrics.MeterName))");
+        program.ShouldContain("ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddMeter(ChatBotMetrics.MeterName, ChatBotMessageCatalog.FallbackMeterName))");
         program.ShouldContain("MapChatBotCompatibilityEndpoints()");
         program.ShouldContain("MapChatBotProjectionSubscriptionCompatibilityEndpoints()");
         program.ShouldNotContain("MapChatBotDomainServiceEndpoints");

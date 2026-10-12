@@ -84,7 +84,7 @@
         _feedbackContract = ResolvedStateFamily is { } stateFamily ? ChatBotStateFeedbackMatrix.For(stateFamily) : null;
 
         ChatBotAnnouncementDedupRule repeatRule = _feedbackContract?.DedupRule ?? ChatBotAnnouncementDedupRule.OncePerStableOperationKey;
-        _shouldAnnounceLiveRegion = _feedbackContract is null
+        _shouldAnnounceLiveRegion = (_feedbackContract is null && !HasCatalogFailure)
             || AnnouncementDeduplication.ShouldAnnounce(ResolvedAnnouncementKey, repeatRule);
     }
 
@@ -101,7 +101,7 @@
             : ChatBotLiveRegionPoliteness.Polite;
 
     private string? AriaRole
-        => EffectivePoliteness switch
+        => ResolvedPoliteness switch
         {
             ChatBotLiveRegionPoliteness.Polite => "status",
             ChatBotLiveRegionPoliteness.Assertive => "alert",
@@ -127,9 +127,10 @@
             : AnnouncementKey;
 
     private ChatBotFeedbackStateFamily? ResolvedStateFamily
-        => HasCatalogFailure && CatalogEntry.IsTerminal &&
-            (StateFamily is ChatBotFeedbackStateFamily.RetryableFailure or ChatBotFeedbackStateFamily.DependencyDegraded)
-            ? ChatBotFeedbackStateFamily.TerminalPolicyFailure
+        => HasCatalogFailure && StateFamily is not ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate
+            ? CatalogEntry.IsTerminal
+                ? ChatBotFeedbackStateFamily.TerminalPolicyFailure
+                : StateFamily ?? ChatBotFeedbackStateFamily.RetryableFailure
             : StateFamily;
 
     private string? FeedbackStateValue => ResolvedStateFamily?.ToString();

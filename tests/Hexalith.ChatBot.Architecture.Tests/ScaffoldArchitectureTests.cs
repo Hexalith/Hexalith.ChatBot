@@ -72,9 +72,16 @@ public static class ScaffoldArchitectureTests
             expected.Where(static path => path.StartsWith("tests/", StringComparison.Ordinal)),
             ignoreOrder: true,
             customMessage: "every independent test lane must remain in the solution inventory");
-        projects.ShouldNotContain(
-            static path => path.StartsWith("references/", StringComparison.Ordinal),
-            "sibling library projects enter through conditional project/package references, not as explicit solution projects");
+        string[] declaredSiblings = File.ReadAllLines(Path.Combine(RepositoryRoot(), ".gitmodules"))
+            .Select(static line => line.Trim())
+            .Where(static line => line.StartsWith("path = references/", StringComparison.Ordinal))
+            .Select(static line => line["path = ".Length..] + "/")
+            .ToArray();
+        foreach (string siblingProject in projects.Where(static path => path.StartsWith("references/", StringComparison.Ordinal)))
+        {
+            declaredSiblings.Any(root => siblingProject.StartsWith(root, StringComparison.Ordinal)).ShouldBeTrue(
+                $"Solution project '{siblingProject}' must belong to a root-declared sibling module.");
+        }
     }
 
     [Fact]

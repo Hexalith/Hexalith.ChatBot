@@ -59,7 +59,8 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
             Message = entry.Reason,
             CorrelationId = correlationId,
             TaskId = taskId,
-            Retryable = known && IsTransientAuthorizationReason(reasonCode),
+            Retryable = known && reasonCode != ChatBotRefusalReasonCodes.EvidenceExpired &&
+                !entry.IsTerminal && entry.NextAction == ChatBotMessageNextActions.RetryLater,
             ClientAction = ClientAction(entry.NextAction),
         });
     }
@@ -198,14 +199,11 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
             ChatBotMessageCodes.AssociationCorrectionAuditUnavailable => ChatBotMessageCodes.AssociationCorrectionAuditUnavailable,
             ChatBotMessageCodes.DependencyDegraded => ChatBotMessageCodes.DependencyDegraded,
             ChatBotAuthorizationReasonCodes.CommandNotAllowlisted => ChatBotRefusalReasonCodes.CatalogCodeFor(ChatBotRefusalReasonCodes.CommandNotAllowlisted),
+            ChatBotAuthorizationReasonCodes.ServiceClientRateLimited => ChatBotMessageCodes.ServiceClientRateLimited,
             ChatBotAuthorizationReasonCodes.AiActorRateLimited => ChatBotMessageCodes.AiActorRateLimited,
             ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited => ChatBotMessageCodes.CommandCapabilityRateLimited,
             _ => ChatBotMessageCodes.AuthorizationDenied,
         };
-
-    private static bool IsTransientAuthorizationReason(string reasonCode)
-        => reasonCode is ChatBotAuthorizationReasonCodes.AiActorRateLimited
-            or ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited;
 
     private static bool IsKnownAuthorizationReason(string reasonCode)
         => reasonCode is
@@ -232,6 +230,13 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
             ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped or
             ChatBotAuthorizationReasonCodes.ServiceClientGrantTenantMismatch or
             ChatBotAuthorizationReasonCodes.ServiceClientWrongSurface or
+            ChatBotAuthorizationReasonCodes.ServiceClientDisabled or
+            ChatBotAuthorizationReasonCodes.ServiceClientQuarantined or
+            ChatBotAuthorizationReasonCodes.ServiceClientRateLimited or
+            ChatBotAuthorizationReasonCodes.AiActorDisabled or
+            ChatBotAuthorizationReasonCodes.AiActorQuarantined or
+            ChatBotAuthorizationReasonCodes.CommandCapabilityDisabled or
+            ChatBotAuthorizationReasonCodes.CommandCapabilityQuarantined or
             ChatBotAuthorizationReasonCodes.AiActorRateLimited or
             ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited or
             ChatBotDisabledActionReasons.InsufficientAuthority or

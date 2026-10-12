@@ -37,6 +37,7 @@ public static partial class DaprAccessControlConformanceTests
         "/project/v2",
         "/project/v2/reconcile",
         "/project/rebuild/v1",
+        "/project/rebuild/part/v1",
         "/project/rebuild/stage/v1",
         "/project/rebuild/commit/v1",
         "/project/rebuild/abort/v1",

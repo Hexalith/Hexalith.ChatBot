@@ -55,20 +55,38 @@ public static class ChatBotCliOutputFormatter
     {
         ArgumentNullException.ThrowIfNull(status);
 
-        string completion = WireName(status.CompletionStatus);
+        bool knownOutcome = KnownStatusCode(status.ReasonCode) &&
+            KnownStatusCode(status.TerminalReason) &&
+            KnownStatusCode(status.FailureReasonCode) &&
+            KnownStatusCode(status.TerminalReasonCode) &&
+            KnownStatusCode(status.WorkflowLastFailureCode);
+        string completion = knownOutcome ? WireName(status.CompletionStatus) : "failed";
+        string lifecycle = knownOutcome ? WireName(status.LifecycleState) : "failed";
+        string[] actions = knownOutcome
+            ? status.SafeNextActions.Select(SafeAction).ToArray()
+            : [ChatBotMessageNextActions.Dismiss];
+        string? terminalReason = knownOutcome
+            ? status.TerminalReason is null ? null : SafeCode(status.TerminalReason.Value)
+            : ChatBotMessageCatalog.Resolve(null).Code;
+        string? failureReasonCode = knownOutcome
+            ? status.FailureReasonCode is null ? null : SafeCode(status.FailureReasonCode.Value)
+            : ChatBotMessageCodes.GenericDenial;
+        string? terminalReasonCode = knownOutcome
+            ? status.TerminalReasonCode is null ? null : SafeCode(status.TerminalReasonCode.Value)
+            : ChatBotMessageCodes.GenericDenial;
         object shape = new
         {
             operationId = status.OperationId,
             commandId = status.CommandId,
             correlationId = status.CorrelationId,
-            lifecycleState = WireName(status.LifecycleState),
+            lifecycleState = lifecycle,
             retryCount = status.RetryCount,
             completionStatus = completion,
             auditStatus = WireName(status.AuditStatus),
-            safeNextActions = status.SafeNextActions.Select(SafeAction).ToArray(),
-            terminalReason = status.TerminalReason is null ? null : SafeCode(status.TerminalReason.Value),
-            failureReasonCode = status.FailureReasonCode is null ? null : SafeCode(status.FailureReasonCode.Value),
-            terminalReasonCode = status.TerminalReasonCode is null ? null : SafeCode(status.TerminalReasonCode.Value),
+            safeNextActions = actions,
+            terminalReason,
+            failureReasonCode,
+            terminalReasonCode,
             acceptedAt = status.AcceptedAt,
             lastUpdatedAt = status.LastUpdatedAt,
             partialSuccess = completion == "accepted-projection-pending",
@@ -84,7 +102,7 @@ public static class ChatBotCliOutputFormatter
             $"operation-id: {status.OperationId}",
             $"command-id: {status.CommandId}",
             $"correlation-id: {status.CorrelationId}",
-            $"lifecycle-state: {WireName(status.LifecycleState)}",
+            $"lifecycle-state: {lifecycle}",
             $"completion-status: {completion}",
             $"audit-status: {WireName(status.AuditStatus)}",
             $"retry-count: {status.RetryCount}",
@@ -95,24 +113,24 @@ public static class ChatBotCliOutputFormatter
             lines.Add("partial-success: accepted by backend; projection reconciliation is pending");
         }
 
-        foreach (ChatBotMessageNextAction action in status.SafeNextActions)
+        foreach (string action in actions)
         {
-            lines.Add($"safe-next-action: {SafeAction(action)}");
+            lines.Add($"safe-next-action: {action}");
         }
 
-        if (status.TerminalReason is not null)
+        if (terminalReason is not null)
         {
-            lines.Add($"terminal-reason: {SafeCode(status.TerminalReason.Value)}");
+            lines.Add($"terminal-reason: {terminalReason}");
         }
 
-        if (status.FailureReasonCode is not null)
+        if (failureReasonCode is not null)
         {
-            lines.Add($"failure-reason-code: {SafeCode(status.FailureReasonCode.Value)}");
+            lines.Add($"failure-reason-code: {failureReasonCode}");
         }
 
-        if (status.TerminalReasonCode is not null)
+        if (terminalReasonCode is not null)
         {
-            lines.Add($"terminal-reason-code: {SafeCode(status.TerminalReasonCode.Value)}");
+            lines.Add($"terminal-reason-code: {terminalReasonCode}");
         }
 
         return Lines(lines);
@@ -283,11 +301,17 @@ public static class ChatBotCliOutputFormatter
 
         SafeDenialMetadata raw = SafeDenialMetadata.From(exception);
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(raw.Code);
+        bool retryable = raw.Retryable && !entry.IsTerminal &&
+            entry.NextAction == ChatBotMessageNextActions.RetryLater && raw.SafeNextAction == entry.NextAction;
+        string action = entry.Code == ChatBotMessageCodes.GenericDenial ? ChatBotMessageNextActions.Dismiss
+            : raw.SafeNextAction == entry.NextAction &&
+                (entry.NextAction != ChatBotMessageNextActions.RetryLater || retryable)
+                ? entry.NextAction : ChatBotMessageNextActions.None;
         SafeDenialMetadata denial = raw with
         {
             Code = entry.Code,
-            Retryable = !entry.IsTerminal && entry.NextAction == ChatBotMessageNextActions.RetryLater,
-            SafeNextAction = entry.NextAction,
+            Retryable = retryable,
+            SafeNextAction = action,
             RedactionState = "metadata-only",
         };
 
@@ -388,6 +412,10 @@ public static class ChatBotCliOutputFormatter
         FieldInfo? field = typeof(TEnum).GetField(name);
         return field?.GetCustomAttribute<EnumMemberAttribute>()?.Value ?? name;
     }
+
+    private static bool KnownStatusCode(ChatBotMessageCode? value)
+        => value is null || (ChatBotMessageCatalog.IsKnown(WireName(value.Value)) &&
+            value != ChatBotMessageCode.Generic_denial);
 
     private static string SafeCode(ChatBotMessageCode value)
         => ChatBotMessageCatalog.Resolve(WireName(value)).Code;

@@ -2,7 +2,7 @@
 title: 'Return Versioned Safe Outcomes'
 type: 'feature'
 created: '2026-10-12'
-status: 'in-review'
+status: 'done'
 baseline_commit: 8437900622d5bf7a9d34ca5cc543cd802f653cb1
 route: 'dispatch'
 review_loop_iteration: 0
@@ -71,6 +71,7 @@ context:
 
 ## Spec Change Log
 
+- 2026-10-12: Completed the resumed parallel review, fixed permission and accessibility regressions, and verified all affected suites (4,016 tests, zero failures/skips). Added real locale/theme/keyboard browser coverage and recorded the environment limitation for full Aspire startup.
 - 2026-10-12: Implemented Story 1.4 and added focused render, leakage, catalog, and boundary coverage. The broad Debug build remains blocked by existing sibling reference conflicts; see Verification.
 
 ## Review Triage Log
@@ -107,6 +108,39 @@ Grouped patch entries: failure-item render verification (V1); enum fallback veri
 
 All patch entries were applied and checked in focused tests. Final inspection also caught and fixed an authorization fallback regression: a general catalog code outside the authorization allowlist now becomes `generic_denial`. A gateway test expectation for expired evidence was restored to its baseline result because that gateway path denies earlier for `insufficient-authority`; a direct factory test covers actual `evidence-expired` mapping.
 
+### Resumed Review (2026-10-12)
+
+| ID | Finding | Verdict | Route | Evidence |
+| --- | --- | --- | --- | --- |
+| R-B1 | CLI/MCP restore prohibited retries | high | patch | Typed audit_unavailable with Retryable=false and ClientAction=None is overwritten with retry-later; intersect catalog actions with supplied permissions. |
+| R-B2 | MCP legacy HTTP and validation codes lose guidance | medium | patch | Untyped 401/403/422 and ArgumentException produce absent hyphenated codes; resolve canonical catalog constants. |
+| R-B3 | Failure item ignores per-item retry permission | medium | patch | Item.Retryable=false and action none still render catalog retry guidance; preserve the narrower permission and accessible unavailable reason. |
+| R-B4 | Safe-action callbacks are absent in production | false | reject | carried: earlier B1; actions intentionally show focusable disabled reasons without handlers, as allowed by acceptance. |
+| R-B5 | Terminal catalog banner retains incompatible state family | medium | patch | Null or BlockedAction family does not acquire terminal semantics for unknown denial; normalize terminal failures except explicitly observed updates. |
+| R-B6 | Default catalog banner bypasses deduplication | medium | patch | Null feedback contract short-circuits ShouldAnnounce; coded banners must apply the default deduplication rule. |
+| R-B7 | Already-decided/corrected outcomes should be completed | false | reject | GovernedOperationAggregate returns InvalidAssociationCorrection or AssociationDecisionValidation.Invalid for these codes; the current request is denied, rather than completed. |
+| R-B8 | CLI/MCP unknown secondary reason preserves success/retry | high | patch | Unknown reason is mapped independently while pending completion and RetryLater persist; deny the whole rendered outcome consistently. |
+| R-B9 | UI fallback meter is not exported | medium | patch | UI records fallback measurements but its host metrics registration does not subscribe to the catalog meter. |
+| R-B10 | Multiple resolver calls overcount distinct failures | false | reject | Counter is named message_catalog.fallbacks and counts fallback resolutions; neither the contract nor intent requires a once-per-operation failure count. Measurements contain no caller input. |
+| R-E1 | CLI ignores supplied retry restriction | high | patch | Same confirmed cause as R-B1 in CLI. |
+| R-E2 | MCP ignores supplied retry restriction | high | patch | Same confirmed cause as R-B1 in MCP. |
+| R-E3 | MCP fallback status codes are uncatalogued | medium | patch | Same confirmed cause as R-B2. |
+| R-E4 | Null banner state repeats terminal announcements | medium | patch | Same confirmed causes as R-B5/R-B6. |
+| R-E5 | Fixed blocked-state identity can suppress a later failure | maybe-false | defer | No failure-generation identity is supplied at fixed workspace sites; a live trace distinguishing a new failed attempt from repeated polling is needed to establish incorrect suppression. |
+| R-E6 | Undefined adapter reasons coexist with pending success | high | patch | Same confirmed cause as R-B8. |
+| R-V1 | Composer submission rejection lacks actual render coverage | medium | patch | Direct banner tests bypass composer wiring and accepted-submission browser tests never reject; add known/unknown composer render checks. |
+| R-V2 | MCP HTTP bucket mapping loses actions | medium | patch | Same confirmed cause as R-B2. |
+| R-V3 | Both adapters overwrite typed retry restrictions | high | patch | Same confirmed cause as R-B1. |
+| R-V4 | Changed markup and meter registration break source tests | medium | patch | Focused native UI tests fail on submission attribute and banner title; Architecture tests fail on old single-meter registration. Update the existing structural assertions and keep behavior covered by actual render tests. |
+
+Grouped patches: adapter permission intersection; MCP canonical codes; failure-item retry permissions; banner terminality and deduplication; complete unknown-status fallback; UI meter registration; composer render verification; stale structural assertions. The implementation subagent from the prior run cannot be continued, so patches are applied in this session.
+
+Full-suite follow-up found and patched additional story regressions: authorization allowlist omitted established disabled/quarantined control reasons; transient authorization factory values marked dependency denials nonretryable; retry eligibility incorrectly used user action presentation instead of the validated workflow schedule; UI blocked-state structural assertions and the root solution inventory assertion still reflected the prior markup and project inventory. Added direct control-denial and transient-retry regressions. New rendering tests explicitly select English and restore the caller culture, avoiding invariant-culture fallback in test setup.
+
+Validation gate corrections: the existing imperative-name allowlist now recognizes the already implemented Grant/Revoke commands. The Dapr ACL and its reviewed route inventory include the current SDK's `/project/rebuild/part/v1` transport endpoint under the existing EventStore-only, verified-identity, POST-scoped rebuild-family grant documented in the policy. These corrections update existing gate expectations and preserve their exhaustive checks.
+
+Browser verification exposed missing button semantics on the Fluent governed-action host; it now declares its button role explicitly, keeps the disabled reason on the focusable host, and preserves the status/alert role when repeated announcements are suppressed. The real-render test host now supplies a consistent authenticated tenant principal to prerender and interactive requests using the existing FrontComposer server helpers. New browser tests seed the supported scoped theme preference, then assert the selected theme, localized known/unknown rejection, keyboard focus, disabled action semantics and accessibility tree in all visual modes. All six existing real-render checks also pass with that host.
+
 ## Verification
 
 **Commands:**
@@ -122,3 +156,12 @@ All patch entries were applied and checked in focused tests. Final inspection al
 - Source-mode solution restore and build passed with zero warnings and zero errors after the root solution included the required sibling projects and FrontComposer stopped emitting unused fields for enum-free StatusOverview projections. FrontComposer generator build and direct xUnit v3 `RazorEmitterExpandInRowTests` passed: 12 tests, zero skips.
 - The final unqualified Debug command still fails with 241 errors, chiefly missing EventStore types in Projects and CS1704 in EventStore.Contracts, because EventStore and Parties intentionally default to package dependencies. Local source builds require the explicit solution-wide property above; no warning suppression is needed. Release package-mode restore passed, while its build still stops at pre-existing CS0246 (`BoundWorkloadCommandRequest` in `ChatBotStreamReadProofSource.cs:49`).
 - Light/dark, forced-colors, reduced-motion, and full screen-reader visual traversal were not rerun against a live AppHost in this sibling-build follow-up. The earlier real-component render lane covers semantic status, focusable action reason, localized copy, and announcement behavior.
+
+**Final verification from resumed review (2026-10-12):**
+
+- `dotnet restore Hexalith.ChatBot.slnx -p:Configuration=Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false` passed.
+- `dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false` passed with zero warnings and zero errors. Final UI E2E test-host changes also passed `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false -v:q`.
+- Each affected test project was run independently using `dotnet tests/Hexalith.ChatBot.<Project>.Tests/bin/Debug/net10.0/Hexalith.ChatBot.<Project>.Tests.dll`. Full suites passed: Contracts 506, Client 91, CLI 39, MCP 52, UI 308, Server 2,571, Conformance 150, Architecture 123, and UI E2E 176: **4,016 tests, zero failures, zero skips**.
+- UI E2E includes 12 safe-outcome component render cases, 12 actual Chromium rejection cases across English/French and light/dark/forced-colors with reduced motion, keyboard focus and accessibility-tree checks, and six existing live cross-surface tests. Both known authorization denials and unknown sentinel codes are covered in the new browser matrix.
+- `git -c core.whitespace=cr-at-eol diff --check` passed. Test-generated updates to tracked Story 13.9 screenshots were copied to `/tmp/bmad-story-1-4-vsaw4g8h/screenshots` and the historical files were restored to their pre-run contents.
+- Full Aspire startup remains environment-blocked: `aspire start --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --no-build --non-interactive --format Json` exited 2 because `ChatBot:LiveRecoveryValidation:MailboxClientSecret` was absent (child exited 134). The actual UI browser tests use a loopback Kestrel host with a deterministic typed-client seam; no live backend or manual screen-reader traversal was claimed.

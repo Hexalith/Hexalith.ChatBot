@@ -94,6 +94,71 @@ public static class ChatBotCliCommandTests
         error.ToString().ShouldBeEmpty();
     }
 
+
+    [Theory]
+    [InlineData(false, ProblemDetailsClientAction.RetryLater, false, "none")]
+    [InlineData(true, ProblemDetailsClientAction.None, false, "none")]
+    [InlineData(false, ProblemDetailsClientAction.None, false, "none")]
+    [InlineData(true, ProblemDetailsClientAction.RetryLater, true, "retry-later")]
+    public static void SafeDenialShouldPreserveBackendRetryPermissions(
+        bool retryable, ProblemDetailsClientAction clientAction, bool expectedRetryable, string expectedAction)
+    {
+        var exception = new HexalithChatBotApiException<ProblemDetails>(
+            "restricted exception", 503, "restricted payload", new Dictionary<string, IEnumerable<string>>(),
+            new ProblemDetails
+            {
+                Code = "audit_unavailable",
+                Retryable = retryable,
+                ClientAction = clientAction,
+                Message = "restricted message",
+            }, null);
+        JsonElement result = JsonDocument.Parse(ChatBotCliOutputFormatter.FormatSafeDenial(exception, json: true)).RootElement.Clone();
+
+        result.GetProperty("retryable").GetBoolean().ShouldBe(expectedRetryable);
+        result.GetProperty("safeNextActions")[0].GetString().ShouldBe(expectedAction);
+        result.GetProperty("code").GetString().ShouldBe("audit_unavailable");
+        result.GetRawText().ShouldNotContain("restricted");
+    }
+
+    [Theory]
+    [InlineData("primary")]
+    [InlineData("terminal")]
+    [InlineData("failure")]
+    [InlineData("terminal-code")]
+    [InlineData("workflow")]
+    [InlineData("generic")]
+    public static void UnknownStatusReasonShouldDenyEntireOutcome(string field)
+    {
+        OperationStatus status = OperationStatus();
+        ChatBotMessageCode unknown = (ChatBotMessageCode)999999;
+        switch (field)
+        {
+            case "primary": status.ReasonCode = unknown; break;
+            case "terminal": status.TerminalReason = unknown; break;
+            case "failure": status.FailureReasonCode = unknown; break;
+            case "terminal-code": status.TerminalReasonCode = unknown; break;
+            case "workflow": status.WorkflowLastFailureCode = unknown; break;
+            case "generic": status.ReasonCode = ChatBotMessageCode.Generic_denial; break;
+        }
+
+        JsonElement result = JsonDocument.Parse(ChatBotCliOutputFormatter.FormatOperationStatus(status, json: true)).RootElement.Clone();
+
+        result.GetProperty("completionStatus").GetString().ShouldBe("failed");
+        result.GetProperty("lifecycleState").GetString().ShouldBe("failed");
+        result.GetProperty("partialSuccess").GetBoolean().ShouldBeFalse();
+        result.GetProperty("safeNextActions").EnumerateArray().Select(action => action.GetString()).ShouldBe(["dismiss"]);
+        result.GetProperty("terminalReason").GetString().ShouldBe("generic_denial");
+        result.GetProperty("failureReasonCode").GetString().ShouldBe("generic_denial");
+        result.GetProperty("terminalReasonCode").GetString().ShouldBe("generic_denial");
+        result.GetRawText().ShouldNotContain("999999");
+        string text = ChatBotCliOutputFormatter.FormatOperationStatus(status, json: false);
+        text.ShouldContain("completion-status: failed");
+        text.ShouldContain("lifecycle-state: failed");
+        text.ShouldContain("safe-next-action: dismiss");
+        text.ShouldNotContain("partial-success");
+        text.ShouldNotContain("retry-later");
+    }
+
     [Fact]
     public static async Task ReadCommandsUseClientFacadeReadMethodsOnly()
     {

@@ -53,7 +53,8 @@ internal static class OperationStatusHttpResults
             CorrelationId = record.CorrelationId,
             LifecycleState = knownReason ? record.LifecycleState : LifecycleState.Failed,
             ReasonCode = knownReason ? ParseCode(record.ReasonCode) : ChatBotMessageCode.Generic_denial,
-            RetryEligible = safeNextActions.Contains(ChatBotMessageNextAction.RetryLater) &&
+            RetryEligible = knownReason && !entry.IsTerminal &&
+                (entry.State == "waiting" || safeNextActions.Contains(ChatBotMessageNextAction.RetryLater)) &&
                 record.NextRetryAt is { } due && due <= now && record.RetryCount < record.MaxAttempts,
             PriorOutcome = !knownReason || previous is null ? null : new PriorCommandOutcome
             {

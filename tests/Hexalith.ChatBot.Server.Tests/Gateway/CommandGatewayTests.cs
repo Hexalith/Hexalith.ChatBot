@@ -5114,6 +5114,39 @@ public sealed partial class CommandGatewayTests
         public IReadOnlyList<AuthorizationFailureReading> ReadAndReset() => [];
     }
 
+    [Theory]
+    [InlineData(ChatBotAuthorizationReasonCodes.ServiceClientDisabled)]
+    [InlineData(ChatBotAuthorizationReasonCodes.ServiceClientQuarantined)]
+    [InlineData(ChatBotAuthorizationReasonCodes.AiActorDisabled)]
+    [InlineData(ChatBotAuthorizationReasonCodes.AiActorQuarantined)]
+    [InlineData(ChatBotAuthorizationReasonCodes.CommandCapabilityDisabled)]
+    [InlineData(ChatBotAuthorizationReasonCodes.CommandCapabilityQuarantined)]
+    public static void KnownControlDenialShouldKeepExistenceNeutralAccessGuidance(string reasonCode)
+    {
+        ProblemDetails problem = DefaultProblemDetailsFactory().CreateAuthorizationProblem(reasonCode, CorrelationId, TaskId);
+
+        problem.Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        problem.ClientAction.ShouldBe(ProblemDetailsClientAction.RequestAccess);
+        problem.Retryable.ShouldBeFalse();
+        problem.Message.ShouldBe("The operation is not available to this caller.");
+        problem.Message.ShouldNotContain(reasonCode);
+    }
+
+    [Theory]
+    [InlineData(ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable)]
+    [InlineData(ChatBotAuthorizationReasonCodes.AssociationCorrectionWorkflowUnavailable)]
+    [InlineData(ChatBotAuthorizationReasonCodes.ParticipantDirectoryDegraded)]
+    [InlineData(ChatBotAuthorizationReasonCodes.ServiceClientRateLimited)]
+    public static void KnownTransientAuthorizationFailureShouldKeepSafeRetry(string reasonCode)
+    {
+        ProblemDetails problem = DefaultProblemDetailsFactory().CreateAuthorizationProblem(reasonCode, CorrelationId, TaskId);
+
+        problem.Code.ShouldNotBe(ChatBotMessageCodes.GenericDenial);
+        problem.Retryable.ShouldBeTrue();
+        problem.ClientAction.ShouldBe(ProblemDetailsClientAction.RetryLater);
+        problem.Message.ShouldBe(ChatBotMessageCatalog.Resolve(problem.Code).Reason);
+    }
+
     [Fact]
     public static void ProblemDetailsFactoryShouldReturnCatalogBackedCurrentGatewayProblems()
     {

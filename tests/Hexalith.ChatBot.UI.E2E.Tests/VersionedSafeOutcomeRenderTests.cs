@@ -302,6 +302,150 @@ public sealed class VersionedSafeOutcomeRenderTests
         }
     }
 
+
+    [Theory]
+    [InlineData("authorization_denied", "The operation is not available to this caller.", "Request access")]
+    [InlineData("restricted_unknown_code", "The requested action is unavailable.", "Dismiss")]
+    public async Task ComposerSubmissionFailureShouldRenderSafeCatalogGuidance(string code, string reason, string action)
+    {
+        CultureInfo originalCulture = CultureInfo.CurrentCulture;
+        CultureInfo originalUiCulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en-US");
+            ServiceCollection services = new();
+            services.AddLogging();
+            services.AddLocalization();
+            services.AddFluentUIComponents();
+            services.AddSingleton<IJSRuntime, StaticRenderJsRuntime>();
+            services.AddSingleton<ChatBotUiTextLocalizer>();
+            services.AddSingleton<ChatBotCultureFormatter>();
+            services.AddSingleton<ChatBotAnnouncementDeduplicationState>();
+            await using ServiceProvider provider = services.BuildServiceProvider();
+            using HtmlRenderer renderer = new(provider, provider.GetRequiredService<ILoggerFactory>());
+
+            string html = await renderer.Dispatcher.InvokeAsync(async () =>
+                (await renderer.RenderComponentAsync<ChatBotGovernedComposer>(ParameterView.FromDictionary(new Dictionary<string, object?>
+                {
+                    [nameof(ChatBotGovernedComposer.SubmissionErrorCode)] = code,
+                })).ConfigureAwait(true)).ToHtmlString()).ConfigureAwait(true);
+
+            string text = WebUtility.HtmlDecode(html);
+            text.ShouldContain(reason);
+            text.ShouldContain(action);
+            html.ShouldContain("data-chatbot-feedback-state=\"TerminalPolicyFailure\"");
+            html.ShouldContain("role=\"alert\"");
+            html.ShouldContain("aria-disabled=\"true\"");
+            html.ShouldNotContain("restricted_unknown_code");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(ChatBotFeedbackStateFamily.BlockedAction)]
+    public async Task TerminalBannerShouldDeduplicateWithoutCallerTerminalState(ChatBotFeedbackStateFamily? stateFamily)
+    {
+        CultureInfo originalCulture = CultureInfo.CurrentCulture;
+        CultureInfo originalUiCulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en-US");
+            ServiceCollection services = new();
+            services.AddLogging();
+            services.AddLocalization();
+            services.AddFluentUIComponents();
+            services.AddSingleton<IJSRuntime, StaticRenderJsRuntime>();
+            services.AddSingleton<ChatBotUiTextLocalizer>();
+            services.AddSingleton<ChatBotCultureFormatter>();
+            services.AddSingleton<ChatBotAnnouncementDeduplicationState>();
+            await using ServiceProvider provider = services.BuildServiceProvider();
+            using HtmlRenderer renderer = new(provider, provider.GetRequiredService<ILoggerFactory>());
+            ParameterView parameters = ParameterView.FromDictionary(new Dictionary<string, object?>
+            {
+                [nameof(ChatBotStatusBanner.Kind)] = ChatBotFeedbackKind.Danger,
+                [nameof(ChatBotStatusBanner.MessageCatalogCode)] = "restricted_unknown_code",
+                [nameof(ChatBotStatusBanner.StateFamily)] = stateFamily,
+                [nameof(ChatBotStatusBanner.Message)] = "restricted raw prose",
+            });
+            async Task<string> Render() => await renderer.Dispatcher.InvokeAsync(async () =>
+                (await renderer.RenderComponentAsync<ChatBotStatusBanner>(parameters).ConfigureAwait(true)).ToHtmlString()).ConfigureAwait(true);
+
+            string first = await Render();
+            string repeat = await Render();
+
+            first.ShouldContain("data-chatbot-feedback-state=\"TerminalPolicyFailure\"");
+            first.ShouldContain("role=\"alert\"");
+            first.ShouldContain("aria-live=\"assertive\"");
+            repeat.ShouldContain("data-chatbot-live-announced=\"false\"");
+            repeat.ShouldContain("aria-live=\"off\"");
+            repeat.ShouldContain("The requested action is unavailable.");
+            first.ShouldNotContain("restricted");
+            repeat.ShouldNotContain("restricted");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
+    }
+
+    [Theory]
+    [InlineData(false, "retry-later", "retry-later", false)]
+    [InlineData(true, "none", "none", false)]
+    [InlineData(true, "retry-later", "retry-later", true)]
+    public async Task FailureItemShouldRespectRetryPermissionWithCallback(
+        bool retryable, string safeAction, string clientAction, bool enabled)
+    {
+        CultureInfo originalCulture = CultureInfo.CurrentCulture;
+        CultureInfo originalUiCulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en-US");
+            ServiceCollection services = new();
+            services.AddLogging();
+            services.AddLocalization();
+            services.AddFluentUIComponents();
+            services.AddSingleton<IJSRuntime, StaticRenderJsRuntime>();
+            services.AddSingleton<ChatBotUiTextLocalizer>();
+            services.AddSingleton<ChatBotCultureFormatter>();
+            services.AddSingleton<ChatBotAnnouncementDeduplicationState>();
+            await using ServiceProvider provider = services.BuildServiceProvider();
+            using HtmlRenderer renderer = new(provider, provider.GetRequiredService<ILoggerFactory>());
+            ProjectConversationItemModel item = JsonSerializer.Deserialize<ProjectConversationItemModel>(
+                """{"itemId":"failure-retry","kind":"FailureState","actorKind":"System","actorLabel":"Worker","occurredAt":"2026-01-01T00:00:00Z","failureStatus":"failed","messageCatalogCode":"failed_attachment","messageDetailVisibility":"metadata_only"}""",
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+            item = item with { Retryable = retryable, SafeNextAction = safeAction, ClientAction = clientAction };
+            EventCallback callback = EventCallback.Factory.Create(this, () => { });
+
+            string html = await renderer.Dispatcher.InvokeAsync(async () =>
+                (await renderer.RenderComponentAsync<ChatBotFailureStateConversationItem>(ParameterView.FromDictionary(new Dictionary<string, object?>
+                {
+                    [nameof(ChatBotFailureStateConversationItem.Item)] = item,
+                    [nameof(ChatBotFailureStateConversationItem.OnNextAction)] = callback,
+                })).ConfigureAwait(true)).ToHtmlString()).ConfigureAwait(true);
+
+            html.ShouldContain($"aria-disabled=\"{(!enabled).ToString().ToLowerInvariant()}\"");
+            if (!enabled)
+            {
+                html.ShouldContain("aria-describedby=\"failure-retry-safe-action-disabled-reason\"");
+                html.ShouldContain("<code class=\"chatbot-code\">none</code>");
+            }
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
+    }
+
     private sealed class StaticRenderJsRuntime : IJSRuntime
     {
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args)

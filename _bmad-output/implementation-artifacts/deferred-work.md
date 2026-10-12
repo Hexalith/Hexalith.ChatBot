@@ -1402,3 +1402,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: Operation status serialization throws when stored completion or audit enum text is unknown.
   evidence: `OperationStatusHttpResults.Parse<T>` threw for unknown enum text at Story 1.4 baseline. Check store schema migration and forward compatibility before choosing a fallback completion or audit state.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
+  summary: Unverified medium risk: distinguish a fresh blocked workspace failure from repeated polling when the component uses a fixed stable identity.
+  evidence: ChatBotBlockedState deduplicates by StableId, Reason and catalog code; fixed workspace callers supply no attempt identity. A live repeated-failure trace with distinct attempted operations would establish whether the second failure is incorrectly silent.

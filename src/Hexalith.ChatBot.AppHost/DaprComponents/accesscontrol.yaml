@@ -64,6 +64,9 @@ spec:
           - name: /project/rebuild/v1
             httpVerb: ["POST"]
             action: allow
+          - name: /project/rebuild/part/v1
+            httpVerb: ["POST"]
+            action: allow
           - name: /project/rebuild/stage/v1
             httpVerb: ["POST"]
             action: allow

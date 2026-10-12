@@ -124,7 +124,7 @@ public sealed class ChatBotGovernedPrimitiveContractTests
         blocked.ShouldContain("<FluentMessageBar");
         blocked.ShouldContain("Intent=\"MessageBarIntent.Error\"");
         blocked.ShouldContain("role=\"@FeedbackContract.AriaRole\"");
-        blocked.ShouldContain("aria-live=\"@FeedbackContract.AriaLive\"");
+        blocked.ShouldContain("aria-live=\"@AriaLive\"");
         blocked.ShouldContain("SafeNextAction");
         blocked.ShouldContain("StableId");
         blocked.ShouldNotContain("Exception");

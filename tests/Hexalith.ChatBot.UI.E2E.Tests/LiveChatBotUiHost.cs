@@ -1,4 +1,8 @@
 using Hexalith.ChatBot.Client;
+using Hexalith.FrontComposer.Contracts.Rendering;
+using Hexalith.FrontComposer.Shell.Extensions;
+using Hexalith.FrontComposer.Shell.Options;
+using Hexalith.FrontComposer.Shell.Services.Auth;
 
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -24,7 +28,8 @@ namespace Hexalith.ChatBot.UI.E2E.Tests;
 /// (Server, gateway, EventStore, Dapr). No production service, projection, store, or transport is touched.
 /// </para>
 /// </summary>
-internal sealed class LiveChatBotUiHost : WebApplicationFactory<Program>
+/// <param name="submissionErrorCode">Optional rejection code for the typed client test seam.</param>
+internal sealed class LiveChatBotUiHost(string? submissionErrorCode = null) : WebApplicationFactory<Program>
 {
     private IHost? _kestrelHost;
 
@@ -45,7 +50,19 @@ internal sealed class LiveChatBotUiHost : WebApplicationFactory<Program>
             // Swap the live typed Client facade for the deterministic metadata-only fake. Everything else
             // (FrontComposer shell, Fluxor, localization, Fluent UI) stays exactly as the production host wires it.
             services.RemoveAll<IChatBotClient>();
-            services.AddScoped<IChatBotClient, FakeChatBotClient>();
+            services.AddScoped<IChatBotClient>(_ => new FakeChatBotClient(submissionErrorCode));
+            // Real-render tests exercise an authorized tenant workspace. Reuse the production claim extractor
+            // with test claims so the shell's fail-closed context guard remains active.
+            services.AddHexalithFrontComposerServerAuthenticationState();
+            services.AddHexalithFrontComposerTokenRelay();
+            services.RemoveAll<IUserContextAccessor>();
+            services.AddScoped<IUserContextAccessor, ServerCircuitUserContextAccessor>();
+            services.Configure<FrontComposerAuthenticationOptions>(options =>
+            {
+                options.TenantClaimTypes.Add("eventstore:tenant");
+                options.UserClaimTypes.Add("sub");
+            });
+            services.AddSingleton<IStartupFilter, SafeOutcomeTestAuthenticationStartupFilter>();
         });
     }
 

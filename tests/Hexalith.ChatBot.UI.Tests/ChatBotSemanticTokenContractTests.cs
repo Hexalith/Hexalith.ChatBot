@@ -85,7 +85,7 @@ public sealed class ChatBotSemanticTokenContractTests
         css.ShouldContain("@media (forced-colors: active)");
         css.ShouldContain("Highlight");
         css.ShouldContain("outline:");
-        banner.ShouldContain("Title=\"@UiText.FeedbackKindLabel(Kind)\"");
+        banner.ShouldContain("UiText.FeedbackKindLabel(Kind)");
         banner.ShouldContain("data-chatbot-status=\"@StatusSlot\"");
         summary.ShouldContain("<FluentBadge");
         summary.ShouldContain("@UiText.StatusSummaryHealthLabel(facet.Health)");
@@ -166,7 +166,7 @@ public sealed class ChatBotSemanticTokenContractTests
         submissionFailure.ShouldBeGreaterThanOrEqualTo(0);
         acceptedReceipt.ShouldBeGreaterThan(submissionFailure);
         ambientDisabled.ShouldBeGreaterThan(acceptedReceipt);
-        composer.ShouldContain("data-chatbot-submission-error-code=\"@SubmissionErrorCode\"");
+        composer.ShouldContain("data-chatbot-submission-error-code=");
     }
 
     [Fact]

@@ -7,14 +7,15 @@ using ChatBotSurfaceOrigin = Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrig
 namespace Hexalith.ChatBot.UI.E2E.Tests;
 
 /// <summary>
-/// Story 13.9 UI-boundary seam: a deterministic, never-throwing <see cref="IChatBotClient"/> fake that returns
+/// Story 13.9 UI-boundary seam: a deterministic <see cref="IChatBotClient"/> fake that returns
 /// metadata-only safe-token DTOs for the four data surfaces (governed operations, project conversation,
 /// association review, compliance audit) so the real <c>Hexalith.ChatBot.UI</c> app renders all six routable
 /// surfaces without reaching a live backend (Server, gateway, EventStore, Dapr). The shapes mirror the valid
 /// fixtures already proven by the <c>Hexalith.ChatBot.UI.Tests</c> service tests; operational dashboards reach
 /// no client method (its service assembles a fail-safe Unknown overview at the UI boundary).
 /// </summary>
-internal sealed class FakeChatBotClient : IChatBotClient
+/// <param name="submissionErrorCode">Optional failure code for exercising rejected submissions.</param>
+internal sealed class FakeChatBotClient(string? submissionErrorCode = null) : IChatBotClient
 {
     private static readonly DateTimeOffset At = new(2026, 5, 31, 9, 0, 0, TimeSpan.Zero);
     private const string CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
@@ -29,6 +30,19 @@ internal sealed class FakeChatBotClient : IChatBotClient
         ChatBotSurfaceOrigin origin = ChatBotSurfaceOrigin.Api,
         CancellationToken cancellationToken = default)
     {
+        if (submissionErrorCode is not null)
+        {
+            return Task.FromException<CommandSubmissionResponse>(new HexalithChatBotApiException<ProblemDetails>(
+                "restricted exception", 403, "restricted payload", new Dictionary<string, IEnumerable<string>>(),
+                new ProblemDetails
+                {
+                    Code = submissionErrorCode,
+                    Message = "restricted prose",
+                    Retryable = false,
+                    ClientAction = ProblemDetailsClientAction.None,
+                }, null));
+        }
+
         switch (command)
         {
             case Hexalith.ChatBot.Contracts.Commands.RecordProjectConversationMessage:
