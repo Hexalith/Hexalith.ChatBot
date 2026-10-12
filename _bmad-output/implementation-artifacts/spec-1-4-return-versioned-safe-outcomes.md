@@ -2,7 +2,7 @@
 title: 'Return Versioned Safe Outcomes'
 type: 'feature'
 created: '2026-10-12'
-status: 'done'
+status: 'in-progress'
 baseline_commit: 8437900622d5bf7a9d34ca5cc543cd802f653cb1
 route: 'dispatch'
 review_loop_iteration: 0
@@ -165,3 +165,53 @@ Browser verification exposed missing button semantics on the Fluent governed-act
 - UI E2E includes 12 safe-outcome component render cases, 12 actual Chromium rejection cases across English/French and light/dark/forced-colors with reduced motion, keyboard focus and accessibility-tree checks, and six existing live cross-surface tests. Both known authorization denials and unknown sentinel codes are covered in the new browser matrix.
 - `git -c core.whitespace=cr-at-eol diff --check` passed. Test-generated updates to tracked Story 13.9 screenshots were copied to `/tmp/bmad-story-1-4-vsaw4g8h/screenshots` and the historical files were restored to their pre-run contents.
 - Full Aspire startup remains environment-blocked: `aspire start --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --no-build --non-interactive --format Json` exited 2 because `ChatBot:LiveRecoveryValidation:MailboxClientSecret` was absent (child exited 134). The actual UI browser tests use a loopback Kestrel host with a deterministic typed-client seam; no live backend or manual screen-reader traversal was claimed.
+
+### Review Findings
+
+- [x] [Review][Patch] Expired evidence dismisses instead of inviting a retry [src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCatalog.cs:247]
+- [x] [Review][Patch] Untyped HTTP 404 matches 403, and 409 dismisses [src/Hexalith.ChatBot.Cli/ChatBotCliOutputFormatter.cs:399]
+
+- [ ] [Review][Patch] High: server status can stay successful when the reason is generic_denial [src/Hexalith.ChatBot.Server/Gateway/Status/OperationStatusHttpResults.cs:31]
+- [ ] [Review][Patch] High: waiting outcomes become retry-eligible without a retry action [src/Hexalith.ChatBot.Server/Gateway/Status/OperationStatusHttpResults.cs:56]
+- [ ] [Review][Patch] High: non-authorization workspace failures keep an enabled Retry control [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor:95]
+- [ ] [Review][Patch] High: authorization responses drop the specific catalog entry [src/Hexalith.ChatBot.Server/Gateway/ChatBotProblemDetailsFactory.cs:187]
+- [ ] [Review][Patch] Unknown-outcome lifecycle text is `failed` instead of wire `Failed` [src/Hexalith.ChatBot.Cli/ChatBotCliOutputFormatter.cs:64]
+- [ ] [Review][Patch] Fixed announcement keys hide a later failure with a different catalog code [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor:124]
+- [ ] [Review][Patch] Blocked or stale conversations replace trusted local guidance with generic denial [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotBlockedState.razor:79]
+- [ ] [Review][Patch] Already-recorded outcomes report state denied [src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCatalogEntry.cs:15]
+- [ ] [Review][Patch] disabled-action renders as Unavailable [src/Hexalith.ChatBot.UI/Localization/ChatBotUiTextLocalizer.cs:339]
+- [ ] [Review][Patch] Failure card prose and button disagree when retry is withheld [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor:78]
+- [ ] [Review][Patch] Association Review retries unknown failures and prints a code [src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor:53]
+- [ ] [Review][Patch] Blocked state heading is not the catalog headline [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotBlockedState.razor:20]
+- [ ] [Review][Patch] Composer presents authentication denial as request-access [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor:157]
+- [ ] [Review][Patch] Null problem body skips catalog redaction [src/Hexalith.ChatBot.Cli/ChatBotCliOutputFormatter.cs:440]
+- [ ] [Review][Patch] Undefined status enums are printed as numbers [src/Hexalith.ChatBot.Cli/ChatBotCliOutputFormatter.cs:408]
+- [ ] [Review][Patch] Fallback counter test counts other tests in the process [tests/Hexalith.ChatBot.UI.Tests/ChatBotLocalizationContractTests.cs:101]
+- [ ] [Review][Patch] Authorization factory requires telemetry it never records [src/Hexalith.ChatBot.Server/Gateway/ChatBotProblemDetailsFactory.cs:14]
+- [ ] [Review][Patch] Accessible description appends the raw action token [src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCatalogEntry.cs:47]
+- [ ] [Review][Patch] Unknown status still copies retry and duplicate counts [src/Hexalith.ChatBot.Server/Gateway/Status/OperationStatusHttpResults.cs:89]
+- [ ] [Review][Patch] Empty conversation and association-review states are not rendered through their parents [tests/Hexalith.ChatBot.UI.E2E.Tests/VersionedSafeOutcomeRenderTests.cs:181]
+- [ ] [Review][Patch] Page failure banners are not rendered with a sentinel error [src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor:52]
+- [ ] [Review][Patch] Reason-only blocked states are not checked for a server action [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor:116]
+- [ ] [Review][Patch] Disabled composer states are not rendered [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor:152]
+- [ ] [Review][Patch] Unknown MCP argument denials do not assert category [tests/Hexalith.ChatBot.Mcp.Tests/ChatBotMcpServiceTests.cs:374]
+- [ ] [Review][Patch] Redaction, status, and UI-host fallback counts are not measured [src/Hexalith.ChatBot.Server/Gateway/Redaction/CoarseUserFacingRedactionStage.cs:13]
+
+- [x] [Review][Defer] Unknown completion or audit text still throws [src/Hexalith.ChatBot.Server/Gateway/Status/OperationStatusHttpResults.cs:29] — deferred: pre-existing parser; the fallback state still needs the schema and forward-compatibility decision already on the deferred-work ledger.
+- [x] [Review][Defer] Failure items still render category, scope, dependency, and escalation fields [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor:45] — deferred: pre-existing projected fields; already deferred from the earlier Story 1.4 review.
+- [x] [Review][Defer] Story commit advances EventStore, FrontComposer, and Memories gitlinks [references/Hexalith.EventStore:1] — deferred: maybe-false, medium if the move is unnecessary. Settle by building this story against the previous submodule commits `1b7b8ce`, `c7491c7`, and `b16ab01`.
+
+#### Rejected
+
+- `false` — CLI and MCP throw when `SafeNextActions` is null. The generated property defaults to an empty list, and `OperationStatusHttpResults.ToWire` always assigns a list.
+- `false` — A retryable catalog code drops the failure-item alert role. Catalog `IsTerminal` is the specified terminality, so a retryable entry correctly uses `status`.
+- `false` — `CommandGatewayHttpResults` constructs `CoarseUserFacingRedactionStage` directly. That class is stateless and is the only registered implementation, so `Apply` matches the scoped service.
+- `false` — A known status whose stored actions do not match the catalog action returns an empty action list. That list is the stored-permission intersection; it does not invent a dismiss action.
+- `false` — CLI and MCP forward unsupported status actions. The server already filters `SafeNextActions` to the catalog action before those formatters print the list.
+- `false` — Banner and blocked-state buttons show catalog `retry-later` without an instance flag. Those components have no per-instance retry input, and the catalog action is the action the spec requires. The separate always-enabled workspace Retry control is a different finding.
+- `false` — The spec frontmatter says `done` while sprint status says `review`. That is this review's starting state, not a product defect.
+- `low` — A local empty blocked state can render a blank reason when the caller passes a blank string. Current callers pass non-empty resources, and the fix would add a fallback branch.
+- `low` — A whitespace catalog code is treated as present. Callers pass real codes, and the fix would add a guard.
+- `low` — The commit message says CLI tests now expect `generic_denial` instead of specific codes. `ChatBotCliCommandTests` still expects `authorization_denied` and `command_contract_invalid`, and correcting the message would rewrite history.
+- `decision` — Coded banners stay catalog-only. A second child channel would keep the why-panel's unauthorized sentence on other failures, and raw error children must stay hidden.
+- `decision` — CLI and MCP fallback counts stay in process. Those hosts have no metrics pipeline, and a one-shot process is not a scrape target. Server and UI already export the meter.

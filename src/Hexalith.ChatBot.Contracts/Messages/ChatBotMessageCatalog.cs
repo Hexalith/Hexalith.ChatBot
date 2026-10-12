@@ -244,7 +244,7 @@ public static class ChatBotMessageCatalog
             ChatBotMessageCodes.AssociationEvidenceExpired,
             "Evidence expired.",
             "The association evidence must be refreshed before deciding.",
-            ChatBotMessageNextActions.RetryLater,
+            ChatBotMessageNextActions.Dismiss,
             ChatBotDisabledActionReasons.EvidenceExpired,
             ChatBotDetailVisibility.MetadataOnly),
         new(

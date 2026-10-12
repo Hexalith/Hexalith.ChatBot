@@ -1406,3 +1406,9 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: Unverified medium risk: distinguish a fresh blocked workspace failure from repeated polling when the component uses a fixed stable identity.
   evidence: ChatBotBlockedState deduplicates by StableId, Reason and catalog code; fixed workspace callers supply no attempt identity. A live repeated-failure trace with distinct attempted operations would establish whether the second failure is incorrectly silent.
+
+## Deferred from: code review of spec-1-4-return-versioned-safe-outcomes (2026-10-12)
+
+- Unknown completion or audit text still throws before the generic-denial path (`OperationStatusHttpResults.cs:29`). Pre-existing parser. The fallback state still needs the schema and forward-compatibility decision already recorded above.
+- Failure items still render category, scope, dependency, and escalation fields (`ChatBotFailureStateConversationItem.razor:45`). Pre-existing projected fields; same exposure as the earlier Story 1.4 deferral.
+- Story commit `abcb637` advances the EventStore, FrontComposer, and Memories gitlinks. Maybe-false, medium if those pointer moves are unnecessary. Settle by building this story against the previous commits `1b7b8ce`, `c7491c7`, and `b16ab01`.

@@ -202,8 +202,9 @@ public static class ChatBotMcpResultFormatter
         => statusCode switch
         {
             401 => ChatBotMessageCodes.AuthenticationDenied,
-            403 => ChatBotMessageCodes.AuthorizationDenied,
-            400 or 409 or 422 => ChatBotMessageCodes.CommandContractInvalid,
+            403 or 404 => ChatBotMessageCodes.AuthorizationDenied,
+            400 or 422 => ChatBotMessageCodes.CommandContractInvalid,
+            409 => ChatBotMessageCodes.GenericDenial,
             408 or 429 or >= 500 => ChatBotMessageCodes.DependencyDegraded,
             _ => ChatBotMessageCodes.GenericDenial,
         };

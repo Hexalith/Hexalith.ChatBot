@@ -47,6 +47,16 @@ public static partial class MessageCatalogContractTests
     }
 
     [Fact]
+    public static void ExpiredEvidenceShouldDismissWithoutRetry()
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AssociationEvidenceExpired);
+
+        entry.Reason.ShouldBe("The association evidence must be refreshed before deciding.");
+        entry.NextAction.ShouldBe(ChatBotMessageNextActions.Dismiss);
+        entry.IsTerminal.ShouldBeTrue();
+    }
+
+    [Fact]
     public static void AcceptedAssociationRejectionShouldBeCompletedTerminalOutcome()
     {
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AssociationDecisionRejected);

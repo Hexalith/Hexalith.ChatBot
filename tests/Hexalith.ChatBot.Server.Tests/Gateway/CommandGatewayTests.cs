@@ -5258,6 +5258,7 @@ public sealed partial class CommandGatewayTests
         problem.Code.ShouldBe(ChatBotMessageCodes.AssociationEvidenceExpired);
         problem.Message.ShouldBe(ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AssociationEvidenceExpired).Reason);
         problem.Retryable.ShouldBeFalse();
+        problem.ClientAction.ShouldBe(ProblemDetailsClientAction.Dismiss);
         Serialized(problem).ShouldNotContain(ChatBotRefusalReasonCodes.EvidenceExpired);
     }
 

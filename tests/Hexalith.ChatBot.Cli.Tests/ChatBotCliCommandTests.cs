@@ -477,7 +477,9 @@ public static class ChatBotCliCommandTests
     [Theory]
     [InlineData(401, "authentication_denied", "authenticate")]
     [InlineData(403, "authorization_denied", "request-access")]
+    [InlineData(404, "authorization_denied", "request-access")]
     [InlineData(400, "command_contract_invalid", "correct-request")]
+    [InlineData(409, "generic_denial", "dismiss")]
     [InlineData(422, "command_contract_invalid", "correct-request")]
     public static void HttpStatusBucketsShouldRetainSafeCatalogGuidance(int statusCode, string code, string action)
     {

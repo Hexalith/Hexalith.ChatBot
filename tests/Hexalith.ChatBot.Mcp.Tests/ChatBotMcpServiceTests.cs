@@ -97,12 +97,12 @@ public static class ChatBotMcpServiceTests
     [InlineData(401, "authentication_denied", "authenticate", false)]
     [InlineData(403, "authorization_denied", "request-access", false)]
     [InlineData(400, "command_contract_invalid", "correct-request", false)]
-    [InlineData(409, "command_contract_invalid", "correct-request", false)]
+    [InlineData(409, "generic_denial", "dismiss", false)]
     [InlineData(422, "command_contract_invalid", "correct-request", false)]
     [InlineData(408, "dependency_degraded", "retry-later", true)]
     [InlineData(429, "dependency_degraded", "retry-later", true)]
     [InlineData(503, "dependency_degraded", "retry-later", true)]
-    [InlineData(404, "generic_denial", "dismiss", false)]
+    [InlineData(404, "authorization_denied", "request-access", false)]
     public static void HttpDenialShouldKeepCatalogGuidance(int statusCode, string code, string action, bool retryable)
     {
         JsonElement result = ChatBotMcpResultFormatter.FormatSafeDenial(RestrictedPayloadException(statusCode, "restricted"));
