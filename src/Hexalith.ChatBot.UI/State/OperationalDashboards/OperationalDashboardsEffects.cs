@@ -1,6 +1,7 @@
 using Fluxor;
 
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.UI.Services;
 
@@ -14,7 +15,7 @@ namespace Hexalith.ChatBot.UI.State.OperationalDashboards;
 public sealed class OperationalDashboardsEffects(OperationalDashboardService service)
 {
     /// <summary>The generic safe failure code used when the server returned no catalog-backed problem code.</summary>
-    public const string GenericFailureCode = "dashboard-load-failed";
+    public const string GenericFailureCode = ChatBotMessageCodes.GenericDenial;
 
     private readonly OperationalDashboardService _service = service ?? throw new ArgumentNullException(nameof(service));
 
@@ -48,5 +49,5 @@ public sealed class OperationalDashboardsEffects(OperationalDashboardService ser
     }
 
     private static string SafeFailureCode(string? problemCode)
-        => string.IsNullOrWhiteSpace(problemCode) ? GenericFailureCode : problemCode;
+        => string.IsNullOrWhiteSpace(problemCode) ? ChatBotMessageCodes.GenericDenial : problemCode;
 }

@@ -57,7 +57,7 @@
                                      AccessibleLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsLoadFailed]"
                                      StableId="operational-dashboards-failed"
                                      StateFamily="@ChatBotFeedbackStateFamily.RetryableFailure"
-                                     AnnouncementKey="@($"operational-dashboards-failed-{UiText.FailureCatalogEntry(error).Code}")">
+                                     AnnouncementKey="@($"operational-dashboards-failed-{_refreshAttempt}-{UiText.FailureCatalogEntry(error).Code}")">
                     <code class="chatbot-code">@error</code>
                 </ChatBotStatusBanner>
             }
@@ -296,13 +296,19 @@
 </ChatBotConversationShell>
 
 @code {
+    private int _refreshAttempt;
+
     protected override void OnInitialized()
     {
         base.OnInitialized();
         Dispatcher.Dispatch(new LoadOperationalDashboardAction());
     }
 
-    private void Refresh() => Dispatcher.Dispatch(new LoadOperationalDashboardAction());
+    private void Refresh()
+    {
+        _refreshAttempt++;
+        Dispatcher.Dispatch(new LoadOperationalDashboardAction());
+    }
 
     private static ChatBotFeedbackKind HealthKind(ChatBotHealthStatus health)
         => health switch

@@ -113,9 +113,38 @@ public sealed class ChatBotLocalizationContractTests
         {
             ChatBotUiTextLocalizer text = CreateProvider().GetRequiredService<ChatBotUiTextLocalizer>();
             text.FailureCatalogEntry(ChatBotMessageCodes.AuditUnavailable).Code.ShouldBe(ChatBotMessageCodes.GenericDenial);
+            text.FailureCatalogHeadline(ChatBotMessageCodes.AuditUnavailable).ShouldNotBeEmpty();
+            text.FailureCatalogReason(ChatBotMessageCodes.AuditUnavailable).ShouldNotBeEmpty();
         }
 
         count.ShouldBe(1);
+    }
+
+    [Theory]
+    [InlineData("en", "Authorization denied", "The operation is not available to this caller.")]
+    [InlineData("fr", "Autorisation refusée", "L'opération n'est pas disponible pour cet appelant.")]
+    public void LegacyPascalCaseCatalogResourcesShouldRemainReadable(string locale, string headline, string reason)
+    {
+        using (UseCulture(locale))
+        {
+            ChatBotUiTextLocalizer text = CreateProvider().GetRequiredService<ChatBotUiTextLocalizer>();
+            text[ChatBotUiTextKey.FailureCatalogAuthorizationDenied].ShouldBe(headline);
+            text[ChatBotUiTextKey.FailureCatalogReasonAuthorizationDenied].ShouldBe(reason);
+        }
+    }
+
+    [Theory]
+    [InlineData(ChatBotMessageCodes.DuplicateSuppressed, "liée à l'opération d'origine")]
+    [InlineData(ChatBotMessageCodes.RetryQueued, "circuit de commandes gouvernées")]
+    [InlineData(ChatBotMessageCodes.TerminalFailure, "nécessite une reprise")]
+    [InlineData(ChatBotMessageCodes.ReprocessCreated, "liens d'audit")]
+    public void CorrectedFrenchCatalogCopyShouldKeepItsSpecificMeaning(string code, string phrase)
+    {
+        using (UseCulture("fr"))
+        {
+            ChatBotUiTextLocalizer text = CreateProvider().GetRequiredService<ChatBotUiTextLocalizer>();
+            text.FailureCatalogReason(code).ShouldContain(phrase);
+        }
     }
 
     [Fact]

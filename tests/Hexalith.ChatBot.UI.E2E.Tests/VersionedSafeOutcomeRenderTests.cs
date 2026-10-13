@@ -14,6 +14,7 @@ using Hexalith.ChatBot.UI.Services;
 using Hexalith.ChatBot.UI.State.ProjectConversation;
 using Hexalith.ChatBot.UI.State.AssociationReview;
 using Hexalith.ChatBot.UI.State.GovernedOperations;
+using Hexalith.ChatBot.UI.State.OperationalDashboards;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -245,7 +246,7 @@ public sealed class VersionedSafeOutcomeRenderTests
             rendered.ShouldContain("L'action demandée est indisponible.");
             rendered.ShouldContain("generic_denial");
             rendered.ShouldContain("Fermer ce message");
-            html.ShouldContain("role=\"alert\"");
+            html.ShouldContain("role=\"status\"");
             html.ShouldContain("aria-live=\"off\"");
             html.ShouldNotContain("private_unknown_failure");
             html.ShouldNotContain("unsafe-action");
@@ -340,7 +341,7 @@ public sealed class VersionedSafeOutcomeRenderTests
             string text = WebUtility.HtmlDecode(html);
             text.ShouldContain(reason);
             text.ShouldContain(action);
-            html.ShouldContain("data-chatbot-feedback-state=\"TerminalPolicyFailure\"");
+            html.ShouldContain($"data-chatbot-feedback-state=\"{(code == "restricted_unknown_code" ? "TerminalPolicyFailure" : "BlockedAction")}\"");
             html.ShouldContain("role=\"alert\"");
             html.ShouldContain("aria-disabled=\"true\"");
             html.ShouldNotContain("restricted_unknown_code");
@@ -400,6 +401,21 @@ public sealed class VersionedSafeOutcomeRenderTests
             CultureInfo.CurrentCulture = originalCulture;
             CultureInfo.CurrentUICulture = originalUiCulture;
         }
+    }
+
+    [Fact]
+    public async Task FailureBannerShouldRejectCatalogSuccessCode()
+    {
+        string html = await RenderParentAsync<ChatBotStatusBanner>(new Dictionary<string, object?>
+        {
+            [nameof(ChatBotStatusBanner.Kind)] = ChatBotFeedbackKind.Danger,
+            [nameof(ChatBotStatusBanner.MessageCatalogCode)] = ChatBotMessageCodes.AssociationDecisionAccepted,
+            [nameof(ChatBotStatusBanner.StateFamily)] = ChatBotFeedbackStateFamily.BlockedAction,
+        });
+
+        WebUtility.HtmlDecode(html).ShouldContain("The requested action is unavailable.");
+        html.ShouldContain("data-chatbot-feedback-state=\"TerminalPolicyFailure\"");
+        html.ShouldNotContain("Association decision accepted");
     }
 
     [Theory]
@@ -477,17 +493,55 @@ public sealed class VersionedSafeOutcomeRenderTests
     [Theory]
     [InlineData("governed")]
     [InlineData("association")]
+    [InlineData("dashboards")]
     public async Task PageFailureShouldHideSentinelAndWithholdRetry(string page)
     {
         const string sentinel = "restricted-page-secret";
-        string html = page == "governed"
-            ? await RenderParentAsync<GovernedOperations>([], governed: new(false, null, sentinel))
-            : await RenderParentAsync<AssociationReview>([], association: new(false, false, null, null, "", "", sentinel, null, AssociationReviewErrorScope.Load));
+        string html = page switch
+        {
+            "governed" => await RenderParentAsync<GovernedOperations>([], governed: new(false, null, sentinel)),
+            "association" => await RenderParentAsync<AssociationReview>([], association: new(false, false, null, null, "", "", sentinel, null, AssociationReviewErrorScope.Load)),
+            _ => await RenderParentAsync<OperationalDashboards>([], dashboards: new(false, null, sentinel)),
+        };
         html.ShouldNotContain(sentinel);
         WebUtility.HtmlDecode(html).ShouldContain("The requested action is unavailable.");
         WebUtility.HtmlDecode(html).ShouldContain("Dismiss");
         html.ShouldContain("role=\"alert\"");
         html.ShouldNotContain("data-chatbot-stable-id=\"association-review-retry\"");
+    }
+
+    [Theory]
+    [InlineData("Not-Authorized", "The operation is not available to this caller.")]
+    [InlineData("TIMEOUT", "A required dependency is temporarily degraded.")]
+    public async Task AssociationReviewLegacyFailureShouldRenderCatalogGuidance(string alias, string reason)
+    {
+        string html = await RenderParentAsync<AssociationReview>([],
+            association: new(false, false, null, null, "", "", alias, null, AssociationReviewErrorScope.Load));
+        WebUtility.HtmlDecode(html).ShouldContain(reason);
+        html.ShouldNotContain(alias);
+    }
+
+    [Fact]
+    public async Task WhyPanelFailureShouldRenderGenericCatalogGuidanceWithoutCallerCode()
+    {
+        const string sentinel = "restricted-why-panel-secret";
+        string html = await RenderParentAsync<ChatBotProjectConversationWorkspace>([],
+            project: new ProjectConversationState(false, null, null) with { WhyPanelErrorCode = sentinel });
+        WebUtility.HtmlDecode(html).ShouldContain("The requested action is unavailable.");
+        WebUtility.HtmlDecode(html).ShouldContain("Dismiss");
+        html.ShouldNotContain(sentinel);
+    }
+
+    [Theory]
+    [InlineData(ChatBotMessageCodes.AuthenticationDenied, "Authentication is required before this operation can continue.")]
+    [InlineData(ChatBotMessageCodes.AuthorizationDenied, "The operation is not available to this caller.")]
+    [InlineData(ChatBotMessageCodes.UnauthorizedParticipant, "The operation is not available to this participant.")]
+    public async Task WorkspaceAuthorizationFailureShouldRenderCatalogGuidance(string code, string reason)
+    {
+        string html = await RenderParentAsync<ChatBotProjectConversationWorkspace>([], project: new(false, null, code));
+        WebUtility.HtmlDecode(html).ShouldContain(reason);
+        html.ShouldContain("data-chatbot-stable-id=\"project-workspace-unauthorized\"");
+        html.ShouldNotContain("data-chatbot-stable-id=\"project-conversation-retryable\"");
     }
 
     [Theory]
@@ -520,15 +574,24 @@ public sealed class VersionedSafeOutcomeRenderTests
     }
 
     [Theory]
-    [InlineData("private-workspace-error", false)]
-    [InlineData("invalid_lifecycle_transition", false)]
-    [InlineData("audit_unavailable", true)]
-    public async Task WorkspaceFailureShouldOnlyEnableCatalogRetry(string code, bool retry)
+    [InlineData("private-workspace-error", "DisabledWithReason")]
+    [InlineData("invalid_lifecycle_transition", null)]
+    [InlineData("audit_unavailable", "Enabled")]
+    public async Task WorkspaceFailureShouldOnlyEnableCatalogRetry(string code, string? expectedActionState)
     {
         string html = await RenderParentAsync<ChatBotProjectConversationWorkspace>([], project: new(false, null, code));
-        html.Contains("data-chatbot-stable-id=\"project-conversation-retry\"", StringComparison.Ordinal).ShouldBe(retry);
+        string action = Regex.Match(html, "<span[^>]*data-chatbot-stable-id=\"project-workspace-retryable-safe-action\"[^>]*>").Value;
+        if (expectedActionState is null)
+        {
+            action.ShouldBeEmpty();
+        }
+        else
+        {
+            action.ShouldContain($"data-chatbot-action-state=\"{expectedActionState}\"");
+        }
+        html.ShouldNotContain("data-chatbot-stable-id=\"project-conversation-retryable-safe-action\"");
         html.ShouldNotContain("private-workspace-error");
-        html.ShouldContain(retry ? "role=\"status\"" : "role=\"alert\"");
+        html.ShouldContain(code == "audit_unavailable" ? "role=\"status\"" : "role=\"alert\"");
     }
 
     [Theory]
@@ -544,6 +607,11 @@ public sealed class VersionedSafeOutcomeRenderTests
         html.ShouldNotContain("private-next-action");
         WebUtility.HtmlDecode(html).ShouldContain("Dismiss");
         html.ShouldContain("data-chatbot-stable-id=\"project-conversation-blocked-safe-action\"");
+        if (status is "Blocked" or "Stale")
+        {
+            WebUtility.HtmlDecode(html).ShouldContain("The requested action is unavailable.");
+            WebUtility.HtmlDecode(html).ShouldNotContain("A required dependency is temporarily degraded.");
+        }
     }
 
     /// <summary>Unknown outcomes suppress contradictory completion and retry metadata.</summary>
@@ -606,7 +674,7 @@ public sealed class VersionedSafeOutcomeRenderTests
                     [nameof(ChatBotConversationStream.Items)] = new[] { item },
                 })).ConfigureAwait(true)).ToHtmlString()).ConfigureAwait(true);
             string article = Regex.Match(history, "<article[^>]*>").Value;
-            article.ShouldContain("role=\"alert\"");
+            article.ShouldContain("role=\"status\"");
             article.ShouldContain("aria-live=\"off\"");
             EventCallback callback = EventCallback.Factory.Create(this, () => { });
             async Task<string> Interactive() => await renderer.Dispatcher.InvokeAsync(async () =>
@@ -619,10 +687,52 @@ public sealed class VersionedSafeOutcomeRenderTests
             string repeated = await Interactive();
             Regex.Match(first, "<article[^>]*>").Value.ShouldContain("aria-live=\"assertive\"");
             Regex.Match(repeated, "<article[^>]*>").Value.ShouldContain("aria-live=\"off\"");
-            repeated.ShouldContain("role=\"alert\"");
+            repeated.ShouldContain("role=\"status\"");
         }
         finally
         {
+            CultureInfo.CurrentUICulture = original;
+        }
+    }
+
+    [Fact]
+    public async Task StreamShouldAnnounceNewCurrentPageFailureOnceAndKeepHistoryQuiet()
+    {
+        CultureInfo original = CultureInfo.CurrentUICulture;
+        CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en");
+        try
+        {
+            ServiceCollection services = new();
+            services.AddLogging();
+            services.AddLocalization();
+            services.AddFluentUIComponents();
+            services.AddSingleton<IJSRuntime, StaticRenderJsRuntime>();
+            services.AddSingleton<ChatBotUiTextLocalizer>();
+            services.AddSingleton<ChatBotCultureFormatter>();
+            services.AddSingleton<ChatBotAnnouncementDeduplicationState>();
+            await using ServiceProvider provider = services.BuildServiceProvider();
+            using HtmlRenderer renderer = new(provider, provider.GetRequiredService<ILoggerFactory>());
+            var root = await renderer.Dispatcher.InvokeAsync(() => renderer.RenderComponentAsync<StreamTransitionRenderHost>());
+            StreamTransitionRenderHost host = StreamTransitionRenderHost.Instance!;
+            ProjectConversationItemModel current = CreateFailureItem(ChatBotMessageCodes.FailedCommand, "current-failure");
+            ProjectConversationItemModel history = CreateFailureItem(ChatBotMessageCodes.FailedCommand, "old-failure");
+            IReadOnlySet<string> currentIds = new HashSet<string>(StringComparer.Ordinal) { current.ItemId };
+
+            await host.UpdateAsync([current, history], currentIds).ConfigureAwait(true);
+            string first = await renderer.Dispatcher.InvokeAsync(root.ToHtmlString).ConfigureAwait(true);
+            Regex.Match(first, "<article[^>]*data-chatbot-conversation-item-id=\"current-failure\"[^>]*>").Value
+                .ShouldContain("aria-live=\"assertive\"");
+            Regex.Match(first, "<article[^>]*data-chatbot-conversation-item-id=\"old-failure\"[^>]*>").Value
+                .ShouldContain("aria-live=\"off\"");
+
+            await host.UpdateAsync([current, history], currentIds).ConfigureAwait(true);
+            string repeated = await renderer.Dispatcher.InvokeAsync(root.ToHtmlString).ConfigureAwait(true);
+            Regex.Match(repeated, "<article[^>]*data-chatbot-conversation-item-id=\"current-failure\"[^>]*>").Value
+                .ShouldContain("aria-live=\"off\"");
+        }
+        finally
+        {
+            StreamTransitionRenderHost.Clear();
             CultureInfo.CurrentUICulture = original;
         }
     }
@@ -655,7 +765,7 @@ public sealed class VersionedSafeOutcomeRenderTests
 
     private static async Task<string> RenderParentAsync<T>(Dictionary<string, object?> parameters,
         ProjectConversationState? project = null, AssociationReviewState? association = null,
-        GovernedOperationsState? governed = null) where T : IComponent
+        GovernedOperationsState? governed = null, OperationalDashboardsState? dashboards = null) where T : IComponent
     {
         CultureInfo original = CultureInfo.CurrentUICulture;
         CultureInfo originalCulture = CultureInfo.CurrentCulture;
@@ -671,6 +781,7 @@ public sealed class VersionedSafeOutcomeRenderTests
             services.AddSingleton<IState<ProjectConversationState>>(new SafeOutcomeRenderState<ProjectConversationState>(project ?? new(false, null, null)));
             services.AddSingleton<IState<AssociationReviewState>>(new SafeOutcomeRenderState<AssociationReviewState>(association ?? new(false, false, null, null, "", "", null, null)));
             services.AddSingleton<IState<GovernedOperationsState>>(new SafeOutcomeRenderState<GovernedOperationsState>(governed ?? new(false, null, null)));
+            services.AddSingleton<IState<OperationalDashboardsState>>(new SafeOutcomeRenderState<OperationalDashboardsState>(dashboards ?? new(false, null, null)));
             services.AddSingleton<IDispatcher, SafeOutcomeRenderDispatcher>();
             services.AddSingleton(new ChatBotHubEndpoint(new Uri("http://127.0.0.1")));
             services.AddSingleton<IJSRuntime, StaticRenderJsRuntime>();

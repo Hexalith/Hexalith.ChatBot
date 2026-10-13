@@ -1048,21 +1048,21 @@
   <data name="Failure_Catalog_project_ai_context_package_unavailable" xml:space="preserve"><value>Contexte IA indisponible.</value></data>
   <data name="Failure_CatalogReason_project_ai_context_package_unavailable" xml:space="preserve"><value>Le contexte IA attend des métadonnées autorisées.</value></data>
   <data name="Failure_Catalog_duplicate_suppressed" xml:space="preserve"><value>Doublon supprimé</value></data>
-  <data name="Failure_CatalogReason_duplicate_suppressed" xml:space="preserve"><value>Une livraison en double a été supprimée sans modifier l'élément d'origine.</value></data>
+  <data name="Failure_CatalogReason_duplicate_suppressed" xml:space="preserve"><value>Une livraison en double a été supprimée et liée à l'opération d'origine.</value></data>
   <data name="Failure_Catalog_retry_queued" xml:space="preserve"><value>Nouvelle tentative en file</value></data>
-  <data name="Failure_CatalogReason_retry_queued" xml:space="preserve"><value>Une nouvelle tentative gouvernée est en file et sûre contre les doublons.</value></data>
+  <data name="Failure_CatalogReason_retry_queued" xml:space="preserve"><value>La demande de nouvelle tentative a été mise en file par le circuit de commandes gouvernées.</value></data>
   <data name="Failure_Catalog_retry_accepted" xml:space="preserve"><value>Nouvelle tentative acceptée</value></data>
   <data name="Failure_CatalogReason_retry_accepted" xml:space="preserve"><value>La nouvelle tentative a été acceptée sans créer de travail en double.</value></data>
   <data name="Failure_Catalog_retry_exhausted" xml:space="preserve"><value>Nouvelles tentatives épuisées</value></data>
   <data name="Failure_CatalogReason_retry_exhausted" xml:space="preserve"><value>Les tentatives sont épuisées et une reprise opérateur est requise.</value></data>
   <data name="Failure_Catalog_terminal_failure" xml:space="preserve"><value>Échec terminal</value></data>
-  <data name="Failure_CatalogReason_terminal_failure" xml:space="preserve"><value>Cet élément terminal ne revient pas en arrière ; le retraitement crée un nouveau travail.</value></data>
+  <data name="Failure_CatalogReason_terminal_failure" xml:space="preserve"><value>L'élément a atteint un état d'échec terminal et nécessite une reprise.</value></data>
   <data name="Failure_Catalog_recoverable_mailbox_degradation" xml:space="preserve"><value>Récupération boîte aux lettres en attente</value></data>
   <data name="Failure_CatalogReason_recoverable_mailbox_degradation" xml:space="preserve"><value>L'ingestion de boîte aux lettres est récupérable et suivra la stratégie de nouvelle tentative.</value></data>
   <data name="Failure_Catalog_projection_retryable" xml:space="preserve"><value>Projection rejouable</value></data>
   <data name="Failure_CatalogReason_projection_retryable" xml:space="preserve"><value>Le statut de projection peut être rejoué et reste limité aux métadonnées.</value></data>
   <data name="Failure_Catalog_reprocess_created" xml:space="preserve"><value>Retraitement créé</value></data>
-  <data name="Failure_CatalogReason_reprocess_created" xml:space="preserve"><value>Une nouvelle instance de workflow a été créée pour le retraitement.</value></data>
+  <data name="Failure_CatalogReason_reprocess_created" xml:space="preserve"><value>Une nouvelle instance de workflow a été créée avec des liens d'audit vers l'élément terminal.</value></data>
   <data name="Failure_Catalog_notification_routing_unauthorized" xml:space="preserve"><value>Modification du routage indisponible.</value></data>
   <data name="Failure_CatalogReason_notification_routing_unauthorized" xml:space="preserve"><value>La modification du routage exige un administrateur humain.</value></data>
   <data name="Failure_Catalog_escalation_policy_unauthorized" xml:space="preserve"><value>Modification de l'escalade indisponible.</value></data>

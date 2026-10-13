@@ -2,7 +2,7 @@
 title: 'Return Versioned Safe Outcomes'
 type: 'feature'
 created: '2026-10-12'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: 8437900622d5bf7a9d34ca5cc543cd802f653cb1
 route: 'dispatch'
 review_loop_iteration: 0
@@ -71,6 +71,7 @@ context:
 
 ## Spec Change Log
 
+- 2026-10-13: Closed the 17 remaining source-slice patches and the follow-up independent review. Preserved specific idempotency conflicts while denying unrelated success codes, added a mounted stream transition test, and verified 4,111 affected tests. Completion evidence remains outstanding.
 - 2026-10-12: Completed the resumed parallel review, fixed permission and accessibility regressions, and verified all affected suites (4,016 tests, zero failures/skips). Added real locale/theme/keyboard browser coverage and recorded the environment limitation for full Aspire startup.
 - 2026-10-12: Implemented Story 1.4 and added focused render, leakage, catalog, and boundary coverage. The broad Debug build remains blocked by existing sibling reference conflicts; see Verification.
 
@@ -250,23 +251,23 @@ Acceptance Auditor and Edge Case Hunter were interrupted and filed nothing. Blin
 - [x] [Review][Patch] AI invalidation stores retry-later so it matches the blocked-context catalog action [src/Hexalith.ChatBot.Server/Projections/ApprovedAiActionOutcomeProjectionTranslator.cs:204]
 - [x] [Review][Patch] Expired-evidence copy states that the decision stopped, and the action stays dismiss [src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCatalog.cs:246]
 
-- [ ] [Review][Patch] Collapsed CLI and MCP status still prints the original retry count, and MCP drops a known code when the problem category is null [src/Hexalith.ChatBot.Cli/ChatBotCliOutputFormatter.cs:85]
-- [ ] [Review][Patch] A generic denial is labeled authorization, and an unknown 401 or 503 becomes a 403 authorization dismissal [src/Hexalith.ChatBot.Server/Gateway/Redaction/CoarseUserFacingRedactionStage.cs:29]
-- [ ] [Review][Patch] A catalog banner replaces an explicit blocked or degraded family with terminal policy failure [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor:129]
-- [ ] [Review][Patch] Already-submitted idempotency conflicts still report state denied [src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCatalogEntry.cs:48]
-- [ ] [Review][Patch] The banner renders a disabled catalog action beside the live retry [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor:81]
-- [ ] [Review][Patch] Historical failure items use role alert, and the stream never announces them [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor:10]
-- [ ] [Review][Patch] Four French catalog sentences do not carry the English meaning [src/Hexalith.ChatBot.UI/Localization/SharedResource.fr.resx:975]
-- [ ] [Review][Patch] One render increments the fallback counter once per catalog property access [src/Hexalith.ChatBot.UI/Localization/ChatBotUiTextLocalizer.cs:373]
-- [ ] [Review][Patch] PascalCase Failure_Catalog resources are no longer read [src/Hexalith.ChatBot.UI/Localization/SharedResource.resx:538]
-- [ ] [Review][Patch] Local transport sentinels are unknown codes, so load failures become terminal generic denials and count as fallbacks [src/Hexalith.ChatBot.UI/State/GovernedOperations/GovernedOperationsEffects.cs:16]
-- [ ] [Review][Patch] Operational dashboards load failures are not rendered with a non-catalog error [tests/Hexalith.ChatBot.UI.E2E.Tests/VersionedSafeOutcomeRenderTests.cs:478]
-- [ ] [Review][Patch] Association-review legacy aliases are not rendered on the page [src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor:53]
-- [ ] [Review][Patch] Why-panel failures are not rendered [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor:201]
-- [ ] [Review][Patch] Workspace authorization codes are not rendered [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor:62]
-- [ ] [Review][Patch] CLI 408 and 429 denials are outside the status-bucket tests [tests/Hexalith.ChatBot.Cli.Tests/ChatBotCliCommandTests.cs:552]
-- [ ] [Review][Patch] CLI and MCP denial tests do not assert headline or catalog version [src/Hexalith.ChatBot.Cli/ChatBotCliOutputFormatter.cs:329]
-- [ ] [Review][Patch] The server host does not prove the fallback meter is exported [src/Hexalith.ChatBot.Server/Program.cs:74]
+- [x] [Review][Patch] Collapsed CLI and MCP status still prints the original retry count, and MCP drops a known code when the problem category is null [src/Hexalith.ChatBot.Cli/ChatBotCliOutputFormatter.cs:85]
+- [x] [Review][Patch] A generic denial is labeled authorization, and an unknown 401 or 503 becomes a 403 authorization dismissal [src/Hexalith.ChatBot.Server/Gateway/Redaction/CoarseUserFacingRedactionStage.cs:29]
+- [x] [Review][Patch] A catalog banner replaces an explicit blocked or degraded family with terminal policy failure [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor:129]
+- [x] [Review][Patch] Already-submitted idempotency conflicts still report state denied [src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCatalogEntry.cs:48]
+- [x] [Review][Patch] The banner renders a disabled catalog action beside the live retry [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor:81]
+- [x] [Review][Patch] Historical failure items use role alert, and the stream never announces them [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor:10]
+- [x] [Review][Patch] Four French catalog sentences do not carry the English meaning [src/Hexalith.ChatBot.UI/Localization/SharedResource.fr.resx:975]
+- [x] [Review][Patch] One render increments the fallback counter once per catalog property access [src/Hexalith.ChatBot.UI/Localization/ChatBotUiTextLocalizer.cs:373]
+- [x] [Review][Patch] PascalCase Failure_Catalog resources are no longer read [src/Hexalith.ChatBot.UI/Localization/SharedResource.resx:538]
+- [x] [Review][Patch] Local transport sentinels are unknown codes, so load failures become terminal generic denials and count as fallbacks [src/Hexalith.ChatBot.UI/State/GovernedOperations/GovernedOperationsEffects.cs:16]
+- [x] [Review][Patch] Operational dashboards load failures are not rendered with a non-catalog error [tests/Hexalith.ChatBot.UI.E2E.Tests/VersionedSafeOutcomeRenderTests.cs:478]
+- [x] [Review][Patch] Association-review legacy aliases are not rendered on the page [src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor:53]
+- [x] [Review][Patch] Why-panel failures are not rendered [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor:201]
+- [x] [Review][Patch] Workspace authorization codes are not rendered [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor:62]
+- [x] [Review][Patch] CLI 408 and 429 denials are outside the status-bucket tests [tests/Hexalith.ChatBot.Cli.Tests/ChatBotCliCommandTests.cs:552]
+- [x] [Review][Patch] CLI and MCP denial tests do not assert headline or catalog version [src/Hexalith.ChatBot.Cli/ChatBotCliOutputFormatter.cs:329]
+- [x] [Review][Patch] The server host does not prove the fallback meter is exported [src/Hexalith.ChatBot.Server/Program.cs:74]
 
 ##### Rejected (src slice)
 
@@ -338,6 +339,45 @@ dotnet tools/Hexalith.ChatBot.StoryEvidenceGate/bin/Debug/net10.0/Hexalith.ChatB
 
 The repository's required completion gate takes precedence over the workflow's done transition. The spec remains `in-review` and the sprint entry moves to `review`. Completion requires the story evidence contract, exact scope and assertion mappings, attested machine evidence and any triggered primary lanes, followed by a passing gate report; the Debug suite pass does not replace that preflight. Normal AppHost startup also remains blocked by the missing `ChatBot:LiveRecoveryValidation:MailboxClientSecret` key described above. No successful live AppHost startup or manual screen-reader run is claimed.
 
+### Independent review of 2026-10-13 continuation
+
+| ID | Finding | Verdict | Route | Evidence |
+| --- | --- | --- | --- | --- |
+| C-B1 | Outbound duplicate send is completed | medium | patch | The aggregate rejects the second send; the catalog's completed state can describe the refused current request as success. |
+| C-B2 | Invalidated AI proposal suggests retry | false | reject | Retry-later refers to waiting for corrected context propagation; the AI outcome row has no callback that retries the invalidated proposal. |
+| C-B3 | Unexpected UI exceptions advertise dependency retry | medium | patch | Broad exception handlers use dependency_degraded even for programming failures with no established retry permission. |
+| C-B4 | Denial surfaces accept other catalog success codes | high | patch | Redaction and CLI/MCP guards exclude command_accepted alone; association_decision_accepted reaches denial copy. Known idempotency conflicts must retain their specific denial code. |
+| C-B5 | Unknown MCP tool loses correct-request guidance | medium | patch | UnknownTool emits mcp.tool.unknown with correct-request, but the formatter does not map this fixed code. |
+| C-B6 | Status formatters omit primary reason copy | medium | defer | The omission predates this story; adding catalog fields to both public status shapes needs a separate output-contract decision. |
+| C-B7 | Status formatters pass incompatible actions | false | reject | carried N-E1/N-E2: the production status endpoint intersects persisted actions with catalog permission before either typed client receives them. |
+| C-B8 | Generic composer denial keeps BlockedAction family | medium | patch | The terminal generic fallback should carry terminal-policy semantics while a specific blocked code retains its explicit family. |
+| C-B9 | Blocked and stale composer gets dependency retry copy | medium | patch | The workspace passes degraded for all three context states and the new composer catalog mapping advertises dependency retry for blocked and stale. |
+| C-B10 | Localizer cache undercounts repeated fallback | false | reject | A cache hit does not run another catalog resolution; the meter counts underlying fallback resolutions without raw input, while cache bounds work per scope. |
+| C-B11 | Release solution graph expands | maybe-false | defer | carried N-B10: compare exact Release project graphs before and after the source inventory edit. |
+| C-B12 | Unknown stored completion or audit text throws | medium | defer | carried B8: the parser predates this story and needs a storage forward-compatibility decision. |
+| C-B13 | Failure card exposes optional projected metadata | medium | defer | carried B5: the fields existed before this story and still require a provenance audit. |
+| C-B14 | Redaction copies correlation and task IDs | medium | defer | carried B6: copying IDs predates this story and needs a provenance audit for non-HTTP callers. |
+| C-E1 | Server denial accepts a completed code | high | patch | Same verified cause as C-B4 at the redaction boundary. |
+| C-E2 | CLI denial accepts a completed code | high | patch | Same verified cause as C-B4 in the CLI formatter. |
+| C-E3 | MCP denial accepts a completed code | high | patch | Same verified cause as C-B4 in the MCP formatter. |
+| C-E4 | Failure banner accepts a catalog success code | medium | patch | A danger or warning banner currently renders waiting or completed catalog prose as failure guidance. |
+| C-E5 | CLI status action mismatch | false | reject | carried N-E1: server-side action intersection prevents this mismatch on the typed-client path. |
+| C-E6 | MCP status action mismatch | false | reject | carried N-E2: the same server-side intersection protects the MCP typed-client path. |
+| C-E7 | Generic failure card exposes optional metadata | medium | defer | carried B5: this is the pre-existing projected-field provenance issue. |
+| C-E8 | Repeated dashboard refresh failure stays silent | medium | patch | The user can refresh twice and the fixed code-based key suppresses the second attempt's failure announcement. |
+| C-E9 | Invalidated AI proposal retry guidance | false | reject | Same refutation as C-B2: retry-later waits for context propagation and does not re-execute the invalidated proposal. |
+| C-V1 | Current-page stream arrival lacks transition test | medium | patch | The direct card test bypasses the stream Announce parameter, so a new current-page failure could remain silent undetected. |
+
+### Verification of source-slice review patches and independent review (2026-10-13)
+
+- The final Debug source build passed with zero warnings and errors: `dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false -v:q`.
+- Full native suites passed independently: Contracts 516, Client 91, CLI 53, MCP 60, UI 320, Server 2,595, Conformance 150, Architecture 123, and UI E2E 203: **4,111 tests, zero failures or skips**. The final UI E2E run included 38 safe-outcome render cases and 13 Chromium cases.
+- The server host exporter test proves the actual meter provider emits a tag-free catalog fallback. CLI/MCP tests verify collapsed retry counts, catalog headlines/versions, and rejection of unrelated success codes. Parent renders verify dashboard, association aliases, why-panel, workspace authorization, and catalog success codes inside failure banners.
+- `StreamShouldAnnounceNewCurrentPageFailureOnceAndKeepHistoryQuiet` mounts a stream, adds a new current-page failure and old history after the initial render, then proves the new item announces once while history stays quiet. Repeated dashboard refreshes now use an attempt-specific announcement key.
+- Known idempotency conflict problems retain their specific codes and safe copy; an outbound duplicate send remains a denied current request. A non-catalog exception now produces terminal generic denial instead of implying dependency retry.
+- The historical Story 13.9 screenshots were restored to their pre-run bytes; generated copies are in `/tmp/chatbot-story-1-4-final-generated-screenshots`. The completion evidence contract and live AppHost secret limitations described above remain outstanding.
+- The follow-up completion preflight `dotnet tools/Hexalith.ChatBot.StoryEvidenceGate/bin/Debug/net10.0/Hexalith.ChatBot.StoryEvidenceGate.dll validate --story _bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md --contract _bmad-output/implementation-artifacts/evidence/1-4-return-versioned-safe-outcomes.json --target-status done --base 8437900622d5bf7a9d34ca5cc543cd802f653cb1 --head 3fd47d3de1bf8efe5434948d53fdd917d625a412 --results /tmp/chatbot-story-1-4-final-generated-screenshots --report /tmp/chatbot-story-1-4-evidence-preflight.json` exited 1 with `scope_digest_mismatch` for the absent Story 1.4 evidence contract. The spec stays `in-review` and sprint status stays `review`; no attested completion is claimed.
+
 ## File List
 
 - `Hexalith.ChatBot.slnx`
@@ -361,6 +401,7 @@ The repository's required completion gate takes precedence over the workflow's d
 - `src/Hexalith.ChatBot.Server/Gateway/Redaction/CoarseUserFacingRedactionStage.cs`
 - `src/Hexalith.ChatBot.Server/Gateway/Status/OperationStatusHttpResults.cs`
 - `src/Hexalith.ChatBot.Server/Program.cs`
+- `src/Hexalith.ChatBot.Server/Projections/ApprovedAiActionOutcomeProjectionTranslator.cs`
 - `src/Hexalith.ChatBot.UI/Components/Governed/ChatBotBlockedState.razor`
 - `src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor`
 - `src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor`
@@ -377,6 +418,9 @@ The repository's required completion gate takes precedence over the workflow's d
 - `src/Hexalith.ChatBot.UI/Localization/SharedResource.fr.resx`
 - `src/Hexalith.ChatBot.UI/Localization/SharedResource.resx`
 - `src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewFailureCatalog.cs`
+- `src/Hexalith.ChatBot.UI/State/GovernedOperations/GovernedOperationsEffects.cs`
+- `src/Hexalith.ChatBot.UI/State/OperationalDashboards/OperationalDashboardsEffects.cs`
+- `src/Hexalith.ChatBot.UI/State/ProjectConversation/ProjectConversationEffects.cs`
 - `tests/Hexalith.ChatBot.Architecture.Tests/DomainServiceSdkHostAdoptionAdrTests.cs`
 - `tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs`
 - `tests/Hexalith.ChatBot.Cli.Tests/ChatBotCliCommandTests.cs`
@@ -389,6 +433,8 @@ The repository's required completion gate takes precedence over the workflow's d
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/SafeOutcomeFallbackMetricTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/SafeOutcomeProblemCompatibilityTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/ServerSafeOutcomeHostMetricTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/ServerSafeOutcomeMetricExporter.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Lifecycle/CorrectionPropagationProgressReadTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Lifecycle/OperationStatusWorkflowStatusSinkTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Projections/AiOutcomeProjectionTests.cs`
@@ -399,6 +445,7 @@ The repository's required completion gate takes precedence over the workflow's d
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/SafeOutcomeRenderDispatcher.cs`
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/SafeOutcomeRenderState.cs`
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/SafeOutcomeTestAuthenticationStartupFilter.cs`
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/StreamTransitionRenderHost.cs`
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/VersionedSafeOutcomeBrowserTests.cs`
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/VersionedSafeOutcomeRenderTests.cs`
 - `tests/Hexalith.ChatBot.UI.Tests/AssociationReviewEffectsTests.cs`

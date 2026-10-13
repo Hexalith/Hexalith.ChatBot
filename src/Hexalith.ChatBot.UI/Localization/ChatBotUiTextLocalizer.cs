@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.UI.Design;
@@ -12,6 +14,10 @@ namespace Hexalith.ChatBot.UI.Localization;
 /// </summary>
 public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> localizer)
 {
+    private const int MaxCatalogEntryCacheSize = 256;
+
+    private readonly Dictionary<(string Locale, string CodeHash), ChatBotMessageCatalogEntry> _catalogEntryCache = [];
+
     public string this[string key] => Get(key);
 
     public string Get(string key, params object[] arguments)
@@ -372,8 +378,29 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
     /// <summary>Resolves a catalog entry only when both phrases exist in the active locale.</summary>
     public ChatBotMessageCatalogEntry FailureCatalogEntry(string? code)
     {
-        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(code);
         string locale = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+        string codeHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(code ?? string.Empty)));
+        lock (_catalogEntryCache)
+        {
+            if (_catalogEntryCache.TryGetValue((locale, codeHash), out ChatBotMessageCatalogEntry? cached))
+            {
+                return cached;
+            }
+
+            ChatBotMessageCatalogEntry entry = ResolveCatalogEntry(code, locale);
+            if (_catalogEntryCache.Count >= MaxCatalogEntryCacheSize)
+            {
+                _catalogEntryCache.Clear();
+            }
+
+            _catalogEntryCache[(locale, codeHash)] = entry;
+            return entry;
+        }
+    }
+
+    private static ChatBotMessageCatalogEntry ResolveCatalogEntry(string? code, string locale)
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(code);
         var resourceSet = locale is "en" or "fr"
             ? SharedResource.ResourceManager.GetResourceSet(
                 locale == "en" ? CultureInfo.InvariantCulture : CultureInfo.GetCultureInfo("fr"),

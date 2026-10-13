@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Cli;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Messages;
 
 using NSubstitute;
 
@@ -150,11 +151,13 @@ public static class ChatBotCliCommandTests
         result.GetProperty("terminalReason").GetString().ShouldBe("generic_denial");
         result.GetProperty("failureReasonCode").GetString().ShouldBe("generic_denial");
         result.GetProperty("terminalReasonCode").GetString().ShouldBe("generic_denial");
+        result.GetProperty("retryCount").GetInt32().ShouldBe(0);
         result.GetRawText().ShouldNotContain("999999");
         string text = ChatBotCliOutputFormatter.FormatOperationStatus(status, json: false);
         text.ShouldContain("completion-status: failed");
         text.ShouldContain("lifecycle-state: Failed");
         text.ShouldContain("safe-next-action: dismiss");
+        text.ShouldContain("retry-count: 0");
         text.ShouldNotContain("partial-success");
         text.ShouldNotContain("retry-later");
     }
@@ -459,6 +462,7 @@ public static class ChatBotCliCommandTests
     /// <param name="category">The supplied category.</param>
     [Theory]
     [InlineData("command_accepted", ProblemDetailsCategory.Authorization_denied)]
+    [InlineData("association_decision_accepted", ProblemDetailsCategory.Authorization_denied)]
     [InlineData("audit_unavailable", (ProblemDetailsCategory)999999)]
     public static void RefusedProblemShouldDenyIncompatibleMetadata(string code, ProblemDetailsCategory category)
     {
@@ -468,7 +472,7 @@ public static class ChatBotCliCommandTests
         using JsonDocument json = JsonDocument.Parse(ChatBotCliOutputFormatter.FormatSafeDenial(exception, true));
         JsonElement result = json.RootElement;
         result.GetProperty("code").GetString().ShouldBe("generic_denial");
-        result.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        result.GetProperty("category").GetString().ShouldBe("request_denied");
         result.GetProperty("retryable").GetBoolean().ShouldBeFalse();
         result.GetProperty("safeNextActions")[0].GetString().ShouldBe("dismiss");
         result.GetProperty("message").GetString().ShouldBe("The requested action is unavailable.");
@@ -553,6 +557,8 @@ public static class ChatBotCliCommandTests
     [InlineData(401, "authentication_denied", "authenticate")]
     [InlineData(403, "authorization_denied", "request-access")]
     [InlineData(404, "authorization_denied", "request-access")]
+    [InlineData(408, "dependency_degraded", "retry-later")]
+    [InlineData(429, "dependency_degraded", "retry-later")]
     [InlineData(400, "command_contract_invalid", "correct-request")]
     [InlineData(409, "generic_denial", "dismiss")]
     [InlineData(422, "command_contract_invalid", "correct-request")]
@@ -562,6 +568,8 @@ public static class ChatBotCliCommandTests
 
         text.ShouldContain($"reason-code: {code}");
         text.ShouldContain($"safe-next-action: {action}");
+        text.ShouldContain($"headline: {ChatBotMessageCatalog.Resolve(code).Headline}");
+        text.ShouldContain($"catalog-version: {ChatBotMessageCatalogVersion.Current}");
         text.ShouldNotContain("restricted project");
     }
 

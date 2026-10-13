@@ -10,9 +10,15 @@ internal sealed class CoarseUserFacingRedactionStage : IUserFacingRedactionStage
     public ProblemDetails Apply(ProblemDetails problem)
     {
         ArgumentNullException.ThrowIfNull(problem);
-        bool known = problem.Code != ChatBotMessageCodes.CommandAccepted &&
-            ChatBotMessageCatalog.IsKnown(problem.Code) && Enum.IsDefined(problem.Category);
+        bool known = ChatBotMessageCatalog.IsKnown(problem.Code) && Enum.IsDefined(problem.Category) &&
+            (ChatBotMessageCatalog.Resolve(problem.Code).State is not ("waiting" or "completed") ||
+                problem.Code?.StartsWith("idempotency_conflict_", StringComparison.Ordinal) == true);
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(known ? problem.Code : null);
+        int status = problem.Status is >= 400 and <= 599
+            ? problem.Status == StatusCodes.Status404NotFound
+                ? StatusCodes.Status403Forbidden
+                : problem.Status
+            : StatusCodes.Status403Forbidden;
         ProblemDetailsClientAction catalogAction = entry.NextAction switch
         {
             ChatBotMessageNextActions.Authenticate => ProblemDetailsClientAction.Authenticate,
@@ -26,14 +32,13 @@ internal sealed class CoarseUserFacingRedactionStage : IUserFacingRedactionStage
 
         return new ProblemDetails
         {
-            Type = known ? KnownType(problem.Type) : ChatBotProblemTypes.AuthorizationDenied,
+            Type = known ? KnownType(problem.Type) : TypeForStatus(status),
             Title = entry.Headline,
-            Status = known && problem.Status is >= 400 and <= 599
-                ? problem.Status
-                : StatusCodes.Status403Forbidden,
+            Status = status,
             Detail = null,
             Instance = null,
-            Category = known ? problem.Category : ProblemDetailsCategory.Authorization_denied,
+            Category = known && entry.Code != ChatBotMessageCodes.GenericDenial
+                ? problem.Category : CategoryForStatus(status),
             Code = entry.Code,
             Message = entry.Reason,
             CorrelationId = problem.CorrelationId,
@@ -66,5 +71,24 @@ internal sealed class CoarseUserFacingRedactionStage : IUserFacingRedactionStage
             ChatBotProblemTypes.InvalidLifecycleTransition or
             ChatBotProblemTypes.CommandNotAllowlisted => type,
             _ => ChatBotProblemTypes.AuthorizationDenied,
+        };
+
+    private static ProblemDetailsCategory CategoryForStatus(int status)
+        => status switch
+        {
+            StatusCodes.Status401Unauthorized => ProblemDetailsCategory.Authentication_failure,
+            StatusCodes.Status403Forbidden => ProblemDetailsCategory.Authorization_denied,
+            StatusCodes.Status400BadRequest or StatusCodes.Status422UnprocessableEntity => ProblemDetailsCategory.Validation_error,
+            StatusCodes.Status409Conflict => ProblemDetailsCategory.Conflict,
+            _ => ProblemDetailsCategory.Internal_error,
+        };
+
+    private static string TypeForStatus(int status)
+        => status switch
+        {
+            StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden => ChatBotProblemTypes.AuthorizationDenied,
+            StatusCodes.Status400BadRequest or StatusCodes.Status422UnprocessableEntity => ChatBotProblemTypes.ValidationFailure,
+            StatusCodes.Status409Conflict => ChatBotProblemTypes.IdempotencyConflict,
+            _ => ChatBotProblemTypes.DependencyUnavailable,
         };
 }

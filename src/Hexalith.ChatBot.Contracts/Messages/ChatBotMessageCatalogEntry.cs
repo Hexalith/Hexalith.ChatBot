@@ -26,6 +26,8 @@ public sealed record ChatBotMessageCatalogEntry(
         ChatBotMessageCodes.IdempotencyConflictMessageIntake or
         ChatBotMessageCodes.IdempotencyConflictCorrection or
         ChatBotMessageCodes.IdempotencyConflictAssociationDecision or
+        ChatBotMessageCodes.IdempotencyConflictRetry or
+        ChatBotMessageCodes.IdempotencyConflictOutboundDraftCreation or
         ChatBotMessageCodes.AssociationDecisionRejected or
         ChatBotMessageCodes.AssociationCorrectionPropagationComplete or
         ChatBotMessageCodes.ReprocessCreated => "completed",

@@ -7,7 +7,7 @@
          data-chatbot-conversation-item-kind="@Item.Kind"
          data-chatbot-conversation-item-id="@Item.ItemId"
          tabindex="0"
-         role="@(IsTerminal ? "alert" : "status")"
+         role="@(_announce && IsTerminal ? "alert" : "status")"
          aria-live="@AriaLive"
          aria-atomic="true"
          aria-label="@AccessibleLabel">
@@ -113,6 +113,9 @@
     [Parameter]
     public EventCallback OnNextAction { get; set; }
 
+    [Parameter]
+    public bool Announce { get; set; }
+
     private ChatBotMessageCatalogEntry CatalogEntry => UiText.FailureCatalogEntry(Item.MessageCatalogCode);
 
     private bool IsGenericDenial => CatalogEntry.Code == ChatBotMessageCodes.GenericDenial;
@@ -124,7 +127,7 @@
     private bool _announce;
 
     protected override void OnParametersSet()
-        => _announce = OnNextAction.HasDelegate && AnnouncementDeduplication.ShouldAnnounce($"{Item.ItemId}-{CatalogEntry.Code}-{CatalogEntry.State}", ChatBotAnnouncementDedupRule.OncePerStableOperationKey);
+        => _announce = (Announce || OnNextAction.HasDelegate) && AnnouncementDeduplication.ShouldAnnounce($"{Item.ItemId}-{CatalogEntry.Code}-{CatalogEntry.State}", ChatBotAnnouncementDedupRule.OncePerStableOperationKey);
 
     private string AriaLive => _announce ? (IsTerminal ? "assertive" : "polite") : "off";
 

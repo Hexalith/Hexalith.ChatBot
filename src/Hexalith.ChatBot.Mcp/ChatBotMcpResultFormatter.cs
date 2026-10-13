@@ -62,7 +62,7 @@ public static class ChatBotMcpResultFormatter
             status.CommandId,
             status.CorrelationId,
             lifecycleState = knownOutcome ? WireName(status.LifecycleState) : WireName(LifecycleState.Failed),
-            status.RetryCount,
+            retryCount = knownOutcome ? status.RetryCount : 0,
             completionStatus,
             auditStatus = Enum.IsDefined(status.AuditStatus) ? WireName(status.AuditStatus) : "unavailable",
             safeNextActions = knownOutcome ? status.SafeNextActions.Select(SafeAction).ToArray() : [ChatBotMessageNextActions.Dismiss],
@@ -87,11 +87,14 @@ public static class ChatBotMcpResultFormatter
             "mcp.argument.invalid-number" or
             "mcp.argument.invalid-string" or
             "mcp.argument.invalid-list" or
-            "mcp.argument.invalid-enum" => ChatBotMessageCodes.CommandContractInvalid,
+            "mcp.argument.invalid-enum" or
+            "mcp.tool.unknown" => ChatBotMessageCodes.CommandContractInvalid,
             _ => raw.Code,
         };
-        bool compatible = catalogCode != ChatBotMessageCodes.CommandAccepted &&
-            (raw.Category == "request_denied" || Enum.GetValues<ProblemDetailsCategory>()
+        bool compatible = ChatBotMessageCatalog.IsKnown(catalogCode) &&
+            (ChatBotMessageCatalog.Resolve(catalogCode).State is not ("waiting" or "completed") ||
+                catalogCode.StartsWith("idempotency_conflict_", StringComparison.Ordinal)) &&
+            (raw.Category is null or "request_denied" || Enum.GetValues<ProblemDetailsCategory>()
                 .Any(category => WireName(category) == raw.Category));
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(compatible ? catalogCode : null);
         bool retryable = raw.Retryable && !entry.IsTerminal &&
@@ -102,7 +105,7 @@ public static class ChatBotMcpResultFormatter
                 ? entry.NextAction : ChatBotMessageNextActions.None;
         SafeDenialMetadata denial = raw with
         {
-            Category = entry.Code == ChatBotMessageCodes.GenericDenial ? "authorization_denied" : raw.Category,
+            Category = entry.Code == ChatBotMessageCodes.GenericDenial ? "request_denied" : raw.Category ?? "request_denied",
             Code = entry.Code,
             SafeMessage = entry.Reason,
             Retryable = retryable,

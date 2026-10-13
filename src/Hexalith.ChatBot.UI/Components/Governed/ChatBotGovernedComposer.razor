@@ -158,6 +158,7 @@
             {
                 "unauthorized" => ChatBotMessageCodes.AuthorizationDenied,
                 "degraded" => ChatBotMessageCodes.DependencyDegraded,
+                "unsafe-context" => ChatBotMessageCodes.GenericDenial,
                 "loading" or null => null,
                 _ => DisabledReasonCode,
             };

@@ -1,6 +1,7 @@
 using Fluxor;
 
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.UI.Services;
 
 namespace Hexalith.ChatBot.UI.State.GovernedOperations;
@@ -13,7 +14,7 @@ namespace Hexalith.ChatBot.UI.State.GovernedOperations;
 public sealed class GovernedOperationsEffects(GovernedOperationService service)
 {
     /// <summary>The generic safe failure code used when the server returned no catalog-backed problem code.</summary>
-    public const string GenericFailureCode = "submission-failed";
+    public const string GenericFailureCode = ChatBotMessageCodes.GenericDenial;
 
     private readonly GovernedOperationService _service = service ?? throw new ArgumentNullException(nameof(service));
 
@@ -52,5 +53,5 @@ public sealed class GovernedOperationsEffects(GovernedOperationService service)
     }
 
     private static string SafeFailureCode(string? problemCode)
-        => string.IsNullOrWhiteSpace(problemCode) ? GenericFailureCode : problemCode;
+        => string.IsNullOrWhiteSpace(problemCode) ? ChatBotMessageCodes.GenericDenial : problemCode;
 }

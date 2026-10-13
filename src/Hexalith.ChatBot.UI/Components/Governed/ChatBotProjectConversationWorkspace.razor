@@ -84,23 +84,16 @@
                                      AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateDependencyDegraded]"
                                      StableId="project-conversation-retryable"
                                      StateFamily="ChatBotFeedbackStateFamily.RetryableFailure"
-                                     AnnouncementKey="project-conversation-failed-retryable">
+                                     AnnouncementKey="project-conversation-failed-retryable"
+                                     ShowCatalogAction="false">
                     <code class="chatbot-code">@State.Value.ErrorCode</code>
                 </ChatBotStatusBanner>
                 <ChatBotBlockedState Reason="ChatBotBlockedReason.FailedDependency"
                                      MessageCatalogCode="@State.Value.ErrorCode"
                                      ReasonText="@UiText[ChatBotUiTextKey.FailureStatusRetryable]"
                                      SafeNextAction="@UiText[ChatBotUiTextKey.FailureNextActionRetryLater]"
-                                     StableId="project-workspace-retryable" />
-                @if (UiText.FailureCatalogEntry(State.Value.ErrorCode).NextAction == ChatBotMessageNextActions.RetryLater)
-                {
-                    <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.FailureNextActionRetryLater]"
-                                           StableId="project-conversation-retry"
-                                           State="@(State.Value.IsLoading ? ChatBotGovernedActionState.DisabledWithReason : ChatBotGovernedActionState.Enabled)"
-                                           DisabledReason="@UiText[ChatBotUiTextKey.ProjectConversationLoading]"
-                                           Appearance="ButtonAppearance.Outline"
-                                           OnActivate="@RetryLoad" />
-                }
+                                     StableId="project-workspace-retryable"
+                                     OnNextAction="@(CanRetryLoad ? EventCallback.Factory.Create(this, RetryLoad) : default)" />
             }
 
             @if (Conversation is { } conversation)
@@ -125,6 +118,7 @@
                 }
 
                 <ChatBotConversationStream Items="@conversation.Items"
+                                           CurrentPageItemIds="@State.Value.CurrentPageItemIds"
                                            Title="@UiText[ChatBotUiTextKey.ProjectConversationStream]"
                                            EmptyText="@UiText[ChatBotUiTextKey.ProjectConversationEmpty]"
                                            SafeNextAction="@UiText[ChatBotUiTextKey.ProjectConversationEmptySafeNextAction]"
@@ -501,8 +495,10 @@
     private string? ComposerDisabledReasonCode
         => State.Value.ErrorCode is not null
             ? State.Value.ErrorCode
-            : Conversation?.Status is "Blocked" or "Stale" or "Degraded"
-                ? "degraded"
+            : Conversation?.Status is "Blocked" or "Stale"
+                ? "unsafe-context"
+                : Conversation?.Status == "Degraded"
+                    ? "degraded"
                 : Conversation is null
                     ? "loading"
                     : null;
@@ -623,6 +619,10 @@
             ProjectConversationEffects.GenericFailureCode => UiText[ChatBotUiTextKey.ProjectConversationStreamingRetry],
             _ => UiText[ChatBotUiTextKey.ProjectConversationStreamingUnavailable],
         };
+
+    private bool CanRetryLoad
+        => !State.Value.IsLoading && State.Value.ErrorCode is { } code &&
+            UiText.FailureCatalogEntry(code).NextAction == ChatBotMessageNextActions.RetryLater;
 
     private string StreamingNoticeText(string notice)
         => notice switch

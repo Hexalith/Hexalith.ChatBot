@@ -41,7 +41,8 @@
                             }
                             else if (item.IsFailureState)
                             {
-                                <ChatBotFailureStateConversationItem Item="@item" />
+                                <ChatBotFailureStateConversationItem Item="@item"
+                                                                     Announce="@_newFailureIds.Contains(item.ItemId)" />
                             }
                             else if (item.IsAiOutcome)
                             {
@@ -64,6 +65,10 @@
     [Parameter]
     public IReadOnlyList<ProjectConversationItemModel> Items { get; set; } = [];
 
+    /// <summary>Identifies current-page items so loading older history does not announce old failures.</summary>
+    [Parameter]
+    public IReadOnlySet<string>? CurrentPageItemIds { get; set; }
+
     [Parameter]
     public string Title { get; set; } = "Project conversation";
 
@@ -75,6 +80,31 @@
 
     [Parameter]
     public EventCallback<ProjectConversationItemModel> OnWhyThisProjectRequested { get; set; }
+
+    private HashSet<string> _seenItemIds = new(StringComparer.Ordinal);
+
+    private readonly HashSet<string> _newFailureIds = new(StringComparer.Ordinal);
+
+    private bool _initialized;
+
+    protected override void OnParametersSet()
+    {
+        _newFailureIds.Clear();
+        HashSet<string> currentItemIds = new(StringComparer.Ordinal);
+        foreach (ProjectConversationItemModel item in Items)
+        {
+            if (_initialized && item.IsFailureState && !_seenItemIds.Contains(item.ItemId) &&
+                (CurrentPageItemIds is null || CurrentPageItemIds.Contains(item.ItemId)))
+            {
+                _newFailureIds.Add(item.ItemId);
+            }
+
+            currentItemIds.Add(item.ItemId);
+        }
+
+        _seenItemIds = currentItemIds;
+        _initialized = true;
+    }
 
     private string TitleId => "project-conversation-stream-title";
 }

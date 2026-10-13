@@ -115,7 +115,8 @@ public sealed class VersionedSafeOutcomeBrowserTests
         await composer.Locator(".chatbot-governed-composer__actions fluent-button")
             .ClickAsync().ConfigureAwait(true);
         ILocator banner = composer.Locator("#project-conversation-composer-status");
-        await Assertions.Expect(banner).ToHaveAttributeAsync("data-chatbot-feedback-state", "TerminalPolicyFailure").ConfigureAwait(true);
+        await Assertions.Expect(banner).ToHaveAttributeAsync("data-chatbot-feedback-state",
+            code == "authorization_denied" ? "BlockedAction" : "TerminalPolicyFailure").ConfigureAwait(true);
         // A previously announced persistent state may have aria-live=off after a render; its semantic role stays an alert.
         await Assertions.Expect(banner).ToHaveAttributeAsync("role", "alert").ConfigureAwait(true);
         string reason = code == "authorization_denied"

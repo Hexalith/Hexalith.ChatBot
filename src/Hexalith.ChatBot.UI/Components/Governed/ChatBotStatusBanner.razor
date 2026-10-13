@@ -9,7 +9,7 @@
                   Class="chatbot-status"
                   Intent="@Intent"
                   AllowDismiss="false"
-                  Title="@(HasCatalogFailure ? UiText.FailureCatalogHeadline(MessageCatalogCode) : UiText.FeedbackKindLabel(Kind))"
+                  Title="@(HasCatalogFailure ? UiText.FailureCatalogHeadline(CatalogEntry.Code) : UiText.FeedbackKindLabel(Kind))"
                   data-chatbot-status="@StatusSlot"
                   data-chatbot-feedback-state="@FeedbackStateValue"
                   data-chatbot-live="@AriaLive"
@@ -29,7 +29,7 @@
     {
         @ResolvedMessage
     }
-    @if (HasCatalogFailure && StateFamily is not ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate &&
+    @if (ShowCatalogAction && HasCatalogFailure && StateFamily is not ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate &&
         CatalogEntry.NextAction is not ChatBotMessageNextActions.None)
     {
         <ChatBotGovernedAction Label="@UiText.FailureNextActionLabel(CatalogEntry.NextAction)"
@@ -53,6 +53,9 @@
 
     [Parameter]
     public EventCallback OnNextAction { get; set; }
+
+    [Parameter]
+    public bool ShowCatalogAction { get; set; } = true;
 
     [Parameter]
     public string? AccessibleLabel { get; set; }
@@ -127,7 +130,8 @@
             : $"{(string.IsNullOrWhiteSpace(AnnouncementKey) ? StableId : AnnouncementKey)}-{CatalogEntry.Code}";
 
     private ChatBotFeedbackStateFamily? ResolvedStateFamily
-        => HasCatalogFailure && StateFamily is not ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate
+        => HasCatalogFailure && (StateFamily is null or ChatBotFeedbackStateFamily.RetryableFailure ||
+            (StateFamily == ChatBotFeedbackStateFamily.BlockedAction && CatalogEntry.Code == ChatBotMessageCodes.GenericDenial))
             ? CatalogEntry.IsTerminal
                 ? ChatBotFeedbackStateFamily.TerminalPolicyFailure
                 : StateFamily ?? ChatBotFeedbackStateFamily.RetryableFailure
@@ -144,10 +148,17 @@
     private bool HasCatalogFailure
         => MessageCatalogCode is not null && Kind is ChatBotFeedbackKind.Danger or ChatBotFeedbackKind.Warning;
 
-    private ChatBotMessageCatalogEntry CatalogEntry => UiText.FailureCatalogEntry(MessageCatalogCode);
+    private ChatBotMessageCatalogEntry CatalogEntry
+    {
+        get
+        {
+            ChatBotMessageCatalogEntry entry = UiText.FailureCatalogEntry(MessageCatalogCode);
+            return entry.State is "waiting" or "completed" ? UiText.FailureCatalogEntry(null) : entry;
+        }
+    }
 
     private string ResolvedMessage => HasCatalogFailure
-        ? UiText.FailureCatalogReason(MessageCatalogCode)
+        ? UiText.FailureCatalogReason(CatalogEntry.Code)
         : Message;
 
     private MessageBarIntent Intent

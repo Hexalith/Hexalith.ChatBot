@@ -1,6 +1,7 @@
 using Fluxor;
 
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.UI.Services;
 
@@ -10,7 +11,7 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
 {
     private const int SubmissionProjectionVerificationAttempts = 20;
     private static readonly TimeSpan SubmissionProjectionVerificationDelay = TimeSpan.FromMilliseconds(250);
-    public const string GenericFailureCode = "project-conversation-unavailable";
+    public const string GenericFailureCode = ChatBotMessageCodes.GenericDenial;
     public const string EmptyComposerCode = "composer_input_required";
 
     private readonly ProjectConversationService _service = service ?? throw new ArgumentNullException(nameof(service));
@@ -40,7 +41,7 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
         catch (HexalithChatBotApiException<ProblemDetails> problem)
         {
             dispatcher.Dispatch(new ProjectConversationFailedAction(
-                string.IsNullOrWhiteSpace(problem.Result?.Code) ? GenericFailureCode : problem.Result.Code,
+                string.IsNullOrWhiteSpace(problem.Result?.Code) ? ChatBotMessageCodes.GenericDenial : problem.Result.Code,
                 action.RequestId,
                 action.ProjectId,
                 action.Cursor));
@@ -145,7 +146,7 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
         catch (HexalithChatBotApiException<ProblemDetails> problem)
         {
             dispatcher.Dispatch(new ProjectConversationSubmissionFailedAction(
-                string.IsNullOrWhiteSpace(problem.Result?.Code) ? GenericFailureCode : problem.Result.Code)
+                string.IsNullOrWhiteSpace(problem.Result?.Code) ? ChatBotMessageCodes.GenericDenial : problem.Result.Code)
             {
                 ProjectId = action.ProjectId,
                 RequestId = action.RequestId,
@@ -327,7 +328,7 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
         catch (HexalithChatBotApiException<ProblemDetails> problem)
         {
             dispatcher.Dispatch(new ProjectConversationAiResponseCancellationFailedAction(
-                string.IsNullOrWhiteSpace(problem.Result?.Code) ? GenericFailureCode : problem.Result.Code)
+                string.IsNullOrWhiteSpace(problem.Result?.Code) ? ChatBotMessageCodes.GenericDenial : problem.Result.Code)
             {
                 ProjectId = action.Progress.ProjectId,
                 RequestId = action.RequestId,
@@ -449,7 +450,7 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
             dispatcher.Dispatch(new ProjectAssociationWhyPanelFailedAction(
                 action.ProjectId,
                 action.AssociationId,
-                string.IsNullOrWhiteSpace(problem.Result?.Code) ? GenericFailureCode : problem.Result.Code));
+                string.IsNullOrWhiteSpace(problem.Result?.Code) ? ChatBotMessageCodes.GenericDenial : problem.Result.Code));
         }
         catch (Exception)
         {

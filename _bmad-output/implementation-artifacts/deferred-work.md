@@ -1416,3 +1416,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: Unverified medium risk: unconditional solution sibling entries may expand the Release package-mode build beyond the existing AppHost source closure.
   evidence: Compare exact Release project graphs at the story baseline and current revision with UseHexalithProjectReferences=false; the source inventory alone does not establish which additional projects would newly build. The existing AppHost already carries direct sibling resource references.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
+  summary: CLI and MCP operation-status output omits the primary reason code and catalog headline/reason even when the status contains a known failure reason.
+  evidence: The omission predates Story 1.4. A separate output-contract decision should define which existing status shapes gain catalog copy and how clients consume additive fields.

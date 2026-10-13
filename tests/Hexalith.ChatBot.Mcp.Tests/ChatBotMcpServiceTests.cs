@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Client;
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Cli;
 using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Mcp;
 
 using ModelContextProtocol.Server;
@@ -90,6 +91,7 @@ public static class ChatBotMcpServiceTests
         result.GetProperty("terminalReason").GetString().ShouldBe("generic_denial");
         result.GetProperty("failureReasonCode").GetString().ShouldBe("generic_denial");
         result.GetProperty("terminalReasonCode").GetString().ShouldBe("generic_denial");
+        result.GetProperty("retryCount").GetInt32().ShouldBe(0);
         result.GetRawText().ShouldNotContain("999999");
     }
 
@@ -110,6 +112,8 @@ public static class ChatBotMcpServiceTests
         result.GetProperty("code").GetString().ShouldBe(code);
         result.GetProperty("clientAction").GetString().ShouldBe(action);
         result.GetProperty("retryable").GetBoolean().ShouldBe(retryable);
+        result.GetProperty("headline").GetString().ShouldBe(ChatBotMessageCatalog.Resolve(code).Headline);
+        result.GetProperty("catalogVersion").GetString().ShouldBe(ChatBotMessageCatalogVersion.Current);
         result.GetRawText().ShouldNotContain("restricted");
     }
 
@@ -122,6 +126,17 @@ public static class ChatBotMcpServiceTests
         result.GetProperty("clientAction").GetString().ShouldBe("correct-request");
         result.GetProperty("retryable").GetBoolean().ShouldBeFalse();
         result.GetRawText().ShouldNotContain("restricted");
+    }
+
+    [Fact]
+    public static void UnknownToolShouldKeepCorrectionGuidanceWithoutSuggestedToolName()
+    {
+        JsonElement result = ChatBotMcpResultFormatter.FormatSafeDenial(
+            McpToolDeniedException.UnknownTool("restricted-tool-secret"));
+
+        result.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.CommandContractInvalid);
+        result.GetProperty("clientAction").GetString().ShouldBe(ChatBotMessageNextActions.CorrectRequest);
+        result.GetRawText().ShouldNotContain("restricted-tool-secret");
     }
 
     [Fact]
@@ -332,7 +347,7 @@ public static class ChatBotMcpServiceTests
     }
 
     [Theory]
-    [InlineData("chatbot.association.stats", "generic_denial")]
+    [InlineData("chatbot.association.stats", "command_contract_invalid")]
     [InlineData("chatbot.association.associate", "command_contract_invalid")]
     public static async Task BoundaryValidationReturnsSafeMetadataOnlyDenials(string toolName, string expectedCode)
     {
@@ -378,7 +393,7 @@ public static class ChatBotMcpServiceTests
             McpToolDeniedException.InvalidArgument("mcp.argument.private", "restricted private reason", "unsafe-action"));
 
         result.GetProperty("code").GetString().ShouldBe("generic_denial");
-        result.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        result.GetProperty("category").GetString().ShouldBe("request_denied");
         result.GetProperty("safeSuggestion").GetString().ShouldBe("dismiss");
         result.GetRawText().ShouldNotContain("restricted private reason");
         result.GetRawText().ShouldNotContain("unsafe-action");
@@ -557,6 +572,7 @@ public static class ChatBotMcpServiceTests
     /// <param name="category">The supplied category.</param>
     [Theory]
     [InlineData("command_accepted", ProblemDetailsCategory.Authorization_denied)]
+    [InlineData("association_decision_accepted", ProblemDetailsCategory.Authorization_denied)]
     [InlineData("audit_unavailable", (ProblemDetailsCategory)999999)]
     public static void RefusedProblemShouldDenyIncompatibleMetadata(string code, ProblemDetailsCategory category)
     {
@@ -564,7 +580,7 @@ public static class ChatBotMcpServiceTests
             new ProblemDetails { Code = code, Category = category, Retryable = true, ClientAction = ProblemDetailsClientAction.RetryLater }, null);
         JsonElement result = ChatBotMcpResultFormatter.FormatSafeDenial(exception);
         result.GetProperty("code").GetString().ShouldBe("generic_denial");
-        result.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        result.GetProperty("category").GetString().ShouldBe("request_denied");
         result.GetProperty("retryable").GetBoolean().ShouldBeFalse();
         result.GetProperty("clientAction").GetString().ShouldBe("dismiss");
         result.GetProperty("message").GetString().ShouldBe("The requested action is unavailable.");

@@ -65,7 +65,7 @@ public static partial class MessageCatalogContractTests
         entry.IsTerminal.ShouldBeTrue();
     }
 
-    /// <summary>Processing failures convey failed state while refused outbound sends retain denied state.</summary>
+    /// <summary>Processing failures convey a failed state.</summary>
     /// <param name="code">The terminal processing failure.</param>
     [Theory]
     [InlineData(ChatBotMessageCodes.MemoriesCorrectionFailed)]
@@ -75,19 +75,24 @@ public static partial class MessageCatalogContractTests
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(code);
         entry.State.ShouldBe("failed");
         entry.IsTerminal.ShouldBeTrue();
-        ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.IdempotencyConflictOutboundSend).State.ShouldBe("denied");
     }
 
     [Theory]
     [InlineData(ChatBotMessageCodes.IdempotencyConflictMessageIntake)]
     [InlineData(ChatBotMessageCodes.IdempotencyConflictCorrection)]
     [InlineData(ChatBotMessageCodes.IdempotencyConflictAssociationDecision)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictRetry)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictOutboundDraftCreation)]
     public static void AlreadyRecordedOutcomeShouldBeCompleted(string code)
     {
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(code);
         entry.State.ShouldBe("completed");
         entry.IsTerminal.ShouldBeTrue();
     }
+
+    [Fact]
+    public static void RefusedOutboundDuplicateSendShouldStayDenied()
+        => ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.IdempotencyConflictOutboundSend).State.ShouldBe("denied");
 
     [Fact]
     public static void AccessibleDescriptionsShouldUsePhrasesInsteadOfActionTokens()
