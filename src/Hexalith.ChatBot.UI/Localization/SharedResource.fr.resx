@@ -554,7 +554,7 @@
   <data name="Failure_CatalogReason_AuthorizationDenied" xml:space="preserve"><value>L'opération n'est pas disponible pour cet appelant.</value></data>
   <data name="Failure_CatalogReason_RefusalBlockedAction" xml:space="preserve"><value>Cette opération est bloquée par stratégie.</value></data>
   <data name="Failure_CatalogReason_UnresolvedParticipant" xml:space="preserve"><value>L'identité du participant doit être vérifiée avant de continuer.</value></data>
-  <data name="Failure_CatalogReason_AssociationEvidenceExpired" xml:space="preserve"><value>La preuve a expiré et doit être actualisée avant de continuer.</value></data>
+  <data name="Failure_CatalogReason_AssociationEvidenceExpired" xml:space="preserve"><value>Cette décision s'est arrêtée parce que la preuve a expiré.</value></data>
   <data name="Failure_CatalogReason_AssociationStaleEvidence" xml:space="preserve"><value>La preuve a changé avant la fin de l'opération.</value></data>
   <data name="Failure_CatalogReason_AssociationCorrectionAuditUnavailable" xml:space="preserve"><value>Le détail d'audit de correction est indisponible sur cette surface.</value></data>
   <data name="Failure_CatalogReason_AssociationCorrectionPropagationDelayed" xml:space="preserve"><value>La propagation du contexte corrigé est retardée et demande une attention opérateur.</value></data>
@@ -1010,7 +1010,7 @@
   <data name="Failure_Catalog_association_already_decided" xml:space="preserve"><value>Association déjà décidée.</value></data>
   <data name="Failure_CatalogReason_association_already_decided" xml:space="preserve"><value>Une décision durable existe déjà pour cette association.</value></data>
   <data name="Failure_Catalog_association_evidence_expired" xml:space="preserve"><value>Preuve expirée</value></data>
-  <data name="Failure_CatalogReason_association_evidence_expired" xml:space="preserve"><value>La preuve a expiré et doit être actualisée avant de continuer.</value></data>
+  <data name="Failure_CatalogReason_association_evidence_expired" xml:space="preserve"><value>Cette décision s'est arrêtée parce que la preuve a expiré.</value></data>
   <data name="Failure_Catalog_association_stale_evidence" xml:space="preserve"><value>Preuve modifiée</value></data>
   <data name="Failure_CatalogReason_association_stale_evidence" xml:space="preserve"><value>La preuve a changé avant la fin de l'opération.</value></data>
   <data name="Failure_Catalog_association_unauthorized_project_suppressed" xml:space="preserve"><value>Candidat indisponible.</value></data>

@@ -201,7 +201,7 @@ internal static class ApprovedAiActionOutcomeProjectionTranslator
             AuditOperationId: $"audit:{invalidated.ProposalId}:invalidation",
             AuditStatus: "available",
             FailureCode: ChatBotRefusalReasonCodes.CorrectedContextInvalidated,
-            SafeNextAction: ChatBotMessageNextActions.ReviewSourceEvidence,
+            SafeNextAction: ChatBotMessageNextActions.RetryLater,
             RedactionState: invalidated.RedactionState,
             RetentionClass: invalidated.RetentionClass);
     }

@@ -855,7 +855,7 @@ public sealed class AiOutcomeProjectionTests
         item.AiFailureCode.ShouldBe(ChatBotRefusalReasonCodes.CorrectedContextInvalidated);
         item.AiExecutionOutcomeCode.ShouldBe(ChatBotRefusalReasonCodes.CorrectedContextInvalidated);
         item.AiApprovalId.ShouldBe("approval:proposal-001");
-        item.AiSafeNextAction.ShouldBe(ChatBotMessageNextActions.ReviewSourceEvidence);
+        item.AiSafeNextAction.ShouldBe(ChatBotMessageNextActions.RetryLater);
         IReadOnlyList<string> contextReferences = item.AiAuthorizedContextReferences.ShouldNotBeNull();
         contextReferences.ShouldContain("association:01ARZ3NDEKTSV4RRFFQ69G5FAV");
         contextReferences.ShouldContain("correction:01ARZ3NDEKTSV4RRFFQ69G5FAV:correction:11");

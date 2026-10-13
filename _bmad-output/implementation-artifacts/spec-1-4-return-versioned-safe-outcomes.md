@@ -243,6 +243,44 @@ Browser verification exposed missing button semantics on the Fluent governed-act
 - `decision` — Coded banners stay catalog-only. A second child channel would keep the why-panel's unauthorized sentence on other failures, and raw error children must stay hidden.
 - `decision` — CLI and MCP fallback counts stay in process. Those hosts have no metrics pipeline, and a one-shot process is not a scrape target. Server and UI already export the meter.
 
+#### Src slice (2026-10-12)
+
+Acceptance Auditor and Edge Case Hunter were interrupted and filed nothing. Blind Hunter and Verification Gap reviewed `src` only (`84379006...80853fd`).
+
+- [x] [Review][Patch] AI invalidation stores retry-later so it matches the blocked-context catalog action [src/Hexalith.ChatBot.Server/Projections/ApprovedAiActionOutcomeProjectionTranslator.cs:204]
+- [x] [Review][Patch] Expired-evidence copy states that the decision stopped, and the action stays dismiss [src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCatalog.cs:246]
+
+- [ ] [Review][Patch] Collapsed CLI and MCP status still prints the original retry count, and MCP drops a known code when the problem category is null [src/Hexalith.ChatBot.Cli/ChatBotCliOutputFormatter.cs:85]
+- [ ] [Review][Patch] A generic denial is labeled authorization, and an unknown 401 or 503 becomes a 403 authorization dismissal [src/Hexalith.ChatBot.Server/Gateway/Redaction/CoarseUserFacingRedactionStage.cs:29]
+- [ ] [Review][Patch] A catalog banner replaces an explicit blocked or degraded family with terminal policy failure [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor:129]
+- [ ] [Review][Patch] Already-submitted idempotency conflicts still report state denied [src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCatalogEntry.cs:48]
+- [ ] [Review][Patch] The banner renders a disabled catalog action beside the live retry [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor:81]
+- [ ] [Review][Patch] Historical failure items use role alert, and the stream never announces them [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor:10]
+- [ ] [Review][Patch] Four French catalog sentences do not carry the English meaning [src/Hexalith.ChatBot.UI/Localization/SharedResource.fr.resx:975]
+- [ ] [Review][Patch] One render increments the fallback counter once per catalog property access [src/Hexalith.ChatBot.UI/Localization/ChatBotUiTextLocalizer.cs:373]
+- [ ] [Review][Patch] PascalCase Failure_Catalog resources are no longer read [src/Hexalith.ChatBot.UI/Localization/SharedResource.resx:538]
+- [ ] [Review][Patch] Local transport sentinels are unknown codes, so load failures become terminal generic denials and count as fallbacks [src/Hexalith.ChatBot.UI/State/GovernedOperations/GovernedOperationsEffects.cs:16]
+- [ ] [Review][Patch] Operational dashboards load failures are not rendered with a non-catalog error [tests/Hexalith.ChatBot.UI.E2E.Tests/VersionedSafeOutcomeRenderTests.cs:478]
+- [ ] [Review][Patch] Association-review legacy aliases are not rendered on the page [src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor:53]
+- [ ] [Review][Patch] Why-panel failures are not rendered [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor:201]
+- [ ] [Review][Patch] Workspace authorization codes are not rendered [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor:62]
+- [ ] [Review][Patch] CLI 408 and 429 denials are outside the status-bucket tests [tests/Hexalith.ChatBot.Cli.Tests/ChatBotCliCommandTests.cs:552]
+- [ ] [Review][Patch] CLI and MCP denial tests do not assert headline or catalog version [src/Hexalith.ChatBot.Cli/ChatBotCliOutputFormatter.cs:329]
+- [ ] [Review][Patch] The server host does not prove the fallback meter is exported [src/Hexalith.ChatBot.Server/Program.cs:74]
+
+##### Rejected (src slice)
+
+- `false` — Treating `generic_denial` as an unknown status and collapsing that GET is the closed fix for a successful generic-denial status. Unknown completion and audit text still throwing is already deferred.
+- `false` — CLI and MCP do not export the fallback meter. That was rejected: those hosts have no metrics pipeline.
+- `false` — The catalog banner drops child content, including the association-review load sentence. That was rejected: coded banners stay catalog-only, and the child template interpolates the raw code.
+- `false` — A later failure with the same catalog code is not announced again. The previous patch added the catalog code to the key so a different code still announces; repeating the same code is the specified dedup.
+- `false` — Mapping HTTP 404 to `authorization_denied` hides not-found. The epic requires missing and forbidden to be indistinguishable, and the earlier patch accepted that mapping.
+- `false` — `conflict` no longer offers retry. It maps to `invalid_lifecycle_transition`, whose catalog action is none.
+- `false` — MCP replaces `SafeSuggestion` with the action token. The spec requires metadata-only output rather than caller prose.
+- `false` — Locales other than English and French, and a missing resource, become generic denial and an input-free count. That is the specified fallback.
+- `false` — The failure-reason row shows the catalog code. Public surfaces must not keep a raw reason code.
+- `false` — An unknown workspace error loses its retry button. Unknown codes are specified to be terminal and non-retryable.
+- `false` — This src diff contains no test updates. The story range does; the concrete gaps are the patch items above.
 
 ### Verification of remaining review patches (2026-10-12)
 

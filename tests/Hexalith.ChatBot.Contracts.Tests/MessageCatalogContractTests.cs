@@ -51,7 +51,7 @@ public static partial class MessageCatalogContractTests
     {
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AssociationEvidenceExpired);
 
-        entry.Reason.ShouldBe("The association evidence must be refreshed before deciding.");
+        entry.Reason.ShouldBe("This decision stopped because the evidence expired.");
         entry.NextAction.ShouldBe(ChatBotMessageNextActions.Dismiss);
         entry.IsTerminal.ShouldBeTrue();
     }
