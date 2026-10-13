@@ -11,6 +11,20 @@ public static class ProblemDetailsContractTests
     private static readonly string RepositoryRoot = LocateRepositoryRoot();
     private static readonly string ContractPath = Path.Combine(RepositoryRoot, "src", "Hexalith.ChatBot.Contracts", "openapi", "hexalith.chatbot.v1.yaml");
 
+    /// <summary>The public message enum and the authoritative catalog expose exactly the same stable codes.</summary>
+    [Fact]
+    public static void OpenApiMessageCodesShouldMatchTheCompleteCatalog()
+    {
+        string[] wireCodes = Sequence(Schema("ChatBotMessageCode"), "enum").Children
+            .Select(static value => value.ShouldBeOfType<YamlScalarNode>().Value.ShouldNotBeNull())
+            .ToArray();
+
+        wireCodes.ShouldBe(wireCodes.Distinct(StringComparer.Ordinal).ToArray(), ignoreOrder: false);
+        wireCodes.Order(StringComparer.Ordinal).ShouldBe(
+            ChatBotMessageCatalog.Entries.Select(static entry => entry.Code).Order(StringComparer.Ordinal),
+            ignoreOrder: false);
+    }
+
     [Fact]
     public static void ProblemDetailsShouldExposeRfcAndHexalithMetadataFields()
     {

@@ -66,7 +66,8 @@ public sealed class RealRenderFixture : IAsyncLifetime
         }
     }
 
-    private static string? ResolveChromeExecutable()
+    /// <summary>Resolves the configured browser or the system Chrome shared by real render tests.</summary>
+    internal static string? ResolveChromeExecutable()
     {
         string? configured = Environment.GetEnvironmentVariable("CHROME_EXECUTABLE_PATH");
         if (!string.IsNullOrWhiteSpace(configured))

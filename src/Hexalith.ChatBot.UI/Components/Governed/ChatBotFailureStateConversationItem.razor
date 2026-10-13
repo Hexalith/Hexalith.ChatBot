@@ -18,7 +18,7 @@
                          HorizontalGap="0.75rem"
                          Class="chatbot-failure-conversation-item__header">
                 <ChatBotEvidenceChip State="@EvidenceState"
-                                     Text="@UiText.FailureCatalogHeadline(Item.MessageCatalogCode)"
+                                     Text="@UiText.FailureCatalogHeadline(CatalogEntry.Code)"
                                      StableId="@Item.ItemId" />
                 <ChatBotRiskChip RiskClass="ChatBotRiskActionClass.ProjectMutating"
                                  PolicyReason="@UiText.FailureBlockedReasonLabel(Item.BlockedReason)" />
@@ -71,7 +71,7 @@
         @CodeRow(UiText[ChatBotUiTextKey.CorrelationIdLabel], Item.CorrelationId)
     </FluentStack>
     <p class="chatbot-failure-conversation-item__reason" tabindex="0">
-        <strong>@UiText[ChatBotUiTextKey.FailureReasonLabel]</strong> @UiText.FailureCatalogReason(Item.MessageCatalogCode)
+        <strong>@UiText[ChatBotUiTextKey.FailureReasonLabel]</strong> @UiText.FailureCatalogReason(CatalogEntry.Code)
     </p>
     <p class="chatbot-failure-conversation-item__reason" tabindex="0">
         <strong>@UiText[ChatBotUiTextKey.FailureNextActionLabel]</strong> @UiText.FailureNextActionLabel(CatalogEntry.NextAction)
@@ -116,7 +116,18 @@
     [Parameter]
     public bool Announce { get; set; }
 
-    private ChatBotMessageCatalogEntry CatalogEntry => UiText.FailureCatalogEntry(Item.MessageCatalogCode);
+    private ChatBotMessageCatalogEntry CatalogEntry
+    {
+        get
+        {
+            ChatBotMessageCatalogEntry entry = UiText.FailureCatalogEntry(Item.MessageCatalogCode);
+            return entry.State is "waiting" or "completed" && entry.Code is not
+                (ChatBotMessageCodes.RetryQueued or ChatBotMessageCodes.RetryAccepted or
+                    ChatBotMessageCodes.DuplicateSuppressed or ChatBotMessageCodes.ReprocessCreated) &&
+                !entry.Code.StartsWith("idempotency_conflict_", StringComparison.Ordinal)
+                ? UiText.FailureCatalogEntry(null) : entry;
+        }
+    }
 
     private bool IsGenericDenial => CatalogEntry.Code == ChatBotMessageCodes.GenericDenial;
 
@@ -169,7 +180,7 @@
     private string AccessibleLabel
         => UiText.Get(
             ChatBotUiTextKey.FailureStateAccessible,
-            UiText.FailureCatalogHeadline(Item.MessageCatalogCode),
+            UiText.FailureCatalogHeadline(CatalogEntry.Code),
             UiText.FailureStatusLabel(ResolvedFailureStatus),
             FormatDisplayUtc(Item.OccurredAt));
 

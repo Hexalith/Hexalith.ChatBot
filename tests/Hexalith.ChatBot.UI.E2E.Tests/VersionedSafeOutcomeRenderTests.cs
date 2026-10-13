@@ -544,6 +544,36 @@ public sealed class VersionedSafeOutcomeRenderTests
         html.ShouldNotContain("data-chatbot-stable-id=\"project-conversation-retryable\"");
     }
 
+    /// <summary>Two persistent explanations of one workspace failure share one live announcement.</summary>
+    /// <param name="code">The workspace load failure.</param>
+    /// <param name="authorization">Whether this is an authorization failure.</param>
+    [Theory]
+    [InlineData(ChatBotMessageCodes.AuthorizationDenied, true)]
+    [InlineData(ChatBotMessageCodes.AuthenticationDenied, true)]
+    [InlineData(ChatBotMessageCodes.AuditUnavailable, false)]
+    [InlineData("private-workspace-error", false)]
+    public async Task WorkspaceFailureShouldAnnounceItsCatalogExplanationOnlyOnce(string code, bool authorization)
+    {
+        string html = await RenderParentAsync<ChatBotProjectConversationWorkspace>([], project: new(false, null, code));
+        string bannerId = authorization ? "project-conversation-failed" : "project-conversation-retryable";
+        string blockedId = authorization ? "project-workspace-unauthorized" : "project-workspace-retryable";
+        string banner = Regex.Match(html, $"<[^>]+data-chatbot-stable-id=\"{bannerId}\"[^>]*>").Value;
+        string blocked = Regex.Match(html, $"<[^>]+data-chatbot-stable-id=\"{blockedId}\"[^>]*>").Value;
+        string key = Regex.Match(banner, "data-chatbot-announcement-key=\"([^\"]+)\"").Groups[1].Value;
+
+        banner.ShouldContain("data-chatbot-live-announced=\"true\"");
+        banner.ShouldNotContain("aria-live=\"off\"");
+        blocked.ShouldContain("data-chatbot-live-announced=\"false\"");
+        blocked.ShouldContain("aria-live=\"off\"");
+        key.ShouldNotBeEmpty();
+        blocked.ShouldContain($"data-chatbot-announcement-key=\"{key}\"");
+        banner.ShouldContain("data-chatbot-repeat-rule=\"OncePerFailureKey\"");
+        blocked.ShouldContain("data-chatbot-repeat-rule=\"OncePerFailureKey\"");
+        string reason = ChatBotMessageCatalog.Resolve(code).Reason;
+        Regex.Matches(WebUtility.HtmlDecode(html), Regex.Escape(reason)).Count.ShouldBeGreaterThanOrEqualTo(2);
+        html.ShouldContain($"data-chatbot-stable-id=\"{blockedId}-safe-action\"");
+    }
+
     [Theory]
     [InlineData("stream")]
     [InlineData("association")]
@@ -614,11 +644,21 @@ public sealed class VersionedSafeOutcomeRenderTests
         }
     }
 
-    /// <summary>Unknown outcomes suppress contradictory completion and retry metadata.</summary>
-    [Fact]
-    public async Task ContradictoryGenericFailureShouldSuppressResolvedAndRetryMetadata()
+    /// <summary>Unknown and incompatible acceptance outcomes suppress contradictory completion and retry metadata.</summary>
+    /// <param name="code">The incompatible failure code.</param>
+    [Theory]
+    [InlineData("private-fallback-code")]
+    [InlineData(ChatBotMessageCodes.CommandAccepted)]
+    [InlineData(ChatBotMessageCodes.AssociationDecisionAccepted)]
+    [InlineData(ChatBotMessageCodes.AssociationDecisionRejected)]
+    [InlineData(ChatBotMessageCodes.AssociationDecisionDeferred)]
+    [InlineData(ChatBotMessageCodes.AssociationDecisionNeedsReview)]
+    [InlineData(ChatBotMessageCodes.AssociationCorrectionAccepted)]
+    [InlineData(ChatBotMessageCodes.AssociationCorrectionPropagationPending)]
+    [InlineData(ChatBotMessageCodes.AssociationCorrectionPropagationComplete)]
+    public async Task ContradictoryGenericFailureShouldSuppressResolvedAndRetryMetadata(string code)
     {
-        ProjectConversationItemModel item = CreateFailureItem("private-fallback-code", "contradictory") with
+        ProjectConversationItemModel item = CreateFailureItem(code, "contradictory") with
         {
             FailureStatus = "resolved", FailureStateKind = "reprocess-created", Retryable = true,
             RetryCount = 17, MaxRetryCount = 99,
@@ -644,6 +684,123 @@ public sealed class VersionedSafeOutcomeRenderTests
         html.ShouldNotContain("2030-");
         html.ShouldNotContain("private-retry-operation");
         html.ShouldNotContain("retry-later");
+        html.ShouldContain("<code class=\"chatbot-code\">generic_denial</code>");
+        html.ShouldContain("<code class=\"chatbot-code\">dismiss</code>");
+        if (ChatBotMessageCatalog.IsKnown(code))
+        {
+            text.ShouldNotContain(ChatBotMessageCatalog.Resolve(code).Reason);
+            html.ShouldNotContain($"<code class=\"chatbot-code\">{code}</code>");
+        }
+    }
+
+    /// <summary>Blocked surfaces cannot describe an incompatible acceptance as the current outcome.</summary>
+    /// <param name="code">The incompatible acceptance code.</param>
+    [Theory]
+    [InlineData(ChatBotMessageCodes.CommandAccepted)]
+    [InlineData(ChatBotMessageCodes.AssociationDecisionAccepted)]
+    [InlineData(ChatBotMessageCodes.AssociationDecisionRejected)]
+    [InlineData(ChatBotMessageCodes.AssociationDecisionDeferred)]
+    [InlineData(ChatBotMessageCodes.AssociationDecisionNeedsReview)]
+    [InlineData(ChatBotMessageCodes.AssociationCorrectionAccepted)]
+    [InlineData(ChatBotMessageCodes.AssociationCorrectionPropagationPending)]
+    [InlineData(ChatBotMessageCodes.AssociationCorrectionPropagationComplete)]
+    public async Task BlockedStateShouldNormalizeIncompatibleAcceptance(string code)
+    {
+        string html = await RenderParentAsync<ChatBotBlockedState>(new Dictionary<string, object?>
+        {
+            [nameof(ChatBotBlockedState.Reason)] = ChatBotBlockedReason.FailedDependency,
+            [nameof(ChatBotBlockedState.MessageCatalogCode)] = code,
+            [nameof(ChatBotBlockedState.ReasonText)] = "restricted-acceptance-prose",
+            [nameof(ChatBotBlockedState.SafeNextAction)] = "retry-later",
+        });
+
+        string text = WebUtility.HtmlDecode(html);
+        text.ShouldContain("The requested action is unavailable.");
+        text.ShouldContain("Dismiss");
+        text.ShouldNotContain(ChatBotMessageCatalog.Resolve(code).Reason);
+        html.ShouldContain("data-chatbot-feedback-state=\"TerminalPolicyFailure\"");
+        html.ShouldContain("aria-live=\"assertive\"");
+        html.ShouldNotContain(code);
+        html.ShouldNotContain("retry-later");
+        html.ShouldNotContain("restricted-acceptance-prose");
+    }
+
+    /// <summary>Failure and blocked renderers retain legitimate failure-history outcomes.</summary>
+    /// <param name="code">The history-compatible catalog outcome.</param>
+    [Theory]
+    [InlineData(ChatBotMessageCodes.RetryQueued)]
+    [InlineData(ChatBotMessageCodes.RetryAccepted)]
+    [InlineData(ChatBotMessageCodes.DuplicateSuppressed)]
+    [InlineData(ChatBotMessageCodes.ReprocessCreated)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictCommandExecution)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictMessageIntake)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictCorrection)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictAssociationDecision)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictRetry)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictOutboundDraftCreation)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictOutboundSend)]
+    public async Task FailureHistoryOutcomesShouldRemainCatalogBackedInBothRenderers(string code)
+    {
+        string failure = await RenderParentAsync<ChatBotFailureStateConversationItem>(new Dictionary<string, object?>
+        {
+            [nameof(ChatBotFailureStateConversationItem.Item)] = CreateFailureItem(code, "valid-history"),
+        });
+        string blocked = await RenderParentAsync<ChatBotBlockedState>(new Dictionary<string, object?>
+        {
+            [nameof(ChatBotBlockedState.Reason)] = ChatBotBlockedReason.FailedDependency,
+            [nameof(ChatBotBlockedState.MessageCatalogCode)] = code,
+        });
+
+        foreach (string html in new[] { failure, blocked })
+        {
+            WebUtility.HtmlDecode(html).ShouldContain(ChatBotMessageCatalog.Resolve(code).Reason);
+            html.ShouldNotContain("The requested action is unavailable.");
+            html.ShouldContain(code);
+            html.ShouldNotContain("generic_denial");
+        }
+    }
+
+    /// <summary>Mounted same-code failures announce each new attempt and suppress the repeated attempt.</summary>
+    [Fact]
+    public async Task MountedBannerShouldActivateEachSameCodeAttemptAndSuppressRepeats()
+    {
+        CultureInfo original = CultureInfo.CurrentUICulture;
+        CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en");
+        try
+        {
+            ServiceCollection services = new();
+            services.AddLogging();
+            services.AddLocalization();
+            services.AddFluentUIComponents();
+            services.AddSingleton<IJSRuntime, StaticRenderJsRuntime>();
+            services.AddSingleton<ChatBotUiTextLocalizer>();
+            services.AddSingleton<ChatBotCultureFormatter>();
+            services.AddSingleton<ChatBotAnnouncementDeduplicationState>();
+            await using ServiceProvider provider = services.BuildServiceProvider();
+            using HtmlRenderer renderer = new(provider, provider.GetRequiredService<ILoggerFactory>());
+            var root = await renderer.Dispatcher.InvokeAsync(() => renderer.RenderComponentAsync<BannerTransitionRenderHost>());
+            BannerTransitionRenderHost host = BannerTransitionRenderHost.Instance!;
+
+            foreach (string attempt in new[] { "attempt-1", "attempt-2" })
+            {
+                await host.UpdateAsync(attempt).ConfigureAwait(true);
+                string announced = await renderer.Dispatcher.InvokeAsync(root.ToHtmlString).ConfigureAwait(true);
+                announced.ShouldContain($"data-chatbot-announcement-key=\"{attempt}-authorization_denied\"");
+                announced.ShouldContain("data-chatbot-live-announced=\"true\"");
+                announced.ShouldContain("aria-live=\"assertive\"");
+
+                await host.UpdateAsync(attempt).ConfigureAwait(true);
+                string repeated = await renderer.Dispatcher.InvokeAsync(root.ToHtmlString).ConfigureAwait(true);
+                repeated.ShouldContain("data-chatbot-live-announced=\"false\"");
+                repeated.ShouldContain("aria-live=\"off\"");
+                repeated.ShouldContain("The operation is not available to this caller.");
+            }
+        }
+        finally
+        {
+            BannerTransitionRenderHost.Clear();
+            CultureInfo.CurrentUICulture = original;
+        }
     }
 
     /// <summary>Passive history stays silent without consuming the interactive announcement key.</summary>

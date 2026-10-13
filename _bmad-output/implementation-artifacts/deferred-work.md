@@ -1424,3 +1424,11 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 ## Deferred from: code review of spec-1-4-return-versioned-safe-outcomes (2026-10-13)
 
 - Failure card can say retry is allowed when the action was withheld (`src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor:148`). Outside the contracts and server slice. `RetryableText` shows Yes when the stored retry flag is true and the catalog entry is not terminal, even if `SafeNextAction` does not match the catalog action. Re-check in the UI review group.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
+  summary: Reconcile known terminal failure codes with independently stored resolved statuses in failure conversation items.
+  evidence: D-B3; the baseline already rendered Item.FailureStatus beside terminal_failure catalog copy. Define producer state/code compatibility before changing history rendering.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
+  summary: Give distinct association-review attempts or route identities distinct announcement keys for repeated same-code failures.
+  evidence: D-B5; the baseline already deduplicated by the fixed association-review-failed identity plus unchanged error code. Trace association navigation and retry focus behavior, then verify the chosen attempt identity in a mounted page.

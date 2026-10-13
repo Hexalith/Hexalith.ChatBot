@@ -67,7 +67,7 @@
                                      AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateUnauthorizedRedacted]"
                                      StableId="project-conversation-failed"
                                      StateFamily="ChatBotFeedbackStateFamily.BlockedAction"
-                                     AnnouncementKey="project-conversation-failed-redacted">
+                                     AnnouncementKey="project-workspace-unauthorized-Denial">
                     @UiText[ChatBotUiTextKey.ProjectWorkspaceUnauthorizedSafeMessage]
                 </ChatBotStatusBanner>
                 <ChatBotBlockedState Reason="ChatBotBlockedReason.Denial"
@@ -84,7 +84,7 @@
                                      AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateDependencyDegraded]"
                                      StableId="project-conversation-retryable"
                                      StateFamily="ChatBotFeedbackStateFamily.RetryableFailure"
-                                     AnnouncementKey="project-conversation-failed-retryable"
+                                     AnnouncementKey="project-workspace-retryable-FailedDependency"
                                      ShowCatalogAction="false">
                     <code class="chatbot-code">@State.Value.ErrorCode</code>
                 </ChatBotStatusBanner>

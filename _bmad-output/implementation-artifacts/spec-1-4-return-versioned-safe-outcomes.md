@@ -2,7 +2,7 @@
 title: 'Return Versioned Safe Outcomes'
 type: 'feature'
 created: '2026-10-12'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: 8437900622d5bf7a9d34ca5cc543cd802f653cb1
 route: 'dispatch'
 review_loop_iteration: 0
@@ -71,6 +71,8 @@ context:
 
 ## Spec Change Log
 
+- 2026-10-13: Completed the workflow review, applied six follow-up patch groups, and verified all nine affected suites (4,164 tests, zero failures/skips). Kept the story in review because the repository completion evidence gate still fails for the absent contract.
+- 2026-10-13: Closed the four contracts and server review patches. Policy blocks now retain escalation guidance, generic denials use `about:blank`, and catalog/OpenAPI/generated enum parity is checked. The five affected suites passed 3,487 tests; completion evidence remains outstanding.
 - 2026-10-13: Closed the 17 remaining source-slice patches and the follow-up independent review. Preserved specific idempotency conflicts while denying unrelated success codes, added a mounted stream transition test, and verified 4,111 affected tests. Completion evidence remains outstanding.
 - 2026-10-12: Completed the resumed parallel review, fixed permission and accessibility regressions, and verified all affected suites (4,016 tests, zero failures/skips). Added real locale/theme/keyboard browser coverage and recorded the environment limitation for full Aspire startup.
 - 2026-10-12: Implemented Story 1.4 and added focused render, leakage, catalog, and boundary coverage. The broad Debug build remains blocked by existing sibling reference conflicts; see Verification.
@@ -168,6 +170,30 @@ Full-suite follow-up found and patched additional story regressions: authorizati
 Validation gate corrections: the existing imperative-name allowlist now recognizes the already implemented Grant/Revoke commands. The Dapr ACL and its reviewed route inventory include the current SDK's `/project/rebuild/part/v1` transport endpoint under the existing EventStore-only, verified-identity, POST-scoped rebuild-family grant documented in the policy. These corrections update existing gate expectations and preserve their exhaustive checks.
 
 Browser verification exposed missing button semantics on the Fluent governed-action host; it now declares its button role explicitly, keeps the disabled reason on the focusable host, and preserves the status/alert role when repeated announcements are suppressed. The real-render test host now supplies a consistent authenticated tenant principal to prerender and interactive requests using the existing FrontComposer server helpers. New browser tests seed the supported scoped theme preference, then assert the selected theme, localized known/unknown rejection, keyboard focus, disabled action semantics and accessibility tree in all visual modes. All six existing real-render checks also pass with that host.
+
+### Workflow review of the resumed build (2026-10-13)
+
+| ID | Finding | Verdict | Route | Evidence |
+| --- | --- | --- | --- | --- |
+| D-B1 | Explicit generic denial loses dismiss when an action mismatches | medium | patch | Redaction treats a known generic_denial as an ordinary permission intersection; RetryLater becomes None instead of the generic fallback's Dismiss. Normalize explicit and resolved generic denials identically. |
+| D-B2 | Failure and blocked surfaces admit unrelated acceptance codes | high | patch | FailureStateProjectionTranslator accepts any known catalog code, and both renderers select command_accepted copy directly. Reject incompatible success codes while retaining the existing failure-history lifecycle outcomes. |
+| D-B3 | Known terminal failure displays a resolved status | medium | defer | The baseline already displayed Item.FailureStatus alongside the existing terminal_failure headline and reason. The contradiction predates this catalog expansion; reconcile status/code producer semantics separately. |
+| D-B4 | Workspace duplicates live announcements of one failure | medium | patch | Its banner and blocked state now render the same catalog explanation under different keys. Their existing OncePerFailureKey rules can share one key so only one announces the transition. |
+| D-B5 | Association review suppresses a later same-code attempt | medium | defer | The baseline already used association-review-failed plus the unchanged error code, without association or attempt identity; new catalog normalization preserves that pre-existing same-code suppression. |
+| D-B6 | Unknown stored completion or audit values throw | medium | defer | carried B8/N-B12: the pre-existing enum parser and the logged storage forward-compatibility decision are unchanged. |
+| D-B7 | Adapter status omits primary catalog copy | medium | defer | carried C-B6: the pre-existing output shape still needs the separately recorded output-contract decision. |
+| D-B8 | Failure card exposes optional projected metadata | medium | defer | carried B5/C-B13: the pre-existing token-shaped projected fields still need the recorded producer-provenance audit. |
+| D-B9 | Release source inventory expands | maybe-false | defer | carried N-B10/C-B11: no exact before/after Release graph has established an expansion beyond the existing AppHost closure. |
+| D-B10 | Accessible-tree checks do not prove manual screen-reader delivery | false | reject | Component and browser tests assert live activation, roles, reachable actions and accessible text; the spec explicitly disclaims manual screen-reader traversal and attested completion. The concrete changed-attempt verification gap is D-V2. |
+| D-V1 | Primary stored lifecycle guard has no isolated server regression | medium | patch | Pre-verified: undefined nested lifecycle and adapter cases do not exercise the primary stored lifecycle guard. Add an otherwise-valid record with only that primary value undefined. |
+| D-V2 | Same-code attempt test checks keys but not live activation | medium | patch | Pre-verified: replacing ShouldAnnounce's argument with stable identity plus code leaves its displayed key assertions passing. Mount a banner and assert both fresh attempts announce while a repeat stays quiet. |
+| D-V3 | Browser tests miss ordinary CI's installed Chrome | medium | patch | Reproduced with CHROME_EXECUTABLE_PATH unset and an empty Playwright cache. Ordinary CI provides system Chrome, which RealRenderFixture already discovers; reuse that discovery in these tests. |
+| D-V4 | Failure card renders command acceptance inside terminal failure | high | patch | Same verified root cause as D-B2; the projection's catalog-membership guard does not reject acceptance codes. Preserve legitimate retry_queued and reprocess_created history. |
+| D-E1 | Mixed-case terminal kind can re-enable retry | false | reject | The supported server projection takes FailureStateKind as a closed enum and ProjectConversationItemView emits the canonical terminal-failure token; it cannot emit TERMINAL-FAILURE. Existing canonical/PascalCase inputs and terminal FailureStatus remain guarded. |
+| D-E2 | Retry text advertises a withheld action | medium | defer | carried final contracts/server review deferral: the same RetryableText expression still reads the stored flag independently of the action intersection. The existing ledger entry is retained. |
+| D-E3 | A later workspace retry uses consumed keys | maybe-false | defer | carried R-E5: fixed workspace keys and the original live attempt-identity follow-up are unchanged. This review traces RetryLoad clearing ErrorCode and replacing CurrentLoadRequestId; retain that evidence for the previously deferred mounted/live retry check. |
+
+Grouped patches: generic-denial action parity; failure/blocked compatibility (D-B2/D-V4); workspace duplicate announcements; primary lifecycle regression; mounted same-code attempt regression; shared browser discovery. Carried findings retain their existing disposition without new duplicate ledger entries.
 
 ## Verification
 
@@ -378,6 +404,52 @@ The repository's required completion gate takes precedence over the workflow's d
 - The historical Story 13.9 screenshots were restored to their pre-run bytes; generated copies are in `/tmp/chatbot-story-1-4-final-generated-screenshots`. The completion evidence contract and live AppHost secret limitations described above remain outstanding.
 - The follow-up completion preflight `dotnet tools/Hexalith.ChatBot.StoryEvidenceGate/bin/Debug/net10.0/Hexalith.ChatBot.StoryEvidenceGate.dll validate --story _bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md --contract _bmad-output/implementation-artifacts/evidence/1-4-return-versioned-safe-outcomes.json --target-status done --base 8437900622d5bf7a9d34ca5cc543cd802f653cb1 --head 3fd47d3de1bf8efe5434948d53fdd917d625a412 --results /tmp/chatbot-story-1-4-final-generated-screenshots --report /tmp/chatbot-story-1-4-evidence-preflight.json` exited 1 with `scope_digest_mismatch` for the absent Story 1.4 evidence contract. The spec stays `in-review` and sprint status stays `review`; no attested completion is claimed.
 
+### Verification of contracts and server review patches (2026-10-13)
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false -v:q` passed with zero warnings or errors. The final client test correction also passed `dotnet build tests/Hexalith.ChatBot.Client.Tests/Hexalith.ChatBot.Client.Tests.csproj --no-restore --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false -v:q`.
+- The focused gateway and problem compatibility lane passed 424 tests. Full native assemblies then passed independently with `-failSkips -noColor -result-trx <lane>.trx -result-ctrf <lane>.ctrf.json`. Final results are retained in `/tmp/chatbot-story-1-4-contracts-server-20261013`; use `client-final.trx` and the four other `*-full.trx` reports. The initial client test used default enum serialization; the corrected assertion uses the same string enum converter as the generated wire properties.
+
+| Suite | Passed | Failed / skipped |
+| --- | ---: | ---: |
+| Contracts | 517 | 0 / 0 |
+| Client | 92 | 0 / 0 |
+| Server | 2,605 | 0 / 0 |
+| Conformance | 150 | 0 / 0 |
+| Architecture | 123 | 0 / 0 |
+| Total | 3,487 | 0 / 0 |
+
+- `PolicyAdministrationDenialShouldKeepSpecificCatalogProblem` verifies policy-block, notification-routing, and escalation-policy denials through CommandGateway, including safe code/copy/action/version and zero dispatch. Generic conflict regressions verify `about:blank` for unknown, explicit generic, and incompatible completed codes while recognized conflicts retain their existing specific type. Catalog parity tests cover the complete OpenAPI and generated enum sets, uniqueness, and JSON wire-value round trips; no OpenAPI or generated client edit was needed.
+- The required startup baseline command `aspire start --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --no-build --non-interactive --format Json` still exits 2 (child exit 134) because `ChatBot:LiveRecoveryValidation:MailboxClientSecret` is absent. Story 1.4 still has no completion evidence contract. The story remains `in-progress`; no attested completion, live topology, or manual screen-reader run is claimed. The UI retry-text finding remains deferred as recorded below.
+
+### Final verification after workflow review (2026-10-13)
+
+- All six new patch groups in the workflow triage were applied and verified. Generic denials consistently dismiss; failure/blocked views reject unrelated acceptance copy while retaining supported retry, duplicate, reprocess and idempotency history; paired workspace explanations share one announcement key without a new public parameter. Browser tests reuse the existing system Chrome discovery.
+- `dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false -v:q` passed with zero warnings and errors.
+- All nine affected native assemblies passed independently with `-failSkips -noColor -result-trx <lane>.trx -result-ctrf <lane>.ctrf.json`. Current results, complete execution logs and the build log are retained in `/tmp/chatbot-story-1-4-contracts-server-20261013` under `final-*`; all results below have zero failures or skips.
+
+| Suite | Passed |
+| --- | ---: |
+| Contracts | 517 |
+| Client | 92 |
+| Cli | 53 |
+| Mcp | 60 |
+| UI | 320 |
+| Server | 2614 |
+| Conformance | 150 |
+| Architecture | 123 |
+| UI.E2E | 235 |
+| Total | 4,164 |
+
+- Final machine results cover all four frozen matrix rows. UI E2E includes 70 actual component-render cases and 13 safe-outcome Chromium cases, plus the existing real cross-surface checks. New mounted assertions verify that each distinct same-code attempt activates the live region and a repeated attempt stays quiet. Parent renders verify that paired workspace explanations announce once. Isolated server regressions guard explicit generic-denial actions and malformed primary lifecycle metadata.
+- The browser class also passed all 13 cases with `CHROME_EXECUTABLE_PATH` unset and `PLAYWRIGHT_BROWSERS_PATH` set to an empty task-owned cache; it stayed empty. Historical tracked screenshots were restored to their pre-run bytes; generated copies are retained under `screenshots-final-generated` in the results directory.
+- The repository gate self-tests passed 219 tests with no failures or skips. The completion preflight command below exits 1 with `passed: false`, reason `scope_digest_mismatch`, subject `1-4-return-versioned-safe-outcomes.json`, because the story still has no evidence contract. The workflow's completion transition remains subject to this repository gate; no attested completion, live backend topology or manual screen-reader traversal is claimed.
+
+```bash
+dotnet tools/Hexalith.ChatBot.StoryEvidenceGate/bin/Debug/net10.0/Hexalith.ChatBot.StoryEvidenceGate.dll validate --story _bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md --contract _bmad-output/implementation-artifacts/evidence/1-4-return-versioned-safe-outcomes.json --target-status done --base 8437900622d5bf7a9d34ca5cc543cd802f653cb1 --head 927a6b022b2f8f262b25cd07350721b2a7a5e29e --results /tmp/chatbot-story-1-4-contracts-server-20261013 --report /tmp/chatbot-story-1-4-contracts-server-20261013/story-evidence-preflight.json
+```
+
+- Ordinary Aspire startup remains blocked by the missing `ChatBot:LiveRecoveryValidation:MailboxClientSecret` as recorded above. Prior carried findings and the two newly identified pre-existing issues retain their recorded deferred disposition. The story is `in-review`, with its sprint entry at `review`, pending completion evidence.
+
 ## File List
 
 - `Hexalith.ChatBot.slnx`
@@ -397,6 +469,7 @@ The repository's required completion gate takes precedence over the workflow's d
 - `src/Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml`
 - `src/Hexalith.ChatBot.Mcp/ChatBotMcpResultFormatter.cs`
 - `src/Hexalith.ChatBot.Server/Gateway/ChatBotProblemDetailsFactory.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/ChatBotProblemTypes.cs`
 - `src/Hexalith.ChatBot.Server/Gateway/CommandGatewayHttpResults.cs`
 - `src/Hexalith.ChatBot.Server/Gateway/Redaction/CoarseUserFacingRedactionStage.cs`
 - `src/Hexalith.ChatBot.Server/Gateway/Status/OperationStatusHttpResults.cs`
@@ -424,9 +497,11 @@ The repository's required completion gate takes precedence over the workflow's d
 - `tests/Hexalith.ChatBot.Architecture.Tests/DomainServiceSdkHostAdoptionAdrTests.cs`
 - `tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs`
 - `tests/Hexalith.ChatBot.Cli.Tests/ChatBotCliCommandTests.cs`
+- `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs`
 - `tests/Hexalith.ChatBot.Conformance.Tests/CrossTenantLeakageScannerTests.cs`
 - `tests/Hexalith.ChatBot.Conformance.Tests/DaprAccessControlConformanceTests.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`
+- `tests/Hexalith.ChatBot.Contracts.Tests/ProblemDetailsContractTests.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/SharedContractTypeTests.cs`
 - `tests/Hexalith.ChatBot.Mcp.Tests/ChatBotMcpServiceTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
@@ -439,8 +514,10 @@ The repository's required completion gate takes precedence over the workflow's d
 - `tests/Hexalith.ChatBot.Server.Tests/Lifecycle/OperationStatusWorkflowStatusSinkTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Projections/AiOutcomeProjectionTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs`
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/BannerTransitionRenderHost.cs`
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/FakeChatBotClient.cs`
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/LiveChatBotUiHost.cs`
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/RealRenderFixture.cs`
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/RealRenderCrossSurfaceE2ETests.cs`
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/SafeOutcomeRenderDispatcher.cs`
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/SafeOutcomeRenderState.cs`
@@ -460,10 +537,10 @@ The repository's required completion gate takes precedence over the workflow's d
 
 ### Review Findings (2026-10-13 contracts and server)
 
-- [ ] [Review][Patch] Policy block is returned as an authorization denial [src/Hexalith.ChatBot.Server/Gateway/ChatBotProblemDetailsFactory.cs:211]
-- [ ] [Review][Patch] Generic denial keeps an idempotency-conflict type [src/Hexalith.ChatBot.Server/Gateway/Redaction/CoarseUserFacingRedactionStage.cs:35]
-- [ ] [Review][Patch] Routing and escalation denials have no problem assertion [tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs:5124]
-- [ ] [Review][Patch] Catalog codes are not locked to the generated enum [src/Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml:3250]
+- [x] [Review][Patch] Policy block is returned as an authorization denial [src/Hexalith.ChatBot.Server/Gateway/ChatBotProblemDetailsFactory.cs:211]
+- [x] [Review][Patch] Generic denial keeps an idempotency-conflict type [src/Hexalith.ChatBot.Server/Gateway/Redaction/CoarseUserFacingRedactionStage.cs:35]
+- [x] [Review][Patch] Routing and escalation denials have no problem assertion [tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs:5124]
+- [x] [Review][Patch] Catalog codes are not locked to the generated enum [src/Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml:3250]
 - [x] [Review][Defer] Failure card can say retry is allowed when the action was withheld [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor:148] — deferred: outside this contracts and server slice; `RetryableText` shows Yes for a non-terminal catalog entry when the stored retry flag is true, even if the stored action does not match the catalog action
 
 #### Rejected

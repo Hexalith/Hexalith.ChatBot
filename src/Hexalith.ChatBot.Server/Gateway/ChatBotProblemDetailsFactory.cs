@@ -207,6 +207,7 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
             ChatBotAuthorizationReasonCodes.ServiceClientRateLimited => ChatBotMessageCodes.ServiceClientRateLimited,
             ChatBotAuthorizationReasonCodes.AiActorRateLimited => ChatBotMessageCodes.AiActorRateLimited,
             ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited => ChatBotMessageCodes.CommandCapabilityRateLimited,
+            ChatBotDisabledActionReasons.PolicyBlocked => ChatBotMessageCodes.RefusalBlockedAction,
             _ when ChatBotMessageCatalog.IsKnown(reasonCode) => reasonCode,
             _ => ChatBotMessageCodes.AuthorizationDenied,
         };

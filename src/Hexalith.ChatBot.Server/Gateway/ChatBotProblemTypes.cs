@@ -10,6 +10,9 @@ namespace Hexalith.ChatBot.Server.Gateway;
 /// </remarks>
 internal static class ChatBotProblemTypes
 {
+    /// <summary>A generic denial conveys no problem-specific cause beyond its safe HTTP status.</summary>
+    public const string GenericDenial = "about:blank";
+
     /// <summary>The request did not match the published OpenAPI command-submission contract.</summary>
     public const string ValidationFailure = "https://hexalith.dev/errors/chatbot/validation-failure";
 

@@ -8,6 +8,7 @@ using System.Text.Json;
 
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Messages;
 
 using Shouldly;
 
@@ -689,6 +690,27 @@ public static class ClientGenerationTests
                     "Correction-delayed",
                 ],
                 ignoreOrder: false);
+    }
+
+    /// <summary>Every catalog code has one generated wire enum value with lossless JSON conversion.</summary>
+    [Fact]
+    public static void GeneratedMessageCodesShouldMatchAndRoundTripTheCompleteCatalog()
+    {
+        string[] wireCodes = Enum.GetValues<ChatBotMessageCode>()
+            .Select(static value => GetWireValue(value).ShouldNotBeNull())
+            .ToArray();
+
+        wireCodes.ShouldBe(wireCodes.Distinct(StringComparer.Ordinal).ToArray(), ignoreOrder: false);
+        wireCodes.Order(StringComparer.Ordinal).ShouldBe(
+            ChatBotMessageCatalog.Entries.Select(static entry => entry.Code).Order(StringComparer.Ordinal),
+            ignoreOrder: false);
+
+        foreach (ChatBotMessageCode value in Enum.GetValues<ChatBotMessageCode>())
+        {
+            string json = Newtonsoft.Json.JsonConvert.SerializeObject(value, new Newtonsoft.Json.Converters.StringEnumConverter());
+            JsonSerializer.Deserialize<string>(json).ShouldBe(GetWireValue(value));
+            Newtonsoft.Json.JsonConvert.DeserializeObject<ChatBotMessageCode>(json, new Newtonsoft.Json.Converters.StringEnumConverter()).ShouldBe(value);
+        }
     }
 
     [Fact]

@@ -203,6 +203,25 @@ public sealed class OperationStatusWorkflowStatusSinkTests
         wire.GetRawText().ShouldNotContain(unknown);
     }
 
+    /// <summary>The primary lifecycle guard denies an otherwise valid retryable stored status.</summary>
+    [Fact]
+    public void UndefinedPrimaryLifecycleShouldIndependentlyDenyOutcome()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        OperationStatusRecord record = RetryableRecord(now);
+        JsonElement valid = OperationStatusHttpResults.ToJsonElement(record, now);
+        valid.GetProperty("reasonCode").GetString().ShouldBe(ChatBotMessageCodes.AuditUnavailable);
+        valid.GetProperty("retryEligible").GetBoolean().ShouldBeTrue();
+
+        JsonElement wire = OperationStatusHttpResults.ToJsonElement(record with { LifecycleState = (LifecycleState)999999 }, now);
+        wire.GetProperty("reasonCode").GetString().ShouldBe(ChatBotMessageCodes.GenericDenial);
+        wire.GetProperty("completionStatus").GetString().ShouldBe("failed");
+        wire.GetProperty("lifecycleState").GetString().ShouldBe("Failed");
+        wire.GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
+        wire.GetProperty("safeNextActions").EnumerateArray().ShouldHaveSingleItem().GetString().ShouldBe("dismiss");
+        wire.GetRawText().ShouldNotContain("999999");
+    }
+
     /// <summary>Malformed nested reasons and lifecycle values deny the whole status.</summary>
     /// <param name="field">The nested field to invalidate.</param>
     [Theory]

@@ -32,7 +32,8 @@ internal sealed class CoarseUserFacingRedactionStage : IUserFacingRedactionStage
 
         return new ProblemDetails
         {
-            Type = known ? KnownType(problem.Type) : TypeForStatus(status),
+            Type = known && entry.Code != ChatBotMessageCodes.GenericDenial
+                ? KnownType(problem.Type) : ChatBotProblemTypes.GenericDenial,
             Title = entry.Headline,
             Status = status,
             Detail = null,
@@ -46,7 +47,7 @@ internal sealed class CoarseUserFacingRedactionStage : IUserFacingRedactionStage
             Retryable = known && problem.Retryable && !entry.IsTerminal &&
                 catalogAction == ProblemDetailsClientAction.RetryLater &&
                 problem.ClientAction == ProblemDetailsClientAction.RetryLater,
-            ClientAction = !known ? ProblemDetailsClientAction.Dismiss
+            ClientAction = entry.Code == ChatBotMessageCodes.GenericDenial ? ProblemDetailsClientAction.Dismiss
                 : problem.ClientAction == catalogAction &&
                     (catalogAction != ProblemDetailsClientAction.RetryLater || problem.Retryable)
                     ? catalogAction
@@ -81,14 +82,5 @@ internal sealed class CoarseUserFacingRedactionStage : IUserFacingRedactionStage
             StatusCodes.Status400BadRequest or StatusCodes.Status422UnprocessableEntity => ProblemDetailsCategory.Validation_error,
             StatusCodes.Status409Conflict => ProblemDetailsCategory.Conflict,
             _ => ProblemDetailsCategory.Internal_error,
-        };
-
-    private static string TypeForStatus(int status)
-        => status switch
-        {
-            StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden => ChatBotProblemTypes.AuthorizationDenied,
-            StatusCodes.Status400BadRequest or StatusCodes.Status422UnprocessableEntity => ChatBotProblemTypes.ValidationFailure,
-            StatusCodes.Status409Conflict => ChatBotProblemTypes.IdempotencyConflict,
-            _ => ChatBotProblemTypes.DependencyUnavailable,
         };
 }

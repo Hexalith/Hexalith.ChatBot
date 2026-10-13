@@ -72,15 +72,26 @@
 
     private string AnnouncementKey => $"{StableId}-{Reason}-{CatalogEntry.Code}";
 
-    private ChatBotMessageCatalogEntry CatalogEntry => UiText.FailureCatalogEntry(
-        MessageCatalogCode ?? (Reason switch
+    private ChatBotMessageCatalogEntry CatalogEntry
+    {
+        get
         {
-            ChatBotBlockedReason.Denial => ChatBotMessageCodes.AuthorizationDenied,
-            ChatBotBlockedReason.FailedDependency => ChatBotMessageCodes.DependencyDegraded,
-            ChatBotBlockedReason.Quarantine => ChatBotMessageCodes.RefusalBlockedAction,
-            ChatBotBlockedReason.UnsafeContext => ChatBotMessageCodes.AssociationAiContextBlocked,
-            _ => ChatBotMessageCodes.GenericDenial,
-        }));
+            ChatBotMessageCatalogEntry entry = UiText.FailureCatalogEntry(
+                MessageCatalogCode ?? (Reason switch
+                {
+                    ChatBotBlockedReason.Denial => ChatBotMessageCodes.AuthorizationDenied,
+                    ChatBotBlockedReason.FailedDependency => ChatBotMessageCodes.DependencyDegraded,
+                    ChatBotBlockedReason.Quarantine => ChatBotMessageCodes.RefusalBlockedAction,
+                    ChatBotBlockedReason.UnsafeContext => ChatBotMessageCodes.AssociationAiContextBlocked,
+                    _ => ChatBotMessageCodes.GenericDenial,
+                }));
+            return entry.State is "waiting" or "completed" && entry.Code is not
+                (ChatBotMessageCodes.RetryQueued or ChatBotMessageCodes.RetryAccepted or
+                    ChatBotMessageCodes.DuplicateSuppressed or ChatBotMessageCodes.ReprocessCreated) &&
+                !entry.Code.StartsWith("idempotency_conflict_", StringComparison.Ordinal)
+                ? UiText.FailureCatalogEntry(null) : entry;
+        }
+    }
 
     private bool IsLocalEmptyState => UseLocalEmptyStateGuidance &&
         Reason is ChatBotBlockedReason.UnresolvedAssociation && MessageCatalogCode is null;

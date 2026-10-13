@@ -5114,6 +5114,43 @@ public sealed partial class CommandGatewayTests
         public IReadOnlyList<AuthorizationFailureReading> ReadAndReset() => [];
     }
 
+    /// <summary>Policy and administration denials preserve their safe explanation through the admission boundary.</summary>
+    /// <param name="reasonCode">The trusted authorization-stage reason.</param>
+    /// <param name="catalogCode">The corresponding public catalog code.</param>
+    /// <param name="nextAction">The permitted public action.</param>
+    [Theory]
+    [InlineData(ChatBotDisabledActionReasons.PolicyBlocked, ChatBotMessageCodes.RefusalBlockedAction, ProblemDetailsClientAction.Escalate)]
+    [InlineData(ChatBotAuthorizationReasonCodes.NotificationRoutingUnauthorized, ChatBotMessageCodes.NotificationRoutingUnauthorized, ProblemDetailsClientAction.RequestAccess)]
+    [InlineData(ChatBotAuthorizationReasonCodes.EscalationPolicyUnauthorized, ChatBotMessageCodes.EscalationPolicyUnauthorized, ProblemDetailsClientAction.RequestAccess)]
+    public async Task PolicyAdministrationDenialShouldKeepSpecificCatalogProblem(
+        string reasonCode, string catalogCode, ProblemDetailsClientAction nextAction)
+    {
+        RecordingDispatcher dispatcher = new();
+        CommandGateway gateway = Gateway(dispatcher, authorizationStage: new DenyingAuthorizationStage(reasonCode));
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "restricted-policy-target")),
+            TestContext.Current.CancellationToken);
+
+        ProblemDetails problem = result.Problem.ShouldNotBeNull();
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(catalogCode);
+        result.IsAccepted.ShouldBeFalse();
+        dispatcher.DispatchCount.ShouldBe(0);
+        problem.Type.ShouldBe(ChatBotProblemTypes.AuthorizationDenied);
+        problem.Status.ShouldBe(403);
+        problem.Category.ShouldBe(ProblemDetailsCategory.Authorization_denied);
+        problem.Code.ShouldBe(entry.Code);
+        problem.Title.ShouldBe(entry.Headline);
+        problem.Message.ShouldBe(entry.Reason);
+        problem.ClientAction.ShouldBe(nextAction);
+        problem.Retryable.ShouldBeFalse();
+        problem.Details.Visibility.ShouldBe(ProblemDetailsDetailsVisibility.Metadata_only);
+        problem.SchemaVersion.ShouldBe(entry.Version);
+        problem.CorrelationId.ShouldBe(CorrelationId);
+        problem.TaskId.ShouldBe(TaskId);
+        Serialized(problem).ShouldNotContain("restricted-policy-target");
+    }
+
     [Theory]
     [InlineData(ChatBotAuthorizationReasonCodes.ServiceClientDisabled)]
     [InlineData(ChatBotAuthorizationReasonCodes.ServiceClientQuarantined)]

@@ -20,7 +20,7 @@ public sealed class VersionedSafeOutcomeBrowserTests
         await using var hostLifetime = host.ConfigureAwait(true);
         _ = host.Server;
         using IPlaywright playwright = await Playwright.CreateAsync().ConfigureAwait(true);
-        string? chrome = Environment.GetEnvironmentVariable("CHROME_EXECUTABLE_PATH");
+        string? chrome = RealRenderFixture.ResolveChromeExecutable();
         IBrowser browser = await playwright.Chromium.LaunchAsync(new()
         {
             Headless = true, ExecutablePath = string.IsNullOrWhiteSpace(chrome) ? null : chrome,
@@ -69,7 +69,7 @@ public sealed class VersionedSafeOutcomeBrowserTests
         await using var hostLifetime = host.ConfigureAwait(true);
         _ = host.Server;
         using IPlaywright playwright = await Playwright.CreateAsync().ConfigureAwait(true);
-        string? chrome = Environment.GetEnvironmentVariable("CHROME_EXECUTABLE_PATH");
+        string? chrome = RealRenderFixture.ResolveChromeExecutable();
         IBrowser browser = await playwright.Chromium.LaunchAsync(new()
         {
             Headless = true,
