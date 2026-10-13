@@ -2,7 +2,7 @@
 title: 'Return Versioned Safe Outcomes'
 type: 'feature'
 created: '2026-10-12'
-status: 'in-review'
+status: 'in-progress'
 baseline_commit: 8437900622d5bf7a9d34ca5cc543cd802f653cb1
 route: 'dispatch'
 review_loop_iteration: 0
@@ -457,3 +457,25 @@ The repository's required completion gate takes precedence over the workflow's d
 - `tests/Hexalith.ChatBot.UI.Tests/SafeOutcomeHostMetricTests.cs`
 - `tests/Hexalith.ChatBot.UI.Tests/SafeOutcomeMetricExporter.cs`
 - `tests/fixtures/hexalith-chatbot-generated-client.sha256`
+
+### Review Findings (2026-10-13 contracts and server)
+
+- [ ] [Review][Patch] Policy block is returned as an authorization denial [src/Hexalith.ChatBot.Server/Gateway/ChatBotProblemDetailsFactory.cs:211]
+- [ ] [Review][Patch] Generic denial keeps an idempotency-conflict type [src/Hexalith.ChatBot.Server/Gateway/Redaction/CoarseUserFacingRedactionStage.cs:35]
+- [ ] [Review][Patch] Routing and escalation denials have no problem assertion [tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs:5124]
+- [ ] [Review][Patch] Catalog codes are not locked to the generated enum [src/Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml:3250]
+- [x] [Review][Defer] Failure card can say retry is allowed when the action was withheld [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor:148] — deferred: outside this contracts and server slice; `RetryableText` shows Yes for a non-terminal catalog entry when the stored retry flag is true, even if the stored action does not match the catalog action
+
+#### Rejected
+
+- `false` — Unknown resolution depends on `Entries[0]` and a public counter. `generic_denial` is that first entry, and `RecordFallback` is the shared input-free counter the UI localizer already calls.
+- `false` — `failed_attachment`, command-execution idempotency conflict, and the escalate-only correction codes use the wrong state family. Public copy comes from the catalog headline and action; `State` only excludes waiting and completed codes from problem redaction, and these codes are not excluded.
+- `false` — Authenticate, correct-request, request-access, and escalate are reported as terminal. `IsTerminal` means the operation will not continue, which matches those actions. Association Review's policy-failure mapping of that flag is a UI classification, not a catalog error.
+- `false` — Redaction rewrites `retry_queued`, `duplicate_suppressed`, and the other waiting or completed codes to generic denial. Those codes are status and audit tokens. Problem Details that reach `Apply` are admission denials, not those codes.
+- `false` — A known problem drops its client action unless it already matches the catalog, an unset action becomes authenticate, and `review-source-evidence` is missing from OpenAPI. The factory sets the catalog action before redaction, no catalog entry uses `review-source-evidence`, and the OpenAPI action enum was not part of this change.
+- `false` — Unknown completion or audit text throws with the raw token, and the unknown status branch sets `maxAttempts` to 0. Status writers store only `accepted-projection-pending`, `completed`, `failed`, `committed`, and `reconciling`.
+- `false` — A known status emits an empty `safeNextActions` array. Accept writes `none` for `command_accepted`, whose catalog action is `none`, and the workflow sink writes the catalog action for the reason it stores.
+- `false` — A stored `generic_denial` erases a known primary reason and zeros retry counts. No status writer stores `generic_denial` in the reason fields `KnownCode` rejects.
+- `false` — `command_accepted` carries `projection-pending`, so every accepted command is blocked. That reason is read as a failure-item blocked reason, and accepted commands are not failure items.
+- `false` — An unknown status still returns an arbitrary operation class. Writers assign only closed server operation-class codes.
+- `false` — Redaction leaves untrusted correlation and task text in the problem. `Detail` and `Message` are replaced with catalog copy; the copied identifiers are the gateway's own correlation and task values.

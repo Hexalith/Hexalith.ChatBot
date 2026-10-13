@@ -1420,3 +1420,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: CLI and MCP operation-status output omits the primary reason code and catalog headline/reason even when the status contains a known failure reason.
   evidence: The omission predates Story 1.4. A separate output-contract decision should define which existing status shapes gain catalog copy and how clients consume additive fields.
+
+## Deferred from: code review of spec-1-4-return-versioned-safe-outcomes (2026-10-13)
+
+- Failure card can say retry is allowed when the action was withheld (`src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor:148`). Outside the contracts and server slice. `RetryableText` shows Yes when the stored retry flag is true and the catalog entry is not terminal, even if `SafeNextAction` does not match the catalog action. Re-check in the UI review group.
