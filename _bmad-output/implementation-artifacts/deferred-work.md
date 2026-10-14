@@ -1432,3 +1432,9 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: Give distinct association-review attempts or route identities distinct announcement keys for repeated same-code failures.
   evidence: D-B5; the baseline already deduplicated by the fixed association-review-failed identity plus unchanged error code. Trace association navigation and retry focus behavior, then verify the chosen attempt identity in a mounted page.
+
+## Deferred from: code review of spec-1-4-return-versioned-safe-outcomes (2026-10-14, src chunk)
+
+- AI execution recovery returns a bare `404 {code:"safe-not-found"}` (`src/Hexalith.ChatBot.Server/Lifecycle/AiExecution/AiExecutionRecoveryEndpoints.cs:34`). Pre-existing: the response is not problem+json, has no catalog code and no catalog version, so this public failure path bypasses the versioned safe-outcome catalog.
+- Suppressed status banners keep `role="alert"`/`"status"` with `aria-live="off"` (`src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor:106`). Maybe-false, medium if true: a remounted suppressed alert may still announce, which would defeat once-per-failure deduplication. Settle with NVDA and JAWS on Chrome against a remounted suppressed banner.
+- A failure item whose code or state changes under the same `ItemId` is never announced (`src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor:90`). Maybe-false, medium if true. Settle by checking whether failure-state projections update one conversation item in place or append a new item per transition.

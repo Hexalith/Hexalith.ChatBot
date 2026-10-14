@@ -2,7 +2,7 @@
 title: 'Return Versioned Safe Outcomes'
 type: 'feature'
 created: '2026-10-12'
-status: 'in-review'
+status: 'in-progress'
 baseline_commit: 8437900622d5bf7a9d34ca5cc543cd802f653cb1
 route: 'dispatch'
 review_loop_iteration: 0
@@ -68,6 +68,7 @@ context:
 - Operation status intersects catalog actions with persisted per-operation permissions. Actual Razor render tests cover known and unknown localized failures, semantic status, announcement deduplication, and disabled action reasons.
 - No persistence path, dependency version, or public wire version changed. The additive OpenAPI code enum required client regeneration and a refreshed client hash fixture.
 - Review fixes preserve trusted local empty-state and banner guidance, make every unknown status reason terminal, respect explicit no-retry decisions, and count unknown or untranslated fallback through an input-free metric.
+- Localization scope (review decision 2026-10-14): English/French copy is resolved at the UI boundary. API Problem Details, CLI and MCP expose the stable catalog code and version with English default copy; clients localize by code.
 
 ## Spec Change Log
 
@@ -556,3 +557,64 @@ dotnet tools/Hexalith.ChatBot.StoryEvidenceGate/bin/Debug/net10.0/Hexalith.ChatB
 - `false` — `command_accepted` carries `projection-pending`, so every accepted command is blocked. That reason is read as a failure-item blocked reason, and accepted commands are not failure items.
 - `false` — An unknown status still returns an arbitrary operation class. Writers assign only closed server operation-class codes.
 - `false` — Redaction leaves untrusted correlation and task text in the problem. `Detail` and `Message` are replaced with catalog copy; the copied identifiers are the gateway's own correlation and task values.
+
+### Review Findings (2026-10-14 src chunk)
+
+Scope: `8437900..08be477`, limited to `src`, `Hexalith.ChatBot.slnx`, gitlinks and `README.md`; the generated client, tests and BMAD artifacts are excluded (38 files, 2,734 diff lines). Layers: Blind Hunter, Edge Case Hunter, Verification Gap, Acceptance Auditor. All four completed. Tests are a follow-up chunk.
+
+- [ ] [Review][Patch] Seven server idempotency-conflict codes have no catalog entry [src/Hexalith.ChatBot.Server/Gateway/Idempotency/CoarseIdempotencyOperationClass.cs:18] — resolved by decision (2026-10-14): add catalog entries with specific en/fr copy for `idempotency_conflict_participant_resolution`, `_association_scoring`, `_association_threshold_policy`, `_low_risk_ai_assistance`, `_approval_decision`, `_approved_ai_action_execution` and `_ai_action_proposal`; add them to the OpenAPI code enum without renumbering, regenerate the client and refresh the hash fixture; add a parity test of `CoarseIdempotencyOperationClass.All` conflict codes against the catalog. Today a legitimate non-equivalent duplicate returns 409 `about:blank` "Request unavailable." with Dismiss and counts as a fallback.
+- [ ] [Review][Patch] UI transport failures became terminal generic denials with no retry [src/Hexalith.ChatBot.UI/State/ProjectConversation/ProjectConversationEffects.cs:14] — resolved by decision (2026-10-14): mirror the CLI/MCP status buckets. Map `HttpRequestException`, timeouts and body-less 408/429/5xx (`HexalithChatBotApiException` without a problem code, or a typed problem with a null `Result`) to `dependency_degraded`/`retry-later`; keep `generic_denial` for programming errors. Covers `ProjectConversationEffects`, `AssociationReviewEffects`, `GovernedOperationsEffects` and `OperationalDashboardsEffects`, and adds per-status effects tests. Refines C-B3.
+- [ ] [Review][Patch] Composer announces a terminal generic denial for a transient blocked/stale context [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor:161] — resolved by decision (2026-10-14): for `unsafe-context`, render the composer's localized disabled-reason guidance with no catalog code, so there are no terminal semantics and no retry copy; the sibling `ChatBotBlockedState` keeps the explanation.
+- [ ] [Review][Patch] Blocked/stale conversation shows server next-action tokens as "Dismiss" [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotBlockedState.razor:118] — resolved by decision (2026-10-14): in `UseLocalStateGuidance` mode, render tokens outside the 7-action vocabulary (`review-status`, `wait-for-*`, `review-*`) as the `SafeNextActionDefault` text the governance panel uses, and render no action button for them.
+- [x] [Review][Decision] French copy exists only at the UI boundary — resolved by decision (2026-10-14): accepted. API Problem Details, CLI and MCP return the stable catalog code, version and English default copy, and clients localize by code; English/French parity applies to the UI catalog resources. Recorded in Implementation Notes; no code change.
+
+- [ ] [Review][Patch] Streaming status says "Retry response refresh." for a terminal generic denial [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor:619] — `GenericFailureCode` is now `generic_denial`, and every failure keeps the conversation and sets `StreamingErrorCode`. Derive the text from the catalog action of the resolved entry, which is correct whichever way the transport decision goes.
+- [ ] [Review][Patch] Association Review and Operational Dashboards banners show a disabled catalog action beside a live Retry/Refresh [src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor:53] — the workspace fix (`ShowCatalogAction="false"`) was not applied to these banners. A retryable Load failure shows a disabled "Retry later" plus the enabled `association-review-retry`, and the dashboards banner sits beside the enabled header Refresh. Fix both and extend the `TIMEOUT` render test to assert there is exactly one enabled retry.
+- [ ] [Review][Patch] One workspace load failure is announced twice, once by the composer [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor:495] — `ComposerDisabledReasonCode` now forwards the raw `ErrorCode`, so the composer renders a coded Warning banner (assertive `BlockedAction`) under the key `project-conversation-composer-attempt-N-{code}`. The workspace banner and blocked state announce under `project-workspace-retryable-FailedDependency-{code}`. Only one region should announce a page-load failure.
+- [ ] [Review][Patch] Status banner turns idempotency conflicts into generic denial; the compatibility check is copied with different rules [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor:156] — the banner rejects every `waiting`/`completed` code. The server, CLI, MCP, blocked state and failure item all keep `idempotency_conflict_*`, so a duplicate association decision reaching `AssociationReview` shows "Request unavailable." instead of "Decision already submitted." Workspace `CanRetryLoad` also skips the blocked-state downgrade. Use one shared compatibility helper.
+- [ ] [Review][Patch] Blocked-state accessible label contradicts the visible catalog headline [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotBlockedState.razor:131] — the label starts with `BlockedReasonLabel(Reason)`. An unknown workspace code therefore reads "Dependency failed: The requested action is unavailable…" while the heading says "Request unavailable." Build the label from `ResolvedHeadline`.
+- [ ] [Review][Patch] Failure card makes the whole article an atomic live region [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor:10] — `role="status"`/`"alert"` with `aria-atomic="true"` on the `<article>` reads every metadata row (operation, correlation and workflow IDs, timestamps) and drops article semantics. A polite region inserted with its content already present is often not announced at all. Announce `AccessibleLabel` through a stable live region instead.
+- [ ] [Review][Patch] Attempt counters restart on remount, so a new same-code attempt after navigation is silent [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor:91] — `_attemptSequence` (composer) and `_refreshAttempt` (`OperationalDashboards.razor:299`) are instance fields, but the deduplication set is circuit-scoped. After navigating back, a user's new submission or Refresh reuses an already-announced key, undoing N-B4. Add a per-instance identity to the key; suppressing the initial load on re-entry stays as designed.
+- [ ] [Review][Patch] MCP null-body problem fallback has no test [src/Hexalith.ChatBot.Mcp/ChatBotMcpResultFormatter.cs:250] — CLI pins this with `NullProblemBodyShouldUseStatusCatalogFallback`. Restoring the baseline unconditional `Result` read would bring back an NRE inside the catch-all with no MCP test failing. Mirror the CLI theory for 401/403/503.
+- [ ] [Review][Patch] Workspace retry action is checked for its enabled state but never activated [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor:96] — `WorkspaceFailureShouldOnlyEnableCatalogRetry` reads only `data-chatbot-action-state`. Dropping `OnActivate` or passing the wrong callback still passes. Activate the action and assert a reload is dispatched.
+- [ ] [Review][Patch] Dashboards refresh-attempt announcement key is untested [src/Hexalith.ChatBot.UI/Components/Pages/OperationalDashboards.razor:60] — removing `_refreshAttempt++` or the key segment silences a repeated same-code failure after Refresh, and no test fails. Add a mounted transition test.
+- [ ] [Review][Patch] Composer `unauthorized` branches and their resource are dead [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor:143] — the only caller now passes the raw `ErrorCode`, so the `"unauthorized"` branches in `StatusMessage`/`StatusCatalogCode` and `ProjectConversationComposerUnauthorizedReason` are unreachable. Delete them.
+- [ ] [Review][Patch] `BlockedReasonText_Default` is no longer read [src/Hexalith.ChatBot.UI/Localization/ChatBotUiTextKey.cs:666] — the `ChatBotBlockedState` rewrite removed its only reader. Delete the key and both resources.
+- [ ] [Review][Patch] Private field `redactionStage` breaks the `_camelCase` convention [src/Hexalith.ChatBot.Server/Gateway/ChatBotProblemDetailsFactory.cs:10] — the primary-constructor conversion added `redactionStage` next to `_telemetry`. Rename it, or restore the primary constructor.
+
+- [x] [Review][Defer] AI execution recovery returns a bare, non-catalog 404 [src/Hexalith.ChatBot.Server/Lifecycle/AiExecution/AiExecutionRecoveryEndpoints.cs:34] — deferred: pre-existing endpoint outside the code map. `SafeNotFound()` returns `{code:"safe-not-found"}`, which is not problem+json, has no catalog code and no version (from the auditor's AC2/AC3 note and the Blind Hunter's existence-neutral finding).
+- [x] [Review][Defer] Suppressed banners keep `role="alert"`/`"status"` with `aria-live="off"` [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor:106] — deferred: maybe-false, medium if true. The role was kept deliberately for semantic status. Settle by remounting a suppressed `alert` banner under NVDA and JAWS with Chrome and checking whether the alert event still announces it.
+- [x] [Review][Defer] A failure item whose code or state changes under the same `ItemId` is never announced [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor:90] — deferred: maybe-false, medium if true. Settle by checking whether failure-state projections update one conversation item in place (retryable → terminal) or append a new item per transition.
+
+#### Rejected (2026-10-14 src chunk)
+
+- `false` — Catalog entries with action `none` never show a disabled reason. No applicable action exists to disable; the renderers show "No user action is required."
+- `carried` — Generic-denial failure card shows dependency, escalation, category and scope rows. This duplicates deferred C-E7/B5.
+- `carried` — Out-of-scope gitlink, solution and ACL changes. The gitlinks and Release graph are already deferred (abcb637, N-B10/D-B9). The ACL row adds the new SDK `/project/rebuild/part/v1` route to the existing EventStore-only rebuild grant.
+- `low` — Failure card shows "Next action: Retry later" beside a `none` metadata row when retry is withheld. This is rare, and R-B3 deliberately kept the disabled catalog action with its reason; it relates to deferred D-E2.
+- `carried` — The generic Dismiss can never be activated (B1/R-B4).
+- `false` — The CLI JSON separates 404 from 403. It echoes the status the server already sent; the leak source is the endpoint deferred above.
+- `carried` — `AccessibleDescription` is English-only and unused (N-B9).
+- `carried` — Status `Parse<>` throws and adapter status omits catalog copy (B8/D-B6, C-B6/D-B7).
+- `rejected` — The review ledger contradicts the code. The fix would edit this spec.
+- `carried` — `Resolve` falls back to `Entries[0]`. The strict-resolve suggestion is covered by the conflict-code decision.
+- `carried` — Escalate and delayed codes are labelled `denied`/terminal. `State` is never shown to users, and escalate-is-terminal was decided earlier.
+- `low` — SHA-256 plus a lock on each UI catalog lookup. A measurable but small cost, and the fix is a refactor.
+- `false` — A culture other than en/fr turns every failure into a generic denial. Request localization accepts only en/fr, and the I/O matrix specifies the missing-locale fallback.
+- `carried` — `CommandGatewayHttpResults` constructs its own redaction stage.
+- `false` — The catalog version stayed v1 despite semantic changes. The spec requires preserving the v1 wire version.
+- `carried` — The fallback counter has no tags and lives in Contracts (earlier metrics decisions).
+- `carried` — MCP replaces server correction hints with the action token (metadata-only decision).
+- `low` — PascalCase `Failure_Catalog_*` aliases are no longer read. They are kept deliberately as aliases and checked by a parity test.
+- `low` — The workspace banner/blocked-state shared announcement key depends on matching spelling. D-B4 chose this, and load errors cannot reach a diverging code.
+- `low` — An `about:blank` problem carries a custom title. The fix conflicts with the catalog-headline requirement.
+- `false` — `ChatBotBlockedState` has two overlapping local-guidance flags. No named harm.
+- `false` — An invalid prior outcome denies a healthy status. That is the fail-closed behaviour decided in N-B2/N-E5.
+- `carried` — The localizer cache undercounts repeated fallbacks (C-B10).
+- `carried` — Workspace and Association Review retry paths use static keys (R-E5/D-E3/D-B5), and the related commit claim.
+- `low` — The CLI emits a null JSON `category` for status-only exceptions. This predates the story.
+- `low` — CLI/MCP print `unavailable` for an undefined audit enum. This is CLI output, not the wire contract.
+- `low` — The composer data attribute reports `generic_denial` for a whitespace code. The attribute is test-only.
+- `carried` — The Release solution graph expands (D-B9).
+- `carried` — Association Review `conflict` is no longer retryable. It maps to `invalid_lifecycle_transition`, as recorded earlier.
+- `false` — A `reprocess-created` item loses terminal styling. `reprocess_created` is terminal in the catalog.
