@@ -56,8 +56,9 @@
                                      MessageCatalogCode="@error"
                                      AccessibleLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsLoadFailed]"
                                      StableId="operational-dashboards-failed"
+                                     ShowCatalogAction="@(UiText.FailureCatalogEntryForFailure(error).NextAction != Hexalith.ChatBot.Contracts.Messages.ChatBotMessageNextActions.RetryLater)"
                                      StateFamily="@ChatBotFeedbackStateFamily.RetryableFailure"
-                                     AnnouncementKey="@($"operational-dashboards-failed-{_refreshAttempt}-{UiText.FailureCatalogEntry(error).Code}")">
+                                     AnnouncementKey="@($"operational-dashboards-failed-{RefreshAnnouncementIdentity}-{UiText.FailureCatalogEntry(error).Code}")">
                     <code class="chatbot-code">@error</code>
                 </ChatBotStatusBanner>
             }
@@ -297,6 +298,9 @@
 
 @code {
     private int _refreshAttempt;
+    private readonly string _instanceId = Guid.NewGuid().ToString("N");
+
+    private string RefreshAnnouncementIdentity => _refreshAttempt == 0 ? "initial" : $"{_instanceId}-{_refreshAttempt}";
 
     protected override void OnInitialized()
     {

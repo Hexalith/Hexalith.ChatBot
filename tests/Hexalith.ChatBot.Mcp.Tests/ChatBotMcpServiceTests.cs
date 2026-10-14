@@ -36,6 +36,21 @@ public static class ChatBotMcpServiceTests
 
 
     [Theory]
+    [InlineData(401, "authentication_denied")]
+    [InlineData(403, "authorization_denied")]
+    [InlineData(503, "dependency_degraded")]
+    public static void NullProblemBodyShouldUseStatusCatalogFallback(int status, string code)
+    {
+        var error = new HexalithChatBotApiException<ProblemDetails>("restricted-secret", status, "restricted-secret", null!, null!, null);
+        JsonElement result = ChatBotMcpResultFormatter.FormatSafeDenial(error);
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(code);
+        result.GetProperty("code").GetString().ShouldBe(code);
+        result.GetProperty("message").GetString().ShouldBe(entry.Reason);
+        result.GetProperty("clientAction").GetString().ShouldBe(entry.NextAction);
+        result.GetRawText().ShouldNotContain("restricted-secret");
+    }
+
+    [Theory]
     [InlineData(false, ProblemDetailsClientAction.RetryLater, false, "none")]
     [InlineData(true, ProblemDetailsClientAction.None, false, "none")]
     [InlineData(false, ProblemDetailsClientAction.None, false, "none")]

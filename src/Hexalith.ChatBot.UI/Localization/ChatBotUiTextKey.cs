@@ -500,7 +500,6 @@ public static class ChatBotUiTextKey
     public const string ProjectConversationComposerSubmit = "ProjectConversation_Composer_Submit";
     public const string ProjectConversationComposerSubmitting = "ProjectConversation_Composer_Submitting";
     public const string ProjectConversationComposerTitle = "ProjectConversation_Composer_Title";
-    public const string ProjectConversationComposerUnauthorizedReason = "ProjectConversation_Composer_UnauthorizedReason";
     public const string ProjectConversationComposerValidationRequired = "ProjectConversation_Composer_ValidationRequired";
     public const string ProjectConversationStreamingCancelling = "ProjectConversation_Streaming_Cancelling";
     public const string ProjectConversationStreamingCompleted = "ProjectConversation_Streaming_Completed";
@@ -663,7 +662,6 @@ public static class ChatBotUiTextKey
     public const string StatusSummaryWaitForProjection = "StatusSummary_WaitForProjection";
     public const string StatusTextContextVisible = "StatusText_ContextVisible";
     public const string ThresholdBandLabel = "ThresholdBand_Label";
-    public const string BlockedReasonTextDefault = "BlockedReasonText_Default";
     public const string StopResponse = "StopResponse";
     public const string StopResponseAccessible = "StopResponse_Accessible";
     public const string StopResponseAnnouncement = "StopResponse_Announcement";
@@ -1411,7 +1409,6 @@ public static class ChatBotUiTextKey
         ProjectConversationComposerSubmit,
         ProjectConversationComposerSubmitting,
         ProjectConversationComposerTitle,
-        ProjectConversationComposerUnauthorizedReason,
         ProjectConversationComposerValidationRequired,
         ProjectConversationStreamingCancelling,
         ProjectConversationStreamingCompleted,
@@ -1569,7 +1566,6 @@ public static class ChatBotUiTextKey
         StatusSummaryWaitForProjection,
         StatusTextContextVisible,
         ThresholdBandLabel,
-        BlockedReasonTextDefault,
         StopResponse,
         StopResponseAccessible,
         StopResponseAnnouncement,

@@ -18,6 +18,16 @@ namespace Hexalith.ChatBot.UI.Tests;
 /// </summary>
 public sealed class GovernedOperationsEffectsTests
 {
+    [Theory]
+    [MemberData(nameof(UiTransportFailureCases.Cases), MemberType = typeof(UiTransportFailureCases))]
+    public async Task TransportFailureShouldUseStatusCatalogWithoutRawText(string kind, int status, string expected)
+    {
+        GovernedOperationsEffects effects = EffectsThatThrow(UiTransportFailureCases.Create(kind, status));
+        RecordingDispatcher dispatcher = new();
+        await effects.HandleSubmitAsync(dispatcher);
+        dispatcher.Actions.OfType<GovernedNoteSubmissionFailedAction>().Single().Error.ShouldBe(expected);
+    }
+
     [Fact]
     public async Task SubmitEffectShouldSurfaceDistinctServerProblemCodesInsteadOfCollapsingToOneMessage()
     {
@@ -38,10 +48,12 @@ public sealed class GovernedOperationsEffectsTests
         failure.Error.ShouldNotBe(GovernedOperationsEffects.GenericFailureCode);
     }
 
-    [Fact]
-    public async Task SubmitEffectShouldRethrowCancellationAndNeverCollapseItToASubmissionFailure()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SubmitEffectShouldRethrowCancellationAndNeverCollapseItToASubmissionFailure(bool taskCancellation)
     {
-        GovernedOperationsEffects effects = EffectsThatThrow(new OperationCanceledException());
+        GovernedOperationsEffects effects = EffectsThatThrow(taskCancellation ? new TaskCanceledException("explicit cancellation", null, new CancellationToken(canceled: true)) : new OperationCanceledException());
         RecordingDispatcher dispatcher = new();
 
         await Should.ThrowAsync<OperationCanceledException>(() => effects.HandleSubmitAsync(dispatcher));

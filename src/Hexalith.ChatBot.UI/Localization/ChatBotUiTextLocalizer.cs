@@ -55,8 +55,13 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
     public string BlockedReasonLabel(ChatBotBlockedReason reason)
         => Get(ChatBotGovernedUiText.GetBlockedReasonResourceKey(reason));
 
-    public string BlockedStateAccessibleLabel(ChatBotBlockedReason reason, string reasonText, string safeNextAction)
-        => Get(ChatBotUiTextKey.BlockedStateAccessibleLabel, BlockedReasonLabel(reason), reasonText, safeNextAction);
+    /// <summary>Builds the accessible label from the same headline and guidance shown visibly.</summary>
+    /// <param name="headline">The resolved localized headline.</param>
+    /// <param name="reasonText">The safe localized explanation.</param>
+    /// <param name="safeNextAction">The localized permitted action or guidance.</param>
+    /// <returns>The complete localized accessible label.</returns>
+    public string BlockedStateAccessibleLabel(string headline, string reasonText, string safeNextAction)
+        => Get(ChatBotUiTextKey.BlockedStateAccessibleLabel, headline, reasonText, safeNextAction);
 
     public string ConfidenceBandLabel(ThresholdBand band)
         => Get(band switch
@@ -396,6 +401,19 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
             _catalogEntryCache[(locale, codeHash)] = entry;
             return entry;
         }
+    }
+
+    /// <summary>Resolves safe failure copy while retaining supported failure-history outcomes.</summary>
+    /// <param name="code">The catalog code received at the failure surface.</param>
+    /// <returns>The compatible entry, or the terminal generic denial.</returns>
+    public ChatBotMessageCatalogEntry FailureCatalogEntryForFailure(string? code)
+    {
+        ChatBotMessageCatalogEntry entry = FailureCatalogEntry(code);
+        return entry.State is "waiting" or "completed" && entry.Code is not
+            (ChatBotMessageCodes.RetryQueued or ChatBotMessageCodes.RetryAccepted or
+                ChatBotMessageCodes.DuplicateSuppressed or ChatBotMessageCodes.ReprocessCreated) &&
+            !entry.Code.StartsWith("idempotency_conflict_", StringComparison.Ordinal)
+            ? FailureCatalogEntry(null) : entry;
     }
 
     private static ChatBotMessageCatalogEntry ResolveCatalogEntry(string? code, string locale)

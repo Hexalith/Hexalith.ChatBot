@@ -2,6 +2,7 @@ using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
+using Hexalith.ChatBot.Server.Gateway.Idempotency;
 
 using Shouldly;
 
@@ -10,6 +11,27 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway;
 /// <summary>Checks incompatible or malformed metadata at the public problem boundary.</summary>
 public sealed class SafeOutcomeProblemCompatibilityTests
 {
+    /// <summary>Every admitted operation class retains specific safe conflict guidance.</summary>
+    [Fact]
+    public void EveryIdempotencyOperationClassShouldHaveCatalogBackedConflict()
+    {
+        foreach (CoarseIdempotencyOperationClass operation in CoarseIdempotencyOperationClass.All)
+        {
+            ChatBotMessageCatalog.IsKnown(operation.ConflictCode).ShouldBeTrue(operation.Code);
+            ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(operation.ConflictCode);
+            ProblemDetails result = new CoarseUserFacingRedactionStage().Apply(new ProblemDetails
+            {
+                Code = operation.ConflictCode, Type = ChatBotProblemTypes.IdempotencyConflict, Status = 409,
+                Category = ProblemDetailsCategory.Conflict, ClientAction = ProblemDetailsClientAction.None,
+            });
+            result.Code.ShouldBe(operation.ConflictCode);
+            result.Title.ShouldBe(entry.Headline);
+            result.Message.ShouldBe(entry.Reason);
+            result.Type.ShouldBe(ChatBotProblemTypes.IdempotencyConflict);
+            result.ClientAction.ShouldBe(ProblemDetailsClientAction.None);
+        }
+    }
+
     /// <summary>Unknown failure codes retain a safe status class without exposing a caller-supplied category.</summary>
     /// <param name="status">The incoming HTTP status.</param>
     /// <param name="expectedStatus">The safe public status.</param>

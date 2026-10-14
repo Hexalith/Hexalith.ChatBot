@@ -20,7 +20,7 @@
                 <ol class="chatbot-conversation-stream__list" aria-label="@Title">
                     @foreach (ProjectConversationItemModel item in Items)
                     {
-                        <li class="chatbot-conversation-stream__entry">
+                        <li @key="item.ItemId" class="chatbot-conversation-stream__entry">
                             @if (item.IsParticipant)
                             {
                                 <ChatBotParticipantConversationItem Item="@item" />

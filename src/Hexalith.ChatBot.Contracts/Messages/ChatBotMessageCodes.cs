@@ -37,6 +37,20 @@ public static class ChatBotMessageCodes
     public const string IdempotencyConflictRetry = "idempotency_conflict_retry";
     public const string IdempotencyConflictOutboundDraftCreation = "idempotency_conflict_outbound_draft_creation";
     public const string IdempotencyConflictOutboundSend = "idempotency_conflict_outbound_send";
+    /// <summary>The safe conflict code for participant resolution.</summary>
+    public const string IdempotencyConflictParticipantResolution = "idempotency_conflict_participant_resolution";
+    /// <summary>The safe conflict code for association scoring.</summary>
+    public const string IdempotencyConflictAssociationScoring = "idempotency_conflict_association_scoring";
+    /// <summary>The safe conflict code for association threshold policy.</summary>
+    public const string IdempotencyConflictAssociationThresholdPolicy = "idempotency_conflict_association_threshold_policy";
+    /// <summary>The safe conflict code for low risk ai assistance.</summary>
+    public const string IdempotencyConflictLowRiskAiAssistance = "idempotency_conflict_low_risk_ai_assistance";
+    /// <summary>The safe conflict code for approval decision.</summary>
+    public const string IdempotencyConflictApprovalDecision = "idempotency_conflict_approval_decision";
+    /// <summary>The safe conflict code for approved ai action execution.</summary>
+    public const string IdempotencyConflictApprovedAiActionExecution = "idempotency_conflict_approved_ai_action_execution";
+    /// <summary>The safe conflict code for ai action proposal.</summary>
+    public const string IdempotencyConflictAiActionProposal = "idempotency_conflict_ai_action_proposal";
     public const string InvalidLifecycleTransition = "invalid_lifecycle_transition";
     public const string RefusalBlockedAction = "refusal_blocked_action";
     public const string DependencyDegraded = "dependency_degraded";

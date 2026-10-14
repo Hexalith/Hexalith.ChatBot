@@ -1438,3 +1438,13 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - AI execution recovery returns a bare `404 {code:"safe-not-found"}` (`src/Hexalith.ChatBot.Server/Lifecycle/AiExecution/AiExecutionRecoveryEndpoints.cs:34`). Pre-existing: the response is not problem+json, has no catalog code and no catalog version, so this public failure path bypasses the versioned safe-outcome catalog.
 - Suppressed status banners keep `role="alert"`/`"status"` with `aria-live="off"` (`src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor:106`). Maybe-false, medium if true: a remounted suppressed alert may still announce, which would defeat once-per-failure deduplication. Settle with NVDA and JAWS on Chrome against a remounted suppressed banner.
 - A failure item whose code or state changes under the same `ItemId` is never announced (`src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor:90`). Maybe-false, medium if true. Settle by checking whether failure-state projections update one conversation item in place or append a new item per transition.
+
+
+## Deferred from: Story 1.4 workflow review (2026-10-14)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
+  summary: Preserve instance-specific backend retry permissions through code-only UI failure state.
+  evidence: F-B4/F-E4; the baseline effects already discarded Retryable and ClientAction and enabled non-authorization load retries. Define the state fields and rendering intersection before changing this pre-existing behavior; a typed audit_unavailable with Retryable=false/ClientAction=None currently retains catalog retry guidance.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
+  summary: Define malformed typed-problem category handling at the UI failure state boundary.
+  evidence: F-B5; both baseline and current effects reduce typed problem metadata to a code, so a hand-built known code with an undefined category loses that category before rendering. Align this existing UI boundary with the server and adapter validation policy without inferring a new state contract.

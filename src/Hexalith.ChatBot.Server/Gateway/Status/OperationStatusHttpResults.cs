@@ -82,7 +82,7 @@ internal static class OperationStatusHttpResults
             SafeNextActions = safeNextActions,
             TerminalReason = knownReason ? ParseCodeOrNull(record.TerminalReason) : ChatBotMessageCode.Generic_denial,
             OperationClass = record.OperationClass,
-            MaxAttempts = knownReason ? record.MaxAttempts : 0,
+            MaxAttempts = knownReason ? record.MaxAttempts : 1,
             NextRetryAt = knownReason ? record.NextRetryAt?.ToUniversalTime() : null,
             DuplicateSafetyNote = knownReason ? record.DuplicateSafetyNote : null,
             OwnerRole = knownReason ? record.OwnerRole : null,

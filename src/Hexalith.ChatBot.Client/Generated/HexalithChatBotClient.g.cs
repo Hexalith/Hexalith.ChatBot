@@ -4409,6 +4409,27 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_outbound_send")]
         Idempotency_conflict_outbound_send = 86,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_participant_resolution")]
+        Idempotency_conflict_participant_resolution = 87,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_association_scoring")]
+        Idempotency_conflict_association_scoring = 88,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_association_threshold_policy")]
+        Idempotency_conflict_association_threshold_policy = 89,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_low_risk_ai_assistance")]
+        Idempotency_conflict_low_risk_ai_assistance = 90,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_approval_decision")]
+        Idempotency_conflict_approval_decision = 91,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_approved_ai_action_execution")]
+        Idempotency_conflict_approved_ai_action_execution = 92,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_ai_action_proposal")]
+        Idempotency_conflict_ai_action_proposal = 93,
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]

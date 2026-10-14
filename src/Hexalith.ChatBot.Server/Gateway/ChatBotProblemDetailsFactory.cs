@@ -7,7 +7,7 @@ namespace Hexalith.ChatBot.Server.Gateway;
 
 internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFactory
 {
-    private readonly IUserFacingRedactionStage redactionStage;
+    private readonly IUserFacingRedactionStage _redactionStage;
     private readonly IUserFacingMessageTelemetry _telemetry;
 
     public ChatBotProblemDetailsFactory(
@@ -15,7 +15,7 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
         IUserFacingMessageTelemetry telemetry)
     {
         ArgumentNullException.ThrowIfNull(redactionStage);
-        this.redactionStage = redactionStage;
+        _redactionStage = redactionStage;
         ArgumentNullException.ThrowIfNull(telemetry);
         _telemetry = telemetry;
     }
@@ -24,7 +24,7 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
     {
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.CommandContractInvalid);
 
-        return redactionStage.Apply(new ProblemDetails
+        return _redactionStage.Apply(new ProblemDetails
         {
             Type = ChatBotProblemTypes.ValidationFailure,
             Title = entry.Headline,
@@ -53,7 +53,7 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
             ? StatusCodes.Status401Unauthorized
             : StatusCodes.Status403Forbidden;
 
-        return redactionStage.Apply(new ProblemDetails
+        return _redactionStage.Apply(new ProblemDetails
         {
             Type = ChatBotProblemTypes.AuthorizationDenied,
             Title = entry.Headline,
@@ -74,7 +74,7 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
     {
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AuditUnavailable);
 
-        return redactionStage.Apply(new ProblemDetails
+        return _redactionStage.Apply(new ProblemDetails
         {
             Type = ChatBotProblemTypes.AuditUnavailable,
             Title = entry.Headline,
@@ -96,7 +96,7 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
         // redacted audit-unavailable copy (RetryLater) so no raw exception text ever reaches the caller (NFR40).
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AuditUnavailable);
 
-        return redactionStage.Apply(new ProblemDetails
+        return _redactionStage.Apply(new ProblemDetails
         {
             Type = ChatBotProblemTypes.DispatchUnavailable,
             Title = entry.Headline,
@@ -114,7 +114,7 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
     public ProblemDetails CreateDependencyUnavailable(string correlationId, string? taskId)
     {
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.DependencyDegraded);
-        return redactionStage.Apply(new ProblemDetails
+        return _redactionStage.Apply(new ProblemDetails
         {
             Type = ChatBotProblemTypes.DependencyUnavailable,
             Title = entry.Headline,
@@ -136,7 +136,7 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
                 ? ChatBotMessageCodes.IdempotencyConflictCommandExecution
                 : catalogCode);
 
-        return redactionStage.Apply(new ProblemDetails
+        return _redactionStage.Apply(new ProblemDetails
         {
             Type = ChatBotProblemTypes.IdempotencyConflict,
             Title = entry.Headline,
@@ -155,7 +155,7 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
     {
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.InvalidLifecycleTransition);
 
-        return redactionStage.Apply(new ProblemDetails
+        return _redactionStage.Apply(new ProblemDetails
         {
             Type = ChatBotProblemTypes.InvalidLifecycleTransition,
             Title = entry.Headline,
@@ -174,7 +174,7 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
     {
         ChatBotMessageCatalogEntry entry = ChatBotRefusalReasonCodes.CatalogEntryFor(ChatBotRefusalReasonCodes.CommandNotAllowlisted);
 
-        return redactionStage.Apply(new ProblemDetails
+        return _redactionStage.Apply(new ProblemDetails
         {
             Type = ChatBotProblemTypes.CommandNotAllowlisted,
             Title = entry.Headline,

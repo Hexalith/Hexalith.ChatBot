@@ -8170,7 +8170,9 @@ public sealed class ProjectConversationE2ETests
         composer.ShouldNotContain("<label", Case.Sensitive);
         composer.ShouldNotContain("chatbot-button", Case.Sensitive);
         composer.ShouldContain("ProjectConversationComposerAccepted");
-        composer.ShouldContain("ProjectConversationComposerUnauthorizedReason");
+        composer.ShouldContain("MessageCatalogCode=\"@StatusCatalogCode\"");
+        composer.ShouldContain("ProjectConversationComposerDisabledReason");
+        composer.ShouldNotContain("ProjectConversationComposerUnauthorizedReason");
         composer.ShouldContain("ProjectConversationComposerDegradedReason");
         composer.ShouldContain("FocusAsync");
         workspace.ShouldContain("<ChatBotGovernedComposer");

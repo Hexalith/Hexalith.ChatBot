@@ -356,6 +356,7 @@ public sealed class VersionedSafeOutcomeRenderTests
     [Theory]
     [InlineData(null)]
     [InlineData(ChatBotFeedbackStateFamily.BlockedAction)]
+    [InlineData(ChatBotFeedbackStateFamily.DependencyDegraded)]
     public async Task TerminalBannerShouldDeduplicateWithoutCallerTerminalState(ChatBotFeedbackStateFamily? stateFamily)
     {
         CultureInfo originalCulture = CultureInfo.CurrentCulture;
@@ -401,6 +402,24 @@ public sealed class VersionedSafeOutcomeRenderTests
             CultureInfo.CurrentCulture = originalCulture;
             CultureInfo.CurrentUICulture = originalUiCulture;
         }
+    }
+
+
+    [Fact]
+    public async Task ObserverGenericDenialShouldKeepPassiveFeedbackSemantics()
+    {
+        string html = await RenderParentAsync<ChatBotStatusBanner>(new()
+        {
+            [nameof(ChatBotStatusBanner.Kind)] = ChatBotFeedbackKind.Danger,
+            [nameof(ChatBotStatusBanner.MessageCatalogCode)] = ChatBotMessageCodes.GenericDenial,
+            [nameof(ChatBotStatusBanner.StateFamily)] = ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate,
+        });
+        html.ShouldContain("data-chatbot-feedback-state=\"ObservedForOthersRejectionOrQueueUpdate\"");
+        html.ShouldContain("aria-live=\"off\"");
+        html.ShouldContain("data-chatbot-live-announced=\"false\"");
+        html.ShouldContain("data-chatbot-repeat-rule=\"NoLiveAnnouncement\"");
+        html.ShouldNotContain("role=\"alert\"");
+        WebUtility.HtmlDecode(html).ShouldContain("The requested action is unavailable.");
     }
 
     [Fact]
@@ -519,6 +538,11 @@ public sealed class VersionedSafeOutcomeRenderTests
             association: new(false, false, null, null, "", "", alias, null, AssociationReviewErrorScope.Load));
         WebUtility.HtmlDecode(html).ShouldContain(reason);
         html.ShouldNotContain(alias);
+        if (alias == "TIMEOUT")
+        {
+            Regex.Matches(html, "data-chatbot-action-state=\"Enabled\"").Count.ShouldBe(1);
+            html.ShouldNotContain("data-chatbot-stable-id=\"association-review-failed-safe-action\"");
+        }
     }
 
     [Fact]
@@ -554,7 +578,9 @@ public sealed class VersionedSafeOutcomeRenderTests
     [InlineData("private-workspace-error", false)]
     public async Task WorkspaceFailureShouldAnnounceItsCatalogExplanationOnlyOnce(string code, bool authorization)
     {
-        string html = await RenderParentAsync<ChatBotProjectConversationWorkspace>([], project: new(false, null, code));
+        ProjectConversationModel conversation = new("project", "Project", null, "Current", "Current", [], null, false,
+            20, "synthetic", "metadata_only", "standard", "v1", "correlation", "none");
+        string html = await RenderParentAsync<ChatBotProjectConversationWorkspace>([], project: new(false, conversation, code));
         string bannerId = authorization ? "project-conversation-failed" : "project-conversation-retryable";
         string blockedId = authorization ? "project-workspace-unauthorized" : "project-workspace-retryable";
         string banner = Regex.Match(html, $"<[^>]+data-chatbot-stable-id=\"{bannerId}\"[^>]*>").Value;
@@ -567,6 +593,9 @@ public sealed class VersionedSafeOutcomeRenderTests
         blocked.ShouldContain("aria-live=\"off\"");
         key.ShouldNotBeEmpty();
         blocked.ShouldContain($"data-chatbot-announcement-key=\"{key}\"");
+        string composer = Regex.Match(html, "<[^>]+data-chatbot-stable-id=\"project-conversation-composer-status\"[^>]*>").Value;
+        composer.ShouldContain("aria-live=\"off\"");
+        composer.ShouldContain("data-chatbot-live-announced=\"false\"");
         banner.ShouldContain("data-chatbot-repeat-rule=\"OncePerFailureKey\"");
         blocked.ShouldContain("data-chatbot-repeat-rule=\"OncePerFailureKey\"");
         string reason = ChatBotMessageCatalog.Resolve(code).Reason;
@@ -635,12 +664,14 @@ public sealed class VersionedSafeOutcomeRenderTests
         string html = await RenderParentAsync<ChatBotProjectConversationWorkspace>([], project: new(false, conversation, null));
         WebUtility.HtmlDecode(html).ShouldContain("Conversation context is not current.");
         html.ShouldNotContain("private-next-action");
-        WebUtility.HtmlDecode(html).ShouldContain("Dismiss");
-        html.ShouldContain("data-chatbot-stable-id=\"project-conversation-blocked-safe-action\"");
+        WebUtility.HtmlDecode(html).ShouldContain("Review the safe next action for this state.");
+        html.ShouldNotContain("data-chatbot-stable-id=\"project-conversation-blocked-safe-action\"");
         if (status is "Blocked" or "Stale")
         {
-            WebUtility.HtmlDecode(html).ShouldContain("The requested action is unavailable.");
+            WebUtility.HtmlDecode(html).ShouldNotContain("The requested action is unavailable.");
             WebUtility.HtmlDecode(html).ShouldNotContain("A required dependency is temporarily degraded.");
+            string composer = Regex.Match(html, "<[^>]+data-chatbot-stable-id=\"project-conversation-composer-status\"[^>]*>").Value;
+            composer.ShouldContain("data-chatbot-feedback-state=\"BlockedAction\"");
         }
     }
 
@@ -739,6 +770,13 @@ public sealed class VersionedSafeOutcomeRenderTests
     [InlineData(ChatBotMessageCodes.IdempotencyConflictRetry)]
     [InlineData(ChatBotMessageCodes.IdempotencyConflictOutboundDraftCreation)]
     [InlineData(ChatBotMessageCodes.IdempotencyConflictOutboundSend)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictParticipantResolution)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictAssociationScoring)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictAssociationThresholdPolicy)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictLowRiskAiAssistance)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictApprovalDecision)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictApprovedAiActionExecution)]
+    [InlineData(ChatBotMessageCodes.IdempotencyConflictAiActionProposal)]
     public async Task FailureHistoryOutcomesShouldRemainCatalogBackedInBothRenderers(string code)
     {
         string failure = await RenderParentAsync<ChatBotFailureStateConversationItem>(new Dictionary<string, object?>
@@ -751,7 +789,12 @@ public sealed class VersionedSafeOutcomeRenderTests
             [nameof(ChatBotBlockedState.MessageCatalogCode)] = code,
         });
 
-        foreach (string html in new[] { failure, blocked })
+        string banner = await RenderParentAsync<ChatBotStatusBanner>(new Dictionary<string, object?>
+        {
+            [nameof(ChatBotStatusBanner.Kind)] = ChatBotFeedbackKind.Warning,
+            [nameof(ChatBotStatusBanner.MessageCatalogCode)] = code,
+        });
+        foreach (string html in new[] { failure, blocked, banner })
         {
             WebUtility.HtmlDecode(html).ShouldContain(ChatBotMessageCatalog.Resolve(code).Reason);
             html.ShouldNotContain("The requested action is unavailable.");
@@ -830,8 +873,8 @@ public sealed class VersionedSafeOutcomeRenderTests
                 {
                     [nameof(ChatBotConversationStream.Items)] = new[] { item },
                 })).ConfigureAwait(true)).ToHtmlString()).ConfigureAwait(true);
-            string article = Regex.Match(history, "<article[^>]*>").Value;
-            article.ShouldContain("role=\"status\"");
+            string article = Regex.Match(history, "<[^>]+data-chatbot-failure-announcement=\"history-failure\"[^>]*>").Value;
+            article.ShouldContain("role=\"alert\"");
             article.ShouldContain("aria-live=\"off\"");
             EventCallback callback = EventCallback.Factory.Create(this, () => { });
             async Task<string> Interactive() => await renderer.Dispatcher.InvokeAsync(async () =>
@@ -842,9 +885,9 @@ public sealed class VersionedSafeOutcomeRenderTests
                 })).ConfigureAwait(true)).ToHtmlString()).ConfigureAwait(true);
             string first = await Interactive();
             string repeated = await Interactive();
-            Regex.Match(first, "<article[^>]*>").Value.ShouldContain("aria-live=\"assertive\"");
-            Regex.Match(repeated, "<article[^>]*>").Value.ShouldContain("aria-live=\"off\"");
-            repeated.ShouldContain("role=\"status\"");
+            Regex.Match(first, "<[^>]+data-chatbot-failure-announcement=\"history-failure\"[^>]*>").Value.ShouldContain("aria-live=\"assertive\"");
+            Regex.Match(repeated, "<[^>]+data-chatbot-failure-announcement=\"history-failure\"[^>]*>").Value.ShouldContain("aria-live=\"off\"");
+            repeated.ShouldContain("role=\"alert\"");
         }
         finally
         {
@@ -877,14 +920,14 @@ public sealed class VersionedSafeOutcomeRenderTests
 
             await host.UpdateAsync([current, history], currentIds).ConfigureAwait(true);
             string first = await renderer.Dispatcher.InvokeAsync(root.ToHtmlString).ConfigureAwait(true);
-            Regex.Match(first, "<article[^>]*data-chatbot-conversation-item-id=\"current-failure\"[^>]*>").Value
+            Regex.Match(first, "<[^>]+data-chatbot-failure-announcement=\"current-failure\"[^>]*>").Value
                 .ShouldContain("aria-live=\"assertive\"");
-            Regex.Match(first, "<article[^>]*data-chatbot-conversation-item-id=\"old-failure\"[^>]*>").Value
+            Regex.Match(first, "<[^>]+data-chatbot-failure-announcement=\"old-failure\"[^>]*>").Value
                 .ShouldContain("aria-live=\"off\"");
 
             await host.UpdateAsync([current, history], currentIds).ConfigureAwait(true);
             string repeated = await renderer.Dispatcher.InvokeAsync(root.ToHtmlString).ConfigureAwait(true);
-            Regex.Match(repeated, "<article[^>]*data-chatbot-conversation-item-id=\"current-failure\"[^>]*>").Value
+            Regex.Match(repeated, "<[^>]+data-chatbot-failure-announcement=\"current-failure\"[^>]*>").Value
                 .ShouldContain("aria-live=\"off\"");
         }
         finally
@@ -915,6 +958,72 @@ public sealed class VersionedSafeOutcomeRenderTests
         WebUtility.HtmlDecode(html).ShouldNotContain("Yes");
     }
 
+
+    [Theory]
+    [InlineData(ChatBotMessageCodes.GenericDenial, false)]
+    [InlineData(ChatBotMessageCodes.DependencyDegraded, true)]
+    [InlineData(ChatBotMessageCodes.AuditUnavailable, true)]
+    [InlineData("restricted-stream-error", false)]
+    [InlineData(ChatBotMessageCodes.RetryQueued, true)]
+    public async Task StreamingFailureShouldOnlySuggestCatalogRetry(string code, bool retry)
+    {
+        ProjectConversationModel conversation = new("project", "Project", null, "Current", "Current", [], null, false,
+            20, "synthetic", "metadata_only", "standard", "v1", "correlation", "none");
+        string html = await RenderParentAsync<ChatBotProjectConversationWorkspace>([],
+            project: new ProjectConversationState(false, conversation, null) with { StreamingErrorCode = code });
+        string text = WebUtility.HtmlDecode(html);
+        if (retry) text.ShouldContain("Retry response refresh.");
+        else text.ShouldNotContain("Retry response refresh.");
+        html.ShouldNotContain("restricted-stream-error");
+    }
+
+    [Fact]
+    public async Task UnknownBlockedAccessibleLabelShouldUseVisibleHeadline()
+    {
+        string html = await RenderParentAsync<ChatBotBlockedState>(new()
+        {
+            [nameof(ChatBotBlockedState.Reason)] = ChatBotBlockedReason.FailedDependency,
+            [nameof(ChatBotBlockedState.MessageCatalogCode)] = "restricted-blocked-code",
+        });
+        string label = WebUtility.HtmlDecode(Regex.Match(html, "aria-label=\"([^\"]+)\"").Groups[1].Value);
+        label.ShouldStartWith("Request unavailable.");
+        label.ShouldNotContain("Dependency failed");
+        string article = await RenderParentAsync<ChatBotFailureStateConversationItem>(new()
+        {
+            [nameof(ChatBotFailureStateConversationItem.Item)] = CreateFailureItem(ChatBotMessageCodes.FailedCommand, "passive-article"),
+        });
+        string tag = Regex.Match(article, "<article[^>]*>").Value;
+        tag.ShouldNotContain("role=");
+        tag.ShouldNotContain("aria-live=");
+        tag.ShouldNotContain("aria-atomic=");
+    }
+
+
+    [Fact]
+    public async Task MissingLocaleAssociationFailureShouldWithholdRetry()
+    {
+        string html = await RenderParentAsync<AssociationReview>([],
+            association: new(false, false, null, null, "", "", "TIMEOUT", null, AssociationReviewErrorScope.Load), culture: "es");
+        html.ShouldContain("data-chatbot-feedback-state=\"TerminalPolicyFailure\"");
+        html.ShouldNotContain("data-chatbot-stable-id=\"association-review-retry\"");
+        html.ShouldNotContain("data-chatbot-action-state=\"Enabled\"");
+        WebUtility.HtmlDecode(html).ShouldContain("The requested action is unavailable.");
+    }
+
+    [Fact]
+    public async Task GovernedOperationsLegacyProblemShouldRenderCanonicalGuidance()
+    {
+        SafeOutcomeRenderDispatcher dispatcher = new();
+        await new GovernedOperationsEffects(new GovernedOperationService(new FakeChatBotClient("TIMEOUT")))
+            .HandleSubmitAsync(dispatcher).ConfigureAwait(true);
+        string code = dispatcher.Actions.OfType<GovernedNoteSubmissionFailedAction>().Single().Error;
+        code.ShouldBe(ChatBotMessageCodes.DependencyDegraded);
+        string html = await RenderParentAsync<GovernedOperations>([], governed: new(false, null, code));
+        WebUtility.HtmlDecode(html).ShouldContain("A required dependency is temporarily degraded.");
+        html.ShouldNotContain("TIMEOUT");
+        html.ShouldNotContain("The requested action is unavailable.");
+    }
+
     private static ProjectConversationItemModel CreateFailureItem(string code, string id)
         => JsonSerializer.Deserialize<ProjectConversationItemModel>(
             """{"itemId":"failure","kind":"FailureState","actorKind":"System","actorLabel":"Worker","occurredAt":"2026-01-01T00:00:00Z","failureStatus":"failed","messageDetailVisibility":"metadata_only"}""",
@@ -922,14 +1031,14 @@ public sealed class VersionedSafeOutcomeRenderTests
 
     private static async Task<string> RenderParentAsync<T>(Dictionary<string, object?> parameters,
         ProjectConversationState? project = null, AssociationReviewState? association = null,
-        GovernedOperationsState? governed = null, OperationalDashboardsState? dashboards = null) where T : IComponent
+        GovernedOperationsState? governed = null, OperationalDashboardsState? dashboards = null, string culture = "en") where T : IComponent
     {
         CultureInfo original = CultureInfo.CurrentUICulture;
         CultureInfo originalCulture = CultureInfo.CurrentCulture;
         try
         {
-            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en");
-            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en");
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(culture);
             ServiceCollection services = new();
             services.AddLogging();
             services.AddLocalization();

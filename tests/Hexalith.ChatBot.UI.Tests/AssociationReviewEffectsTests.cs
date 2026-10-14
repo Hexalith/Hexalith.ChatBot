@@ -15,6 +15,45 @@ namespace Hexalith.ChatBot.UI.Tests;
 
 public sealed class AssociationReviewEffectsTests
 {
+    [Theory]
+    [MemberData(nameof(UiTransportFailureCases.Cases), MemberType = typeof(UiTransportFailureCases))]
+    public async Task TransportFailureShouldUseStatusCatalogWithoutRawText(string kind, int status, string expected)
+    {
+        AssociationReviewEffects effects = EffectsThatThrow(UiTransportFailureCases.Create(kind, status));
+        RecordingDispatcher dispatcher = new();
+        await effects.HandleLoadAsync(new LoadAssociationReviewAction("01ARZ3NDEKTSV4RRFFQ69G5FAZ"), dispatcher);
+        dispatcher.Actions.OfType<AssociationReviewFailedAction>().Single().ErrorCode.ShouldBe(expected);
+    }
+
+
+    [Theory]
+    [InlineData("task-timeout", false)]
+    [InlineData("canceled-token-timeout", false)]
+    [InlineData("task-timeout", true)]
+    [InlineData("canceled-token-timeout", true)]
+    public async Task SubmissionTimeoutShouldProduceSafeFailure(string kind, bool correction)
+    {
+        RecordingClient client = new()
+        {
+            LifecycleState = correction ? LifecycleState.Associated : LifecycleState.NeedsReview,
+            SubmitException = UiTransportFailureCases.Create(kind, 0),
+        };
+        RecordingDispatcher dispatcher = new();
+        AssociationReviewEffects effects = EffectsFor(client, StateOf(client, "choose-candidate"));
+        if (correction)
+        {
+            await effects.HandleCorrectionAsync(new SubmitAssociationCorrectionAction(), dispatcher);
+            dispatcher.Actions.OfType<AssociationCorrectionSubmitFailedAction>().Single().ErrorCode.ShouldBe("dependency_degraded");
+            dispatcher.Actions.OfType<AssociationCorrectionSubmittedAction>().ShouldBeEmpty();
+        }
+        else
+        {
+            await effects.HandleConfirmedDecisionAsync(new ConfirmAssociationDecisionAction(), dispatcher);
+            dispatcher.Actions.OfType<AssociationDecisionSubmitFailedAction>().Single().ErrorCode.ShouldBe("dependency_degraded");
+            dispatcher.Actions.OfType<AssociationDecisionSubmittedAction>().ShouldBeEmpty();
+        }
+    }
+
     [Fact]
     public async Task LoadEffectShouldPreserveServerProblemCodesAndNeverSurfaceRawExceptionText()
     {
@@ -33,10 +72,12 @@ public sealed class AssociationReviewEffectsTests
         failure.ErrorCode.ShouldBe("authorization_denied");
     }
 
-    [Fact]
-    public async Task LoadEffectShouldRethrowCancellation()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LoadEffectShouldRethrowCancellation(bool taskCancellation)
     {
-        AssociationReviewEffects effects = EffectsThatThrow(new OperationCanceledException());
+        AssociationReviewEffects effects = EffectsThatThrow(taskCancellation ? new TaskCanceledException("explicit cancellation", null, new CancellationToken(canceled: true)) : new OperationCanceledException());
         RecordingDispatcher dispatcher = new();
 
         await Should.ThrowAsync<OperationCanceledException>(() =>
@@ -261,6 +302,8 @@ public sealed class AssociationReviewEffectsTests
     /// <summary>A client that answers routing-status reads and records what was submitted.</summary>
     private sealed class RecordingClient : IChatBotClient
     {
+        public Exception? SubmitException { get; init; }
+
         public LifecycleState LifecycleState { get; init; } = LifecycleState.NeedsReview;
 
         public int SubmitCount { get; private set; }
@@ -277,6 +320,7 @@ public sealed class AssociationReviewEffectsTests
             CancellationToken cancellationToken = default)
         {
             SubmitCount++;
+            if (SubmitException is not null) throw SubmitException;
             SubmittedCommand = command;
             return Task.FromResult(new CommandSubmissionResponse
             {

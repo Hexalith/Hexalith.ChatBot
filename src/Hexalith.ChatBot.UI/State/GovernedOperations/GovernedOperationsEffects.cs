@@ -29,12 +29,10 @@ public sealed class GovernedOperationsEffects(GovernedOperationService service)
             OperationOutcome outcome = await _service.SubmitGovernedNoteAsync().ConfigureAwait(false);
             dispatcher.Dispatch(new GovernedNoteSubmittedAction(outcome));
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException cancellation) when (!ChatBotUiFailureCatalog.IsTimeout(cancellation))
         {
-            // Cancellation (navigation away / component disposal) is not a submission failure: never collapse it
-            // into a generic failure — rethrow so the host observes the cancellation honestly. An HttpClient
-            // timeout also arrives here as TaskCanceledException, so clear the in-flight flag first: rethrowing
-            // without it leaves IsSubmitting stuck true and permanently disables the action.
+            // Explicit cancellation is rethrown after clearing the in-flight flag so the action does not stay disabled.
+            // Client timeouts pass through the safe failure mapping instead.
             dispatcher.Dispatch(new GovernedNoteSubmissionCancelledAction());
             throw;
         }
@@ -43,15 +41,13 @@ public sealed class GovernedOperationsEffects(GovernedOperationService service)
             // The server returned a catalog-backed, already-redacted (metadata-only) problem. Surface its stable
             // code so distinct server problems (e.g. authorization vs. conflict vs. allowlist refusal) stay
             // distinguishable to the user instead of collapsing to one generic message.
-            dispatcher.Dispatch(new GovernedNoteSubmissionFailedAction(SafeFailureCode(problem.Result?.Code)));
+            dispatcher.Dispatch(new GovernedNoteSubmissionFailedAction(ChatBotUiFailureCatalog.Resolve(problem)));
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            // Any other (transport/unknown) failure collapses to a single stable safe code, never raw text (NFR40).
-            dispatcher.Dispatch(new GovernedNoteSubmissionFailedAction(GenericFailureCode));
+            // Transient transport failures retain retry guidance; programming failures remain terminal and metadata-only.
+            dispatcher.Dispatch(new GovernedNoteSubmissionFailedAction(ChatBotUiFailureCatalog.Resolve(exception)));
         }
     }
 
-    private static string SafeFailureCode(string? problemCode)
-        => string.IsNullOrWhiteSpace(problemCode) ? ChatBotMessageCodes.GenericDenial : problemCode;
 }

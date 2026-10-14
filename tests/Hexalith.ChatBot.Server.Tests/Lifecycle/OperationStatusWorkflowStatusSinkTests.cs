@@ -78,6 +78,10 @@ public sealed class OperationStatusWorkflowStatusSinkTests
 
         wire.GetProperty("reasonCode").GetString().ShouldBe(ChatBotMessageCodes.GenericDenial);
         wire.GetProperty("completionStatus").GetString().ShouldBe(OperationStatusRecord.Failed);
+        wire.GetProperty("lifecycleState").GetString().ShouldBe("Failed");
+        wire.GetProperty("maxAttempts").GetInt32().ShouldBe(1);
+        wire.GetProperty("retryCount").GetInt32().ShouldBe(0);
+        wire.GetProperty("workflowRetryCount").GetInt32().ShouldBe(0);
         wire.GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
         wire.GetProperty("safeNextActions").EnumerateArray().Single().GetString().ShouldBe("dismiss");
         wire.GetRawText().ShouldNotContain("private-unsafe-action");
@@ -147,7 +151,8 @@ public sealed class OperationStatusWorkflowStatusSinkTests
         wire.GetProperty("lifecycleState").GetString().ShouldBe("Failed");
         wire.GetProperty("safeNextActions")[0].GetString().ShouldBe("dismiss");
         wire.GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
-        foreach (string field in new[] { "retryCount", "maxAttempts", "workflowRetryCount", "duplicateAttemptCount" })
+        wire.GetProperty("maxAttempts").GetInt32().ShouldBe(1);
+        foreach (string field in new[] { "retryCount", "workflowRetryCount", "duplicateAttemptCount" })
         {
             wire.GetProperty(field).GetInt32().ShouldBe(0);
         }

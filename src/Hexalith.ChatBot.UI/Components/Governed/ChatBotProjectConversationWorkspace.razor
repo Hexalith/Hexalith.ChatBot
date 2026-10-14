@@ -616,13 +616,14 @@
         => code switch
         {
             "ai-response-nudge-unsafe" => UiText[ChatBotUiTextKey.ProjectConversationStreamingStale],
-            ProjectConversationEffects.GenericFailureCode => UiText[ChatBotUiTextKey.ProjectConversationStreamingRetry],
+            _ when UiText.FailureCatalogEntryForFailure(code).NextAction == ChatBotMessageNextActions.RetryLater
+                => UiText[ChatBotUiTextKey.ProjectConversationStreamingRetry],
             _ => UiText[ChatBotUiTextKey.ProjectConversationStreamingUnavailable],
         };
 
     private bool CanRetryLoad
         => !State.Value.IsLoading && State.Value.ErrorCode is { } code &&
-            UiText.FailureCatalogEntry(code).NextAction == ChatBotMessageNextActions.RetryLater;
+            UiText.FailureCatalogEntryForFailure(code).NextAction == ChatBotMessageNextActions.RetryLater;
 
     private string StreamingNoticeText(string notice)
         => notice switch

@@ -87,8 +87,9 @@
         _feedbackContract = ResolvedStateFamily is { } stateFamily ? ChatBotStateFeedbackMatrix.For(stateFamily) : null;
 
         ChatBotAnnouncementDedupRule repeatRule = _feedbackContract?.DedupRule ?? ChatBotAnnouncementDedupRule.OncePerStableOperationKey;
-        _shouldAnnounceLiveRegion = (_feedbackContract is null && !HasCatalogFailure)
-            || AnnouncementDeduplication.ShouldAnnounce(ResolvedAnnouncementKey, repeatRule);
+        _shouldAnnounceLiveRegion = LiveRegionPoliteness != ChatBotLiveRegionPoliteness.None &&
+            ((_feedbackContract is null && !HasCatalogFailure)
+                || AnnouncementDeduplication.ShouldAnnounce(ResolvedAnnouncementKey, repeatRule));
     }
 
     private ChatBotLiveRegionPoliteness ResolvedPoliteness
@@ -130,8 +131,8 @@
             : $"{(string.IsNullOrWhiteSpace(AnnouncementKey) ? StableId : AnnouncementKey)}-{CatalogEntry.Code}";
 
     private ChatBotFeedbackStateFamily? ResolvedStateFamily
-        => HasCatalogFailure && (StateFamily is null or ChatBotFeedbackStateFamily.RetryableFailure ||
-            (StateFamily == ChatBotFeedbackStateFamily.BlockedAction && CatalogEntry.Code == ChatBotMessageCodes.GenericDenial))
+        => HasCatalogFailure && StateFamily != ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate &&
+            (CatalogEntry.Code == ChatBotMessageCodes.GenericDenial || StateFamily is null or ChatBotFeedbackStateFamily.RetryableFailure)
             ? CatalogEntry.IsTerminal
                 ? ChatBotFeedbackStateFamily.TerminalPolicyFailure
                 : StateFamily ?? ChatBotFeedbackStateFamily.RetryableFailure
@@ -149,13 +150,7 @@
         => MessageCatalogCode is not null && Kind is ChatBotFeedbackKind.Danger or ChatBotFeedbackKind.Warning;
 
     private ChatBotMessageCatalogEntry CatalogEntry
-    {
-        get
-        {
-            ChatBotMessageCatalogEntry entry = UiText.FailureCatalogEntry(MessageCatalogCode);
-            return entry.State is "waiting" or "completed" ? UiText.FailureCatalogEntry(null) : entry;
-        }
-    }
+        => UiText.FailureCatalogEntryForFailure(MessageCatalogCode);
 
     private string ResolvedMessage => HasCatalogFailure
         ? UiText.FailureCatalogReason(CatalogEntry.Code)

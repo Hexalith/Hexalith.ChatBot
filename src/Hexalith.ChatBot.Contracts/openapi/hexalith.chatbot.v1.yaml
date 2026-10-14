@@ -3269,6 +3269,13 @@ components:
         - command_capability_rate_limited
         - outbound_channel_rate_limited
         - idempotency_conflict_outbound_send
+        - idempotency_conflict_participant_resolution
+        - idempotency_conflict_association_scoring
+        - idempotency_conflict_association_threshold_policy
+        - idempotency_conflict_low_risk_ai_assistance
+        - idempotency_conflict_approval_decision
+        - idempotency_conflict_approved_ai_action_execution
+        - idempotency_conflict_ai_action_proposal
     ProblemDetails:
       type: object
       additionalProperties: false

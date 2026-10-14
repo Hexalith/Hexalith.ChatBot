@@ -15,8 +15,9 @@
                              MessageCatalogCode="@StatusCatalogCode"
                              AccessibleLabel="@StatusMessage"
                              StableId="project-conversation-composer-status"
-                             AnnouncementKey="@($"project-conversation-composer-attempt-{_attemptSequence}")"
-                             StateFamily="@StatusFamily">
+                             AnnouncementKey="@($"project-conversation-composer-{(_attemptSequence == 0 ? "initial" : _instanceId)}-attempt-{_attemptSequence}")"
+                             StateFamily="@StatusFamily"
+                             LiveRegionPoliteness="@(IsPageLoadFailure ? ChatBotLiveRegionPoliteness.None : null)">
             @if (!string.IsNullOrWhiteSpace(StatusCode))
             {
                 <code class="chatbot-code">@StatusCode</code>
@@ -89,6 +90,7 @@
     private string? _focusedPendingCommandId;
     private bool _awaitingSubmissionReceipt;
     private long _attemptSequence;
+    private readonly string _instanceId = Guid.NewGuid().ToString("N");
 
     [Parameter]
     public ProjectConversationComposerMode Mode { get; set; }
@@ -126,6 +128,8 @@
     private string? ValidationMessage
         => string.IsNullOrWhiteSpace(ValidationErrorCode) ? null : UiText[ChatBotUiTextKey.ProjectConversationComposerValidationRequired];
 
+    private bool IsPageLoadFailure => !HasSubmissionError && DisabledReasonCode is not null and not ("unsafe-context" or "degraded" or "loading");
+
     private bool HasSubmissionError => !string.IsNullOrWhiteSpace(SubmissionErrorCode);
 
     private string? StatusMessage
@@ -140,7 +144,6 @@
                     ? UiText[ChatBotUiTextKey.ProjectConversationComposerAccepted]
                     : DisabledReasonCode switch
         {
-            "unauthorized" => UiText[ChatBotUiTextKey.ProjectConversationComposerUnauthorizedReason],
             "degraded" => UiText[ChatBotUiTextKey.ProjectConversationComposerDegradedReason],
             not null => UiText[ChatBotUiTextKey.ProjectConversationComposerDisabledReason],
             _ => null,
@@ -156,10 +159,8 @@
             ? SubmissionErrorCode
             : DisabledReasonCode switch
             {
-                "unauthorized" => ChatBotMessageCodes.AuthorizationDenied,
                 "degraded" => ChatBotMessageCodes.DependencyDegraded,
-                "unsafe-context" => ChatBotMessageCodes.GenericDenial,
-                "loading" or null => null,
+                "unsafe-context" or "loading" or null => null,
                 _ => DisabledReasonCode,
             };
 

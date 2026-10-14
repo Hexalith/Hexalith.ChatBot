@@ -35,13 +35,29 @@ public sealed class VersionedSafeOutcomeBrowserTests
         ILocator composer = page.Locator(".chatbot-governed-composer");
         await composer.Locator("textarea").FillAsync("Repeated safe submission").ConfigureAwait(true);
         ILocator banner = composer.Locator("#project-conversation-composer-status");
+        await page.EvaluateAsync("""
+            () => {
+                window.safeOutcomeLiveActivations = [];
+                new MutationObserver(() => {
+                    const banner = document.querySelector('#project-conversation-composer-status');
+                    if (!banner || banner.getAttribute('aria-live') !== 'assertive'
+                        || banner.getAttribute('role') !== 'alert'
+                        || banner.getAttribute('data-chatbot-live-announced') !== 'true') return;
+                    const key = banner.getAttribute('data-chatbot-announcement-key');
+                    if (key && !window.safeOutcomeLiveActivations.includes(key)) window.safeOutcomeLiveActivations.push(key);
+                }).observe(document.body, {subtree: true, childList: true, attributes: true,
+                    attributeFilter: ['aria-live', 'role', 'data-chatbot-live-announced', 'data-chatbot-announcement-key']});
+            }
+            """).ConfigureAwait(true);
         for (int attempt = 1; attempt <= 2; attempt++)
         {
             await composer.Locator(".chatbot-governed-composer__actions fluent-button").ClickAsync().ConfigureAwait(true);
             await Assertions.Expect(banner).ToHaveAttributeAsync("data-chatbot-announcement-key",
-                $"project-conversation-composer-attempt-{attempt}-authorization_denied").ConfigureAwait(true);
+                new System.Text.RegularExpressions.Regex($"^project-conversation-composer-[a-f0-9]+-attempt-{attempt}-authorization_denied$")).ConfigureAwait(true);
             await Assertions.Expect(banner).ToContainTextAsync("The operation is not available to this caller.").ConfigureAwait(true);
+            await page.WaitForFunctionAsync("attempt => window.safeOutcomeLiveActivations.some(key => key.endsWith(`-attempt-${attempt}-authorization_denied`))", attempt).ConfigureAwait(true);
         }
+        (await page.EvaluateAsync<string[]>("() => window.safeOutcomeLiveActivations").ConfigureAwait(true)).Length.ShouldBe(2);
     }
 
     /// <summary>Checks localized denial text, semantic state and keyboard reachable unavailable actions in each visual mode.</summary>

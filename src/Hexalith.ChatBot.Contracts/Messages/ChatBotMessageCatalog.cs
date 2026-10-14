@@ -555,6 +555,13 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.None,
             ChatBotDisabledActionReasons.StateNotPermitted,
             ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.IdempotencyConflictParticipantResolution, "Participant resolution already submitted.", "This participant resolution conflicts with an existing resolution request.", ChatBotMessageNextActions.None, ChatBotDisabledActionReasons.StateNotPermitted, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.IdempotencyConflictAssociationScoring, "Association scoring already submitted.", "This association scoring conflicts with an existing scoring request.", ChatBotMessageNextActions.None, ChatBotDisabledActionReasons.StateNotPermitted, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.IdempotencyConflictAssociationThresholdPolicy, "Threshold policy already submitted.", "This threshold policy update conflicts with an existing policy request.", ChatBotMessageNextActions.None, ChatBotDisabledActionReasons.StateNotPermitted, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.IdempotencyConflictLowRiskAiAssistance, "AI assistance already submitted.", "This AI assistance conflicts with an existing assistance request.", ChatBotMessageNextActions.None, ChatBotDisabledActionReasons.StateNotPermitted, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.IdempotencyConflictApprovalDecision, "Approval decision already submitted.", "This approval decision conflicts with an existing decision request.", ChatBotMessageNextActions.None, ChatBotDisabledActionReasons.StateNotPermitted, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.IdempotencyConflictApprovedAiActionExecution, "Approved AI action already submitted.", "This approved AI action execution conflicts with an existing execution request.", ChatBotMessageNextActions.None, ChatBotDisabledActionReasons.StateNotPermitted, ChatBotDetailVisibility.MetadataOnly),
+        new(ChatBotMessageCodes.IdempotencyConflictAiActionProposal, "AI action proposal already submitted.", "This AI action proposal conflicts with an existing proposal request.", ChatBotMessageNextActions.None, ChatBotDisabledActionReasons.StateNotPermitted, ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string? code)

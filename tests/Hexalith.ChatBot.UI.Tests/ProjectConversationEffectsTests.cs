@@ -30,6 +30,102 @@ public sealed class ProjectConversationEffectsTests
     private const string ResponseId = "proposal-001";
     private const string GenerationId = "operation-001";
 
+    [Theory]
+    [MemberData(nameof(UiTransportFailureCases.Cases), MemberType = typeof(UiTransportFailureCases))]
+    public async Task TransportFailureShouldUseStatusCatalogWithoutRawText(string kind, int status, string expected)
+    {
+        StubChatBotClient client = new() { ReadException = UiTransportFailureCases.Create(kind, status) };
+        ProjectConversationEffects effects = new(new ProjectConversationService(client), EmptyState());
+        RecordingDispatcher dispatcher = new();
+        await effects.HandleLoadAsync(new LoadProjectConversationAction("project-001"), dispatcher);
+        dispatcher.Actions.OfType<ProjectConversationFailedAction>().Single().ErrorCode.ShouldBe(expected);
+    }
+
+
+    [Theory]
+    [InlineData("task-timeout")]
+    [InlineData("canceled-token-timeout")]
+    public async Task StopTimeoutShouldReleaseCancellationThroughRealReducers(string kind)
+    {
+        FakeState state = new(new ProjectConversationState(false, null, null) { RequestedProjectId = "project-001" });
+        RecordingDispatcher dispatcher = new(state);
+        StubChatBotClient client = new() { SubmitException = UiTransportFailureCases.Create(kind, 0) };
+        await new ProjectConversationEffects(new ProjectConversationService(client), state)
+            .HandleStopAiResponseAsync(new StopProjectConversationAiResponseAction(ActiveProgress()), dispatcher);
+        dispatcher.Actions.OfType<ProjectConversationAiResponseCancellationFailedAction>().Single().ErrorCode.ShouldBe("dependency_degraded");
+        state.Value.IsCancellingAiResponse.ShouldBeFalse();
+        state.Value.StreamingErrorCode.ShouldBe("dependency_degraded");
+        state.Value.VerifiedStopAnnouncementGenerationId.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("task-timeout")]
+    [InlineData("canceled-token-timeout")]
+    public async Task AcceptedStopShouldContinuePollingAfterReadTimeout(string kind)
+    {
+        FakeState state = new(new ProjectConversationState(false, null, null) { RequestedProjectId = "project-001" });
+        RecordingDispatcher dispatcher = new(state);
+        StubChatBotClient client = new()
+        {
+            ReadException = UiTransportFailureCases.Create(kind, 0), ReadExceptionAttempts = 1,
+            ProgressState = AiResponseProgressState.Stopped, ProgressIsTerminal = true,
+        };
+        await new ProjectConversationEffects(new ProjectConversationService(client), state)
+            .HandleStopAiResponseAsync(new StopProjectConversationAiResponseAction(ActiveProgress()), dispatcher);
+        dispatcher.Actions.OfType<ProjectConversationAiResponseCancellationAcceptedAction>().ShouldHaveSingleItem();
+        dispatcher.Actions.OfType<ProjectConversationAiResponseCancellationFailedAction>().ShouldBeEmpty();
+        state.Value.PendingSubmission.ShouldNotBeNull();
+        state.Value.IsCancellingAiResponse.ShouldBeFalse();
+        state.Value.VerifiedStopAnnouncementGenerationId.ShouldBe(GenerationId);
+    }
+
+    [Theory]
+    [InlineData("task-timeout")]
+    [InlineData("canceled-token-timeout")]
+    public async Task ComposerSubmissionTimeoutShouldProduceSafeFailure(string kind)
+    {
+        StubChatBotClient client = new() { SubmitException = UiTransportFailureCases.Create(kind, 0) };
+        RecordingDispatcher dispatcher = new();
+        await new ProjectConversationEffects(new ProjectConversationService(client), EmptyState())
+            .HandleSubmitComposerAsync(new("project-001", ProjectConversationComposerMode.Message, "draft", "en", 10), dispatcher);
+        dispatcher.Actions.OfType<ProjectConversationSubmissionFailedAction>().Single().ErrorCode.ShouldBe("dependency_degraded");
+        dispatcher.Actions.OfType<ProjectConversationSubmissionAcceptedAction>().ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("task-timeout")]
+    [InlineData("canceled-token-timeout")]
+    public async Task AcceptedMutationShouldRemainAcceptedWhenLaterReadTimesOut(string kind)
+    {
+        SubmitProjectConversationComposerAction action = new("project-001", ProjectConversationComposerMode.Message, "draft", "en", 10);
+        FakeState state = new(new ProjectConversationState(false, null, null)
+        {
+            RequestedProjectId = action.ProjectId, SubmissionRequestId = action.RequestId, IsSubmitting = true,
+        });
+        RecordingDispatcher dispatcher = new(state);
+        StubChatBotClient client = new() { ReadException = UiTransportFailureCases.Create(kind, 0), ReadExceptionAttempts = 1 };
+        await new ProjectConversationEffects(new ProjectConversationService(client), state).HandleSubmitComposerAsync(action, dispatcher);
+        client.SubmitCount.ShouldBe(1);
+        dispatcher.Actions.OfType<ProjectConversationSubmissionAcceptedAction>().ShouldHaveSingleItem();
+        dispatcher.Actions.OfType<ProjectConversationSubmissionFailedAction>().ShouldBeEmpty();
+        dispatcher.Actions.OfType<ProjectConversationLoadedAction>().ShouldHaveSingleItem();
+        state.Value.PendingSubmission.ShouldNotBeNull();
+        state.Value.IsSubmitting.ShouldBeFalse();
+        state.Value.SubmissionErrorCode.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("task-timeout")]
+    [InlineData("canceled-token-timeout")]
+    public async Task WhyPanelTimeoutShouldProduceSafeFailure(string kind)
+    {
+        StubChatBotClient client = new() { ReadException = UiTransportFailureCases.Create(kind, 0) };
+        RecordingDispatcher dispatcher = new();
+        await new ProjectConversationEffects(new ProjectConversationService(client), EmptyState())
+            .HandleOpenWhyPanelAsync(new("project-001", "association-001"), dispatcher);
+        dispatcher.Actions.OfType<ProjectAssociationWhyPanelFailedAction>().Single().ErrorCode.ShouldBe("dependency_degraded");
+    }
+
     [Fact]
     public async Task StopEffectShouldGoPendingThenGovernedSubmitThenTypedRequeryWithoutClaimingStoppedLocally()
     {
@@ -114,10 +210,12 @@ public sealed class ProjectConversationEffectsTests
         failed.ErrorCode.ShouldNotContain("exception", Case.Insensitive);
     }
 
-    [Fact]
-    public async Task StopEffectShouldRethrowCancellationAndNeverCollapseItToAFailure()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task StopEffectShouldRethrowCancellationAndNeverCollapseItToAFailure(bool taskCancellation)
     {
-        StubChatBotClient client = new() { SubmitException = new OperationCanceledException() };
+        StubChatBotClient client = new() { SubmitException = taskCancellation ? new TaskCanceledException("explicit cancellation", null, new CancellationToken(canceled: true)) : new OperationCanceledException() };
         ProjectConversationEffects effects = new(new ProjectConversationService(client), EmptyState());
         RecordingDispatcher dispatcher = new();
 
@@ -486,6 +584,12 @@ public sealed class ProjectConversationEffectsTests
     {
         public Exception? SubmitException { get; init; }
 
+        public Exception? ReadException { get; init; }
+
+        public int ReadExceptionAttempts { get; init; } = int.MaxValue;
+
+        private int _readFailures;
+
         public AiResponseProgressState ProgressState { get; init; } = AiResponseProgressState.Rendering;
 
         public bool ProgressIsTerminal { get; init; }
@@ -540,6 +644,8 @@ public sealed class ProjectConversationEffectsTests
             string? taskId = null,
             CancellationToken cancellationToken = default)
         {
+            if (ReadException is not null && _readFailures++ < ReadExceptionAttempts) throw ReadException;
+
             int readIndex = ConversationReadCount++;
             long conversationSourceVersion = ConversationReadSourceVersions is { Count: > 0 } sourceVersions
                 ? sourceVersions[Math.Min(readIndex, sourceVersions.Count - 1)]
@@ -631,13 +737,13 @@ public sealed class ProjectConversationEffectsTests
             => throw new NotSupportedException();
 
         public Task<AssociationRoutingStatus> GetAssociationRoutingStatusAsync(string associationId, string? correlationId = null, string? taskId = null, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
+            => throw ReadException ?? new NotSupportedException();
 
         public Task<TaskIntentReview> GetTaskIntentReviewAsync(string projectId, string taskIntentId, string? correlationId = null, string? taskId = null, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
     }
 
-    private sealed class RecordingDispatcher : IDispatcher
+    private sealed class RecordingDispatcher(FakeState? state = null) : IDispatcher
     {
         public List<object> Actions { get; } = [];
 
@@ -646,6 +752,19 @@ public sealed class ProjectConversationEffectsTests
         public void Dispatch(object action)
         {
             Actions.Add(action);
+            if (state is not null)
+            {
+                state.Value = action switch
+                {
+                    ProjectConversationAiResponseCancellationPendingAction pending => ProjectConversationReducers.ReduceAiResponseCancellationPending(state.Value, pending),
+                    ProjectConversationAiResponseCancellationAcceptedAction accepted => ProjectConversationReducers.ReduceAiResponseCancellationAccepted(state.Value, accepted),
+                    ProjectConversationAiResponseCancellationFailedAction failed => ProjectConversationReducers.ReduceAiResponseCancellationFailed(state.Value, failed),
+                    ProjectConversationSubmissionAcceptedAction accepted => ProjectConversationReducers.ReduceSubmissionAccepted(state.Value, accepted),
+                    ProjectConversationSubmissionFailedAction failed => ProjectConversationReducers.ReduceSubmissionFailed(state.Value, failed),
+                    ProjectConversationLoadedAction loaded => ProjectConversationReducers.ReduceLoaded(state.Value, loaded),
+                    _ => state.Value,
+                };
+            }
             ActionDispatched?.Invoke(this, new ActionDispatchedEventArgs(action));
         }
     }

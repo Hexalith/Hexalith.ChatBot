@@ -55,6 +55,7 @@
                                      Message="@FailureMessage(error)"
                                      AccessibleLabel="@FailureMessage(error)"
                                      StableId="association-review-failed"
+                                     ShowCatalogAction="@(State.Value.ErrorScope is not AssociationReviewErrorScope.Load || !CanRetryFailure(error))"
                                      StateFamily="@AssociationReviewFailureCatalog.StateFamily(error)"
                                      AnnouncementKey="association-review-failed">
                     @FailureBody(error)
@@ -62,7 +63,7 @@
                 </div>
 
                 @if (State.Value.ErrorScope is AssociationReviewErrorScope.Load
-                     && AssociationReviewFailureCatalog.IsRetryable(error))
+                     && CanRetryFailure(error))
                 {
                     @* A banner that claims RetryableFailure must actually offer the retry. *@
                     <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.AssociationReviewLoadFailedRetry]"
@@ -304,10 +305,14 @@
 
     // A failed read and a failed write are opposite messages: "submission did not complete" on a read failure
     // tells the reviewer a command was sent when none was, and invites a duplicate.
+    private bool CanRetryFailure(string? code)
+        => UiText.FailureCatalogEntryForFailure(AssociationReviewFailureCatalog.CatalogCode(code)).NextAction ==
+            Hexalith.ChatBot.Contracts.Messages.ChatBotMessageNextActions.RetryLater;
+
     private string FailureBody(string code)
         => State.Value.ErrorScope is AssociationReviewErrorScope.Load
             ? UiText.Get(ChatBotUiTextKey.AssociationReviewLoadFailedBodyTemplate, code)
-            : AssociationReviewFailureCatalog.IsRetryable(code)
+            : CanRetryFailure(code)
                 ? UiText.Get(ChatBotUiTextKey.SubmissionFailedBodyTemplate, code)
                 : FailureMessage(code);
 

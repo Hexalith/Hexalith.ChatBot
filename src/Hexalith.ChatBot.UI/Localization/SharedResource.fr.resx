@@ -319,7 +319,6 @@
   <data name="SourceProvenance_Label" xml:space="preserve"><value>Source</value></data>
   <data name="SourceThread_Label" xml:space="preserve"><value>Fil</value></data>
   <data name="SourceTimezone_Label" xml:space="preserve"><value>Fuseau horaire source</value></data>
-  <data name="BlockedReasonText_Default" xml:space="preserve"><value>Cette opération est bloquée par la stratégie.</value></data>
   <data name="StatusText_ContextVisible" xml:space="preserve"><value>Contexte visible</value></data>
   <data name="Status_AccessibleLabel" xml:space="preserve"><value>Statut {0} : {1}</value></data>
   <data name="ThresholdBand_Label" xml:space="preserve"><value>Bande de seuil</value></data>
@@ -912,7 +911,6 @@
   <data name="ProjectConversation_Composer_Submit" xml:space="preserve"><value>Envoyer</value></data>
   <data name="ProjectConversation_Composer_Submitting" xml:space="preserve"><value>Envoi de la commande gouvernée</value></data>
   <data name="ProjectConversation_Composer_Title" xml:space="preserve"><value>Composeur gouverné</value></data>
-  <data name="ProjectConversation_Composer_UnauthorizedReason" xml:space="preserve"><value>Le composeur est indisponible car ce contexte projet est non autorisé ou masqué.</value></data>
   <data name="ProjectConversation_Composer_ValidationRequired" xml:space="preserve"><value>Saisissez du texte avant l'envoi.</value></data>
   <data name="ProjectConversation_LoadOlder" xml:space="preserve"><value>Charger les messages précédents</value></data>
   <data name="ProjectConversation_Streaming_Cancelling" xml:space="preserve"><value>Arrêt de la réponse ; attente de la vérification serveur.</value></data>
@@ -1102,4 +1100,18 @@
   <data name="Failure_NextAction_Dismiss" xml:space="preserve"><value>Fermer ce message.</value></data>
   <data name="Failure_NextAction_Authenticate" xml:space="preserve"><value>Authentifiez-vous pour continuer.</value></data>
   <data name="Failure_NextAction_CorrectRequest" xml:space="preserve"><value>Corrigez la demande avant de réessayer.</value></data>
+  <data name="Failure_Catalog_idempotency_conflict_participant_resolution" xml:space="preserve"><value>Résolution des participants déjà soumise.</value></data>
+  <data name="Failure_CatalogReason_idempotency_conflict_participant_resolution" xml:space="preserve"><value>Cette résolution des participants est en conflit avec une demande de résolution existante.</value></data>
+  <data name="Failure_Catalog_idempotency_conflict_association_scoring" xml:space="preserve"><value>Évaluation de l’association déjà soumise.</value></data>
+  <data name="Failure_CatalogReason_idempotency_conflict_association_scoring" xml:space="preserve"><value>Cette évaluation de l’association est en conflit avec une demande d’évaluation existante.</value></data>
+  <data name="Failure_Catalog_idempotency_conflict_association_threshold_policy" xml:space="preserve"><value>Politique de seuil déjà soumise.</value></data>
+  <data name="Failure_CatalogReason_idempotency_conflict_association_threshold_policy" xml:space="preserve"><value>Cette mise à jour de la politique de seuil est en conflit avec une demande de politique existante.</value></data>
+  <data name="Failure_Catalog_idempotency_conflict_low_risk_ai_assistance" xml:space="preserve"><value>Assistance IA déjà soumise.</value></data>
+  <data name="Failure_CatalogReason_idempotency_conflict_low_risk_ai_assistance" xml:space="preserve"><value>Cette assistance IA est en conflit avec une demande d’assistance existante.</value></data>
+  <data name="Failure_Catalog_idempotency_conflict_approval_decision" xml:space="preserve"><value>Décision d’approbation déjà soumise.</value></data>
+  <data name="Failure_CatalogReason_idempotency_conflict_approval_decision" xml:space="preserve"><value>Cette décision d’approbation est en conflit avec une demande de décision existante.</value></data>
+  <data name="Failure_Catalog_idempotency_conflict_approved_ai_action_execution" xml:space="preserve"><value>Action IA approuvée déjà soumise.</value></data>
+  <data name="Failure_CatalogReason_idempotency_conflict_approved_ai_action_execution" xml:space="preserve"><value>Cette exécution d’action IA approuvée est en conflit avec une demande d’exécution existante.</value></data>
+  <data name="Failure_Catalog_idempotency_conflict_ai_action_proposal" xml:space="preserve"><value>Proposition d’action IA déjà soumise.</value></data>
+  <data name="Failure_CatalogReason_idempotency_conflict_ai_action_proposal" xml:space="preserve"><value>Cette proposition d’action IA est en conflit avec une demande de proposition existante.</value></data>
 </root>

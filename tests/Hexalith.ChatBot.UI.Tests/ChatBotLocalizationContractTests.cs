@@ -299,7 +299,6 @@ public sealed class ChatBotLocalizationContractTests
         {
             text[ChatBotUiTextKey.GovernedCommandPath].ShouldBe("Chemin de commande gouvernée");
             text[ChatBotUiTextKey.RiskPolicyReasonDefault].ShouldBe("La stratégie exige une revue.");
-            text[ChatBotUiTextKey.BlockedReasonTextDefault].ShouldBe("Cette opération est bloquée par la stratégie.");
             text[ChatBotUiTextKey.SafeNextActionDefault].ShouldBe("Revoyez l'action sûre suivante pour cet état.");
             text[ChatBotUiTextKey.DisabledReasonDefault].ShouldBe("Cette action n'est pas disponible dans l'état gouverné actuel.");
         }
@@ -398,7 +397,6 @@ public sealed class ChatBotLocalizationContractTests
             [
                 text[ChatBotUiTextKey.ProjectConversationComposerSubmit],
                 text[ChatBotUiTextKey.ProjectConversationComposerValidationRequired],
-                text[ChatBotUiTextKey.ProjectConversationComposerUnauthorizedReason],
                 text[ChatBotUiTextKey.ProjectConversationComposerDegradedReason],
                 text[ChatBotUiTextKey.ProjectWorkspaceStateProjectSwitchSuccess],
                 text[ChatBotUiTextKey.GovernedOperationsQueueDetailUnavailable],

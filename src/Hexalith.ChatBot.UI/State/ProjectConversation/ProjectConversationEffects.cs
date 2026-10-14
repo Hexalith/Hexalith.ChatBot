@@ -34,22 +34,22 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
                 action.ProjectId,
                 action.Cursor));
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException cancellation) when (!ChatBotUiFailureCatalog.IsTimeout(cancellation))
         {
             throw;
         }
         catch (HexalithChatBotApiException<ProblemDetails> problem)
         {
             dispatcher.Dispatch(new ProjectConversationFailedAction(
-                string.IsNullOrWhiteSpace(problem.Result?.Code) ? ChatBotMessageCodes.GenericDenial : problem.Result.Code,
+                ChatBotUiFailureCatalog.Resolve(problem),
                 action.RequestId,
                 action.ProjectId,
                 action.Cursor));
         }
-        catch (Exception)
+        catch (Exception exception)
         {
             dispatcher.Dispatch(new ProjectConversationFailedAction(
-                GenericFailureCode,
+                ChatBotUiFailureCatalog.Resolve(exception),
                 action.RequestId,
                 action.ProjectId,
                 action.Cursor));
@@ -139,23 +139,23 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
                     RequestedProjectId: action.ProjectId));
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException cancellation) when (!ChatBotUiFailureCatalog.IsTimeout(cancellation))
         {
             throw;
         }
         catch (HexalithChatBotApiException<ProblemDetails> problem)
         {
             dispatcher.Dispatch(new ProjectConversationSubmissionFailedAction(
-                string.IsNullOrWhiteSpace(problem.Result?.Code) ? ChatBotMessageCodes.GenericDenial : problem.Result.Code)
+                ChatBotUiFailureCatalog.Resolve(problem))
             {
                 ProjectId = action.ProjectId,
                 RequestId = action.RequestId,
                 ScopeVersion = scopeVersion,
             });
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            dispatcher.Dispatch(new ProjectConversationSubmissionFailedAction(GenericFailureCode)
+            dispatcher.Dispatch(new ProjectConversationSubmissionFailedAction(ChatBotUiFailureCatalog.Resolve(exception))
             {
                 ProjectId = action.ProjectId,
                 RequestId = action.RequestId,
@@ -187,7 +187,7 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
                     return conversation;
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException cancellation) when (!ChatBotUiFailureCatalog.IsTimeout(cancellation))
             {
                 throw;
             }
@@ -321,23 +321,23 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
             });
             await VerifyCancellationTerminalAsync(action.Progress, action.RequestId, scopeVersion, dispatcher).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException cancellation) when (!ChatBotUiFailureCatalog.IsTimeout(cancellation))
         {
             throw;
         }
         catch (HexalithChatBotApiException<ProblemDetails> problem)
         {
             dispatcher.Dispatch(new ProjectConversationAiResponseCancellationFailedAction(
-                string.IsNullOrWhiteSpace(problem.Result?.Code) ? ChatBotMessageCodes.GenericDenial : problem.Result.Code)
+                ChatBotUiFailureCatalog.Resolve(problem))
             {
                 ProjectId = action.Progress.ProjectId,
                 RequestId = action.RequestId,
                 ScopeVersion = _state.Value.ProjectScopeVersion,
             });
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            dispatcher.Dispatch(new ProjectConversationAiResponseCancellationFailedAction(GenericFailureCode)
+            dispatcher.Dispatch(new ProjectConversationAiResponseCancellationFailedAction(ChatBotUiFailureCatalog.Resolve(exception))
             {
                 ProjectId = action.Progress.ProjectId,
                 RequestId = action.RequestId,
@@ -380,7 +380,7 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
                     return;
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException cancellation) when (!ChatBotUiFailureCatalog.IsTimeout(cancellation))
             {
                 throw;
             }
@@ -441,7 +441,7 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
                 .ConfigureAwait(false);
             dispatcher.Dispatch(new ProjectAssociationWhyPanelLoadedAction(action.ProjectId, action.AssociationId, panel));
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException cancellation) when (!ChatBotUiFailureCatalog.IsTimeout(cancellation))
         {
             throw;
         }
@@ -450,11 +450,11 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
             dispatcher.Dispatch(new ProjectAssociationWhyPanelFailedAction(
                 action.ProjectId,
                 action.AssociationId,
-                string.IsNullOrWhiteSpace(problem.Result?.Code) ? ChatBotMessageCodes.GenericDenial : problem.Result.Code));
+                ChatBotUiFailureCatalog.Resolve(problem)));
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            dispatcher.Dispatch(new ProjectAssociationWhyPanelFailedAction(action.ProjectId, action.AssociationId, GenericFailureCode));
+            dispatcher.Dispatch(new ProjectAssociationWhyPanelFailedAction(action.ProjectId, action.AssociationId, ChatBotUiFailureCatalog.Resolve(exception)));
         }
     }
 }

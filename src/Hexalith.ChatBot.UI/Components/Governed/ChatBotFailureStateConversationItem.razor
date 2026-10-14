@@ -3,13 +3,18 @@
 @inject ChatBotUiTextLocalizer UiText
 @inject ChatBotAnnouncementDeduplicationState AnnouncementDeduplication
 
+<FluentText As="TextTag.Span"
+            Class="chatbot-visually-hidden"
+            id="@($"{Item.ItemId}-failure-announcement")"
+            data-chatbot-failure-announcement="@Item.ItemId"
+            role="@(IsTerminal ? "alert" : "status")"
+            aria-live="@AriaLive"
+            aria-atomic="true">@_announcementText</FluentText>
+
 <article class="chatbot-failure-conversation-item"
          data-chatbot-conversation-item-kind="@Item.Kind"
          data-chatbot-conversation-item-id="@Item.ItemId"
          tabindex="0"
-         role="@(_announce && IsTerminal ? "alert" : "status")"
-         aria-live="@AriaLive"
-         aria-atomic="true"
          aria-label="@AccessibleLabel">
     <FluentCard Class="chatbot-failure-conversation-item__surface">
         <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.75rem">
@@ -117,17 +122,7 @@
     public bool Announce { get; set; }
 
     private ChatBotMessageCatalogEntry CatalogEntry
-    {
-        get
-        {
-            ChatBotMessageCatalogEntry entry = UiText.FailureCatalogEntry(Item.MessageCatalogCode);
-            return entry.State is "waiting" or "completed" && entry.Code is not
-                (ChatBotMessageCodes.RetryQueued or ChatBotMessageCodes.RetryAccepted or
-                    ChatBotMessageCodes.DuplicateSuppressed or ChatBotMessageCodes.ReprocessCreated) &&
-                !entry.Code.StartsWith("idempotency_conflict_", StringComparison.Ordinal)
-                ? UiText.FailureCatalogEntry(null) : entry;
-        }
-    }
+        => UiText.FailureCatalogEntryForFailure(Item.MessageCatalogCode);
 
     private bool IsGenericDenial => CatalogEntry.Code == ChatBotMessageCodes.GenericDenial;
 
@@ -136,9 +131,28 @@
     private string? ResolvedFailureStateKind => IsGenericDenial ? "terminal-failure" : Item.FailureStateKind;
 
     private bool _announce;
+    private bool _announcementPending;
+    private string _announcementText = string.Empty;
 
     protected override void OnParametersSet()
-        => _announce = (Announce || OnNextAction.HasDelegate) && AnnouncementDeduplication.ShouldAnnounce($"{Item.ItemId}-{CatalogEntry.Code}-{CatalogEntry.State}", ChatBotAnnouncementDedupRule.OncePerStableOperationKey);
+    {
+        _announce = (Announce || OnNextAction.HasDelegate) && AnnouncementDeduplication.ShouldAnnounce($"{Item.ItemId}-{CatalogEntry.Code}-{CatalogEntry.State}", ChatBotAnnouncementDedupRule.OncePerStableOperationKey);
+        _announcementPending = _announce;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (_announcementPending)
+        {
+            _announcementPending = false;
+            _announcementText = $"{AccessibleLabel} {UiText.FailureCatalogReason(CatalogEntry.Code)} " +
+                $"{UiText[ChatBotUiTextKey.FailureNextActionLabel]} {UiText.FailureNextActionLabel(CatalogEntry.NextAction)}" +
+                (CatalogEntry.NextAction != ChatBotMessageNextActions.None && (!OnNextAction.HasDelegate || !ActionPermitted)
+                    ? $" {UiText[ChatBotUiTextKey.WhyUnavailable]} {UiText.FailureBlockedReasonLabel(ActionPermitted ? CatalogEntry.DisabledActionReason : ChatBotDisabledActionReasons.StateNotPermitted)}"
+                    : string.Empty);
+            StateHasChanged();
+        }
+    }
 
     private string AriaLive => _announce ? (IsTerminal ? "assertive" : "polite") : "off";
 

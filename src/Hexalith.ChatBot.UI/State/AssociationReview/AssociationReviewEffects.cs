@@ -37,17 +37,17 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
 
             dispatcher.Dispatch(new AssociationReviewLoadedAction(review));
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException cancellation) when (!ChatBotUiFailureCatalog.IsTimeout(cancellation))
         {
             throw;
         }
         catch (HexalithChatBotApiException<ProblemDetails> problem)
         {
-            dispatcher.Dispatch(new AssociationReviewFailedAction(SafeFailureCode(problem.Result?.Code)));
+            dispatcher.Dispatch(new AssociationReviewFailedAction(SafeFailureCode(ChatBotUiFailureCatalog.Resolve(problem))));
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            dispatcher.Dispatch(new AssociationReviewFailedAction(GenericFailureCode));
+            dispatcher.Dispatch(new AssociationReviewFailedAction(ChatBotUiFailureCatalog.Resolve(exception)));
         }
     }
 
@@ -99,21 +99,21 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
                 .ConfigureAwait(false);
             dispatcher.Dispatch(new AssociationDecisionSubmittedAction(result));
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException cancellation) when (!ChatBotUiFailureCatalog.IsTimeout(cancellation))
         {
             throw;
         }
         catch (HexalithChatBotApiException<ProblemDetails> problem)
         {
-            dispatcher.Dispatch(new AssociationDecisionSubmitFailedAction(SafeFailureCode(problem.Result?.Code)));
+            dispatcher.Dispatch(new AssociationDecisionSubmitFailedAction(SafeFailureCode(ChatBotUiFailureCatalog.Resolve(problem))));
         }
         catch (InvalidOperationException invalid) when (IsSafeValidationCode(invalid.Message))
         {
             dispatcher.Dispatch(new AssociationDecisionValidationRejectedAction(invalid.Message));
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            dispatcher.Dispatch(new AssociationDecisionSubmitFailedAction(GenericFailureCode));
+            dispatcher.Dispatch(new AssociationDecisionSubmitFailedAction(ChatBotUiFailureCatalog.Resolve(exception)));
         }
     }
 
@@ -154,21 +154,21 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
                 .ConfigureAwait(false);
             dispatcher.Dispatch(new AssociationCorrectionSubmittedAction(result));
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException cancellation) when (!ChatBotUiFailureCatalog.IsTimeout(cancellation))
         {
             throw;
         }
         catch (HexalithChatBotApiException<ProblemDetails> problem)
         {
-            dispatcher.Dispatch(new AssociationCorrectionSubmitFailedAction(SafeFailureCode(problem.Result?.Code)));
+            dispatcher.Dispatch(new AssociationCorrectionSubmitFailedAction(SafeFailureCode(ChatBotUiFailureCatalog.Resolve(problem))));
         }
         catch (InvalidOperationException invalid) when (IsSafeValidationCode(invalid.Message))
         {
             dispatcher.Dispatch(new AssociationCorrectionValidationRejectedAction(invalid.Message));
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            dispatcher.Dispatch(new AssociationCorrectionSubmitFailedAction(GenericFailureCode));
+            dispatcher.Dispatch(new AssociationCorrectionSubmitFailedAction(ChatBotUiFailureCatalog.Resolve(exception)));
         }
     }
 
