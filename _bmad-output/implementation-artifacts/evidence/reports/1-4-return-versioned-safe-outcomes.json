@@ -1,0 +1,139 @@
+{
+  "schemaVersion": "2.0",
+  "storyKey": "1-4-return-versioned-safe-outcomes",
+  "baseCommit": "c8da8a5b3aeaf057586aacd30f9c3e5e7bf37947",
+  "headCommit": "7906ca1a9fbc1a2026cb379f006495aae434d0cd",
+  "implementationDigest": "85f674f2b2743483c7f406422c5760973f9c9e92ba43b96ad30c95d22c51f29f",
+  "policyVersion": "2.1",
+  "passed": true,
+  "fileListCount": 15,
+  "scopedDiffCount": 15,
+  "eventPathCount": 15,
+  "checkedItemCount": 11,
+  "mappedItemCount": 11,
+  "repositoryScopes": [
+    "."
+  ],
+  "lanes": [
+    {
+      "lane": "Hexalith.ChatBot.Contracts.Tests",
+      "source": "current-run",
+      "total": 519,
+      "executed": 519,
+      "passed": 519,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:completion/Hexalith.ChatBot.Contracts.Tests.trx",
+      "checksumSha256": "1a603de1a6d7b359641ab154b7ec1f3c6f773c28f82f9894a0d0f5fc423307d5"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Client.Tests",
+      "source": "current-run",
+      "total": 92,
+      "executed": 92,
+      "passed": 92,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:completion/Hexalith.ChatBot.Client.Tests.trx",
+      "checksumSha256": "196034c6817ce3eba69f13f06eab3367867ce8b8781a4b221ad217f0e99240de"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Cli.Tests",
+      "source": "current-run",
+      "total": 57,
+      "executed": 57,
+      "passed": 57,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:completion/Hexalith.ChatBot.Cli.Tests.trx",
+      "checksumSha256": "528e2077fc609b21d3a750ac10f9ffba0f0d39d95b9febcf10fbf20f6a097136"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Mcp.Tests",
+      "source": "current-run",
+      "total": 67,
+      "executed": 67,
+      "passed": 67,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:completion/Hexalith.ChatBot.Mcp.Tests.trx",
+      "checksumSha256": "d1424fa14a80b4dbad84b08215cde4810bf3017ac6f5e934c356296835994a46"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Server.Tests",
+      "source": "current-run",
+      "total": 2617,
+      "executed": 2617,
+      "passed": 2617,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:completion/Hexalith.ChatBot.Server.Tests.trx",
+      "checksumSha256": "132f5eb53433f531cf3824fefd9a2a2cf68e74347e206b0a9497a9b1c60dc06a"
+    },
+    {
+      "lane": "Hexalith.ChatBot.UI.Tests",
+      "source": "current-run",
+      "total": 496,
+      "executed": 496,
+      "passed": 496,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:completion/Hexalith.ChatBot.UI.Tests.trx",
+      "checksumSha256": "683a774118ed91d90df6c364691ded1f1755eee8792cd9292f279e362d3d6127"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Conformance.Tests",
+      "source": "current-run",
+      "total": 150,
+      "executed": 150,
+      "passed": 150,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:completion/Hexalith.ChatBot.Conformance.Tests.trx",
+      "checksumSha256": "0dfe4babbae6354434568a7d4d21d5e6c977136f6760ec769e7aed3123ab9939"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Architecture.Tests",
+      "source": "current-run",
+      "total": 123,
+      "executed": 123,
+      "passed": 123,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:completion/Hexalith.ChatBot.Architecture.Tests.trx",
+      "checksumSha256": "de42419aaa5f69ab68647415726c886cd8b51e2905f5372e5b2ec198fd83f25f"
+    },
+    {
+      "lane": "browser-primary",
+      "primaryPathClass": "browser",
+      "source": "current-run",
+      "total": 265,
+      "executed": 265,
+      "passed": 265,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:completion/browser-primary.trx",
+      "checksumSha256": "123f9fe1ad9fe23ce529fdf18e1c989b48fea5e646869a58f4475c69c30c7e52"
+    },
+    {
+      "lane": "Hexalith.ChatBot.StoryEvidenceGate.Tests",
+      "source": "current-run",
+      "total": 226,
+      "executed": 226,
+      "passed": 226,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:completion/Hexalith.ChatBot.StoryEvidenceGate.Tests.trx",
+      "checksumSha256": "5ae64ec2aa7f8f7108dce85baee470ace11ee01b24d9d5c872a50f85c154cacf"
+    }
+  ],
+  "primaryPaths": [
+    {
+      "pathClass": "browser",
+      "executed": true,
+      "lane": "browser-primary"
+    }
+  ],
+  "issues": [],
+  "evaluatedAtUtc": "2026-10-14T15:16:54.9067083+00:00"
+}
