@@ -46,6 +46,14 @@ public static partial class MessageCatalogContractTests
         }
     }
 
+    /// <summary>Retry acceptance remains waiting and cannot be mistaken for a refusal.</summary>
+    /// <param name="code">The accepted retry outcome.</param>
+    [Theory]
+    [InlineData(ChatBotMessageCodes.RetryQueued)]
+    [InlineData(ChatBotMessageCodes.RetryAccepted)]
+    public static void RetryAcceptanceShouldRemainWaiting(string code)
+        => ChatBotMessageCatalog.Resolve(code).State.ShouldBe("waiting");
+
     [Fact]
     public static void ExpiredEvidenceShouldDismissWithoutRetry()
     {

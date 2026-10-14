@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text.Json;
@@ -483,6 +484,19 @@ public static class ChatBotCliOutputFormatter
                     false,
                     "metadata-only",
                     SafeActionForReason(code));
+            }
+
+            if (exception is HttpRequestException or TimeoutException)
+            {
+                return new SafeDenialMetadata(
+                    ChatBotMessageCodes.DependencyDegraded,
+                    "internal_error",
+                    null,
+                    null,
+                    null,
+                    true,
+                    "metadata-only",
+                    ChatBotMessageNextActions.RetryLater);
             }
 
             return new SafeDenialMetadata(

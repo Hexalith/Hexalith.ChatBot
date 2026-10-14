@@ -810,7 +810,7 @@ public static class StoryEvidenceValidator
             options.BaseCommit,
             "_bmad-output/implementation-artifacts/sprint-status.yaml");
         if (baseStory is null
-            || !MarkdownStoryReader.ReadStatus(baseStory).Equals("review", StringComparison.Ordinal)
+            || MarkdownStoryReader.ReadStatus(baseStory) is not ("review" or "in-review")
             || baseProductSprint is null
             || !string.Equals(
                 SprintLedgerReader.StoryStatusFromText(baseProductSprint, sprintStatusKey),

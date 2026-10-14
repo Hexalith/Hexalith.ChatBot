@@ -463,6 +463,8 @@ public static class ChatBotCliCommandTests
     [Theory]
     [InlineData("command_accepted", ProblemDetailsCategory.Authorization_denied)]
     [InlineData("association_decision_accepted", ProblemDetailsCategory.Authorization_denied)]
+    [InlineData("retry_queued", ProblemDetailsCategory.Authorization_denied)]
+    [InlineData("retry_accepted", ProblemDetailsCategory.Authorization_denied)]
     [InlineData("audit_unavailable", (ProblemDetailsCategory)999999)]
     public static void RefusedProblemShouldDenyIncompatibleMetadata(string code, ProblemDetailsCategory category)
     {
@@ -479,6 +481,25 @@ public static class ChatBotCliCommandTests
         text.ShouldContain("safe-next-action: dismiss");
         text.ShouldNotContain("accepted");
         text.ShouldNotContain("999999");
+    }
+
+    /// <summary>Known dependency transport failures retain catalog retry guidance without exception prose.</summary>
+    /// <param name="timeout">Whether the transport failure is a timeout.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public static void TransportFailureShouldUseSafeDependencyRetry(bool timeout)
+    {
+        Exception exception = timeout ? new TimeoutException("restricted transport secret")
+            : new System.Net.Http.HttpRequestException("restricted transport secret");
+        using JsonDocument json = JsonDocument.Parse(ChatBotCliOutputFormatter.FormatSafeDenial(exception, true));
+        JsonElement result = json.RootElement;
+        ChatBotCliOutputFormatter.FormatSafeDenial(exception, false).ShouldNotContain("restricted");
+        result.GetProperty("safeNextActions")[0].GetString().ShouldBe("retry-later");
+        result.GetProperty("code").GetString().ShouldBe("dependency_degraded");
+        result.GetProperty("retryable").GetBoolean().ShouldBeTrue();
+        result.GetProperty("message").GetString().ShouldBe("A required dependency is temporarily degraded.");
+        result.GetRawText().ShouldNotContain("restricted");
     }
 
     /// <summary>Exercises action normalization with otherwise valid status metadata in text and JSON.</summary>

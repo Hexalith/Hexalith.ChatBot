@@ -588,6 +588,8 @@ public static class ChatBotMcpServiceTests
     [Theory]
     [InlineData("command_accepted", ProblemDetailsCategory.Authorization_denied)]
     [InlineData("association_decision_accepted", ProblemDetailsCategory.Authorization_denied)]
+    [InlineData("retry_queued", ProblemDetailsCategory.Authorization_denied)]
+    [InlineData("retry_accepted", ProblemDetailsCategory.Authorization_denied)]
     [InlineData("audit_unavailable", (ProblemDetailsCategory)999999)]
     public static void RefusedProblemShouldDenyIncompatibleMetadata(string code, ProblemDetailsCategory category)
     {
@@ -601,6 +603,23 @@ public static class ChatBotMcpServiceTests
         result.GetProperty("message").GetString().ShouldBe("The requested action is unavailable.");
         result.GetRawText().ShouldNotContain("accepted");
         result.GetRawText().ShouldNotContain("999999");
+    }
+
+    /// <summary>Known dependency transport failures retain catalog retry guidance without exception prose.</summary>
+    /// <param name="timeout">Whether the transport failure is a timeout.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public static void TransportFailureShouldUseSafeDependencyRetry(bool timeout)
+    {
+        Exception exception = timeout ? new TimeoutException("restricted transport secret")
+            : new System.Net.Http.HttpRequestException("restricted transport secret");
+        JsonElement result = ChatBotMcpResultFormatter.FormatSafeDenial(exception);
+        result.GetProperty("clientAction").GetString().ShouldBe("retry-later");
+        result.GetProperty("code").GetString().ShouldBe("dependency_degraded");
+        result.GetProperty("retryable").GetBoolean().ShouldBeTrue();
+        result.GetProperty("message").GetString().ShouldBe("A required dependency is temporarily degraded.");
+        result.GetRawText().ShouldNotContain("restricted");
     }
 
     /// <summary>Exercises action normalization with otherwise valid status metadata.</summary>
@@ -677,7 +696,10 @@ public static class ChatBotMcpServiceTests
 
         result.GetProperty("outcome").GetString().ShouldBe("denied");
         result.GetProperty("detailsVisibility").GetString().ShouldBe("metadata-only");
-        result.GetProperty("message").GetString().ShouldBe("The requested action is unavailable.");
+        result.GetProperty("message").GetString().ShouldBe("A required dependency is temporarily degraded.");
+        result.GetProperty("code").GetString().ShouldBe("dependency_degraded");
+        result.GetProperty("retryable").GetBoolean().ShouldBeTrue();
+        result.GetProperty("clientAction").GetString().ShouldBe("retry-later");
         // The raw transport message (endpoint topology, fabricated secrets) must never reach the MCP client.
         result.GetRawText().ShouldNotContain("chatbot-backend");
         result.GetRawText().ShouldNotContain("bearer-token");

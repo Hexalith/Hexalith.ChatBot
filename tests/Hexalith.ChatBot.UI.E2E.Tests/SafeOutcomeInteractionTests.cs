@@ -8,6 +8,7 @@ using Hexalith.ChatBot.UI.Design;
 using Hexalith.ChatBot.UI.Services;
 using Hexalith.ChatBot.UI.State.ProjectConversation;
 using Hexalith.ChatBot.UI.State.OperationalDashboards;
+using Hexalith.ChatBot.UI.State.GovernedOperations;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -69,6 +70,67 @@ public sealed class SafeOutcomeInteractionTests
                 }).ConfigureAwait(true);
             }
             dispatcher.Actions.OfType<LoadOperationalDashboardAction>().Count().ShouldBe(6);
+        });
+
+    /// <summary>A terminal or untranslated dashboard denial cannot activate a new load.</summary>
+    /// <param name="code">The current dashboard failure code.</param>
+    /// <param name="culture">The requested locale.</param>
+    /// <param name="canRetry">Whether the localized catalog permits retry.</param>
+    [Theory]
+    [InlineData(null, "en", true)]
+    [InlineData(ChatBotMessageCodes.DependencyDegraded, "en", true)]
+    [InlineData(ChatBotMessageCodes.DependencyDegraded, "fr", true)]
+    [InlineData("restricted-dashboard-secret", "en", false)]
+    [InlineData(ChatBotMessageCodes.AuthorizationDenied, "fr", false)]
+    [InlineData(ChatBotMessageCodes.DependencyDegraded, "ja", false)]
+    public Task DashboardRefreshShouldRespectLocalizedRetryPermission(string? code, string culture, bool canRetry)
+        => RunAsync(async (renderer, dispatcher) =>
+        {
+            OperationalDashboards dashboard = await renderer.MountAsync<OperationalDashboards>().ConfigureAwait(true);
+            await renderer.Dispatcher.InvokeAsync(async () =>
+            {
+                ChatBotGovernedAction refresh = renderer.Find<ChatBotGovernedAction>(dashboard)
+                    .Single(item => item.StableId == "operational-dashboards-refresh");
+                refresh.State.ShouldBe(canRetry ? ChatBotGovernedActionState.Enabled : ChatBotGovernedActionState.DisabledWithReason);
+                if (!canRetry)
+                {
+                    refresh.DisabledReason.ShouldNotBeNullOrWhiteSpace();
+                    renderer.Attribute(refresh, "aria-describedby").ShouldBe("operational-dashboards-refresh-disabled-reason");
+                    renderer.Attribute(refresh, "tabindex").ShouldBe("0");
+                }
+                await renderer.Find<FluentButton>(refresh).Single().OnClick.InvokeAsync(new MouseEventArgs()).ConfigureAwait(true);
+            }).ConfigureAwait(true);
+            dispatcher.Actions.OfType<LoadOperationalDashboardAction>().Count().ShouldBe(canRetry ? 2 : 1);
+        }, culture, code);
+
+    /// <summary>A fresh governed submission announces after navigation without re-announcing passive state.</summary>
+    [Fact]
+    public Task GovernedSubmissionShouldAnnounceAcrossRemount()
+        => RunAsync(async (renderer, dispatcher) =>
+        {
+            HashSet<string> keys = [];
+            for (int mount = 0; mount < 2; mount++)
+            {
+                GovernedOperations page = await renderer.MountAsync<GovernedOperations>().ConfigureAwait(true);
+                await renderer.Dispatcher.InvokeAsync(async () =>
+                {
+                    ChatBotStatusBanner banner = renderer.Find<ChatBotStatusBanner>(page)
+                        .Single(item => item.StableId == "governed-note-failed");
+                    renderer.Attribute(banner, "aria-live").ShouldBe(mount == 0 ? "polite" : "off");
+                    for (int attempt = 0; attempt < 2; attempt++)
+                    {
+                        ChatBotGovernedAction submit = renderer.Find<ChatBotGovernedAction>(page)
+                            .Single(item => item.StableId == "record-governed-note");
+                        await renderer.Find<FluentButton>(submit).Single().OnClick.InvokeAsync(new MouseEventArgs()).ConfigureAwait(true);
+                        keys.Add(renderer.Attribute(banner, "data-chatbot-announcement-key")!).ShouldBeTrue();
+                        renderer.Attribute(banner, "aria-live").ShouldBe("polite");
+                        renderer.Attribute(banner, "data-chatbot-live-announced").ShouldBe("true");
+                        await renderer.UpdateAsync(page, []).ConfigureAwait(true);
+                        renderer.Attribute(banner, "aria-live").ShouldBe("off");
+                    }
+                }).ConfigureAwait(true);
+            }
+            dispatcher.Actions.OfType<SubmitGovernedNoteAction>().Count().ShouldBe(4);
         });
 
     /// <summary>A new composer instance can announce a same-code submission in the same circuit.</summary>
@@ -179,7 +241,7 @@ public sealed class SafeOutcomeInteractionTests
             }).ConfigureAwait(true);
         });
 
-    private static async Task RunAsync(Func<SafeOutcomeInteractiveRenderer, SafeOutcomeRenderDispatcher, Task> test, string culture = "en")
+    private static async Task RunAsync(Func<SafeOutcomeInteractiveRenderer, SafeOutcomeRenderDispatcher, Task> test, string culture = "en", string? dashboardError = ChatBotMessageCodes.DependencyDegraded)
     {
         CultureInfo original = CultureInfo.CurrentUICulture;
         CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(culture);
@@ -191,7 +253,8 @@ public sealed class SafeOutcomeInteractionTests
             services.AddFluentUIComponents();
             services.AddFluxor(options => options.ScanAssemblies(typeof(SafeOutcomeInteractionTests).Assembly));
             services.AddSingleton<IState<ProjectConversationState>>(new SafeOutcomeRenderState<ProjectConversationState>(new(false, null, ChatBotMessageCodes.AuditUnavailable)));
-            services.AddSingleton<IState<OperationalDashboardsState>>(new SafeOutcomeRenderState<OperationalDashboardsState>(new(false, null, ChatBotMessageCodes.DependencyDegraded)));
+            services.AddSingleton<IState<OperationalDashboardsState>>(new SafeOutcomeRenderState<OperationalDashboardsState>(new(false, null, dashboardError)));
+            services.AddSingleton<IState<GovernedOperationsState>>(new SafeOutcomeRenderState<GovernedOperationsState>(new(false, null, ChatBotMessageCodes.DependencyDegraded)));
             SafeOutcomeRenderDispatcher dispatcher = new();
             services.AddSingleton<IDispatcher>(dispatcher);
             services.AddSingleton(new ChatBotHubEndpoint(new Uri("http://127.0.0.1")));

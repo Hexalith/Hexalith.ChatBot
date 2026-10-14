@@ -421,9 +421,28 @@ public static class StoryEvidenceGateTests
         fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.StatusMismatch);
     }
 
-    /// <summary>Proves both exact base records must exist and equal review for a product transition.</summary>
+    /// <summary>Accepts both supported reviewed story spellings with an exact reviewed sprint entry.</summary>
+    /// <param name="storyStatus">The supported reviewed story spelling.</param>
+    [Theory]
+    [InlineData("review")]
+    [InlineData("in-review")]
+    public static void ProductCompletionFromReviewedBaseShouldPass(string storyStatus)
+    {
+        using GateFixture fixture = new();
+        fixture.UseProductCompletionFromBase(storyStatus, "review");
+        fixture.RefreshEvidence();
+
+        fixture.Validate().Passed.ShouldBeTrue();
+    }
+
+    /// <summary>Proves both base records must exist and represent a reviewed product transition.</summary>
     [Theory]
     [InlineData("in-progress", "review")]
+    [InlineData("ready-for-dev", "review")]
+    [InlineData("done", "review")]
+    [InlineData("in-review", "in-progress")]
+    [InlineData("in-review", "in-review")]
+    [InlineData("in-review", null)]
     [InlineData(null, "review")]
     [InlineData("review", "in-progress")]
     [InlineData("review", null)]

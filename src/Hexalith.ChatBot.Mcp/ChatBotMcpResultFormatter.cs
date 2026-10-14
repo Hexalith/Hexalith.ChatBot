@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text.Json;
@@ -291,6 +292,20 @@ public static class ChatBotMcpResultFormatter
                     "correct-request",
                     "metadata-only",
                     safeSuggestion ?? "correct-request");
+            }
+
+            if (exception is HttpRequestException or TimeoutException)
+            {
+                return new SafeDenialMetadata(
+                    "internal_error",
+                    ChatBotMessageCodes.DependencyDegraded,
+                    "A required dependency is temporarily degraded.",
+                    correlationId,
+                    taskId,
+                    true,
+                    ChatBotMessageNextActions.RetryLater,
+                    "metadata-only",
+                    ChatBotMessageNextActions.RetryLater);
             }
 
             return new SafeDenialMetadata(

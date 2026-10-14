@@ -67,6 +67,8 @@ public sealed class SafeOutcomeProblemCompatibilityTests
     [Theory]
     [InlineData(ChatBotMessageCodes.CommandAccepted, ProblemDetailsCategory.Authorization_denied)]
     [InlineData(ChatBotMessageCodes.AssociationDecisionAccepted, ProblemDetailsCategory.Authorization_denied)]
+    [InlineData(ChatBotMessageCodes.RetryQueued, ProblemDetailsCategory.Authorization_denied)]
+    [InlineData(ChatBotMessageCodes.RetryAccepted, ProblemDetailsCategory.Authorization_denied)]
     [InlineData(ChatBotMessageCodes.AuditUnavailable, (ProblemDetailsCategory)999999)]
     public void RefusedProblemShouldDenyIncompatibleMetadata(string code, ProblemDetailsCategory category)
     {

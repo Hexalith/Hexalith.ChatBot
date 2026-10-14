@@ -31,8 +31,8 @@
                     <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.OperationalDashboardsRefreshAction]"
                                             AccessibleLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsRefreshAction]"
                                             StableId="operational-dashboards-refresh"
-                                            State="@(State.Value.IsLoading ? ChatBotGovernedActionState.DisabledWithReason : ChatBotGovernedActionState.Enabled)"
-                                            DisabledReason="@UiText[ChatBotUiTextKey.OperationalDashboardsRefreshDisabledReason]"
+                                            State="@(CanRefresh ? ChatBotGovernedActionState.Enabled : ChatBotGovernedActionState.DisabledWithReason)"
+                                            DisabledReason="@RefreshDisabledReason"
                                             Appearance="@ButtonAppearance.Outline"
                                             CriticalAction="false"
                                             OnActivate="@Refresh" />
@@ -308,8 +308,21 @@
         Dispatcher.Dispatch(new LoadOperationalDashboardAction());
     }
 
+    private bool CanRefresh => !State.Value.IsLoading &&
+        (State.Value.Error is null || UiText.FailureCatalogEntryForFailure(State.Value.Error).NextAction ==
+            Hexalith.ChatBot.Contracts.Messages.ChatBotMessageNextActions.RetryLater);
+
+    private string RefreshDisabledReason => State.Value.IsLoading
+        ? UiText[ChatBotUiTextKey.OperationalDashboardsRefreshDisabledReason]
+        : UiText.ApprovalDisabledReasonLabel(UiText.FailureCatalogEntryForFailure(State.Value.Error).DisabledActionReason);
+
     private void Refresh()
     {
+        if (!CanRefresh)
+        {
+            return;
+        }
+
         _refreshAttempt++;
         Dispatcher.Dispatch(new LoadOperationalDashboardAction());
     }

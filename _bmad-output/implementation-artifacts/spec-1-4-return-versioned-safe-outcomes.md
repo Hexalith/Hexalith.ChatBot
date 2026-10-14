@@ -2,7 +2,7 @@
 title: 'Return Versioned Safe Outcomes'
 type: 'feature'
 created: '2026-10-12'
-status: 'in-review'
+status: 'done'
 baseline_commit: 8437900622d5bf7a9d34ca5cc543cd802f653cb1
 route: 'dispatch'
 review_loop_iteration: 0
@@ -54,6 +54,8 @@ context:
 - [x] `src/Hexalith.ChatBot.Cli/ChatBotCliOutputFormatter.cs`, `src/Hexalith.ChatBot.Mcp/ChatBotMcpResultFormatter.cs` — resolve problem code rather than forwarding wire prose; keep output metadata-only.
 - [x] `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`, `tests/Hexalith.ChatBot.UI.Tests/ChatBotLocalizationContractTests.cs`, `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`, `tests/Hexalith.ChatBot.Conformance.Tests/CrossTenantLeakageScannerTests.cs`, `tests/Hexalith.ChatBot.UI.E2E.Tests/DuplicateRetryFailureStatesE2ETests.cs`, `tests/Hexalith.ChatBot.Cli.Tests/ChatBotCliCommandTests.cs`, `tests/Hexalith.ChatBot.Mcp.Tests/ChatBotMcpServiceTests.cs` — test matrix, locale parity, assistive output, and sentinel leakage.
 
+- [x] `tools/Hexalith.ChatBot.StoryEvidenceGate/StoryEvidenceValidator.cs`, `tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/StoryEvidenceGateTests.cs`, `docs/story-evidence-integrity.md` — accept the supported `in-review` base spelling while retaining exact sprint review and rejecting unreviewed, missing or terminal base states; user-authorized completion prerequisite.
+
 **Acceptance Criteria:**
 
 - Given every code, when English and French entries are checked, then version, state, terminality, action, disabled reason, accessible description, headline limit, and one-sentence copy agree.
@@ -71,6 +73,8 @@ context:
 - Localization scope (review decision 2026-10-14): English/French copy is resolved at the UI boundary. API Problem Details, CLI and MCP expose the stable catalog code and version with English default copy; clients localize by code.
 
 ## Spec Change Log
+
+- 2026-10-14: Resumed all three workflow review layers, applied four patch groups, and added the user-authorized reviewed-status gate compatibility prerequisite. Completion evidence uses the current refinement diff from `c8da8a5b3aeaf057586aacd30f9c3e5e7bf37947`; the original implementation remains committed at that base.
 
 - 2026-10-14: Completed the three-layer workflow review, fixed ten grouped findings, and verified 4,367 tests with zero failures/skips. Preserved quiet observer feedback, recorded two pre-existing UI-state deferrals, and retained review status pending completion evidence.
 
@@ -224,6 +228,24 @@ Grouped patches: generic-denial action parity; failure/blocked compatibility (D-
 | F-V1 | Stop timeout can leave cancellation pending without coverage | medium | patch | Pre-verified: restoring the old unconditional cancellation catch passes existing Stop tests but skips the failure reducer. Add both timeout shapes and assert pending clears with dependency_degraded through the actual reducer; group with F-B9. |
 
 Grouped patches: keyed pagination; positive timeout evidence; canonical aliases; complete concise announcements; schema-valid fallback attempts; caller-specific timeout verification (F-B9/F-V1); browser activation; generic terminal semantics; localized retry permission; no-browser cleanup assertion. All use existing inputs, private state or tests and introduce no public contract. Prior carried findings retain their dispositions.
+
+### Completion review and status compatibility (2026-10-14)
+
+| ID | Finding | Verdict | Route | Evidence |
+| --- | --- | --- | --- | --- |
+| G-B1 | Current banners retain supported retry/duplicate/reprocess feedback | false | reject | The shared resolver deliberately preserves these lifecycle outcomes; actual render regressions cover the failure card, blocked state and banner. Production refused Problem Details rejects waiting/completed codes before the typed UI client receives them; no failed-read producer emitting this code was demonstrated. |
+| G-B2 | Dashboard Refresh remains enabled after terminal or untranslated denial | medium | patch | The header checks loading alone and can dispatch a fresh read after generic denial. Intersect Refresh with the localized retry action and verify the actual control cannot dispatch for unknown, authorization or unavailable-locale failures. |
+| G-B3 | Governed Operations attempt keys collide after remount | medium | patch | Its newly introduced local counter restarts while circuit deduplication survives. Use a private instance identity for fresh submissions, preserve initial-load deduplication, and assert mounted live activation and repeat suppression. |
+| G-B4 | Adapter transport failures lose known dependency guidance | medium | patch | HttpRequestException and TimeoutException reach the generic formatter fallback while bodyless dependency HTTP failures and UI transport failures retain retry guidance. Map these demonstrated transport classes to dependency_degraded and verify catalog copy, retry action and absence of exception prose. |
+| G-B5 | UI code reduction discards per-instance retry restrictions | medium | defer | carried F-B4/F-E4: the baseline state already omitted instance permissions; the recorded separate UI-state decision remains required. |
+| G-B6 | UI code reduction discards category validation | medium | defer | carried F-B5: the baseline reduction already omitted category, and the existing deferred state-boundary decision is unchanged. |
+| G-B7 | Failure-card Retryable text disagrees with withheld action | medium | defer | carried D-E2 and the contracts/server retry-text deferral: the stored flag remains independent of the action intersection, as it did before this story. |
+| G-B8 | Workspace and Association Review reuse fixed failure keys | medium | defer | carried R-E5/D-E3/D-B5: fixed keys and the existing attempt/route identity follow-ups remain; no duplicate ledger entry or patch. |
+| G-B9 | Generic failure card renders optional projected metadata | medium | defer | carried B5/C-E7: the pre-existing projected-field provenance audit remains deferred. |
+| G-B10 | Unknown stored completion or audit text throws | medium | defer | carried B8/D-B6: the pre-existing storage forward-compatibility decision remains deferred. |
+| G-V1 | Retry waiting classifications lack denial-boundary regression coverage | medium | patch | Pre-verified: removing RetryQueued/RetryAccepted from the waiting switch leaves prior tests passing while three denial consumers admit queued/accepted copy. Pin waiting classification and add both codes to the existing server, CLI and MCP denial theories. |
+
+The edge-case layer returned no findings. Four patch groups were applied in this session; carried findings retain their recorded disposition. The user additionally authorized a narrowly tested gate compatibility fix: product completion accepts reviewed story spellings `review` and `in-review`, while requiring an exact `review` sprint base and preserving all source, result, provenance and mapping checks.
 
 ## Verification
 
@@ -526,7 +548,49 @@ dotnet tools/Hexalith.ChatBot.StoryEvidenceGate/bin/Debug/net10.0/Hexalith.ChatB
 
 - The spec remains `in-review` and sprint status remains `review`. Repository completion evidence and ordinary AppHost startup remain blocked as recorded above; no attested completion, successful live backend topology or manual screen-reader traversal is claimed. The workflow's requested done transition is subordinate to the required repository preflight.
 
+### Completion verification of the final refinement (2026-10-14)
+
+- The final Debug source build passed with zero warnings and errors: `dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false -v:q`. The final log is `/tmp/chatbot-story-1-4-review-11laus_d/final-build.log`.
+- All nine affected native test assemblies passed independently with `-failSkips -noColor -result-trx <lane>.trx -result-ctrf <lane>.ctrf.json`: **4,386 passed, zero failures or skips**. Gate self-tests passed **226 tests, zero failures or skips**. Complete current-run TRX/CTRF results and logs are retained in `/tmp/chatbot-story-1-4-review-11laus_d/results/completion`, with `suite-summary.json` in its parent run directory.
+- Mounted regressions prove terminal and untranslated dashboard failures cannot activate Refresh, dependency failures retain a real reload action in English/French, and fresh Governed Operations submissions announce across remount while passive rerenders remain quiet. Server, CLI and MCP refusal theories reject queued/accepted retry outcomes; catalog tests pin their waiting state. Transport exceptions retain safe catalog dependency copy and retry guidance without raw prose.
+- Product completion regressions accept both `review` and `in-review` story bases with an exact `review` sprint base. Missing, unreviewed, terminal or inconsistent base records still fail; the source/provenance/mapping gates and policy exceptions are unchanged.
+- The repository completion preflight passed for the proposed done state: 15 exact refinement paths, 11 checked/mapped items, ten current-run lanes and the recognized browser primary. Its final report path is `_bmad-output/implementation-artifacts/evidence/reports/1-4-return-versioned-safe-outcomes.json`.
+- The completion contract maps all seven execution tasks and four acceptance criteria to passing canonical test identities and declares the recognized `browser-primary` lane. Its exact refinement scope begins at the already-reviewed implementation `c8da8a5b3aeaf057586aacd30f9c3e5e7bf37947`; historical source inventory is retained separately below.
+- `git -c core.whitespace=cr-at-eol diff --check` passed. Browser-generated historical images are retained separately in the run directory and their original tracked bytes are preserved.
+- Baseline command `aspire start --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --no-build --non-interactive --format Json` exited 2 (child 134) because `ChatBot:LiveRecoveryValidation:MailboxClientSecret` is absent. The current refinement changes no AppHost path and makes no live Aspire/Dapr claim; browser evidence uses the actual loopback UI host with the existing typed-client seam. This environment limitation and the previously recorded deferred issues remain.
+
+| Suite | Passed | Failed / skipped |
+| --- | ---: | ---: |
+| Contracts | 519 | 0 / 0 |
+| Client | 92 | 0 / 0 |
+| Cli | 57 | 0 / 0 |
+| Mcp | 67 | 0 / 0 |
+| Server | 2617 | 0 / 0 |
+| UI | 496 | 0 / 0 |
+| Conformance | 150 | 0 / 0 |
+| Architecture | 123 | 0 / 0 |
+| UI.E2E | 265 | 0 / 0 |
+| StoryEvidenceGate | 226 | 0 / 0 |
+
 ## File List
+
+- `_bmad-output/implementation-artifacts/evidence/1-4-return-versioned-safe-outcomes.json`
+- `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `docs/story-evidence-integrity.md`
+- `src/Hexalith.ChatBot.Cli/ChatBotCliOutputFormatter.cs`
+- `src/Hexalith.ChatBot.Mcp/ChatBotMcpResultFormatter.cs`
+- `src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor`
+- `src/Hexalith.ChatBot.UI/Components/Pages/OperationalDashboards.razor`
+- `tests/Hexalith.ChatBot.Cli.Tests/ChatBotCliCommandTests.cs`
+- `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`
+- `tests/Hexalith.ChatBot.Mcp.Tests/ChatBotMcpServiceTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/SafeOutcomeProblemCompatibilityTests.cs`
+- `tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/StoryEvidenceGateTests.cs`
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/SafeOutcomeInteractionTests.cs`
+- `tools/Hexalith.ChatBot.StoryEvidenceGate/StoryEvidenceValidator.cs`
+
+## Historical Implementation Inventory
 
 - `Hexalith.ChatBot.slnx`
 - `README.md`
