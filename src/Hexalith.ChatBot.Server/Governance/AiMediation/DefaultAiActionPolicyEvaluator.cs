@@ -47,6 +47,7 @@ internal sealed class DefaultAiActionPolicyEvaluator(ITenantAiPolicySnapshotProv
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Unavailable();
         }
 

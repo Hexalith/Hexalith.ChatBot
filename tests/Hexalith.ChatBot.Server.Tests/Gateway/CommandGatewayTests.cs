@@ -1526,68 +1526,43 @@ public sealed partial class CommandGatewayTests
             "sha256:routingnew");
 
     [Fact]
-    public async Task EscalationPolicyChangePreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    public async Task EscalationPolicyChangeMustDenyBeforePreCommitAuditEvenWhenThatWriterIsUnavailable()
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
         RecordingReplayIntentQueue replayQueue = new();
-        RecordingOperatorAlertSink alertSink = new();
-        CommandGateway gateway = Gateway(
-            dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
-            auditWriter: auditWriter,
-            replayQueue: replayQueue,
-            alertSink: alertSink,
-            commandAllowlist: new ChatBotSpineCommandAllowlist());
+        CommandGateway gateway = Gateway(dispatcher, authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
+            auditWriter: auditWriter, replayQueue: replayQueue, commandAllowlist: new ChatBotSpineCommandAllowlist());
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
-            Submission(AdminPrincipal("policy-admin"), EscalationPolicyChangeCommand()),
-            TestContext.Current.CancellationToken);
+            Submission(AdminPrincipal("policy-admin"), EscalationPolicyChangeCommand()), TestContext.Current.CancellationToken);
 
         result.IsAccepted.ShouldBeFalse();
-        result.Problem.ShouldNotBeNull();
-        result.Problem.Status.ShouldBe(503);
-        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        result.Problem.ShouldNotBeNull().Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.DependencyDegraded);
         dispatcher.DispatchCount.ShouldBe(0);
-        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
-        replayQueue.Intents.Single().CommandName.ShouldBe(nameof(SubmitEscalationPolicyChange));
-        alertSink.Alerts.Single().Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
-        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-operation:escalation-policy-edit");
-        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+        replayQueue.Intents.ShouldBeEmpty();
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
     }
 
     [Fact]
-    public async Task EscalationPolicyChangeAuditRefsShouldRemainMetadataOnly()
+    public async Task EscalationPolicyChangeDeniedAuditMustRemainMetadataOnly()
     {
         RecordingAuditWriter auditWriter = new();
-        CommandGateway gateway = Gateway(
-            new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
-            auditWriter: auditWriter,
-            commandAllowlist: new ChatBotSpineCommandAllowlist());
+        CommandGateway gateway = Gateway(new RecordingDispatcher(), authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
+            auditWriter: auditWriter, commandAllowlist: new ChatBotSpineCommandAllowlist());
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
-            Submission(AdminPrincipal("policy-admin"), EscalationPolicyChangeCommand()),
-            TestContext.Current.CancellationToken);
+            Submission(AdminPrincipal("policy-admin"), EscalationPolicyChangeCommand()), TestContext.Current.CancellationToken);
 
-        result.IsAccepted.ShouldBeTrue();
-        auditWriter.Envelopes.Count.ShouldBe(2);
-        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
-        {
-            envelope.SourceEvidenceRefs.ShouldContain("admin-role:policy-admin");
-            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:escalation-policy-edit");
-            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
-            envelope.SourceEvidenceRefs.ShouldContain("escalation-state-class:approval-pending");
-            envelope.SourceEvidenceRefs.ShouldContain("escalation-channel:email");
-            envelope.SourceEvidenceRefs.ShouldContain("escalation-target-role:policy-admin");
-            envelope.SourceEvidenceRefs.ShouldContain("escalation-severity:medium");
-            envelope.SourceEvidenceRefs.ShouldContain("escalation-age-threshold-seconds:43200");
-            envelope.SourceEvidenceRefs.ShouldContain("escalation-new-fingerprint:sha256:escalationnew");
-        }
-
-        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        serialized.ShouldNotContain("secret", Case.Insensitive);
-        serialized.ShouldNotContain("address", Case.Insensitive);
+        result.IsAccepted.ShouldBeFalse();
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+        string serialized = JsonSerializer.Serialize(auditWriter.AuthorizationFailures, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("escalation-snapshot-current");
+        serialized.ShouldNotContain("escalation-snapshot-proposed");
+        serialized.ShouldNotContain("sha256:escalationnew");
     }
 
     private static SubmitEscalationPolicyChange EscalationPolicyChangeCommand()

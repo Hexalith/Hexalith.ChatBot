@@ -127,6 +127,33 @@ public sealed class ImmutableTenantPolicySnapshotTests
     }
 
     [Fact]
+    public void SyntheticResolutionMustDenyFutureEffectiveAndUnauthenticatedCallers()
+    {
+        TenantPolicySnapshotHistory future = new();
+        future.TryAppend(Snapshot(effective: SyntheticNow.AddMinutes(1)), out future, out _).ShouldBeTrue();
+        Resolve(future, "synthetic-first", 1).ShouldBeNull();
+
+        TenantPolicySnapshotHistory current = new();
+        current.TryAppend(Snapshot(), out current, out _).ShouldBeTrue();
+        ChatBotRequestContext unauthenticated = new("synthetic-actor", "synthetic-alpha", "human", null, ChatBotSurfaceOrigin.Api,
+            new ClaimsPrincipal(new ClaimsIdentity([new("sub", "synthetic-actor")])));
+        TenantPolicySnapshotResolver.Resolve([current], unauthenticated, "synthetic-first", 1, true, SyntheticNow, SyntheticNow).ShouldBeNull();
+    }
+
+    [Fact]
+    public void SyntheticHistoryMustRejectBrokenSupersessionAndRollbackLineage()
+    {
+        TenantPolicySnapshotHistory empty = new();
+        empty.TryAppend(Snapshot(supersedes: "synthetic-ghost"), out _, out _).ShouldBeFalse();
+        empty.TryAppend(Snapshot(rollback: "synthetic-ghost"), out _, out _).ShouldBeFalse();
+
+        TenantPolicySnapshotHistory history = new();
+        history.TryAppend(Snapshot(), out history, out _).ShouldBeTrue();
+        history.TryAppend(Snapshot(id: "synthetic-next", version: 2, supersedes: "synthetic-ghost"), out _, out _).ShouldBeFalse();
+        history.TryAppend(Snapshot(id: "synthetic-next", version: 2, supersedes: "synthetic-first", rollback: "synthetic-ghost"), out _, out _).ShouldBeFalse();
+    }
+
+    [Fact]
     public void SyntheticMalformedPolicyMustRejectUnknownKnobsIncompleteValuesAndUnsafeThresholds()
     {
         Should.Throw<ArgumentException>(() => Snapshot(values: new([new("unknown", BoolValue: true)])));

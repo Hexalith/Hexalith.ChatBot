@@ -120,6 +120,9 @@ public sealed class AiActionPolicyEvaluatorTests
         allowed.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskExecuteAllowed);
         denied.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
         denied.ReasonCode.ShouldBe("low_risk_policy_false");
+        denied.TenantId.ShouldBe("tenant-alpha");
+        denied.PolicyVersion.ShouldBe(1);
+        denied.PolicySnapshotId.ShouldBe("policy-snap-001");
     }
 
     [Fact]
@@ -152,6 +155,36 @@ public sealed class AiActionPolicyEvaluatorTests
 
         decision.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
         decision.ReasonCode.ShouldBe("low_risk_policy_false");
+        decision.TenantId.ShouldBe("tenant-alpha");
+        decision.PolicyVersion.ShouldBe(1);
+        decision.PolicySnapshotId.ShouldBe("policy-snap-001");
+    }
+
+    [Fact]
+    public async Task SurfaceMismatchMustKeepTheExactResolvedReference()
+    {
+        DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new("tenant-alpha", 1, "policy-snap-001", true, "read-only", ["other-kind"], true, true)));
+
+        AiActionPolicyDecision decision = await evaluator.EvaluateAsync(Request(), TestContext.Current.CancellationToken);
+
+        decision.ReasonCode.ShouldBe("policy_surface_mismatch");
+        decision.TenantId.ShouldBe("tenant-alpha");
+        decision.PolicyVersion.ShouldBe(1);
+        decision.PolicySnapshotId.ShouldBe("policy-snap-001");
+    }
+
+    [Theory]
+    [InlineData("bad/kind", "read-only")]
+    [InlineData("summarize-visible-context", "bad/surface")]
+    public async Task SyntheticUnsafeSnapshotTokensMustNotPermitExecution(string kind, string surface)
+    {
+        DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new("tenant-alpha", 1, "policy-snap-001", true, surface, [kind], true, true)));
+
+        AiActionPolicyDecision decision = await evaluator.EvaluateAsync(Request(), TestContext.Current.CancellationToken);
+
+        decision.Kind.ShouldBe(AiActionPolicyDecisionKind.Blocked);
+        decision.ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+        decision.PolicySnapshotId.ShouldBe("unavailable");
     }
 
     [Theory]
