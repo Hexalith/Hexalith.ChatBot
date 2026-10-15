@@ -189,11 +189,13 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new();
         RecordingReplayIntentQueue replayQueue = new();
         RecordingOperatorAlertSink alertSink = new();
+        AbortTrackingIdempotencyStore idempotencyStore = new();
         CommandGateway gateway = Gateway(
             dispatcher,
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             alertSink: alertSink,
+            idempotencyStore: idempotencyStore,
             lifecycleTransitionGuard: new FixedLifecycleTransitionGuard(
                 LifecycleTransitionValidation.Invalid(new LifecycleTransitionDefinition("Received", "Associated"))));
 
@@ -207,7 +209,11 @@ public sealed partial class CommandGatewayTests
         result.Problem.Category.ShouldBe(ProblemDetailsCategory.Conflict);
         result.Problem.Code.ShouldBe(LifecycleTransitionReasonCodes.InvalidTransition);
         dispatcher.DispatchCount.ShouldBe(0);
+        idempotencyStore.AbortCount.ShouldBe(1);
         auditWriter.Envelopes.Count.ShouldBe(1);
+        auditWriter.Envelopes[0].ActorId.ShouldBe(ActorId);
+        auditWriter.Envelopes[0].ActorType.ShouldBe("human");
+        auditWriter.Envelopes[0].CorrelationId.ShouldBe(CorrelationId);
         auditWriter.Envelopes[0].Decision.ShouldBe("reject");
         auditWriter.Envelopes[0].ReasonCode.ShouldBe(LifecycleTransitionReasonCodes.InvalidTransition);
         auditWriter.Envelopes[0].StateTransition.ShouldBe("Received->Associated");
@@ -224,11 +230,13 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
         RecordingReplayIntentQueue replayQueue = new();
         RecordingOperatorAlertSink alertSink = new();
+        AbortTrackingIdempotencyStore idempotencyStore = new();
         CommandGateway gateway = Gateway(
             dispatcher,
             auditWriter: auditWriter,
             replayQueue: replayQueue,
             alertSink: alertSink,
+            idempotencyStore: idempotencyStore,
             lifecycleTransitionGuard: new FixedLifecycleTransitionGuard(
                 LifecycleTransitionValidation.Invalid(new LifecycleTransitionDefinition("Received", "Associated"))));
 
@@ -241,7 +249,11 @@ public sealed partial class CommandGatewayTests
         result.Problem.Status.ShouldBe(503);
         result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
         dispatcher.DispatchCount.ShouldBe(0);
+        idempotencyStore.AbortCount.ShouldBe(1);
         auditWriter.Envelopes.Count.ShouldBe(1);
+        auditWriter.Envelopes[0].ActorId.ShouldBe(ActorId);
+        auditWriter.Envelopes[0].ActorType.ShouldBe("human");
+        auditWriter.Envelopes[0].CorrelationId.ShouldBe(CorrelationId);
         replayQueue.Intents.Count.ShouldBe(1);
         replayQueue.Intents[0].Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
         alertSink.Alerts.Count.ShouldBe(1);

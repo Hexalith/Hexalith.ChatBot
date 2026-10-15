@@ -2,8 +2,8 @@ namespace Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
 internal static class LifecycleReprocessFactory
 {
-    public const string SupersededByWorkflowLink = "superseded_by_workflow";
-    public const string SupersedesWorkflowLink = "supersedes_workflow";
+    public const string SupersededByWorkflowLink = "superseded_by";
+    public const string SupersedesWorkflowLink = "supersedes";
 
     public static LifecycleReprocessPlan Create(string terminalState, string supersededWorkflowId, string newWorkflowId)
     {

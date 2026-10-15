@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Security.Claims;
 
 using Hexalith.ChatBot.Client.Generated;
@@ -102,8 +103,45 @@ public static class LifecycleStateModelTests
 
         plan.SupersededWorkflowId.ShouldBe("workflow-old");
         plan.NewWorkflowId.ShouldBe("workflow-new");
-        plan.SupersededByAuditLinkName.ShouldBe("superseded_by_workflow");
-        plan.SupersedesAuditLinkName.ShouldBe("supersedes_workflow");
+        plan.SupersededByAuditLinkName.ShouldBe("superseded_by");
+        plan.SupersedesAuditLinkName.ShouldBe("supersedes");
+    }
+
+    [Fact]
+    public static void ReprocessShouldRejectNonTerminalStateEqualIdsAndBlankIds()
+    {
+        Should.Throw<ArgumentException>(() => LifecycleReprocessFactory.Create(LifecycleStates.Proposed, "workflow-old", "workflow-new"));
+        Should.Throw<ArgumentException>(() => LifecycleReprocessFactory.Create(LifecycleStates.Failed, "workflow-1", "workflow-1"));
+        Should.Throw<ArgumentException>(() => LifecycleReprocessFactory.Create(LifecycleStates.Failed, "workflow-1", " "));
+        Should.Throw<ArgumentException>(() => LifecycleReprocessFactory.Create(LifecycleStates.Failed, "", "workflow-2"));
+    }
+
+    [Theory]
+    [InlineData("Rejected")]
+    [InlineData("Failed")]
+    [InlineData("Skipped")]
+    public static void TerminalStatesShouldHaveNoOutgoingEdgeToAnyState(string terminalState)
+    {
+        foreach (string target in LifecycleStates.All)
+        {
+            LifecycleTransitionValidator
+                .Validate(new LifecycleTransitionDefinition(terminalState, target))
+                .IsValid.ShouldBeFalse();
+        }
+    }
+
+    [Fact]
+    public static void CanonicalStateStringsShouldMatchContractEnumWireValues()
+    {
+        string[] enumWireValues = Enum.GetValues<Hexalith.ChatBot.Contracts.Enums.LifecycleState>()
+            .Select(static value => typeof(Hexalith.ChatBot.Contracts.Enums.LifecycleState)
+                .GetMember(value.ToString()).Single()
+                .GetCustomAttribute<System.Runtime.Serialization.EnumMemberAttribute>()!.Value!)
+            .ToArray();
+
+        // The contract enum is the workflow wire vocabulary; admin-control states (Active/Disabled/Quarantined)
+        // are server-only and follow the workflow states in LifecycleStates.All.
+        LifecycleStates.All.Take(enumWireValues.Length).ShouldBe(enumWireValues);
     }
 
     // ---- M1 lifecycle completion (Story 7.27) ----

@@ -1000,7 +1000,7 @@ public static class ClientGenerationTests
                 CommandId = body.CommandId,
                 CorrelationId = x_Correlation_Id ?? string.Empty,
                 TaskId = x_Hexalith_Task_Id,
-                LifecycleState = Enum.Parse<LifecycleState>("Proposed"),
+                LifecycleState = LifecycleState.Proposed,
                 AcceptedAt = DateTimeOffset.UtcNow,
             });
         }

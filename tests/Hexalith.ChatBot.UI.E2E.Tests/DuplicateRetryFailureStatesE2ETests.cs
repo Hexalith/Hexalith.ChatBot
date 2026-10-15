@@ -115,8 +115,8 @@ public sealed class DuplicateRetryFailureStatesE2ETests
             (await harness.Page.EvaluateAsync<string>("() => window.__newWorkflow.supersedes")).ShouldBe("workflow-001");
 
             string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
-            bodyText.ShouldContain("supersedes_workflow:workflow-001");
-            bodyText.ShouldContain("superseded_by_workflow:workflow-002");
+            bodyText.ShouldContain("supersedes:workflow-001");
+            bodyText.ShouldContain("superseded_by:workflow-002");
             bodyText.ShouldContain("Terminal states stay append-only");
             AssertMetadataOnly(bodyText);
         }
@@ -329,7 +329,7 @@ public sealed class DuplicateRetryFailureStatesE2ETests
                 document.querySelector("[data-reprocess-status]").textContent = "reprocess_created";
                 document.querySelector("[data-new-workflow]").textContent = "workflow-002";
                 document.querySelector("[data-new-lifecycle]").textContent = "Received";
-                document.querySelector("[data-reprocess-links]").textContent = "supersedes_workflow:workflow-001; superseded_by_workflow:workflow-002";
+                document.querySelector("[data-reprocess-links]").textContent = "supersedes:workflow-001; superseded_by:workflow-002";
               }
             </script>
           </body>
@@ -379,8 +379,8 @@ public sealed class DuplicateRetryFailureStatesE2ETests
 
         fixture.ShouldContain("retry_exhausted");
         fixture.ShouldContain("reprocess_created");
-        fixture.ShouldContain("supersedes_workflow:workflow-001");
-        fixture.ShouldContain("superseded_by_workflow:workflow-002");
+        fixture.ShouldContain("supersedes:workflow-001");
+        fixture.ShouldContain("superseded_by:workflow-002");
         fixture.ShouldContain("Terminal states stay append-only");
         reprocessFactory.ShouldContain("SupersedesWorkflow");
         stateModelTests.ShouldContain("Failed");

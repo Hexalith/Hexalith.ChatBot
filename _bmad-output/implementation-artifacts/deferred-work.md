@@ -1448,3 +1448,12 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: Define malformed typed-problem category handling at the UI failure state boundary.
   evidence: F-B5; both baseline and current effects reduce typed problem metadata to a code, so a hand-built known code with an undefined category loses that category before rendering. Align this existing UI boundary with the server and adapter validation policy without inferring a new state contract.
+
+## Deferred from: code review of 1-6-canonical-lifecycle-state-model-and-transition-enforcement (2026-10-15)
+
+- source_spec: `_bmad-output/implementation-artifacts/1-6-canonical-lifecycle-state-model-and-transition-enforcement.md`
+  summary: `CommandSubmissionLifecycleTransitionGuard` always validates the constant `Received->Proposed` edge, so the invalid-transition rejection path is reachable only via fake guards.
+  evidence: Make the guard validate `current->requested` once a story persists per-item lifecycle state; do not accept a client-supplied current state.
+- source_spec: `_bmad-output/implementation-artifacts/1-6-canonical-lifecycle-state-model-and-transition-enforcement.md`
+  summary: `LifecycleReprocessFactory` has no production caller and emits no `supersedes`/`superseded_by` audit envelope (AC4 wiring).
+  evidence: No `src` caller; wire it in the reprocess story (FR48d, Epic 6) together with the audit link emission.

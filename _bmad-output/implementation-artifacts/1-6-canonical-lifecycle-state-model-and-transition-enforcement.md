@@ -241,6 +241,32 @@ Verification:
 - PASS: `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests`
 - PASS: `tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests`
 
+### Review Findings
+
+Code review 2026-10-15 of commits `f4378d1` + `6409240` (spec mode: full). Layers: Blind Hunter, Edge Case Hunter, Verification Gap, Acceptance Auditor.
+
+- [x] [Review][Defer] Production lifecycle guard is constant `Received->Proposed` and can never reject — `CommandSubmissionLifecycleTransitionGuard` ignores `context`, so the new 409 / `AuditUnavailable` rejection branch runs only via injected fake guards. Options: (1) accept as foundation scaffolding until a story persists per-item lifecycle state (record as defer); (2) require the guard to read a current state now. Intent of AC2 for "future association/retry/correction paths" is ambiguous. [CommandSubmissionLifecycleTransitionGuard.cs] — deferred: no persisted per-item lifecycle state exists yet; guard must read it once a story adds it.
+- [x] [Review][Defer] AC4 reprocess has no production path — `LifecycleReprocessFactory` is referenced by no `src` caller and emits no audit envelope; link names are `superseded_by_workflow`/`supersedes_workflow` while AC4 says `supersedes`/`superseded_by`. Options: defer wiring to the reprocess story and align names with the AC, or keep names and record the deviation. [LifecycleReprocessFactory.cs:5-28] — deferred: wiring belongs to the Epic 6 reprocess story; link-name values renamed to `supersedes`/`superseded_by` per AC4.
+- [x] [Review][Patch] Lifecycle validation runs after `RecordAdmissionAsync` (durable idempotency write), so rejection must compensate with `AbortAdmissionAsync`; no try/finally, so a throwing audit writer/replay queue/alert sink leaves the admission held. Validate before admission (guard does not depend on it) or make the abort exception-safe. AC2/AC3. [ChatBotCommandAdmissionPipeline.cs] — RESOLVED WITHOUT CODE CHANGE: a reorder was tried and reverted; Story 1.5 tests deliberately require admission before lifecycle validation (`GatewayShouldExecuteAdmissionStagesBeforeDispatch`, `LifecycleExceptionShouldFenceOwnershipAndKeepDependencyCauseDuringCleanupFailure`), and the pipeline's catch + `AbortSafelyAsync` already covers throwing audit/replay/alert. Rejection tests now assert the abort ran.
+- [x] [Review][Patch] Rejection tests do not assert `AbortAdmissionAsync` ran, nor `ActorId`/`ActorType`/`CorrelationId` on the rejection envelope (AC3). [CommandGatewayTests InvalidLifecycleTransition*, ServerBootstrapApiTests, CommandGatewayAdmissionApiE2ETests]
+- [x] [Review][Patch] `LifecycleReprocessFactory` guard branches untested: non-terminal state, equal IDs, blank IDs. [LifecycleStateModelTests.cs:98,124]
+- [x] [Review][Patch] Terminal-state test checks only `Terminal->Received`; assert no edge leaves any terminal state to any state. [LifecycleStateModelTests.cs]
+- [x] [Review][Patch] No test ties `LifecycleStates.All` / `CommandGatewayHttpResults.Lifecycle()` literals to the contract enum's `EnumMember` values (two parallel vocabularies). [LifecycleStateModelTests.cs, CommandGatewayHttpResults.cs:75-90]
+- [x] [Review][Patch] `ClientGenerationTests` uses `Enum.Parse<LifecycleState>("Proposed")` instead of `LifecycleState.Proposed`, losing compile-time drift protection. [ClientGenerationTests.cs]
+
+#### Rejected
+
+- Health endpoint hard-codes `"healthy"` / enum unused (Blind, Auditor): false — `6409240` binds it via `ChatBotHealthStatuses.ToWireValue(ChatBotHealthStatus.Healthy)`.
+- Test fake implements `ResolveSkipTransition` absent from interface (Edge, Blind): false — artifact of the non-contiguous two-commit diff; at `6409240` the interface declares it.
+- Post-commit outcome lowercase `"proposed"` / half-migrated vocabulary (Edge, Auditor): low — outcome is a free-form audit token, no remaining `"accepted"` consumer in `src`.
+- Pre/post-commit envelopes both carry `Received->Proposed` (Blind, Auditor): low — intentional two-phase audit design from Story 1.4.
+- Validator accepts arbitrary From/To strings (Edge, Blind): low — unreachable from production guard (constants only); fix adds guards.
+- Single `invalid_lifecycle_transition` reason code (Auditor): low — AC3 requires a reason, not subtype granularity.
+- 503 reuses `InternalFailure` description; 409 shared (Edge, Blind, Auditor): low — doc polish needing client regeneration.
+- Legacy idempotency record replay with "accepted" (Edge): false/unsupported — no evidence such a stored outcome exists (no `"accepted"` literal left in `src`).
+- Architecture guard only scans five lowercase words (Edge, Auditor): low — spec task names exactly those synonyms.
+- Questionable state graph, `ChatBotHealth.Status` as string, test-summary/File List inconsistencies, orchestration log touched (Blind, Auditor): low — no named runtime harm; later review commit corrected most artifacts.
+
 ### File List
 
 - _bmad-output/implementation-artifacts/1-6-canonical-lifecycle-state-model-and-transition-enforcement.md
