@@ -254,7 +254,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             reservation.ReservationLeaseExpiresAt is not { } lease || lease <= clock.UtcNow ||
             !string.Equals(outcome.CommandId, reservation.CommandId, StringComparison.Ordinal) ||
             !string.Equals(outcome.CorrelationId, reservation.CorrelationId, StringComparison.Ordinal) ||
-            !string.Equals(outcome.OperationId, reservation.TaskId ?? reservation.CommandId, StringComparison.Ordinal) ||
+            !MatchesOperationIdentity(outcome.OperationId, reservation.CommandId, reservation.TaskId) ||
             outcome.AcceptedAt.Offset != TimeSpan.Zero)
         {
             return false;
@@ -609,7 +609,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
               !string.Equals(reservation.CanonicalEquivalenceHash, retry.CanonicalEquivalenceHash, StringComparison.Ordinal))) ||
             !string.Equals(reservation.IdentityKeyHash, identityKey, StringComparison.Ordinal) ||
             !string.Equals(reservation.CorrelationId, outcome.CorrelationId, StringComparison.Ordinal) ||
-            !string.Equals(outcome.OperationId, outcome.TaskId ?? outcome.CommandId, StringComparison.Ordinal))
+            !MatchesOperationIdentity(outcome.OperationId, outcome.CommandId, outcome.TaskId))
         {
             return false;
         }
@@ -668,7 +668,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             !string.Equals(identity.CommandId, commandId, StringComparison.Ordinal) ||
             !string.Equals(identity.DomainKeyHash, domainKey, StringComparison.Ordinal) ||
             !string.Equals(reservation.CorrelationId, envelope.CorrelationId, StringComparison.Ordinal) ||
-            !string.Equals(operationId, reservation.TaskId ?? commandId, StringComparison.Ordinal))
+            !MatchesOperationIdentity(operationId, commandId, reservation.TaskId))
         {
             return false;
         }
@@ -1411,4 +1411,9 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             ReasonCode = outcome.ReasonCode,
             RetryEligible = outcome.RetryEligible,
         };
+    /// <summary>Accepts current caller-command identities and exact historical task-based receipts.</summary>
+    private static bool MatchesOperationIdentity(string operationId, string commandId, string? taskId)
+        => string.Equals(operationId, commandId, StringComparison.Ordinal) ||
+            (taskId is not null && string.Equals(operationId, taskId, StringComparison.Ordinal));
+
 }

@@ -337,6 +337,27 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         root.GetProperty("taskId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
         root.GetProperty("lifecycleState").GetString().ShouldBe("Proposed");
+        string operationId = root.GetProperty("operationId").GetString().ShouldNotBeNull();
+        operationId.ShouldBe(root.GetProperty("commandId").GetString());
+        operationId.ShouldNotBe(root.GetProperty("taskId").GetString());
+        scheduled.OperationId.ShouldBe(operationId);
+        OperationStatusWorkflowStatusSink statusSink = new(
+            factory.Services.GetRequiredService<IOperationStatusStore>(),
+            factory.Services.GetRequiredService<ISystemClock>());
+        await statusSink.ReportAsync(scheduled, CorrectionPropagationWorkflowStatuses.Completed, 0,
+            CorrectionPropagationWorkflowFailureCodes.None, TestContext.Current.CancellationToken);
+        using HttpResponseMessage polled = await client.GetAsync($"/api/v1/operations/{operationId}", TestContext.Current.CancellationToken);
+        polled.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using JsonDocument operation = JsonDocument.Parse(await polled.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        JsonElement status = operation.RootElement;
+        status.GetProperty("operationId").GetString().ShouldBe(operationId);
+        status.GetProperty("commandId").GetString().ShouldBe(operationId);
+        status.GetProperty("correlationId").GetString().ShouldBe(root.GetProperty("correlationId").GetString());
+        status.GetProperty("workflowInstanceId").GetString().ShouldBe(scheduled.WorkflowInstanceId);
+        status.GetProperty("workflowStatus").GetString().ShouldBe(CorrectionPropagationWorkflowStatuses.Completed);
+        status.GetProperty("completionStatus").GetString().ShouldBe(OperationStatusRecord.Completed);
+        status.GetProperty("reasonCode").GetString().ShouldBe(ChatBotMessageCodes.AssociationCorrectionPropagationComplete);
+
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
         body.ShouldNotContain("project-alpha", Case.Insensitive);
         body.ShouldNotContain("project-beta", Case.Insensitive);
@@ -2405,7 +2426,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         AssertReplayBody(firstBody, secondBody);
         using JsonDocument replayJson = JsonDocument.Parse(secondBody);
         string storedOperationId = replayJson.RootElement.GetProperty("operationId").GetString().ShouldNotBeNull();
-        second.Headers.GetValues("X-Hexalith-Task-Id").Single().ShouldBe(storedOperationId);
+        second.Headers.GetValues("X-Hexalith-Task-Id").Single().ShouldBe(replayJson.RootElement.GetProperty("taskId").GetString());
         second.Headers.GetValues("X-Correlation-Id").Single()
             .ShouldBe(replayJson.RootElement.GetProperty("correlationId").GetString());
         dispatcher.DispatchCount.ShouldBe(1);
@@ -2416,7 +2437,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         alertSink.Alerts.ShouldBeEmpty();
 
         OperationStatusRecord? status = await operationStatusStore
-            .TryGetAsync("tenant-alpha", "01ARZ3NDEKTSV4RRFFQ69G5FAX", TestContext.Current.CancellationToken)
+            .TryGetAsync("tenant-alpha", "01ARZ3NDEKTSV4RRFFQ69G5FAY", TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         status.ShouldNotBeNull();
         status.AuditStatus.ShouldBe(OperationStatusRecord.AuditCommitted);
@@ -2742,7 +2763,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         alertSink.Alerts[0].ReasonCode.ShouldBe("post_commit_sink_unavailable");
 
         OperationStatusRecord? status = await operationStatusStore
-            .TryGetAsync("tenant-alpha", "01ARZ3NDEKTSV4RRFFQ69G5FAX", TestContext.Current.CancellationToken)
+            .TryGetAsync("tenant-alpha", "01ARZ3NDEKTSV4RRFFQ69G5FAY", TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         status.ShouldNotBeNull();
         status.AuditStatus.ShouldBe(OperationStatusRecord.AuditReconciling);

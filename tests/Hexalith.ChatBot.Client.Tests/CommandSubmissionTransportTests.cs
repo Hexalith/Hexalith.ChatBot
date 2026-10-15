@@ -19,6 +19,46 @@ public sealed class CommandSubmissionTransportTests
     private const string TaskId = "01ARZ3NDEKTSV4RRFFQ69G5FAX";
 
     [Fact]
+    public async Task CanonicalConcurrencyShouldSerializeWithoutChangingLegacyCommandIdentity()
+    {
+        CapturingHandler handler = new(HttpStatusCode.Accepted,
+            """
+            {"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","lifecycleState":"Proposed","acceptedAt":"2026-10-15T12:00:00Z","reasonCode":"command_accepted","retryEligible":false}
+            """);
+        CommandSubmissionRequest request = Request();
+        request.Concurrency = new CommandOperationConcurrency { ExpectedRevision = 4, DecisionSlotId = "decision:alpha" };
+        CommandSubmissionResponse response = await NewClient(handler).SubmitCommandAsync(CorrelationId, TaskId, request, TestContext.Current.CancellationToken);
+        handler.LastRequestBody.ShouldContain("\"concurrency\":{\"expectedRevision\":4,\"decisionSlotId\":\"decision:alpha\"}");
+        response.OperationId.ShouldBe(CommandId);
+    }
+
+    [Fact]
+    public async Task CanonicalStatusShouldDecodeAllSafeFactsWithoutConfusingProjectionLagWithCompletion()
+    {
+        CapturingHandler handler = new(HttpStatusCode.OK,
+            """
+            {"operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","lifecycleState":"Proposed","retryCount":0,"completionStatus":"accepted-projection-pending","auditStatus":"committed","partialOutputs":{"acceptedAt":"2026-10-15T12:00:00Z","completionStatus":"accepted-projection-pending","auditStatus":"committed"},"safeNextActions":["none"],"operationClass":"command-execution","maxAttempts":1,"acceptedAt":"2026-10-15T12:00:00Z","lastUpdatedAt":"2026-10-15T12:00:03Z","reasonCode":"command_accepted","retryEligible":false,"executionState":"Committed","projectionState":"ProjectionLagging","canonicalRevision":3,"expectedRevision":4,"committedRevision":5,"origin":"ui","resourceIds":["resource-alpha"],"createdAt":"2026-10-15T12:00:00Z","equivalenceVersion":"v1","predecessorOperationId":"01ARZ3NDEKTSV4RRFFQ69G5FAX","hasPartialOutputs":true,"terminalReasonCode":"command_accepted","lastTransition":{"revision":3,"state":"Committed","projectionState":"ProjectionLagging","actorId":"actor-alpha","occurredAt":"2026-10-15T12:00:03Z","reasonCode":"command_accepted","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW"}}
+            """);
+        OperationStatus status = await NewClient(handler).GetOperationStatusAsync(CommandId, CorrelationId, TaskId, TestContext.Current.CancellationToken);
+        status.ExecutionState.ShouldBe(CommandExecutionState.Committed);
+        status.ProjectionState.ShouldBe(CommandProjectionState.ProjectionLagging);
+        status.CompletionStatus.ShouldBe(OperationCompletionStatus.AcceptedProjectionPending);
+        status.CanonicalRevision.ShouldBe(3);
+        status.ExpectedRevision.ShouldBe(4);
+        status.CommittedRevision.ShouldBe(5);
+        status.Origin.ShouldBe(SurfaceOrigin.Ui);
+        status.ResourceIds.ShouldBe(["resource-alpha"]);
+        status.CreatedAt.ShouldBe(status.AcceptedAt);
+        status.EquivalenceVersion.ShouldBe(OperationStatusEquivalenceVersion.V1);
+        status.PredecessorOperationId.ShouldBe(TaskId);
+        status.HasPartialOutputs.ShouldBe(true);
+        status.TerminalReasonCode.ShouldBe(ChatBotMessageCode.Command_accepted);
+        status.LastTransition.ShouldNotBeNull().ActorId.ShouldBe("actor-alpha");
+        status.LastTransition.CorrelationId.ShouldBe(CorrelationId);
+        status.RetryEligible.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task SubmitCommandShouldPostTheTypedCommandRequestAndParseAcceptedResponse()
     {
         const string responseBody =
@@ -145,6 +185,9 @@ public sealed class CommandSubmissionTransportTests
             TestContext.Current.CancellationToken);
 
         status.SafeNextActions.ShouldBe([ChatBotMessageNextAction.RetryLater, ChatBotMessageNextAction.Escalate]);
+        status.ExecutionState.ShouldBeNull();
+        status.CanonicalRevision.ShouldBeNull();
+        status.LastTransition.ShouldBeNull();
     }
 
     [Theory]

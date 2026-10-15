@@ -588,6 +588,64 @@ components:
           $ref: "#/components/schemas/ThresholdBand"
         origin:
           $ref: "#/components/schemas/SurfaceOrigin"
+        concurrency:
+          $ref: "#/components/schemas/CommandOperationConcurrency"
+          description: Explicit canonical execution request; unavailable until owner and protection acceptance.
+    CommandOperationConcurrency:
+      type: object
+      additionalProperties: false
+      required:
+        - expectedRevision
+      properties:
+        expectedRevision:
+          type: integer
+          format: int64
+          minimum: 0
+        decisionSlotId:
+          type: string
+          minLength: 1
+          maxLength: 240
+          pattern: "^[a-zA-Z0-9:._-]+$"
+    CommandExecutionState:
+      type: string
+      description: Canonical execution state. Admission and projection never imply commit.
+      enum:
+        - Received
+        - Admitted
+        - Committed
+        - Rejected
+        - Failed
+    CommandProjectionState:
+      type: string
+      enum:
+        - ProjectionPending
+        - Projected
+        - ProjectionLagging
+    CommandOperationTransition:
+      type: object
+      additionalProperties: false
+      required: [revision, state, projectionState, actorId, occurredAt, reasonCode, correlationId]
+      properties:
+        revision:
+          type: integer
+          format: int64
+          minimum: 0
+        state:
+          $ref: "#/components/schemas/CommandExecutionState"
+        projectionState:
+          $ref: "#/components/schemas/CommandProjectionState"
+        actorId:
+          type: string
+          minLength: 1
+          maxLength: 240
+          pattern: "^[a-zA-Z0-9:._@-]+$"
+        occurredAt:
+          type: string
+          format: date-time
+        reasonCode:
+          $ref: "#/components/schemas/ChatBotMessageCode"
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
     CommandSubmissionResponse:
       allOf:
         - $ref: "#/components/schemas/AcceptedCommand"
@@ -609,7 +667,7 @@ components:
           $ref: "#/components/schemas/CorrelationId"
         operationId:
           $ref: "#/components/schemas/CommandId"
-          description: Canonical status identity, equal to taskId when supplied and commandId otherwise.
+          description: Caller commandId for new receipts, independent of taskId. Historical stored identities are preserved.
         taskId:
           $ref: "#/components/schemas/TaskId"
         lifecycleState:
@@ -1273,9 +1331,8 @@ components:
         - retryEligible
       properties:
         operationId:
-          oneOf:
-            - $ref: "#/components/schemas/TaskId"
-            - $ref: "#/components/schemas/CommandId"
+          $ref: "#/components/schemas/CommandId"
+          description: Lifetime caller command ULID for canonical records; historical values remain unchanged.
         commandId:
           $ref: "#/components/schemas/CommandId"
         correlationId:
@@ -1364,6 +1421,45 @@ components:
           type: string
           format: date-time
           description: UTC last status update timestamp.
+        executionState:
+          $ref: "#/components/schemas/CommandExecutionState"
+          description: Absent on legacy receipts. SDK admission never supplies this committed state.
+        projectionState:
+          $ref: "#/components/schemas/CommandProjectionState"
+        canonicalRevision:
+          type: integer
+          format: int64
+          minimum: 0
+        expectedRevision:
+          type: integer
+          format: int64
+          minimum: 0
+        committedRevision:
+          type: integer
+          format: int64
+          minimum: 0
+        origin:
+          $ref: "#/components/schemas/SurfaceOrigin"
+        resourceIds:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 240
+            pattern: "^[a-zA-Z0-9:._-]+$"
+        createdAt:
+          type: string
+          format: date-time
+        equivalenceVersion:
+          type: string
+          enum: [v1]
+        predecessorOperationId:
+          $ref: "#/components/schemas/CommandId"
+        lastTransition:
+          $ref: "#/components/schemas/CommandOperationTransition"
+        hasPartialOutputs:
+          type: boolean
+          description: Indicates partial metadata without exposing output contents.
     OperationStatusPartialOutputs:
       type: object
       additionalProperties: false
@@ -8526,7 +8622,7 @@ components:
         commandId: 01ARZ3NDEKTSV4RRFFQ69G5FAV
         correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
         taskId: 01ARZ3NDEKTSV4RRFFQ69G5FAX
-        operationId: 01ARZ3NDEKTSV4RRFFQ69G5FAX
+        operationId: 01ARZ3NDEKTSV4RRFFQ69G5FAV
         lifecycleState: Proposed
         acceptedAt: "2026-05-30T00:00:00Z"
         reasonCode: command_accepted
@@ -8534,7 +8630,7 @@ components:
     OperationStatusProjectionPending:
       summary: Synthetic projection-pending operation status.
       value:
-        operationId: 01ARZ3NDEKTSV4RRFFQ69G5FAX
+        operationId: 01ARZ3NDEKTSV4RRFFQ69G5FAV
         commandId: 01ARZ3NDEKTSV4RRFFQ69G5FAV
         correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
         lifecycleState: Proposed
@@ -8556,7 +8652,7 @@ components:
     OperationAuditHistoryPostCommit:
       summary: Synthetic post-commit audit-history summary.
       value:
-        operationId: 01ARZ3NDEKTSV4RRFFQ69G5FAX
+        operationId: 01ARZ3NDEKTSV4RRFFQ69G5FAV
         auditStatus: committed
         entries:
           - phase: post-commit

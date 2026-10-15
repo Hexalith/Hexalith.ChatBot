@@ -12,6 +12,28 @@ public static partial class OpenApiContractSpineTests
     private static readonly string ContractPath = Path.Combine(RepositoryRoot, "src", "Hexalith.ChatBot.Contracts", "openapi", "hexalith.chatbot.v1.yaml");
 
     [Fact]
+    public static void CanonicalOperationContractShouldDeclareSeparateStatesRevisionGuardAndOptionalLegacyCompatibleMetadata()
+    {
+        YamlMappingNode schemas = Mapping(Mapping(LoadContract(), "components"), "schemas");
+        YamlMappingNode guard = Mapping(schemas, "CommandOperationConcurrency");
+        Sequence(guard, "required").Children.OfType<YamlScalarNode>().Select(node => node.Value).ShouldBe(["expectedRevision"]);
+        Scalar(Mapping(Mapping(guard, "properties"), "expectedRevision"), "minimum").ShouldBe("0");
+        Scalar(Mapping(Mapping(guard, "properties"), "expectedRevision"), "format").ShouldBe("int64");
+        Sequence(Mapping(schemas, "CommandExecutionState"), "enum").Children.OfType<YamlScalarNode>().Select(node => node.Value)
+            .ShouldBe(["Received", "Admitted", "Committed", "Rejected", "Failed"]);
+        Sequence(Mapping(schemas, "CommandProjectionState"), "enum").Children.OfType<YamlScalarNode>().Select(node => node.Value)
+            .ShouldBe(["ProjectionPending", "Projected", "ProjectionLagging"]);
+        YamlMappingNode status = Mapping(schemas, "OperationStatus");
+        string[] canonical = ["executionState", "projectionState", "canonicalRevision", "origin", "resourceIds", "createdAt",
+            "expectedRevision", "committedRevision", "equivalenceVersion", "predecessorOperationId", "lastTransition", "hasPartialOutputs"];
+        ShouldContainAll(RequiredKeys(Mapping(status, "properties")), canonical);
+        string[] required = Sequence(status, "required").Children.OfType<YamlScalarNode>().Select(node => node.Value!).ToArray();
+        required.Intersect(canonical).ShouldBeEmpty();
+        ShouldContainAll(Sequence(Mapping(schemas, "CommandOperationTransition"), "required").Children.OfType<YamlScalarNode>().Select(node => node.Value!).ToArray(),
+            ["revision", "state", "projectionState", "actorId", "occurredAt", "reasonCode", "correlationId"]);
+    }
+
+    [Fact]
     public static void ContractSpineShouldDeclareOpenApiFoundation()
     {
         YamlMappingNode root = LoadContract();

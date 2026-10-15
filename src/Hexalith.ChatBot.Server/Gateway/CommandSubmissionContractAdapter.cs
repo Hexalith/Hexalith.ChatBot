@@ -22,7 +22,7 @@ internal static partial class CommandSubmissionContractAdapter
     /// <summary>The <c>CommandSubmissionRequest</c> properties; any other root member is rejected.</summary>
     internal static readonly IReadOnlySet<string> RequestProperties = new HashSet<string>(StringComparer.Ordinal)
     {
-        "commandId", "commandType", "command", "requestSchemaVersion", "actorType", "riskClass", "thresholdBand", "origin",
+        "commandId", "commandType", "command", "requestSchemaVersion", "actorType", "riskClass", "thresholdBand", "origin", "concurrency",
     };
 
     /// <summary>The <c>CommandSubmissionRequest</c> required properties, in schema order.</summary>
@@ -117,6 +117,7 @@ internal static partial class CommandSubmissionContractAdapter
                 !OptionalEnum(root, "riskClass", RiskClasses) ||
                 !OptionalEnum(root, "thresholdBand", ThresholdBands) ||
                 !OptionalEnum(root, "origin", SurfaceOrigins) ||
+                !ValidConcurrency(root) ||
                 !ValidateKnownCommand(commandType, command))
             {
                 return (null, null);
@@ -131,12 +132,33 @@ internal static partial class CommandSubmissionContractAdapter
                 CommandType = commandType,
                 Command = command.Clone(),
                 RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
+                Concurrency = root.TryGetProperty("concurrency", out JsonElement concurrency) ? new CommandOperationConcurrency
+                {
+                    ExpectedRevision = concurrency.GetProperty("expectedRevision").GetInt64(),
+                    DecisionSlotId = concurrency.TryGetProperty("decisionSlotId", out JsonElement slot) ? slot.GetString() : null,
+                } : null,
             }, origin);
         }
         catch (JsonException)
         {
             return (null, null);
         }
+    }
+
+    private static bool ValidConcurrency(JsonElement root)
+    {
+        if (!root.TryGetProperty("concurrency", out JsonElement guard))
+        {
+            return true; // Historical request compatibility does not opt in to canonical execution.
+        }
+        return guard.ValueKind == JsonValueKind.Object &&
+            guard.EnumerateObject().Select(property => property.Name).Distinct(StringComparer.Ordinal).Count() == guard.EnumerateObject().Count() &&
+            guard.EnumerateObject().All(property => property.Name is "expectedRevision" or "decisionSlotId") &&
+            guard.TryGetProperty("expectedRevision", out JsonElement revision) && revision.ValueKind == JsonValueKind.Number &&
+            revision.TryGetInt64(out long value) && value >= 0 &&
+            (!guard.TryGetProperty("decisionSlotId", out JsonElement slot) ||
+                (slot.ValueKind == JsonValueKind.String && slot.GetString() is { Length: > 0 and <= 240 } token &&
+                    token.All(character => char.IsAsciiLetterOrDigit(character) || character is ':' or '.' or '_' or '-')));
     }
 
     private static bool RequiredString(JsonElement root, string name, out string? value)

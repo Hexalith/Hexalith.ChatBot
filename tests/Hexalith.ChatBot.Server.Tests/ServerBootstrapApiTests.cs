@@ -1687,7 +1687,7 @@ public sealed class ServerBootstrapApiTests
         command.StatusCode.ShouldBe(HttpStatusCode.Accepted);
 
         using HttpResponseMessage response = await client
-            .SendAsync(OperationStatusRequest("01ARZ3NDEKTSV4RRFFQ69G5FAX"), TestContext.Current.CancellationToken)
+            .SendAsync(OperationStatusRequest("01ARZ3NDEKTSV4RRFFQ69G5FAY"), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -1699,7 +1699,7 @@ public sealed class ServerBootstrapApiTests
             .ConfigureAwait(true);
         using JsonDocument status = JsonDocument.Parse(body);
         JsonElement root = status.RootElement;
-        root.GetProperty("operationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        root.GetProperty("operationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
         root.GetProperty("commandId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
         root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         root.GetProperty("lifecycleState").GetString().ShouldBe("Proposed");
@@ -1919,7 +1919,7 @@ public sealed class ServerBootstrapApiTests
         AssertReplayMatchesStoredOutcome(firstBody, duplicateBody);
 
         using HttpResponseMessage response = await client
-            .SendAsync(OperationStatusRequest("01ARZ3NDEKTSV4RRFFQ69G5FAX"), TestContext.Current.CancellationToken)
+            .SendAsync(OperationStatusRequest("01ARZ3NDEKTSV4RRFFQ69G5FAY"), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -1929,7 +1929,7 @@ public sealed class ServerBootstrapApiTests
         using JsonDocument status = JsonDocument.Parse(body);
         JsonElement root = status.RootElement;
         root.GetProperty("operationClass").GetString().ShouldBe("message-intake");
-        root.GetProperty("originalOperationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        root.GetProperty("originalOperationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
         root.GetProperty("duplicateAttemptCount").GetInt32().ShouldBe(1);
         root.GetProperty("duplicateSafetyNote").GetString().ShouldBe("duplicate-provider-message-suppressed");
         root.GetProperty("safeNextActions").EnumerateArray().Single().GetString().ShouldBe("none");
@@ -2036,7 +2036,7 @@ public sealed class ServerBootstrapApiTests
         AssertReplayMatchesStoredOutcome(firstBody, replayBody);
 
         using HttpResponseMessage response = await client
-            .SendAsync(OperationStatusRequest("01ARZ3NDEKTSV4RRFFQ69G5FAX"), TestContext.Current.CancellationToken)
+            .SendAsync(OperationStatusRequest("01ARZ3NDEKTSV4RRFFQ69G5FAY"), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -2048,7 +2048,7 @@ public sealed class ServerBootstrapApiTests
         root.GetProperty("operationClass").GetString().ShouldBe("retry");
         root.GetProperty("retryCount").GetInt32().ShouldBe(1);
         root.GetProperty("maxAttempts").GetInt32().ShouldBe(5);
-        root.GetProperty("originalOperationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        root.GetProperty("originalOperationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
         root.GetProperty("duplicateAttemptCount").GetInt32().ShouldBe(0);
         root.GetProperty("safeNextActions").EnumerateArray().Single().GetString().ShouldBe("none");
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
@@ -2725,7 +2725,15 @@ public sealed class ServerBootstrapApiTests
             .ConfigureAwait(true);
         command.StatusCode.ShouldBe(HttpStatusCode.Accepted);
 
-        using HttpRequestMessage crossTenant = OperationStatusRequest("01ARZ3NDEKTSV4RRFFQ69G5FAX", "tenant-beta");
+        using JsonDocument receipt = JsonDocument.Parse(await command.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true));
+        string operationId = receipt.RootElement.GetProperty("operationId").GetString().ShouldNotBeNull();
+        using HttpResponseMessage authorized = await client
+            .SendAsync(OperationStatusRequest(operationId), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        authorized.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        using HttpRequestMessage crossTenant = OperationStatusRequest(operationId, "tenant-beta");
         using HttpRequestMessage unknown = OperationStatusRequest("01ARZ3NDEKTSV4RRFFQ69G5FAV", "tenant-beta");
         using HttpResponseMessage crossTenantResponse = await client
             .SendAsync(crossTenant, TestContext.Current.CancellationToken)
@@ -2772,7 +2780,7 @@ public sealed class ServerBootstrapApiTests
         command.StatusCode.ShouldBe(HttpStatusCode.Accepted);
 
         using HttpResponseMessage response = await client
-            .SendAsync(AuditHistoryRequest("01ARZ3NDEKTSV4RRFFQ69G5FAX"), TestContext.Current.CancellationToken)
+            .SendAsync(AuditHistoryRequest("01ARZ3NDEKTSV4RRFFQ69G5FAY"), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -2782,7 +2790,7 @@ public sealed class ServerBootstrapApiTests
             .ConfigureAwait(true);
         using JsonDocument history = JsonDocument.Parse(body);
         JsonElement root = history.RootElement;
-        root.GetProperty("operationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        root.GetProperty("operationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
         root.GetProperty("auditStatus").GetString().ShouldBe("committed");
         JsonElement entries = root.GetProperty("entries");
         entries.GetArrayLength().ShouldBe(1);

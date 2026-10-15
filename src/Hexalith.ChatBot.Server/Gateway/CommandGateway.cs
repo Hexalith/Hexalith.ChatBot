@@ -114,12 +114,44 @@ internal sealed class CommandGateway(
             CommandId = submission.Request.CommandId,
             CorrelationId = submission.CorrelationId,
             TaskId = submission.TaskId,
-            OperationId = submission.TaskId ?? submission.Request.CommandId,
+            OperationId = submission.Request.CommandId,
             LifecycleState = LifecycleState.Proposed,
             AcceptedAt = clock.UtcNow.ToUniversalTime(),
             ReasonCode = ChatBotMessageCode.Command_accepted,
             RetryEligible = false,
         };
+
+        if (context.Actor.Principal is Hexalith.ChatBot.Server.Authorization.ChatBotAuthorityPrincipal lookupAuthority && !lookupAuthority.IsCurrent(clock.UtcNow))
+        {
+            await AbortSafelyAsync(idempotency, cancellationToken).ConfigureAwait(false);
+            return Denied(await admission.RejectAuthorityLapseAsync(context, cancellationToken).ConfigureAwait(false));
+        }
+
+        // Legacy compatibility protection only; canonical atomic owner reservation remains unavailable.
+        // Historical task-based identities occupy the same status namespace. A new caller command ULID must
+        // never alias one owned by another command, and the collision must be rejected before any dispatch effect.
+        try
+        {
+            OperationStatusRecord? occupied = await operationStatusStore.TryGetAsync(context.TenantBinding.TenantId,
+                response.OperationId, cancellationToken).ConfigureAwait(false);
+            if (occupied is not null && !string.Equals(occupied.CommandId, response.CommandId, StringComparison.Ordinal))
+            {
+                await AbortSafelyAsync(idempotency, cancellationToken).ConfigureAwait(false);
+                return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateIdempotencyConflict(submission.CorrelationId,
+                    submission.TaskId, Hexalith.ChatBot.Contracts.Messages.ChatBotMessageCodes.IdempotencyConflictCommandExecution));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            using CancellationTokenSource cleanup = new(TimeSpan.FromSeconds(5));
+            await AbortSafelyAsync(idempotency, cleanup.Token).ConfigureAwait(false);
+            throw;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            await AbortSafelyAsync(idempotency, cancellationToken).ConfigureAwait(false);
+            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateDependencyUnavailable(submission.CorrelationId, submission.TaskId));
+        }
 
         if (context.Actor.Principal is Hexalith.ChatBot.Server.Authorization.ChatBotAuthorityPrincipal authority && !authority.IsCurrent(clock.UtcNow))
         {
@@ -228,7 +260,7 @@ internal sealed class CommandGateway(
             bool auditEvidenceRetained = false;
             try
             {
-                // The EventStore command has committed. Persist the metadata-only outcome
+                // SDK submission is accepted; owner commit is not established. Persist the metadata-only outcome
                 // evidence in the independent audit seam before returning a retryable error.
                 AuditWriteResult fallbackAudit = await auditWriter.RecordPostCommitAsync(failedReceiptEnvelope, cancellationToken).ConfigureAwait(false);
                 auditEvidenceRetained = fallbackAudit.Succeeded;
@@ -325,7 +357,7 @@ internal sealed class CommandGateway(
             return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateAuditUnavailable(decision.CorrelationId, decision.TaskId));
         }
 
-        if (string.Equals(reasonCode, "idempotency_outcome_unavailable", StringComparison.Ordinal))
+        if (reasonCode is "idempotency_outcome_unavailable" or "canonical_execution_unavailable")
         {
             return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateDependencyUnavailable(decision.CorrelationId, decision.TaskId));
         }

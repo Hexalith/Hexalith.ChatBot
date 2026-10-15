@@ -1601,6 +1601,93 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public SurfaceOrigin? Origin { get; set; } = default!;
 
+        /// <summary>
+        /// Explicit canonical execution request; unavailable until owner and protection acceptance.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("concurrency", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public CommandOperationConcurrency? Concurrency { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class CommandOperationConcurrency
+    {
+
+        [Newtonsoft.Json.JsonProperty("expectedRevision", Required = Newtonsoft.Json.Required.Always)]
+        public long ExpectedRevision { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("decisionSlotId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DecisionSlotId { get; set; } = default!;
+
+    }
+
+    /// <summary>
+    /// Canonical execution state. Admission and projection never imply commit.
+    /// </summary>
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum CommandExecutionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Received")]
+        Received = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Admitted")]
+        Admitted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Committed")]
+        Committed = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Rejected")]
+        Rejected = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Failed")]
+        Failed = 4,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum CommandProjectionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ProjectionPending")]
+        ProjectionPending = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Projected")]
+        Projected = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ProjectionLagging")]
+        ProjectionLagging = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class CommandOperationTransition
+    {
+
+        [Newtonsoft.Json.JsonProperty("revision", Required = Newtonsoft.Json.Required.Always)]
+        public long Revision { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public CommandExecutionState State { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("projectionState", Required = Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public CommandProjectionState ProjectionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("actorId", Required = Newtonsoft.Json.Required.Always)]
+        public string ActorId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("occurredAt", Required = Newtonsoft.Json.Required.Always)]
+        public System.DateTimeOffset OccurredAt { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ChatBotMessageCode ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
+        public string CorrelationId { get; set; } = default!;
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -1614,7 +1701,7 @@ namespace Hexalith.ChatBot.Client.Generated
         public string CorrelationId { get; set; } = default!;
 
         /// <summary>
-        /// Canonical status identity, equal to taskId when supplied and commandId otherwise.
+        /// Caller commandId for new receipts, independent of taskId. Historical stored identities are preserved.
         /// </summary>
         [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.Always)]
         public string OperationId { get; set; } = default!;
@@ -2153,6 +2240,9 @@ namespace Hexalith.ChatBot.Client.Generated
     public partial class OperationStatus
     {
 
+        /// <summary>
+        /// Lifetime caller command ULID for canonical records; historical values remain unchanged.
+        /// </summary>
         [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.Always)]
         public string OperationId { get; set; } = default!;
 
@@ -2253,6 +2343,52 @@ namespace Hexalith.ChatBot.Client.Generated
         /// </summary>
         [Newtonsoft.Json.JsonProperty("lastUpdatedAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset LastUpdatedAt { get; set; } = default!;
+
+        /// <summary>
+        /// Absent on legacy receipts. SDK admission never supplies this committed state.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("executionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public CommandExecutionState? ExecutionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("projectionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public CommandProjectionState? ProjectionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("canonicalRevision", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long? CanonicalRevision { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("expectedRevision", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long? ExpectedRevision { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("committedRevision", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long? CommittedRevision { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("origin", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public SurfaceOrigin? Origin { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("resourceIds", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? ResourceIds { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("createdAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? CreatedAt { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("equivalenceVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public OperationStatusEquivalenceVersion? EquivalenceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("predecessorOperationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? PredecessorOperationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("lastTransition", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public CommandOperationTransition? LastTransition { get; set; } = default!;
+
+        /// <summary>
+        /// Indicates partial metadata without exposing output contents.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("hasPartialOutputs", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? HasPartialOutputs { get; set; } = default!;
 
     }
 
@@ -9115,6 +9251,15 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
         Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum OperationStatusEquivalenceVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"v1")]
+        V1 = 0,
 
     }
 

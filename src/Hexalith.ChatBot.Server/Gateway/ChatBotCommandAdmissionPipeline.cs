@@ -181,6 +181,13 @@ internal sealed class ChatBotCommandAdmissionPipeline(
             return await DenyAsync(submission, binding.TenantId, actor.ActorId, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken).ConfigureAwait(false);
         }
 
+        // Canonical execution requires accepted owner/protection evidence (A6/A13). This is unconditional in live
+        // runtime; synthetic reducer tests cannot enable it, and no caller flag is an approval substitute.
+        if (submission.Request.Concurrency is not null)
+        {
+            return ChatBotCommandAdmissionDecision.Rejected("canonical_execution_unavailable", submission.CorrelationId, submission.TaskId);
+        }
+
         CoarseIdempotencyDecision idempotencyDecision = await idempotencyStore
             .RecordAdmissionAsync(context, cancellationToken)
             .ConfigureAwait(false);

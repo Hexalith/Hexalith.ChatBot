@@ -11,7 +11,9 @@ internal sealed class InMemoryOperationStatusStore : IOperationStatusStore
         ArgumentNullException.ThrowIfNull(record);
         cancellationToken.ThrowIfCancellationRequested();
 
-        _records[new OperationStatusKey(record.TenantId, record.OperationId)] = record;
+        _ = _records.AddOrUpdate(new OperationStatusKey(record.TenantId, record.OperationId),
+            _ => OperationStatusUpdatePolicy.Apply(null, record),
+            (_, current) => OperationStatusUpdatePolicy.Apply(current, record));
         return ValueTask.CompletedTask;
     }
 
@@ -19,8 +21,8 @@ internal sealed class InMemoryOperationStatusStore : IOperationStatusStore
     {
         cancellationToken.ThrowIfCancellationRequested();
         _ = _records.TryGetValue(new OperationStatusKey(tenantId, operationId), out OperationStatusRecord? record);
-        return ValueTask.FromResult(record);
+        return ValueTask.FromResult(record is null ? null : OperationStatusUpdatePolicy.Snapshot(record));
     }
 
-    private sealed record OperationStatusKey(string TenantId, string OperationId);
+
 }

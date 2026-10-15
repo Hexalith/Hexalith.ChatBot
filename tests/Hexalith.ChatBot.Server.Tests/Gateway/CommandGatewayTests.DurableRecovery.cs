@@ -353,7 +353,10 @@ public sealed partial class CommandGatewayTests
         CoarseCommandIdentityRecord retainedB = state.IdentityRecords.ShouldHaveSingleItem();
         retainedB.DomainReservation!.PreparedAggregateId.ShouldBe(aggregateB);
         CommandSubmissionResponse preparedB = retainedB.DomainReservation.PreparedOutcome.ShouldNotBeNull();
-        AssertPreparedOutcome(preparedB, acceptedA);
+        CommandSubmissionResponse expectedB = PreparedOutcome(oldContext, clock.UtcNow);
+        expectedB.OperationId = changed.Request.CommandId;
+        AssertPreparedOutcome(preparedB, expectedB);
+        acceptedA.OperationId.ShouldBe(oldContext.Submission.TaskId); // The historical receipt was not rewritten.
 
         // Replace every application service; only the coarse state and authoritative platform evidence survive.
         clock.UtcNow += TimeSpan.FromHours(25);

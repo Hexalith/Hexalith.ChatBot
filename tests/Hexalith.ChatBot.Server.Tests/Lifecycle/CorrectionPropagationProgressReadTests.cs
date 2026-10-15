@@ -129,6 +129,7 @@ public sealed class CorrectionPropagationProgressReadTests
         JsonElement status = result.GetPayload();
         status.GetProperty("retryEligible").GetBoolean().ShouldBe(eligible);
         status.TryGetProperty("nextRetryAt", out _).ShouldBe(scenario is "before" or "due");
-        (await store.TryGetAsync("tenant-alpha", operationId, TestContext.Current.CancellationToken)).ShouldBe(record);
+        JsonSerializer.Serialize(await store.TryGetAsync("tenant-alpha", operationId, TestContext.Current.CancellationToken))
+            .ShouldBe(JsonSerializer.Serialize(record));
     }
 }

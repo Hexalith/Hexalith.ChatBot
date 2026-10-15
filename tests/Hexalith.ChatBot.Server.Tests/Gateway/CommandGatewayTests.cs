@@ -748,7 +748,7 @@ public sealed partial class CommandGatewayTests
         state.IdentityRecords.ShouldHaveSingleItem().PriorOutcome.ShouldNotBeNull();
         string expectedReason = auditAvailable ? "idempotency_outcome_unavailable" : "post_commit_evidence_unavailable";
         replayQueue.Intents.ShouldHaveSingleItem().ReasonCode.ShouldBe(expectedReason);
-        replayQueue.Intents[0].AcceptedOutcome.ShouldNotBeNull().OperationId.ShouldBe(request.TaskId);
+        replayQueue.Intents[0].AcceptedOutcome.ShouldNotBeNull().OperationId.ShouldBe(request.Request.CommandId);
         replayQueue.Intents[0].CoarseKeyHash.ShouldNotBeNullOrWhiteSpace();
         replayQueue.Intents[0].IdentityKeyHash.ShouldNotBeNullOrWhiteSpace();
         replayQueue.Intents[0].Kind.ShouldBe(AuditReplayIntentKind.PostCommitAuditReconciliation);
@@ -929,10 +929,10 @@ public sealed partial class CommandGatewayTests
         ChatBotGatewayResult stillUnavailable = await gateway.SubmitAsync(request, TestContext.Current.CancellationToken);
         first.Problem.ShouldNotBeNull().Status.ShouldBe(503);
         stillUnavailable.Problem.ShouldNotBeNull().Status.ShouldBe(503);
-        queue.Intents.ShouldHaveSingleItem().AcceptedOutcome.ShouldNotBeNull().OperationId.ShouldBe(request.TaskId);
+        queue.Intents.ShouldHaveSingleItem().AcceptedOutcome.ShouldNotBeNull().OperationId.ShouldBe(request.Request.CommandId);
         AuditEnvelope receipt = audit.Envelopes.Single(static envelope => envelope.Phase == AuditCommitPhase.PostCommit);
         receipt.SourceEvidenceRefs.ShouldContain($"command:{request.Request.CommandId}");
-        receipt.SourceEvidenceRefs.ShouldContain($"operation:{request.TaskId}");
+        receipt.SourceEvidenceRefs.ShouldContain($"operation:{request.Request.CommandId}");
         string acceptedAtRef = $"accepted-at:{queue.Intents[0].AcceptedOutcome!.AcceptedAt.UtcDateTime:O}";
         acceptedAtRef.ShouldEndWith("Z");
         receipt.SourceEvidenceRefs.ShouldContain(acceptedAtRef);
@@ -3424,9 +3424,9 @@ public sealed partial class CommandGatewayTests
         ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed-resource"));
 
         ChatBotGatewayResult first = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
-        OperationStatusRecord? afterFirst = await statusStore.TryGetAsync(BoundTenant, TaskId, TestContext.Current.CancellationToken);
+        OperationStatusRecord? afterFirst = await statusStore.TryGetAsync(BoundTenant, submission.Request.CommandId, TestContext.Current.CancellationToken);
         ChatBotGatewayResult replay = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
-        OperationStatusRecord? afterReplay = await statusStore.TryGetAsync(BoundTenant, TaskId, TestContext.Current.CancellationToken);
+        OperationStatusRecord? afterReplay = await statusStore.TryGetAsync(BoundTenant, submission.Request.CommandId, TestContext.Current.CancellationToken);
 
         first.IsAccepted.ShouldBeTrue();
         first.AuditReconciliationRequired.ShouldBeTrue();

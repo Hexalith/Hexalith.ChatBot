@@ -58,7 +58,7 @@ public static class SuccessIntentParityTests
         foreach (ArmOutcome outcome in new[] { ui, cli, mcp })
         {
             outcome.DurableStatus.ShouldNotBeNull();
-            outcome.DurableStatus.OperationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+            outcome.DurableStatus.OperationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
             outcome.DurableStatus.CommandId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
             outcome.DurableStatus.CorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
             outcome.DurableStatus.LifecycleState.ShouldBe("Proposed");

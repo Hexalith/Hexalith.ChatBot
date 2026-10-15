@@ -1033,9 +1033,7 @@ internal sealed class AcceptedCommandDispatcher(
                 payload.AssociationId,
                 correctionId,
                 propagationSourceVersion);
-            string operationId = string.IsNullOrWhiteSpace(context.Submission.TaskId)
-                ? context.Submission.Request.CommandId
-                : context.Submission.TaskId;
+            string operationId = context.Submission.Request.CommandId;
             CorrectionPropagationRequest propagation = new(
                 context.TenantBinding.TenantId,
                 context.Actor.ActorId,

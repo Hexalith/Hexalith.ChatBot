@@ -50,7 +50,7 @@ internal static class AuditEnvelopeFactory
         List<string> receiptRefs =
         [
             .. envelope.SourceEvidenceRefs,
-            $"operation:{context.Submission.TaskId ?? context.Submission.Request.CommandId}",
+            $"operation:{context.Submission.Request.CommandId}",
             // A Z-suffixed UTC round-trip token keeps the evidence inside the safe-token charset ('+' is not allowed),
             // so compliance detail retains it; the recovery parser accepts both the Z and +00:00 spellings.
             $"accepted-at:{dispatchResult.AcceptedAt.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture)}",

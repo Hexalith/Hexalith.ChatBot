@@ -136,7 +136,8 @@ public sealed partial class CommandGatewayTests
         CoarseIdempotencyRecord after = durable ? state.DomainRecords.Single() : ((InMemoryCoarseIdempotencyStore)real).Records.Single();
         after.ShouldBe(before);
         if (durable) { AssertPreparedOutcome(state.IdentityRecords.ShouldHaveSingleItem().PriorOutcome!, first.Accepted!); }
-        (await realStatus.TryGetAsync("tenant-alpha", beforeStatus.OperationId, TestContext.Current.CancellationToken)).ShouldBe(beforeStatus);
+        System.Text.Json.JsonSerializer.Serialize(await realStatus.TryGetAsync("tenant-alpha", beforeStatus.OperationId, TestContext.Current.CancellationToken))
+            .ShouldBe(System.Text.Json.JsonSerializer.Serialize(beforeStatus));
     }
 
     /// <summary>

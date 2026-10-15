@@ -38,7 +38,18 @@ internal sealed record OperationStatusRecord(
     int WorkflowRetryCount = 0,
     string? WorkflowLastFailureCode = null,
     string ReasonCode = ChatBotMessageCodes.CommandAccepted,
-    [property: JsonConverter(typeof(EnumMemberWireValueObjectJsonConverter<CommandSubmissionResponse>))] CommandSubmissionResponse? PriorOutcome = null)
+    [property: JsonConverter(typeof(EnumMemberWireValueObjectJsonConverter<CommandSubmissionResponse>))] CommandSubmissionResponse? PriorOutcome = null,
+    Hexalith.ChatBot.Contracts.Enums.CommandExecutionState? ExecutionState = null,
+    Hexalith.ChatBot.Contracts.Enums.CommandProjectionState? ProjectionState = null,
+    long? CanonicalRevision = null,
+    long? ExpectedRevision = null,
+    long? CommittedRevision = null,
+    string? Origin = null,
+    string[]? ResourceIds = null,
+    DateTimeOffset? CreatedAt = null,
+    string? EquivalenceVersion = null,
+    string? PredecessorOperationId = null,
+    Hexalith.ChatBot.Server.Operations.CommandOperationTransition? LastTransition = null)
 {
     public const string AcceptedProjectionPending = "accepted-projection-pending";
     public const string Completed = "completed";
@@ -47,14 +58,53 @@ internal sealed record OperationStatusRecord(
     public const string AuditReconciling = "reconciling";
 
     /// <summary>
-    /// Resolves the stable operation identity for a submission response: the supplied task id when present,
-    /// otherwise the command id. Keeping this in one place guarantees the accept and idempotent-replay paths
-    /// key the same record.
+    /// Resolves a stored receipt without rewriting its historical identity. New gateway receipts supply CommandId
+    /// explicitly; the task fallback applies only to historical receipts which lacked OperationId.
     /// </summary>
     public static string OperationIdFor(CommandSubmissionResponse response)
     {
         ArgumentNullException.ThrowIfNull(response);
         return string.IsNullOrWhiteSpace(response.OperationId) ? response.TaskId ?? response.CommandId : response.OperationId;
+    }
+
+    /// <summary>Maps an authoritative folded canonical outcome. This pure mapping does not perform runtime writes.</summary>
+    public static OperationStatusRecord FromCanonical(Hexalith.ChatBot.Server.Operations.CommandOperationState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        Hexalith.ChatBot.Server.Operations.CommandOperationTransition fact = state.Transitions[^1];
+        Hexalith.ChatBot.Server.Operations.CommandOperationTransition outcome = state.Transitions.FirstOrDefault(
+            transition => transition.State is Hexalith.ChatBot.Contracts.Enums.CommandExecutionState.Committed or
+                Hexalith.ChatBot.Contracts.Enums.CommandExecutionState.Rejected or Hexalith.ChatBot.Contracts.Enums.CommandExecutionState.Failed) ?? fact;
+        bool failed = state.ExecutionState is Hexalith.ChatBot.Contracts.Enums.CommandExecutionState.Failed or Hexalith.ChatBot.Contracts.Enums.CommandExecutionState.Rejected;
+        string completion = failed ? Failed : state.ProjectionState == Hexalith.ChatBot.Contracts.Enums.CommandProjectionState.Projected ? Completed : AcceptedProjectionPending;
+        LifecycleState legacy = state.ExecutionState switch
+        {
+            Hexalith.ChatBot.Contracts.Enums.CommandExecutionState.Received => LifecycleState.Received,
+            Hexalith.ChatBot.Contracts.Enums.CommandExecutionState.Rejected => LifecycleState.Rejected,
+            Hexalith.ChatBot.Contracts.Enums.CommandExecutionState.Failed => LifecycleState.Failed,
+            _ => LifecycleState.Proposed,
+        };
+        return new(state.Identity.TenantId, state.Identity.OperationId, state.Identity.OperationId, state.Identity.CorrelationId,
+            legacy, state.Attempt - 1, completion, state.CommittedRevision is null ? AuditReconciling : AuditCommitted,
+            [ChatBotMessageCatalog.Resolve(outcome.ReasonCode).NextAction], state.IsTerminal ? outcome.ReasonCode : null,
+            state.Identity.CreatedAt, fact.OccurredAt, state.Identity.OperationClass, state.MaxAttempts,
+            FailureReasonCode: failed ? outcome.ReasonCode : null, TerminalReasonCode: state.IsTerminal ? outcome.ReasonCode : null,
+            OriginalOperationId: state.Identity.PredecessorOperationId ?? state.Identity.OperationId,
+            ReasonCode: outcome.ReasonCode, ExecutionState: state.ExecutionState, ProjectionState: state.ProjectionState,
+            CanonicalRevision: state.Revision, ExpectedRevision: state.Concurrency.ExpectedRevision, CommittedRevision: state.CommittedRevision,
+            Origin: Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigins.ToWireValue(state.Identity.Origin),
+            ResourceIds: state.Identity.ResourceIds.ToArray(), CreatedAt: state.Identity.CreatedAt,
+            EquivalenceVersion: state.Identity.EquivalenceVersion, PredecessorOperationId: state.Identity.PredecessorOperationId, LastTransition: fact,
+            PriorOutcome: state.PriorOutcome is not { } previous ? null : new CommandSubmissionResponse
+            {
+                CommandId = previous.OperationId, OperationId = previous.OperationId, CorrelationId = previous.CorrelationId,
+                AcceptedAt = previous.CreatedAt,
+                LifecycleState = previous.State == Hexalith.ChatBot.Contracts.Enums.CommandExecutionState.Rejected ? LifecycleState.Rejected : LifecycleState.Failed,
+                ReasonCode = Enum.GetValues<ChatBotMessageCode>().First(code => typeof(ChatBotMessageCode).GetField(code.ToString())!
+                    .GetCustomAttributes(typeof(System.Runtime.Serialization.EnumMemberAttribute), false)
+                    .OfType<System.Runtime.Serialization.EnumMemberAttribute>().Any(attribute => attribute.Value == previous.ReasonCode)),
+                RetryEligible = false,
+            });
     }
 
     public static OperationStatusRecord Accepted(

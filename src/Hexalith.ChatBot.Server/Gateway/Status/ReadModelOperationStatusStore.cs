@@ -16,7 +16,7 @@ internal sealed class ReadModelOperationStatusStore(IReadModelStore store) : IOp
                 store,
                 ChatBotReadModelStoreNames.StateStoreName,
                 KeyFor(record.TenantId, record.OperationId),
-                _ => record,
+                current => OperationStatusUpdatePolicy.Apply(current, record),
                 new ReadModelWriteContext(Category: nameof(OperationStatusRecord), CorrelationId: record.CorrelationId),
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
@@ -26,12 +26,15 @@ internal sealed class ReadModelOperationStatusStore(IReadModelStore store) : IOp
         string tenantId,
         string operationId,
         CancellationToken cancellationToken)
-        => (await store
+    {
+        OperationStatusRecord? record = (await store
             .GetAsync<OperationStatusRecord>(
                 ChatBotReadModelStoreNames.StateStoreName,
                 KeyFor(tenantId, operationId),
                 cancellationToken)
             .ConfigureAwait(false)).Value;
+        return record is null ? null : OperationStatusUpdatePolicy.Snapshot(record);
+    }
 
     public static string KeyFor(string tenantId, string operationId)
     {

@@ -29,7 +29,14 @@ internal static class OperationStatusHttpResults
         OperationCompletionStatus completion = Parse<OperationCompletionStatus>(record.CompletionStatus);
         OperationAuditStatus audit = Parse<OperationAuditStatus>(record.AuditStatus);
         CommandSubmissionResponse? previous = record.PriorOutcome;
-        bool knownReason = KnownCode(record.ReasonCode) && Enum.IsDefined(record.LifecycleState) &&
+        bool validCanonicalMetadata = record.CanonicalRevision is null ||
+            (record.ResourceIds is not null && record.ResourceIds.All(Hexalith.ChatBot.Server.Operations.CommandOperationMetadataValidation.IsValidResourceId) &&
+                record.LastTransition is not null && Hexalith.ChatBot.Server.Operations.CommandOperationMetadataValidation.IsValidActorId(record.LastTransition.ActorId));
+        bool knownReason = validCanonicalMetadata && KnownCode(record.ReasonCode) && Enum.IsDefined(record.LifecycleState) &&
+            (record.ExecutionState is null || Enum.IsDefined(record.ExecutionState.Value)) &&
+            (record.ProjectionState is null || Enum.IsDefined(record.ProjectionState.Value)) &&
+            (record.LastTransition is null || (KnownCode(record.LastTransition.ReasonCode) &&
+                Enum.IsDefined(record.LastTransition.State) && Enum.IsDefined(record.LastTransition.ProjectionState))) &&
             KnownOptionalCode(record.TerminalReason) &&
             KnownOptionalCode(record.FailureReasonCode) &&
             KnownOptionalCode(record.TerminalReasonCode) &&
@@ -57,8 +64,11 @@ internal static class OperationStatusHttpResults
             LifecycleState = knownReason ? record.LifecycleState : LifecycleState.Failed,
             ReasonCode = knownReason ? ParseCode(record.ReasonCode) : ChatBotMessageCode.Generic_denial,
             RetryEligible = knownReason && !entry.IsTerminal &&
+                (record.CanonicalRevision is null || (record.ExecutionState == Hexalith.ChatBot.Contracts.Enums.CommandExecutionState.Failed &&
+                    record.LastTransition is { PreEffectFailure: true } && record.CommittedRevision is null)) &&
                 safeNextActions.Contains(ChatBotMessageNextAction.RetryLater) &&
-                record.NextRetryAt is { } due && due <= now && record.RetryCount < record.MaxAttempts,
+                record.NextRetryAt is { } due && due <= now &&
+                (record.CanonicalRevision is null ? record.RetryCount < record.MaxAttempts : (long)record.RetryCount + 1 < record.MaxAttempts),
             PriorOutcome = !knownReason || previous is null ? null : new PriorCommandOutcome
             {
                 CommandId = previous.CommandId,
@@ -96,6 +106,27 @@ internal static class OperationStatusHttpResults
             WorkflowLastFailureCode = knownReason ? ParseCodeOrNull(record.WorkflowLastFailureCode) : null,
             AcceptedAt = record.AcceptedAt.ToUniversalTime(),
             LastUpdatedAt = record.LastUpdatedAt.ToUniversalTime(),
+            ExecutionState = knownReason && record.ExecutionState is { } execution ? Enum.Parse<CommandExecutionState>(execution.ToString()) : null,
+            ProjectionState = knownReason && record.ProjectionState is { } projection ? Enum.Parse<CommandProjectionState>(projection.ToString()) : null,
+            CanonicalRevision = knownReason ? record.CanonicalRevision : null,
+            ExpectedRevision = knownReason ? record.ExpectedRevision : null,
+            CommittedRevision = knownReason ? record.CommittedRevision : null,
+            Origin = knownReason && record.Origin is { } origin && TryParse(origin, out SurfaceOrigin surface) ? surface : null,
+            ResourceIds = knownReason ? record.ResourceIds : null,
+            CreatedAt = knownReason ? record.CreatedAt?.ToUniversalTime() : null,
+            EquivalenceVersion = knownReason && record.EquivalenceVersion == "v1" ? OperationStatusEquivalenceVersion.V1 : null,
+            PredecessorOperationId = knownReason ? record.PredecessorOperationId : null,
+            HasPartialOutputs = knownReason && record.PartialOutputCodes is { Length: > 0 },
+            LastTransition = knownReason && record.LastTransition is { } fact && KnownCode(fact.ReasonCode) ? new CommandOperationTransition
+            {
+                Revision = fact.Revision,
+                State = Enum.Parse<CommandExecutionState>(fact.State.ToString()),
+                ProjectionState = Enum.Parse<CommandProjectionState>(fact.ProjectionState.ToString()),
+                ActorId = fact.ActorId,
+                OccurredAt = fact.OccurredAt.ToUniversalTime(),
+                ReasonCode = ParseCode(fact.ReasonCode),
+                CorrelationId = fact.CorrelationId,
+            } : null,
         };
     }
 

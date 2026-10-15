@@ -138,6 +138,7 @@ public static class CommandSubmissionRequestContractDriftTests
             {
                 "commandId" => "01ARZ3NDEKTSV4RRFFQ69G5FAY",
                 "commandType" => "RecordGovernedNote",
+                "concurrency" => new JsonObject { ["expectedRevision"] = 0, ["decisionSlotId"] = "decision:alpha" },
                 "command" => new JsonObject { ["noteId"] = "01ARZ3NDEKTSV4RRFFQ69G5FAW" },
                 _ => FirstEnumValue(schemas, Mapping(properties, name), name),
             };
