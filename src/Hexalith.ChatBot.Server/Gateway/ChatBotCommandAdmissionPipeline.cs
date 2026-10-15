@@ -8,6 +8,8 @@ using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Observability;
+using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Server.Governance.Policy;
 using Hexalith.EventStore.Contracts.Commands;
 
 namespace Hexalith.ChatBot.Server.Gateway;
@@ -153,6 +155,12 @@ internal sealed class ChatBotCommandAdmissionPipeline(
                 ChatBotAuthorizationReasonCodes.CommandNotAllowlisted,
                 submission.CorrelationId,
                 submission.TaskId);
+        }
+
+        if (TenantPolicyPersistenceGate.Denies(submission.Request.CommandType))
+        {
+            return await DenyAsync(submission, binding.TenantId, actor.ActorId,
+                ChatBotRefusalReasonCodes.PolicySnapshotUnavailable, cancellationToken).ConfigureAwait(false);
         }
 
         ChatBotGatewayContext context = new(submission, actor, binding, authorizationResult.ServiceClientGrantEvidence, authority.EvidenceReferences);
@@ -495,7 +503,10 @@ internal sealed class ChatBotCommandAdmissionPipeline(
                 cancellationToken)
             .ConfigureAwait(false);
 
-        authorizationFailureCounter?.Record(tenantId, clock.UtcNow);
+        if (reasonCode != ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)
+        {
+            authorizationFailureCounter?.Record(tenantId, clock.UtcNow);
+        }
 
         return ChatBotCommandAdmissionDecision.Rejected(reasonCode, submission.CorrelationId, submission.TaskId);
     }

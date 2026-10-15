@@ -59,6 +59,16 @@ public sealed partial class CommandGatewayTests
             .SubmitAsync(submission, TestContext.Current.CancellationToken);
         first.IsAccepted.ShouldBeFalse();
         first.Problem.ShouldNotBeNull().Status.ShouldBe(503);
+        if (operation == "policy")
+        {
+            // Historical synthetic policy state remains readable, but absent A6 blocks every new policy write.
+            first.Problem.Code.ShouldBe(ChatBotMessageCodes.DependencyDegraded);
+            state.IdentityRecords.ShouldBeEmpty();
+            state.DomainRecords.ShouldHaveSingleItem().ShouldBe(legacy);
+            platform.SubmissionCount.ShouldBe(1);
+            platform.ReceivedSubmissionCount.ShouldBe(1);
+            return;
+        }
         CoarseCommandIdentityRecord identity = state.IdentityRecords.ShouldHaveSingleItem();
         CoarseIdempotencyRecord preparedReservation = identity.DomainReservation.ShouldNotBeNull();
         preparedReservation.PreparedAggregateId.ShouldBe(aggregate);

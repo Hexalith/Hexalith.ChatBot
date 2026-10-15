@@ -18,6 +18,8 @@ internal sealed class RecoveryTenantAiPolicySnapshotProvider : ITenantAiPolicySn
     {
         cancellationToken.ThrowIfCancellationRequested();
         TenantAiPolicySnapshot snapshot = new(
+            tenantId,
+            1,
             string.IsNullOrWhiteSpace(requestedPolicySnapshotId) ? "policy-recovery" : requestedPolicySnapshotId,
             LowRiskAllowed: true,
             "read-only",

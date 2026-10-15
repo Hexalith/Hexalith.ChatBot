@@ -4072,6 +4072,8 @@ public sealed class ServerBootstrapApiTests
             string? requestedPolicySnapshotId,
             CancellationToken cancellationToken)
             => ValueTask.FromResult<TenantAiPolicySnapshot?>(new TenantAiPolicySnapshot(
+                tenantId,
+                1,
                 requestedPolicySnapshotId ?? "policy-snap-001",
                 lowRiskAllowed,
                 "read-only",

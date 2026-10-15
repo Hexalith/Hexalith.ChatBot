@@ -1457,3 +1457,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/1-6-canonical-lifecycle-state-model-and-transition-enforcement.md`
   summary: `LifecycleReprocessFactory` has no production caller and emits no `supersedes`/`superseded_by` audit envelope (AC4 wiring).
   evidence: No `src` caller; wire it in the reprocess story (FR48d, Epic 6) together with the audit link emission.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Defensively copy collections in the pre-existing TenantAiPolicySnapshot provider evidence contract before activating a live policy provider.
+  evidence: The primary-constructor record retained caller-owned AssistanceKinds and LowRiskAllowedByActionClass before Story 1.6; mutating them changes authorization values under the same reference. Story 1.6's separate synthetic snapshot copies nested collections, and its production AI snapshot provider remains unavailable.

@@ -1726,69 +1726,44 @@ public sealed partial class CommandGatewayTests
     }
 
     [Fact]
-    public async Task TenantPolicyChangePreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    public async Task TenantPolicyChangeMustDenyBeforePreCommitAuditEvenWhenThatWriterIsUnavailable()
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
         RecordingReplayIntentQueue replayQueue = new();
-        CommandGateway gateway = Gateway(
-            dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
-            auditWriter: auditWriter,
-            replayQueue: replayQueue,
-            commandAllowlist: new ChatBotSpineCommandAllowlist());
+        CommandGateway gateway = Gateway(dispatcher, authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
+            auditWriter: auditWriter, replayQueue: replayQueue, commandAllowlist: new ChatBotSpineCommandAllowlist());
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
-            Submission(AdminPrincipal("policy-admin"), TenantPolicyChangeCommand()),
-            TestContext.Current.CancellationToken);
+            Submission(AdminPrincipal("policy-admin"), TenantPolicyChangeCommand()), TestContext.Current.CancellationToken);
 
         result.IsAccepted.ShouldBeFalse();
-        result.Problem.ShouldNotBeNull();
-        result.Problem.Status.ShouldBe(503);
-        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        result.Problem.ShouldNotBeNull().Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.DependencyDegraded);
         dispatcher.DispatchCount.ShouldBe(0);
-        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
-        AuditEnvelope envelope = auditWriter.Envelopes.Single();
-        envelope.SourceEvidenceRefs.ShouldContain("admin-operation:submit-policy-change");
-        envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
-        envelope.SourceEvidenceRefs.ShouldContain("policy-change:policy-change-001");
-        envelope.SourceEvidenceRefs.ShouldContain("policy-knob:association.t-high");
+        replayQueue.Intents.ShouldBeEmpty();
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
     }
 
     [Fact]
-    public async Task TenantPolicyChangeAuditRefsShouldRemainMetadataOnly()
+    public async Task TenantPolicyChangeDeniedAuditMustRemainMetadataOnly()
     {
         RecordingAuditWriter auditWriter = new();
-        CommandGateway gateway = Gateway(
-            new RecordingDispatcher(),
-            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
-            auditWriter: auditWriter,
-            commandAllowlist: new ChatBotSpineCommandAllowlist());
+        CommandGateway gateway = Gateway(new RecordingDispatcher(), authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
+            auditWriter: auditWriter, commandAllowlist: new ChatBotSpineCommandAllowlist());
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
-            Submission(AdminPrincipal("tenant-admin"), TenantPolicyChangeCommand()),
-            TestContext.Current.CancellationToken);
+            Submission(AdminPrincipal("tenant-admin"), TenantPolicyChangeCommand()), TestContext.Current.CancellationToken);
 
-        result.IsAccepted.ShouldBeTrue();
-        auditWriter.Envelopes.Count.ShouldBe(2);
-        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
-        {
-            envelope.SourceEvidenceRefs.ShouldContain("admin-role:policy-admin");
-            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:submit-policy-change");
-            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
-            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-current");
-            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-proposed");
-            envelope.SourceEvidenceRefs.ShouldContain("policy-old-fingerprint:old-fingerprint-001");
-            envelope.SourceEvidenceRefs.ShouldContain("policy-new-fingerprint:new-fingerprint-001");
-            envelope.SourceEvidenceRefs.ShouldContain("reason:security-owner-request");
-        }
-
-        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        serialized.ShouldNotContain("project-alpha", Case.Insensitive);
-        serialized.ShouldNotContain("mailbox body", Case.Insensitive);
-        serialized.ShouldNotContain("provider payload", Case.Insensitive);
-        serialized.ShouldNotContain("raw claim", Case.Insensitive);
-        serialized.ShouldNotContain("bearer", Case.Insensitive);
+        result.IsAccepted.ShouldBeFalse();
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+        string serialized = JsonSerializer.Serialize(auditWriter.AuthorizationFailures, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("policy-snapshot-current");
+        serialized.ShouldNotContain("policy-snapshot-proposed");
+        serialized.ShouldNotContain("fingerprint");
+        serialized.ShouldNotContain("association.t-high");
     }
 
     [Fact]
@@ -6822,6 +6797,8 @@ public sealed partial class CommandGatewayTests
             string? requestedPolicySnapshotId,
             CancellationToken cancellationToken)
             => ValueTask.FromResult<TenantAiPolicySnapshot?>(new TenantAiPolicySnapshot(
+                tenantId,
+                1,
                 requestedPolicySnapshotId ?? "policy-snap-001",
                 lowRiskAllowed,
                 "read-only",

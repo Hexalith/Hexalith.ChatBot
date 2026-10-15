@@ -3,11 +3,13 @@ using System.Text.Json;
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Governance.Policy;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Events;
 using Hexalith.EventStore.DomainService;
@@ -28,6 +30,23 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
+
+        // A signed admission marker proves transport integrity, never accepted A6 protection or isolation.
+        if (TenantPolicyPersistenceGate.Denies(context.Command.CommandType))
+        {
+            ChatBotRequestContext? issuer = requestContextResolver.ResolveCommand(context.Command);
+            if (issuer is null && admissionMarker.IsValid(context.Command))
+            {
+                issuer = requestContextResolver.ResolveBoundGrantIssuer(context.Command);
+            }
+
+            string reason = issuer is null || issuer.SubjectId != context.Command.UserId
+                ? ChatBotAuthorizationReasonCodes.AuthenticationDenied
+                : issuer.TenantId != context.Command.TenantId
+                    ? ChatBotAuthorizationReasonCodes.TenantMismatch
+                    : ChatBotRefusalReasonCodes.PolicySnapshotUnavailable;
+            return await RejectTransportAsync(context.Command, issuer, reason, cancellationToken).ConfigureAwait(false);
+        }
 
         if (admissionMarker.IsValid(context.Command))
         {

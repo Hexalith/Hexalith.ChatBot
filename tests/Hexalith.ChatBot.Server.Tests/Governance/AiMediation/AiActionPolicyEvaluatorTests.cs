@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 
 using Shouldly;
@@ -11,6 +12,8 @@ public sealed class AiActionPolicyEvaluatorTests
     public async Task AllowedPolicyShouldPermitLowRiskReadOnlyAssistance()
     {
         DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new(
+            "tenant-alpha",
+            1,
             "policy-snap-001",
             LowRiskAllowed: true,
             "read-only",
@@ -23,15 +26,20 @@ public sealed class AiActionPolicyEvaluatorTests
         decision.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskExecuteAllowed);
         decision.ReasonCode.ShouldBe("low-risk-execute-allowed");
         decision.SafeNextAction.ShouldBe("none");
+        decision.TenantId.ShouldBe("tenant-alpha");
+        decision.PolicySnapshotId.ShouldBe("policy-snap-001");
+        decision.PolicyVersion.ShouldBe(1);
     }
 
     [Theory]
     [InlineData(false, true, true, "low_risk_policy_false")]
-    [InlineData(true, false, true, "policy_stale")]
-    [InlineData(true, true, false, "policy_invalid")]
+    [InlineData(true, false, true, ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData(true, true, false, ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
     public async Task UnsafePolicyStatesShouldRouteToApproval(bool allowed, bool fresh, bool valid, string expectedReason)
     {
         DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new(
+            "tenant-alpha",
+            1,
             "policy-snap-001",
             allowed,
             "read-only",
@@ -41,15 +49,17 @@ public sealed class AiActionPolicyEvaluatorTests
 
         AiActionPolicyDecision decision = await evaluator.EvaluateAsync(Request(), TestContext.Current.CancellationToken);
 
-        decision.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
+        decision.Kind.ShouldBe(fresh && valid ? AiActionPolicyDecisionKind.LowRiskRoutedToApproval : AiActionPolicyDecisionKind.Blocked);
         decision.ReasonCode.ShouldBe(expectedReason);
-        decision.SafeNextAction.ShouldBe("review-ai-action");
+        decision.SafeNextAction.ShouldBe(fresh && valid ? "review-ai-action" : "none");
     }
 
     [Fact]
     public async Task MissingPackageOrRiskyClassificationShouldRouteToApproval()
     {
         DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new(
+            "tenant-alpha",
+            1,
             "policy-snap-001",
             LowRiskAllowed: true,
             "read-only",
@@ -70,12 +80,20 @@ public sealed class AiActionPolicyEvaluatorTests
         missingPackage.ReasonCode.ShouldBe("missing_context_package");
         risky.ReasonCode.ShouldBe("risk_not_low_risk");
         missingAuthorization.ReasonCode.ShouldBe("missing_project_authorization");
+        foreach (AiActionPolicyDecision decision in new[] { missingPackage, risky, missingAuthorization })
+        {
+            decision.PolicySnapshotId.ShouldBe("unavailable");
+            decision.TenantId.ShouldBeNull();
+            decision.PolicyVersion.ShouldBeNull();
+        }
     }
 
     [Fact]
     public async Task PerActionClassPolicyShouldRequireEveryRequestedClassToBeAllowed()
     {
         DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new(
+            "tenant-alpha",
+            1,
             "policy-snap-001",
             LowRiskAllowed: false,
             "read-only",
@@ -113,11 +131,13 @@ public sealed class AiActionPolicyEvaluatorTests
             Request(),
             TestContext.Current.CancellationToken);
 
-        missingSnapshot.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
-        missingSnapshot.ReasonCode.ShouldBe("policy_unavailable");
-        missingSnapshot.PolicySnapshotId.ShouldBe("policy-snap-001");
+        missingSnapshot.Kind.ShouldBe(AiActionPolicyDecisionKind.Blocked);
+        missingSnapshot.ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+        missingSnapshot.PolicySnapshotId.ShouldBe("unavailable");
 
         DefaultAiActionPolicyEvaluator unknownClass = new(new FixedProvider(new(
+            "tenant-alpha",
+            1,
             "policy-snap-001",
             LowRiskAllowed: true,
             "read-only",
@@ -132,6 +152,93 @@ public sealed class AiActionPolicyEvaluatorTests
 
         decision.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
         decision.ReasonCode.ShouldBe("low_risk_policy_false");
+    }
+
+    [Theory]
+    [InlineData("foreign-tenant", "restricted-policy", 7)]
+    [InlineData("tenant-alpha", "restricted-policy", 7)]
+    [InlineData("tenant-alpha", "policy-snap-001", 0)]
+    public async Task SyntheticUnresolvedReferencesMustNotPermitExecutionOrRevealProviderMetadata(string tenant, string id, long version)
+    {
+        DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new(tenant, version, id, true, "read-only", ["summarize-visible-context"], true, true)));
+        AiActionPolicyDecision decision = await evaluator.EvaluateAsync(Request(), TestContext.Current.CancellationToken);
+        decision.Kind.ShouldBe(AiActionPolicyDecisionKind.Blocked);
+        decision.PolicySnapshotId.ShouldBe("unavailable");
+        decision.TenantId.ShouldBeNull();
+        decision.PolicyVersion.ShouldBeNull();
+        decision.ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+        System.Text.Json.JsonSerializer.Serialize(decision).ShouldNotContain("restricted-policy");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("malformed/id")]
+    public async Task SyntheticMissingOrMalformedReferencesMustNeverSelectADefault(string? id)
+    {
+        DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new("tenant-alpha", 1, "policy-snap-001", true, "read-only", ["summarize-visible-context"], true, true)));
+        AiActionPolicyDecision decision = await evaluator.EvaluateAsync(Request() with { RequestedPolicySnapshotId = id }, TestContext.Current.CancellationToken);
+        decision.AllowsLowRiskExecution.ShouldBeFalse();
+        decision.PolicySnapshotId.ShouldBe("unavailable");
+        decision.TenantId.ShouldBeNull();
+        decision.PolicyVersion.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task SyntheticUnavailableOrMalformedProviderMustNotLeakItsFailureOrGrantPermission()
+    {
+        foreach (DefaultAiActionPolicyEvaluator evaluator in new DefaultAiActionPolicyEvaluator[]
+        {
+            new(new FixedProvider(null, fails: true)),
+            new(new FixedProvider(new("tenant-alpha", 1, "policy-snap-001", true, "read-only", null!, true, true))),
+        })
+        {
+            AiActionPolicyDecision decision = await evaluator.EvaluateAsync(Request(), TestContext.Current.CancellationToken);
+            decision.Kind.ShouldBe(AiActionPolicyDecisionKind.Blocked);
+            decision.PolicySnapshotId.ShouldBe("unavailable");
+            decision.TenantId.ShouldBeNull();
+            decision.PolicyVersion.ShouldBeNull();
+            System.Text.Json.JsonSerializer.Serialize(decision).ShouldNotContain("restricted-provider-detail");
+        }
+    }
+
+    [Fact]
+    public async Task IndependentProviderCancellationMustReturnRedactedUnavailableWhileCallerRemainsActive()
+    {
+        using CancellationTokenSource provider = new();
+        provider.Cancel();
+        DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(null,
+            failure: new OperationCanceledException("restricted-provider-timeout", provider.Token)));
+
+        AiActionPolicyDecision decision = await evaluator.EvaluateAsync(Request(), TestContext.Current.CancellationToken);
+
+        TestContext.Current.CancellationToken.IsCancellationRequested.ShouldBeFalse();
+        decision.Kind.ShouldBe(AiActionPolicyDecisionKind.Blocked);
+        decision.ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+        decision.PolicySnapshotId.ShouldBe("unavailable");
+        decision.TenantId.ShouldBeNull();
+        decision.PolicyVersion.ShouldBeNull();
+        System.Text.Json.JsonSerializer.Serialize(decision).ShouldNotContain("restricted-provider-timeout");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ActualCallerCancellationDuringProviderResolutionMustPropagate(bool providerThrows)
+    {
+        using CancellationTokenSource caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(null,
+            failure: providerThrows ? new OperationCanceledException(caller.Token) : null, onRead: caller.Cancel));
+
+        OperationCanceledException canceled = await Should.ThrowAsync<OperationCanceledException>(() => evaluator.EvaluateAsync(Request(), caller.Token).AsTask());
+
+        canceled.CancellationToken.ShouldBe(caller.Token);
+    }
+
+    [Fact]
+    public async Task ProductionPolicyProviderMustRemainUnavailable()
+    {
+        (await new UnavailableTenantAiPolicySnapshotProvider().TryGetAsync("tenant-alpha", "project-001", "policy-snap-001", TestContext.Current.CancellationToken)).ShouldBeNull();
     }
 
     private static AiActionPolicyEvaluationRequest Request(
@@ -163,13 +270,17 @@ public sealed class AiActionPolicyEvaluatorTests
             [AiActionRiskActionClass.ActsOnBehalf] = true,
         };
 
-    private sealed class FixedProvider(TenantAiPolicySnapshot? snapshot) : ITenantAiPolicySnapshotProvider
+    private sealed class FixedProvider(TenantAiPolicySnapshot? snapshot, bool fails = false, Exception? failure = null, Action? onRead = null) : ITenantAiPolicySnapshotProvider
     {
         public ValueTask<TenantAiPolicySnapshot?> TryGetAsync(
             string tenantId,
             string projectId,
             string? requestedPolicySnapshotId,
             CancellationToken cancellationToken)
-            => ValueTask.FromResult(snapshot);
+        {
+            onRead?.Invoke();
+            if (failure is not null) { throw failure; }
+            return fails ? throw new IOException("restricted-provider-detail") : ValueTask.FromResult(snapshot);
+        }
     }
 }

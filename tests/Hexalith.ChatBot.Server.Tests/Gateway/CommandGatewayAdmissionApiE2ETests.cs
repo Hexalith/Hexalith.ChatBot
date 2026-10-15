@@ -559,6 +559,8 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         submitted.CommandType.ShouldBe(nameof(ExecuteLowRiskAIAssistance));
         JsonElement payload = submitted.Payload;
         payload.GetProperty("ExecutionRecord").GetProperty("PolicyReasonCode").GetString().ShouldBe("risk_not_low_risk");
+        payload.GetProperty("PolicySnapshotId").GetString().ShouldBe("unavailable");
+        payload.GetProperty("ExecutionRecord").GetProperty("PolicySnapshotId").GetString().ShouldBe("unavailable");
         payload.GetProperty("RiskClassification").GetProperty("RiskClass").GetString().ShouldBe("approval-required");
         payload.GetRawText().ShouldNotContain("prompt", Case.Insensitive);
         payload.GetRawText().ShouldNotContain("completion", Case.Insensitive);
@@ -615,6 +617,8 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         record.GetProperty("Outcome").GetString().ShouldBe("pending-approval");
         record.GetProperty("ProviderName").GetString().ShouldBe("not-invoked");
         record.GetProperty("PolicyReasonCode").GetString().ShouldBe("risk_not_low_risk");
+        submitted.Payload.GetProperty("PolicySnapshotId").GetString().ShouldBe("unavailable");
+        record.GetProperty("PolicySnapshotId").GetString().ShouldBe("unavailable");
         record.GetProperty("SafeNextAction").GetString().ShouldBe("review-ai-action");
         submitted.Payload.GetRawText().ShouldNotContain("provider payload", Case.Insensitive);
         submitted.Payload.GetRawText().ShouldNotContain("prompt", Case.Insensitive);
@@ -4066,6 +4070,8 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         {
             cancellationToken.ThrowIfCancellationRequested();
             TenantAiPolicySnapshot snapshot = new(
+                tenantId,
+                1,
                 string.IsNullOrWhiteSpace(requestedPolicySnapshotId) ? "policy-snap-001" : requestedPolicySnapshotId,
                 lowRiskAllowed,
                 "read-only",

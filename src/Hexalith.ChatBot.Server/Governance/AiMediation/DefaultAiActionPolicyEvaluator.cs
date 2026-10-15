@@ -1,4 +1,6 @@
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Messages;
 
 namespace Hexalith.ChatBot.Server.Governance.AiMediation;
 
@@ -13,57 +15,66 @@ internal sealed class DefaultAiActionPolicyEvaluator(ITenantAiPolicySnapshotProv
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
-        string requestedSnapshot = string.IsNullOrWhiteSpace(request.RequestedPolicySnapshotId)
-            ? "unavailable"
-            : request.RequestedPolicySnapshotId;
         if (!request.HasProjectAuthorization)
         {
-            return AiActionPolicyDecision.Routed(requestedSnapshot, "missing_project_authorization");
+            return AiActionPolicyDecision.Routed("unavailable", "missing_project_authorization");
         }
 
         if (request.RiskClass is not AiActionRiskClass.LowRisk ||
             !string.Equals(request.EffectSurface, "read-only", StringComparison.Ordinal))
         {
-            return AiActionPolicyDecision.Routed(requestedSnapshot, "risk_not_low_risk");
+            return AiActionPolicyDecision.Routed("unavailable", "risk_not_low_risk");
         }
 
         if (string.IsNullOrWhiteSpace(request.ContextPackageId) ||
             string.IsNullOrWhiteSpace(request.ContextPackageVersion))
         {
-            return AiActionPolicyDecision.Routed(requestedSnapshot, "missing_context_package");
+            return AiActionPolicyDecision.Routed("unavailable", "missing_context_package");
         }
 
-        TenantAiPolicySnapshot? snapshot = await _policySnapshots
-            .TryGetAsync(request.TenantId, request.ProjectId, request.RequestedPolicySnapshotId, cancellationToken)
-            .ConfigureAwait(false);
-        if (snapshot is null)
+        if (!TenantPolicySchema.IsSafePolicyToken(request.TenantId) ||
+            !TenantPolicySchema.IsSafePolicyToken(request.RequestedPolicySnapshotId))
         {
-            return AiActionPolicyDecision.Routed(requestedSnapshot, "policy_unavailable");
+            return Unavailable();
         }
 
-        if (!snapshot.IsValid)
+        TenantAiPolicySnapshot? snapshot;
+        try
         {
-            return AiActionPolicyDecision.Routed(snapshot.PolicySnapshotId, "policy_invalid");
+            snapshot = await _policySnapshots
+                .TryGetAsync(request.TenantId, request.ProjectId, request.RequestedPolicySnapshotId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            return Unavailable();
         }
 
-        if (!snapshot.IsFresh)
+        cancellationToken.ThrowIfCancellationRequested();
+        if (snapshot is null || !snapshot.IsValid || !snapshot.IsFresh || snapshot.PolicyVersion < 1 ||
+            snapshot.TenantId != request.TenantId || snapshot.PolicySnapshotId != request.RequestedPolicySnapshotId ||
+            snapshot.AssistanceKinds is null || snapshot.AssistanceKinds.Any(static kind => !TenantPolicySchema.IsSafePolicyToken(kind)) ||
+            !TenantPolicySchema.IsSafePolicyToken(snapshot.EffectSurface))
         {
-            return AiActionPolicyDecision.Routed(snapshot.PolicySnapshotId, "policy_stale");
+            return Unavailable();
         }
 
         if (!LowRiskAllowedForEveryActionClass(snapshot, request.RiskActionClasses))
         {
-            return AiActionPolicyDecision.Routed(snapshot.PolicySnapshotId, "low_risk_policy_false");
+            return AiActionPolicyDecision.Routed(snapshot, "low_risk_policy_false");
         }
 
         if (!string.Equals(snapshot.EffectSurface, request.EffectSurface, StringComparison.Ordinal) ||
             !snapshot.AssistanceKinds.Contains(request.AssistanceKind, StringComparer.Ordinal))
         {
-            return AiActionPolicyDecision.Routed(snapshot.PolicySnapshotId, "policy_surface_mismatch");
+            return AiActionPolicyDecision.Routed(snapshot, "policy_surface_mismatch");
         }
 
-        return AiActionPolicyDecision.Allowed(snapshot.PolicySnapshotId);
+        return AiActionPolicyDecision.Allowed(snapshot);
     }
+
+    private static AiActionPolicyDecision Unavailable()
+        => AiActionPolicyDecision.Blocked("unavailable", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
 
     private static bool LowRiskAllowedForEveryActionClass(TenantAiPolicySnapshot snapshot, IReadOnlyList<string> requestedActionClasses)
     {

@@ -357,7 +357,7 @@ internal sealed class CommandGateway(
             return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateAuditUnavailable(decision.CorrelationId, decision.TaskId));
         }
 
-        if (reasonCode is "idempotency_outcome_unavailable" or "canonical_execution_unavailable")
+        if (reasonCode is "idempotency_outcome_unavailable" or "canonical_execution_unavailable" or Contracts.Messages.ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)
         {
             return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateDependencyUnavailable(decision.CorrelationId, decision.TaskId));
         }

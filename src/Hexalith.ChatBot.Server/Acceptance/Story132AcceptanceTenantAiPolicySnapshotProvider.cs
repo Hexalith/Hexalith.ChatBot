@@ -20,6 +20,8 @@ internal sealed class Story132AcceptanceTenantAiPolicySnapshotProvider : ITenant
             ? DefaultSnapshotId
             : requestedPolicySnapshotId;
         return ValueTask.FromResult<TenantAiPolicySnapshot?>(new TenantAiPolicySnapshot(
+            tenantId,
+            1,
             snapshotId,
             LowRiskAllowed: true,
             EffectSurface: "read-only",
