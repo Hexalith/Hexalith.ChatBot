@@ -292,10 +292,10 @@ Applied 2026-10-16 (round 5): ADR note on the intentional 503 vs AI-path refusal
 
 ### Review Findings (round 6)
 
-- [ ] [Review][Patch] `AdminScopesValue.Order()` uses the culture-sensitive default string comparer while knob ordering is ordinal — canonical scope order (and thus the order-sensitive `SameSequence` replay/rollback comparison) can differ under another culture; use `Order(StringComparer.Ordinal)` [src/Hexalith.ChatBot.Server/Governance/Policy/ImmutableTenantPolicySnapshot.cs:42]
 - [x] [Review][Defer] Gate not defended in depth in `GovernedOperationAggregate` / `AcceptedCommandDispatcher` (Acceptance Auditor) — deferred: already in the ledger (rounds 1-5), unverified medium; no new entry added.
 
 #### Rejected (round 6)
+- `AdminScopesValue.Order()` culture-sensitive comparer — false: elements are `AdminScope` values, not strings (`Order(StringComparer.Ordinal)` does not compile), so ordering is not culture-dependent. Found on attempted patch; reverted.
 - 503 `dependency_degraded` vs ADR "should not retry"; OpenAPI/`x-hexalith` unsynced; ADR claim of denial "before reservation" while authority evidence still resolves — false/low: round 5 decision (keep 503, documented in ADR); wording is already reconciled by the ADR's AI-path note.
 - Authorization-failure stream taxonomy / spike counter skipped; SDK gate before grant authorization — low: decided rounds 2/4/5.
 - Gate is a hard-coded name list; casing, qualified aliases, one-directional map test — low: qualified-alias reachability already deferred (round 4); exact-match allowlist supplies command types.
