@@ -1465,3 +1465,8 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 ## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-15)
 
 - Policy commands are denied only in the gateway pipeline and SDK admission stage; `GovernedOperationAggregate` and `AcceptedCommandDispatcher` still process `SubmitTenantPolicyChange`, `ApproveTenantPolicyChange` and `SetAssociationConfidenceThresholds`. Unverified medium. Settle by tracing whether any dispatch path reaches the aggregate without an admission stage.
+
+## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-16)
+
+- Audit-enabled builds fail with NU1903 on `Microsoft.AspNetCore.SignalR.Common` (GHSA-334f-vvp4-7g6p); Story 1.6 evidence passes only with `-p:NuGetAudit=false` and no tracked item exists. Pre-existing dependency advisory; track a package bump or documented suppression.
+- Policy-command denial not enforced in `GovernedOperationAggregate` / `AcceptedCommandDispatcher` (raised again in round 3). Unverified medium; see the 2026-10-15 entry for what settles it.

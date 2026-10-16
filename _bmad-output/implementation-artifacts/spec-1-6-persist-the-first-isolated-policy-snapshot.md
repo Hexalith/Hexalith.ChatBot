@@ -2,7 +2,7 @@
 title: 'Persist the First Isolated Policy Snapshot'
 type: 'feature'
 created: '2026-10-15'
-status: 'in-review'
+status: 'in-progress'
 baseline_commit: '38ca946f1dca9978f0eed5c5948d69421d6dac17'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -165,3 +165,26 @@ Applied 2026-10-16: the two new tests plus the ADR edit; the two touched test cl
 - Intended: blank requested snapshot id is now `Blocked`, which makes the acceptance provider's default-id branch unreachable — spec says "no default policy"; tests pass 2748/2748.
 - Low, not worth fixing: `DenyAsync` reason-string coupling; resolver bool/5-minute bound; hard-coded four-name gate list (a catalog-derived test needs an agreed definition of "policy-mutating"); casing variants of `CommandType`; non-logged provider failure; `StringListValue` order sensitivity; no-op rollback source; using-directive order; partial-class file naming; deleted escalation audit-shape tests (restore when the gate lifts); 503 retry semantics (spec-mandated `dependency_degraded`); SDK stage unauthorized-vs-degraded wording.
 - Rejected (spec edit only): frontmatter `in-review` vs sprint `review`, `review_loop_iteration`, execution-evidence totals.
+
+### Review Findings (round 3)
+
+Code review 2026-10-16 (diff `38ca946..HEAD`, 4 layers: Blind Hunter, Edge Case Hunter, Verification Gap, Acceptance Auditor). No `decision-needed`.
+
+- [ ] [Review][Patch] Pin the unresolved-policy outcome at the gate/pipeline: add a pipeline test with the real evaluator and a null/stale/foreign provider asserting the caller-visible rejection and zero dispatch/reservation (the Routed→Blocked change is only pinned at `EvaluateAsync`) [tests/Hexalith.ChatBot.Server.Tests/Gateway/, AiActionApprovalGate]
+- [ ] [Review][Patch] Pin authorization precedence: add a denying `IAuthorizationStage` case with a policy command expecting the authorization reason, not `policy-snapshot-unavailable`; moving the gate above authorization currently fails no test [tests/Hexalith.ChatBot.Server.Tests/Gateway/PolicyPersistenceAdmissionTests.cs]
+- [ ] [Review][Patch] Cover `SubmitEscalationPolicyChange` in the gateway/SDK/marker theories — only "submit"/"approval"/"thresholds" rows exist, so the fourth gated command's branches are untested [tests/Hexalith.ChatBot.Server.Tests/Gateway/PolicyPersistenceAdmissionTests.cs:37-148]
+- [ ] [Review][Patch] ADR claims the AI evaluator "checks exact tenant/ID/version evidence", but the evaluator matches tenant and ID and only requires `PolicyVersion >= 1` (the request carries no version); correct the wording [docs/adrs/isolated-policy-snapshots.md:32-33]
+- [x] [Review][Defer] Gate not enforced in `GovernedOperationAggregate` / `AcceptedCommandDispatcher` (raised a third time) — deferred: already in `deferred-work.md`; unverified medium, settled by tracing dispatch paths that skip admission
+- [x] [Review][Defer] Audit-enabled build red on `Microsoft.AspNetCore.SignalR.Common` NU1903 (GHSA-334f-vvp4-7g6p); evidence only passes with `NuGetAudit=false` and no tracked item exists — deferred: pre-existing dependency advisory, not caused by this change
+
+#### Rejected
+
+- False: "superseded older version resolves as current" — exact-version resolution of historical references is the intent ("Historical decision references remain exact"); "stale" refers to the 5-minute evidence-freshness bound.
+- False: "signed policy follow-up gets AuthenticationDenied" — the SDK stage already falls back to `ResolveBoundGrantIssuer` for valid markers, and the signed-marker theory covers it.
+- False: "unvalidated `LowRiskAllowedByActionClass` keys" — keyed by enum; requested classes pass `TryParseActionClass`.
+- False: "replay of accepted policy commands broken" — rejected in rounds 1–2 (no policy command can be accepted).
+- Intended: Routed→Blocked for stale/invalid/unavailable policy, `"unavailable"` snapshot id on early routes, `SafeNextAction none` — I/O row "deny; no default policy".
+- Intended: `SdkConfirmation` early `return` for the policy row — policy writes are denied by design.
+- Intended: audit fact recorded while the counter is skipped — spec BH-7 scopes the counter skip to dependency denials.
+- Low, not worth fixing: 503 retry semantics (spec-mandated); non-contiguous/first-version history and unbound first tenant (synthetic, unwired); null-argument guards in `HasSameContents`/`Resolve`; lazy provider property reads outside the catch; provider-tautology tests; silent catch/no logging; `StringListValue` order; hard-coded four-name gate (no agreed definition of "policy-mutating"); ADR gate-lifting checklist; style/naming nits.
+- Rejected (spec edit only): `review_loop_iteration`, test-total inconsistencies, untracked TRX evidence references.
