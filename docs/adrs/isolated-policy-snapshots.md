@@ -14,6 +14,12 @@ path and `policy-snapshot-unavailable`, mapped by the safe-message catalog to
 `dependency_degraded`. No protected policy values are included in that outcome. Dependency denials remain
 audited without incrementing the authorization-failure spike counter.
 
+The gateway reports this denial as HTTP 503 `dependency_degraded` by design: policy
+persistence is unavailable until accepted A6 protection and native isolation evidence
+exist, and clients should not retry until then. The AI evaluator path reports the same
+reason code as a non-retryable refusal because it is a per-action decision, not a
+gateway dependency; the two outward shapes differ intentionally.
+
 The internal snapshot, history fold, and resolver are explicitly synthetic. They
 have no DI registration, store, event subscription, or runtime persistence path.
 Snapshot construction copies nested lists and dictionaries, validates the closed

@@ -86,6 +86,8 @@ public sealed class ImmutableTenantPolicySnapshotTests
     [InlineData("export-delete")]
     [InlineData("backup")]
     [InlineData("encryption")]
+    [InlineData("supersedes")]
+    [InlineData("rollback")]
     public void SyntheticMetadataConflictsMustRejectAndRetainOriginalHistory(string changedField)
     {
         ImmutableTenantPolicySnapshot original = Snapshot();
@@ -100,13 +102,30 @@ public sealed class ImmutableTenantPolicySnapshotTests
             changedField == "hold" ? "synthetic-other" : original.HoldReference,
             changedField == "export-delete" ? "synthetic-other" : original.ExportDeleteReference,
             changedField == "backup" ? "synthetic-other" : original.BackupReference,
-            changedField == "encryption" ? "synthetic-other" : original.EncryptionReference, original.Values);
+            changedField == "encryption" ? "synthetic-other" : original.EncryptionReference, original.Values,
+            changedField == "supersedes" ? "synthetic-other" : original.SupersedesSnapshotId,
+            changedField == "rollback" ? "synthetic-other" : original.RollbackSnapshotId);
 
         history.TryAppend(conflict, out TenantPolicySnapshotHistory retained, out bool replay).ShouldBeFalse();
         replay.ShouldBeFalse();
         retained.ShouldBeSameAs(history);
         retained.Snapshots.ShouldHaveSingleItem().ShouldBeSameAs(original);
         original.HasSameContents(Snapshot()).ShouldBeTrue();
+    }
+
+    /// <summary>Rejects a schema-version change under an already retained identity and version.</summary>
+    [Fact]
+    public void SyntheticSchemaVersionConflictMustRejectAndRetainOriginalHistory()
+    {
+        ImmutableTenantPolicySnapshot original = Snapshot(schema: TenantPolicySchemaVersions.M1Preview, values: M1Values([AdminScope.Policy], null));
+        TenantPolicySnapshotHistory history = new();
+        history.TryAppend(original, out history, out _).ShouldBeTrue();
+        ImmutableTenantPolicySnapshot conflict = Snapshot(schema: TenantPolicySchemaVersions.M0);
+
+        history.TryAppend(conflict, out TenantPolicySnapshotHistory retained, out bool replay).ShouldBeFalse();
+        replay.ShouldBeFalse();
+        retained.ShouldBeSameAs(history);
+        retained.Snapshots.ShouldHaveSingleItem().ShouldBeSameAs(original);
     }
 
     /// <summary>Canonicalizes separately allocated nested maps and scope collections for equivalent replay.</summary>

@@ -2,7 +2,7 @@
 title: 'Persist the First Isolated Policy Snapshot'
 type: 'feature'
 created: '2026-10-15'
-status: 'in-review'
+status: 'in-progress'
 baseline_commit: '38ca946f1dca9978f0eed5c5948d69421d6dac17'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -240,3 +240,22 @@ Code review 2026-10-16 (diff `38ca946..HEAD`, 4 layers: Blind Hunter, Edge Case 
 - Constructor diagnostics lack param names; `using`/ordering/ADR-wrapping nits — low/cosmetic. ADR link `../story-evidence-integrity.md` verified valid.
 - AI evidence not linked to resolver; A6 denial not tied to proof state; NU1903 evidence from modified build; status narrative inconsistencies — low/documentation; accepted by spec as synthetic scope and NU1903 already in ledger.
 - Edit-the-spec findings (status/test-count prose) — rejected per rule.
+
+### Review Findings (round 5)
+
+- [x] [Review][Decision] (resolved: option 1 — keep 503, documented in ADR) One reason code, two outward contracts — `policy-snapshot-unavailable` maps to HTTP 503 `dependency_degraded` (transient, retry-inviting) in `CommandGateway` for the six gated policy commands, but to a non-retryable 403 `refusal_blocked_action` on the AI evaluator path. The denial is permanent until A6 evidence exists, so clients will retry forever; OpenAPI / `x-hexalith` for the six commands is untouched. Options: (1) keep 503 and document it in OpenAPI/ADR; (2) map the gate denial to a non-retryable refusal (403/409-style) and sync OpenAPI. [CommandGateway.cs:360, ChatBotCommandAdmissionPipeline.cs:160] (blind-hunter+acceptance-auditor, medium)
+- [x] [Review][Patch] Add conflict rows for `SupersedesSnapshotId`, `RollbackSnapshotId` and `SchemaVersion` under a reused ID+version — `HasSameContents` compares them, but no test varies them, so removing them from the tuple passes every test. Add three rows to `SyntheticMetadataConflictsMustRejectAndRetainOriginalHistory`. [ImmutableTenantPolicySnapshotTests.cs] (verification-gap, low)
+- [x] [Review][Defer] Gate not defended in depth: `GovernedOperationAggregate` / `AcceptedCommandDispatcher` still process the six policy commands — deferred: already in the ledger (rounds 1-4), unverified medium; settled by tracing dispatch paths or adding an aggregate refusal + test (blind-hunter, edge-case, acceptance-auditor, verification-gap)
+- [x] [Review][Defer] Gate runs before idempotency lookup, so a retry of a pre-gate accepted policy command returns 503 — deferred: already in the ledger, unverified medium; settled by confirming no pre-gate accepted policy commands exist in any environment
+- [x] [Review][Defer] Audit-envelope / replay-intent / `SourceEvidenceRefs` / SDK-confirmation retry coverage for notification, escalation, tenant-policy and mailbox commands removed rather than moved — deferred: already in the ledger (round 4), resolves with the aggregate-bypass entry
+
+#### Rejected (round 5)
+- Gate is a hard-coded name list; case/whitespace variants and typed `Request.Command` vs `CommandType` mismatch — false/low: command types come from the exact-match allowlist, and no path showing a differing downstream lookup was demonstrated. Guard test already covers the audit-map class.
+- Authorization-failure counter skipped for `policy-snapshot-unavailable`; SDK stage gate precedes authorization — low: decided in rounds 2/4, nothing disclosed to the caller, and the fix adds a counter/branch.
+- Evaluator catch swallows fatal exceptions / no logging; `LowRiskAllowedByActionClass` read outside the try — low: provider DTO properties are plain record members, so a throwing getter is not reachable; the fix adds a logger dependency.
+- Resolver null history element; history first-append lacks tenant/version-1/contiguity checks; rollback equal to supersedes; order-sensitive list comparison — low: internal, unregistered synthetic fold with no runtime consumer; fixes add guards.
+- Synthetic protection references not forced to `synthetic-unaccepted`; actor token charset rejects `@`/`|` — low: type is internal and unwired; revisit at live-persistence story.
+- Evaluator outcome change (Routed → Blocked, literal `"unavailable"`), unreachable provider default branches, evaluator tenant charset untested — false: round 4 human decision (fail closed), recorded in ADR.
+- Spec status narrative / test-count / `deferred-work.md` schema / TRX evidence not tracked / test-file hygiene nits — rejected: fix edits the spec under review or is cosmetic.
+
+Applied 2026-10-16 (round 5): ADR note on the intentional 503 vs AI-path refusal; `supersedes`/`rollback` theory rows plus a schema-version conflict test; `ImmutableTenantPolicySnapshotTests` 28/28 (Debug, project references, `NuGetAudit=false`). Open deferred mediums remain, so status is `in-progress`.

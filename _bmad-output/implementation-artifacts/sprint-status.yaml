@@ -43,7 +43,7 @@ development_status:
   1-3-bind-every-request-to-trusted-tenant-and-actor-context: done
   1-4-return-versioned-safe-outcomes: done
   1-5-establish-stable-operation-identity-and-concurrency-contract: review
-  1-6-persist-the-first-isolated-policy-snapshot: review
+  1-6-persist-the-first-isolated-policy-snapshot: in-progress
   1-7-admit-commands-through-the-single-commandgateway: backlog
   1-8-commit-a-governed-mutation-and-canonical-audit-atomically: backlog
   1-9-handle-duplicate-conflicting-and-sensitive-non-mutating-atte: backlog
