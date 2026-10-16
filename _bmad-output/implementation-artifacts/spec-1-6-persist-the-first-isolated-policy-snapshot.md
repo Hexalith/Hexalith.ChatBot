@@ -308,3 +308,28 @@ Applied 2026-10-16 (round 5): ADR note on the intentional 503 vs AI-path refusal
 - Synthetic protection references free-form tokens — low: type internal/unwired; revisit at the live-persistence story.
 - SDK invalid marker now yields `AuthenticationDenied` — maybe-false/low: tests assert SDK rejection reasons; would only be low.
 - Using-directive order, test file naming/blank line/`ThrowIfNullOrWhiteSpace` noise, authentication precedence tested for one command, ADR wrapping/evidence-link/exit-criteria asks — cosmetic or edits the ADR/spec under review.
+
+### Review Findings (round 7)
+
+- [x] [Review][Decision] Out-of-scope `.mcp.json` change — commit `eb0fa47` ("fix: story 1.6") removes the `aspire` MCP server from both `mcpServers` and `servers`. It is not in the Code Map, Tasks or Execution Evidence, and it violates the "internal Server model/admission, tests and ADR only" footprint. It may be an intentional environment edit (the aspire MCP server fails to connect here, and Story 11.6 retires the AppHost/Aspire), so the right action is ambiguous: revert it, or split it into its own commit. (blind-hunter+acceptance-auditor, medium)
+- [x] [Review][Defer] Gate not defended in `GovernedOperationAggregate`/`AcceptedCommandDispatcher` — deferred: already recorded in `deferred-work.md` as an unverified medium. Settled by tracing every dispatch path that skips both admission stages. (acceptance-auditor+blind-hunter+edge-case-hunter+verification-gap)
+- [x] [Review][Defer] Gate precedes the idempotency lookup, so retries of pre-gate accepted policy commands return 503 — deferred: already recorded as an unverified entry. (acceptance-auditor+verification-gap)
+- [x] [Review][Defer] Namespace-qualified or case-variant `CommandType` bypasses the simple-name gate — deferred: already recorded as an unverified medium. (edge-case-hunter+blind-hunter)
+- [x] [Review][Defer] Provider-owned collection access outside the try/catch — deferred: already recorded as R4-BH-2. (blind-hunter+edge-case-hunter)
+
+**Decision (2026-10-16, Jerome):** keep the removal. The `aspire` MCP server is dropped deliberately as an environment change unrelated to policy snapshots; the `aspire` CLI (`describe`, `logs`, `otel`, `resource`, `wait`, `doctor`) covers the same needs without a long-running stdio server. No revert.
+
+#### Rejected (round 7)
+
+- Gate is a hard-coded list that will drift from `ChatBotAuditPathMap` — false: `GateMustDenyEveryCommandClassifiedAsTenantPolicyMutation` fails when the map classifies a command the gate omits (verification-gap).
+- Synthetic protection references accept any safe token — low: the type is internal and unwired; revisit at the live-persistence story (previously rejected).
+- Exact-version enforcement and "version not checked by the evaluator" — low: the request carries no expected version and the ADR documents this. Fixing it adds a request parameter and public surface.
+- Evaluator outcome change (`Routed` to `Blocked`, `"unavailable"` snapshot id on early routes) — false: owner-approved fail-closed decision recorded in rounds 4–5.
+- Gate scope broader than "submit/approve" — false: the round-4 decision keeps the broad gate under AC1 "any policy transport".
+- 503 `dependency_degraded` retry semantics vs ADR wording — low: round 5 chose to keep 503 and document it.
+- Authorization-failure counter skipped for the policy denial, and keyed on the reason string — low: decided in BH-7 and the ADR. The suggested explicit flag adds a parameter.
+- SDK path skips grant authorization precedence — low: decided as Current-BH-1.
+- History first-version, tenant-binding and no-op rollback gaps; `StringListValue` order; null argument guards; resolver 5-minute constant and `EffectiveAtUtc` check; `HasSameContents` ignoring `EvidenceKind` — low: internal, unwired synthetic types, and fixes add guards or branches (previously rejected).
+- `IsSafePolicyToken` narrows the tenant charset (`@`, `|`) — low: no supported live decision is affected (Current-BH-9).
+- Hard-coded `PolicyVersion = 1` in the acceptance and recovery providers — low: synthetic fixtures with production unavailable.
+- Using-directive order, `deferred-work.md` tidiness, status wording ("in-review" vs "review" vs "in-progress") and removed gateway audit tests — cosmetic or process noise; the last fix would edit the spec under review.
