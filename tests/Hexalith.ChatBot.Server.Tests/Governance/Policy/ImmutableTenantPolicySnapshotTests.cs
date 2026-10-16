@@ -73,7 +73,8 @@ public sealed class ImmutableTenantPolicySnapshotTests
         first.TryAppend(Snapshot(values: new(TenantPolicySchema.DefaultM0Values.Reverse().ToArray())), out TenantPolicySnapshotHistory same, out replay).ShouldBeTrue();
         replay.ShouldBeTrue();
         same.ShouldBeSameAs(first);
-        foreach (ImmutableTenantPolicySnapshot conflict in new[] { Snapshot(values: Values(0.95)), Snapshot(id: "synthetic-other"), Snapshot(tenant: "synthetic-foreign") })
+        foreach (ImmutableTenantPolicySnapshot conflict in new[] { Snapshot(values: Values(0.95)), Snapshot(id: "synthetic-other"), Snapshot(tenant: "synthetic-foreign"),
+            Snapshot(id: "synthetic-first", version: 2, supersedes: "synthetic-first") })
         {
             first.TryAppend(conflict, out TenantPolicySnapshotHistory retained, out replay).ShouldBeFalse();
             retained.ShouldBeSameAs(first);

@@ -142,3 +142,26 @@ Applied 2026-10-15: Server tests 2748/2748 (was 2743; +5 new), zero skips, built
 - False: "authorization-failure counter skip is unspecified" — spec BH-7 says dependency denials do not increment the counter.
 - Intended: evaluator collapses stale/invalid/unavailable to `Blocked` with `policy-snapshot-unavailable` — matches the I/O row "Resolution: deny; no default policy" and the ADR redaction rule.
 - Low, not worth fixing: resolver takes `isAuthorized` as a bool and a hard-coded 5-minute bound (internal, unwired); empty history not tenant-bound (resolver filters by tenant); list-order comparison in `HasSameValues`; early-route snapshot id now `"unavailable"`; using-directive ordering; deleted audit-shape tests; tenant-id charset in `IsSafePolicyToken`; hard-coded fold magic numbers in tests.
+
+### Review Findings (round 2)
+
+Code review 2026-10-16 (diff `38ca946..HEAD`, 4 layers: Blind Hunter, Edge Case Hunter, Verification Gap, Acceptance Auditor). No `decision-needed`.
+
+- [x] [Review][Patch] Pin the evaluator catch's caller-cancellation re-check: add a case where the provider cancels the caller token then throws a non-cancellation exception (`new FixedProvider(null, fails: true, onRead: caller.Cancel)`), expecting `OperationCanceledException`; deleting the `ThrowIfCancellationRequested()` inside the catch currently fails no test [tests/Hexalith.ChatBot.Server.Tests/Governance/AiMediation/AiActionPolicyEvaluatorTests.cs]
+- [x] [Review][Patch] Pin history ID reuse with a new version: add `Snapshot(id: "synthetic-first", version: 2, supersedes: "synthetic-first")` against `[v1]` expecting `TryAppend == false`, `replay == false`; dropping the `existing.SnapshotId == snapshot.SnapshotId` clause currently fails no test [tests/Hexalith.ChatBot.Server.Tests/Governance/Policy/ImmutableTenantPolicySnapshotTests.cs]
+- [x] [Review][Patch] ADR understates the denied surface: it lists submit, approve and association-threshold commands, but `TenantPolicyPersistenceGate.Denies` also denies `SubmitEscalationPolicyChange` [docs/adrs/isolated-policy-snapshots.md:8]
+- [x] [Review][Defer] Gate not enforced in `GovernedOperationAggregate` / `AcceptedCommandDispatcher` (flagged again by Blind Hunter and Acceptance Auditor) — deferred: already recorded in `deferred-work.md` (round 1); unverified medium, no new evidence
+
+Applied 2026-10-16: the two new tests plus the ADR edit; the two touched test classes pass 30/30 (Debug, `NuGetAudit=false`). Story remains `review`.
+
+#### Rejected
+
+- False: "policy-gate unauthorized callers get `dependency_degraded` on the SDK path" — the SDK stage only re-runs the workload's authentication and tenant binding; authorization already ran in the gateway pipeline, which returns first. Round 1 refuted the same claim.
+- False: "retry of an accepted policy command returns 503" — the gate denies unconditionally, so no policy command is accepted to be retried (round 1).
+- False: duplicate `KnobId` values retained — `TenantPolicySchema.Validate` rejects them (`seen.Add`).
+- False: `EvidenceKind` not compared / not enforced — it is a constant property, so every instance carries `synthetic-unaccepted`.
+- False: mixed-tenant history lets one tenant resolve for another — `Resolve` filters every snapshot by tenant, and `TryAppend` requires a matching tenant after the first entry.
+- Intended: stale/invalid/unavailable now `Blocked`, and early routes report snapshot id `"unavailable"` — matches the I/O row "Resolution: deny; no default policy" and the ADR redaction rule.
+- Intended: blank requested snapshot id is now `Blocked`, which makes the acceptance provider's default-id branch unreachable — spec says "no default policy"; tests pass 2748/2748.
+- Low, not worth fixing: `DenyAsync` reason-string coupling; resolver bool/5-minute bound; hard-coded four-name gate list (a catalog-derived test needs an agreed definition of "policy-mutating"); casing variants of `CommandType`; non-logged provider failure; `StringListValue` order sensitivity; no-op rollback source; using-directive order; partial-class file naming; deleted escalation audit-shape tests (restore when the gate lifts); 503 retry semantics (spec-mandated `dependency_degraded`); SDK stage unauthorized-vs-degraded wording.
+- Rejected (spec edit only): frontmatter `in-review` vs sprint `review`, `review_loop_iteration`, execution-evidence totals.

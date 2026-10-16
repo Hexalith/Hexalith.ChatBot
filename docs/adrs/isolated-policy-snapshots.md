@@ -4,8 +4,8 @@ Status: partially implemented; Story 1.6 remains in progress. A6 and native
 isolation acceptance are incomplete. This decision does not authorize live policy
 persistence, pilot data, compliance claims, or production readiness.
 
-Policy submit, approve, and direct association-threshold update commands are
-denied before admission reservation or dispatch. This applies to legacy HTTP requests, canonical requests, SDK `/process`
+Policy submit, approve, direct association-threshold update, and escalation
+policy submit commands are denied before admission reservation or dispatch. This applies to legacy HTTP requests, canonical requests, SDK `/process`
 requests, and correctly signed admission markers. A marker proves transport
 integrity; it is not protection or isolation approval. Existing authentication and
 tenant-binding failures keep their safe semantics. Denials use the existing audit

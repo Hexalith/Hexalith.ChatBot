@@ -269,6 +269,15 @@ public sealed class AiActionPolicyEvaluatorTests
     }
 
     [Fact]
+    public async Task CallerCancellationMustWinOverANonCancellationProviderFailure()
+    {
+        using CancellationTokenSource caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(null, fails: true, onRead: caller.Cancel));
+
+        await Should.ThrowAsync<OperationCanceledException>(() => evaluator.EvaluateAsync(Request(), caller.Token).AsTask());
+    }
+
+    [Fact]
     public async Task ProductionPolicyProviderMustRemainUnavailable()
     {
         (await new UnavailableTenantAiPolicySnapshotProvider().TryGetAsync("tenant-alpha", "project-001", "policy-snap-001", TestContext.Current.CancellationToken)).ShouldBeNull();
