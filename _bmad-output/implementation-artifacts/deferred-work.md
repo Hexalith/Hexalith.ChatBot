@@ -1483,3 +1483,12 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Verify that supported admission-marker issuers cannot sign qualified policy command aliases that bypass the simple-name policy gate (unverified medium).
   evidence: EventStore dispatch normalizes namespace/assembly-qualified CommandType strings, while TenantPolicyPersistenceGate matches simple names. A valid marker for an alias takes the SDK marker fast path, but current dispatcher plans and exact-match admission issue only simple names and marker validation binds the exact CommandType. A supported producer of a qualified signed envelope, or an explicit qualified-issuer contract test before activation, would settle reachability.
+
+## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-16, round 8)
+
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: SDK `/process` rejection with `PolicySnapshotUnavailable` may expose a different outward shape than the HTTP gateway's 503 `dependency_degraded` (unverified medium).
+  evidence: only `CommandGateway` maps the reason to a dependency-unavailable problem; `ChatBotDomainServiceAdmissionStage` returns `Rejected(PolicySnapshotUnavailable)`. Settle by checking how EventStore surfaces an SDK Rejected reason to the caller.
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Carry the exact resolved tenant/policy-version tuple from `AiActionPolicyDecision` into `ChatBotApprovalResult` and the low-risk AI events when snapshots become live.
+  evidence: `AiActionApprovalGate.cs:97-98` passes only `PolicySnapshotId`; events are persisted state, so the change belongs with accepted A6 evidence in the live-persistence story. ADR wording qualified in round 8.

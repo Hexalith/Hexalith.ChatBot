@@ -38,7 +38,7 @@ tuples. The synthetic resolver requires trusted tenant context, authorization,
 fresh evidence, and a single exact match; it returns no default on ambiguity,
 malformed references, missing versions, or foreign tenants. The AI evaluator also
 matches the requested tenant and snapshot ID, requires a positive resolved policy
-version, and retains that exact tuple in resolved decisions. The request carries
+version, and retains that exact tuple in resolved decisions; carrying it into approval results and events is deferred to the live-persistence story. The request carries
 no expected version. It returns a redacted unavailable outcome for unresolved,
 stale, invalid, or foreign snapshots. The production snapshot
 provider remains unavailable.

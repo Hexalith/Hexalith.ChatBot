@@ -333,3 +333,22 @@ Applied 2026-10-16 (round 5): ADR note on the intentional 503 vs AI-path refusal
 - `IsSafePolicyToken` narrows the tenant charset (`@`, `|`) — low: no supported live decision is affected (Current-BH-9).
 - Hard-coded `PolicyVersion = 1` in the acceptance and recovery providers — low: synthetic fixtures with production unavailable.
 - Using-directive order, `deferred-work.md` tidiness, status wording ("in-review" vs "review" vs "in-progress") and removed gateway audit tests — cosmetic or process noise; the last fix would edit the spec under review.
+
+### Review Findings (round 8)
+
+- [x] [Review][Decision] Twelve sibling submodule pointer bumps ride in commit `9da2e06` ("build: sync local changes via /pushall") — Commons, Conversations, EventStore, Folders, FrontComposer, McpCli, Memories, Platform, Projects, Tenants, Timesheets and Works under `references/` all move. The spec says "Never ... modify siblings" and rounds 1-7 only discussed `.mcp.json`. Options: (1) accept as an environment sync and record it in Execution Evidence; (2) revert the gitlinks to the `38ca946` pins in a separate commit. Beware catalog drift (see hosted-lane drift traps). (acceptance-auditor+blind-hunter+edge-case-hunter, medium)
+- [x] [Review][Defer] Exact tenant/version tuple is dropped before approval results — `AiActionPolicyDecision` carries `TenantId`/`PolicyVersion`, but `AiActionApprovalGate` (`Gateway/Stages/AiActionApprovalGate.cs:97-98`) maps only `PolicySnapshotId` into `ChatBotApprovalResult.AllowedLowRiskExecution`/`RoutedToApproval`, so the exact decision reference the ADR says is retained never reaches approval results or events. Tests assert the tuple only on the decision object. Fixing adds public surface on `ChatBotApprovalResult`; options: (1) add tenant/version to approval results now; (2) defer to the live-persistence story and qualify the ADR wording. (verification-gap, medium)
+- [x] [Review][Defer] SDK `/process` rejection and HTTP gateway expose different outward shapes for `PolicySnapshotUnavailable` — deferred: unverified medium; only `CommandGateway` maps the code to a dependency-unavailable problem. Settle by checking how EventStore surfaces an SDK `Rejected` reason to the caller. (edge-case-hunter)
+
+#### Rejected (round 8)
+- Gate hard-codes names / `CommandsForPath` only used by a test; qualified or case-variant aliases; gate before idempotency; aggregate/dispatcher not defended — already rejected or deferred (rounds 4-7); guard test pins map coverage.
+- 503 `dependency_degraded` vs ADR "should not retry" wording — decided round 5/6; the fix edits the spec/ADR under review.
+- Exact-version equality not enforced by the evaluator; hard-coded `PolicyVersion = 1`; provider-asserted `IsFresh`/`IsValid` — low: rounds 6/7.
+- `IsValid`/`IsFresh` "may throw outside the try" — false: they are positional record bool properties (`TenantAiPolicySnapshot.cs:20-21`).
+- Provider faults swallowed with no telemetry; `Routed(string,…)` overload; `"unavailable"` literal; early routes lacking tenant/version — low/false: rounds 4-7 fail-closed decision.
+- History/resolver gaps (first-append anchor, version gaps, future-dated `EffectiveAtUtc`, duplicate histories, null `Principal`, duplicate `KnobId`, null elements, schema-version coverage, 5-minute window, caller-supplied `isAuthorized`) — low: internal unregistered synthetic types; fixes add guards/branches.
+- Spike-counter exemption keyed on reason code; `IsSafePolicyToken` tenant charset; ADR claims about old reason-code consumers; removed audit tests; `SdkConfirmation` early return; style/using order/ADR hygiene — low or previously decided.
+- Dead default-snapshot-id fallbacks in acceptance/recovery/`ServerBootstrapApiTests` providers — low: harmless fixtures.
+- `.mcp.json` `aspire` removal — decided round 7 (keep).
+
+**Decisions (2026-10-16, Jerome, applied recommended):** (1a) accept the `references/*` pointer bumps from `9da2e06` as an environment sync from `/pushall`; they are unrelated to Story 1.6, were not reviewed here, and were not reverted. (2b) defer carrying the tenant/version tuple into `ChatBotApprovalResult` and events to the live-persistence story; the ADR now says so.
