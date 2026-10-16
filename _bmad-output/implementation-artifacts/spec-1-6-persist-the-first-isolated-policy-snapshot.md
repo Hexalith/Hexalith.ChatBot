@@ -218,3 +218,25 @@ Code review 2026-10-16 (diff `38ca946..HEAD`, 4 layers: Blind Hunter, Edge Case 
 - The reviewed synthetic increment is ready for review; Story 1.6 remains open. Live persistence, accepted A6 protection, witnessed native isolation, native persisted-end-state evidence and completion qualification remain incomplete. Synthetic evidence cannot authorize a `done` transition.
 
 - Final status: spec `in-review`, sprint `review`. The frozen approved scope prohibits the generic workflow `done` transition until native acceptance and completion qualification exist.
+
+### Review Findings (round 4)
+
+- [x] [Review][Decision] RESOLVED (option 1, accept fail-closed outcome; ADR note added) — Evaluator collapses `policy_unavailable`/`policy_invalid`/`policy_stale` from `LowRiskRoutedToApproval` into `Blocked` (`policy-snapshot-unavailable`), and early routes drop the requested snapshot id (`"unavailable"` literal); SafeNextAction goes `review-ai-action` → `none`; blank requested snapshot id is now Blocked, so acceptance/recovery provider default-id branch is unreachable — conflicts with "Always: preserve historical decisions and catalog outcomes"; triage log called it "Intended" but no human sign-off. Options: (a) accept and sync OpenAPI/UI/catalog; (b) restore Routed outcomes/ids for the legacy reasons. [DefaultAiActionPolicyEvaluator.cs:20-62] (acceptance-auditor, blind-hunter, edge-case-hunter; medium)
+- [x] [Review][Decision] RESOLVED (option 1, keep broad gate; guard test added) — Hard-coded six-command gate (incl. notification-routing, mailbox-configuration, escalation) disables other stories' write paths beyond the policy submit/approve named in Task 1; escalation audit-shape tests were deleted, not adapted. Options: (a) keep broad gate per AC1 "any policy transport"; (b) narrow to named policy commands. [TenantPolicyPersistenceGate.cs] (acceptance-auditor, blind-hunter; medium)
+- [x] [Review][Patch] Add a guard test that fails when a command classified `tenant-policy-mutation` in `ChatBotAuditPathMap` is not covered by `TenantPolicyPersistenceGate.Denies` (gate already extended twice after misses) [ChatBotAuditPathMap.cs:67-73]
+- [x] [Review][Patch] WITHDRAWN as false on verification (`AdminScopesValue` is `IReadOnlyList<AdminScope>`, an enum, so `Order()` is culture-independent; no change made) — `AdminScopesValue.Order()` uses the culture-sensitive default string comparer while KnobId uses Ordinal; canonical form/`HasSameValues` can differ by culture — use `Order(StringComparer.Ordinal)` [ImmutableTenantPolicySnapshot.cs:42]
+- [x] [Review][Defer] Gate runs before any idempotency lookup, so a retry/`/process` callback of a policy command accepted before the gate returns 503 instead of its recorded outcome [ChatBotCommandAdmissionPipeline.cs:160-164] — deferred: unverified medium; settle by checking whether any environment holds policy commands accepted pre-gate (SdkConfirmation fixture uses a legacy domain record)
+- [x] [Review][Defer] Aggregate/dispatcher still process policy commands and audit-envelope coverage for them (PreCommit audit failure, replay intent, SourceEvidenceRefs) was removed from gateway tests — deferred: already in deferred-work ledger (unverified medium); merge duplicate entries when traced
+
+#### Rejected (round 4)
+
+- Evaluator re-reads mutable snapshot collections / provider exceptions outside the try — low; providers are internal in-process arrays/maps, already in the deferred ledger, fix adds guards.
+- Silent exception swallowing without telemetry — low; redaction is intentional, no named caller harmed.
+- Resolver null `Principal`/null histories — false for Principal (`ChatBotRequestContext` constructor always clones a non-null principal); synthetic, unregistered code.
+- History first-append lacks tenant/version-1/contiguity binding; replay returns bare bool; `isAuthorized` bare boolean; hard-coded 5-minute window — low; synthetic unregistered fold, resolver already filters by tenant, not met in everyday use.
+- Synthetic references could resemble accepted evidence — low; `EvidenceKind = "synthetic-unaccepted"` labels it.
+- SDK stage returns `PolicySnapshotUnavailable` without role authorization — low; only authenticated, tenant-matched subjects reach it and nothing is disclosed.
+- Positional ctor transposition risk / acceptance & recovery providers hard-code version 1 — low; cosmetic, synthetic providers.
+- Constructor diagnostics lack param names; `using`/ordering/ADR-wrapping nits — low/cosmetic. ADR link `../story-evidence-integrity.md` verified valid.
+- AI evidence not linked to resolver; A6 denial not tied to proof state; NU1903 evidence from modified build; status narrative inconsistencies — low/documentation; accepted by spec as synthetic scope and NU1903 already in ledger.
+- Edit-the-spec findings (status/test-count prose) — rejected per rule.

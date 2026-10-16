@@ -48,6 +48,13 @@ projections, caches, exports, backups and recovery. Missing, stale, failing, or
 unavailable proof or storage must deny before mutation. Prefixes, filters,
 admission markers, flags, and these synthetic tests cannot satisfy that gate.
 
+The evaluator now fails closed: a missing, invalid or stale AI policy snapshot is
+`Blocked` (`policy-snapshot-unavailable`) instead of routed to approval, and early
+routes no longer echo the requested snapshot id. This outcome change is intentional
+and signed off by the story owner; no code or contract consumed the old reason codes.
+The persistence gate covers every command the audit map classifies as
+`tenant-policy-mutation`, enforced by a guard test.
+
 Any future domain write must use Hexalith.EventStore; queries, projections, read
 models, and cursors must use the domain-service SDK seams. There is no history
 migration or sibling change in this work. Atomic command admission and mutation /

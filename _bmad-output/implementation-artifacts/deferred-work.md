@@ -1474,3 +1474,8 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Before enabling a live AI policy provider, verify provider-owned collection failures produce redacted unavailable decisions.
   evidence: The pre-existing TenantAiPolicySnapshot contract exposes provider-owned collections and baseline enumeration/lookup already occurred without failure translation. Current providers use ordinary arrays/maps and production remains unavailable; a reachable provider whose enumeration or lookup throws would settle this unverified medium concern.
+
+## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-16, round 4)
+
+- Gate precedes idempotency lookup: retries of policy commands accepted before the gate now return 503 `dependency_degraded`. Unverified medium; settle by checking for any environment/event stream holding pre-gate accepted policy commands.
+- Audit-envelope coverage (PreCommit audit failure, replay intent, SourceEvidenceRefs) for notification/escalation/tenant-policy/mailbox commands was removed with gateway denial; aggregate-level tests missing. Unverified medium; resolves together with the aggregate-bypass entries above.

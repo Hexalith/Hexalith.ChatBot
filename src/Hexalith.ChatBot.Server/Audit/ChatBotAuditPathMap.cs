@@ -76,6 +76,10 @@ internal static class ChatBotAuditPathMap
         [nameof(AssignTenantAdminRole)] = "allowlist-mutation",
     };
 
+    /// <summary>Lists the command names mapped to one inventory path code.</summary>
+    internal static IEnumerable<string> CommandsForPath(string pathCode)
+        => CommandToPathCode.Where(pair => pair.Value == pathCode).Select(static pair => pair.Key);
+
     /// <summary>
     /// Resolves the inventory path a chained envelope realises, or <see langword="null"/> when the envelope maps to no
     /// known state-writing path (a completeness gap the measurer counts against the fraction). Pure and deterministic.
