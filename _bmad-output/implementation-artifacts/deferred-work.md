@@ -1479,3 +1479,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 
 - Gate precedes idempotency lookup: retries of policy commands accepted before the gate now return 503 `dependency_degraded`. Unverified medium; settle by checking for any environment/event stream holding pre-gate accepted policy commands.
 - Audit-envelope coverage (PreCommit audit failure, replay intent, SourceEvidenceRefs) for notification/escalation/tenant-policy/mailbox commands was removed with gateway denial; aggregate-level tests missing. Unverified medium; resolves together with the aggregate-bypass entries above.
+
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Verify that supported admission-marker issuers cannot sign qualified policy command aliases that bypass the simple-name policy gate (unverified medium).
+  evidence: EventStore dispatch normalizes namespace/assembly-qualified CommandType strings, while TenantPolicyPersistenceGate matches simple names. A valid marker for an alias takes the SDK marker fast path, but current dispatcher plans and exact-match admission issue only simple names and marker validation binds the exact CommandType. A supported producer of a qualified signed envelope, or an explicit qualified-issuer contract test before activation, would settle reachability.

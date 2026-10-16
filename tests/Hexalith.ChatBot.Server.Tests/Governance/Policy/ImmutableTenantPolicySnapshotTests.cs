@@ -128,6 +128,55 @@ public sealed class ImmutableTenantPolicySnapshotTests
         retained.Snapshots.ShouldHaveSingleItem().ShouldBeSameAs(original);
     }
 
+    /// <summary>Rejects nested value differences on identity reuse and rollback without changing retained snapshots.</summary>
+    [Theory]
+    [InlineData(TenantPolicyKnobIds.AiActionLowRiskAllowed, false)]
+    [InlineData(TenantPolicyKnobIds.MailboxRoutingRules, false)]
+    [InlineData(TenantPolicyKnobIds.AdminPermissionScopes, false)]
+    [InlineData(TenantPolicyKnobIds.AiActionLowRiskAllowed, true)]
+    [InlineData(TenantPolicyKnobIds.MailboxRoutingRules, true)]
+    [InlineData(TenantPolicyKnobIds.AdminPermissionScopes, true)]
+    public void SyntheticNestedValueConflictsMustRejectIdentityReuseAndRollback(string changedKnob, bool rollback)
+    {
+        TenantPolicyChangeSet originalValues = new(M1Values().Values.Select(static value => value.KnobId == TenantPolicyKnobIds.MailboxRoutingRules
+            ? value with { StringListValue = ["synthetic-original-route"] } : value).ToArray());
+        ImmutableTenantPolicySnapshot original = Snapshot(schema: TenantPolicySchemaVersions.M1Preview, values: originalValues);
+        TenantPolicySnapshotHistory history = new();
+        history.TryAppend(original, out history, out _).ShouldBeTrue();
+        TenantPolicyChangeSet changedValues = new(original.Values.Values.Select(value => value.KnobId != changedKnob ? value : changedKnob switch
+        {
+            TenantPolicyKnobIds.AiActionLowRiskAllowed => value with
+            {
+                AiActionLowRiskAllowed = value.AiActionLowRiskAllowed!.ToDictionary(static pair => pair.Key,
+                    static pair => pair.Key == AiActionRiskActionClass.ModifiesState || pair.Value),
+            },
+            TenantPolicyKnobIds.MailboxRoutingRules => value with { StringListValue = ["synthetic-different-route"] },
+            TenantPolicyKnobIds.AdminPermissionScopes => value with { AdminScopesValue = [AdminScope.SeeOnly] },
+            _ => throw new ArgumentOutOfRangeException(nameof(changedKnob)),
+        }).ToArray());
+        if (rollback)
+        {
+            history.TryAppend(Snapshot(id: "synthetic-next", version: 2, supersedes: original.SnapshotId,
+                schema: original.SchemaVersion, values: changedValues), out history, out _).ShouldBeTrue();
+        }
+        ImmutableTenantPolicySnapshot[] beforeConflict = history.Snapshots.ToArray();
+        ImmutableTenantPolicySnapshot conflict = Snapshot(id: rollback ? "synthetic-rollback" : original.SnapshotId,
+            version: rollback ? 3 : original.PolicyVersion, supersedes: rollback ? "synthetic-next" : null,
+            rollback: rollback ? original.SnapshotId : null, schema: original.SchemaVersion, values: changedValues);
+
+        history.TryAppend(conflict, out TenantPolicySnapshotHistory retained, out bool replay).ShouldBeFalse();
+        replay.ShouldBeFalse();
+        retained.ShouldBeSameAs(history);
+        retained.Snapshots.ShouldBe(beforeConflict);
+        retained.Snapshots[0].ShouldBeSameAs(original);
+        original.Values.Values.Single(static value => value.KnobId == TenantPolicyKnobIds.AiActionLowRiskAllowed)
+            .AiActionLowRiskAllowed!.Values.ShouldAllBe(static allowed => !allowed);
+        original.Values.Values.Single(static value => value.KnobId == TenantPolicyKnobIds.MailboxRoutingRules)
+            .StringListValue.ShouldBe(["synthetic-original-route"]);
+        original.Values.Values.Single(static value => value.KnobId == TenantPolicyKnobIds.AdminPermissionScopes)
+            .AdminScopesValue.ShouldBe([AdminScope.Policy]);
+    }
+
     /// <summary>Canonicalizes separately allocated nested maps and scope collections for equivalent replay.</summary>
     [Fact]
     public void SyntheticEquivalentReplayMustCanonicalizeNestedCollectionOrder()
@@ -207,15 +256,28 @@ public sealed class ImmutableTenantPolicySnapshotTests
         ImmutableTenantPolicySnapshot original = Resolve(history, "synthetic-first", 1)!;
         AiActionPolicyDecision originalDecision = AiActionPolicyDecision.Allowed(new(original.TenantId, original.PolicyVersion, original.SnapshotId,
             true, "read-only", ["summarize-visible-context"], true, true));
-        history.TryAppend(Snapshot(id: "synthetic-next", version: 2, supersedes: "synthetic-first", values: Values(0.95)), out history, out _).ShouldBeTrue();
-        history.TryAppend(Snapshot(id: "synthetic-rollback", version: 3, supersedes: "synthetic-next", rollback: "synthetic-first"), out history, out _).ShouldBeTrue();
+        foreach (ImmutableTenantPolicySnapshot successor in new[]
+        {
+            Snapshot(id: "synthetic-next", version: 2, supersedes: "synthetic-first", values: Values(0.95)),
+            Snapshot(id: "synthetic-rollback", version: 3, supersedes: "synthetic-next", rollback: "synthetic-first"),
+        })
+        {
+            history.TryAppend(successor, out history, out _).ShouldBeTrue();
+            ImmutableTenantPolicySnapshot[] beforeReplay = history.Snapshots.ToArray();
+            history.TryAppend(Snapshot(), out TenantPolicySnapshotHistory replayed, out bool replay).ShouldBeTrue();
+            replay.ShouldBeTrue();
+            replayed.ShouldBeSameAs(history);
+            replayed.Snapshots.ShouldBe(beforeReplay);
+            originalDecision.TenantId.ShouldBe("synthetic-alpha");
+            originalDecision.PolicyVersion.ShouldBe(1);
+            originalDecision.PolicySnapshotId.ShouldBe("synthetic-first");
+        }
 
         Resolve(history, "synthetic-first", 1).ShouldBeSameAs(original);
-        originalDecision.TenantId.ShouldBe("synthetic-alpha");
-        originalDecision.PolicyVersion.ShouldBe(1);
-        originalDecision.PolicySnapshotId.ShouldBe("synthetic-first");
         original.Values.Values.Single(static value => value.KnobId == TenantPolicyKnobIds.AssociationTHigh).NumberValue.ShouldBe(0.90);
         history.Snapshots.Count.ShouldBe(3);
+        history.Snapshots[1].Values.Values.Single(static value => value.KnobId == TenantPolicyKnobIds.AssociationTHigh).NumberValue.ShouldBe(0.95);
+        history.Snapshots[2].Values.Values.Single(static value => value.KnobId == TenantPolicyKnobIds.AssociationTHigh).NumberValue.ShouldBe(0.90);
         history.Snapshots[2].RollbackSnapshotId.ShouldBe("synthetic-first");
         history.TryAppend(Snapshot(id: "synthetic-invalid", version: 4, supersedes: "synthetic-rollback", rollback: "synthetic-first", values: Values(0.99)), out _, out _).ShouldBeFalse();
         history.TryAppend(Snapshot(id: "synthetic-backdated", version: 4, supersedes: "synthetic-rollback", effective: SyntheticNow.AddMinutes(-30)), out _, out _).ShouldBeFalse();
