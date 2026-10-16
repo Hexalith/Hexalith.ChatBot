@@ -1442,7 +1442,7 @@ public sealed partial class CommandGatewayTests
     }
 
     [Fact]
-    public async Task NotificationRoutingChangePreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    public async Task NotificationRoutingChangeMustDenyBeforePreCommitAuditEvenWhenThatWriterIsUnavailable()
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
@@ -1463,17 +1463,16 @@ public sealed partial class CommandGatewayTests
         result.IsAccepted.ShouldBeFalse();
         result.Problem.ShouldNotBeNull();
         result.Problem.Status.ShouldBe(503);
-        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.DependencyDegraded);
         dispatcher.DispatchCount.ShouldBe(0);
-        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
-        replayQueue.Intents.Single().CommandName.ShouldBe(nameof(SubmitNotificationRoutingChange));
-        alertSink.Alerts.Single().Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
-        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-operation:notification-routing-edit");
-        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+        replayQueue.Intents.ShouldBeEmpty();
+        alertSink.Alerts.ShouldBeEmpty();
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
     }
 
     [Fact]
-    public async Task NotificationRoutingChangeAuditRefsShouldRemainMetadataOnly()
+    public async Task NotificationRoutingChangeDeniedAuditMustRemainMetadataOnly()
     {
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
@@ -1486,22 +1485,14 @@ public sealed partial class CommandGatewayTests
             Submission(AdminPrincipal("policy-admin"), NotificationRoutingChangeCommand()),
             TestContext.Current.CancellationToken);
 
-        result.IsAccepted.ShouldBeTrue();
-        auditWriter.Envelopes.Count.ShouldBe(2);
-        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
-        {
-            envelope.SourceEvidenceRefs.ShouldContain("admin-role:policy-admin");
-            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:notification-routing-edit");
-            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
-            envelope.SourceEvidenceRefs.ShouldContain("notification-state-class:approval-pending");
-            envelope.SourceEvidenceRefs.ShouldContain("notification-channel:email");
-            envelope.SourceEvidenceRefs.ShouldContain("recipient-role:policy-admin");
-            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:routing-snapshot-current");
-            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:routing-snapshot-proposed");
-            envelope.SourceEvidenceRefs.ShouldContain("routing-new-fingerprint:sha256:routingnew");
-        }
-
-        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull().Code.ShouldBe(ChatBotMessageCodes.DependencyDegraded);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+        string serialized = JsonSerializer.Serialize(auditWriter.AuthorizationFailures, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("routing-snapshot-current");
+        serialized.ShouldNotContain("routing-snapshot-proposed");
+        serialized.ShouldNotContain("sha256:routingnew");
         serialized.ShouldNotContain("secret", Case.Insensitive);
         serialized.ShouldNotContain("address", Case.Insensitive);
     }
@@ -1742,7 +1733,7 @@ public sealed partial class CommandGatewayTests
     }
 
     [Fact]
-    public async Task MailboxConfigurationChangePreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    public async Task MailboxConfigurationChangeMustDenyBeforePreCommitAuditEvenWhenThatWriterIsUnavailable()
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
@@ -1761,18 +1752,15 @@ public sealed partial class CommandGatewayTests
         result.IsAccepted.ShouldBeFalse();
         result.Problem.ShouldNotBeNull();
         result.Problem.Status.ShouldBe(503);
-        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.DependencyDegraded);
         dispatcher.DispatchCount.ShouldBe(0);
-        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
-        AuditEnvelope envelope = auditWriter.Envelopes.Single();
-        envelope.SourceEvidenceRefs.ShouldContain("admin-operation:mailbox-config-change");
-        envelope.SourceEvidenceRefs.ShouldContain("admin-scope:mailbox");
-        envelope.SourceEvidenceRefs.ShouldContain("mailbox-config:mailbox-config-current");
-        envelope.SourceEvidenceRefs.ShouldContain("mailbox-source:controlled-mailbox-001");
+        replayQueue.Intents.ShouldBeEmpty();
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
     }
 
     [Fact]
-    public async Task MailboxConfigurationChangeAuditRefsShouldRemainMetadataOnly()
+    public async Task MailboxConfigurationChangeDeniedAuditMustRemainMetadataOnly()
     {
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
@@ -1785,25 +1773,14 @@ public sealed partial class CommandGatewayTests
             Submission(AdminPrincipal("tenant-admin"), MailboxConfigurationChangeCommand()),
             TestContext.Current.CancellationToken);
 
-        result.IsAccepted.ShouldBeTrue();
-        auditWriter.Envelopes.Count.ShouldBe(2);
-        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
-        {
-            envelope.SourceEvidenceRefs.ShouldContain("admin-role:mailbox-admin");
-            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:mailbox-config-change");
-            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:mailbox");
-            envelope.SourceEvidenceRefs.ShouldContain("mailbox-config:mailbox-config-current");
-            envelope.SourceEvidenceRefs.ShouldContain("mailbox-config:mailbox-config-proposed");
-            envelope.SourceEvidenceRefs.ShouldContain("mailbox-source:controlled-mailbox-001");
-            envelope.SourceEvidenceRefs.ShouldContain("mailbox-routing-rule:routing-rule-001");
-            envelope.SourceEvidenceRefs.ShouldContain("provider-connection:provider-connection-001");
-            envelope.SourceEvidenceRefs.ShouldContain("permission-status:permission-status-001");
-            envelope.SourceEvidenceRefs.ShouldContain("mailbox-old-fingerprint:sha256:oldfingerprint001");
-            envelope.SourceEvidenceRefs.ShouldContain("mailbox-new-fingerprint:sha256:newfingerprint001");
-            envelope.SourceEvidenceRefs.ShouldContain("reason:mailbox-admin-update");
-        }
-
-        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull().Code.ShouldBe(ChatBotMessageCodes.DependencyDegraded);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+        string serialized = JsonSerializer.Serialize(auditWriter.AuthorizationFailures, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("mailbox-config-current");
+        serialized.ShouldNotContain("mailbox-config-proposed");
+        serialized.ShouldNotContain("sha256:newfingerprint001");
         serialized.ShouldNotContain("mailbox body", Case.Insensitive);
         serialized.ShouldNotContain("message subject", Case.Insensitive);
         serialized.ShouldNotContain("provider payload", Case.Insensitive);

@@ -7,6 +7,7 @@ using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Server.Acceptance;
 using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Authorization;
@@ -14,6 +15,8 @@ using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Gateway.Status;
+using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Governance.Policy;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Results;
@@ -25,6 +28,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 
 using Shouldly;
 
@@ -40,10 +44,16 @@ public sealed partial class CommandGatewayTests
     [InlineData("approval", true)]
     [InlineData("thresholds", false)]
     [InlineData("thresholds", true)]
+    [InlineData("escalation", false)]
+    [InlineData("escalation", true)]
+    [InlineData("notification-routing", false)]
+    [InlineData("notification-routing", true)]
+    [InlineData("mailbox-configuration", false)]
+    [InlineData("mailbox-configuration", true)]
     public async Task SyntheticPolicyWritesMustDenyBothLegacyAndCanonicalAdmissionBeforeReservation(string commandKind, bool canonical)
     {
         object command = SyntheticPolicyCommand(commandKind);
-        ChatBotCommandSubmission submission = Submission(AdminPrincipal("policy-admin"), command);
+        ChatBotCommandSubmission submission = Submission(SyntheticPolicyPrincipal(commandKind), command);
         if (canonical)
         {
             submission.Request.Concurrency = new CommandOperationConcurrency { ExpectedRevision = 0, DecisionSlotId = "synthetic-policy-slot" };
@@ -79,6 +89,15 @@ public sealed partial class CommandGatewayTests
     [InlineData("submit", true, true)]
     [InlineData("approval", true, true)]
     [InlineData("thresholds", true, true)]
+    [InlineData("escalation", false, false)]
+    [InlineData("escalation", true, false)]
+    [InlineData("escalation", true, true)]
+    [InlineData("notification-routing", false, false)]
+    [InlineData("notification-routing", true, false)]
+    [InlineData("notification-routing", true, true)]
+    [InlineData("mailbox-configuration", false, false)]
+    [InlineData("mailbox-configuration", true, false)]
+    [InlineData("mailbox-configuration", true, true)]
     public async Task SyntheticSdkPolicyWritesMustDenyEvenAnAuthenticSignedMarker(string commandKind, bool signed, bool workload)
     {
         FixedClock clock = new();
@@ -91,7 +110,7 @@ public sealed partial class CommandGatewayTests
         ClaimsPrincipal principal = workload
             ? new(new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "workload:eventstore"), new("eventstore:workload", "eventstore"),
                 new("eventstore:operation", "domain-service:process")], "EventStoreWorkload"))
-            : AdminPrincipal("policy-admin");
+            : SyntheticPolicyPrincipal(commandKind);
         HttpContextAccessor accessor = new() { HttpContext = new DefaultHttpContext { User = principal } };
         ChatBotRequestContextResolver resolver = new(accessor);
         DataProtectionChatBotAdmissionMarker marker = new(new EphemeralDataProtectionProvider());
@@ -146,6 +165,12 @@ public sealed partial class CommandGatewayTests
     [InlineData("approval", true)]
     [InlineData("thresholds", false)]
     [InlineData("thresholds", true)]
+    [InlineData("escalation", false)]
+    [InlineData("escalation", true)]
+    [InlineData("notification-routing", false)]
+    [InlineData("notification-routing", true)]
+    [InlineData("mailbox-configuration", false)]
+    [InlineData("mailbox-configuration", true)]
     public async Task SyntheticHttpPolicyTransportsMustReturnSafeDependencyDenial(string commandKind, bool canonical)
     {
         FixedClock clock = new();
@@ -153,7 +178,7 @@ public sealed partial class CommandGatewayTests
         RecordingAuditWriter audit = new();
         InMemoryCoarseIdempotencyStore reservations = new(clock);
         object command = SyntheticPolicyCommand(commandKind);
-        using WebApplicationFactory<Program> factory = SyntheticPolicyHost(AdminPrincipal("policy-admin"), clock, audit, reservations, dispatcher);
+        using WebApplicationFactory<Program> factory = SyntheticPolicyHost(SyntheticPolicyPrincipal(commandKind), clock, audit, reservations, dispatcher);
         using HttpClient client = factory.CreateClient();
         Dictionary<string, object> request = new()
         {
@@ -184,6 +209,93 @@ public sealed partial class CommandGatewayTests
         audit.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthenticationDenied);
         counter.RecordedTenants.ShouldHaveSingleItem().ShouldBe("unavailable");
         dispatcher.DispatchCount.ShouldBe(0);
+    }
+
+    /// <summary>Preserves authorization denials before the unavailable policy-persistence guard.</summary>
+    [Theory]
+    [InlineData("submit", false)]
+    [InlineData("submit", true)]
+    [InlineData("approval", false)]
+    [InlineData("approval", true)]
+    [InlineData("thresholds", false)]
+    [InlineData("thresholds", true)]
+    [InlineData("escalation", false)]
+    [InlineData("escalation", true)]
+    [InlineData("notification-routing", false)]
+    [InlineData("notification-routing", true)]
+    [InlineData("mailbox-configuration", false)]
+    [InlineData("mailbox-configuration", true)]
+    public async Task SyntheticPolicyDenialMustPreserveAuthorizationPrecedence(string commandKind, bool canonical)
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter audit = new();
+        RecordingAuthorizationFailureCounter counter = new();
+        InMemoryCoarseIdempotencyStore reservations = new(new FixedClock());
+        InMemoryOperationStatusStore status = new();
+        ChatBotCommandSubmission submission = Submission(SyntheticPolicyPrincipal(commandKind), SyntheticPolicyCommand(commandKind));
+        if (canonical)
+        {
+            submission.Request.Concurrency = new CommandOperationConcurrency { ExpectedRevision = 0, DecisionSlotId = "synthetic-policy-slot" };
+        }
+
+        ChatBotGatewayResult result = await Gateway(dispatcher,
+            authorizationStage: new DenyingAuthorizationStage(ChatBotAuthorizationReasonCodes.AuthorizationDenied),
+            auditWriter: audit, idempotencyStore: reservations, operationStatusStore: status, authorizationFailureCounter: counter)
+            .SubmitAsync(submission, TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull().Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        audit.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        counter.RecordedTenants.ShouldHaveSingleItem().ShouldBe(BoundTenant);
+        audit.Envelopes.ShouldBeEmpty();
+        reservations.RecordCount.ShouldBe(0);
+        dispatcher.DispatchCount.ShouldBe(0);
+        (await status.TryGetAsync(BoundTenant, submission.Request.CommandId, TestContext.Current.CancellationToken)).ShouldBeNull();
+    }
+
+    /// <summary>Exercises real policy evaluation through admission with synthetic unresolved evidence.</summary>
+    [Theory]
+    [InlineData("missing", false)]
+    [InlineData("missing", true)]
+    [InlineData("stale", false)]
+    [InlineData("stale", true)]
+    [InlineData("foreign", false)]
+    [InlineData("foreign", true)]
+    public async Task SyntheticUnresolvedPolicyMustBlockAdmissionBeforeReservationOrDispatch(string evidenceState, bool canonical)
+    {
+        TenantAiPolicySnapshot? snapshot = evidenceState == "missing" ? null : new(
+            evidenceState == "foreign" ? "synthetic-foreign-tenant" : BoundTenant,
+            7, "policy-snap-001", LowRiskAllowed: true, "read-only", ["summarize-visible-context"],
+            IsFresh: evidenceState != "stale", IsValid: true);
+        SyntheticAdmissionPolicySnapshotProvider provider = new(snapshot);
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter audit = new();
+        InMemoryCoarseIdempotencyStore reservations = new(new FixedClock());
+        InMemoryOperationStatusStore status = new();
+        ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), LowRiskExecutionCommand());
+        if (canonical)
+        {
+            submission.Request.Concurrency = new CommandOperationConcurrency { ExpectedRevision = 0, DecisionSlotId = "synthetic-ai-policy-slot" };
+        }
+
+        ChatBotGatewayResult result = await Gateway(dispatcher, auditWriter: audit, idempotencyStore: reservations, operationStatusStore: status,
+            riskClassifier: new SyntheticLowRiskPolicyRiskClassifier(),
+            approvalGate: new AiActionApprovalGate(new DefaultAiActionPolicyEvaluator(provider)))
+            .SubmitAsync(submission, TestContext.Current.CancellationToken);
+
+        provider.ReadCount.ShouldBe(1);
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull().Code.ShouldBe(ChatBotMessageCodes.RefusalBlockedAction);
+        result.Problem.Status.ShouldBe(StatusCodes.Status403Forbidden);
+        result.Problem.Retryable.ShouldBeFalse();
+        dispatcher.DispatchCount.ShouldBe(0);
+        reservations.RecordCount.ShouldBe(0);
+        audit.Envelopes.ShouldBeEmpty();
+        (await status.TryGetAsync(BoundTenant, submission.Request.CommandId, TestContext.Current.CancellationToken)).ShouldBeNull();
+        string safe = JsonSerializer.Serialize(result);
+        safe.ShouldNotContain("synthetic-foreign-tenant");
+        safe.ShouldNotContain("policy-snap-001");
+        safe.ShouldNotContain("context-package-001");
     }
 
     [Theory]
@@ -240,6 +352,103 @@ public sealed partial class CommandGatewayTests
         dispatcher.DispatchCount.ShouldBe(0);
     }
 
+    /// <summary>Denies untrusted signed-workload fallback metadata before any policy admission effect.</summary>
+    [Theory]
+    [InlineData("tampered-marker", false)]
+    [InlineData("missing-gateway-origin", true)]
+    [InlineData("conflicting-gateway-origin", true)]
+    [InlineData("missing-bound-actor", true)]
+    [InlineData("conflicting-bound-actor", true)]
+    [InlineData("missing-actor-id", false)]
+    [InlineData("conflicting-actor-id", true)]
+    [InlineData("missing-actor-type", true)]
+    [InlineData("conflicting-actor-type", true)]
+    [InlineData("missing-surface-origin", false)]
+    [InlineData("conflicting-surface-origin", true)]
+    public async Task SyntheticSignedWorkloadPolicyFallbackMustRejectTamperingAndAmbiguousBindings(string failure, bool validMarker)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(failure);
+        FixedClock clock = new();
+        RecordingAuditWriter audit = new();
+        RecordingDispatcher dispatcher = new();
+        InMemoryCoarseIdempotencyStore reservations = new(clock);
+        ClaimsPrincipal principal = new(new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "workload:eventstore"),
+            new("eventstore:workload", "eventstore"), new("eventstore:operation", "domain-service:process")], "EventStoreWorkload"));
+        object command = SyntheticPolicyCommand("approval");
+        JsonElement payload = JsonSerializer.SerializeToElement(command);
+        DataProtectionChatBotAdmissionMarker marker = new(new EphemeralDataProtectionProvider());
+        string signedMarker = marker.Create("01ARZ3NDEKTSV4RRFFQ69G5FAY", BoundTenant, "policy-change-001", command.GetType().Name,
+            payload, CorrelationId, "synthetic-actor", "api", null);
+        Dictionary<string, string> extensions = new()
+        {
+            ["actorId"] = "synthetic-actor", ["actorType"] = "human", ["surfaceOrigin"] = "api",
+            [EventStoreGatewayVerifiedOrigin.ExtensionKey] = "chatbot", [EventStoreGatewayVerifiedOrigin.ActorExtensionKey] = "synthetic-actor",
+            [DataProtectionChatBotAdmissionMarker.ExtensionKey] = failure == "tampered-marker" ? "invalid-" + signedMarker : signedMarker,
+            ["taskId"] = "restricted/policy-secret",
+        };
+        if (failure != "tampered-marker")
+        {
+            string key = failure[(failure.IndexOf('-') + 1)..] switch
+            {
+                "gateway-origin" => EventStoreGatewayVerifiedOrigin.ExtensionKey,
+                "bound-actor" => EventStoreGatewayVerifiedOrigin.ActorExtensionKey,
+                "actor-id" => "actorId",
+                "actor-type" => "actorType",
+                "surface-origin" => "surfaceOrigin",
+                _ => throw new ArgumentOutOfRangeException(nameof(failure)),
+            };
+            if (failure.StartsWith("missing-", StringComparison.Ordinal)) { extensions.Remove(key); }
+            else { extensions.Add(key.ToUpperInvariant(), "restricted/policy-secret"); }
+        }
+        CommandEnvelope envelope = new("01ARZ3NDEKTSV4RRFFQ69G5FAY", BoundTenant, "chatbot", "policy-change-001", command.GetType().Name,
+            JsonSerializer.SerializeToUtf8Bytes(payload), CorrelationId, null, "synthetic-actor", extensions);
+        marker.IsValid(envelope).ShouldBe(validMarker);
+        using WebApplicationFactory<Program> factory = SyntheticPolicyHost(principal, clock, audit, reservations, dispatcher, marker);
+        using HttpClient client = factory.CreateClient();
+        using HttpResponseMessage response = await client.PostAsJsonAsync("/process", new DomainServiceRequest(envelope, null), TestContext.Current.CancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        DomainServiceWireResult wire = (await response.Content.ReadFromJsonAsync<DomainServiceWireResult>(cancellationToken: TestContext.Current.CancellationToken))!;
+        wire.IsRejection.ShouldBeTrue();
+        DomainServiceWireEvent rejected = wire.Events.ShouldHaveSingleItem();
+        rejected.EventTypeName.ShouldBe(typeof(ChatBotDomainServiceAdmissionRejected).FullName);
+        JsonSerializer.Deserialize<ChatBotDomainServiceAdmissionRejected>(rejected.Payload)!.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthenticationDenied);
+        audit.AuthorizationFailures.ShouldHaveSingleItem().ShouldBe(new ChatBotAuthorizationFailureAuditFact("unavailable", "anonymous",
+            command.GetType().Name, ChatBotAuthorizationReasonCodes.AuthenticationDenied, CorrelationId, null, "api"));
+        audit.Envelopes.ShouldBeEmpty();
+        reservations.RecordCount.ShouldBe(0);
+        dispatcher.DispatchCount.ShouldBe(0);
+        string safe = JsonSerializer.Serialize(new { wire, audit.AuthorizationFailures });
+        safe.ShouldNotContain("restricted/policy-secret");
+        safe.ShouldNotContain(signedMarker);
+        safe.ShouldNotContain("policy-snapshot-current");
+    }
+
+    /// <summary>Checks the real host keeps production policy unavailable and synthetic models unregistered.</summary>
+    [Fact]
+    public async Task SyntheticPolicyModelsMustRemainUnregisteredAndProductionProviderUnavailableWhenAcceptanceIsDisabled()
+    {
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting(Story132AcceptanceServiceCollectionExtensions.EnabledConfigurationKey, "false");
+            builder.ConfigureServices(services =>
+            {
+                services.ShouldNotContain(static descriptor => descriptor.ServiceType == typeof(ImmutableTenantPolicySnapshot) ||
+                    descriptor.ServiceType == typeof(TenantPolicySnapshotHistory) || descriptor.ServiceType == typeof(TenantPolicySnapshotResolver));
+                foreach (ServiceDescriptor service in services.Where(static service => service.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)).ToArray())
+                {
+                    services.Remove(service);
+                }
+            });
+        });
+        factory.Services.GetRequiredService<IConfiguration>().GetValue<bool>(Story132AcceptanceServiceCollectionExtensions.EnabledConfigurationKey).ShouldBeFalse();
+        ITenantAiPolicySnapshotProvider provider = factory.Services.GetServices<ITenantAiPolicySnapshotProvider>().ShouldHaveSingleItem();
+        provider.ShouldBeOfType<UnavailableTenantAiPolicySnapshotProvider>();
+        (await provider.TryGetAsync(BoundTenant, "project-001", "synthetic-policy", TestContext.Current.CancellationToken)).ShouldBeNull();
+        factory.Services.GetService<ImmutableTenantPolicySnapshot>().ShouldBeNull();
+        factory.Services.GetService<TenantPolicySnapshotHistory>().ShouldBeNull();
+        factory.Services.GetService(typeof(TenantPolicySnapshotResolver)).ShouldBeNull();
+    }
+
     private static WebApplicationFactory<Program> SyntheticPolicyHost(ClaimsPrincipal principal, ISystemClock clock, IAuditWriter audit,
         IIdempotencyStore reservations, ICommandDispatcher dispatcher, IChatBotAdmissionMarker? marker = null)
         => new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
@@ -260,6 +469,9 @@ public sealed partial class CommandGatewayTests
             }
         }));
 
+    private static ClaimsPrincipal SyntheticPolicyPrincipal(string commandKind)
+        => AdminPrincipal(commandKind == "mailbox-configuration" ? "mailbox-admin" : "policy-admin");
+
     private static object SyntheticPolicyCommand(string commandKind)
         => commandKind switch
         {
@@ -268,6 +480,9 @@ public sealed partial class CommandGatewayTests
                 [TenantPolicyKnobIds.AssociationTHigh], "synthetic", "admin-requester", "admin-approver", TenantPolicySchemaVersions.M0, CorrelationId),
             "thresholds" => new Hexalith.ChatBot.Contracts.Commands.SetAssociationConfidenceThresholds("policy-change-001", 0.90, 0.60,
                 "synthetic-v1", "synthetic-evaluation", FixedClock.FixedUtcNow),
+            "escalation" => EscalationPolicyChangeCommand(),
+            "notification-routing" => NotificationRoutingChangeCommand(),
+            "mailbox-configuration" => MailboxConfigurationChangeCommand(),
             _ => throw new ArgumentOutOfRangeException(nameof(commandKind)),
         };
 

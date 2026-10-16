@@ -1470,3 +1470,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 
 - Audit-enabled builds fail with NU1903 on `Microsoft.AspNetCore.SignalR.Common` (GHSA-334f-vvp4-7g6p); Story 1.6 evidence passes only with `-p:NuGetAudit=false` and no tracked item exists. Pre-existing dependency advisory; track a package bump or documented suppression.
 - Policy-command denial not enforced in `GovernedOperationAggregate` / `AcceptedCommandDispatcher` (raised again in round 3). Unverified medium; see the 2026-10-15 entry for what settles it.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Before enabling a live AI policy provider, verify provider-owned collection failures produce redacted unavailable decisions.
+  evidence: The pre-existing TenantAiPolicySnapshot contract exposes provider-owned collections and baseline enumeration/lookup already occurred without failure translation. Current providers use ordinary arrays/maps and production remains unavailable; a reachable provider whose enumeration or lookup throws would settle this unverified medium concern.

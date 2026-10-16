@@ -4,8 +4,9 @@ Status: partially implemented; Story 1.6 remains in progress. A6 and native
 isolation acceptance are incomplete. This decision does not authorize live policy
 persistence, pilot data, compliance claims, or production readiness.
 
-Policy submit, approve, direct association-threshold update, and escalation
-policy submit commands are denied before admission reservation or dispatch. This applies to legacy HTTP requests, canonical requests, SDK `/process`
+Policy submit, approve, direct association-threshold update, escalation policy
+submit, notification-routing snapshot change, and mailbox-configuration snapshot
+change commands are denied before admission reservation or dispatch. This applies to legacy HTTP requests, canonical requests, SDK `/process`
 requests, and correctly signed admission markers. A marker proves transport
 integrity; it is not protection or isolation approval. Existing authentication and
 tenant-binding failures keep their safe semantics. Denials use the existing audit
@@ -30,8 +31,10 @@ values and schema. Historical decision references remain exact tenant/ID/version
 tuples. The synthetic resolver requires trusted tenant context, authorization,
 fresh evidence, and a single exact match; it returns no default on ambiguity,
 malformed references, missing versions, or foreign tenants. The AI evaluator also
-checks exact tenant/ID/version evidence and returns a redacted unavailable outcome
-for unresolved, stale, invalid, or foreign snapshots. The production snapshot
+matches the requested tenant and snapshot ID, requires a positive resolved policy
+version, and retains that exact tuple in resolved decisions. The request carries
+no expected version. It returns a redacted unavailable outcome for unresolved,
+stale, invalid, or foreign snapshots. The production snapshot
 provider remains unavailable.
 
 Live persistence can be designed only after accepted data-class protection

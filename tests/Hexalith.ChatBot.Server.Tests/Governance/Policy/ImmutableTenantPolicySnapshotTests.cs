@@ -45,15 +45,7 @@ public sealed class ImmutableTenantPolicySnapshotTests
     public void SyntheticM1AdminScopesMustBeCopiedWithoutExposingMutableHistory()
     {
         List<AdminScope> scopes = [AdminScope.Policy];
-        TenantPolicyChangeSet values = new([.. TenantPolicySchema.DefaultM0Values,
-            new(TenantPolicyKnobIds.ApprovalRouting, StringValue: "synthetic-routing"),
-            new(TenantPolicyKnobIds.AdminPermissionScopes, AdminScopesValue: scopes),
-            new(TenantPolicyKnobIds.AllowlistVersionPin, StringValue: "synthetic-v1"),
-            new(TenantPolicyKnobIds.ClassifierExplanationLayerEnabled, BoolValue: false),
-            new(TenantPolicyKnobIds.InboundAuthenticityStrictness, StringValue: "strict"),
-            new(TenantPolicyKnobIds.ApprovalPriorityWeights, ApprovalPriorityWeightsValue: new(1, 1, 1)),
-            new(TenantPolicyKnobIds.NotificationThrottleCeilings, NotificationThrottleCeilingsValue: new(1, 1)),
-            new(TenantPolicyKnobIds.ReviewerBacklogThreshold, ReviewerBacklogThresholdValue: new(1))]);
+        TenantPolicyChangeSet values = M1Values(scopes);
         ImmutableTenantPolicySnapshot snapshot = new("synthetic-alpha", "synthetic-m1", 1, TenantPolicySchemaVersions.M1Preview,
             SyntheticNow, "synthetic-actor", "synthetic-provenance", "synthetic-redaction", "synthetic-retention", "synthetic-hold",
             "synthetic-export-delete", "synthetic-backup", "synthetic-encryption", values);
@@ -81,6 +73,111 @@ public sealed class ImmutableTenantPolicySnapshotTests
             replay.ShouldBeFalse();
         }
         first.Snapshots.Single().Values.Values.Single(static value => value.KnobId == TenantPolicyKnobIds.AssociationTHigh).NumberValue.ShouldBe(0.90);
+    }
+
+    /// <summary>Rejects immutable metadata changes under an already retained identity and version.</summary>
+    [Theory]
+    [InlineData("actor")]
+    [InlineData("effective-time")]
+    [InlineData("provenance")]
+    [InlineData("redaction")]
+    [InlineData("retention")]
+    [InlineData("hold")]
+    [InlineData("export-delete")]
+    [InlineData("backup")]
+    [InlineData("encryption")]
+    public void SyntheticMetadataConflictsMustRejectAndRetainOriginalHistory(string changedField)
+    {
+        ImmutableTenantPolicySnapshot original = Snapshot();
+        TenantPolicySnapshotHistory history = new();
+        history.TryAppend(original, out history, out _).ShouldBeTrue();
+        ImmutableTenantPolicySnapshot conflict = new(original.TenantId, original.SnapshotId, original.PolicyVersion, original.SchemaVersion,
+            changedField == "effective-time" ? original.EffectiveAtUtc.AddTicks(1) : original.EffectiveAtUtc,
+            changedField == "actor" ? "synthetic-other" : original.ActorId,
+            changedField == "provenance" ? "synthetic-other" : original.ProvenanceReference,
+            changedField == "redaction" ? "synthetic-other" : original.RedactionReference,
+            changedField == "retention" ? "synthetic-other" : original.RetentionReference,
+            changedField == "hold" ? "synthetic-other" : original.HoldReference,
+            changedField == "export-delete" ? "synthetic-other" : original.ExportDeleteReference,
+            changedField == "backup" ? "synthetic-other" : original.BackupReference,
+            changedField == "encryption" ? "synthetic-other" : original.EncryptionReference, original.Values);
+
+        history.TryAppend(conflict, out TenantPolicySnapshotHistory retained, out bool replay).ShouldBeFalse();
+        replay.ShouldBeFalse();
+        retained.ShouldBeSameAs(history);
+        retained.Snapshots.ShouldHaveSingleItem().ShouldBeSameAs(original);
+        original.HasSameContents(Snapshot()).ShouldBeTrue();
+    }
+
+    /// <summary>Canonicalizes separately allocated nested maps and scope collections for equivalent replay.</summary>
+    [Fact]
+    public void SyntheticEquivalentReplayMustCanonicalizeNestedCollectionOrder()
+    {
+        Dictionary<AiActionRiskActionClass, bool> firstMap = TenantPolicySchema.RequiredAiActionClasses.ToDictionary(static key => key, static _ => false);
+        Dictionary<AiActionRiskActionClass, bool> secondMap = TenantPolicySchema.RequiredAiActionClasses.Reverse().ToDictionary(static key => key, static _ => false);
+        TenantPolicySnapshotHistory history = new();
+        ImmutableTenantPolicySnapshot original = Snapshot(schema: TenantPolicySchemaVersions.M1Preview,
+            values: M1Values([AdminScope.Policy, AdminScope.SeeOnly], firstMap));
+        history.TryAppend(original, out history, out _).ShouldBeTrue();
+        ImmutableTenantPolicySnapshot equivalent = Snapshot(schema: TenantPolicySchemaVersions.M1Preview,
+            values: M1Values([AdminScope.SeeOnly, AdminScope.Policy], secondMap));
+
+        history.TryAppend(equivalent, out TenantPolicySnapshotHistory replayed, out bool replay).ShouldBeTrue();
+        replay.ShouldBeTrue();
+        replayed.ShouldBeSameAs(history);
+        replayed.Snapshots.ShouldHaveSingleItem().ShouldBeSameAs(original);
+    }
+
+    /// <summary>Rejects an unused lower version and an equal effective time without replacing history.</summary>
+    [Theory]
+    [InlineData("lower-version")]
+    [InlineData("equal-effective-time")]
+    public void SyntheticAppendMustRequireStrictlyProspectiveVersionAndEffectiveTime(string boundary)
+    {
+        ImmutableTenantPolicySnapshot original = Snapshot(version: 3);
+        TenantPolicySnapshotHistory history = new();
+        history.TryAppend(original, out history, out _).ShouldBeTrue();
+        ImmutableTenantPolicySnapshot candidate = Snapshot(id: "synthetic-next", version: boundary == "lower-version" ? 2 : 4,
+            supersedes: original.SnapshotId, effective: boundary == "lower-version" ? original.EffectiveAtUtc.AddTicks(1) : original.EffectiveAtUtc);
+
+        history.TryAppend(candidate, out TenantPolicySnapshotHistory retained, out bool replay).ShouldBeFalse();
+        replay.ShouldBeFalse();
+        retained.ShouldBeSameAs(history);
+        retained.Snapshots.ShouldHaveSingleItem().ShouldBeSameAs(original);
+    }
+
+    /// <summary>Keeps M0 and M1 declared knob sets separate and complete.</summary>
+    [Fact]
+    public void SyntheticSchemaMustRejectM1KnobsInM0AndIncompleteM1Values()
+    {
+        TenantPolicyChangeSet completeM1 = M1Values();
+        Snapshot(schema: TenantPolicySchemaVersions.M1Preview, values: completeM1).SchemaVersion.ShouldBe(TenantPolicySchemaVersions.M1Preview);
+        Should.Throw<ArgumentException>(() => Snapshot(values: new([.. TenantPolicySchema.DefaultM0Values,
+            new(TenantPolicyKnobIds.ApprovalRouting, StringValue: "synthetic-routing")])));
+        Should.Throw<ArgumentException>(() => Snapshot(schema: TenantPolicySchemaVersions.M1Preview,
+            values: new(completeM1.Values.Where(static value => value.KnobId != TenantPolicyKnobIds.ApprovalRouting).ToArray())));
+    }
+
+    /// <summary>Pins UTC evidence and current-time requirements and the exact five-minute freshness limit.</summary>
+    [Theory]
+    [InlineData("evidence-offset", false)]
+    [InlineData("current-offset", false)]
+    [InlineData("five-minutes", true)]
+    [InlineData("five-minutes-plus-tick", false)]
+    public void SyntheticResolutionMustEnforceUtcAndExactFreshnessBoundaries(string boundary, bool allowed)
+    {
+        TenantPolicySnapshotHistory history = new();
+        history.TryAppend(Snapshot(), out history, out _).ShouldBeTrue();
+        DateTimeOffset evidence = SyntheticNow.AddMinutes(-5);
+        DateTimeOffset current = SyntheticNow;
+        if (boundary == "evidence-offset") { evidence = evidence.ToOffset(TimeSpan.FromHours(1)); }
+        if (boundary == "current-offset") { current = current.ToOffset(TimeSpan.FromHours(1)); }
+        if (boundary == "five-minutes-plus-tick") { evidence = evidence.AddTicks(-1); }
+
+        ImmutableTenantPolicySnapshot? resolved = TenantPolicySnapshotResolver.Resolve([history], Context("synthetic-alpha"),
+            "synthetic-first", 1, true, evidence, current);
+        if (allowed) { resolved.ShouldBeSameAs(history.Snapshots.Single()); }
+        else { resolved.ShouldBeNull(); }
     }
 
     [Fact]
@@ -178,9 +275,21 @@ public sealed class ImmutableTenantPolicySnapshotTests
     private static TenantPolicyChangeSet Values(double high)
         => new(TenantPolicySchema.DefaultM0Values.Select(value => value.KnobId == TenantPolicyKnobIds.AssociationTHigh ? value with { NumberValue = high } : value).ToArray());
 
+    private static TenantPolicyChangeSet M1Values(IReadOnlyList<AdminScope>? scopes = null, IReadOnlyDictionary<AiActionRiskActionClass, bool>? actionMap = null)
+        => new([.. TenantPolicySchema.DefaultM0Values.Select(value => value.KnobId == TenantPolicyKnobIds.AiActionLowRiskAllowed && actionMap is not null
+                ? value with { AiActionLowRiskAllowed = actionMap } : value),
+            new(TenantPolicyKnobIds.ApprovalRouting, StringValue: "synthetic-routing"),
+            new(TenantPolicyKnobIds.AdminPermissionScopes, AdminScopesValue: scopes ?? [AdminScope.Policy]),
+            new(TenantPolicyKnobIds.AllowlistVersionPin, StringValue: "synthetic-v1"),
+            new(TenantPolicyKnobIds.ClassifierExplanationLayerEnabled, BoolValue: false),
+            new(TenantPolicyKnobIds.InboundAuthenticityStrictness, StringValue: "strict"),
+            new(TenantPolicyKnobIds.ApprovalPriorityWeights, ApprovalPriorityWeightsValue: new(1, 1, 1)),
+            new(TenantPolicyKnobIds.NotificationThrottleCeilings, NotificationThrottleCeilingsValue: new(1, 1)),
+            new(TenantPolicyKnobIds.ReviewerBacklogThreshold, ReviewerBacklogThresholdValue: new(1))]);
+
     private static ImmutableTenantPolicySnapshot Snapshot(string tenant = "synthetic-alpha", string id = "synthetic-first", long version = 1,
-        string? supersedes = null, string? rollback = null, TenantPolicyChangeSet? values = null, DateTimeOffset? effective = null)
-        => new(tenant, id, version, TenantPolicySchemaVersions.M0, effective ?? SyntheticNow.AddMinutes(-10).AddSeconds(version), "synthetic-actor",
+        string? supersedes = null, string? rollback = null, TenantPolicyChangeSet? values = null, DateTimeOffset? effective = null, string schema = TenantPolicySchemaVersions.M0)
+        => new(tenant, id, version, schema, effective ?? SyntheticNow.AddMinutes(-10).AddSeconds(version), "synthetic-actor",
             "synthetic-provenance", "synthetic-redaction", "synthetic-retention", "synthetic-hold", "synthetic-export-delete", "synthetic-backup", "synthetic-encryption",
             values ?? new(TenantPolicySchema.DefaultM0Values), supersedes, rollback);
 }
