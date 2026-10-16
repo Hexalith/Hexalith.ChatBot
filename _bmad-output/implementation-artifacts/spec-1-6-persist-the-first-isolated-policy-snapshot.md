@@ -352,3 +352,21 @@ Applied 2026-10-16 (round 5): ADR note on the intentional 503 vs AI-path refusal
 - `.mcp.json` `aspire` removal — decided round 7 (keep).
 
 **Decisions (2026-10-16, Jerome, applied recommended):** (1a) accept the `references/*` pointer bumps from `9da2e06` as an environment sync from `/pushall`; they are unrelated to Story 1.6, were not reviewed here, and were not reverted. (2b) defer carrying the tenant/version tuple into `ChatBotApprovalResult` and events to the live-persistence story; the ADR now says so.
+
+### Review Findings (round 9)
+
+Scope: `38ca946..HEAD` excluding `_bmad-output` (37 files, +1574/−212). All four layers completed; no failed layers. Zero new `decision-needed` or `patch` entries; every finding repeats a round 1–8 decision, deferral or rejection. No new `deferred-work.md` entries.
+
+- [x] [Review][Defer] Gate not defended in `GovernedOperationAggregate`/`AcceptedCommandDispatcher`; removed audit-envelope/replay-intent tests for the six commands — deferred: already in the ledger (rounds 1–8), unverified medium (acceptance-auditor+verification-gap).
+- [x] [Review][Defer] Qualified/case-variant `CommandType` bypasses the simple-name gate — deferred: already recorded as unverified medium (rounds 4–7) (acceptance-auditor+edge-case-hunter).
+- [x] [Review][Defer] SDK `/process` vs HTTP outward shape for `PolicySnapshotUnavailable`; tenant/version tuple not carried into approval results — deferred: round 8 entries / decision 2b (blind-hunter+edge-case-hunter+acceptance-auditor).
+
+#### Rejected (round 9)
+- `.mcp.json` `aspire` removal and 12 `references/*` pointer bumps — decided rounds 7–8 (Jerome: keep / accept).
+- Evaluator `Routed`→`Blocked`, `"unavailable"` literal, narrowed token charset, early routes not blocked, `Routed(string,…)` overload, provider catch without logging — false/low: round 4 owner-approved fail-closed decision.
+- 503 `dependency_degraded` vs ADR "do not retry" wording — decided round 5.
+- Counter skip keyed on reason string; SDK gate before authorization; null-issuer audit uses placeholder tenant — low: decided rounds 2/4/5; fix adds branches/parameters, nothing disclosed to caller.
+- Gate hard-coded list drifting from audit map / `CommandsForPath` test-only helper — false: `GateMustDenyEveryCommandClassifiedAsTenantPolicyMutation` fails on drift.
+- Synthetic history/resolver/snapshot gaps (first-append anchor, replay-vs-conflict signal, superseded version resolves on exact tuple, future-dated `EffectiveAtUtc`, duplicate `KnobId`, null guards, 5-minute constant, null `Principal`, free-form protection refs) — low: internal, unwired synthetic types; fixes add guards. Null `Principal` is false (never null, round 6).
+- Positional ctor change / hard-coded `PolicyVersion = 1` / dead provider fallbacks / `LowRiskAllowedByActionClass` outside try — low or false (rounds 5–8).
+- ADR claims (spike counter with null issuer, ordering vs authorization across transports) and ADR/using-order style — low/cosmetic; fix edits the ADR/spec under review.
