@@ -370,3 +370,24 @@ Scope: `38ca946..HEAD` excluding `_bmad-output` (37 files, +1574/−212). All fo
 - Synthetic history/resolver/snapshot gaps (first-append anchor, replay-vs-conflict signal, superseded version resolves on exact tuple, future-dated `EffectiveAtUtc`, duplicate `KnobId`, null guards, 5-minute constant, null `Principal`, free-form protection refs) — low: internal, unwired synthetic types; fixes add guards. Null `Principal` is false (never null, round 6).
 - Positional ctor change / hard-coded `PolicyVersion = 1` / dead provider fallbacks / `LowRiskAllowedByActionClass` outside try — low or false (rounds 5–8).
 - ADR claims (spike counter with null issuer, ordering vs authorization across transports) and ADR/using-order style — low/cosmetic; fix edits the ADR/spec under review.
+
+### Review Findings (round 10)
+
+Scope: `38ca946..HEAD` excluding `_bmad-output` (37 files, +1574/−212). All four layers completed; no failed layers. Blind Hunter and Acceptance Auditor read only part of the diff (non-test portion / first ~1200 lines). One new `patch`; every other finding repeats a round 1–9 decision, deferral or rejection. No new `deferred-work.md` entries.
+
+- [x] [Review][Patch] Evaluator's unsafe request-tenant guard has no test [tests/Hexalith.ChatBot.Server.Tests/Governance/AiMediation/AiActionPolicyEvaluatorTests.cs] — `DefaultAiActionPolicyEvaluator` returns `Unavailable()` when `IsSafePolicyToken(request.TenantId)` is false, but every tenant-varying case uses a well-formed token. Deleting the clause lets a provider that echoes a malformed request tenant reach `Allowed` (the later `snapshot.TenantId != request.TenantId` check only catches a mismatch) and no test fails. Add a row with request `TenantId = "bad/tenant"` and a provider snapshot carrying the same tenant; assert `Blocked`, `policy-snapshot-unavailable`, `PolicySnapshotId == "unavailable"`. Test-only, no public surface. (verification-gap, low; round 5 rejected "evaluator tenant charset untested" as covered by the round 4 decision, but that decision does not exercise this branch)
+- [x] [Review][Defer] Gate not defended in `GovernedOperationAggregate`/`AcceptedCommandDispatcher`; removed audit-envelope/replay-intent/`SourceEvidenceRefs` coverage for the six commands — deferred: already in the ledger (rounds 1–9), unverified medium (acceptance-auditor)
+- [x] [Review][Defer] Gate precedes the idempotency lookup, so retries of historically accepted policy commands return 503 — deferred: already recorded, unverified (edge-case-hunter)
+- [x] [Review][Defer] Tenant/version tuple not carried into approval results; SDK `/process` vs HTTP outward shape — deferred: round 8 entries / decision 2b (acceptance-auditor)
+
+#### Rejected (round 10)
+- `.mcp.json` `aspire` removal and 12 `references/*` pointer bumps — decided rounds 7–8 (Jerome: keep / accept).
+- SDK `RejectTransportAsync` may bump the spike counter — false: it routes through `DenyAsync`, which skips `authorizationFailureCounter` for `PolicySnapshotUnavailable`; the verification-gap layer confirmed a test pins the counter untouched.
+- 503 `dependency_degraded` vs ADR "should not retry" wording / retry hints — decided round 5; the fix edits the ADR under review.
+- Gate hard-coded list; `CommandsForPath` test-only helper — false: `GateMustDenyEveryCommandClassifiedAsTenantPolicyMutation` fails on drift.
+- Evaluator `Routed`→`Blocked`, `"unavailable"` literal, blank-id default branches unreachable, early routes not blocked, provider faults not logged — false/low: round 4 owner-approved fail-closed decision.
+- Positional ctor change; hard-coded `PolicyVersion = 1`; exact-version enforcement — low: rounds 5–8, synthetic fixtures.
+- Synthetic history/resolver/snapshot gaps (null guards, duplicate `KnobId`, first-append anchor, id-or-version match, 5-minute constant, future-dated `EffectiveAtUtc`, free-form protection refs, ordinal knob sort, generic ctor errors) — low: internal, unwired synthetic types; fixes add guards.
+- ADR gaps (no date/number/alternatives, wrapping), using-directive order — cosmetic; fix edits the ADR/spec under review.
+
+Applied 2026-10-16 (round 10): added `SyntheticMalformedRequestTenantMustNotBeAcceptedWhenProviderEchoesIt` to `AiActionPolicyEvaluatorTests` (test-only). Debug build with project references and `NuGetAudit=false` is clean (0 warnings/errors); `AiActionPolicyEvaluatorTests` 23/23, zero skips. Status unchanged at `review`: Story 1.6 stays open for A6 / native isolation evidence and the deferred unverified mediums.

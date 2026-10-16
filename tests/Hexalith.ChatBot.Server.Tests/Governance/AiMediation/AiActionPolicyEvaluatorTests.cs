@@ -187,6 +187,20 @@ public sealed class AiActionPolicyEvaluatorTests
         decision.PolicySnapshotId.ShouldBe("unavailable");
     }
 
+    [Fact]
+    public async Task SyntheticMalformedRequestTenantMustNotBeAcceptedWhenProviderEchoesIt()
+    {
+        DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new("bad/tenant", 1, "policy-snap-001", true, "read-only", ["summarize-visible-context"], true, true)));
+
+        AiActionPolicyDecision decision = await evaluator.EvaluateAsync(Request() with { TenantId = "bad/tenant" }, TestContext.Current.CancellationToken);
+
+        decision.Kind.ShouldBe(AiActionPolicyDecisionKind.Blocked);
+        decision.ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+        decision.PolicySnapshotId.ShouldBe("unavailable");
+        decision.TenantId.ShouldBeNull();
+        decision.PolicyVersion.ShouldBeNull();
+    }
+
     [Theory]
     [InlineData("foreign-tenant", "restricted-policy", 7)]
     [InlineData("tenant-alpha", "restricted-policy", 7)]
