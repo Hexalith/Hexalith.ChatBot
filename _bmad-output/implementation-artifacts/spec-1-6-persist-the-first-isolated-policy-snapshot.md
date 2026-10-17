@@ -410,3 +410,19 @@ Scope: `38ca946..HEAD` limited to `src tests docs` (24 files, +1576/−175). All
 - ADR structure/wrapping, positional ctor, magic `1`, metric string compare — cosmetic or edits the ADR/spec under review.
 
 Status unchanged at `review`: Story 1.6 stays open for A6 / native isolation evidence and the deferred unverified mediums (AC4; "done" only via the evidence contract).
+
+### Review Findings (round 12)
+
+Scope: `38ca946..HEAD` limited to everything except `_bmad-output` and `references` (25 files, +1576/−200). All four layers completed; no failed layers. Clean review: 0 `decision-needed`, 0 `patch`, 0 new `defer`. Every finding repeats a round 1–11 decision, deferral or rejection, or is refuted below.
+
+#### Rejected (round 12)
+- `.mcp.json` `aspire` removal — decided round 7 (Jerome: keep, no revert).
+- Gate hard-coded six-name list, one-directional map test, case/qualified-name aliases — rounds 2–11; qualified-alias reachability already in the deferral ledger.
+- SDK-path counter not asserted (verification-gap) — low: `RejectTransportAsync` routes through the same `DenyAsync` condition that the gateway test (`RecordingAuthorizationFailureCounter`, `PolicyPersistenceAdmissionTests.cs:66`) pins; dropping the condition fails that test. A dedicated SDK-path assertion only adds test setup.
+- Redelivery of pre-gate policy commands rejected mid-lifecycle — false: no policy command can currently be accepted (rounds 1–2).
+- Resolver `context.Principal` null — false: `ChatBotRequestContext.Principal` always returns a non-null clone.
+- Duplicate `KnobId` — false: `TenantPolicySchema.Validate` rejects duplicates.
+- Evaluator early `Routed("unavailable")` vs Blocked; null `RiskActionClasses`; clock-skew tolerance; newer-schema knobs; first-append anchor; 5-minute constant; free-form protection refs; evaluator not wired to resolver; tuple not on persisted decision — owner-approved fail-closed decision (round 4) or low/unwired synthetic types where fixes add guards; tuple carriage is in the deferral ledger.
+- 503 vs ADR "should not retry" wording; ADR hygiene; test-only `CommandsForPath`; partial-class test layout; deleted audit-ref coverage — decided round 5 / cosmetic / edits the ADR under review.
+
+Status unchanged at `review`: Story 1.6 stays open for A6 / native isolation evidence and the deferred unverified mediums ("done" only via the evidence contract). Sprint status not changed.
