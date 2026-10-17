@@ -391,3 +391,22 @@ Scope: `38ca946..HEAD` excluding `_bmad-output` (37 files, +1574/−212). All fo
 - ADR gaps (no date/number/alternatives, wrapping), using-directive order — cosmetic; fix edits the ADR/spec under review.
 
 Applied 2026-10-16 (round 10): added `SyntheticMalformedRequestTenantMustNotBeAcceptedWhenProviderEchoesIt` to `AiActionPolicyEvaluatorTests` (test-only). Debug build with project references and `NuGetAudit=false` is clean (0 warnings/errors); `AiActionPolicyEvaluatorTests` 23/23, zero skips. Status unchanged at `review`: Story 1.6 stays open for A6 / native isolation evidence and the deferred unverified mediums.
+
+### Review Findings (round 11)
+
+Scope: `38ca946..HEAD` limited to `src tests docs` (24 files, +1576/−175). All four layers completed; no failed layers. Blind Hunter read only ~700 of 2,230 diff lines; Acceptance Auditor skimmed tests. Clean review: 0 `decision-needed`, 0 `patch`, 0 new `defer`. Every finding repeats a round 1–10 decision, deferral or rejection, or is refuted below.
+
+#### Rejected (round 11)
+- 503 `dependency_degraded` retryable vs ADR "should not retry" wording; OpenAPI/`x-hexalith` unsynced — decided round 5 (keep 503, documented); the fix edits the ADR under review.
+- Gate hard-coded six-name list / no reverse check — false: `GateMustDenyEveryCommandClassifiedAsTenantPolicyMutation` fails on audit-map drift; no agreed definition of "policy-mutating" beyond it (rounds 2–8).
+- SDK stage reports `PolicySnapshotUnavailable` to unauthorized callers — false: authorization already ran in the gateway pipeline (rounds 1–2).
+- Evaluator `Routed`→`Blocked`, `"unavailable"` literal, unreachable blank-id provider defaults — owner-approved fail-closed decision (round 4). Verification-gap's open question is answered: `Story132ProductionBrowserAspireE2ETests.cs:605` and `RecoveryDependencyExercise.cs:139` pass explicit non-blank snapshot ids, so neither flow relies on the dead default.
+- Retired `policy_unavailable`/`policy_stale`/`policy_invalid` codes unproven outside `src` — false: repo grep (excluding `references/`, build output) finds no consumer; the only hits are unrelated `Hexalith.Folders` code.
+- `LowRiskAllowedByActionClass` keys unvalidated — false: lookup uses enum values parsed from the request; an undefined provider key is never matched.
+- Provider OCE with foreign token escapes the catch filter — low: still a cancellation either way; fix adds branching.
+- `request.ProjectId` unvalidated; resolver null elements/`Principal`; history double-collision `FirstOrDefault`, version gaps, first-append anchor, replay-vs-conflict signal; 5-minute constant; free-form protection refs; no-op rollback — low: internal unwired synthetic types, fixes add guards (rounds 2–10).
+- Tuple not carried into approval results; gate not defended in aggregate/dispatcher; removed audit/replay tests; gate before idempotency; AC4 "not done" prose-only — already in the deferral ledger / decision 2b.
+- Gate scope broader than submit/approve — decided round 4 (AC1 "any policy transport").
+- ADR structure/wrapping, positional ctor, magic `1`, metric string compare — cosmetic or edits the ADR/spec under review.
+
+Status unchanged at `review`: Story 1.6 stays open for A6 / native isolation evidence and the deferred unverified mediums (AC4; "done" only via the evidence contract).
