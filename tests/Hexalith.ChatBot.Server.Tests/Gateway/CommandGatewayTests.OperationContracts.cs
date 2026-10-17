@@ -1,6 +1,11 @@
 using System.Text.Json;
 
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Authorization;
+using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Status;
@@ -24,11 +29,15 @@ public sealed partial class CommandGatewayTests
         };
         await status.UpsertAsync(OperationStatusRecord.Accepted(BoundTenant, historical, false, historical.AcceptedAt), TestContext.Current.CancellationToken);
         RecordingDispatcher dispatcher = new();
-        CommandGateway gateway = Gateway(dispatcher, operationStatusStore: status);
+        RecordingAuditWriter audit = new();
+        InMemoryCoarseIdempotencyStore idempotency = new(new FixedClock());
+        CommandGateway gateway = Gateway(dispatcher, operationStatusStore: status, idempotencyStore: idempotency, auditWriter: audit);
         ChatBotGatewayResult result = await gateway.SubmitAsync(Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "new-resource")), TestContext.Current.CancellationToken);
         result.IsAccepted.ShouldBeFalse();
         result.Problem.ShouldNotBeNull().Status.ShouldBe(409);
         dispatcher.DispatchCount.ShouldBe(0);
+        idempotency.RecordCount.ShouldBe(0);
+        audit.Envelopes.ShouldBeEmpty();
         OperationStatusRecord stored = (await status.TryGetAsync(BoundTenant, historical.OperationId, TestContext.Current.CancellationToken))!;
         stored.CommandId.ShouldBe(historical.CommandId);
         stored.OperationId.ShouldBe(historical.OperationId);
@@ -68,19 +77,23 @@ public sealed partial class CommandGatewayTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task DuplicateDuringInitialStatusWriteShouldPreserveReceiptAndSingleDispatchEvenIfInitialStatusFails(bool failInitialWrite)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task DuplicateDuringInitialStatusWriteShouldPreserveReceiptAndSingleDispatchEvenIfInitialStatusFails(bool failInitialWrite, bool advancingClock)
     {
         RecordingDispatcher dispatcher = new();
-        InMemoryCoarseIdempotencyStore idempotency = new(new FixedClock());
+        MutableClock clock = new(FixedClock.FixedUtcNow);
+        InMemoryCoarseIdempotencyStore idempotency = new(clock);
         DelayedInitialOperationStatusStore status = new(failInitialWrite);
-        CommandGateway gateway = Gateway(dispatcher, idempotencyStore: idempotency, operationStatusStore: status);
+        CommandGateway gateway = Gateway(dispatcher, clock: clock, idempotencyStore: idempotency, operationStatusStore: status);
         ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "resource"));
         Task<ChatBotGatewayResult> initial = gateway.SubmitAsync(submission, TestContext.Current.CancellationToken).AsTask();
         await status.FirstWriteEntered.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         CommandSubmissionResponse receipt = idempotency.Records.ShouldHaveSingleItem().PriorOutcome.ShouldNotBeNull();
         string originalReceipt = JsonSerializer.Serialize(receipt);
+        if (advancingClock) { clock.UtcNow = clock.UtcNow.AddSeconds(1); }
         try
         {
             ChatBotGatewayResult racingReplay = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
@@ -117,6 +130,87 @@ public sealed partial class CommandGatewayTests
         stored.CreatedAt.ShouldBeNull();
         stored.EquivalenceVersion.ShouldBeNull();
         stored.CanonicalRevision.ShouldBeNull();
+        stored.AuditStatus.ShouldBe(failInitialWrite ? OperationStatusRecord.AuditReconciling : OperationStatusRecord.AuditCommitted);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CollisionLookupFailureShouldReturnUnavailableWithoutReservationAndAllowLaterRetry(bool cancelled)
+    {
+        bool fail = true;
+        IOperationStatusStore status = TrustedAuthorityBoundaryProxy.Create<IOperationStatusStore>(new InMemoryOperationStatusStore(), method =>
+        {
+            if (fail && method == "TryGetAsync")
+            {
+                if (cancelled) { throw new OperationCanceledException("Synthetic dependency read cancellation."); }
+                throw new InvalidOperationException("Synthetic status lookup failure.");
+            }
+        });
+        InMemoryCoarseIdempotencyStore idempotency = new(new FixedClock());
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter audit = new();
+        CommandGateway gateway = Gateway(dispatcher, idempotencyStore: idempotency, operationStatusStore: status, auditWriter: audit);
+        ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "resource"));
+        ChatBotGatewayResult unavailable = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
+        unavailable.Problem.ShouldNotBeNull().Status.ShouldBe(503);
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotency.RecordCount.ShouldBe(0);
+        audit.Envelopes.ShouldBeEmpty();
+        fail = false;
+        (await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken)).IsAccepted.ShouldBeTrue();
+        dispatcher.DispatchCount.ShouldBe(1);
+        idempotency.Records.ShouldHaveSingleItem().PriorOutcome.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task CallerCancellationDuringCollisionLookupShouldPropagateWithoutReservationAuditOrDispatch()
+    {
+        using CancellationTokenSource caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        TaskCompletionSource lookupEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        IOperationStatusStore status = TrustedAuthorityBoundaryProxy.Create<IOperationStatusStore>(new InMemoryOperationStatusStore(), method =>
+        {
+            if (method == "TryGetAsync")
+            {
+                lookupEntered.TrySetResult();
+                caller.Token.WaitHandle.WaitOne(TimeSpan.FromSeconds(5)).ShouldBeTrue();
+                caller.Token.ThrowIfCancellationRequested();
+            }
+        });
+        InMemoryCoarseIdempotencyStore idempotency = new(new FixedClock());
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter audit = new();
+        CommandGateway gateway = Gateway(dispatcher, idempotencyStore: idempotency, operationStatusStore: status, auditWriter: audit);
+        ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "resource"));
+        Task<ChatBotGatewayResult> pending = gateway.SubmitAsync(submission, caller.Token).AsTask();
+        await lookupEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        caller.Cancel();
+        OperationCanceledException exception = await Should.ThrowAsync<OperationCanceledException>(() => pending);
+        exception.CancellationToken.ShouldBe(caller.Token);
+        idempotency.RecordCount.ShouldBe(0);
+        audit.Envelopes.ShouldBeEmpty();
+        audit.AuthorizationFailures.ShouldBeEmpty();
+        dispatcher.DispatchCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task CanonicalGuardShouldPreserveAuthorizationDenialAuditAndCounterPrecedence()
+    {
+        FixedClock clock = new();
+        RecordingAuditWriter audit = new();
+        InMemoryAuthorizationFailureCounter counter = new(clock);
+        InMemoryCoarseIdempotencyStore idempotency = new(clock);
+        RecordingDispatcher dispatcher = new();
+        CommandGateway gateway = Gateway(dispatcher, authorizationStage: new DenyingAuthorizationStage(ChatBotAuthorizationReasonCodes.AuthorizationDenied),
+            auditWriter: audit, idempotencyStore: idempotency, authorizationFailureCounter: counter);
+        ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "resource"));
+        submission.Request.Concurrency = new() { ExpectedRevision = 0 };
+        ChatBotGatewayResult result = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
+        result.Problem.ShouldNotBeNull().Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        audit.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        counter.ReadAndReset().ShouldHaveSingleItem().FailureCount.ShouldBe(1);
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotency.RecordCount.ShouldBe(0);
     }
 
     [Fact]
@@ -133,6 +227,9 @@ public sealed partial class CommandGatewayTests
         ChatBotGatewayResult result = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
         result.IsAccepted.ShouldBeFalse();
         result.Problem.ShouldNotBeNull().Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.CanonicalExecutionUnavailable);
+        result.Problem.Retryable.ShouldBeFalse();
+        result.Problem.ClientAction.ShouldBe(ProblemDetailsClientAction.None);
         dispatcher.DispatchCount.ShouldBe(0);
         idempotency.RecordCount.ShouldBe(0);
         (await status.TryGetAsync(BoundTenant, submission.Request.CommandId, TestContext.Current.CancellationToken)).ShouldBeNull();

@@ -22,6 +22,9 @@ internal static class ChatBotProblemTypes
     /// <summary>A required audit write was unavailable.</summary>
     public const string AuditUnavailable = "https://hexalith.dev/errors/chatbot/audit-unavailable";
 
+    /// <summary>Canonical execution is disabled pending accepted owner and protection evidence.</summary>
+    public const string CanonicalExecutionUnavailable = "https://hexalith.dev/errors/chatbot/canonical-execution-unavailable";
+
     /// <summary>A required state or recovery dependency is unavailable.</summary>
     public const string DependencyUnavailable = "https://hexalith.dev/errors/chatbot/dependency-degraded";
 

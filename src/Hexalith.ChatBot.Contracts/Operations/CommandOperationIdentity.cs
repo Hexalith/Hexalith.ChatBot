@@ -18,7 +18,7 @@ public sealed record CommandOperationIdentity
         ArgumentException.ThrowIfNullOrWhiteSpace(operationClass);
         ArgumentNullException.ThrowIfNull(resourceIds);
         ChatBotOperationId predecessor = default;
-        if (!IsValidActorId(actorId) || !ChatBotOperationId.TryParse(operationId, out ChatBotOperationId id) ||
+        if (!IsValidOperationClass(operationClass) || !IsValidActorId(actorId) || !ChatBotOperationId.TryParse(operationId, out ChatBotOperationId id) ||
             !ChatBotCorrelationId.TryParse(correlationId, out ChatBotCorrelationId correlation) ||
             !Enum.IsDefined(origin) || equivalenceVersion != "v1" ||
             (predecessorOperationId is not null && !ChatBotOperationId.TryParse(predecessorOperationId, out predecessor)))
@@ -65,6 +65,10 @@ public sealed record CommandOperationIdentity
     public string EquivalenceVersion { get; }
     /// <summary>Gets the failed attempt preceding a distinct retry.</summary>
     public string? PredecessorOperationId { get; }
+    private static bool IsValidOperationClass(string value)
+        => value is { Length: > 0 and <= 80 } && value[0] is >= 'a' and <= 'z' &&
+            value.All(character => character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-');
+
     private static bool IsValidActorId(string? actorId) => IsValidMetadataToken(actorId, allowAt: true);
 
     private static bool IsValidResourceId(string? resourceId) => IsValidMetadataToken(resourceId, allowAt: false);

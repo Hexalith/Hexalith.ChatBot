@@ -14,6 +14,25 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway;
 
 public sealed partial class CommandGatewayTests
 {
+    [Fact]
+    public async Task NewDurableDispatchPreparationShouldRequireCallerCommandOperationIdentity()
+    {
+        FakeCoarseIdempotencyStateClient state = new();
+        FixedClock clock = new();
+        DaprCoarseIdempotencyStore store = new(state, clock);
+        ChatBotGatewayContext context = DirectContext(new TenantScopedCommand(BoundTenant, "resource"), "01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        CoarseIdempotencyDecision admission = await store.RecordAdmissionAsync(context, TestContext.Current.CancellationToken);
+        CommandSubmissionResponse outcome = PreparedOutcome(context, clock.UtcNow);
+        outcome.OperationId = context.Submission.TaskId!;
+        outcome.OperationId.ShouldNotBe(outcome.CommandId);
+        (await store.PrepareDispatchAsync(admission.Metadata, outcome, TestContext.Current.CancellationToken)).ShouldBeFalse();
+        state.IdentityRecords.ShouldHaveSingleItem().DomainReservation!.DispatchState.ShouldBe(CoarseDispatchState.Reserved);
+        state.DomainRecords.ShouldHaveSingleItem().PreparedOutcome.ShouldBeNull();
+        outcome.OperationId = outcome.CommandId;
+        (await store.PrepareDispatchAsync(admission.Metadata, outcome, TestContext.Current.CancellationToken)).ShouldBeTrue();
+        state.IdentityRecords.ShouldHaveSingleItem().DomainReservation!.PreparedOutcome!.OperationId.ShouldBe(outcome.CommandId);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

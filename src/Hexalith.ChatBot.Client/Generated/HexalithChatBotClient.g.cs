@@ -33,7 +33,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Submit a typed ChatBot command for governed processing.
         /// </summary>
         /// <remarks>
-        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages.
+        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. Requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
@@ -46,7 +46,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Submit a typed ChatBot command for governed processing.
         /// </summary>
         /// <remarks>
-        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages.
+        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. Requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
@@ -283,7 +283,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Submit a typed ChatBot command for governed processing.
         /// </summary>
         /// <remarks>
-        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages.
+        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. Requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
@@ -299,7 +299,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Submit a typed ChatBot command for governed processing.
         /// </summary>
         /// <remarks>
-        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages.
+        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. Requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
@@ -1675,9 +1675,6 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public CommandProjectionState ProjectionState { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("actorId", Required = Newtonsoft.Json.Required.Always)]
-        public string ActorId { get; set; } = default!;
-
         [Newtonsoft.Json.JsonProperty("occurredAt", Required = Newtonsoft.Json.Required.Always)]
         public System.DateTimeOffset OccurredAt { get; set; } = default!;
 
@@ -2261,7 +2258,7 @@ namespace Hexalith.ChatBot.Client.Generated
         public ChatBotMessageCode ReasonCode { get; set; } = default!;
 
         /// <summary>
-        /// True only after nextRetryAt is due and retryCount is below maxAttempts.
+        /// Legacy records require a due nextRetryAt and retryCount below maxAttempts. Canonical records also require fold eligibility and an approved retry profile; eligibility remains false while profile approval is open.
         /// </summary>
         [Newtonsoft.Json.JsonProperty("retryEligible", Required = Newtonsoft.Json.Required.Always)]
         public bool RetryEligible { get; set; } = default!;
@@ -2272,10 +2269,16 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("retryCount", Required = Newtonsoft.Json.Required.Always)]
         public int RetryCount { get; set; } = default!;
 
+        /// <summary>
+        /// Compatibility summary for legacy consumers. For canonical records, executionState and projectionState are authoritative.
+        /// </summary>
         [Newtonsoft.Json.JsonProperty("completionStatus", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OperationCompletionStatus CompletionStatus { get; set; } = default!;
 
+        /// <summary>
+        /// Legacy compatibility summary; it does not establish canonical owner commit or audit acceptance.
+        /// </summary>
         [Newtonsoft.Json.JsonProperty("auditStatus", Required = Newtonsoft.Json.Required.Always)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public OperationAuditStatus AuditStatus { get; set; } = default!;
@@ -4565,6 +4568,9 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_ai_action_proposal")]
         Idempotency_conflict_ai_action_proposal = 93,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"canonical_execution_unavailable")]
+        Canonical_execution_unavailable = 94,
 
     }
 

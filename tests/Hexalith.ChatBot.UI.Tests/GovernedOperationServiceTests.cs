@@ -35,16 +35,16 @@ public sealed class GovernedOperationServiceTests
     }
 
     [Fact]
-    public async Task SubmitGovernedNoteShouldReadOutcomeBackThroughOperationStatusKeyedByTaskId()
+    public async Task SubmitGovernedNoteShouldReadOutcomeBackThroughOperationStatusKeyedByAcceptedOperationId()
     {
         FakeChatBotClient client = new(Response(), Status());
         GovernedOperationService service = new(client);
 
         OperationOutcome outcome = await service.SubmitGovernedNoteAsync(TestContext.Current.CancellationToken);
 
-        // The operation read is keyed by the task id when present, and the outcome reflects the status fields.
-        client.LastOperationId.ShouldBe(TaskId);
-        outcome.OperationId.ShouldBe(TaskId);
+        // The accepted operation identity differs from TaskId and keys both typed status and audit reads.
+        client.LastOperationId.ShouldBe(CommandId);
+        outcome.OperationId.ShouldBe(CommandId);
         outcome.CommandId.ShouldBe(CommandId);
         outcome.CorrelationId.ShouldBe(CorrelationId);
         outcome.LifecycleState.ShouldBe(nameof(LifecycleState.Proposed));
@@ -73,7 +73,7 @@ public sealed class GovernedOperationServiceTests
     [Fact]
     public async Task SubmitGovernedNoteShouldFallBackToTheCommandIdWhenNoTaskIdIsReturned()
     {
-        FakeChatBotClient client = new(Response(taskId: null), Status());
+        FakeChatBotClient client = new(Response(taskId: null, operationId: null), Status());
         GovernedOperationService service = new(client);
 
         OperationOutcome outcome = await service.SubmitGovernedNoteAsync(TestContext.Current.CancellationToken);
@@ -93,7 +93,7 @@ public sealed class GovernedOperationServiceTests
         // Audit history is a REAL server read of the post-commit audit envelope summary (Story 1.9 M3), keyed by
         // the same operation id and rendered as a redacted, metadata-only line: stable codes and opaque
         // identifiers only — no command payload, tenant/resource names, secrets, paths, or raw exception text.
-        client.LastAuditHistoryOperationId.ShouldBe(TaskId);
+        client.LastAuditHistoryOperationId.ShouldBe(CommandId);
         outcome.AuditHistory.ShouldNotBeEmpty();
         outcome.AuditHistory.ShouldContain(line =>
             line.Contains($"audit:{OperationAuditStatus.Committed}", StringComparison.Ordinal)
@@ -115,10 +115,24 @@ public sealed class GovernedOperationServiceTests
         }
     }
 
-    private static CommandSubmissionResponse Response(string? taskId = TaskId)
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task HistoricalReceiptShouldRetainTaskIdentityWhenOperationIdentityIsAbsent(string? operationId)
+    {
+        FakeChatBotClient client = new(Response(operationId: operationId), Status());
+        OperationOutcome outcome = await new GovernedOperationService(client).SubmitGovernedNoteAsync(TestContext.Current.CancellationToken);
+        client.LastOperationId.ShouldBe(TaskId);
+        client.LastAuditHistoryOperationId.ShouldBe(TaskId);
+        outcome.OperationId.ShouldBe(TaskId);
+    }
+
+    private static CommandSubmissionResponse Response(string? taskId = TaskId, string? operationId = CommandId)
         => new()
         {
             CommandId = CommandId,
+            OperationId = operationId!,
             CorrelationId = CorrelationId,
             TaskId = taskId,
             LifecycleState = LifecycleState.Proposed,

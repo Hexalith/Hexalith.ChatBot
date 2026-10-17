@@ -1114,4 +1114,6 @@
   <data name="Failure_CatalogReason_idempotency_conflict_approved_ai_action_execution" xml:space="preserve"><value>Cette exécution d’action IA approuvée est en conflit avec une demande d’exécution existante.</value></data>
   <data name="Failure_Catalog_idempotency_conflict_ai_action_proposal" xml:space="preserve"><value>Proposition d’action IA déjà soumise.</value></data>
   <data name="Failure_CatalogReason_idempotency_conflict_ai_action_proposal" xml:space="preserve"><value>Cette proposition d’action IA est en conflit avec une demande de proposition existante.</value></data>
+  <data name="Failure_Catalog_canonical_execution_unavailable" xml:space="preserve"><value>Exécution de la commande indisponible.</value></data>
+  <data name="Failure_CatalogReason_canonical_execution_unavailable" xml:space="preserve"><value>Cette commande est indisponible dans la configuration actuelle.</value></data>
 </root>

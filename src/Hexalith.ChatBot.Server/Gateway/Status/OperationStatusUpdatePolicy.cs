@@ -32,7 +32,15 @@ internal static class OperationStatusUpdatePolicy
         // compatibility explicit: never upgrade them implicitly or let them overwrite a canonical fold.
         if (current.CanonicalRevision is null && incoming.CanonicalRevision is null)
         {
-            return incoming.LastUpdatedAt < current.LastUpdatedAt ? current : incoming;
+            OperationStatusRecord latest = incoming.LastUpdatedAt < current.LastUpdatedAt ? current : incoming;
+            return latest with
+            {
+                // A receipt-proven commit is stronger than replay's conservative reconciliation inference.
+                AuditStatus = current.AuditStatus == OperationStatusRecord.AuditCommitted || incoming.AuditStatus == OperationStatusRecord.AuditCommitted
+                    ? OperationStatusRecord.AuditCommitted : latest.AuditStatus,
+                DuplicateAttemptCount = Math.Max(current.DuplicateAttemptCount, incoming.DuplicateAttemptCount),
+                PriorOutcome = latest.PriorOutcome ?? current.PriorOutcome ?? incoming.PriorOutcome,
+            };
         }
         if (current.CanonicalRevision is null || incoming.CanonicalRevision is null ||
             current.ExpectedRevision != incoming.ExpectedRevision || current.MaxAttempts != incoming.MaxAttempts ||
@@ -101,12 +109,28 @@ internal static class OperationStatusUpdatePolicy
             },
         };
 
+    /// <summary>Checks persisted metadata before exposing it, including legacy records which must stay legacy.</summary>
+    public static bool HasValidMetadata(OperationStatusRecord record)
+    {
+        try
+        {
+            ValidateCanonical(record);
+            return true;
+        }
+        catch (OperationStatusUpdateConflictException)
+        {
+            return false;
+        }
+    }
+
     private static void ValidateCanonical(OperationStatusRecord record)
     {
         if (record.CanonicalRevision is null)
         {
             if (record.ExecutionState is not null || record.ProjectionState is not null || record.ExpectedRevision is not null ||
-                record.CommittedRevision is not null || record.LastTransition is not null)
+                record.CommittedRevision is not null || record.LastTransition is not null || record.Origin is not null ||
+                record.ResourceIds is not null || record.CreatedAt is not null || record.EquivalenceVersion is not null ||
+                record.PredecessorOperationId is not null)
             {
                 throw new OperationStatusUpdateConflictException();
             }
@@ -126,7 +150,14 @@ internal static class OperationStatusUpdatePolicy
             ? record.ExpectedRevision is >= 0 and < long.MaxValue && record.CommittedRevision == record.ExpectedRevision + 1
             : record.CommittedRevision is null;
         if (record.CanonicalRevision < 0 || record.ExpectedRevision is null or < 0 ||
-            !ChatBotOperationId.TryParse(record.OperationId, out _) || record.OperationId != record.CommandId ||
+            record.OperationClass is not { Length: > 0 and <= 80 } || record.OperationClass[0] is not (>= 'a' and <= 'z') ||
+            record.OperationClass.Any(character => character is not (>= 'a' and <= 'z' or >= '0' and <= '9' or '-')) ||
+            !ChatBotOperationId.TryParse(record.OperationId, out ChatBotOperationId operationId) || operationId.Value != record.OperationId || record.OperationId != record.CommandId ||
+            !ChatBotCorrelationId.TryParse(record.CorrelationId, out ChatBotCorrelationId correlationId) || correlationId.Value != record.CorrelationId ||
+            (record.PredecessorOperationId is { } predecessor &&
+                (!ChatBotOperationId.TryParse(predecessor, out ChatBotOperationId previousId) || previousId.Value != predecessor || predecessor == record.OperationId)) ||
+            (record.PredecessorOperationId is null) != (record.PriorOutcome is null) ||
+            (record.PredecessorOperationId is { } predecessorId && record.PriorOutcome!.OperationId != predecessorId) ||
             record.ExecutionState is not { } execution || !Enum.IsDefined(execution) ||
             record.ProjectionState is not { } projection || !Enum.IsDefined(projection) ||
             record.Origin is null || ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigins.FromWireValueOrDefault(record.Origin)) != record.Origin ||
@@ -136,9 +167,17 @@ internal static class OperationStatusUpdatePolicy
             transition.State != record.ExecutionState || transition.ProjectionState != record.ProjectionState ||
             transition.CommittedRevision != record.CommittedRevision || transition.OccurredAt.Offset != TimeSpan.Zero ||
             transition.OccurredAt != record.LastUpdatedAt || !Hexalith.ChatBot.Server.Operations.CommandOperationMetadataValidation.IsValidActorId(transition.ActorId) ||
-            !ChatBotIdentity.IsValidUlid(transition.CorrelationId) || !ChatBotMessageCatalog.IsKnown(transition.ReasonCode) ||
+            !ChatBotCorrelationId.TryParse(transition.CorrelationId, out ChatBotCorrelationId transitionCorrelation) || transitionCorrelation.Value != transition.CorrelationId ||
+            !ChatBotMessageCatalog.IsKnown(transition.ReasonCode) ||
             transition.ReasonCode == ChatBotMessageCodes.GenericDenial ||
             !validCommit || record.LifecycleState != expectedLifecycle ||
+            !ChatBotMessageCatalog.IsKnown(record.ReasonCode) || record.ReasonCode == ChatBotMessageCodes.GenericDenial ||
+            !record.SafeNextActions.SequenceEqual(new[] { ChatBotMessageCatalog.Resolve(record.ReasonCode).NextAction }) ||
+            record.NextRetryAt is not null ||
+            (record.ExecutionState != CommandExecutionState.Committed && record.ReasonCode != transition.ReasonCode) ||
+            (record.ExecutionState is CommandExecutionState.Committed or CommandExecutionState.Rejected or CommandExecutionState.Failed
+                ? record.TerminalReason != record.ReasonCode || record.TerminalReasonCode != record.ReasonCode
+                : record.TerminalReason is not null || record.TerminalReasonCode is not null) ||
             (!committed && record.ProjectionState != CommandProjectionState.ProjectionPending) ||
             record.CompletionStatus != expectedCompletion ||
             (record.CompletionStatus == OperationStatusRecord.Completed && (!committed || record.ProjectionState != CommandProjectionState.Projected)))

@@ -27,6 +27,19 @@ public sealed class CommandOperationConcurrencyAdapterTests
         request.ShouldBeNull();
     }
 
+    [Theory]
+    [InlineData("\"decision slot\"")]
+    [InlineData("\"decision/slot\"")]
+    [InlineData("241-characters")]
+    [InlineData("1")]
+    [InlineData("null")]
+    public async Task CanonicalDecisionSlotShouldRejectTokensOutsidePublishedBounds(string slot)
+    {
+        string token = slot == "241-characters" ? System.Text.Json.JsonSerializer.Serialize(new string('x', 241)) : slot;
+        var parsed = await CommandSubmissionContractAdapter.ReadAsync(Context("{\"expectedRevision\":0,\"decisionSlotId\":" + token + "}"), TestContext.Current.CancellationToken);
+        parsed.Request.ShouldBeNull();
+    }
+
     [Fact]
     public async Task CanonicalZeroRevisionShouldParseAndOmittingWholeGuardShouldPreserveLegacyDecoding()
     {

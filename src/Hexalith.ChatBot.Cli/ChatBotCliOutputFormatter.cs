@@ -21,10 +21,13 @@ public static class ChatBotCliOutputFormatter
     {
         ArgumentNullException.ThrowIfNull(response);
 
+        string operationId = string.IsNullOrWhiteSpace(response.OperationId)
+            ? string.IsNullOrWhiteSpace(response.TaskId) ? response.CommandId : response.TaskId
+            : response.OperationId;
         object shape = new
         {
             outcome = "command-accepted",
-            operationId = response.TaskId ?? response.CommandId,
+            operationId,
             commandId = response.CommandId,
             correlationId = response.CorrelationId,
             taskId = response.TaskId,
@@ -41,7 +44,7 @@ public static class ChatBotCliOutputFormatter
 
         return json ? ToJson(shape) : Lines(
             "outcome: command-accepted",
-            $"operation-id: {response.TaskId ?? response.CommandId}",
+            $"operation-id: {operationId}",
             $"command-id: {response.CommandId}",
             $"correlation-id: {response.CorrelationId}",
             $"lifecycle-state: {WireName(response.LifecycleState)}",

@@ -30,9 +30,10 @@ public sealed class GovernedOperationService(IChatBotClient client)
             .SubmitAsync(command, origin: ChatBotSurfaceOrigin.Ui, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        // TaskId is optional and may arrive as an empty string rather than null; `??` would then yield an empty
-        // operation id that is used for two spine reads and stamped into the UI as the operation identity.
-        string operationId = string.IsNullOrWhiteSpace(response.TaskId) ? response.CommandId : response.TaskId;
+        // Preserve the accepted lifetime identity. Only historical receipts lack OperationId.
+        string operationId = string.IsNullOrWhiteSpace(response.OperationId)
+            ? string.IsNullOrWhiteSpace(response.TaskId) ? response.CommandId : response.TaskId
+            : response.OperationId;
         OperationStatus status = await _client
             .GetOperationStatusAsync(operationId, cancellationToken: cancellationToken)
             .ConfigureAwait(false);

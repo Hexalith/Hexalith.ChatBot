@@ -38,6 +38,7 @@ public sealed record ChatBotMessageCatalogEntry(
         ChatBotMessageCodes.AssociationDecisionRejected or
         ChatBotMessageCodes.AssociationCorrectionPropagationComplete or
         ChatBotMessageCodes.ReprocessCreated => "completed",
+        ChatBotMessageCodes.CanonicalExecutionUnavailable or
         ChatBotMessageCodes.RefusalBlockedAction or
         ChatBotMessageCodes.AssociationCorrectionPolicyBlocked or
         ChatBotMessageCodes.AssociationAiContextBlocked => "blocked",

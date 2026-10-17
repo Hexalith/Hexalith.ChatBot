@@ -25,10 +25,13 @@ public static class ChatBotMcpResultFormatter
     {
         ArgumentNullException.ThrowIfNull(response);
 
+        string operationId = string.IsNullOrWhiteSpace(response.OperationId)
+            ? string.IsNullOrWhiteSpace(response.TaskId) ? response.CommandId : response.TaskId
+            : response.OperationId;
         return ToElement(new
         {
             outcome = "command-accepted",
-            operationId = response.TaskId ?? response.CommandId,
+            operationId,
             commandId = response.CommandId,
             correlationId = response.CorrelationId,
             taskId = response.TaskId,

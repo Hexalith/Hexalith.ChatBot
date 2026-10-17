@@ -29,9 +29,7 @@ internal static class OperationStatusHttpResults
         OperationCompletionStatus completion = Parse<OperationCompletionStatus>(record.CompletionStatus);
         OperationAuditStatus audit = Parse<OperationAuditStatus>(record.AuditStatus);
         CommandSubmissionResponse? previous = record.PriorOutcome;
-        bool validCanonicalMetadata = record.CanonicalRevision is null ||
-            (record.ResourceIds is not null && record.ResourceIds.All(Hexalith.ChatBot.Server.Operations.CommandOperationMetadataValidation.IsValidResourceId) &&
-                record.LastTransition is not null && Hexalith.ChatBot.Server.Operations.CommandOperationMetadataValidation.IsValidActorId(record.LastTransition.ActorId));
+        bool validCanonicalMetadata = OperationStatusUpdatePolicy.HasValidMetadata(record);
         bool knownReason = validCanonicalMetadata && KnownCode(record.ReasonCode) && Enum.IsDefined(record.LifecycleState) &&
             (record.ExecutionState is null || Enum.IsDefined(record.ExecutionState.Value)) &&
             (record.ProjectionState is null || Enum.IsDefined(record.ProjectionState.Value)) &&
@@ -63,12 +61,12 @@ internal static class OperationStatusHttpResults
             CorrelationId = record.CorrelationId,
             LifecycleState = knownReason ? record.LifecycleState : LifecycleState.Failed,
             ReasonCode = knownReason ? ParseCode(record.ReasonCode) : ChatBotMessageCode.Generic_denial,
-            RetryEligible = knownReason && !entry.IsTerminal &&
-                (record.CanonicalRevision is null || (record.ExecutionState == Hexalith.ChatBot.Contracts.Enums.CommandExecutionState.Failed &&
-                    record.LastTransition is { PreEffectFailure: true } && record.CommittedRevision is null)) &&
+            // The pure fold establishes only state eligibility. No canonical retry profile has been approved,
+            // so it cannot authorize retries through this public boundary, even for an eligible pre-effect failure.
+            RetryEligible = knownReason && record.CanonicalRevision is null && !entry.IsTerminal &&
                 safeNextActions.Contains(ChatBotMessageNextAction.RetryLater) &&
                 record.NextRetryAt is { } due && due <= now &&
-                (record.CanonicalRevision is null ? record.RetryCount < record.MaxAttempts : (long)record.RetryCount + 1 < record.MaxAttempts),
+                record.RetryCount < record.MaxAttempts,
             PriorOutcome = !knownReason || previous is null ? null : new PriorCommandOutcome
             {
                 CommandId = previous.CommandId,
@@ -91,7 +89,7 @@ internal static class OperationStatusHttpResults
             },
             SafeNextActions = safeNextActions,
             TerminalReason = knownReason ? ParseCodeOrNull(record.TerminalReason) : ChatBotMessageCode.Generic_denial,
-            OperationClass = record.OperationClass,
+            OperationClass = knownReason ? record.OperationClass : "command-execution",
             MaxAttempts = knownReason ? record.MaxAttempts : 1,
             NextRetryAt = knownReason ? record.NextRetryAt?.ToUniversalTime() : null,
             DuplicateSafetyNote = knownReason ? record.DuplicateSafetyNote : null,
@@ -122,7 +120,6 @@ internal static class OperationStatusHttpResults
                 Revision = fact.Revision,
                 State = Enum.Parse<CommandExecutionState>(fact.State.ToString()),
                 ProjectionState = Enum.Parse<CommandProjectionState>(fact.ProjectionState.ToString()),
-                ActorId = fact.ActorId,
                 OccurredAt = fact.OccurredAt.ToUniversalTime(),
                 ReasonCode = ParseCode(fact.ReasonCode),
                 CorrelationId = fact.CorrelationId,

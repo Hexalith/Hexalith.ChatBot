@@ -34,6 +34,9 @@ paths:
         Accepts a typed ChatBot command shape from an adapter and returns accepted
         metadata. The operation records only contract-level submission intent; it
         does not execute domain behavior or expose internal processing stages.
+        Requests carrying concurrency fail closed with HTTP 503 and the non-retryable
+        canonical_execution_unavailable catalog code until canonical execution is enabled;
+        callers must not automatically retry that refusal.
       parameters:
         - $ref: "#/components/parameters/CorrelationId"
         - $ref: "#/components/parameters/TaskId"
@@ -624,7 +627,7 @@ components:
     CommandOperationTransition:
       type: object
       additionalProperties: false
-      required: [revision, state, projectionState, actorId, occurredAt, reasonCode, correlationId]
+      required: [revision, state, projectionState, occurredAt, reasonCode, correlationId]
       properties:
         revision:
           type: integer
@@ -634,11 +637,6 @@ components:
           $ref: "#/components/schemas/CommandExecutionState"
         projectionState:
           $ref: "#/components/schemas/CommandProjectionState"
-        actorId:
-          type: string
-          minLength: 1
-          maxLength: 240
-          pattern: "^[a-zA-Z0-9:._@-]+$"
         occurredAt:
           type: string
           format: date-time
@@ -1343,7 +1341,7 @@ components:
           $ref: "#/components/schemas/ChatBotMessageCode"
         retryEligible:
           type: boolean
-          description: True only after nextRetryAt is due and retryCount is below maxAttempts.
+          description: Legacy records require a due nextRetryAt and retryCount below maxAttempts. Canonical records also require fold eligibility and an approved retry profile; eligibility remains false while profile approval is open.
         priorOutcome:
           $ref: "#/components/schemas/PriorCommandOutcome"
         retryCount:
@@ -1352,8 +1350,10 @@ components:
           minimum: 0
         completionStatus:
           $ref: "#/components/schemas/OperationCompletionStatus"
+          description: Compatibility summary for legacy consumers. For canonical records, executionState and projectionState are authoritative.
         auditStatus:
           $ref: "#/components/schemas/OperationAuditStatus"
+          description: Legacy compatibility summary; it does not establish canonical owner commit or audit acceptance.
         partialOutputs:
           $ref: "#/components/schemas/OperationStatusPartialOutputs"
         safeNextActions:
@@ -3372,6 +3372,7 @@ components:
         - idempotency_conflict_approval_decision
         - idempotency_conflict_approved_ai_action_execution
         - idempotency_conflict_ai_action_proposal
+        - canonical_execution_unavailable
     ProblemDetails:
       type: object
       additionalProperties: false

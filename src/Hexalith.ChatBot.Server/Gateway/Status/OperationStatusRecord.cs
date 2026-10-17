@@ -68,6 +68,8 @@ internal sealed record OperationStatusRecord(
     }
 
     /// <summary>Maps an authoritative folded canonical outcome. This pure mapping does not perform runtime writes.</summary>
+    /// <remarks>Completion, audit, and lifecycle summaries retain legacy compatibility. Canonical consumers use
+    /// execution and projection state. Retry scheduling remains absent until a retry profile is approved.</remarks>
     public static OperationStatusRecord FromCanonical(Hexalith.ChatBot.Server.Operations.CommandOperationState state)
     {
         ArgumentNullException.ThrowIfNull(state);

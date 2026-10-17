@@ -37,7 +37,7 @@ public sealed class CommandSubmissionTransportTests
     {
         CapturingHandler handler = new(HttpStatusCode.OK,
             """
-            {"operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","lifecycleState":"Proposed","retryCount":0,"completionStatus":"accepted-projection-pending","auditStatus":"committed","partialOutputs":{"acceptedAt":"2026-10-15T12:00:00Z","completionStatus":"accepted-projection-pending","auditStatus":"committed"},"safeNextActions":["none"],"operationClass":"command-execution","maxAttempts":1,"acceptedAt":"2026-10-15T12:00:00Z","lastUpdatedAt":"2026-10-15T12:00:03Z","reasonCode":"command_accepted","retryEligible":false,"executionState":"Committed","projectionState":"ProjectionLagging","canonicalRevision":3,"expectedRevision":4,"committedRevision":5,"origin":"ui","resourceIds":["resource-alpha"],"createdAt":"2026-10-15T12:00:00Z","equivalenceVersion":"v1","predecessorOperationId":"01ARZ3NDEKTSV4RRFFQ69G5FAX","hasPartialOutputs":true,"terminalReasonCode":"command_accepted","lastTransition":{"revision":3,"state":"Committed","projectionState":"ProjectionLagging","actorId":"actor-alpha","occurredAt":"2026-10-15T12:00:03Z","reasonCode":"command_accepted","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW"}}
+            {"operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","lifecycleState":"Proposed","retryCount":0,"completionStatus":"accepted-projection-pending","auditStatus":"committed","partialOutputs":{"acceptedAt":"2026-10-15T12:00:00Z","completionStatus":"accepted-projection-pending","auditStatus":"committed"},"safeNextActions":["none"],"operationClass":"command-execution","maxAttempts":1,"acceptedAt":"2026-10-15T12:00:00Z","lastUpdatedAt":"2026-10-15T12:00:03Z","reasonCode":"command_accepted","retryEligible":false,"executionState":"Committed","projectionState":"ProjectionLagging","canonicalRevision":3,"expectedRevision":4,"committedRevision":5,"origin":"ui","resourceIds":["resource-alpha"],"createdAt":"2026-10-15T12:00:00Z","equivalenceVersion":"v1","predecessorOperationId":"01ARZ3NDEKTSV4RRFFQ69G5FAX","hasPartialOutputs":true,"terminalReasonCode":"command_accepted","lastTransition":{"revision":3,"state":"Committed","projectionState":"ProjectionLagging","occurredAt":"2026-10-15T12:00:03Z","reasonCode":"command_accepted","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW"}}
             """);
         OperationStatus status = await NewClient(handler).GetOperationStatusAsync(CommandId, CorrelationId, TaskId, TestContext.Current.CancellationToken);
         status.ExecutionState.ShouldBe(CommandExecutionState.Committed);
@@ -53,7 +53,8 @@ public sealed class CommandSubmissionTransportTests
         status.PredecessorOperationId.ShouldBe(TaskId);
         status.HasPartialOutputs.ShouldBe(true);
         status.TerminalReasonCode.ShouldBe(ChatBotMessageCode.Command_accepted);
-        status.LastTransition.ShouldNotBeNull().ActorId.ShouldBe("actor-alpha");
+        status.LastTransition.ShouldNotBeNull().Revision.ShouldBe(3);
+        typeof(CommandOperationTransition).GetProperty("ActorId").ShouldBeNull();
         status.LastTransition.CorrelationId.ShouldBe(CorrelationId);
         status.RetryEligible.ShouldBeFalse();
     }

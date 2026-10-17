@@ -1114,4 +1114,6 @@
   <data name="Failure_CatalogReason_idempotency_conflict_approved_ai_action_execution" xml:space="preserve"><value>This approved AI action execution conflicts with an existing execution request.</value></data>
   <data name="Failure_Catalog_idempotency_conflict_ai_action_proposal" xml:space="preserve"><value>AI action proposal already submitted.</value></data>
   <data name="Failure_CatalogReason_idempotency_conflict_ai_action_proposal" xml:space="preserve"><value>This AI action proposal conflicts with an existing proposal request.</value></data>
+  <data name="Failure_Catalog_canonical_execution_unavailable" xml:space="preserve"><value>Command execution unavailable.</value></data>
+  <data name="Failure_CatalogReason_canonical_execution_unavailable" xml:space="preserve"><value>This command is unavailable in the current configuration.</value></data>
 </root>

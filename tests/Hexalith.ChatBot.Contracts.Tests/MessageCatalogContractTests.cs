@@ -55,6 +55,17 @@ public static partial class MessageCatalogContractTests
         => ChatBotMessageCatalog.Resolve(code).State.ShouldBe("waiting");
 
     [Fact]
+    public static void CanonicalExecutionRefusalShouldBeTerminalBlockedAndNeverSuggestRetry()
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.CanonicalExecutionUnavailable);
+        entry.Code.ShouldBe("canonical_execution_unavailable");
+        entry.State.ShouldBe("blocked");
+        entry.IsTerminal.ShouldBeTrue();
+        entry.NextAction.ShouldBe(ChatBotMessageNextActions.None);
+        entry.DisabledActionReason.ShouldBe(ChatBotDisabledActionReasons.PolicyBlocked);
+    }
+
+    [Fact]
     public static void ExpiredEvidenceShouldDismissWithoutRetry()
     {
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AssociationEvidenceExpired);

@@ -132,7 +132,7 @@ public sealed partial class CommandGatewayTests
         dispatcher.DispatchCount.ShouldBe(1);
         audit.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         counter.ReadAndReset().ShouldHaveSingleItem().FailureCount.ShouldBe(1);
-        ((TrustedAuthorityBoundaryProxy)(object)status).Calls.ShouldBe(boundary == "status" ? ["TryGetAsync"] : []);
+        ((TrustedAuthorityBoundaryProxy)(object)status).Calls.ShouldBe(["TryGetAsync"]);
         CoarseIdempotencyRecord after = durable ? state.DomainRecords.Single() : ((InMemoryCoarseIdempotencyStore)real).Records.Single();
         after.ShouldBe(before);
         if (durable) { AssertPreparedOutcome(state.IdentityRecords.ShouldHaveSingleItem().PriorOutcome!, first.Accepted!); }

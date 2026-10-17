@@ -164,6 +164,7 @@ public sealed partial class CommandGatewayTests
         ChatBotGatewayContext original = DirectContext(new TenantScopedCommand(BoundTenant, "before"), "01ARZ3NDEKTSV4RRFFQ69G5FAY");
         CoarseIdempotencyRecord current = CoarseIdempotencyComposer.ComposeCommandExecutionRecord(original, clock.UtcNow);
         CommandSubmissionResponse prepared = PreparedOutcome(original, clock.UtcNow);
+        prepared.OperationId = original.Submission.TaskId!; // Explicit historical task-based receipt remains unchanged.
         state.SeedDomain(current with
         {
             CoarseKeyHash = current.LegacyKeyHash!, IdentityKeyHash = null, CallerFingerprint = null,
@@ -319,6 +320,7 @@ public sealed partial class CommandGatewayTests
         ChatBotGatewayContext oldContext = DirectContext(new RecordGovernedNote(aggregateA), "01ARZ3NDEKTSV4RRFFQ69G5FAY");
         CoarseIdempotencyRecord current = CoarseIdempotencyComposer.ComposeCommandExecutionRecord(oldContext, clock.UtcNow);
         CommandSubmissionResponse acceptedA = PreparedOutcome(oldContext, clock.UtcNow);
+        acceptedA.OperationId = oldContext.Submission.TaskId!; // Explicit historical identity is never normalized to CommandId.
         CoarseIdempotencyRecord legacy = current with
         {
             CoarseKeyHash = current.LegacyKeyHash!, IdentityKeyHash = null, CallerFingerprint = null,
@@ -474,7 +476,7 @@ public sealed partial class CommandGatewayTests
             CommandId = context.Submission.Request.CommandId,
             CorrelationId = context.Submission.CorrelationId,
             TaskId = context.Submission.TaskId,
-            OperationId = context.Submission.TaskId ?? context.Submission.Request.CommandId,
+            OperationId = context.Submission.Request.CommandId,
             LifecycleState = LifecycleState.Proposed,
             AcceptedAt = acceptedAt.ToUniversalTime(),
             ReasonCode = ChatBotMessageCode.Command_accepted,

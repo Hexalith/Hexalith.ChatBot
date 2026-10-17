@@ -69,6 +69,29 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Fact]
+    public async Task CanonicalConcurrencyHttpRequestShouldFailClosedBeforeReservationAuditOrDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter audit = new();
+        InMemoryCoarseIdempotencyStore idempotency = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = GatewayFactory("tenant-alpha", dispatcher, audit, idempotencyStore: idempotency);
+        using HttpClient client = factory.CreateClient();
+        using HttpRequestMessage request = CommandSubmissionRequest("tenant-alpha", "resource");
+        string payload = await request.Content!.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        request.Content = new StringContent(payload.Replace("\"requestSchemaVersion\": \"v1\"", "\"requestSchemaVersion\": \"v1\", \"concurrency\": {\"expectedRevision\": 0}", StringComparison.Ordinal), Encoding.UTF8, "application/json");
+        using HttpResponseMessage response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        using JsonDocument problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.CanonicalExecutionUnavailable);
+        problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeFalse();
+        problem.RootElement.GetProperty("clientAction").GetString().ShouldBe("none");
+        idempotency.RecordCount.ShouldBe(0);
+        audit.Envelopes.ShouldBeEmpty();
+        audit.AuthorizationFailures.ShouldBeEmpty();
+        dispatcher.DispatchCount.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task CommandGatewayApi_ShouldResolveMailboxParticipantsBeforeEventStoreSubmission()
     {
         RecordingEventStoreGatewayClient eventStore = new();

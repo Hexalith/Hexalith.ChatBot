@@ -254,7 +254,7 @@ internal sealed class DaprCoarseIdempotencyStore : IIdempotencyStore
             reservation.ReservationLeaseExpiresAt is not { } lease || lease <= clock.UtcNow ||
             !string.Equals(outcome.CommandId, reservation.CommandId, StringComparison.Ordinal) ||
             !string.Equals(outcome.CorrelationId, reservation.CorrelationId, StringComparison.Ordinal) ||
-            !MatchesOperationIdentity(outcome.OperationId, reservation.CommandId, reservation.TaskId) ||
+            !string.Equals(outcome.OperationId, reservation.CommandId, StringComparison.Ordinal) ||
             outcome.AcceptedAt.Offset != TimeSpan.Zero)
         {
             return false;

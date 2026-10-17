@@ -19,6 +19,9 @@ public static partial class OpenApiContractSpineTests
         Sequence(guard, "required").Children.OfType<YamlScalarNode>().Select(node => node.Value).ShouldBe(["expectedRevision"]);
         Scalar(Mapping(Mapping(guard, "properties"), "expectedRevision"), "minimum").ShouldBe("0");
         Scalar(Mapping(Mapping(guard, "properties"), "expectedRevision"), "format").ShouldBe("int64");
+        YamlMappingNode slot = Mapping(Mapping(guard, "properties"), "decisionSlotId");
+        Scalar(slot, "pattern").ShouldBe("^[a-zA-Z0-9:._-]+$");
+        Scalar(slot, "maxLength").ShouldBe("240");
         Sequence(Mapping(schemas, "CommandExecutionState"), "enum").Children.OfType<YamlScalarNode>().Select(node => node.Value)
             .ShouldBe(["Received", "Admitted", "Committed", "Rejected", "Failed"]);
         Sequence(Mapping(schemas, "CommandProjectionState"), "enum").Children.OfType<YamlScalarNode>().Select(node => node.Value)
@@ -30,7 +33,11 @@ public static partial class OpenApiContractSpineTests
         string[] required = Sequence(status, "required").Children.OfType<YamlScalarNode>().Select(node => node.Value!).ToArray();
         required.Intersect(canonical).ShouldBeEmpty();
         ShouldContainAll(Sequence(Mapping(schemas, "CommandOperationTransition"), "required").Children.OfType<YamlScalarNode>().Select(node => node.Value!).ToArray(),
-            ["revision", "state", "projectionState", "actorId", "occurredAt", "reasonCode", "correlationId"]);
+            ["revision", "state", "projectionState", "occurredAt", "reasonCode", "correlationId"]);
+        RequiredKeys(Mapping(Mapping(schemas, "CommandOperationTransition"), "properties")).ShouldNotContain("actorId");
+        Scalar(Mapping(Mapping(status, "properties"), "completionStatus"), "description").ShouldContain("Compatibility");
+        Scalar(Mapping(Mapping(status, "properties"), "auditStatus"), "description").ShouldContain("compatibility");
+        Scalar(Mapping(Mapping(status, "properties"), "retryEligible"), "description").ShouldContain("approved retry profile");
     }
 
     [Fact]
@@ -72,6 +79,8 @@ public static partial class OpenApiContractSpineTests
     public static void CommandSubmissionOperationShouldCoverHappyPathAndCriticalFailures()
     {
         YamlMappingNode operation = Operation(LoadContract(), "/api/v1/commands", "post");
+        Scalar(operation, "description").ShouldContain("non-retryable");
+        Scalar(operation, "description").ShouldContain("canonical_execution_unavailable");
         string[] responseCodes = RequiredKeys(Mapping(operation, "responses"));
 
         ShouldContainAll(responseCodes, ["202", "400", "401", "403", "409", "500"]);

@@ -66,6 +66,7 @@ internal sealed class CoarseUserFacingRedactionStage : IUserFacingRedactionStage
             ChatBotProblemTypes.ValidationFailure or
             ChatBotProblemTypes.AuthorizationDenied or
             ChatBotProblemTypes.AuditUnavailable or
+            ChatBotProblemTypes.CanonicalExecutionUnavailable or
             ChatBotProblemTypes.DependencyUnavailable or
             ChatBotProblemTypes.DispatchUnavailable or
             ChatBotProblemTypes.IdempotencyConflict or

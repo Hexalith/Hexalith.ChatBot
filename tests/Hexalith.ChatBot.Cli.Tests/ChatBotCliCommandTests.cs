@@ -263,7 +263,7 @@ public static class ChatBotCliCommandTests
         using JsonDocument document = JsonDocument.Parse(output.ToString());
         JsonElement root = document.RootElement;
         root.GetProperty("outcome").GetString().ShouldBe("command-accepted");
-        root.GetProperty("operationId").GetString().ShouldBe("op-1");
+        root.GetProperty("operationId").GetString().ShouldBe("operation-command-1");
         root.GetProperty("commandId").GetString().ShouldBe("cmd-1");
         root.GetProperty("correlationId").GetString().ShouldBe("corr-1");
         root.GetProperty("taskId").GetString().ShouldBe("op-1");
@@ -274,6 +274,18 @@ public static class ChatBotCliCommandTests
         output.ToString().ShouldNotContain("outcome: success", Case.Insensitive);
         output.ToString().ShouldNotContain("done", Case.Insensitive);
         error.ToString().ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(null, "historical-task", "historical-task")]
+    [InlineData("", "historical-task", "historical-task")]
+    [InlineData(" ", null, "caller-command")]
+    public static void AcceptedFormatterShouldPreserveHistoricalFallbackOnlyWithoutOperationId(string? operationId, string? taskId, string expected)
+    {
+        CommandSubmissionResponse receipt = new() { OperationId = operationId!, CommandId = "caller-command", TaskId = taskId };
+        using JsonDocument json = JsonDocument.Parse(ChatBotCliOutputFormatter.FormatCommandAccepted(receipt, true));
+        json.RootElement.GetProperty("operationId").GetString().ShouldBe(expected);
+        ChatBotCliOutputFormatter.FormatCommandAccepted(receipt, false).ShouldContain($"operation-id: {expected}");
     }
 
     [Fact]
@@ -648,6 +660,7 @@ public static class ChatBotCliCommandTests
             .Returns(Task.FromResult(new CommandSubmissionResponse
             {
                 CommandId = "cmd-1",
+                OperationId = "operation-command-1",
                 CorrelationId = "corr-1",
                 TaskId = "op-1",
                 LifecycleState = GeneratedLifecycleState.Received,

@@ -121,38 +121,6 @@ internal sealed class CommandGateway(
             RetryEligible = false,
         };
 
-        if (context.Actor.Principal is Hexalith.ChatBot.Server.Authorization.ChatBotAuthorityPrincipal lookupAuthority && !lookupAuthority.IsCurrent(clock.UtcNow))
-        {
-            await AbortSafelyAsync(idempotency, cancellationToken).ConfigureAwait(false);
-            return Denied(await admission.RejectAuthorityLapseAsync(context, cancellationToken).ConfigureAwait(false));
-        }
-
-        // Legacy compatibility protection only; canonical atomic owner reservation remains unavailable.
-        // Historical task-based identities occupy the same status namespace. A new caller command ULID must
-        // never alias one owned by another command, and the collision must be rejected before any dispatch effect.
-        try
-        {
-            OperationStatusRecord? occupied = await operationStatusStore.TryGetAsync(context.TenantBinding.TenantId,
-                response.OperationId, cancellationToken).ConfigureAwait(false);
-            if (occupied is not null && !string.Equals(occupied.CommandId, response.CommandId, StringComparison.Ordinal))
-            {
-                await AbortSafelyAsync(idempotency, cancellationToken).ConfigureAwait(false);
-                return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateIdempotencyConflict(submission.CorrelationId,
-                    submission.TaskId, Hexalith.ChatBot.Contracts.Messages.ChatBotMessageCodes.IdempotencyConflictCommandExecution));
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            using CancellationTokenSource cleanup = new(TimeSpan.FromSeconds(5));
-            await AbortSafelyAsync(idempotency, cleanup.Token).ConfigureAwait(false);
-            throw;
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            await AbortSafelyAsync(idempotency, cancellationToken).ConfigureAwait(false);
-            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateDependencyUnavailable(submission.CorrelationId, submission.TaskId));
-        }
-
         if (context.Actor.Principal is Hexalith.ChatBot.Server.Authorization.ChatBotAuthorityPrincipal authority && !authority.IsCurrent(clock.UtcNow))
         {
             await AbortSafelyAsync(idempotency, cancellationToken).ConfigureAwait(false);
@@ -357,7 +325,12 @@ internal sealed class CommandGateway(
             return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateAuditUnavailable(decision.CorrelationId, decision.TaskId));
         }
 
-        if (reasonCode is "idempotency_outcome_unavailable" or "canonical_execution_unavailable" or Contracts.Messages.ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)
+        if (reasonCode == Contracts.Messages.ChatBotMessageCodes.CanonicalExecutionUnavailable)
+        {
+            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateCanonicalExecutionUnavailable(decision.CorrelationId, decision.TaskId));
+        }
+
+        if (reasonCode is "idempotency_outcome_unavailable" or Contracts.Messages.ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)
         {
             return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateDependencyUnavailable(decision.CorrelationId, decision.TaskId));
         }

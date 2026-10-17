@@ -6,6 +6,8 @@ public static class ChatBotMessageCodes
 {
     public const string GenericDenial = "generic_denial";
     public const string CommandAccepted = "command_accepted";
+    /// <summary>Canonical command execution is disabled until the required acceptance gates are satisfied.</summary>
+    public const string CanonicalExecutionUnavailable = "canonical_execution_unavailable";
     public const string CommandContractInvalid = "command_contract_invalid";
     public const string AssociationCorrectionCaseResolutionUnavailable = "association_correction_case_resolution_unavailable";
     public const string AssociationCorrectionStoreUnavailable = "association_correction_store_unavailable";

@@ -18,6 +18,11 @@ internal static class CommandOperationReducer
     public static CommandOperationResult Receive(CommandOperationIdentity identity, JsonElement input,
         long? expectedRevision, string? decisionSlotId = null, CommandOperationState? current = null,
         CommandOperationState? occupiedDecision = null, int maxAttempts = 1)
+        => ReceiveCore(identity, input, expectedRevision, decisionSlotId, current, occupiedDecision, maxAttempts, allowPredecessor: false);
+
+    private static CommandOperationResult ReceiveCore(CommandOperationIdentity identity, JsonElement input,
+        long? expectedRevision, string? decisionSlotId, CommandOperationState? current,
+        CommandOperationState? occupiedDecision, int maxAttempts, bool allowPredecessor)
     {
         ArgumentNullException.ThrowIfNull(identity);
         // Validate guards independently of replay, before comparing semantic input.
@@ -25,6 +30,10 @@ internal static class CommandOperationReducer
             (decisionSlotId is not null && string.IsNullOrWhiteSpace(decisionSlotId)))
         {
             return new(current, CommandOperationConflict.InvalidConcurrency);
+        }
+        if (!allowPredecessor && identity.PredecessorOperationId is not null)
+        {
+            return new(current, CommandOperationConflict.RetryNotEligible);
         }
         if (input.ValueKind != JsonValueKind.Object)
         {
@@ -74,17 +83,24 @@ internal static class CommandOperationReducer
     /// <summary>Folds projection progress without changing or reopening a committed execution outcome.</summary>
     public static CommandOperationResult Project(CommandOperationState current, long? expectedRevision,
         CommandProjectionState projection, string actorId, DateTimeOffset serverUtc, string reasonCode, string correlationId)
-        => expectedRevision is null or < 0
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        return expectedRevision is null or < 0
             ? new(current, CommandOperationConflict.InvalidConcurrency)
             : expectedRevision != current.Revision ? new(current, CommandOperationConflict.RevisionConflict)
             : Apply(current, new(current.Revision + 1, current.ExecutionState, projection, actorId,
                 serverUtc.ToUniversalTime(), reasonCode, correlationId, current.CommittedRevision));
+    }
 
     /// <summary>Replays one declared event; invalid or incompatible events leave the fold unchanged.</summary>
     public static CommandOperationResult Apply(CommandOperationState current, CommandOperationTransition transition)
     {
         ArgumentNullException.ThrowIfNull(current);
         ArgumentNullException.ThrowIfNull(transition);
+        if (ChatBotCorrelationId.TryParse(transition.CorrelationId, out ChatBotCorrelationId correlation))
+        {
+            transition = transition with { CorrelationId = correlation.Value };
+        }
         if (current.Transitions.Contains(transition))
         {
             return new(current, IsReplay: true);
@@ -138,7 +154,7 @@ internal static class CommandOperationReducer
         {
             return new(previous, CommandOperationConflict.RetryNotEligible);
         }
-        CommandOperationResult result = Receive(identity, input, expectedRevision, previous.Concurrency.DecisionSlotId, maxAttempts: previous.MaxAttempts);
+        CommandOperationResult result = ReceiveCore(identity, input, expectedRevision, previous.Concurrency.DecisionSlotId, null, null, previous.MaxAttempts, allowPredecessor: true);
         return result.Succeeded ? result with
         {
             State = result.State! with

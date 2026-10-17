@@ -316,6 +316,8 @@ public static class ChatBotMcpServiceTests
         JsonElement result = await service.InvokeAsync(Invocation(toolName, ArgumentsFor(toolName)), TestContext.Current.CancellationToken);
 
         result.GetProperty("outcome").GetString().ShouldBe("command-accepted");
+        result.GetProperty("operationId").GetString().ShouldBe("operation-command-1");
+        result.GetProperty("taskId").GetString().ShouldBe("op-1");
         result.GetProperty("completionStatus").GetString().ShouldBe("accepted-projection-pending");
         result.GetProperty("auditStatus").GetString().ShouldBe("reconciling");
         await client.Received(1).SubmitAsync(
@@ -549,6 +551,16 @@ public static class ChatBotMcpServiceTests
             ChatBotSurfaceOrigin.Mcp,
             Arg.Any<CancellationToken>());
         result.GetRawText().ShouldNotContain("tenant-alpha");
+    }
+
+    [Theory]
+    [InlineData(null, "historical-task", "historical-task")]
+    [InlineData("", "historical-task", "historical-task")]
+    [InlineData(" ", null, "caller-command")]
+    public static void AcceptedFormatterShouldPreserveHistoricalFallbackOnlyWithoutOperationId(string? operationId, string? taskId, string expected)
+    {
+        CommandSubmissionResponse receipt = new() { OperationId = operationId!, CommandId = "caller-command", TaskId = taskId };
+        ChatBotMcpResultFormatter.FormatCommandAccepted(receipt).GetProperty("operationId").GetString().ShouldBe(expected);
     }
 
     [Fact]
@@ -828,6 +840,7 @@ public static class ChatBotMcpServiceTests
             .Returns(Task.FromResult(new CommandSubmissionResponse
             {
                 CommandId = "cmd-1",
+                OperationId = "operation-command-1",
                 CorrelationId = "corr-1",
                 TaskId = "op-1",
                 LifecycleState = LifecycleState.Received,

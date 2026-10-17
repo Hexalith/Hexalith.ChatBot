@@ -55,6 +55,54 @@ public sealed class CommandOperationContractTests
         Should.Throw<JsonException>(() => JsonSerializer.Deserialize<CommandOperationConcurrency>("{\"" + revisionName + "\":-1}", options));
         Should.Throw<JsonException>(() => JsonSerializer.Deserialize<CommandOperationConcurrency>("{\"" + revisionName + "\":null}", options));
         Should.Throw<JsonException>(() => JsonSerializer.Deserialize<CommandOperationConcurrency>("null", options));
+        JsonSerializer.Serialize<CommandOperationConcurrency>(null!, options).ShouldBe("null");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ConcurrencyJsonShouldRejectUnknownDuplicateAndMalformedMembersAsJsonErrors(bool webDefaults)
+    {
+        JsonSerializerOptions options = new(webDefaults ? JsonSerializerDefaults.Web : JsonSerializerDefaults.General);
+        string revision = webDefaults ? "expectedRevision" : "ExpectedRevision";
+        string slot = webDefaults ? "decisionSlotId" : "DecisionSlotId";
+        string prefix = "{\"" + revision + "\":0,";
+        foreach (string suffix in new[]
+        {
+            "\"unknown\":true}",
+            "\"" + revision + "\":1}",
+            "\"" + slot + "\":\"first\",\"" + slot + "\":\"second\"}",
+            "\"" + slot + "\":null,\"" + slot + "\":\"second\"}",
+            "\"" + slot + "\":\"\"}", "\"" + slot + "\":\" \"}",
+            "\"" + slot + "\":5}", "\"" + slot + "\":{}}",
+            "\"" + slot + "\":\"first\",\"" + slot.ToUpperInvariant() + "\":\"second\"}",
+        })
+        {
+            Should.Throw<JsonException>(() => JsonSerializer.Deserialize<CommandOperationConcurrency>(prefix + suffix, options));
+        }
+        JsonSerializer.Deserialize<CommandOperationConcurrency>(prefix + "\"" + slot + "\":null}", options).ShouldBe(new(0));
+        // These pre-existing constructor/reducer slot decisions are deliberately narrower in the live adapter.
+        foreach (string accepted in new[] { "decision slot", "decision/slot", new string('s', 241) })
+        {
+            CommandOperationConcurrency guard = new(0, accepted);
+            JsonSerializer.Deserialize<CommandOperationConcurrency>(JsonSerializer.Serialize(guard, options), options).ShouldBe(guard);
+        }
+        Should.Throw<ArgumentException>(() => new CommandOperationConcurrency(0, " "));
+    }
+
+    [Fact]
+    public void IdentityShouldRejectOperationClassesOutsidePublishedTokenBounds()
+    {
+        foreach (string invalid in new[] { "", " ", "Command-execution", "1command", "command_execution", "command.execution", "command/class", "é", new string('a', 81) })
+        {
+            Should.Throw<ArgumentException>(() => new CommandOperationIdentity("tenant", OperationId, "RecordGovernedNote", "actor",
+                ChatBotSurfaceOrigin.Api, ["resource"], CreatedAt, CorrelationId, operationClass: invalid));
+        }
+        foreach (string valid in new[] { "a", "command-execution-2", new string('a', 80) })
+        {
+            new CommandOperationIdentity("tenant", OperationId, "RecordGovernedNote", "actor", ChatBotSurfaceOrigin.Api,
+                ["resource"], CreatedAt, CorrelationId, operationClass: valid).OperationClass.ShouldBe(valid);
+        }
     }
 
     [Fact]
@@ -86,6 +134,22 @@ public sealed class CommandOperationContractTests
             result.Conflict.ShouldBe(CommandOperationConflict.InvalidTransition);
             result.State.ShouldBeSameAs(admitted);
         }
+    }
+
+    [Fact]
+    public void ReceiveShouldRejectPredecessorIdentityOutsideEligibleRetry()
+    {
+        CommandOperationResult result = CommandOperationReducer.Receive(
+            Identity(Hexalith.ChatBot.Contracts.Identities.ChatBotIdentity.NewUlid(), predecessor: OperationId), Input(), 0);
+        result.Conflict.ShouldBe(CommandOperationConflict.RetryNotEligible);
+        result.State.ShouldBeNull();
+    }
+
+    [Fact]
+    public void ProjectShouldRejectNullStateBeforeExaminingRevision()
+    {
+        Should.Throw<ArgumentNullException>(() => CommandOperationReducer.Project(null!, null,
+            CommandProjectionState.Projected, "projector", CreatedAt, ChatBotMessageCodes.CommandAccepted, CorrelationId));
     }
 
     [Fact]

@@ -111,6 +111,24 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
         });
     }
 
+    public ProblemDetails CreateCanonicalExecutionUnavailable(string correlationId, string? taskId)
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.CanonicalExecutionUnavailable);
+        return _redactionStage.Apply(new ProblemDetails
+        {
+            Type = ChatBotProblemTypes.CanonicalExecutionUnavailable,
+            Title = entry.Headline,
+            Status = StatusCodes.Status503ServiceUnavailable,
+            Category = ProblemDetailsCategory.Internal_error,
+            Code = entry.Code,
+            Message = entry.Reason,
+            CorrelationId = correlationId,
+            TaskId = taskId,
+            Retryable = false,
+            ClientAction = ClientAction(entry.NextAction),
+        });
+    }
+
     public ProblemDetails CreateDependencyUnavailable(string correlationId, string? taskId)
     {
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.DependencyDegraded);

@@ -83,7 +83,8 @@ public sealed partial class CommandGatewayTests
             new RecordingAuditWriter(stages),
             new RecordingReplayIntentQueue(),
             new RecordingOperatorAlertSink(),
-            new InMemoryOperationStatusStore(),
+            TrustedAuthorityBoundaryProxy.Create<IOperationStatusStore>(
+                new InMemoryOperationStatusStore(), method => { if (method == "TryGetAsync") { stages.Add("operation-status-collision"); } }),
             new FixedClock(),
             new RecordingLifecycleTransitionGuard(stages),
             dispatcher,
@@ -104,6 +105,7 @@ public sealed partial class CommandGatewayTests
                 "authorize",
                 "risk-classify",
                 "approval-gate",
+                "operation-status-collision",
                 "coarse-idempotency",
                 "lifecycle-validation",
                 "pre-commit-audit",

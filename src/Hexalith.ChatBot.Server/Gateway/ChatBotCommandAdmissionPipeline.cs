@@ -193,7 +193,28 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         // runtime; synthetic reducer tests cannot enable it, and no caller flag is an approval substitute.
         if (submission.Request.Concurrency is not null)
         {
-            return ChatBotCommandAdmissionDecision.Rejected("canonical_execution_unavailable", submission.CorrelationId, submission.TaskId);
+            return ChatBotCommandAdmissionDecision.Rejected(ChatBotMessageCodes.CanonicalExecutionUnavailable, submission.CorrelationId, submission.TaskId);
+        }
+
+        // Read-only legacy collision protection precedes reservation and pre-commit audit. This is not
+        // an atomic owner reservation and cannot enable canonical execution while A6/A13 remain open.
+        try
+        {
+            OperationStatusRecord? occupied = await operationStatusStore.TryGetAsync(binding.TenantId,
+                submission.Request.CommandId ?? string.Empty, cancellationToken).ConfigureAwait(false);
+            if (occupied is not null && !string.Equals(occupied.CommandId, submission.Request.CommandId, StringComparison.Ordinal))
+            {
+                return ChatBotCommandAdmissionDecision.Rejected(CoarseIdempotencyOperationClass.CommandExecution.ConflictCode, submission.CorrelationId, submission.TaskId);
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            // Lookup failure (including a dependency-cancelled read) has no reservation or effect to release.
+            return ChatBotCommandAdmissionDecision.Rejected("idempotency_outcome_unavailable", submission.CorrelationId, submission.TaskId);
+        }
+        if (!authority.Principal!.IsCurrent(clock.UtcNow))
+        {
+            return await DenyAsync(submission, binding.TenantId, actor.ActorId, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken).ConfigureAwait(false);
         }
 
         CoarseIdempotencyDecision idempotencyDecision = await idempotencyStore
