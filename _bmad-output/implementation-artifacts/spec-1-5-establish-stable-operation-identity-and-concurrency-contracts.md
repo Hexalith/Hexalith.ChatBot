@@ -74,6 +74,8 @@ context:
 
 ## Spec Change Log
 
+- 2026-10-17: Resumed review at eb6530d34f00d51920a42f88a3dffec3090715e3, retained the original baseline and prior dispositions, and added five focused reducer regression groups. Re-ran the required verification and identified the AppHost's missing recovery-mailbox secret as a concrete native-runtime blocker. Frozen intent and completion/activation gates remain unchanged.
+
 - 2026-10-17: Resumed the three-layer review at 050866e685edadfd7ff529bd781f2daf1de83fb4, corrected lifetime replay of stored predecessor-linked attempts, and implemented nine accepted review corrections with schema, transition, snapshot and historical audit-recovery evidence. Recorded one separate Story 1.6 documentation deferral; preserved frozen intent and all completion/activation gates.
 
 - 2026-10-17: Resumed the saved review, rejected duplicate root concurrency guards, corrected the canonical client fixture, and added replay/retry identity-binding regressions. Recorded every review disposition and three separate deferrals; preserved frozen intent and all owner/protection/completion gates.
@@ -169,6 +171,27 @@ Resumed at `050866e685edadfd7ff529bd781f2daf1de83fb4`, preserving baseline `5bb5
 | R4V1 | medium | patch | Verified gap: both retained audit recovery tests generate only command-based receipts, so tightening either reconciliation path to CommandId equality would go undetected. Extend existing fixtures with historical TaskId-based preparations/intents/envelopes and assert exact reconstructed receipt metadata and one dispatch. |
 
 Patch groups remain direct corrections to the reducer and existing verification boundaries; they add no public API or runtime activation. The prior implementation agent is unavailable in this resumed session, so patches are applied inline. Frozen intent, A6/A13, retry-profile approval and native/primary completion obligations remain unchanged.
+
+### Fifth build review triage (2026-10-17)
+
+Resumed at `eb6530d34f00d51920a42f88a3dffec3090715e3`, retaining baseline `5bb56567499c6df1c621184d3c3d35aa45521166`. All three independent layers completed before classification: Blind Hunter returned ten findings, Edge Case Hunter returned two, and Verification Gap found no gaps. Each finding is classified separately; unchanged earlier claims retain their recorded dispositions.
+
+| ID | Verdict | Route | Evidence and disposition |
+| --- | --- | --- | --- |
+| R5B1 | low | rejected | The pre-reservation collision read can block historical command A's replay if another historical command already used A as its TaskId/OperationId, even though A's receipt names a different operation. This requires a cross-kind historical ULID alias; ordinary lifetime replay remains covered and succeeds. Preserving this rare alias would require a new read-only receipt lookup across idempotency implementations before the no-reservation gate, adding behavior beyond a direct correction for an everyday defect. |
+| R5B2 | low | rejected | Carried: the earlier review rejected the same single catalog reason for different typed reducer conflicts. Conflict already distinguishes the outcomes, the reducer has no live consumer, and differentiated safe-message mapping adds branches without an everyday caller. |
+| R5B3 | low | rejected | The pure unregistered reducer accepts any known non-generic safe reason, including CommandAccepted on a failed fact. No current runtime transition writer consumes this path. A new state-to-reason taxonomy would add contract decisions and validation branches for an inactive consumer; existing known-code and retained-terminal-reason checks remain enforced. |
+| R5B4 | low | rejected | Canonical fields are independently optional to preserve legacy wire decoding. The actual FromCanonical writer supplies coherent fields and the store validates them; the reviewer identifies schema-permitted fabricated responses rather than a malformed response from a current writer. Adding conditional schema branches and generated-client handling adds complexity without an everyday defect. |
+| R5B5 | low | rejected | Existing OpenAPI examples intentionally demonstrate producible legacy responses; canonical client and status fixtures already exercise complete synthetic metadata. Adding a second public example, regeneration and example-validation machinery is optional documentation expansion, beyond a direct correction to an incorrect example. |
+| R5B6 | medium | patch | Verified test gap: Project's missing/negative and mismatched revision branches have no direct committed-fold assertions. Add focused cases asserting the typed conflict and exact unchanged execution, projection, committed revision and fold. |
+| R5B7 | medium | patch | Verified test gap: existing eligible-retry rejection rows vary tenant/actor/resources/class but not command type/input, missing or changed predecessor, reused operation identity or backdated creation. Add independently varied rejection cases against an eligible predecessor, with a successful control and unchanged-fold assertions. |
+| R5B8 | medium | patch | Verified test gap: decision-slot conflict tests do not exercise a foreign-tenant occupant. Add a same-tenant conflict control and foreign-tenant success, retaining the occupant unchanged. This protects the existing tenant comparison without claiming native store isolation. |
+| R5B9 | medium | patch | Verified test gap: direct transition fixtures do not set PreEffectFailure on otherwise valid non-failure events. Cover admission, commit and both projection targets; establish the unmodified event is legal, then assert rejection and unchanged state for its flagged counterpart. |
+| R5B10 | medium | patch | Verified test gap: direct-event replay only repeats the latest fact. Replay admission and commit after projection completes, then alter each historical fact at its old revision; assert exact replay retains the complete current fold and the altered fact conflicts without losing progress. |
+| R5E1 | false | rejected | Carried: null SafeNextActions was already rejected in the earlier and fourth reviews. It is a required positional field and every historical/current writer supplies it; the reviewer again constructs an omitted/null persisted value without identifying a writer that produced it. |
+| R5E2 | low | rejected | Carried: the earlier BH5 row rejected the same forged predecessor-correlation snapshot. Retry constructs prior identity/correlation from a validated CommandOperationIdentity and FromCanonical retains them; another guard on a manually fabricated inactive snapshot adds complexity without an everyday caller. |
+
+The five surviving findings have independent test gaps and remain separate patch groups. The previous implementation agent is unavailable in this resumed session, so the focused test additions are applied inline. No new public surface, persistence path, runtime activation or deferral is introduced. Frozen intent, prior deferrals, A6/A13, retry-profile approval and native/primary completion obligations remain unchanged.
 
 ## Design Notes
 
@@ -406,6 +429,44 @@ The earlier exact `git diff --exit-code HEAD -- ...` unchanged-path command retu
 The current runtime attempt also remains blocked: `aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj` stayed at “Starting Aspire AppHost in the background...”. Exact-target `aspire describe --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --format Json` found no running host. Exact-target stop also found none; Ctrl-C canceled the pending start with exit 0, and final describe again found no host. The separate FrontComposer host was left untouched.
 
 The build workflow halts at step-04 because required verification still fails and accepted native owner/persistence evidence remains unavailable. The spec remains in-review and sprint tracking remains in-progress; no commit, completion transition or completion attestation is proposed. A6/A13, retry-profile approval and all prior explicit deferrals remain open. These results do not authorize canonical runtime execution.
+
+### Fifth review-patch verification (2026-10-17)
+
+The five accepted regression groups R5B6-R5B10 add **18** cases in `CommandOperationContractTests.cs`; runtime code is unchanged. They cover missing/negative/mismatched projection revisions, independently changed retry semantics and chronology, a foreign-tenant decision-slot occupant, illegal pre-effect flags on otherwise legal events, and exact/altered older-event replay after projection completes. The focused run passes all 18 with zero failures/skips at `TestResults/story-1-5-r5/patch-server.{ctrf.json,trx}`.
+
+- `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false` passed with zero warnings/errors; log `/tmp/story-1-5-r5-patch-build.log`.
+- Final `dotnet build Hexalith.ChatBot.slnx --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false` passed with zero warnings/errors; log `/tmp/story-1-5-r5-final-build.log`.
+- Each full lane used `XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.<Lane>.Tests/bin/Debug/net10.0/Hexalith.ChatBot.<Lane>.Tests TestResults/story-1-5-r5/final-<lane>.ctrf.json -result-trx TestResults/story-1-5-r5/final-<lane>.trx`. No exclusions or skip-policy changes were introduced.
+
+| Final lane | Passed | Failed | Skipped | Exit |
+| --- | ---: | ---: | ---: | ---: |
+| Contracts | 521 | 0 | 0 | 0 |
+| Client | 94 | 0 | 0 | 0 |
+| Server | 2906 | 1 | 0 | 1 |
+| Cli | 60 | 0 | 0 | 0 |
+| Mcp | 70 | 0 | 0 | 0 |
+| Architecture | 121 | 2 | 0 | 1 |
+| Conformance | 150 | 1 | 0 | 1 |
+| UI | 495 | 4 | 0 | 1 |
+
+Total: **4417 passed, 8 failed, 0 skipped**. All 16 Matrix/acceptance methods and all five new regression methods resolve to passing final-run cases. Their parent audit is retained at `TestResults/story-1-5-r5/verification-audit.json`, which also records the failing full-lane summaries and explicitly is not completion evidence.
+
+The seven Architecture/Conformance/UI failures exactly match the pre-patch run and the earlier broader-lane table: ten sibling package-version declarations; the stale Release xUnit 4.0.1 child probe against catalog 4.0.2; five missing production ACL routes; and four Fluent 5.0.0 assertions against catalog 5.0.1. An additional Server failure occurred twice in full-suite runs: `AiExecutionCoordinatorTests.OwningReplicaCancellationProjectionShouldNotRunProviderCancellationCallbacksInline` times out at line 262 waiting one second for its callback. The pre-patch full Server run passed all 2889 cases. The failing method then passed alone (**1** case), and its entire class passed alone (**32** cases), with zero skips. Retained probe outputs are `server-timeout-probe` and `server-lifecycle-probe` under `TestResults/story-1-5-r5/`. The full Server rerun still failed the same test with **2906 passed, 1 failed, 0 skipped**; its results remain separate at `final-server-rerun.{ctrf.json,trx}`. Focused success does not replace this full-suite failure, and no timeout or assertion was weakened.
+
+Exact failing final commands, each exit 1:
+
+```bash
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests TestResults/story-1-5-r5/final-server-rerun.ctrf.json -result-trx TestResults/story-1-5-r5/final-server-rerun.trx
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests TestResults/story-1-5-r5/final-architecture.ctrf.json -result-trx TestResults/story-1-5-r5/final-architecture.trx
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests TestResults/story-1-5-r5/final-conformance.ctrf.json -result-trx TestResults/story-1-5-r5/final-conformance.trx
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests TestResults/story-1-5-r5/final-ui.ctrf.json -result-trx TestResults/story-1-5-r5/final-ui.trx
+```
+
+The earlier exact unchanged-path command returned exit 0 with no diff. `git diff --exit-code HEAD -- tests/Hexalith.ChatBot.Server.Tests/Lifecycle/AiExecutionCoordinatorTests.cs src/Hexalith.ChatBot.Server/Lifecycle/AiExecution/AiExecutionCoordinator.cs` also returned exit 0. No dependency, ACL, unrelated test, timeout, submodule or runtime-code changes were made to mask these failures.
+
+The current native-runtime attempt reached a concrete startup blocker: `aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj` exited **2**, reporting AppHost exit **134** because no recovery mailbox client secret was configured. The required key is `ChatBot:LiveRecoveryValidation:MailboxClientSecret` (or the existing legacy AppHost key `LiveRecoveryValidation:MailboxClientSecret`). Startup diagnostics are retained at `/home/administrator/.aspire/logs/cli_20261017T164731_401986ef.log`. Exact-target describe and stop both found no running ChatBot host; other AppHosts were left untouched. This does not establish native persisted end-state, accepted owner execution, A6/A13 acceptance or retry-profile approval.
+
+The build workflow halts at step-04 because required full verification remains failing and native/primary evidence is unavailable. The spec remains `in-review`, sprint tracking remains `in-progress`, and no commit, completion transition or completion attestation is proposed. Frozen intent, the original baseline, all earlier explicit deferrals and runtime activation gates remain unchanged.
 
 ## File List
 
