@@ -1492,3 +1492,21 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Carry the exact resolved tenant/policy-version tuple from `AiActionPolicyDecision` into `ChatBotApprovalResult` and the low-risk AI events when snapshots become live.
   evidence: `AiActionApprovalGate.cs:97-98` passes only `PolicySnapshotId`; events are persisted state, so the change belongs with accepted A6 evidence in the live-persistence story. ADR wording qualified in round 8.
+
+## Deferred from: code review of spec-1-5-establish-stable-operation-identity-and-concurrency-contracts (2026-10-17)
+
+- source_spec: `spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: OpenAPI `oneOf: [TaskId, CommandId]` over identical ULID schemas can never satisfy strict `oneOf` validation (pre-existing).
+  evidence: Still present on the `/api/v1/operations/{operationId}` and audit-history path parameters, on `OperationStatus.originalOperationId` and on `OperationAuditHistory.operationId` (`hexalith.chatbot.v1.yaml:97,1393,1487` at `839aee3`). Story 1.5 replaced only `OperationStatus.operationId` with `$ref: CommandId`.
+- source_spec: `spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: `OperationStatusWorkflowStatusSink` writes a record built from an earlier non-atomic `TryGetAsync`, so concurrent replay or workflow field changes can be lost (pre-existing).
+  evidence: `OperationStatusWorkflowStatusSink.cs:25-69`. Before Story 1.5 the blind store replace lost them; now the legacy timestamp policy decides instead. Fix with an atomic read-modify-write through the store's update callback.
+- source_spec: `spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: The canonical commit invariant `CommittedRevision == ExpectedRevision + 1` assumes single-event owner commits (unverified medium).
+  evidence: Enforced in `CommandOperationReducer.Apply` (`commitValid`) and `OperationStatusUpdatePolicy.ValidateCanonical` (`validCommit`). Settle by confirming EventStore owner revision semantics for commands that emit several events when Story 1.8 wires the owner commit.
+- source_spec: `spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: Equal-revision canonical equivalence is decided by comparing `JsonSerializer.Serialize(current)` with `JsonSerializer.Serialize(incoming)`, but the synthetic SDK store never JSON round-trips (unverified medium).
+  evidence: `AtomicOperationStatusReadModelStore.cs:53` keeps the object reference, so the "SDK fake" race and duplicate rows never compare against a store-deserialized `current`. Settle with a round-trip through the DAPR read-model serializer before canonical writes go live.
+- source_spec: `spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: The pure reducer cannot stop one failed attempt being retried more than once. `CommandOperationReducer.Retry` records nothing on the predecessor, so several distinct retry ULIDs can each succeed, and `MaxAttempts` limits chain depth rather than total attempts.
+  evidence: `CommandOperationReducer.cs:123` at `839aee3`. Deferred by decision on 2026-10-17: successor uniqueness belongs to the owner aggregate. Enforce it when Story 1.8 (atomic owner commit) and Story 1.10 (RetryCommandExecution UI) wire live retries.
