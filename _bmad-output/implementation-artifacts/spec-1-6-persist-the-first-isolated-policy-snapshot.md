@@ -426,3 +426,20 @@ Scope: `38ca946..HEAD` limited to everything except `_bmad-output` and `referenc
 - 503 vs ADR "should not retry" wording; ADR hygiene; test-only `CommandsForPath`; partial-class test layout; deleted audit-ref coverage — decided round 5 / cosmetic / edits the ADR under review.
 
 Status unchanged at `review`: Story 1.6 stays open for A6 / native isolation evidence and the deferred unverified mediums ("done" only via the evidence contract). Sprint status not changed.
+
+### Review Findings (round 13)
+
+Scope: `38ca946..HEAD` limited to `docs src tests` (24 files, +1576/−175). All four layers completed; no failed layers. Verification-gap found no gaps. Blind Hunter read only ~700 of 2,230 diff lines; Acceptance Auditor skipped test hunks and spec lines past ~312. Clean review: 0 `decision-needed`, 0 `patch`, 0 new `defer`. Every finding repeats a round 1–12 decision, deferral or rejection, or is refuted below.
+
+#### Rejected (round 13)
+- 503 `dependency_degraded` retryable vs ADR "should not retry"; ADR claims (spike-counter wording, "signed off" without link, all-transport coverage, Blocked-vs-Routed wording), ADR wrapping — decided round 5 / cosmetic; the fix edits the ADR/spec under review.
+- `CommandsForPath` unknown path passes the guard test vacuously — false: `GateMustDenyEveryCommandClassifiedAsTenantPolicyMutation` asserts `ShouldNotBeEmpty()` before checking the gate.
+- Gate hard-coded six-name list, case/qualified aliases, null command type, gate duplicated across pipeline and SDK stage with different precedence — decided rounds 2–8; qualified-alias bypass already in the deferral ledger.
+- Gate not enforced in aggregate/dispatcher; gate precedes idempotency lookup; removed audit/replay/ref tests and `SdkConfirmation` policy early-return; tuple not carried into approval results — already in the deferral ledger / decision 2b.
+- Evaluator `Routed`→`Blocked`, collapsed reason codes, `"unavailable"` literal, provider faults not logged, provider OCE, null `RiskActionClasses`, early routes unvalidated, dead blank-id provider defaults — owner-approved fail-closed decision (round 4).
+- Policy denials audited as authorization failures; counter skip keyed on reason string; SDK denial skips grant authorization; null issuer — decided BH-7 / rounds 2/4/5.
+- Positional `TenantAiPolicySnapshot` change; hard-coded `PolicyVersion = 1`; providers echo snapshot id — low: synthetic fixtures; evaluator negative cases are covered by `AiActionPolicyEvaluatorTests`.
+- Synthetic history/resolver/snapshot gaps (first-append anchor, no-op rollback, double collision, replay-vs-conflict signal, duplicate `KnobId`, list order, newer-schema knobs, null guards, clock skew, 5-minute constant, free-form protection refs, `isAuthorized` bool) — low: internal unwired synthetic types, fixes add guards (rounds 2–12).
+- `IsSafePolicyToken` narrower charset; test-only `CommandsForPath`; using-directive order — low / cosmetic (rounds 5–10).
+
+Status unchanged at `review`: Story 1.6 stays open for A6 / native isolation evidence and the deferred unverified mediums ("done" only via the evidence contract). Sprint status not changed.
