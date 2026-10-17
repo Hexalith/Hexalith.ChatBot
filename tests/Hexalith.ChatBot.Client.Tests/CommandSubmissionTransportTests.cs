@@ -37,7 +37,47 @@ public sealed class CommandSubmissionTransportTests
     {
         CapturingHandler handler = new(HttpStatusCode.OK,
             """
-            {"operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","lifecycleState":"Proposed","retryCount":0,"completionStatus":"accepted-projection-pending","auditStatus":"committed","partialOutputs":{"acceptedAt":"2026-10-15T12:00:00Z","completionStatus":"accepted-projection-pending","auditStatus":"committed"},"safeNextActions":["none"],"operationClass":"command-execution","maxAttempts":1,"acceptedAt":"2026-10-15T12:00:00Z","lastUpdatedAt":"2026-10-15T12:00:03Z","reasonCode":"command_accepted","retryEligible":false,"executionState":"Committed","projectionState":"ProjectionLagging","canonicalRevision":3,"expectedRevision":4,"committedRevision":5,"origin":"ui","resourceIds":["resource-alpha"],"createdAt":"2026-10-15T12:00:00Z","equivalenceVersion":"v1","predecessorOperationId":"01ARZ3NDEKTSV4RRFFQ69G5FAX","hasPartialOutputs":true,"terminalReasonCode":"command_accepted","lastTransition":{"revision":3,"state":"Committed","projectionState":"ProjectionLagging","occurredAt":"2026-10-15T12:00:03Z","reasonCode":"command_accepted","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW"}}
+            {
+              "operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV",
+              "commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV",
+              "correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW",
+              "lifecycleState":"Proposed",
+              "retryCount":1,
+              "completionStatus":"accepted-projection-pending",
+              "auditStatus":"committed",
+              "partialOutputs":{"acceptedAt":"2026-10-15T12:00:00Z","completionStatus":"accepted-projection-pending","auditStatus":"committed"},
+              "safeNextActions":["none"],
+              "operationClass":"command-execution",
+              "maxAttempts":2,
+              "acceptedAt":"2026-10-15T12:00:00Z",
+              "lastUpdatedAt":"2026-10-15T12:00:03Z",
+              "reasonCode":"command_accepted",
+              "retryEligible":false,
+              "executionState":"Committed",
+              "projectionState":"ProjectionLagging",
+              "canonicalRevision":3,
+              "expectedRevision":4,
+              "committedRevision":5,
+              "origin":"ui",
+              "resourceIds":["resource-alpha"],
+              "createdAt":"2026-10-15T12:00:00Z",
+              "equivalenceVersion":"v1",
+              "originalOperationId":"01ARZ3NDEKTSV4RRFFQ69G5FAX",
+              "predecessorOperationId":"01ARZ3NDEKTSV4RRFFQ69G5FAX",
+              "priorOutcome":{
+                "commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                "operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                "correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                "lifecycleState":"Failed",
+                "acceptedAt":"2026-10-15T11:59:55Z",
+                "reasonCode":"audit_unavailable",
+                "retryEligible":false
+              },
+              "hasPartialOutputs":false,
+              "terminalReason":"command_accepted",
+              "terminalReasonCode":"command_accepted",
+              "lastTransition":{"revision":3,"state":"Committed","projectionState":"ProjectionLagging","occurredAt":"2026-10-15T12:00:03Z","reasonCode":"command_accepted","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW"}
+            }
             """);
         OperationStatus status = await NewClient(handler).GetOperationStatusAsync(CommandId, CorrelationId, TaskId, TestContext.Current.CancellationToken);
         status.ExecutionState.ShouldBe(CommandExecutionState.Committed);
@@ -51,7 +91,18 @@ public sealed class CommandSubmissionTransportTests
         status.CreatedAt.ShouldBe(status.AcceptedAt);
         status.EquivalenceVersion.ShouldBe(OperationStatusEquivalenceVersion.V1);
         status.PredecessorOperationId.ShouldBe(TaskId);
-        status.HasPartialOutputs.ShouldBe(true);
+        status.OriginalOperationId.ShouldBe(TaskId);
+        status.RetryCount.ShouldBe(1);
+        status.MaxAttempts.ShouldBe(2);
+        status.PriorOutcome.ShouldNotBeNull().OperationId.ShouldBe(TaskId);
+        status.PriorOutcome.CommandId.ShouldBe(TaskId);
+        status.PriorOutcome.CorrelationId.ShouldBe(CorrelationId);
+        status.PriorOutcome.AcceptedAt.ShouldBe(DateTimeOffset.Parse("2026-10-15T11:59:55Z", System.Globalization.CultureInfo.InvariantCulture));
+        status.PriorOutcome.LifecycleState.ShouldBe(LifecycleState.Failed);
+        status.PriorOutcome.ReasonCode.ShouldBe(ChatBotMessageCode.Audit_unavailable);
+        status.PriorOutcome.RetryEligible.ShouldBeFalse();
+        status.HasPartialOutputs.ShouldBe(false);
+        status.TerminalReason.ShouldBe(ChatBotMessageCode.Command_accepted);
         status.TerminalReasonCode.ShouldBe(ChatBotMessageCode.Command_accepted);
         status.LastTransition.ShouldNotBeNull().Revision.ShouldBe(3);
         typeof(CommandOperationTransition).GetProperty("ActorId").ShouldBeNull();

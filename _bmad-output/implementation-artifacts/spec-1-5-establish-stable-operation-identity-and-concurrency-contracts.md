@@ -74,6 +74,8 @@ context:
 
 ## Spec Change Log
 
+- 2026-10-17: Resumed the saved review, rejected duplicate root concurrency guards, corrected the canonical client fixture, and added replay/retry identity-binding regressions. Recorded every review disposition and three separate deferrals; preserved frozen intent and all owner/protection/completion gates.
+
 - 2026-10-17: Applied the 15 accepted review patches, including the non-retryable canonical refusal, pre-reservation collision lookup, legacy field merge, private transition actors, accepted OperationId adapters, predecessor validation and focused regression evidence. Preserved all explicit deferrals and frozen intent.
 
 - 2026-10-15: Implemented approved scope without changing frozen intent. Aligned new receipt references in audit/correction paths and current-runtime fixtures; preserved historical replay fixtures. The parent matrix audit strengthened cross-tenant parity to first prove the operation exists for an authorized caller.
@@ -123,6 +125,26 @@ Three independent layers reviewed the preserved baseline diff. Each finding was 
 | VG1 | medium | patch | Verified against the gateway's cancellation filter and new lookup catch: same caller-cancellation regression as BH11. The existing dependency-OCE test has an uncancelled caller token and does not cover this case. |
 
 Patch groups: guard JSON strictness/exception consistency (BH2/BH3); operation-class metadata validation (BH4); caller cancellation (BH11/VG1); normalized fold correlation (EC1). All explicit prior deferrals remain unchanged.
+
+### Resumed build review triage (2026-10-17)
+
+Resumed from `in-review` at `8adcde63b2103a98930dc590db269c5be8a53498`, retaining baseline `5bb56567499c6df1c621184d3c3d35aa45521166`. All three independent layers completed before classification: Blind Hunter returned ten findings, Edge Case Hunter returned none, and Verification Gap returned one. The full baseline diff also contains previously committed Story 1.6 and BMAD work; it is context, not permission to rewrite that work.
+
+| ID | Verdict | Route | Evidence and disposition |
+| --- | --- | --- | --- |
+| R3B1 | low | rejected | `ChatBotOperationId` loses its value if directly JSON-deserialized, but every current use is a local `TryParse` result; serialized identity/status members are strings. Its private-constructor shape matches the existing command/correlation helpers. Supporting a new serialization boundary adds validation/converter complexity without an everyday caller. |
+| R3B2 | low | rejected | The synthetic identity constructor permits command names excluded by the HTTP schema. Live requests already pass the adapter's length/pattern/suffix checks, and the reducer has no runtime registration. Another guard on this inactive internal-consumer path adds complexity without a current caller encountering the defect. |
+| R3B3 | medium | patch | Confirmed: `TryGetProperty` chooses the final root `concurrency` member, so an earlier malformed/null guard can be hidden by a valid final guard. Reject repeated root guards in the existing adapter and cover both orderings plus equivalent duplicates. No public surface is added. |
+| R3B4 | low | rejected | CLI status formatting omits canonical metadata, but live canonical writes are unconditionally closed and legacy receipts intentionally carry no canonical metadata. Extending the output contract adds fields/formatting branches for a state no current runtime writer produces; preserve this prerequisite boundary for owner activation. |
+| R3B5 | low | rejected | The same inactive canonical-status boundary applies to MCP: its present writer supplies legacy status. Adding canonical fields to the structured output introduces public surface and filtering branches without an everyday reachable canonical record. |
+| R3B6 | maybe-false | defer | Unverified medium: raw numeric spellings hash differently in the unchanged canonicalizer; no accepted v1 rule or bound typed command establishes whether `1`, `1.0`, and `1e0` must alias. Confirm owner command numeric equivalence and golden vectors before canonical owner activation; do not silently change existing lifetime fingerprints. |
+| R3B7 | low | rejected | Carried: the earlier review explicitly rejected the immediate-predecessor meaning of `OriginalOperationId` for third attempts. The mapping is unchanged, canonical retry remains inactive, and changing lineage propagation adds state/branches. |
+| R3B8 | medium | patch | The client canonical-status fixture supplies a predecessor without its matching prior outcome and omits the terminal reason retained by the server fold. Correct the existing fixture to a producible retry snapshot and directly assert retained predecessor metadata and terminal facts. |
+| R3B9 | medium | defer | Confirmed pre-existing lost increment: the preserved baseline already reads a status and writes `DuplicateAttemptCount + 1`, so two duplicate callers can write the same next count. The new maximum merge preserves monotonicity but does not create that race. Atomic increment semantics belong to a separate store/caller change. |
+| R3B10 | low | defer | The Story 1.6 ADR tells clients to wait for acceptance while its existing gateway dependency outcome is retryable. This documentation/contract discrepancy comes from the separately committed policy work (`a5548fe3dd185b2cc754ac730d7f2cc88b6f2c1d` for the ADR), not Story 1.5; reconcile it with that story's owner without changing the approved policy behavior here. |
+| R3V1 | medium | patch | Verified regression gap: replay/retry fixtures do not vary tenant, actor, resource identities or operation class. Add parameterized conflict assertions that retain the original failed fold for each binding. These directly verify the already implemented immutable-identity checks. |
+
+Surviving patch groups are root-guard uniqueness (R3B3), producible client fixture (R3B8), and immutable-binding verification (R3V1). The three deferred findings are recorded separately; rejected findings are not patched or deferred. Frozen intent, prior review decisions, A6/A13, retry-profile approval and the native/primary completion gate remain unchanged.
 
 ## Design Notes
 
@@ -291,8 +313,44 @@ XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.C
 
 The build workflow halted at step-04 because required broader verification still fails. The spec remains in-review, sprint tracking remains in-progress, and no commit, completion transition, or completion attestation is proposed. The approved frozen intent and original baseline_commit are preserved. A6/A13, retry-profile approval, native owner/persistence acceptance and the explicit deferrals remain open.
 
+### Resumed review-patch verification (2026-10-17)
+
+All three accepted patch groups (R3B3, R3B8, R3V1) are implemented. Root guard uniqueness rejects null/malformed-first, null/malformed-last, differing and identical duplicate objects. The client fixture now represents the second attempt of a committed, projection-lagging operation with its matching prior failed outcome, consistent attempt ceiling, terminal reason and empty partial-output marker. Replay/retry tests independently vary tenant, actor, resources and operation class and prove the original fold remains unchanged.
+
+- `dotnet build Hexalith.ChatBot.slnx --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false` passed after all code changes: zero warnings/errors. Log: `/tmp/story-1-5-resume-final-build.log`.
+- Focused native runner evidence retained under `TestResults/story-1-5-resume/patch-{server,client}.{ctrf.json,trx}`: Server **10** cases and Client **1**, all passed with zero failures/skips. Server selected `-method '*DuplicateRootCanonicalGuardsShouldRejectBeforeAdmission' -method '*ReplayAndRetryShouldRejectChangedIdentityBindings'`; Client selected `-method '*CanonicalStatusShouldDecodeAllSafeFactsWithoutConfusingProjectionLagWithCompletion'`.
+- Final full lanes each used `XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.<Lane>.Tests/bin/Debug/net10.0/Hexalith.ChatBot.<Lane>.Tests TestResults/story-1-5-resume-final/<lane>.ctrf.json -result-trx TestResults/story-1-5-resume-final/<lane>.trx`. Logs: `/tmp/story-1-5-resume-final-<lane>-tests.log`.
+
+| Final lane | Passed | Failed | Skipped | Exit |
+| --- | ---: | ---: | ---: | ---: |
+| Contracts | 521 | 0 | 0 | 0 |
+| Client | 94 | 0 | 0 | 0 |
+| Server | 2872 | 0 | 0 | 0 |
+| Cli | 60 | 0 | 0 | 0 |
+| Mcp | 70 | 0 | 0 | 0 |
+| Architecture | 121 | 2 | 0 | 1 |
+| Conformance | 150 | 1 | 0 | 1 |
+| UI | 495 | 4 | 0 | 1 |
+
+Total: **4383 passed, 7 failed, 0 skipped**. Contracts/Client/Server/Cli/Mcp account for **3617** passing cases. A parent TRX audit resolved all 16 Matrix evidence/acceptance methods and all three patch methods to passing final-run cases. No test exclusions or gate changes were introduced.
+
+The broader failure names exactly match the pre-patch run and the previously recorded table: sibling package-version authorities, the stale Release xUnit child probe, five missing production ACL routes, and four Fluent 5.0.0 assertions against the shared 5.0.1 catalog. These exact final commands each exited 1:
+
+```bash
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests TestResults/story-1-5-resume-final/architecture.ctrf.json -result-trx TestResults/story-1-5-resume-final/architecture.trx
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests TestResults/story-1-5-resume-final/conformance.ctrf.json -result-trx TestResults/story-1-5-resume-final/conformance.trx
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests TestResults/story-1-5-resume-final/ui.ctrf.json -result-trx TestResults/story-1-5-resume-final/ui.trx
+```
+
+The earlier exact `git diff --exit-code HEAD -- ...` unchanged-path command was rerun with the same paths and returned exit 0 with no output. No package, ACL, unrelated test or submodule changes were made. `git -c core.whitespace=cr-at-eol diff --check` passed, and the frozen intent is byte-identical to HEAD.
+
+The current runtime attempt also remains blocked: `aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj` stayed at "Starting Aspire AppHost in the background...". Exact-target `aspire describe --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --format Json` found no running host. Exact-target stop also found none; Ctrl-C canceled the pending start with exit 0, and final describe again found no host. No other AppHost was stopped.
+
+The build workflow halts at step-04 because broader required verification remains failing. The spec remains `in-review`, sprint tracking remains `in-progress`, and no commit, completion transition or evidence attestation is proposed. A6/A13, retry-profile approval, accepted native owner/persistence evidence and all prior explicit deferrals remain open. These local results do not establish native durability or authorize canonical runtime execution.
+
 ## File List
 
+- `_bmad-output/implementation-artifacts/deferred-work.md`
 - `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `src/Hexalith.ChatBot.Cli/ChatBotCliOutputFormatter.cs`

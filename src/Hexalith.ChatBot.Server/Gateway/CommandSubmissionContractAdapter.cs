@@ -147,6 +147,10 @@ internal static partial class CommandSubmissionContractAdapter
 
     private static bool ValidConcurrency(JsonElement root)
     {
+        if (root.EnumerateObject().Count(property => property.NameEquals("concurrency")) > 1)
+        {
+            return false;
+        }
         if (!root.TryGetProperty("concurrency", out JsonElement guard))
         {
             return true; // Historical request compatibility does not opt in to canonical execution.

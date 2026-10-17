@@ -208,6 +208,39 @@ public sealed class CommandOperationContractTests
         result.State.Revision.ShouldBe(2);
     }
 
+    [Theory]
+    [InlineData("tenant")]
+    [InlineData("actor")]
+    [InlineData("resources")]
+    [InlineData("operation-class")]
+    public void ReplayAndRetryShouldRejectChangedIdentityBindings(string binding)
+    {
+        CommandOperationState original = Advance(Advance(Received(2), CommandExecutionState.Admitted),
+            CommandExecutionState.Failed, preEffectFailure: true);
+        string retainedFold = JsonSerializer.Serialize(original);
+        CommandOperationIdentity ChangeBinding(CommandOperationIdentity identity) => new(
+            binding == "tenant" ? "tenant-other" : identity.TenantId,
+            identity.OperationId, identity.CommandType,
+            binding == "actor" ? "actor-other" : identity.ActorId,
+            identity.Origin,
+            binding == "resources" ? ["resource-other"] : identity.ResourceIds,
+            identity.CreatedAt, identity.CorrelationId,
+            binding == "operation-class" ? "other-execution" : identity.OperationClass,
+            identity.EquivalenceVersion, identity.PredecessorOperationId);
+
+        CommandOperationResult replay = CommandOperationReducer.Receive(ChangeBinding(original.Identity), Input(), 0,
+            current: original);
+        replay.Conflict.ShouldBe(CommandOperationConflict.OperationConflict);
+        replay.State.ShouldBeSameAs(original);
+
+        CommandOperationIdentity retryIdentity = Identity(ChatBotIdentity.NewUlid(),
+            createdAt: original.Transitions[^1].OccurredAt.AddSeconds(1), predecessor: original.Identity.OperationId);
+        CommandOperationResult retry = CommandOperationReducer.Retry(original, ChangeBinding(retryIdentity), Input(), 0);
+        retry.Conflict.ShouldBe(CommandOperationConflict.RetryNotEligible);
+        retry.State.ShouldBeSameAs(original);
+        JsonSerializer.Serialize(original).ShouldBe(retainedFold);
+    }
+
     [Fact]
     public void ChangedInputRevisionOrDecisionSlotShouldProduceTypedConflictsWithoutMutation()
     {

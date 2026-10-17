@@ -1510,3 +1510,15 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
   summary: The pure reducer cannot stop one failed attempt being retried more than once. `CommandOperationReducer.Retry` records nothing on the predecessor, so several distinct retry ULIDs can each succeed, and `MaxAttempts` limits chain depth rather than total attempts.
   evidence: `CommandOperationReducer.cs:123` at `839aee3`. Deferred by decision on 2026-10-17: successor uniqueness belongs to the owner aggregate. Enforce it when Story 1.8 (atomic owner commit) and Story 1.10 (RetryCommandExecution UI) wire live retries.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: Unverified medium - establish accepted numeric equivalence for canonical operation v1 before owner activation.
+  evidence: R3B6; the unchanged canonicalizer preserves numeric token spellings, so 1, 1.0 and 1e0 hash differently. Settle with an accepted owner command numeric rule and golden equivalence vectors; never rewrite existing lifetime fingerprints implicitly.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: Preserve every concurrent duplicate suppression with an atomic count update.
+  evidence: R3B9; the original baseline admission pipeline already reads count N and writes N+1 outside the store transaction. Concurrent callers can lose an increment; the new max merge prevents regression but cannot reconstruct two increments. A focused concurrent gateway/store test should bind the future fix.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: Reconcile the Story 1.6 policy-persistence ADR retry guidance with its gateway dependency outcome.
+  evidence: R3B10; docs/adrs/isolated-policy-snapshots.md says clients should wait for acceptance, while the separately committed gateway policy refusal is a retryable dependency_degraded outcome by design. Resolve with the policy story owner and assert the chosen contract.

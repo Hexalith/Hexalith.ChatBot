@@ -28,6 +28,20 @@ public sealed class CommandOperationConcurrencyAdapterTests
     }
 
     [Theory]
+    [InlineData("null", "{\"expectedRevision\":0}")]
+    [InlineData("{\"expectedRevision\":-1}", "{\"expectedRevision\":0}")]
+    [InlineData("{\"expectedRevision\":0}", "null")]
+    [InlineData("{\"expectedRevision\":0}", "{\"expectedRevision\":-1}")]
+    [InlineData("{\"expectedRevision\":0}", "{\"expectedRevision\":1}")]
+    [InlineData("{\"expectedRevision\":0}", "{\"expectedRevision\":0}")]
+    public async Task DuplicateRootCanonicalGuardsShouldRejectBeforeAdmission(string first, string second)
+    {
+        DefaultHttpContext context = Context(first + ",\"concurrency\":" + second);
+        var parsed = await CommandSubmissionContractAdapter.ReadAsync(context, TestContext.Current.CancellationToken);
+        parsed.Request.ShouldBeNull();
+    }
+
+    [Theory]
     [InlineData("\"decision slot\"")]
     [InlineData("\"decision/slot\"")]
     [InlineData("241-characters")]
