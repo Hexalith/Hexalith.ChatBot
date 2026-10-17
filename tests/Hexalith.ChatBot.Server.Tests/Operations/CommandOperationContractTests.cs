@@ -241,6 +241,95 @@ public sealed class CommandOperationContractTests
         JsonSerializer.Serialize(original).ShouldBe(retainedFold);
     }
 
+    [Theory]
+    [InlineData(CommandExecutionState.Received)]
+    [InlineData(CommandExecutionState.Admitted)]
+    [InlineData(CommandExecutionState.Committed)]
+    [InlineData(CommandExecutionState.Rejected)]
+    [InlineData(CommandExecutionState.Failed)]
+    public void LinkedRetryShouldReplayItsStoredFoldWithoutReopeningTheAttempt(CommandExecutionState state)
+    {
+        CommandOperationState previous = Advance(Advance(Received(2), CommandExecutionState.Admitted),
+            CommandExecutionState.Failed, preEffectFailure: true);
+        CommandOperationIdentity identity = Identity(ChatBotIdentity.NewUlid(),
+            createdAt: previous.Transitions[^1].OccurredAt.AddSeconds(1), predecessor: previous.Identity.OperationId);
+        CommandOperationState stored = CommandOperationReducer.Retry(previous, identity, Input(), 0).State!;
+        if (state != CommandExecutionState.Received)
+        {
+            stored = Advance(stored, CommandExecutionState.Admitted);
+            if (state != CommandExecutionState.Admitted)
+            {
+                stored = Advance(stored, state, state == CommandExecutionState.Committed ? 1 : null);
+            }
+        }
+        string retained = JsonSerializer.Serialize(stored);
+        CommandOperationIdentity replay = Identity(identity.OperationId, ChatBotSurfaceOrigin.Mcp,
+            ChatBotIdentity.NewUlid(), identity.CreatedAt.AddYears(10), identity.PredecessorOperationId);
+        CommandOperationResult result = CommandOperationReducer.Receive(replay, Input(), 0, current: stored);
+        result.Succeeded.ShouldBeTrue(result.Conflict.ToString());
+        result.IsReplay.ShouldBeTrue();
+        result.State.ShouldBeSameAs(stored);
+        result.State!.PriorOutcome.ShouldBeSameAs(stored.PriorOutcome);
+        CommandOperationReducer.Receive(replay, Input(), null, current: stored).Conflict.ShouldBe(CommandOperationConflict.InvalidConcurrency);
+        CommandOperationReducer.Receive(replay, Input(), -1, current: stored).Conflict.ShouldBe(CommandOperationConflict.InvalidConcurrency);
+        CommandOperationReducer.Receive(replay, Input(), 1, current: stored).Conflict.ShouldBe(CommandOperationConflict.OperationConflict);
+        CommandOperationReducer.Receive(replay, Input("{\"value\":2}"), 0, current: stored).Conflict.ShouldBe(CommandOperationConflict.OperationConflict);
+        CommandOperationReducer.Receive(replay, Input(), 0).Conflict.ShouldBe(CommandOperationConflict.RetryNotEligible);
+        JsonSerializer.Serialize(stored).ShouldBe(retained);
+    }
+
+    [Fact]
+    public void MalformedDirectTransitionFactsShouldRejectWithoutChangingTheFold()
+    {
+        CommandOperationState current = Received();
+        CommandOperationTransition valid = new(1, CommandExecutionState.Admitted, CommandProjectionState.ProjectionPending,
+            "actor-alpha", CreatedAt.AddSeconds(1), ChatBotMessageCodes.CommandAccepted, CorrelationId);
+        string retained = JsonSerializer.Serialize(current);
+        foreach (CommandOperationTransition invalid in new[]
+        {
+            valid with { OccurredAt = CreatedAt.AddTicks(-1) },
+            valid with { OccurredAt = valid.OccurredAt.ToOffset(TimeSpan.FromHours(1)) },
+            valid with { ReasonCode = "unknown-private-reason" },
+            valid with { ReasonCode = ChatBotMessageCodes.GenericDenial },
+            valid with { CorrelationId = "not-a-ulid" },
+            valid with { State = (CommandExecutionState)int.MaxValue },
+            valid with { ProjectionState = (CommandProjectionState)int.MaxValue },
+        })
+        {
+            CommandOperationResult result = CommandOperationReducer.Apply(current, invalid);
+            result.Conflict.ShouldBe(CommandOperationConflict.InvalidTransition);
+            result.State.ShouldBeSameAs(current);
+            JsonSerializer.Serialize(current).ShouldBe(retained);
+        }
+    }
+
+    [Theory]
+    [InlineData(CommandExecutionState.Received)]
+    [InlineData(CommandExecutionState.Admitted)]
+    [InlineData(CommandExecutionState.Rejected)]
+    [InlineData(CommandExecutionState.Failed)]
+    public void ProjectionShouldRejectEveryUncommittedExecutionStateWithoutChangingTheFold(CommandExecutionState state)
+    {
+        CommandOperationState current = Received();
+        if (state != CommandExecutionState.Received)
+        {
+            current = Advance(current, CommandExecutionState.Admitted);
+            if (state != CommandExecutionState.Admitted)
+            {
+                current = Advance(current, state);
+            }
+        }
+        string retained = JsonSerializer.Serialize(current);
+        foreach (CommandProjectionState projection in new[] { CommandProjectionState.ProjectionLagging, CommandProjectionState.Projected })
+        {
+            CommandOperationResult result = CommandOperationReducer.Project(current, current.Revision, projection,
+                "projector", current.Transitions[^1].OccurredAt.AddSeconds(1), ChatBotMessageCodes.ProjectionRetryable, CorrelationId);
+            result.Conflict.ShouldBe(CommandOperationConflict.InvalidTransition);
+            result.State.ShouldBeSameAs(current);
+            JsonSerializer.Serialize(current).ShouldBe(retained);
+        }
+    }
+
     [Fact]
     public void ChangedInputRevisionOrDecisionSlotShouldProduceTypedConflictsWithoutMutation()
     {

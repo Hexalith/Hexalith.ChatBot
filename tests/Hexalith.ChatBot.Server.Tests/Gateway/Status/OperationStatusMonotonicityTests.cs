@@ -301,13 +301,92 @@ public sealed class OperationStatusMonotonicityTests
     public async Task MutableInputOrReadArraysShouldNotChangeStoredIdentity(bool sdk)
     {
         IOperationStatusStore store = Store(sdk);
-        OperationStatusRecord original = OperationStatusRecord.FromCanonical(Committed());
+        OperationStatusRecord original = OperationStatusRecord.FromCanonical(Committed()) with { PartialOutputCodes = ["partial:alpha"] };
         await store.UpsertAsync(original, Token);
         original.ResourceIds![0] = "changed-before-read";
+        original.SafeNextActions[0] = ChatBotMessageNextActions.RetryLater;
+        original.PartialOutputCodes![0] = "changed-before-read";
         OperationStatusRecord read = (await store.TryGetAsync(original.TenantId, original.OperationId, Token))!;
         read.ResourceIds.ShouldBe(["resource-alpha"]);
+        read.SafeNextActions.ShouldBe([ChatBotMessageNextActions.None]);
+        read.PartialOutputCodes.ShouldBe(["partial:alpha"]);
         read.ResourceIds![0] = "changed-after-read";
-        (await store.TryGetAsync(original.TenantId, original.OperationId, Token))!.ResourceIds.ShouldBe(["resource-alpha"]);
+        read.SafeNextActions[0] = ChatBotMessageNextActions.RetryLater;
+        read.PartialOutputCodes![0] = "changed-after-read";
+        OperationStatusRecord persisted = (await store.TryGetAsync(original.TenantId, original.OperationId, Token))!;
+        persisted.ResourceIds.ShouldBe(["resource-alpha"]);
+        persisted.SafeNextActions.ShouldBe([ChatBotMessageNextActions.None]);
+        persisted.PartialOutputCodes.ShouldBe(["partial:alpha"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProjectionFactsShouldPreserveTheDistinctCommittedOutcomeReason(bool sdk)
+    {
+        IOperationStatusStore store = Store(sdk);
+        CommandOperationState admitted = CommandOperationContractTests.Advance(CommandOperationContractTests.Received(), CommandExecutionState.Admitted);
+        CommandOperationResult commit = CommandOperationReducer.Transition(admitted, admitted.Revision, CommandExecutionState.Committed,
+            "actor-alpha", admitted.Transitions[^1].OccurredAt.AddSeconds(1), ChatBotMessageCodes.AssociationDecisionAccepted,
+            CommandOperationContractTests.CorrelationId, 1);
+        commit.Succeeded.ShouldBeTrue();
+        CommandOperationState current = commit.State!;
+        await store.UpsertAsync(OperationStatusRecord.FromCanonical(current), Token);
+        foreach (CommandProjectionState projection in new[] { CommandProjectionState.ProjectionLagging, CommandProjectionState.Projected })
+        {
+            CommandOperationResult result = CommandOperationReducer.Project(current, current.Revision, projection, "projector",
+                current.Transitions[^1].OccurredAt.AddSeconds(1), ChatBotMessageCodes.ProjectionRetryable, CommandOperationContractTests.CorrelationId);
+            result.Succeeded.ShouldBeTrue();
+            current = result.State!;
+            await store.UpsertAsync(OperationStatusRecord.FromCanonical(current), Token);
+            OperationStatusRecord persisted = (await store.TryGetAsync(current.Identity.TenantId, current.Identity.OperationId, Token))!;
+            persisted.ReasonCode.ShouldBe(ChatBotMessageCodes.AssociationDecisionAccepted);
+            persisted.TerminalReason.ShouldBe(ChatBotMessageCodes.AssociationDecisionAccepted);
+            persisted.TerminalReasonCode.ShouldBe(ChatBotMessageCodes.AssociationDecisionAccepted);
+            persisted.LastTransition.ShouldNotBeNull().ReasonCode.ShouldBe(ChatBotMessageCodes.ProjectionRetryable);
+            JsonElement wire = OperationStatusHttpResults.ToJsonElement(persisted);
+            wire.GetProperty("reasonCode").GetString().ShouldBe(ChatBotMessageCodes.AssociationDecisionAccepted);
+            wire.GetProperty("lastTransition").GetProperty("reasonCode").GetString().ShouldBe(ChatBotMessageCodes.ProjectionRetryable);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MutablePriorOutcomesShouldNotChangeStoredPredecessorMetadata(bool sdk)
+    {
+        IOperationStatusStore store = Store(sdk);
+        CommandOperationState previous = CommandOperationContractTests.Advance(
+            CommandOperationContractTests.Advance(CommandOperationContractTests.Received(2), CommandExecutionState.Admitted),
+            CommandExecutionState.Failed, preEffectFailure: true);
+        var identity = CommandOperationContractTests.Identity(Hexalith.ChatBot.Contracts.Identities.ChatBotIdentity.NewUlid(),
+            createdAt: previous.Transitions[^1].OccurredAt.AddSeconds(1), predecessor: previous.Identity.OperationId);
+        OperationStatusRecord original = OperationStatusRecord.FromCanonical(
+            CommandOperationReducer.Retry(previous, identity, CommandOperationContractTests.Input(), 0).State!);
+        string retained = JsonSerializer.Serialize(original.PriorOutcome);
+        await store.UpsertAsync(original, Token);
+        original.PriorOutcome!.CorrelationId = "changed-before-read";
+        OperationStatusRecord read = (await store.TryGetAsync(original.TenantId, original.OperationId, Token))!;
+        JsonSerializer.Serialize(read.PriorOutcome).ShouldBe(retained);
+        read.PriorOutcome!.OperationId = "changed-after-read";
+        JsonSerializer.Serialize((await store.TryGetAsync(original.TenantId, original.OperationId, Token))!.PriorOutcome).ShouldBe(retained);
+
+        // Legacy receipts may also retain one nested predecessor outcome.
+        IOperationStatusStore legacyStore = Store(sdk);
+        OperationStatusRecord legacy = Legacy() with { PriorOutcome = new()
+        {
+            CommandId = "prior-command", OperationId = "prior-operation", CorrelationId = "prior-correlation",
+            PriorOutcome = new() { CommandId = "nested-command", OperationId = "nested-operation", CorrelationId = "nested-correlation" },
+        } };
+        string retainedLegacy = JsonSerializer.Serialize(legacy.PriorOutcome);
+        await legacyStore.UpsertAsync(legacy, Token);
+        legacy.PriorOutcome!.OperationId = "changed-before-read";
+        legacy.PriorOutcome.PriorOutcome!.CorrelationId = "changed-nested-before-read";
+        OperationStatusRecord legacyRead = (await legacyStore.TryGetAsync(legacy.TenantId, legacy.OperationId, Token))!;
+        JsonSerializer.Serialize(legacyRead.PriorOutcome).ShouldBe(retainedLegacy);
+        legacyRead.PriorOutcome!.OperationId = "changed-after-read";
+        legacyRead.PriorOutcome.PriorOutcome!.CorrelationId = "changed-nested-after-read";
+        JsonSerializer.Serialize((await legacyStore.TryGetAsync(legacy.TenantId, legacy.OperationId, Token))!.PriorOutcome).ShouldBe(retainedLegacy);
     }
 
     [Theory]

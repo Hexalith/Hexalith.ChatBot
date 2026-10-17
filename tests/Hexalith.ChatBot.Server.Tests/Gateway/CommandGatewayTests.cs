@@ -964,8 +964,10 @@ public sealed partial class CommandGatewayTests
         dispatcher.DispatchCount.ShouldBe(1);
     }
 
-    [Fact]
-    public async Task RetainedAuditIntentShouldReconcileAfterDaprStoreInstanceReplacement()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RetainedAuditIntentShouldReconcileAfterDaprStoreInstanceReplacement(bool historicalTaskIdentity)
     {
         FakeCoarseIdempotencyStateClient state = new();
         RecordingReplayIntentQueue queue = new();
@@ -983,6 +985,15 @@ public sealed partial class CommandGatewayTests
         ChatBotGatewayResult failedReceipt = await firstGateway.SubmitAsync(request, TestContext.Current.CancellationToken);
         failedReceipt.Problem.ShouldNotBeNull().Status.ShouldBe(503);
         AuditReplayIntent intent = queue.Intents.ShouldHaveSingleItem();
+        if (historicalTaskIdentity)
+        {
+            // Reproduce the retained preparation and audit intent written by the historical gateway.
+            state.RestoreHistoricalTaskBasedPreparation();
+            intent = intent with { AcceptedOutcome = HistoricalTaskBasedOutcome(intent.AcceptedOutcome!) };
+        }
+        CommandSubmissionResponse expected = intent.AcceptedOutcome.ShouldNotBeNull();
+        expected.OperationId.ShouldBe(historicalTaskIdentity ? request.TaskId : request.Request.CommandId);
+        expected.TaskId.ShouldNotBe(expected.CommandId);
         state.RejectIdentityOutcomeSaves = 0;
         state.RejectReceiptOutcomeSaves = 0;
         state.RejectPrimaryOutcomeSaves = 0;
@@ -993,15 +1004,20 @@ public sealed partial class CommandGatewayTests
             commandAllowlist: new ChatBotSpineCommandAllowlist());
         ChatBotGatewayResult replay = await restartedGateway.SubmitAsync(request, TestContext.Current.CancellationToken);
         replay.IsAccepted.ShouldBeTrue();
-        replay.Accepted.ShouldNotBeNull().PriorOutcome.ShouldNotBeNull();
-        state.ReceiptRecords.ShouldHaveSingleItem().PriorOutcome.ShouldNotBeNull();
+        AssertPreparedOutcome(replay.Accepted.ShouldNotBeNull(), expected);
+        AssertPreparedOutcome(replay.Accepted.PriorOutcome.ShouldNotBeNull(), expected);
+        AssertPreparedOutcome(state.ReceiptRecords.ShouldHaveSingleItem().PriorOutcome.ShouldNotBeNull(), expected);
+        AssertPreparedOutcome(state.IdentityRecords.ShouldHaveSingleItem().PriorOutcome.ShouldNotBeNull(), expected);
+        AssertPreparedOutcome(state.DomainRecords.ShouldHaveSingleItem().PriorOutcome.ShouldNotBeNull(), expected);
         dispatcher.DispatchCount.ShouldBe(1);
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task RetainedPostCommitAuditEnvelopeShouldReconstructOutcomeAfterStoreRestart(bool legacyOffsetSpelling)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task RetainedPostCommitAuditEnvelopeShouldReconstructOutcomeAfterStoreRestart(bool legacyOffsetSpelling, bool historicalTaskIdentity)
     {
         FakeCoarseIdempotencyStateClient state = new();
         RecordingAuditWriter audit = new();
@@ -1018,6 +1034,20 @@ public sealed partial class CommandGatewayTests
 
         (await gateway.SubmitAsync(request, TestContext.Current.CancellationToken)).Problem.ShouldNotBeNull().Status.ShouldBe(503);
         AuditEnvelope retained = audit.Envelopes.Single(static envelope => envelope.Phase == AuditCommitPhase.PostCommit);
+        CommandSubmissionResponse expected = state.IdentityRecords.ShouldHaveSingleItem().DomainReservation!.PreparedOutcome.ShouldNotBeNull();
+        if (historicalTaskIdentity)
+        {
+            // The historical post-commit envelope identifies the operation by its distinct task identity.
+            state.RestoreHistoricalTaskBasedPreparation();
+            expected = HistoricalTaskBasedOutcome(expected);
+            retained = retained with
+            {
+                SourceEvidenceRefs = [.. retained.SourceEvidenceRefs.Select(reference =>
+                    reference.StartsWith("operation:", StringComparison.Ordinal) ? $"operation:{expected.OperationId}" : reference)],
+            };
+        }
+        expected.OperationId.ShouldBe(historicalTaskIdentity ? request.TaskId : request.Request.CommandId);
+        expected.TaskId.ShouldNotBe(expected.CommandId);
         retained.SourceEvidenceRefs.ShouldContain(reference => reference.StartsWith("identity-key:", StringComparison.Ordinal));
         string acceptedAtRef = retained.SourceEvidenceRefs.Single(static reference => reference.StartsWith("accepted-at:", StringComparison.Ordinal));
         acceptedAtRef.ShouldEndWith("Z");
@@ -1041,7 +1071,11 @@ public sealed partial class CommandGatewayTests
             commandAllowlist: new ChatBotSpineCommandAllowlist());
         ChatBotGatewayResult replay = await restartedGateway.SubmitAsync(request, TestContext.Current.CancellationToken);
         replay.IsAccepted.ShouldBeTrue();
-        replay.Accepted.ShouldNotBeNull().PriorOutcome.ShouldNotBeNull();
+        AssertPreparedOutcome(replay.Accepted.ShouldNotBeNull(), expected);
+        AssertPreparedOutcome(replay.Accepted.PriorOutcome.ShouldNotBeNull(), expected);
+        AssertPreparedOutcome(state.ReceiptRecords.ShouldHaveSingleItem().PriorOutcome.ShouldNotBeNull(), expected);
+        AssertPreparedOutcome(state.IdentityRecords.ShouldHaveSingleItem().PriorOutcome.ShouldNotBeNull(), expected);
+        AssertPreparedOutcome(state.DomainRecords.ShouldHaveSingleItem().PriorOutcome.ShouldNotBeNull(), expected);
         dispatcher.DispatchCount.ShouldBe(1);
     }
 
@@ -5627,6 +5661,26 @@ public sealed partial class CommandGatewayTests
         public DateTimeOffset UtcNow { get; set; } = now;
     }
 
+    private static void AssertPreparedOutcome(PriorCommandOutcome actual, CommandSubmissionResponse expected)
+    {
+        actual.CommandId.ShouldBe(expected.CommandId);
+        actual.OperationId.ShouldBe(expected.OperationId);
+        actual.TaskId.ShouldBe(expected.TaskId);
+        actual.CorrelationId.ShouldBe(expected.CorrelationId);
+        actual.LifecycleState.ShouldBe(expected.LifecycleState);
+        actual.AcceptedAt.ShouldBe(expected.AcceptedAt);
+        actual.ReasonCode.ShouldBe(expected.ReasonCode);
+        actual.RetryEligible.ShouldBe(expected.RetryEligible);
+    }
+
+    private static CommandSubmissionResponse HistoricalTaskBasedOutcome(CommandSubmissionResponse outcome)
+    {
+        CommandSubmissionResponse historical = JsonSerializer.Deserialize<CommandSubmissionResponse>(JsonSerializer.Serialize(outcome))!;
+        historical.OperationId = historical.TaskId.ShouldNotBeNull();
+        historical.OperationId.ShouldNotBe(historical.CommandId);
+        return historical;
+    }
+
     private sealed class FakeCoarseIdempotencyStateClient : ICoarseIdempotencyStateClient
     {
         private readonly Lock _sync = new();
@@ -5727,6 +5781,28 @@ public sealed partial class CommandGatewayTests
                     else if (current.Record is CoarseCommandIdentityRecord identity && identity.DomainReservation is { } reservation)
                     {
                         _records[key] = (identity with { DomainReservation = reservation with { ReservationId = reservationId, DispatchState = CoarseDispatchState.Reserved, PreparedOutcome = null } }, current.Version + 1);
+                    }
+                }
+            }
+        }
+
+        public void RestoreHistoricalTaskBasedPreparation()
+        {
+            lock (_sync)
+            {
+                foreach (string key in _records.Keys.ToArray())
+                {
+                    (object record, int version) = _records[key];
+                    if (record is CoarseIdempotencyRecord domain && domain.PreparedOutcome is { } prepared)
+                    {
+                        _records[key] = (domain with { PreparedOutcome = HistoricalTaskBasedOutcome(prepared) }, version + 1);
+                    }
+                    else if (record is CoarseCommandIdentityRecord identity && identity.DomainReservation is { PreparedOutcome: { } outcome } reservation)
+                    {
+                        _records[key] = (identity with
+                        {
+                            DomainReservation = reservation with { PreparedOutcome = HistoricalTaskBasedOutcome(outcome) },
+                        }, version + 1);
                     }
                 }
             }

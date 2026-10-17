@@ -31,10 +31,6 @@ internal static class CommandOperationReducer
         {
             return new(current, CommandOperationConflict.InvalidConcurrency);
         }
-        if (!allowPredecessor && identity.PredecessorOperationId is not null)
-        {
-            return new(current, CommandOperationConflict.RetryNotEligible);
-        }
         if (input.ValueKind != JsonValueKind.Object)
         {
             return new(current, CommandOperationConflict.OperationConflict);
@@ -51,6 +47,12 @@ internal static class CommandOperationReducer
                 current.CanonicalInputHash == hash && current.Concurrency.ExpectedRevision == expectedRevision &&
                 current.Concurrency.DecisionSlotId == decisionSlotId;
             return equivalent ? new(current, IsReplay: true) : new(current, CommandOperationConflict.OperationConflict);
+        }
+        // An existing linked attempt has the same lifetime replay contract as the first attempt.
+        // Only creation of a new predecessor-linked attempt must pass through Retry.
+        if (!allowPredecessor && identity.PredecessorOperationId is not null)
+        {
+            return new(current, CommandOperationConflict.RetryNotEligible);
         }
         if (decisionSlotId is not null && occupiedDecision is not null &&
             occupiedDecision.Identity.TenantId == identity.TenantId && occupiedDecision.Concurrency.DecisionSlotId == decisionSlotId)

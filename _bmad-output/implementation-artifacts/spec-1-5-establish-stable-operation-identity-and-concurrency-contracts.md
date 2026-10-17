@@ -67,12 +67,14 @@ context:
 
 - Caller CommandId is the operation identity for new receipts. Stored receipts retain their exact historical OperationId, including the TaskId fallback when an old receipt omitted OperationId. Existing historical status collisions reject in admission before reservation, pre-commit audit and legacy dispatch; this read is not an atomic owner reservation.
 - Canonical requests explicitly carry `concurrency`; missing, null, noninteger, negative, duplicate or unknown guard members reject during parsing. Omitting the entire object retains legacy request compatibility. After trusted authorization, every canonical request fails closed before reservation/dispatch while A6/A13 remain open.
-- The unregistered pure reducer folds immutable transition events, validates semantic replay and revision guards, retains terminal execution outcomes independently of projection, and creates distinct predecessor-linked retry attempts with safe prior-outcome metadata. It supplies synthetic evidence only and introduces no persistence path or runtime approval switch.
+- The unregistered pure reducer folds immutable transition events, validates semantic replay and revision guards, retains terminal execution outcomes independently of projection, and creates distinct predecessor-linked retry attempts with safe prior-outcome metadata. Equivalent replay of an existing predecessor-linked attempt returns its stored fold after guard validation; only creation of a new linked attempt requires Retry. It supplies synthetic evidence only and introduces no persistence path or runtime approval switch.
 - Live legacy receipts keep canonical metadata absent; equivalent duplicate interleaving and initial status-write recovery preserve receipt identity without relying on unavailable durable metadata. Canonical metadata comes from the pure canonical fold only. Legacy updates merge receipt-proven committed audit status, the highest duplicate count and retained prior outcomes independently of timestamp ordering.
 - Both status stores evaluate the same policy inside atomic replacement/SDK ETag retry, protect identity and terminal outcomes, reject incompatible equal revisions, ignore stale canonical revisions, and defensively copy mutable values. Legacy updates retain explicit timestamp-based compatibility; records are not implicitly upgraded.
 - OpenAPI remains authoritative; NSwag regenerated the client and the hash fixture. Additive metadata is optional for legacy decoding. Canonical consumers use execution/projection state; legacy completion/audit summaries are compatibility fields. Transition actor identities remain server-side. Canonical public retry eligibility stays false while retry-profile approval is open, even when the pure fold is state-eligible; no caller approval switch or synthetic scheduling metadata is introduced. Public metadata files use the Contracts root namespace to retain the existing architecture guard against exported governance namespaces.
 
 ## Spec Change Log
+
+- 2026-10-17: Resumed the three-layer review at 050866e685edadfd7ff529bd781f2daf1de83fb4, corrected lifetime replay of stored predecessor-linked attempts, and implemented nine accepted review corrections with schema, transition, snapshot and historical audit-recovery evidence. Recorded one separate Story 1.6 documentation deferral; preserved frozen intent and all completion/activation gates.
 
 - 2026-10-17: Resumed the saved review, rejected duplicate root concurrency guards, corrected the canonical client fixture, and added replay/retry identity-binding regressions. Recorded every review disposition and three separate deferrals; preserved frozen intent and all owner/protection/completion gates.
 
@@ -145,6 +147,28 @@ Resumed from `in-review` at `8adcde63b2103a98930dc590db269c5be8a53498`, retainin
 | R3V1 | medium | patch | Verified regression gap: replay/retry fixtures do not vary tenant, actor, resource identities or operation class. Add parameterized conflict assertions that retain the original failed fold for each binding. These directly verify the already implemented immutable-identity checks. |
 
 Surviving patch groups are root-guard uniqueness (R3B3), producible client fixture (R3B8), and immutable-binding verification (R3V1). The three deferred findings are recorded separately; rejected findings are not patched or deferred. Frozen intent, prior review decisions, A6/A13, retry-profile approval and the native/primary completion gate remain unchanged.
+
+### Fourth build review triage (2026-10-17)
+
+Resumed at `050866e685edadfd7ff529bd781f2daf1de83fb4`, preserving baseline `5bb56567499c6df1c621184d3c3d35aa45521166`. All three independent reviewers completed before triage. Each finding is classified separately below; earlier decisions are carried only where the location and claim are unchanged.
+
+| ID | Verdict | Route | Evidence and disposition |
+| --- | --- | --- | --- |
+| R4B1 | low | rejected | Carried: the earlier converter/constructor slot-schema mismatch was explicitly rejected. Null slots still deserialize in the reusable contract while the live adapter rejects them; another guard on the unregistered synthetic boundary adds complexity without an everyday caller. |
+| R4B2 | low | patch | Existing Contracts tests already pin required revision, minimum, format and slot bounds, and adapter tests exercise malformed guards; however object closure and integer/string types are not pinned. Complete those existing schema assertions so these new guard rules cannot drift silently. |
+| R4B3 | low | patch | The published canonical state arrays are pinned only to literals, whereas the status mapper resolves Contracts enum names into generated enums. Compare the actual Contracts enum names to the schema in the existing test, preventing a renamed member from reaching a failing mapper. |
+| R4B4 | medium | patch | Every projection fixture uses the commit reason again, so losing the retained terminal reason would pass. Add distinct known commit/projection reasons and assert retained terminal fields independently of last-transition facts. |
+| R4B5 | medium | patch | Existing illegal-transition tests cover state edges and actor bounds, but do not reject backdated/non-UTC direct events, unknown/generic reasons, invalid correlations and undefined enum facts. Add unchanged-fold assertions through Apply for these declared validations. |
+| R4B6 | medium | patch | Projection tests cover committed progress and rollback only. Add Received, Admitted, Rejected and Failed cases proving Project cannot advance projection or change an uncommitted/unsuccessful fold. |
+| R4B7 | medium | patch | The defensive-copy test mutates only ResourceIds. Extend it to SafeNextActions and PartialOutputCodes at both input and read boundaries through both stores, so removal of those copies cannot silently alter public metadata. |
+| R4B8 | medium | patch | Predecessor tests reject replacement via Upsert but never mutate input/read generated PriorOutcome objects. Add direct mutation evidence for retained predecessor metadata and nested legacy outcomes through both stores. |
+| R4B9 | low | rejected | The SDK fixture intentionally models one key per instance; every current consumer creates a separate instance for its one-operation scenario. Key-aware partitioning would add fixture state for a use no existing test makes. These synthetic tests make no native tenant-isolation claim. |
+| R4B10 | low | defer | The lifecycle relationship-name documentation mismatch belongs to separately committed Story 1.6, whose factory changed to superseded_by/supersedes before this resume. Record it separately without rewriting that story's artifact. |
+| R4E1 | false | rejected | Carried: the earlier review rejected the same null SafeNextActions snapshot claim. It is a required positional persisted field and all existing writers supply it; the finding again supplies no historical writer that omitted it. |
+| R4E2 | medium | patch | Confirmed: Receive rejects every predecessor-linked identity before comparing an existing equivalent fold; Retry has no current-state argument. Move the new-attempt predecessor rejection after stored-fold replay, retaining guard validation and rejecting predecessor creation outside Retry. Cover every retry lifecycle state plus conflicting/malformed replay. |
+| R4V1 | medium | patch | Verified gap: both retained audit recovery tests generate only command-based receipts, so tightening either reconciliation path to CommandId equality would go undetected. Extend existing fixtures with historical TaskId-based preparations/intents/envelopes and assert exact reconstructed receipt metadata and one dispatch. |
+
+Patch groups remain direct corrections to the reducer and existing verification boundaries; they add no public API or runtime activation. The prior implementation agent is unavailable in this resumed session, so patches are applied inline. Frozen intent, A6/A13, retry-profile approval and native/primary completion obligations remain unchanged.
 
 ## Design Notes
 
@@ -347,6 +371,41 @@ The earlier exact `git diff --exit-code HEAD -- ...` unchanged-path command was 
 The current runtime attempt also remains blocked: `aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj` stayed at "Starting Aspire AppHost in the background...". Exact-target `aspire describe --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --format Json` found no running host. Exact-target stop also found none; Ctrl-C canceled the pending start with exit 0, and final describe again found no host. No other AppHost was stopped.
 
 The build workflow halts at step-04 because broader required verification remains failing. The spec remains `in-review`, sprint tracking remains `in-progress`, and no commit, completion transition or evidence attestation is proposed. A6/A13, retry-profile approval, accepted native owner/persistence evidence and all prior explicit deferrals remain open. These local results do not establish native durability or authorize canonical runtime execution.
+
+### Fourth review-patch verification (2026-10-17)
+
+All nine accepted corrections (R4B2-R4B8, R4E2, R4V1) are implemented. New linked-attempt creation still requires Retry, while equivalent stored attempts replay without reopening or changing the retained outcome. The replay regression covers Received, Admitted, Committed, Rejected and Failed, plus malformed guards, changed revision/input and rejected new predecessor creation. Historical recovery fixtures cover both retained intents and post-commit envelopes, command/task-based identities and both accepted timestamp spellings. They assert exact reconstructed receipt metadata in identity/domain/receipt state and the replay response, with one dispatch.
+
+- The pre-fix focused run executed 22 Server cases: 17 passed and the five new retry-state replay cases failed with RetryNotEligible. Evidence: `TestResults/story-1-5-r4/red-server.{ctrf.json,trx}`. The final full run passes all 22, demonstrating the correction rather than merely exercising it.
+- `dotnet build Hexalith.ChatBot.slnx --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false` passed after all code changes with zero warnings/errors. Log: `/tmp/story-1-5-r4-final-build.log`.
+- Each full lane used `XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.<Lane>.Tests/bin/Debug/net10.0/Hexalith.ChatBot.<Lane>.Tests TestResults/story-1-5-r4/final-<lane>.ctrf.json -result-trx TestResults/story-1-5-r4/final-<lane>.trx`. Logs: `/tmp/story-1-5-r4-final-<lane>-tests.log`.
+
+| Final lane | Passed | Failed | Skipped | Exit |
+| --- | ---: | ---: | ---: | ---: |
+| Contracts | 521 | 0 | 0 | 0 |
+| Client | 94 | 0 | 0 | 0 |
+| Server | 2889 | 0 | 0 | 0 |
+| Cli | 60 | 0 | 0 | 0 |
+| Mcp | 70 | 0 | 0 | 0 |
+| Architecture | 121 | 2 | 0 | 1 |
+| Conformance | 150 | 1 | 0 | 1 |
+| UI | 495 | 4 | 0 | 1 |
+
+Total: **4400 passed, 7 failed, 0 skipped**. The five passing full lanes account for **3634** cases. The parent TRX audit resolved all 16 Matrix/acceptance methods and all nine patch methods to passing final cases; its diagnostic output is `TestResults/story-1-5-r4/verification-audit.json`. It is a local result audit, not completion attestation or native durability evidence. The remaining patch methods verify distinct commit/projection reasons, malformed direct facts, projection before commit, mutable arrays and nested prior outcomes, and schema/Contracts enum consistency.
+
+The same seven broader failures remain on unchanged paths, with the exact names and causes in the preceding broader-lane table: ten sibling package-version declarations, a stale Release xUnit 4.0.1 probe against catalog 4.0.2, five missing production ACL routes, and four Fluent 5.0.0 assertions against catalog 5.0.1. These commands each exited 1:
+
+```bash
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests TestResults/story-1-5-r4/final-architecture.ctrf.json -result-trx TestResults/story-1-5-r4/final-architecture.trx
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests TestResults/story-1-5-r4/final-conformance.ctrf.json -result-trx TestResults/story-1-5-r4/final-conformance.trx
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests TestResults/story-1-5-r4/final-ui.ctrf.json -result-trx TestResults/story-1-5-r4/final-ui.trx
+```
+
+The earlier exact `git diff --exit-code HEAD -- ...` unchanged-path command returned exit 0 with no output again. No dependency, ACL, unrelated-test or submodule changes were made to hide failures. Frozen intent is byte-identical to HEAD and `git -c core.whitespace=cr-at-eol diff --check` passes.
+
+The current runtime attempt also remains blocked: `aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj` stayed at “Starting Aspire AppHost in the background...”. Exact-target `aspire describe --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --format Json` found no running host. Exact-target stop also found none; Ctrl-C canceled the pending start with exit 0, and final describe again found no host. The separate FrontComposer host was left untouched.
+
+The build workflow halts at step-04 because required verification still fails and accepted native owner/persistence evidence remains unavailable. The spec remains in-review and sprint tracking remains in-progress; no commit, completion transition or completion attestation is proposed. A6/A13, retry-profile approval and all prior explicit deferrals remain open. These results do not authorize canonical runtime execution.
 
 ## File List
 

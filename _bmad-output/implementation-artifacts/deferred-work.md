@@ -1522,3 +1522,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
   summary: Reconcile the Story 1.6 policy-persistence ADR retry guidance with its gateway dependency outcome.
   evidence: R3B10; docs/adrs/isolated-policy-snapshots.md says clients should wait for acceptance, while the separately committed gateway policy refusal is a retryable dependency_degraded outcome by design. Resolve with the policy story owner and assert the chosen contract.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: Align the historical Story 1.6 lifecycle artifact with the superseded_by and supersedes relationship names.
+  evidence: R4B10; the separately committed lifecycle factory now emits superseded_by/supersedes while 1-6-canonical-lifecycle-state-model-and-transition-enforcement.md still claims superseded_by_workflow/supersedes_workflow in its task and AC4 evidence.

@@ -16,16 +16,25 @@ public static partial class OpenApiContractSpineTests
     {
         YamlMappingNode schemas = Mapping(Mapping(LoadContract(), "components"), "schemas");
         YamlMappingNode guard = Mapping(schemas, "CommandOperationConcurrency");
+        Scalar(guard, "type").ShouldBe("object");
+        Scalar(guard, "additionalProperties").ShouldBe("false");
+        Scalar(Mapping(Mapping(guard, "properties"), "expectedRevision"), "type").ShouldBe("integer");
         Sequence(guard, "required").Children.OfType<YamlScalarNode>().Select(node => node.Value).ShouldBe(["expectedRevision"]);
         Scalar(Mapping(Mapping(guard, "properties"), "expectedRevision"), "minimum").ShouldBe("0");
         Scalar(Mapping(Mapping(guard, "properties"), "expectedRevision"), "format").ShouldBe("int64");
         YamlMappingNode slot = Mapping(Mapping(guard, "properties"), "decisionSlotId");
+        Scalar(slot, "type").ShouldBe("string");
+        Scalar(slot, "minLength").ShouldBe("1");
         Scalar(slot, "pattern").ShouldBe("^[a-zA-Z0-9:._-]+$");
         Scalar(slot, "maxLength").ShouldBe("240");
         Sequence(Mapping(schemas, "CommandExecutionState"), "enum").Children.OfType<YamlScalarNode>().Select(node => node.Value)
             .ShouldBe(["Received", "Admitted", "Committed", "Rejected", "Failed"]);
         Sequence(Mapping(schemas, "CommandProjectionState"), "enum").Children.OfType<YamlScalarNode>().Select(node => node.Value)
             .ShouldBe(["ProjectionPending", "Projected", "ProjectionLagging"]);
+        Sequence(Mapping(schemas, "CommandExecutionState"), "enum").Children.OfType<YamlScalarNode>().Select(node => node.Value)
+            .ShouldBe(Enum.GetNames<Hexalith.ChatBot.Contracts.Enums.CommandExecutionState>());
+        Sequence(Mapping(schemas, "CommandProjectionState"), "enum").Children.OfType<YamlScalarNode>().Select(node => node.Value)
+            .ShouldBe(Enum.GetNames<Hexalith.ChatBot.Contracts.Enums.CommandProjectionState>());
         YamlMappingNode status = Mapping(schemas, "OperationStatus");
         string[] canonical = ["executionState", "projectionState", "canonicalRevision", "origin", "resourceIds", "createdAt",
             "expectedRevision", "committedRevision", "equivalenceVersion", "predecessorOperationId", "lastTransition", "hasPartialOutputs"];
