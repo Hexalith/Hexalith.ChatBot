@@ -1594,3 +1594,9 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Qualify Story 1.5's canonical-concurrency OpenAPI refusal description to preserve earlier policy and authorization denial precedence, and refresh the generated client documentation.
   evidence: Low; src/Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml lines 37-39 were introduced by Story 1.5 commit 8adcde63b2103a98930dc590db269c5be8a53498 and promise non-retryable canonical_execution_unavailable for concurrency requests, while the existing earlier policy gate returns retryable dependency_degraded for its eight commands. The 16 passing SyntheticHttpPolicyTransportsMustReturnSafeDependencyDenial rows pin that behavior; this Story 1.6 run changes neither description nor runtime ordering.
+
+## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-18, round 19)
+
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Unresolved-policy AI refusals carry problem `Type` `https://hexalith.dev/errors/chatbot/command-not-allowlisted` and category `Authorization_denied` for an allowlisted, authorized command (pre-existing, low).
+  evidence: `ChatBotCommandAdmissionPipeline.cs:179-185` maps every approval-gate `Blocked` result to `CommandNotAllowlisted`, and `ChatBotProblemDetailsFactory.cs:191-205` stamps that type; the mapping predates the Story 1.6 baseline, which only made missing/stale/invalid policy `Blocked`. Outward Code `refusal_blocked_action` and 403 are the decided shape; a distinct type URI is a public OpenAPI change. No UI/CLI/MCP consumer keys on the type today.
