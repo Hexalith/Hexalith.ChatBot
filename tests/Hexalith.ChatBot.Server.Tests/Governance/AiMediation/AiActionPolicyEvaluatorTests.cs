@@ -126,7 +126,7 @@ public sealed class AiActionPolicyEvaluatorTests
     }
 
     [Fact]
-    public async Task UnavailableOrUnknownActionClassPolicyShouldRouteToApproval()
+    public async Task UnavailablePolicyShouldBlockLowRiskExecution()
     {
         DefaultAiActionPolicyEvaluator unavailable = new(new FixedProvider(null));
 
@@ -137,7 +137,11 @@ public sealed class AiActionPolicyEvaluatorTests
         missingSnapshot.Kind.ShouldBe(AiActionPolicyDecisionKind.Blocked);
         missingSnapshot.ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
         missingSnapshot.PolicySnapshotId.ShouldBe("unavailable");
+    }
 
+    [Fact]
+    public async Task UnknownActionClassPolicyShouldRouteToApproval()
+    {
         DefaultAiActionPolicyEvaluator unknownClass = new(new FixedProvider(new(
             "tenant-alpha",
             1,

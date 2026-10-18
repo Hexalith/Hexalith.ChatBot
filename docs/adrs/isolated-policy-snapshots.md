@@ -20,8 +20,9 @@ snapshot, plus policy approval and direct threshold activation. Its eight member
 - `SubmitRetentionConfigurationChange`
 - `SubmitDataClassInventoryChange`
 
-The round-14 scope decision keeps the per-actor `Submit*RateLimit` and
-disable/quarantine controls outside this gate: these are operational controls with
+The [2026-10-17 Story 1.6 code-review scope decision](../../_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md#review-findings-round-14)
+keeps the per-actor `Submit*RateLimit` and disable/quarantine controls outside this
+gate: these are operational controls with
 no proposed snapshot or old/new snapshot fingerprints. `SubmitConsentLawfulBasisRecord`
 also stays outside the gate because it records per-subject consent, rather than
 proposing a replacement tenant policy or configuration snapshot.
@@ -38,8 +39,10 @@ counter. SDK `/process` runs it after authentication and tenant binding but befo
 grant authorization: an authenticated, tenant-bound caller without a grant, such as
 a relayed `service-account-*` subject, receives `policy-snapshot-unavailable`
 instead of `authorization_denied`, without a spike-counter increment. This order is
-decided; the request is denied either way, and the relay path also reaches the
-shared pipeline gate after authorization. Denials record the existing
+decided; the request is denied either way. The SDK check is the only `/process`
+gate for these commands: without it, an unmarked relay would still meet the shared
+pipeline gate after authorization, but a validly marked command would return
+accepted without reaching that gate. Denials record the existing
 metadata-only authorization-failure fact with `policy-snapshot-unavailable`, mapped
 by the safe-message catalog to `dependency_degraded`. No protected policy values
 are included in that outcome. Denials with `policy-snapshot-unavailable` do not
@@ -95,6 +98,8 @@ The evaluator now fails closed: a missing, invalid or stale AI policy snapshot i
 `Blocked` (`policy-snapshot-unavailable`) instead of routed to approval, and early
 routes no longer echo the requested snapshot id. This outcome change is intentional
 and signed off by the story owner; no code or contract consumed the old reason codes.
+This fail-closed outcome supersedes Story 7.2 AC4's route-to-approval requirement
+for unavailable, invalid or stale policy; the Story 7.2 artifact remains a historical record.
 The persistence gate covers every command the audit map classifies as
 `tenant-policy-mutation`, unioned with every Contracts `IChatBotCommand` that has a
 public `Proposed*SnapshotId`, `Pending*SnapshotId`, or `Activated*SnapshotId` property.
