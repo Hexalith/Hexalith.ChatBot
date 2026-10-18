@@ -4,8 +4,6 @@ namespace Hexalith.ChatBot.Server.Acceptance;
 
 internal sealed class Story132AcceptanceTenantAiPolicySnapshotProvider : ITenantAiPolicySnapshotProvider
 {
-    private const string DefaultSnapshotId = "story-13-2-acceptance-policy";
-
     public ValueTask<TenantAiPolicySnapshot?> TryGetAsync(
         string tenantId,
         string projectId,
@@ -16,13 +14,11 @@ internal sealed class Story132AcceptanceTenantAiPolicySnapshotProvider : ITenant
         ArgumentException.ThrowIfNullOrWhiteSpace(projectId);
         cancellationToken.ThrowIfCancellationRequested();
 
-        string snapshotId = string.IsNullOrWhiteSpace(requestedPolicySnapshotId)
-            ? DefaultSnapshotId
-            : requestedPolicySnapshotId;
+        ArgumentException.ThrowIfNullOrWhiteSpace(requestedPolicySnapshotId);
         return ValueTask.FromResult<TenantAiPolicySnapshot?>(new TenantAiPolicySnapshot(
             tenantId,
             1,
-            snapshotId,
+            requestedPolicySnapshotId,
             LowRiskAllowed: true,
             EffectSurface: "read-only",
             AssistanceKinds: ["summarize-visible-context", "explain-visible-evidence"],

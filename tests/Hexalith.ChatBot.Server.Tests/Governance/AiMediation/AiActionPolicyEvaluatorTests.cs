@@ -35,7 +35,7 @@ public sealed class AiActionPolicyEvaluatorTests
     [InlineData(false, true, true, "low_risk_policy_false")]
     [InlineData(true, false, true, ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
     [InlineData(true, true, false, ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
-    public async Task UnsafePolicyStatesShouldRouteToApproval(bool allowed, bool fresh, bool valid, string expectedReason)
+    public async Task UnsafePolicyStatesShouldNotAllowLowRiskExecution(bool allowed, bool fresh, bool valid, string expectedReason)
     {
         DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new(
             "tenant-alpha",

@@ -14,13 +14,15 @@ public sealed class TenantPolicyPersistenceGateTests
         string[] policyCommands = [.. ChatBotAuditPathMap.CommandsForPath("tenant-policy-mutation")];
         policyCommands.ShouldNotBeEmpty();
 
-        // Discover proposed snapshots independently of the audit map and the gate's command list.
+        // Discover snapshot changes and approvals independently of the audit map and the gate's command list.
         string[] snapshotChangeCommands =
         [
             .. typeof(IChatBotCommand).Assembly.GetTypes()
                 .Where(static type => typeof(IChatBotCommand).IsAssignableFrom(type) &&
                     type.GetProperties().Any(static property =>
-                        property.Name.StartsWith("Proposed", StringComparison.Ordinal) &&
+                        (property.Name.StartsWith("Proposed", StringComparison.Ordinal) ||
+                            property.Name.StartsWith("Pending", StringComparison.Ordinal) ||
+                            property.Name.StartsWith("Activated", StringComparison.Ordinal)) &&
                         property.Name.EndsWith("SnapshotId", StringComparison.Ordinal)))
                 .Select(static type => type.Name),
         ];

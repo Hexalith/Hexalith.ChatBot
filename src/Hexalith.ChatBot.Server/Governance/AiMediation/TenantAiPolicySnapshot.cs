@@ -1,7 +1,7 @@
 namespace Hexalith.ChatBot.Server.Governance.AiMediation;
 
 /// <summary>Resolved AI policy evidence with an exact immutable tenant, identity, and version reference.</summary>
-/// <param name="TenantId">The trusted owning tenant.</param>
+/// <param name="TenantId">The provider-reported owning tenant, which must match the trusted request tenant.</param>
 /// <param name="PolicyVersion">The resolved positive policy version.</param>
 /// <param name="PolicySnapshotId">The exact immutable snapshot identity.</param>
 /// <param name="LowRiskAllowed">Whether low-risk assistance is allowed.</param>

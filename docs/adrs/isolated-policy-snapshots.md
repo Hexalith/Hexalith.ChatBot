@@ -2,7 +2,7 @@
 
 Status: partially implemented; Story 1.6 remains in progress. A6 and native
 isolation acceptance are incomplete. This decision does not authorize live policy
-persistence, pilot data, compliance claims, or production readiness.
+persistence, onboarding, pilot data, compliance claims, or production readiness.
 
 A6 is the data-protection release gate: the `openBlockers` entry with `gate: "A6"`
 in [`release-metadata.json`](../../release-metadata.json) requires accepted
@@ -25,14 +25,19 @@ disable/quarantine controls outside this gate: these are operational controls wi
 no proposed snapshot or old/new snapshot fingerprints. `SubmitConsentLawfulBasisRecord`
 also stays outside the gate because it records per-subject consent, rather than
 proposing a replacement tenant policy or configuration snapshot.
+`SubmitTenantExportRequest` and `SubmitDeletionErasureRequest` also stay outside
+this gate because they reference existing snapshots rather than propose replacements.
+This exclusion does not establish A6 acceptance for either workflow.
 
 All eight commands are denied before admission reservation or dispatch. This applies to legacy HTTP requests, canonical requests, SDK `/process`
 requests, and correctly signed admission markers. A marker proves transport
 integrity; it is not protection or isolation approval. Existing authentication and
-tenant-binding failures keep their safe semantics. Denials use the existing audit
-path and `policy-snapshot-unavailable`, mapped by the safe-message catalog to
-`dependency_degraded`. No protected policy values are included in that outcome. Dependency denials remain
-audited without incrementing the authorization-failure spike counter.
+tenant-binding failures keep their safe semantics. Denials record the existing
+metadata-only authorization-failure fact with `policy-snapshot-unavailable`, mapped
+by the safe-message catalog to `dependency_degraded`. No protected policy values
+are included in that outcome. Denials with `policy-snapshot-unavailable` do not
+increment the authorization-failure spike counter. These facts are currently kept
+in process; durable auditable attempts are deferred to Story 1.9.
 
 The gateway reports this denial as a retryable HTTP 503 `dependency_degraded` with
 `retryable: true` and `clientAction: retry-later` by design. Policy persistence keeps
@@ -85,7 +90,8 @@ routes no longer echo the requested snapshot id. This outcome change is intentio
 and signed off by the story owner; no code or contract consumed the old reason codes.
 The persistence gate covers every command the audit map classifies as
 `tenant-policy-mutation`, unioned with every Contracts `IChatBotCommand` that has a
-public `Proposed*SnapshotId` property. The guard test discovers that structural set
+public `Proposed*SnapshotId`, `Pending*SnapshotId`, or `Activated*SnapshotId` property.
+The guard test discovers that structural set
 independently of the gate and asserts it is nonempty before checking denial coverage.
 The retention and inventory contracts and their suspended admission are also
 documented in [`data-class-inventory-and-retention-policy.md`](data-class-inventory-and-retention-policy.md).

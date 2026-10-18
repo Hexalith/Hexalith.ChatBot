@@ -17,10 +17,11 @@ internal sealed class RecoveryTenantAiPolicySnapshotProvider : ITenantAiPolicySn
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ArgumentException.ThrowIfNullOrWhiteSpace(requestedPolicySnapshotId);
         TenantAiPolicySnapshot snapshot = new(
             tenantId,
             1,
-            string.IsNullOrWhiteSpace(requestedPolicySnapshotId) ? "policy-recovery" : requestedPolicySnapshotId,
+            requestedPolicySnapshotId,
             LowRiskAllowed: true,
             "read-only",
             ["summarize-visible-context", "explain-visible-evidence"],
