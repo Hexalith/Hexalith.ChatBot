@@ -126,9 +126,14 @@ public static class AppHostTopologyTests
         const string SidecarAnchor = "builder.AddHexalithChatBot(";
         appHost.ShouldContain(SidecarAnchor);
         const string Wiring = "_ = chatBot.WithGeneratedEventStoreAppChannelToken();";
-        appHost.ShouldContain("if (builder.ExecutionContext.IsRunMode)\n{\n    " + Wiring + "\n}");
-        appHost.IndexOf(Wiring, StringComparison.Ordinal)
-            .ShouldBeGreaterThan(appHost.IndexOf(SidecarAnchor, StringComparison.Ordinal));
+        const string RunMode = "if (builder.ExecutionContext.IsRunMode)\n{";
+        int runModeIndex = appHost.IndexOf(RunMode, StringComparison.Ordinal);
+        int wiringIndex = appHost.IndexOf(Wiring, StringComparison.Ordinal);
+        int blockEnd = runModeIndex < 0 ? -1 : appHost.IndexOf("\n}", runModeIndex, StringComparison.Ordinal);
+        runModeIndex.ShouldBeGreaterThanOrEqualTo(0);
+        wiringIndex.ShouldBeGreaterThan(runModeIndex);
+        blockEnd.ShouldBeGreaterThan(wiringIndex);
+        wiringIndex.ShouldBeGreaterThan(appHost.IndexOf(SidecarAnchor, StringComparison.Ordinal));
     }
 
     [Fact]
