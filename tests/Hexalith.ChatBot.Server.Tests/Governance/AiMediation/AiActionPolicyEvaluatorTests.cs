@@ -32,16 +32,15 @@ public sealed class AiActionPolicyEvaluatorTests
     }
 
     [Theory]
-    [InlineData(false, true, true, "low_risk_policy_false")]
-    [InlineData(true, false, true, ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
-    [InlineData(true, true, false, ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
-    public async Task UnsafePolicyStatesShouldNotAllowLowRiskExecution(bool allowed, bool fresh, bool valid, string expectedReason)
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task SyntheticStaleOrInvalidPolicyMustBlockAndRedactResolvedReferences(bool fresh, bool valid)
     {
         DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new(
             "tenant-alpha",
             1,
             "policy-snap-001",
-            allowed,
+            LowRiskAllowed: true,
             "read-only",
             ["summarize-visible-context"],
             fresh,
@@ -49,9 +48,35 @@ public sealed class AiActionPolicyEvaluatorTests
 
         AiActionPolicyDecision decision = await evaluator.EvaluateAsync(Request(), TestContext.Current.CancellationToken);
 
-        decision.Kind.ShouldBe(fresh && valid ? AiActionPolicyDecisionKind.LowRiskRoutedToApproval : AiActionPolicyDecisionKind.Blocked);
-        decision.ReasonCode.ShouldBe(expectedReason);
-        decision.SafeNextAction.ShouldBe(fresh && valid ? "review-ai-action" : "none");
+        decision.Kind.ShouldBe(AiActionPolicyDecisionKind.Blocked);
+        decision.ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+        decision.SafeNextAction.ShouldBe("none");
+        decision.PolicySnapshotId.ShouldBe("unavailable");
+        decision.TenantId.ShouldBeNull();
+        decision.PolicyVersion.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task DisallowedLowRiskPolicyShouldRouteToApproval()
+    {
+        DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new(
+            "tenant-alpha",
+            1,
+            "policy-snap-001",
+            LowRiskAllowed: false,
+            "read-only",
+            ["summarize-visible-context"],
+            IsFresh: true,
+            IsValid: true)));
+
+        AiActionPolicyDecision decision = await evaluator.EvaluateAsync(Request(), TestContext.Current.CancellationToken);
+
+        decision.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
+        decision.ReasonCode.ShouldBe("low_risk_policy_false");
+        decision.SafeNextAction.ShouldBe("review-ai-action");
+        decision.TenantId.ShouldBe("tenant-alpha");
+        decision.PolicySnapshotId.ShouldBe("policy-snap-001");
+        decision.PolicyVersion.ShouldBe(1);
     }
 
     [Fact]

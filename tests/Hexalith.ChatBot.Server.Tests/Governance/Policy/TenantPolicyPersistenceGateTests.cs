@@ -9,7 +9,7 @@ namespace Hexalith.ChatBot.Server.Tests.Governance.Policy;
 public sealed class TenantPolicyPersistenceGateTests
 {
     [Fact]
-    public void GateMustDenyEveryCommandClassifiedAsTenantPolicyMutation()
+    public void GateMustDenyEveryAuditClassifiedOrStructuralPolicySnapshotCommand()
     {
         string[] policyCommands = [.. ChatBotAuditPathMap.CommandsForPath("tenant-policy-mutation")];
         policyCommands.ShouldNotBeEmpty();

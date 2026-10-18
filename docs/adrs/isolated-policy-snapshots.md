@@ -75,8 +75,10 @@ tuples. The synthetic resolver requires trusted tenant context, authorization,
 fresh evidence, and a single exact match; it returns no default on ambiguity,
 malformed references, missing versions, or foreign tenants. The AI evaluator also
 matches the trusted request tenant and the requested snapshot ID, requires a
-positive resolved policy version, and retains that exact tuple in resolved decisions; carrying it into approval results and events is deferred to the live-persistence story. The request carries
-no expected version. It returns a redacted unavailable outcome for unresolved,
+positive resolved policy version, and retains that exact tuple in resolved decisions.
+Carrying it into approval results and events is deferred to Story 1.6's open
+live-persistence scope, tracked in [`deferred-work.md`](../../_bmad-output/implementation-artifacts/deferred-work.md).
+The request carries no expected version. It returns a redacted unavailable outcome for unresolved,
 stale, invalid, or foreign snapshots. The production snapshot
 provider remains unavailable. A future live provider must resolve the tenant's
 current effective snapshot for new decisions and deny a caller-selected superseded

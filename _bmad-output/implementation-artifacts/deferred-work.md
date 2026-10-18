@@ -1464,12 +1464,12 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 
 ## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-15)
 
-- Policy commands are denied only in the gateway pipeline and SDK admission stage; `GovernedOperationAggregate` and `AcceptedCommandDispatcher` still process `SubmitTenantPolicyChange`, `ApproveTenantPolicyChange` and `SetAssociationConfidenceThresholds`. Unverified medium. Settle by tracing whether any dispatch path reaches the aggregate without an admission stage.
+- The gate for `SubmitTenantPolicyChange`, `ApproveTenantPolicyChange`, `SetAssociationConfidenceThresholds`, `SubmitEscalationPolicyChange`, `SubmitNotificationRoutingChange`, `SubmitMailboxConfigurationChange`, `SubmitRetentionConfigurationChange` and `SubmitDataClassInventoryChange` is enforced only in the gateway pipeline and SDK admission stage; it is not repeated in `GovernedOperationAggregate` or `AcceptedCommandDispatcher`. Existing handlers remain, including `SubmitNotificationRoutingChange`, which emits `NotificationRoutingSnapshotActivated`. Unverified medium. Settle by tracing every dispatch path for all eight commands to determine whether any reaches the aggregate without an admission stage.
 
 ## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-16)
 
 - Audit-enabled builds fail with NU1903 on `Microsoft.AspNetCore.SignalR.Common` (GHSA-334f-vvp4-7g6p); Story 1.6 evidence passes only with `-p:NuGetAudit=false` and no tracked item exists. Pre-existing dependency advisory; track a package bump or documented suppression.
-- Policy-command denial not enforced in `GovernedOperationAggregate` / `AcceptedCommandDispatcher` (raised again in round 3). Unverified medium; see the 2026-10-15 entry for what settles it.
+- Denial for all eight policy-snapshot commands listed in the 2026-10-15 entry is not repeated in `GovernedOperationAggregate` / `AcceptedCommandDispatcher` (raised again in round 3). Unverified medium; trace dispatch paths for every listed command as described in that entry.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Before enabling a live AI policy provider, verify provider-owned collection failures produce redacted unavailable decisions.
@@ -1600,3 +1600,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Unresolved-policy AI refusals carry problem `Type` `https://hexalith.dev/errors/chatbot/command-not-allowlisted` and category `Authorization_denied` for an allowlisted, authorized command (pre-existing, low).
   evidence: `ChatBotCommandAdmissionPipeline.cs:179-185` maps every approval-gate `Blocked` result to `CommandNotAllowlisted`, and `ChatBotProblemDetailsFactory.cs:191-205` stamps that type; the mapping predates the Story 1.6 baseline, which only made missing/stale/invalid policy `Blocked`. Outward Code `refusal_blocked_action` and 403 are the decided shape; a distinct type URI is a public OpenAPI change. No UI/CLI/MCP consumer keys on the type today.
+
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Add evaluated MSBuild regression coverage for dependency-mode defaults in independent build maintenance (pre-existing, medium).
+  evidence: Round19Build-VG-2 pre-verifies that removing the empty-Configuration arm in Directory.Build.props restores ordinary local package selection while architecture XML checks and explicitly overridden CI builds still pass. The default-source fix was independently committed as 69eec6b779500eaf22f8720f67170c921c57e1ae and is untouched by this policy-snapshot run. Evaluate a consuming project's selected property and project/package reference items with overrides absent, explicit Debug, Release and CI to pin the intended selection behavior.
