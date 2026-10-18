@@ -1491,7 +1491,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
   evidence: only `CommandGateway` maps the reason to a dependency-unavailable problem; `ChatBotDomainServiceAdmissionStage` returns `Rejected(PolicySnapshotUnavailable)`. Settle by checking how EventStore surfaces an SDK Rejected reason to the caller.
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Carry the exact resolved tenant/policy-version tuple from `AiActionPolicyDecision` into `ChatBotApprovalResult` and the low-risk AI events when snapshots become live.
-  evidence: `AiActionApprovalGate.cs:97-98` passes only `PolicySnapshotId`; events are persisted state, so the change belongs with accepted A6 evidence in the live-persistence story. ADR wording qualified in round 8.
+  evidence: `AiActionApprovalGate.cs:97-98` passes only `PolicySnapshotId`; events are persisted state, so the change belongs with accepted A6 evidence in Story 1.6's open live-persistence scope. ADR wording qualified in round 8.
 
 ## Deferred from: code review of spec-1-5-establish-stable-operation-identity-and-concurrency-contracts (2026-10-17)
 
@@ -1582,7 +1582,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Canonical audit envelopes carry the constant `chatbot.gateway.policy-snapshot.v1` instead of the decision's exact tenant/snapshot/version tuple (pre-existing, medium).
-  evidence: `AuditEnvelopeFactory.cs:18` (`NoPayloadPolicySnapshotId`) is stamped on every PreCommit/PostCommit envelope, so no tenant snapshot reference reaches the WORM chain that epic AC4 historical inspection relies on. Unchanged by Story 1.6; the round-8 entry covers only `ChatBotApprovalResult` and the low-risk AI events. No live policy decision exists while the production provider is unavailable. Carry the exact tuple into envelopes in the live-persistence story, alongside the round-8 entry.
+  evidence: `AuditEnvelopeFactory.cs:18` (`NoPayloadPolicySnapshotId`) is stamped on every PreCommit/PostCommit envelope, so no tenant snapshot reference reaches the WORM chain that epic AC4 historical inspection relies on. Unchanged by Story 1.6; the round-8 entry covers only `ChatBotApprovalResult` and the low-risk AI events. No live policy decision exists while the production provider is unavailable. Carry the exact tuple into envelopes in Story 1.6's open live-persistence scope, alongside the round-8 entry.
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Per-action-class policy tokens never match: the approval gate sends enum names, the evaluator parses kebab tokens (pre-existing, low, fail-closed).
   evidence: `AiActionApprovalGate.cs:88` builds `RiskActionClasses` with `value.ToString()` (`ModifiesState`); `DefaultAiActionPolicyEvaluator.TryParseActionClass` (`:105`) accepts only `modifies-state` and similar, so any non-empty list routes to approval. Unreachable today because `AiActionRiskClassifier` yields `LowRisk` only with zero action classes. Settle with the round-16 per-action-map entry at live-provider design: use the shared token mapper, or remove the map.
@@ -1604,3 +1604,12 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Add evaluated MSBuild regression coverage for dependency-mode defaults in independent build maintenance (pre-existing, medium).
   evidence: Round19Build-VG-2 pre-verifies that removing the empty-Configuration arm in Directory.Build.props restores ordinary local package selection while architecture XML checks and explicitly overridden CI builds still pass. The default-source fix was independently committed as 69eec6b779500eaf22f8720f67170c921c57e1ae and is untouched by this policy-snapshot run. Evaluate a consuming project's selected property and project/package reference items with overrides absent, explicit Debug, Release and CI to pin the intended selection behavior.
+
+## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-18, round 20)
+
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Two association-threshold lineages coexist: direct `SetAssociationConfidenceThresholds` (free-form string `PolicyVersion`, read by scoring) and the tenant-policy `association.t-high`/`association.t-low` knobs (versioned by the immutable snapshot model, never read by scoring). Decide which is authoritative before the policy gate lifts (pre-existing, medium).
+  evidence: `GovernedOperationAggregate.cs:2859` emits `AssociationConfidenceThresholdsChanged`, and only `GovernedOperationState.cs:973` sets the scoring thresholds; `TenantPolicySnapshotActivated` is stored by ID at `GovernedOperationState.cs:545` and changes no threshold; the knobs appear only in `TenantPolicySchema` defaults and validation. Both writers are gated today. Owned by Story 2.6 (association rules and confidence thresholds), alongside the 2026-10-17 caller-supplied `ThresholdPolicy` entry.
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Before activating a live AI policy provider, define how `TenantAiPolicySnapshot` is built from a tenant policy snapshot: the schema has no knob for its scalar `LowRiskAllowed`, `EffectSurface` or `AssistanceKinds` (pre-existing, medium).
+  evidence: `TenantAiPolicySnapshot.cs:17` needs those fields (they predate the Story 1.6 baseline); `TenantPolicyKnobIds.cs:10` defines only the `ai-action.low-risk-allowed` map. Without a mapping or new knobs, the retained tenant/ID/version tuple would name a snapshot that cannot answer the evaluator's surface and kind checks. Settle together with the round-16 per-action-map entry.

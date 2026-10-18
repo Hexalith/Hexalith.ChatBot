@@ -20,6 +20,14 @@ snapshot, plus policy approval and direct threshold activation. Its eight member
 - `SubmitRetentionConfigurationChange`
 - `SubmitDataClassInventoryChange`
 
+The persistence gate covers every command the audit map classifies as
+`tenant-policy-mutation`, unioned with every Contracts `IChatBotCommand` that has a
+public `Proposed*SnapshotId`, `Pending*SnapshotId`, or `Activated*SnapshotId` property.
+The guard test discovers that structural set
+independently of the gate and asserts it is nonempty before checking denial coverage.
+The retention and inventory contracts and their suspended admission are also
+documented in [`data-class-inventory-and-retention-policy.md`](data-class-inventory-and-retention-policy.md).
+
 The [2026-10-17 Story 1.6 code-review scope decision](../../_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md#review-findings-round-14)
 keeps the per-actor `Submit*RateLimit` and disable/quarantine controls outside this
 gate: these are operational controls with
@@ -78,7 +86,7 @@ matches the trusted request tenant and the requested snapshot ID, requires a
 positive resolved policy version, and retains that exact tuple in resolved decisions.
 Carrying it into approval results and events is deferred to Story 1.6's open
 live-persistence scope, tracked in [`deferred-work.md`](../../_bmad-output/implementation-artifacts/deferred-work.md).
-The request carries no expected version. It returns a redacted unavailable outcome for unresolved,
+The request carries no expected version. The evaluator returns a redacted unavailable outcome for unresolved,
 stale, invalid, or foreign snapshots. The production snapshot
 provider remains unavailable. A future live provider must resolve the tenant's
 current effective snapshot for new decisions and deny a caller-selected superseded
@@ -102,13 +110,6 @@ routes no longer echo the requested snapshot id. This outcome change is intentio
 and signed off by the story owner; no code or contract consumed the old reason codes.
 This fail-closed outcome supersedes Story 7.2 AC4's route-to-approval requirement
 for unavailable, invalid or stale policy; the Story 7.2 artifact remains a historical record.
-The persistence gate covers every command the audit map classifies as
-`tenant-policy-mutation`, unioned with every Contracts `IChatBotCommand` that has a
-public `Proposed*SnapshotId`, `Pending*SnapshotId`, or `Activated*SnapshotId` property.
-The guard test discovers that structural set
-independently of the gate and asserts it is nonempty before checking denial coverage.
-The retention and inventory contracts and their suspended admission are also
-documented in [`data-class-inventory-and-retention-policy.md`](data-class-inventory-and-retention-policy.md).
 
 Any future domain write must use Hexalith.EventStore; queries, projections, read
 models, and cursors must use the domain-service SDK seams. There is no history
