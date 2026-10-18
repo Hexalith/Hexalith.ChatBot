@@ -133,6 +133,11 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - name: Build Release configuration
+        run: >-
+          bash .github/scripts/build-release-configuration.sh
+          tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
+          tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj
       - name: Require successful general machine-result producer
         if: needs.build.result != 'success'
         run: exit 1
@@ -438,6 +443,8 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - name: Build Release configuration
+        run: bash .github/scripts/build-release-configuration.sh tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Setup checksum-pinned DAPR CLI
         run: bash .github/scripts/install-dapr-cli.sh
       - name: Initialize DAPR runtime
@@ -532,6 +539,8 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - name: Build Release configuration
+        run: bash .github/scripts/build-release-configuration.sh tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Setup checksum-pinned DAPR CLI
         run: bash .github/scripts/install-dapr-cli.sh
       - name: Initialize DAPR runtime
@@ -624,6 +633,8 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - name: Build Release configuration
+        run: bash .github/scripts/build-release-configuration.sh tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Download retained live recovery evidence
         uses: actions/download-artifact@v8
         with:

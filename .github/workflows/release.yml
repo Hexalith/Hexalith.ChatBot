@@ -41,6 +41,8 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - name: Build Release configuration
+        run: bash .github/scripts/build-release-configuration.sh tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Setup checksum-pinned DAPR CLI
         run: bash .github/scripts/install-dapr-cli.sh
       - name: Initialize DAPR runtime
@@ -142,6 +144,8 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - name: Build Release configuration
+        run: bash .github/scripts/build-release-configuration.sh tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Setup checksum-pinned DAPR CLI
         run: bash .github/scripts/install-dapr-cli.sh
       - name: Initialize DAPR runtime
@@ -235,6 +239,8 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - name: Build Release configuration
+        run: bash .github/scripts/build-release-configuration.sh tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Download retained live recovery evidence
         uses: actions/download-artifact@v8
         with:
@@ -260,13 +266,19 @@ jobs:
       - topology-acceptance
       - live-recovery-evidence-gate
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: false
           fetch-depth: 0
+      - name: Initialize references submodules
+        run: git submodule update --init
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -281,4 +293,13 @@ jobs:
         if: steps.publication_guard.outputs.should_publish == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx --yes semantic-release
+          # Organization publishing key. This job does not use a protected environment, so publication
+          # does not wait for a human reviewer.
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: npx --yes -p semantic-release -p @semantic-release/exec semantic-release
+      - name: Verify published NuGet packages
+        if: success() && steps.publication_guard.outputs.should_publish == 'true'
+        run: |
+          set -euo pipefail
+          version="$(git describe --tags --exact-match HEAD | sed 's/^v//')"
+          bash .github/scripts/verify-nuget-publication.sh "$version"

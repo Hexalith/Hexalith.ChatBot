@@ -1,6 +1,8 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- GHSA-334f-vvp4-7g6p is patched in the shared catalog at 10.0.13. The pin applies only when transitive pinning is enabled. -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <Import Project="$(MSBuildThisFileDirectory)references/Hexalith.Builds/Props/Directory.Packages.props" />
 </Project>
