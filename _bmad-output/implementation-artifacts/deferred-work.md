@@ -1564,3 +1564,12 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Add regression coverage for CLI text output choosing a nonblank accepted OperationId over different TaskId and CommandId values (pre-existing Story 1.5 verification gap).
   evidence: Build15-VG-1; ChatBotCliOutputFormatter.cs:47 uses the correct accepted identity, but AcceptedCommandJsonOutputReportsPartialSuccessWorkflowMetadata checks the distinct operation only in JSON and AcceptedFormatterShouldPreserveHistoricalFallbackOnlyWithoutOperationId has only absent/blank-ID rows. Replacing the text identity with the historical task/command fallback would pass those tests. Add a distinct-ID row to the existing shared text/JSON formatter theory in Story 1.5; the formatter and tests were unchanged at this run's initial HEAD 16ba59f50fdbe87c55de117c13405b82fa664f93.
+
+## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-18, round 16)
+
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Authorization-failure audit facts, including the eight policy-gate denials, are held only in process and never reach the WORM chain (pre-existing, medium).
+  evidence: `ChainedAuditWriter.cs:20` delegates `RecordAuthorizationFailureAsync` to the inner `InMemoryAuditWriter`, which appends to an in-process list; nothing in `src` reads `AuthorizationFailures`. Before the Story 1.6 gate, retention and data-class changes produced WORM-chained NFR35 records; a denied attempt now leaves no durable trace. Durable auditable sensitive attempts belong to Story 1.9.
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Before activating a live AI policy provider, decide whether transient provider faults keep a retryable dependency outcome instead of a non-retryable 403 (unverified medium).
+  evidence: `DefaultAiActionPolicyEvaluator.cs:48` catches provider exceptions and returns `Unavailable()` (`Blocked`); `ChatBotCommandAdmissionPipeline.cs:179-185` maps `Blocked` to `Rejected(command_not_allowlisted)`, so the caller sees 403 `refusal_blocked_action`. At the baseline the exception escaped to `CommandGateway.cs:80-82`, giving 503 retry-later. No registered provider throws today (production returns null; acceptance and recovery providers are pure). A provider that can fail transiently would settle reachability.
