@@ -74,6 +74,8 @@ context:
 
 ## Spec Change Log
 
+- 2026-10-18: Resumed all three review layers at ca95a70b9237498568e87c5a95c9958f19717213, recorded eleven individual dispositions with no new patches, and refreshed the full local verification. The seven broader failures and missing runtime secret still prevent completion; frozen intent, original baseline and activation gates remain unchanged.
+
 - 2026-10-17: Resumed review at eb6530d34f00d51920a42f88a3dffec3090715e3, retained the original baseline and prior dispositions, and added five focused reducer regression groups. Re-ran the required verification and identified the AppHost's missing recovery-mailbox secret as a concrete native-runtime blocker. Frozen intent and completion/activation gates remain unchanged.
 
 - 2026-10-17: Resumed the three-layer review at 050866e685edadfd7ff529bd781f2daf1de83fb4, corrected lifetime replay of stored predecessor-linked attempts, and implemented nine accepted review corrections with schema, transition, snapshot and historical audit-recovery evidence. Recorded one separate Story 1.6 documentation deferral; preserved frozen intent and all completion/activation gates.
@@ -192,6 +194,26 @@ Resumed at `eb6530d34f00d51920a42f88a3dffec3090715e3`, retaining baseline `5bb56
 | R5E2 | low | rejected | Carried: the earlier BH5 row rejected the same forged predecessor-correlation snapshot. Retry constructs prior identity/correlation from a validated CommandOperationIdentity and FromCanonical retains them; another guard on a manually fabricated inactive snapshot adds complexity without an everyday caller. |
 
 The five surviving findings have independent test gaps and remain separate patch groups. The previous implementation agent is unavailable in this resumed session, so the focused test additions are applied inline. No new public surface, persistence path, runtime activation or deferral is introduced. Frozen intent, prior deferrals, A6/A13, retry-profile approval and native/primary completion obligations remain unchanged.
+
+### Sixth build review triage (2026-10-18)
+
+Resumed at `ca95a70b9237498568e87c5a95c9958f19717213`, preserving baseline `5bb56567499c6df1c621184d3c3d35aa45521166`. All three independent layers completed before triage. Blind Hunter returned ten findings (its 934,552-byte diff gives the capped floor of ten), Edge Case Hunter returned one, and Verification Gap reported no gaps. Each finding is classified separately below. The baseline diff includes separately committed Story 1.6/BMAD changes; those remain context.
+
+| ID | Verdict | Route | Evidence and disposition |
+| --- | --- | --- | --- |
+| R6B1 | low | rejected | Extending the public positional Contracts record changes its binary constructor/Deconstruct signatures. Repository consumers use the generated wire DTO; no caller constructs or deconstructs this Contracts record. Supporting hypothetical precompiled consumers requires new overloads and parameter forwarding, beyond a direct correction for an everyday caller. Existing legacy wire decoding remains tested. |
+| R6B2 | low | rejected | Generated record equality compares the defensively copied ResourceIds collection by reference. The actual reducer deliberately compares immutable bindings and resource elements rather than record equality, and no current consumer relies on structural identity equality. Adding equality/hash overrides or new public guidance adds behavior for an unused comparison boundary. |
+| R6B3 | low | rejected | Carried: R3B2 rejected the same CommandType constructor/schema mismatch. The live adapter enforces command-name bounds and the reducer remains unregistered; another guard adds complexity without a current runtime caller encountering the defect. |
+| R6B4 | low | rejected | Carried: BH1/EC2/R4B1 and the earlier rejected list cover the same reusable decision-slot bounds mismatch. The live adapter validates the published token bounds; adding another constructor/converter guard on the inactive synthetic boundary remains rejected. |
+| R6B5 | low | rejected | OperationIdFor's TaskId-null fallback is byte-identical to the preserved baseline. A different result from the surface formatters requires an invalid historical receipt with both missing OperationId and empty/whitespace TaskId; no producer or retained fixture demonstrating that shape was identified. Another fallback branch would change historical key selection for a fabricated receipt rather than correct an everyday reachable case. |
+| R6B6 | low | rejected | Carried: R5B4 rejected the same independently optional canonical wire fields. Optional fields preserve legacy decoding; FromCanonical and the stores enforce coherent actual snapshots. Conditional schema alternatives and generated-client handling add complexity for fabricated responses. |
+| R6B7 | low | rejected | Carried: R5B3 rejected the same known-catalog-but-incoherent terminal reason claim. The pure reducer has no runtime transition writer; a state-to-reason taxonomy adds contract decisions and branches to an inactive consumer. Existing known-code and retained-terminal-reason validation remains enforced. |
+| R6B8 | low | rejected | Carried: R4B9 rejected the same one-slot SDK fixture limitation. Each current scenario creates a separate fixture for its single key, and these tests make no native tenant/operation partition-isolation claim. A keyed fixture registry adds unused test state. |
+| R6B9 | maybe-false | defer | Carried: the existing explicit serializer-round-trip deferral covers this exact claim. Production-serializer round trips must settle persisted equal-revision equivalence before canonical persistence activation. Do not append or implement the same deferred item again. |
+| R6B10 | false | rejected | The artifact explicitly treats full-suite failures as a halt and leaves completion blocked; it never accepts focused successes as sufficient. The previous eight-failure result is correctly historical. Current verification below has seven broader failures and a passing full Server lane. No new code defect or incorrect completion claim is established by this finding. |
+| R6E1 | false | rejected | Carried: the original rejected finding, R4E1 and R5E1 cover the identical omitted/null SafeNextActions claim. It has always been a required positional persisted field and every identified writer supplies it. The reviewer again supplies no historical producer of an omitted/null value, so the proposed malformed persisted state does not establish the alleged reachable regression. |
+
+No patch or new deferral survives this review. Runtime code and tests remain unchanged. Frozen intent, prior dispositions/deferrals, A6/A13, retry-profile approval and native/primary completion requirements remain unchanged.
 
 ## Design Notes
 
@@ -467,6 +489,40 @@ The earlier exact unchanged-path command returned exit 0 with no diff. `git diff
 The current native-runtime attempt reached a concrete startup blocker: `aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj` exited **2**, reporting AppHost exit **134** because no recovery mailbox client secret was configured. The required key is `ChatBot:LiveRecoveryValidation:MailboxClientSecret` (or the existing legacy AppHost key `LiveRecoveryValidation:MailboxClientSecret`). Startup diagnostics are retained at `/home/administrator/.aspire/logs/cli_20261017T164731_401986ef.log`. Exact-target describe and stop both found no running ChatBot host; other AppHosts were left untouched. This does not establish native persisted end-state, accepted owner execution, A6/A13 acceptance or retry-profile approval.
 
 The build workflow halts at step-04 because required full verification remains failing and native/primary evidence is unavailable. The spec remains `in-review`, sprint tracking remains `in-progress`, and no commit, completion transition or completion attestation is proposed. Frozen intent, the original baseline, all earlier explicit deferrals and runtime activation gates remain unchanged.
+
+### Sixth review verification (2026-10-18)
+
+The current checkout required no additional code or test patches after the three-layer review. Verification ran against `ca95a70b9237498568e87c5a95c9958f19717213`; only this spec's review/evidence narrative changes afterward. The frozen intent and original baseline remain unchanged.
+
+- `dotnet build Hexalith.ChatBot.slnx --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false` passed with zero warnings/errors. Log: `/tmp/story-1-5-r6-baseline-build.log`.
+- Each lane ran separately with `XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.<Lane>.Tests/bin/Debug/net10.0/Hexalith.ChatBot.<Lane>.Tests TestResults/story-1-5-r6/baseline-<lane>.ctrf.json -result-trx TestResults/story-1-5-r6/baseline-<lane>.trx`. Logs: `/tmp/story-1-5-r6-baseline-<lane>-tests.log`. No tests were excluded and no gate was weakened.
+
+| Current lane | Passed | Failed | Skipped | Exit |
+| --- | ---: | ---: | ---: | ---: |
+| Contracts | 521 | 0 | 0 | 0 |
+| Client | 94 | 0 | 0 | 0 |
+| Server | 2929 | 0 | 0 | 0 |
+| Cli | 60 | 0 | 0 | 0 |
+| Mcp | 70 | 0 | 0 | 0 |
+| Architecture | 121 | 2 | 0 | 1 |
+| Conformance | 150 | 1 | 0 | 1 |
+| UI | 495 | 4 | 0 | 1 |
+
+Total: **4440 passed, 7 failed, 0 skipped**. The five passing lanes contain **3674** cases. All 16 methods named in the Matrix evidence and acceptance paragraph resolve to passing current-run TRX cases; `TestResults/story-1-5-r6/verification-audit.json` retains that local audit and the lane summaries. It is not completion provenance or native persistence evidence. The previously observed Server callback timeout did not recur; the full current Server lane passes, including that method. This does not erase the earlier failed runs.
+
+The seven failures match the earlier broader-lane table: ten sibling package-version declarations; a stale Release xUnit 4.0.1 child probe against catalog 4.0.2; five missing production ACL routes; and four Fluent 5.0.0 assertions against catalog 5.0.1. The exact failing commands each returned exit 1:
+
+```bash
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests TestResults/story-1-5-r6/baseline-architecture.ctrf.json -result-trx TestResults/story-1-5-r6/baseline-architecture.trx
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests TestResults/story-1-5-r6/baseline-conformance.ctrf.json -result-trx TestResults/story-1-5-r6/baseline-conformance.trx
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests TestResults/story-1-5-r6/baseline-ui.ctrf.json -result-trx TestResults/story-1-5-r6/baseline-ui.trx
+```
+
+`aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj` returned exit **2** after building successfully. Startup threw InvalidOperationException because `ChatBot:LiveRecoveryValidation:MailboxClientSecret` (or legacy `LiveRecoveryValidation:MailboxClientSecret`) is unconfigured. Exact-target describe before startup and exact-target stop afterward both reported no running ChatBot host. No other AppHost was stopped, no credentials were fabricated, and native owner/persisted end-state evidence remains unavailable.
+
+The earlier exact unchanged-path check was rerun successfully, including the unrelated Server lifecycle/coordinator paths. No source, test, dependency, ACL or submodule changes were made. `git -c core.whitespace=cr-at-eol diff --check` passes and the frozen block is byte-identical to HEAD.
+
+The workflow halts at step-04 because required full verification remains failing and native/primary evidence is unavailable. The spec remains `in-review`, sprint tracking remains `in-progress`; no commit, completion transition or completion attestation is proposed. A6/A13, retry-profile approval and every prior explicit deferral remain open.
 
 ## File List
 
