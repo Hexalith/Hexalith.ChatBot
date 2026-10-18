@@ -14,13 +14,19 @@ public sealed class TenantPolicyPersistenceGateTests
         string[] policyCommands = [.. ChatBotAuditPathMap.CommandsForPath("tenant-policy-mutation")];
         policyCommands.ShouldNotBeEmpty();
 
-        // Compliance snapshot changes are outside the audit map's tenant-policy-mutation category.
+        // Discover proposed snapshots independently of the audit map and the gate's command list.
         string[] snapshotChangeCommands =
         [
-            nameof(SubmitTenantPolicyChange), nameof(ApproveTenantPolicyChange), nameof(SetAssociationConfidenceThresholds),
-            nameof(SubmitEscalationPolicyChange), nameof(SubmitNotificationRoutingChange), nameof(SubmitMailboxConfigurationChange),
-            nameof(SubmitRetentionConfigurationChange), nameof(SubmitDataClassInventoryChange),
+            .. typeof(IChatBotCommand).Assembly.GetTypes()
+                .Where(static type => typeof(IChatBotCommand).IsAssignableFrom(type) &&
+                    type.GetProperties().Any(static property =>
+                        property.Name.StartsWith("Proposed", StringComparison.Ordinal) &&
+                        property.Name.EndsWith("SnapshotId", StringComparison.Ordinal)))
+                .Select(static type => type.Name),
         ];
-        policyCommands.Concat(snapshotChangeCommands).Where(static command => !TenantPolicyPersistenceGate.Denies(command)).ShouldBeEmpty();
+        snapshotChangeCommands.ShouldNotBeEmpty();
+
+        policyCommands.Union(snapshotChangeCommands, StringComparer.Ordinal)
+            .Where(static command => !TenantPolicyPersistenceGate.Denies(command)).ShouldBeEmpty();
     }
 }

@@ -4,9 +4,29 @@ Status: partially implemented; Story 1.6 remains in progress. A6 and native
 isolation acceptance are incomplete. This decision does not authorize live policy
 persistence, pilot data, compliance claims, or production readiness.
 
-Policy submit, approve, direct association-threshold update, escalation policy
-submit, notification-routing, mailbox-configuration, retention-configuration, and
-data-class-inventory snapshot change commands are denied before admission reservation or dispatch. This applies to legacy HTTP requests, canonical requests, SDK `/process`
+A6 is the data-protection release gate: the `openBlockers` entry with `gate: "A6"`
+in [`release-metadata.json`](../../release-metadata.json) requires accepted
+data-protection and owner-runtime evidence for the exact candidate.
+
+The gate covers commands that propose a replacement tenant policy or configuration
+snapshot, plus policy approval and direct threshold activation. Its eight members are:
+
+- `SubmitTenantPolicyChange`
+- `ApproveTenantPolicyChange`
+- `SetAssociationConfidenceThresholds`
+- `SubmitEscalationPolicyChange`
+- `SubmitNotificationRoutingChange`
+- `SubmitMailboxConfigurationChange`
+- `SubmitRetentionConfigurationChange`
+- `SubmitDataClassInventoryChange`
+
+The round-14 scope decision keeps the per-actor `Submit*RateLimit` and
+disable/quarantine controls outside this gate: these are operational controls with
+no proposed snapshot or old/new snapshot fingerprints. `SubmitConsentLawfulBasisRecord`
+also stays outside the gate because it records per-subject consent, rather than
+proposing a replacement tenant policy or configuration snapshot.
+
+All eight commands are denied before admission reservation or dispatch. This applies to legacy HTTP requests, canonical requests, SDK `/process`
 requests, and correctly signed admission markers. A marker proves transport
 integrity; it is not protection or isolation approval. Existing authentication and
 tenant-binding failures keep their safe semantics. Denials use the existing audit
@@ -43,7 +63,10 @@ matches the requested tenant and snapshot ID, requires a positive resolved polic
 version, and retains that exact tuple in resolved decisions; carrying it into approval results and events is deferred to the live-persistence story. The request carries
 no expected version. It returns a redacted unavailable outcome for unresolved,
 stale, invalid, or foreign snapshots. The production snapshot
-provider remains unavailable.
+provider remains unavailable. A future live provider must resolve the tenant's
+current effective snapshot for new decisions and deny a caller-selected superseded
+snapshot as stale. Exact historical resolution remains available only for audit
+and replay.
 
 Live persistence can be designed only after accepted data-class protection
 evidence and independently witnessed native isolation proof are available. Future
@@ -61,8 +84,11 @@ The evaluator now fails closed: a missing, invalid or stale AI policy snapshot i
 routes no longer echo the requested snapshot id. This outcome change is intentional
 and signed off by the story owner; no code or contract consumed the old reason codes.
 The persistence gate covers every command the audit map classifies as
-`tenant-policy-mutation` plus the retention-configuration and data-class-inventory
-snapshot changes, enforced by a guard test with an explicit snapshot-change list.
+`tenant-policy-mutation`, unioned with every Contracts `IChatBotCommand` that has a
+public `Proposed*SnapshotId` property. The guard test discovers that structural set
+independently of the gate and asserts it is nonempty before checking denial coverage.
+The retention and inventory contracts and their suspended admission are also
+documented in [`data-class-inventory-and-retention-policy.md`](data-class-inventory-and-retention-policy.md).
 
 Any future domain write must use Hexalith.EventStore; queries, projections, read
 models, and cursors must use the domain-service SDK seams. There is no history
