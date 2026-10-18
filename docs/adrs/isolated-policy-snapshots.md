@@ -32,7 +32,14 @@ This exclusion does not establish A6 acceptance for either workflow.
 All eight commands are denied before admission reservation or dispatch. This applies to legacy HTTP requests, canonical requests, SDK `/process`
 requests, and correctly signed admission markers. A marker proves transport
 integrity; it is not protection or isolation approval. Existing authentication and
-tenant-binding failures keep their safe semantics. Denials record the existing
+tenant-binding failures keep their safe semantics. HTTP admission runs the gate
+after grant authorization, so authorization denials keep their reason and spike
+counter. SDK `/process` runs it after authentication and tenant binding but before
+grant authorization: an authenticated, tenant-bound caller without a grant, such as
+a relayed `service-account-*` subject, receives `policy-snapshot-unavailable`
+instead of `authorization_denied`, without a spike-counter increment. This order is
+decided; the request is denied either way, and the relay path also reaches the
+shared pipeline gate after authorization. Denials record the existing
 metadata-only authorization-failure fact with `policy-snapshot-unavailable`, mapped
 by the safe-message catalog to `dependency_degraded`. No protected policy values
 are included in that outcome. Denials with `policy-snapshot-unavailable` do not
@@ -64,8 +71,8 @@ values and schema. Historical decision references remain exact tenant/ID/version
 tuples. The synthetic resolver requires trusted tenant context, authorization,
 fresh evidence, and a single exact match; it returns no default on ambiguity,
 malformed references, missing versions, or foreign tenants. The AI evaluator also
-matches the requested tenant and snapshot ID, requires a positive resolved policy
-version, and retains that exact tuple in resolved decisions; carrying it into approval results and events is deferred to the live-persistence story. The request carries
+matches the trusted request tenant and the requested snapshot ID, requires a
+positive resolved policy version, and retains that exact tuple in resolved decisions; carrying it into approval results and events is deferred to the live-persistence story. The request carries
 no expected version. It returns a redacted unavailable outcome for unresolved,
 stale, invalid, or foreign snapshots. The production snapshot
 provider remains unavailable. A future live provider must resolve the tenant's

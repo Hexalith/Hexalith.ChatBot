@@ -29,7 +29,7 @@ public sealed class ImmutableTenantPolicySnapshotTests
         routes[0] = "changed";
         values.Clear();
 
-        snapshot.Values.Values.Count.ShouldBe(5);
+        snapshot.Values.Values.Count.ShouldBe(TenantPolicySchema.DefaultM0Values.Count);
         IReadOnlyDictionary<AiActionRiskActionClass, bool> copiedMap = snapshot.Values.Values.Single(static value =>
             value.KnobId == TenantPolicyKnobIds.AiActionLowRiskAllowed).AiActionLowRiskAllowed!;
         copiedMap[AiActionRiskActionClass.ModifiesState].ShouldBeFalse();

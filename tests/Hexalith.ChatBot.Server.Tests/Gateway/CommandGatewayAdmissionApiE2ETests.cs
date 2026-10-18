@@ -4092,10 +4092,11 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ArgumentException.ThrowIfNullOrWhiteSpace(requestedPolicySnapshotId);
             TenantAiPolicySnapshot snapshot = new(
                 tenantId,
                 1,
-                string.IsNullOrWhiteSpace(requestedPolicySnapshotId) ? "policy-snap-001" : requestedPolicySnapshotId,
+                requestedPolicySnapshotId,
                 lowRiskAllowed,
                 "read-only",
                 ["summarize-visible-context", "explain-visible-evidence"],

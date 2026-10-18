@@ -6799,15 +6799,18 @@ public sealed partial class CommandGatewayTests
             string projectId,
             string? requestedPolicySnapshotId,
             CancellationToken cancellationToken)
-            => ValueTask.FromResult<TenantAiPolicySnapshot?>(new TenantAiPolicySnapshot(
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(requestedPolicySnapshotId);
+            return ValueTask.FromResult<TenantAiPolicySnapshot?>(new TenantAiPolicySnapshot(
                 tenantId,
                 1,
-                requestedPolicySnapshotId ?? "policy-snap-001",
+                requestedPolicySnapshotId,
                 lowRiskAllowed,
                 "read-only",
                 ["summarize-visible-context"],
                 IsFresh: true,
                 IsValid: true));
+        }
     }
 
     private sealed record TenantScopedIdentifierCommand(string ProjectId);

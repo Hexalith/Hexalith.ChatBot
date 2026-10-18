@@ -1577,3 +1577,12 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Before activating a live AI policy provider, settle whether optional per-action maps require the complete closed schema or represent sparse restrictions (unverified medium).
   evidence: Build16-BH-4; DefaultAiActionPolicyEvaluator.LowRiskAllowedForEveryActionClass has permitted a partial map covering only requested classes since the preserved baseline. TenantAiPolicySnapshot documents optional per-action restrictions, while TenantPolicySchema requires all six keys for stored tenant-policy values. Registered fixtures omit the map and production returns null. Define the provider mapping contract at live-provider design; if it must mirror the closed schema, reject incomplete or unknown-key maps and verify unavailable/redacted outcomes before activation.
+
+## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-18, round 17)
+
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Canonical audit envelopes carry the constant `chatbot.gateway.policy-snapshot.v1` instead of the decision's exact tenant/snapshot/version tuple (pre-existing, medium).
+  evidence: `AuditEnvelopeFactory.cs:18` (`NoPayloadPolicySnapshotId`) is stamped on every PreCommit/PostCommit envelope, so no tenant snapshot reference reaches the WORM chain that epic AC4 historical inspection relies on. Unchanged by Story 1.6; the round-8 entry covers only `ChatBotApprovalResult` and the low-risk AI events. No live policy decision exists while the production provider is unavailable. Carry the exact tuple into envelopes in the live-persistence story, alongside the round-8 entry.
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Per-action-class policy tokens never match: the approval gate sends enum names, the evaluator parses kebab tokens (pre-existing, low, fail-closed).
+  evidence: `AiActionApprovalGate.cs:88` builds `RiskActionClasses` with `value.ToString()` (`ModifiesState`); `DefaultAiActionPolicyEvaluator.TryParseActionClass` (`:105`) accepts only `modifies-state` and similar, so any non-empty list routes to approval. Unreachable today because `AiActionRiskClassifier` yields `LowRisk` only with zero action classes. Settle with the round-16 per-action-map entry at live-provider design: use the shared token mapper, or remove the map.
