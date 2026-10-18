@@ -8,5 +8,6 @@ internal static class TenantPolicyPersistenceGate
     /// <summary>Identifies every policy write, including legacy transports and signed follow-ups.</summary>
     public static bool Denies(string? commandType)
         => commandType is nameof(SubmitTenantPolicyChange) or nameof(ApproveTenantPolicyChange) or nameof(SetAssociationConfidenceThresholds)
-            or nameof(SubmitEscalationPolicyChange) or nameof(SubmitNotificationRoutingChange) or nameof(SubmitMailboxConfigurationChange);
+            or nameof(SubmitEscalationPolicyChange) or nameof(SubmitNotificationRoutingChange) or nameof(SubmitMailboxConfigurationChange)
+            or nameof(SubmitRetentionConfigurationChange) or nameof(SubmitDataClassInventoryChange);
 }

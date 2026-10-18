@@ -2949,40 +2949,7 @@ public sealed partial class CommandGatewayTests
     }
 
     [Fact]
-    public async Task ComplianceInvestigationAndRetentionWritesShouldFailClosedWhenPreCommitAuditUnavailable()
-    {
-        foreach (IChatBotCommand command in new IChatBotCommand[]
-                 {
-                     ComplianceInvestigationCommand(),
-                     RetentionConfigurationChangeCommand(),
-                 })
-        {
-            RecordingDispatcher dispatcher = new();
-            RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
-            RecordingReplayIntentQueue replayQueue = new();
-            CommandGateway gateway = Gateway(
-                dispatcher,
-                authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
-                auditWriter: auditWriter,
-                replayQueue: replayQueue,
-                commandAllowlist: new ChatBotSpineCommandAllowlist());
-
-            ChatBotGatewayResult result = await gateway.SubmitAsync(
-                Submission(AdminPrincipal("compliance-admin"), command),
-                TestContext.Current.CancellationToken);
-
-            result.IsAccepted.ShouldBeFalse();
-            result.Problem.ShouldNotBeNull();
-            result.Problem.Status.ShouldBe(503);
-            result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
-            dispatcher.DispatchCount.ShouldBe(0);
-            replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
-            auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-scope:compliance");
-        }
-    }
-
-    [Fact]
-    public async Task DataClassInventoryWriteShouldFailClosedWhenPreCommitAuditUnavailable()
+    public async Task ComplianceInvestigationWriteShouldFailClosedWhenPreCommitAuditUnavailable()
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
@@ -2995,7 +2962,7 @@ public sealed partial class CommandGatewayTests
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
-            Submission(AdminPrincipal("compliance-admin"), DataClassInventoryChangeCommand()),
+            Submission(AdminPrincipal("compliance-admin"), ComplianceInvestigationCommand()),
             TestContext.Current.CancellationToken);
 
         result.IsAccepted.ShouldBeFalse();
@@ -3007,12 +2974,42 @@ public sealed partial class CommandGatewayTests
         auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-scope:compliance");
     }
 
-    [Fact]
-    public async Task DataClassInventoryAuditRefsShouldCarryPerClassEvidenceMetadataOnly()
+    [Theory]
+    [InlineData("retention-configuration")]
+    [InlineData("data-class-inventory")]
+    public async Task ComplianceSnapshotChangesMustDenyBeforePreCommitAuditEvenWhenThatWriterIsUnavailable(string commandKind)
     {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("compliance-admin"), SyntheticPolicyCommand(commandKind)),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.DependencyDegraded);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.ShouldBeEmpty();
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+    }
+
+    [Fact]
+    public async Task DataClassInventoryChangeDeniedAuditMustRemainMetadataOnly()
+    {
+        RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
-            new RecordingDispatcher(),
+            dispatcher,
             authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -3021,34 +3018,17 @@ public sealed partial class CommandGatewayTests
             Submission(AdminPrincipal("compliance-admin"), DataClassInventoryChangeCommand()),
             TestContext.Current.CancellationToken);
 
-        result.IsAccepted.ShouldBeTrue();
-        auditWriter.Envelopes.Count.ShouldBe(2);
-        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
-        {
-            // NFR35: actor (admin-role), policy snapshot, old/new fingerprints, reason, scope.
-            envelope.SourceEvidenceRefs.ShouldContain("admin-role:compliance-admin");
-            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:submit-data-class-inventory-change");
-            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:compliance");
-            envelope.SourceEvidenceRefs.ShouldContain("inventory-change:inventory-change-001");
-            envelope.SourceEvidenceRefs.ShouldContain("inventory-snapshot:inventory-snapshot-current");
-            envelope.SourceEvidenceRefs.ShouldContain("inventory-snapshot:inventory-snapshot-proposed");
-            envelope.SourceEvidenceRefs.ShouldContain("inventory-old-fingerprint:sha256:oldinventoryfingerprint001");
-            envelope.SourceEvidenceRefs.ShouldContain("inventory-new-fingerprint:sha256:newinventoryfingerprint001");
-            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-admin-v1");
-            envelope.SourceEvidenceRefs.ShouldContain("reason:data-class-inventory-update");
-
-            // Per-changed-class evidence: data-class / retention-class / dimension refs.
-            envelope.SourceEvidenceRefs.ShouldContain("data-class:audit-records");
-            envelope.SourceEvidenceRefs.ShouldContain("data-class:backups");
-            envelope.SourceEvidenceRefs.ShouldContain("data-class:evaluation-datasets");
-            envelope.SourceEvidenceRefs.ShouldContain("retention-class:audit-records");
-            envelope.SourceEvidenceRefs.ShouldContain("owner-role:mailbox-admin");
-            envelope.SourceEvidenceRefs.ShouldContain("deletion-behavior:retain-immutable");
-            envelope.SourceEvidenceRefs.ShouldContain("export-eligibility:not-exportable");
-            envelope.SourceEvidenceRefs.ShouldContain("redaction-sensitivity:restricted");
-        }
-
-        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull().Code.ShouldBe(ChatBotMessageCodes.DependencyDegraded);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+        string serialized = JsonSerializer.Serialize(auditWriter.AuthorizationFailures, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("inventory-snapshot-current");
+        serialized.ShouldNotContain("inventory-snapshot-proposed");
+        serialized.ShouldNotContain("sha256:oldinventoryfingerprint001");
+        serialized.ShouldNotContain("sha256:newinventoryfingerprint001");
+        serialized.ShouldNotContain("data-class:audit-records");
         serialized.ShouldNotContain("mailbox body", Case.Insensitive);
         serialized.ShouldNotContain("project name", Case.Insensitive);
         serialized.ShouldNotContain("secret", Case.Insensitive);
@@ -3265,11 +3245,12 @@ public sealed partial class CommandGatewayTests
     }
 
     [Fact]
-    public async Task ComplianceAdminAuditRefsShouldRemainMetadataOnly()
+    public async Task RetentionConfigurationChangeDeniedAuditMustRemainMetadataOnly()
     {
+        RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new();
         CommandGateway gateway = Gateway(
-            new RecordingDispatcher(),
+            dispatcher,
             authorizationStage: new ParticipantAuthorizationStage(clock: new FixedClock()),
             auditWriter: auditWriter,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -3278,25 +3259,17 @@ public sealed partial class CommandGatewayTests
             Submission(AdminPrincipal("compliance-admin"), RetentionConfigurationChangeCommand()),
             TestContext.Current.CancellationToken);
 
-        result.IsAccepted.ShouldBeTrue();
-        auditWriter.Envelopes.Count.ShouldBe(2);
-        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
-        {
-            envelope.SourceEvidenceRefs.ShouldContain("admin-role:compliance-admin");
-            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:submit-retention-change");
-            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:compliance");
-            envelope.SourceEvidenceRefs.ShouldContain("retention-snapshot:retention-snapshot-current");
-            envelope.SourceEvidenceRefs.ShouldContain("retention-snapshot:retention-snapshot-proposed");
-            envelope.SourceEvidenceRefs.ShouldContain("retention-class:source-email-metadata");
-            envelope.SourceEvidenceRefs.ShouldContain("retention-class:audit-records");
-            envelope.SourceEvidenceRefs.ShouldContain("retention-window:audit-records-window");
-            envelope.SourceEvidenceRefs.ShouldContain("retention-old-fingerprint:sha256:oldretentionfingerprint001");
-            envelope.SourceEvidenceRefs.ShouldContain("retention-new-fingerprint:sha256:newretentionfingerprint001");
-            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-admin-v1");
-            envelope.SourceEvidenceRefs.ShouldContain("reason:compliance-retention-update");
-        }
-
-        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull().Code.ShouldBe(ChatBotMessageCodes.DependencyDegraded);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+        string serialized = JsonSerializer.Serialize(auditWriter.AuthorizationFailures, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("retention-snapshot-current");
+        serialized.ShouldNotContain("retention-snapshot-proposed");
+        serialized.ShouldNotContain("sha256:oldretentionfingerprint001");
+        serialized.ShouldNotContain("sha256:newretentionfingerprint001");
+        serialized.ShouldNotContain("retention-window:audit-records-window");
         serialized.ShouldNotContain("audit envelope", Case.Insensitive);
         serialized.ShouldNotContain("project name", Case.Insensitive);
         serialized.ShouldNotContain("mailbox body", Case.Insensitive);

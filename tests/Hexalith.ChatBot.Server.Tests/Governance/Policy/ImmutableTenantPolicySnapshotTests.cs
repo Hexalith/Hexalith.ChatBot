@@ -268,9 +268,8 @@ public sealed class ImmutableTenantPolicySnapshotTests
             replay.ShouldBeTrue();
             replayed.ShouldBeSameAs(history);
             replayed.Snapshots.ShouldBe(beforeReplay);
-            originalDecision.TenantId.ShouldBe("synthetic-alpha");
-            originalDecision.PolicyVersion.ShouldBe(1);
-            originalDecision.PolicySnapshotId.ShouldBe("synthetic-first");
+            TenantPolicySnapshotResolver.Resolve([history], Context(originalDecision.TenantId!), originalDecision.PolicySnapshotId,
+                originalDecision.PolicyVersion!.Value, true, SyntheticNow, SyntheticNow).ShouldBeSameAs(original);
         }
 
         Resolve(history, "synthetic-first", 1).ShouldBeSameAs(original);

@@ -5,8 +5,8 @@ isolation acceptance are incomplete. This decision does not authorize live polic
 persistence, pilot data, compliance claims, or production readiness.
 
 Policy submit, approve, direct association-threshold update, escalation policy
-submit, notification-routing snapshot change, and mailbox-configuration snapshot
-change commands are denied before admission reservation or dispatch. This applies to legacy HTTP requests, canonical requests, SDK `/process`
+submit, notification-routing, mailbox-configuration, retention-configuration, and
+data-class-inventory snapshot change commands are denied before admission reservation or dispatch. This applies to legacy HTTP requests, canonical requests, SDK `/process`
 requests, and correctly signed admission markers. A marker proves transport
 integrity; it is not protection or isolation approval. Existing authentication and
 tenant-binding failures keep their safe semantics. Denials use the existing audit
@@ -14,11 +14,13 @@ path and `policy-snapshot-unavailable`, mapped by the safe-message catalog to
 `dependency_degraded`. No protected policy values are included in that outcome. Dependency denials remain
 audited without incrementing the authorization-failure spike counter.
 
-The gateway reports this denial as HTTP 503 `dependency_degraded` by design: policy
-persistence is unavailable until accepted A6 protection and native isolation evidence
-exist, and clients should not retry until then. The AI evaluator path reports the same
-reason code as a non-retryable refusal because it is a per-action decision, not a
-gateway dependency; the two outward shapes differ intentionally.
+The gateway reports this denial as a retryable HTTP 503 `dependency_degraded` with
+`retryable: true` and `clientAction: retry-later` by design. Policy persistence keeps
+being denied until accepted A6 protection and native isolation evidence exist.
+An unresolved-policy AI decision retains `policy-snapshot-unavailable` internally;
+the caller sees non-retryable HTTP 403 `refusal_blocked_action`. These blocked AI
+outcomes currently record no auditable attempt; that work is deferred to Story 1.9.
+The two outward shapes differ intentionally.
 
 The internal snapshot, history fold, and resolver are explicitly synthetic. They
 have no DI registration, store, event subscription, or runtime persistence path.
@@ -59,7 +61,8 @@ The evaluator now fails closed: a missing, invalid or stale AI policy snapshot i
 routes no longer echo the requested snapshot id. This outcome change is intentional
 and signed off by the story owner; no code or contract consumed the old reason codes.
 The persistence gate covers every command the audit map classifies as
-`tenant-policy-mutation`, enforced by a guard test.
+`tenant-policy-mutation` plus the retention-configuration and data-class-inventory
+snapshot changes, enforced by a guard test with an explicit snapshot-change list.
 
 Any future domain write must use Hexalith.EventStore; queries, projections, read
 models, and cursors must use the domain-service SDK seams. There is no history

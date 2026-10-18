@@ -50,6 +50,10 @@ public sealed partial class CommandGatewayTests
     [InlineData("notification-routing", true)]
     [InlineData("mailbox-configuration", false)]
     [InlineData("mailbox-configuration", true)]
+    [InlineData("retention-configuration", false)]
+    [InlineData("retention-configuration", true)]
+    [InlineData("data-class-inventory", false)]
+    [InlineData("data-class-inventory", true)]
     public async Task SyntheticPolicyWritesMustDenyBothLegacyAndCanonicalAdmissionBeforeReservation(string commandKind, bool canonical)
     {
         object command = SyntheticPolicyCommand(commandKind);
@@ -98,6 +102,12 @@ public sealed partial class CommandGatewayTests
     [InlineData("mailbox-configuration", false, false)]
     [InlineData("mailbox-configuration", true, false)]
     [InlineData("mailbox-configuration", true, true)]
+    [InlineData("retention-configuration", false, false)]
+    [InlineData("retention-configuration", true, false)]
+    [InlineData("retention-configuration", true, true)]
+    [InlineData("data-class-inventory", false, false)]
+    [InlineData("data-class-inventory", true, false)]
+    [InlineData("data-class-inventory", true, true)]
     public async Task SyntheticSdkPolicyWritesMustDenyEvenAnAuthenticSignedMarker(string commandKind, bool signed, bool workload)
     {
         FixedClock clock = new();
@@ -171,6 +181,10 @@ public sealed partial class CommandGatewayTests
     [InlineData("notification-routing", true)]
     [InlineData("mailbox-configuration", false)]
     [InlineData("mailbox-configuration", true)]
+    [InlineData("retention-configuration", false)]
+    [InlineData("retention-configuration", true)]
+    [InlineData("data-class-inventory", false)]
+    [InlineData("data-class-inventory", true)]
     public async Task SyntheticHttpPolicyTransportsMustReturnSafeDependencyDenial(string commandKind, bool canonical)
     {
         FixedClock clock = new();
@@ -189,7 +203,10 @@ public sealed partial class CommandGatewayTests
         using HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/commands", request, TestContext.Current.CancellationToken);
         response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
         string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        body.ShouldContain(ChatBotMessageCodes.DependencyDegraded);
+        ProblemDetails problem = Newtonsoft.Json.JsonConvert.DeserializeObject<ProblemDetails>(body).ShouldNotBeNull();
+        problem.Code.ShouldBe(ChatBotMessageCodes.DependencyDegraded);
+        problem.Retryable.ShouldBeTrue();
+        problem.ClientAction.ShouldBe(ProblemDetailsClientAction.RetryLater);
         body.ShouldNotContain("policy-snapshot-current");
         dispatcher.DispatchCount.ShouldBe(0);
         reservations.RecordCount.ShouldBe(0);
@@ -225,6 +242,10 @@ public sealed partial class CommandGatewayTests
     [InlineData("notification-routing", true)]
     [InlineData("mailbox-configuration", false)]
     [InlineData("mailbox-configuration", true)]
+    [InlineData("retention-configuration", false)]
+    [InlineData("retention-configuration", true)]
+    [InlineData("data-class-inventory", false)]
+    [InlineData("data-class-inventory", true)]
     public async Task SyntheticPolicyDenialMustPreserveAuthorizationPrecedence(string commandKind, bool canonical)
     {
         RecordingDispatcher dispatcher = new();
@@ -470,7 +491,12 @@ public sealed partial class CommandGatewayTests
         }));
 
     private static ClaimsPrincipal SyntheticPolicyPrincipal(string commandKind)
-        => AdminPrincipal(commandKind == "mailbox-configuration" ? "mailbox-admin" : "policy-admin");
+        => AdminPrincipal(commandKind switch
+        {
+            "mailbox-configuration" => "mailbox-admin",
+            "retention-configuration" or "data-class-inventory" => "compliance-admin",
+            _ => "policy-admin",
+        });
 
     private static object SyntheticPolicyCommand(string commandKind)
         => commandKind switch
@@ -483,6 +509,8 @@ public sealed partial class CommandGatewayTests
             "escalation" => EscalationPolicyChangeCommand(),
             "notification-routing" => NotificationRoutingChangeCommand(),
             "mailbox-configuration" => MailboxConfigurationChangeCommand(),
+            "retention-configuration" => RetentionConfigurationChangeCommand(),
+            "data-class-inventory" => DataClassInventoryChangeCommand(),
             _ => throw new ArgumentOutOfRangeException(nameof(commandKind)),
         };
 

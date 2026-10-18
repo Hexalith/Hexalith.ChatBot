@@ -202,6 +202,22 @@ public sealed class AiActionPolicyEvaluatorTests
     }
 
     [Theory]
+    [InlineData("malformed/id")]
+    [InlineData("")]
+    public async Task SyntheticMalformedRequestSnapshotIdMustNotBeAcceptedWhenProviderEchoesIt(string id)
+    {
+        DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new("tenant-alpha", 1, id, true, "read-only", ["summarize-visible-context"], true, true)));
+
+        AiActionPolicyDecision decision = await evaluator.EvaluateAsync(Request() with { RequestedPolicySnapshotId = id }, TestContext.Current.CancellationToken);
+
+        decision.Kind.ShouldBe(AiActionPolicyDecisionKind.Blocked);
+        decision.ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+        decision.PolicySnapshotId.ShouldBe("unavailable");
+        decision.TenantId.ShouldBeNull();
+        decision.PolicyVersion.ShouldBeNull();
+    }
+
+    [Theory]
     [InlineData("foreign-tenant", "restricted-policy", 7)]
     [InlineData("tenant-alpha", "restricted-policy", 7)]
     [InlineData("tenant-alpha", "policy-snap-001", 0)]
