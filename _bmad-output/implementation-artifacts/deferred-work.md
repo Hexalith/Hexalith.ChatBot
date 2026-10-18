@@ -1526,3 +1526,21 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
   summary: Align the historical Story 1.6 lifecycle artifact with the superseded_by and supersedes relationship names.
   evidence: R4B10; the separately committed lifecycle factory now emits superseded_by/supersedes while 1-6-canonical-lifecycle-state-model-and-transition-enforcement.md still claims superseded_by_workflow/supersedes_workflow in its task and AC4 evidence.
+
+## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-17, round 14)
+
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: `TenantPolicySchema.Validate` rejects `t-low >= t-high` only when `t-high` appears earlier in the change set, so `[t-low=0.95, t-high=0.90]` validates (pre-existing, medium).
+  evidence: `TenantPolicySchema.cs:213-218` compares against values already seen in the loop. `ImmutableTenantPolicySnapshot` sorts knobs to work around it; the live callers (`GovernedOperationAggregate`, `AcceptedCommandDispatcher`, `ParticipantAuthorizationStage`) are currently behind the Story 1.6 policy gate. Move the cross-knob check after the loop before lifting the gate.
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Association scoring uses the caller-supplied `ThresholdPolicy` or falls back to `AssociationThresholdPolicySnapshot.DefaultM0`, and decisions record `command.ThresholdPolicy.PolicyVersion` without checking it against the tenant's threshold version (pre-existing, medium).
+  evidence: `AssociationScoringOrchestrator.cs:44`; `GovernedOperationAggregate.cs:2760/2792/2821`. Conflicts with "no default policy" and exact decision references; owned by Story 2.6 (association rules and confidence thresholds).
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Legacy policy handlers lack replay/conflict/append-only semantics and must be replaced before live policy persistence (pre-existing, medium).
+  evidence: `GovernedOperationAggregate.cs:149-157` derives the next version from caller `SourceVersion + 1`, reads `DateTimeOffset.UtcNow` inside `Handle`, and returns `NoOp` on proposed-ID reuse; `GovernedOperationState.cs:548` overwrites snapshots by ID. Kept for historical replay per the Story 1.6 Code Map and unreachable while the gate denies.
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Pending `ApproveTenantPolicyChange` items created before the gate have no reject/withdraw path and stay pending (unverified medium; extends the round-4 "gate precedes idempotency lookup" entry).
+  evidence: The gate denies approvals unconditionally and no reject/withdraw/expire command exists. Settled by confirming no environment holds pre-gate pending or accepted policy changes; nothing is deployed while A6/A13 remain open.
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Blocked AI outcomes, including `policy-snapshot-unavailable` from the fail-closed evaluator, record no auditable attempt and are relabeled `command_not_allowlisted` (medium; deferred by decision 2026-10-17).
+  evidence: `ChatBotCommandAdmissionPipeline.cs:179-185` returns `Rejected(CommandNotAllowlisted)` without `DenyAsync`; this branch was already unaudited for `insufficient-authority` and `risk_classification_unavailable`. Only acceptance mode reaches the policy case. Reason: auditable sensitive non-mutating attempts belong to Story 1.9; keep the outward 403 `refusal_blocked_action`.
