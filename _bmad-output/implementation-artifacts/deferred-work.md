@@ -1487,8 +1487,8 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 ## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-16, round 8)
 
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
-  summary: SDK `/process` rejection with `PolicySnapshotUnavailable` may expose a different outward shape than the HTTP gateway's 503 `dependency_degraded` (unverified medium).
-  evidence: only `CommandGateway` maps the reason to a dependency-unavailable problem; `ChatBotDomainServiceAdmissionStage` returns `Rejected(PolicySnapshotUnavailable)`. Settle by checking how EventStore surfaces an SDK Rejected reason to the caller.
+  summary: SDK `/process` rejection with `PolicySnapshotUnavailable` may expose a different outward shape than the HTTP gateway's 503 `dependency_degraded` (verified 2026-10-18 in round 21: it does; low, documented in the ADR).
+  evidence: only `CommandGateway` maps the reason to a dependency-unavailable problem; `ChatBotDomainServiceAdmissionStage` returns `Rejected(PolicySnapshotUnavailable)`. Settle by checking how EventStore surfaces an SDK Rejected reason to the caller. Settled 2026-10-18 (round 21): `DomainServiceRequestRouter.cs:149` wraps the admission rejection in `DomainResult.Rejection`; `AggregateActor` persists and publishes the metadata-only `ChatBotDomainServiceAdmissionRejected` event on the target stream (D3) and returns that cached terminal rejection to a same-message-ID retry, so SDK producers get no retryable outcome. `docs/adrs/isolated-policy-snapshots.md` records this. In the live topology `/process` sees a gated command only through the marker path, i.e. pre-gate marked dispatches (round-4/14 stranded entry).
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Carry the exact resolved tenant/policy-version tuple from `AiActionPolicyDecision` into `ChatBotApprovalResult` and the low-risk AI events when snapshots become live.
   evidence: `AiActionApprovalGate.cs:97-98` passes only `PolicySnapshotId`; events are persisted state, so the change belongs with accepted A6 evidence in Story 1.6's open live-persistence scope. ADR wording qualified in round 8.
@@ -1613,3 +1613,9 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Before activating a live AI policy provider, define how `TenantAiPolicySnapshot` is built from a tenant policy snapshot: the schema has no knob for its scalar `LowRiskAllowed`, `EffectSurface` or `AssistanceKinds` (pre-existing, medium).
   evidence: `TenantAiPolicySnapshot.cs:17` needs those fields (they predate the Story 1.6 baseline); `TenantPolicyKnobIds.cs:10` defines only the `ai-action.low-risk-allowed` map. Without a mapping or new knobs, the retained tenant/ID/version tuple would name a snapshot that cannot answer the evaluator's surface and kind checks. Settle together with the round-16 per-action-map entry.
+
+## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-18, round 21)
+
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Retention and data-class inventory audit envelopes map to no NFR15a inventory path, so the completeness measurer will count every admitted change as a gap once the policy gate lifts (pre-existing, medium).
+  evidence: `AuditEnvelopeFactory.cs:3064` and `:3108` build envelopes for `SubmitRetentionConfigurationChange` (Story 7.4) and `SubmitDataClassInventoryChange` (Story 9.7); `ChatBotAuditPathMap.cs:67-73` classifies neither; `AuditOperationReconstructor.cs:47-51` returns `UnmappedPathReasonCode`, which `AuditCompletenessMeasurer.cs:139` counts. Both commands are denied by the Story 1.6 gate today, so no envelope is produced. Choose their inventory path code before the gate lifts; the gate's structural membership already covers both.

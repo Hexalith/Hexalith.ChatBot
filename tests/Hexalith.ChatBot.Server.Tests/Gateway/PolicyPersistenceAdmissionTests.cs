@@ -113,10 +113,11 @@ public sealed partial class CommandGatewayTests
         FixedClock clock = new();
         RecordingAuditWriter audit = new();
         InMemoryCoarseIdempotencyStore reservations = new(clock);
+        RecordingAuthorizationFailureCounter counter = new();
         ChatBotCommandAdmissionPipeline pipeline = new(new ClaimsAuthenticationStage(), new ClaimsTenantBindingStage(), new PassThroughAuthorizationStage(),
             new PassThroughRiskClassifier(), new PassThroughApprovalGate(), reservations, audit, new RecordingReplayIntentQueue(), new RecordingOperatorAlertSink(),
             new InMemoryOperationStatusStore(), clock, new CommandSubmissionLifecycleTransitionGuard(), new PermissiveSpineCommandAllowlist(),
-            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock));
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock), authorizationFailureCounter: counter);
         ClaimsPrincipal principal = workload
             ? new(new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "workload:eventstore"), new("eventstore:workload", "eventstore"),
                 new("eventstore:operation", "domain-service:process")], "EventStoreWorkload"))
@@ -146,7 +147,7 @@ public sealed partial class CommandGatewayTests
         if (workload)
         {
             RecordingDispatcher dispatcher = new();
-            using WebApplicationFactory<Program> factory = SyntheticPolicyHost(principal, clock, audit, reservations, dispatcher, marker);
+            using WebApplicationFactory<Program> factory = SyntheticPolicyHost(principal, clock, audit, reservations, dispatcher, marker, counter);
             using HttpClient client = factory.CreateClient();
             using HttpResponseMessage response = await client.PostAsJsonAsync("/process", new DomainServiceRequest(envelope, null), TestContext.Current.CancellationToken);
             response.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -166,6 +167,7 @@ public sealed partial class CommandGatewayTests
         audit.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
         audit.Envelopes.ShouldBeEmpty();
         reservations.RecordCount.ShouldBe(0);
+        counter.RecordedTenants.ShouldBeEmpty();
     }
 
     [Theory]
@@ -471,7 +473,8 @@ public sealed partial class CommandGatewayTests
     }
 
     private static WebApplicationFactory<Program> SyntheticPolicyHost(ClaimsPrincipal principal, ISystemClock clock, IAuditWriter audit,
-        IIdempotencyStore reservations, ICommandDispatcher dispatcher, IChatBotAdmissionMarker? marker = null)
+        IIdempotencyStore reservations, ICommandDispatcher dispatcher, IChatBotAdmissionMarker? marker = null,
+        IAuthorizationFailureCounter? authorizationFailureCounter = null)
         => new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
             SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
@@ -484,6 +487,7 @@ public sealed partial class CommandGatewayTests
             services.AddSingleton(reservations);
             services.AddSingleton<IOperationStatusStore>(new InMemoryOperationStatusStore());
             if (marker is not null) { services.AddSingleton(marker); }
+            if (authorizationFailureCounter is not null) { services.AddSingleton(authorizationFailureCounter); }
             foreach (ServiceDescriptor service in services.Where(static service => service.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)).ToArray())
             {
                 services.Remove(service);

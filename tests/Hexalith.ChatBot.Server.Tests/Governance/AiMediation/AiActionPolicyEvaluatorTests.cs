@@ -271,6 +271,8 @@ public sealed class AiActionPolicyEvaluatorTests
         DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new("tenant-alpha", 1, "policy-snap-001", true, "read-only", ["summarize-visible-context"], true, true)));
         AiActionPolicyDecision decision = await evaluator.EvaluateAsync(Request() with { RequestedPolicySnapshotId = id }, TestContext.Current.CancellationToken);
         decision.AllowsLowRiskExecution.ShouldBeFalse();
+        decision.Kind.ShouldBe(AiActionPolicyDecisionKind.Blocked);
+        decision.ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
         decision.PolicySnapshotId.ShouldBe("unavailable");
         decision.TenantId.ShouldBeNull();
         decision.PolicyVersion.ShouldBeNull();

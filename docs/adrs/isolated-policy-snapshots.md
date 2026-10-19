@@ -1,12 +1,18 @@
-# Isolated policy snapshots: synthetic foundation, live writes denied
+# ADR: Isolated policy snapshots — synthetic foundation, live writes denied
 
-Status: partially implemented; Story 1.6 remains in progress. A6 and native
+## Status
+
+Partially implemented; Story 1.6 remains in progress. A6 and native
 isolation acceptance are incomplete. This decision does not authorize live policy
 persistence, onboarding, pilot data, compliance claims, or production readiness.
+
+## Context
 
 A6 is the data-protection release gate: the `openBlockers` entry with `gate: "A6"`
 in [`release-metadata.json`](../../release-metadata.json) requires accepted
 data-protection and owner-runtime evidence for the exact candidate.
+
+## Decision
 
 The gate covers commands that propose a replacement tenant policy or configuration
 snapshot, plus policy approval and direct threshold activation. Its eight members are:
@@ -55,7 +61,12 @@ metadata-only authorization-failure fact with `policy-snapshot-unavailable`, map
 by the safe-message catalog to `dependency_degraded`. No protected policy values
 are included in that outcome. Denials with `policy-snapshot-unavailable` do not
 increment the authorization-failure spike counter. These facts are currently kept
-in process; durable auditable attempts are deferred to Story 1.9.
+in process; durable auditable attempts are deferred to Story 1.9. On SDK `/process`,
+the denial also returns the metadata-only `ChatBotDomainServiceAdmissionRejected`
+event. EventStore treats it as an ordinary domain rejection: it persists and
+publishes the event on the target stream and returns that cached terminal rejection
+to a retry with the same message ID, so an SDK producer gets no retryable outcome,
+unlike the gateway 503 below. The event carries no policy values.
 
 The gateway reports this denial as a retryable HTTP 503 `dependency_degraded` with
 `retryable: true` and `clientAction: retry-later` by design. Policy persistence keeps
@@ -93,6 +104,8 @@ current effective snapshot for new decisions and deny a caller-selected supersed
 snapshot as stale. Exact historical resolution remains available only for audit
 and replay.
 
+## Consequences
+
 Live persistence can be designed only after accepted data-class protection
 evidence and independently witnessed native isolation proof are available. Future
 evidence must bind the exact provider/candidate, trusted tenant-derived physical
@@ -115,5 +128,5 @@ Any future domain write must use Hexalith.EventStore; queries, projections, read
 models, and cursors must use the domain-service SDK seams. There is no history
 migration or sibling change in this work. Atomic command admission and mutation /
 audit commitment remain Stories 1.7 and 1.8. Completion also requires the native
-persisted-end-state evidence and qualification in
-[`story-evidence-integrity.md`](../story-evidence-integrity.md).
+persisted-end-state evidence described above and a passing TE-2 completion contract
+under [`story-evidence-integrity.md`](../story-evidence-integrity.md).
