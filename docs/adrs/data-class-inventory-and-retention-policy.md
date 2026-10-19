@@ -4,18 +4,18 @@
 
 Accepted (realized by Story 9.7, NFR52 / NFR53 / NFR23 / NFR35 / NFR1 / FR75f / architecture cross-cutting #7 / #13).
 
-Admission of `SubmitDataClassInventoryChange` and `SubmitRetentionConfigurationChange`
-is suspended by the [Story 1.6 policy-persistence gate](isolated-policy-snapshots.md)
-until accepted A6 protection and native isolation evidence exist. Both commands are
-denied before the pre-commit audit, execution, and post-commit audit sequence
-described in Decisions 6–7; the denial still uses the metadata-only denial audit path.
-
 Built on the Story 7.4 compliance-admin retention editor
 ([the `SubmitRetentionConfigurationChange` / `RetentionSnapshotMetadata` / `ComplianceRetentionClassIds` seam]) and the
 Story 7.1 admin-scope model; reuses the Story 9.1/9.3 audit envelope and no-leak floor
 ([worm-audit-backing.md](worm-audit-backing.md), [audit-investigation-surface.md](audit-investigation-surface.md)). It is
 the **policy-definition layer** that Stories 9.8 (export) and 9.9 (deletion) consume — the story's "so that" is literally
 "before export or deletion workflows use them."
+
+Admission of `SubmitDataClassInventoryChange` and `SubmitRetentionConfigurationChange`
+is suspended by the [Story 1.6 policy-persistence gate](isolated-policy-snapshots.md)
+until accepted A6 protection and native isolation evidence exist. Both commands are
+denied before the pre-commit audit, execution, and post-commit audit sequence
+described in Decisions 6–7; the denial still uses the metadata-only denial audit path.
 
 ## Context
 

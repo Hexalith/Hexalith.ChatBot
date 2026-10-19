@@ -5,6 +5,8 @@ namespace Hexalith.ChatBot.Server.Gateway;
 /// authorization-failure-spike alert (Story 8.4, AC5). It is fed only the bound tenant id (never the actor, command,
 /// or reason) from the same code path that emits <see cref="ChatBotAuthorizationFailureAuditFact"/>, and exposes a
 /// coarse rolling-window count the spike evaluator consumes. Lives alongside the gateway authorization seam.
+/// The Story 1.6 <c>policy-snapshot-unavailable</c> dependency denial records the fact without incrementing
+/// this counter.
 /// </summary>
 internal interface IAuthorizationFailureCounter
 {

@@ -29,8 +29,10 @@ snapshot, plus policy approval and direct threshold activation. Its eight member
 The persistence gate covers every command the audit map classifies as
 `tenant-policy-mutation`, unioned with every Contracts `IChatBotCommand` that has a
 public `Proposed*SnapshotId`, `Pending*SnapshotId`, or `Activated*SnapshotId` property.
-The guard test discovers that structural set
-independently of the gate and asserts it is nonempty before checking denial coverage.
+The guard test
+`TenantPolicyPersistenceGateTests.GateMustDenyEveryAuditClassifiedOrStructuralPolicySnapshotCommand`
+discovers that structural set independently of the gate and asserts it is nonempty
+before checking denial coverage.
 The retention and inventory contracts and their suspended admission are also
 documented in [`data-class-inventory-and-retention-policy.md`](data-class-inventory-and-retention-policy.md).
 
@@ -74,7 +76,7 @@ being denied until accepted A6 protection and native isolation evidence exist.
 An unresolved-policy AI decision retains `policy-snapshot-unavailable` internally;
 the caller sees non-retryable HTTP 403 `refusal_blocked_action`. These blocked AI
 outcomes currently record no auditable attempt; that work is deferred to Story 1.9.
-The two outward shapes differ intentionally.
+The gateway 503 and the AI-path 403 differ intentionally.
 
 The internal snapshot, history fold, and resolver are explicitly synthetic. They
 have no DI registration, store, event subscription, or runtime persistence path.

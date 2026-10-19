@@ -1619,3 +1619,42 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Retention and data-class inventory audit envelopes map to no NFR15a inventory path, so the completeness measurer will count every admitted change as a gap once the policy gate lifts (pre-existing, medium).
   evidence: `AuditEnvelopeFactory.cs:3064` and `:3108` build envelopes for `SubmitRetentionConfigurationChange` (Story 7.4) and `SubmitDataClassInventoryChange` (Story 9.7); `ChatBotAuditPathMap.cs:67-73` classifies neither; `AuditOperationReconstructor.cs:47-51` returns `UnmappedPathReasonCode`, which `AuditCompletenessMeasurer.cs:139` counts. Both commands are denied by the Story 1.6 gate today, so no envelope is produced. Choose their inventory path code before the gate lifts; the gate's structural membership already covers both.
+
+
+## Deferred from: Story 1.6 round-22 build workflow review (2026-10-19; historical release maintenance)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Fix prerelease FileVersion handling in release packaging (pre-existing, medium).
+  evidence: R22Build-BH-1/EH-2: .github/scripts/pack-release-packages.sh:28 assigns a full prerelease version to FileVersion. An independent SDK 10.0.402 warnings-as-errors compiler reproduction for 1.2.3-alpha.1 fails CS7035. Use the numeric file-version core and cover alpha/beta packaging; this release helper is unchanged by the Story 1.6 documentation pass.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Skip NuGet verification when semantic-release publishes no release (pre-existing, medium).
+  evidence: R22Build-BH-2/EH-1/VG-2: release.yml:301 checks successful SHA eligibility rather than an actual release result. Cached semantic-release source returns without tagging on no relevant changes and its CLI exits zero; the subsequent exact-tag lookup fails on an untagged docs/chore HEAD. Bind verification to an actual published version.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Provide recovery for partially published tagged NuGet releases (pre-existing, medium).
+  evidence: R22Build-BH-3: semantic-release tags/pushes before publishCmd, publish-release-packages.sh pushes sequentially, and GitHub assets follow successful publication. A mid-push failure can strand an incomplete tagged version; retain the prepared artifact set and define an explicit retry for that version.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Validate the NuGet publishing credential before release preparation and tag creation (pre-existing, medium).
+  evidence: R22Build-BH-4: .releaserc.json defines prepareCmd/publishCmd but no NuGet verifyConditionsCmd. NUGET_API_KEY is checked only inside publish-release-packages.sh, after semantic-release has created its tag; missing credentials advance release state before failing.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Resolve a packaging output directory consistently before cleanup and repository-directory switching (pre-existing, low).
+  evidence: R22Build-BH-6: pack-release-packages.sh:19-25 cleans the caller-relative output directory, changes to repository_root, and passes the unchanged relative path to dotnet pack; its final inventory still examines the caller-relative directory. An invocation outside the root can clean/inspect one directory and write another. The current semantic-release caller starts at the root.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Bound each NuGet verification HTTP request by the remaining deadline (pre-existing, medium).
+  evidence: R22Build-BH-7/EH-4: verify-nuget-publication.sh:26-29 supplies neither a connection nor a transfer timeout to curl. Its 600-second guard runs only after curl returns failure, so a stalled request can exceed the advertised verification budget until the workflow timeout.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Determine whether duplicate NuGet versions can hide conflicting prepared versus published package contents (pre-existing, unverified medium).
+  evidence: R22Build-BH-8: publish-release-packages.sh uses --skip-duplicate, while verify-nuget-publication.sh discards downloads and tests only HTTP success. No actual conflicting artifact was shown. Settle using a fixture with the same ID/version but conflicting contents and a signing-aware comparison before treating an availability check as artifact-content acceptance.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Add publication-free stable/prerelease package artifact coverage to build maintenance (pre-existing, medium).
+  evidence: R22Build-BH-10: CI invokes restore/build/test but neither dotnet pack nor the packaging helpers, and test-source searches find no helper coverage. The reproduced FileVersion prerelease failure escapes ordinary builds. Check the intended package IDs, versions, dependencies and symbol artifacts without publishing.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Reconcile the release job timeout with its existing Architecture guard (pre-existing, medium).
+  evidence: R22Build-VG-1: release.yml:269 says timeout-minutes: 45, but LiveRecoveryValidationArchitectureTests.cs:633 requires 30. A fresh Debug build passed, then the exact native test ReleasePublication_ShouldRequireFreshMainHeadImmediatelyBeforeSemanticRelease failed 0/1 passed with zero skips. Current failed CTRF/TRX/logs are TestResults/story-1-6/round-22-release-guard.*; do not weaken the guard without deciding the intended release budget.
