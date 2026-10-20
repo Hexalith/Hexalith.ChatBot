@@ -144,7 +144,7 @@ public sealed partial class CommandGatewayTests
             if (fail && method == "TryGetAsync")
             {
                 if (cancelled) { throw new OperationCanceledException("Synthetic dependency read cancellation."); }
-                throw new InvalidOperationException("Synthetic status lookup failure.");
+                throw new IOException("Synthetic status lookup failure.");
             }
         });
         InMemoryCoarseIdempotencyStore idempotency = new(new FixedClock());
@@ -186,6 +186,32 @@ public sealed partial class CommandGatewayTests
         await lookupEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         caller.Cancel();
         OperationCanceledException exception = await Should.ThrowAsync<OperationCanceledException>(() => pending);
+        exception.CancellationToken.ShouldBe(caller.Token);
+        idempotency.RecordCount.ShouldBe(0);
+        audit.Envelopes.ShouldBeEmpty();
+        audit.AuthorizationFailures.ShouldBeEmpty();
+        dispatcher.DispatchCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task CallerCancellationDuringFailedCollisionLookupShouldPropagateWithoutReservationAuditOrDispatch()
+    {
+        using CancellationTokenSource caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        IOperationStatusStore status = TrustedAuthorityBoundaryProxy.Create<IOperationStatusStore>(new InMemoryOperationStatusStore(), method =>
+        {
+            if (method == "TryGetAsync")
+            {
+                caller.Cancel();
+                throw new IOException("Synthetic status lookup failure after caller cancellation.");
+            }
+        });
+        InMemoryCoarseIdempotencyStore idempotency = new(new FixedClock());
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter audit = new();
+        CommandGateway gateway = Gateway(dispatcher, idempotencyStore: idempotency, operationStatusStore: status, auditWriter: audit);
+        ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "resource"));
+
+        OperationCanceledException exception = await Should.ThrowAsync<OperationCanceledException>(() => gateway.SubmitAsync(submission, caller.Token).AsTask());
         exception.CancellationToken.ShouldBe(caller.Token);
         idempotency.RecordCount.ShouldBe(0);
         audit.Envelopes.ShouldBeEmpty();

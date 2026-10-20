@@ -55,6 +55,16 @@ context:
 - [x] `src/Hexalith.ChatBot.Server/Gateway/Status/OperationStatusUpdatePolicy.cs`, `InMemoryOperationStatusStore.cs`, `ReadModelOperationStatusStore.cs` — apply the same policy within atomic updates: ignore stale revisions, allow equivalent duplicates, reject incompatible equal revisions and terminal rollback; preserve committed/identity fields and explicit legacy compatibility.
 - [x] `tests/Hexalith.ChatBot.Server.Tests/Operations/CommandOperationContractTests.cs`, `Gateway/Status/OperationStatusMonotonicityTests.cs`, `tests/Hexalith.ChatBot.Contracts.Tests/OpenApiContractSpineTests.cs`, `tests/Hexalith.ChatBot.Client.Tests/CommandSubmissionTransportTests.cs` — cover the matrix, synthetic revision races/folded end-state, transition facts, shared TaskId, lifetime replay, complete status, legacy decoding and missing/forbidden parity. Retain durable fencing and trusted-authority regressions.
 
+**2026-10-20 resumed review work:**
+
+- [x] `src/Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml` POST description — resolve Round18Build-BH-1 by qualifying canonical refusal as applying only after earlier admission checks, including authorization and the policy gate. Preserve the eight policy commands' retryable `dependency_degraded` precedence and the canonical refusal's non-retryable shape. Regenerate `src/Hexalith.ChatBot.Client/Generated/HexalithChatBotClient.g.cs` with NSwag and refresh `tests/fixtures/hexalith-chatbot-generated-client.sha256`.
+- [x] `tests/Hexalith.ChatBot.Cli.Tests/ChatBotCliCommandTests.cs` — resolve Build15-VG-1 by adding a nonblank OperationId distinct from TaskId and CommandId to the existing text/JSON formatter theory; assert accepted identity precedence in both formats and retain the historical fallback rows.
+- [x] `src/Hexalith.ChatBot.Server/Gateway/ChatBotCommandAdmissionPipeline.cs` lookup catch and `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.OperationContracts.cs` — resolve Resume-BH-10 by rechecking the caller token before translating non-cancellation lookup failures. Cover a lookup which cancels the caller then throws IOException, asserting caller cancellation and zero reservation/audit/dispatch; retain active-caller IOException and dependency-owned cancellation coverage and successful retry.
+
+This resume starts with the three Story 1.5 items carried by Story 1.6 reviews. The original review patches are checked off. Earlier explicit deferrals remain owned by their recorded follow-ups: strict oneOf compatibility, atomic workflow updates and duplicate counts, SDK serializer equivalence, accepted numeric equivalence, multi-event revision semantics, successor uniqueness and the separate historical lifecycle documentation are not silently resolved by this pass. Owner/protection acceptance and native evidence remain open. Status is reconciled to `in-progress` in both artifacts while these patches are open. After review, use spec `in-review` with sprint `review` consistently; never mark done without the existing evidence contract.
+
+Shared-file preservation: apply only the caller-cancellation correction in `ChatBotCommandAdmissionPipeline.cs`; preserve Story 1.6's policy gate placement, authorization/audit/counter semantics and outward outcomes. Leave `CommandGateway.cs`, `CommandGatewayAdmissionApiE2ETests.cs` and `CommandGatewayTests.cs` unchanged unless a demonstrated Story 1.5 regression needs a direct correction. Keep Story 1.6 literal `review` in its spec and sprint tracking.
+
 **Acceptance Criteria:**
 
 - Given a new operation, when created/replayed, then original metadata stays stable and its operation ID cannot bind to different semantics.
@@ -73,6 +83,8 @@ context:
 - OpenAPI remains authoritative; NSwag regenerated the client and the hash fixture. Additive metadata is optional for legacy decoding. Canonical consumers use execution/projection state; legacy completion/audit summaries are compatibility fields. Transition actor identities remain server-side. Canonical public retry eligibility stays false while retry-profile approval is open, even when the pure fold is state-eligible; no caller approval switch or synthetic scheduling metadata is introduced. Public metadata files use the Contracts root namespace to retain the existing architecture guard against exported governance namespaces.
 
 ## Spec Change Log
+
+- 2026-10-20: Reconciled spec `in-review` with sprint `in-progress` by reopening the three actionable Story 1.5 deferrals carried in Story 1.6 reviews (Round18Build-BH-1, Build15-VG-1, Resume-BH-10). Both tracked implementation as `in-progress`; after the three patches passed focused verification they moved consistently to spec `in-review` / sprint `review`. Earlier patches are complete; earlier explicit deferrals and missing native owner/protection evidence remain open. Preserve the frozen intent, original baseline and Story 1.6 policy-gate behavior.
 
 - 2026-10-18: Resumed all three review layers at ca95a70b9237498568e87c5a95c9958f19717213, recorded eleven individual dispositions with no new patches, and refreshed the full local verification. The seven broader failures and missing runtime secret still prevent completion; frozen intent, original baseline and activation gates remain unchanged.
 
@@ -214,6 +226,26 @@ Resumed at `ca95a70b9237498568e87c5a95c9958f19717213`, preserving baseline `5bb5
 | R6E1 | false | rejected | Carried: the original rejected finding, R4E1 and R5E1 cover the identical omitted/null SafeNextActions claim. It has always been a required positional persisted field and every identified writer supplies it. The reviewer again supplies no historical producer of an omitted/null value, so the proposed malformed persisted state does not establish the alleged reachable regression. |
 
 No patch or new deferral survives this review. Runtime code and tests remain unchanged. Frozen intent, prior dispositions/deferrals, A6/A13, retry-profile approval and native/primary completion requirements remain unchanged.
+
+### Seventh build review triage (2026-10-20)
+
+Resumed at `eeb738cd35597155c7abb53eac258f9e4f67fc82`, preserving baseline `5bb56567499c6df1c621184d3c3d35aa45521166`. All three independent context-free layers completed before classification: Blind Hunter returned ten findings, Edge Case Hunter returned one, and Verification Gap found no gaps. The reviewer diff is 962,343 bytes, excluding this claims file; the complete baseline audit and current-run diff are retained under `/tmp/story-1-5-oct20-build-3c7_lrdw/`. The broad historical baseline includes independently committed Story 1.6, release and BMAD work. Every finding repeats an explicit earlier disposition or ledger entry; the carried entries retain their ownership without duplicate deferrals or source changes.
+
+| ID | Verdict | Route | Evidence and disposition |
+| --- | --- | --- | --- |
+| R7B1 | medium | defer | Carried from Story 1.6 R22Build-BH-1/EH-2 and the release-maintenance ledger: `pack-release-packages.sh:28` still passes a prerelease SemVer into FileVersion. The reviewer independently reproduced CS7035 with warnings as errors. The helper is unchanged by this resume; numeric file-version handling remains release maintenance. |
+| R7B2 | medium | defer | Carried from Story 1.6 R22Build-BH-2/EH-1/VG-2: `release.yml:300-305` still performs an exact-tag lookup when semantic-release returns success without a release. This unchanged release issue already has its own ledger entry. |
+| R7B3 | medium | defer | Carried from Story 1.6 R22Build-BH-7/EH-4: the publication verifier's curl still has no transfer/connection timeout, so the outer deadline does not bound a stalled request. Existing release-maintenance ownership stands. |
+| R7B4 | low | defer | Carried from Story 1.6 R22Build-BH-6: the unchanged pack helper resolves its relative output directory on both sides of `cd`; its current caller starts at the root. A single resolved output path remains the recorded release-maintenance correction. |
+| R7B5 | medium | defer | Carried from the explicit Story 1.5 successor-uniqueness deferral: the pure reducer does not record a successor on the predecessor and can construct distinct equal-depth retries. Owner enforcement remains due with Stories 1.8/1.10 before live retry activation; no synthetic reducer test grants it. |
+| R7B6 | maybe-false | defer | Carried, unverified medium: the expected-plus-one commit invariant is explicit in both reducer and store. Accepted EventStore multi-event owner revision semantics are still required to settle its suitability when Story 1.8 wires the owner commit. |
+| R7B7 | maybe-false | defer | Carried, unverified medium: the SDK fake retains object references and does not prove equivalence against a production-serializer round trip. The original review deferral requires that evidence before canonical writes go live; no actual divergent stored value was demonstrated. |
+| R7B8 | maybe-false | defer | Carried from R3B6, unverified medium: the unchanged canonicalizer preserves numeric spellings. Accepted typed-command numeric equivalence and golden vectors remain required before owner activation; historical lifetime fingerprints are preserved. |
+| R7B9 | low | defer | Carried from the explicit pre-existing oneOf compatibility deferral: TaskId and CommandId have identical ULID schemas, so their remaining strict oneOf branches cannot match exactly one alternative. Current schema/legacy compatibility ownership is unchanged; this pass changes POST documentation only. |
+| R7B10 | medium | defer | Carried from Story 1.6 round 8: `AiActionApprovalGate:97-98` forwards only the snapshot ID from the resolved tenant/ID/version tuple. The production provider remains unavailable. Carrying the tuple into approval results and events stays with Story 1.6's accepted live-persistence scope; its policy behavior is preserved. |
+| R7E1 | medium | defer | Carried: the same no-release exact-tag failure as R7B2 and the existing R22Build-BH-2/EH-1/VG-2 ledger entry. It shares that root cause and release-maintenance follow-up. |
+
+All eleven raw findings retain individual rows. Grouping combines only R7B2/R7E1's same exact-tag defect; the other nine remain separate. There are no new patches, intent gaps, spec loopbacks or additional ledger entries. The three requested deferrals are resolved in their original ledger evidence, preserving the earlier text and review history. Frozen intent, A6/A13, retry-profile approval and native/primary obligations remain unchanged.
 
 ## Design Notes
 
@@ -523,6 +555,45 @@ XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.C
 The earlier exact unchanged-path check was rerun successfully, including the unrelated Server lifecycle/coordinator paths. No source, test, dependency, ACL or submodule changes were made. `git -c core.whitespace=cr-at-eol diff --check` passes and the frozen block is byte-identical to HEAD.
 
 The workflow halts at step-04 because required full verification remains failing and native/primary evidence is unavailable. The spec remains `in-review`, sprint tracking remains `in-progress`; no commit, completion transition or completion attestation is proposed. A6/A13, retry-profile approval and every prior explicit deferral remain open.
+
+### Seventh review verification (2026-10-20)
+
+The resumed patch resolves Round18Build-BH-1, Build15-VG-1 and Resume-BH-10. OpenAPI now qualifies the canonical refusal after earlier admission/authorization/policy checks and explicitly retains the policy commands' retryable HTTP 503 `dependency_degraded`. The standard NSwag build target regenerated only the four SubmitCommand XML remarks; the generated-client SHA-256 fixture is current. The shared CLI formatter theory now proves a nonblank accepted OperationId wins over distinct TaskId/CommandId in text and JSON, alongside the three historical fallback rows. The lookup catch adds `cancellationToken.ThrowIfCancellationRequested()` before dependency-error translation; no policy gate or denial mapping changed.
+
+- Red/green evidence: `CallerCancellationDuringFailedCollisionLookupShouldPropagateWithoutReservationAuditOrDispatch` failed before the source correction (no OperationCanceledException), then passed after it. Retained outputs: `TestResults/story-1-5-oct20-impl/red-server.{ctrf.json,trx}` and the passing `patch-server` result. The regression asserts the caller token and zero reservation, audit and dispatch. Existing active-caller IOException, dependency-owned cancellation, direct caller cancellation and successful-retry rows pass.
+- Focused results under `TestResults/story-1-5-oct20-impl/`: Server cancellation/canonical precedence **6**, policy admission/HTTP **32**, CLI identity/fallback **4**, Client generation/freshness **27**, all passed with zero skips. The policy rows cover all eight gated commands with and without concurrency. Client generation includes isolated NSwag regeneration and hash validation. Two initial filter probes (`green-server`, `policy-server`) executed zero cases and correctly exited 1; neither is passing evidence.
+- `dotnet build Hexalith.ChatBot.slnx --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false` passed with zero warnings/errors. Log: `/tmp/story-1-5-oct20-final-build.log`.
+- Each full lane ran with `XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.<Lane>.Tests/bin/Debug/net10.0/Hexalith.ChatBot.<Lane>.Tests TestResults/story-1-5-oct20-final/<lane>.ctrf.json -result-trx TestResults/story-1-5-oct20-final/<lane>.trx`, using lowercase result names. Exact commands, exits, failure names and logs are retained in `TestResults/story-1-5-oct20-final/lane-results.json`.
+
+| Current full lane | Passed | Failed | Skipped | Exit |
+| --- | ---: | ---: | ---: | ---: |
+| Contracts | 521 | 0 | 0 | 0 |
+| Client | 94 | 0 | 0 | 0 |
+| Server | 2931 | 0 | 0 | 0 |
+| Cli | 61 | 0 | 0 | 0 |
+| Architecture | 121 | 2 | 0 | 1 |
+| Conformance | 150 | 1 | 0 | 1 |
+
+Total **3878 passed, 3 failed, 0 skipped**. All 16 Matrix/acceptance methods and eight resumed-patch/control methods resolve to current passing TRX cases via test definitions, recorded in `TestResults/story-1-5-oct20-final/verification-audit.json`. This is a local result audit, not completion provenance. Unaffected UI/MCP lanes were not rerun; earlier disclosed UI package-pin failures are not claimed resolved.
+
+Required broader checks remain failing on unchanged paths. These exact commands each exited 1:
+
+```bash
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests TestResults/story-1-5-oct20-final/architecture.ctrf.json -result-trx TestResults/story-1-5-oct20-final/architecture.trx
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests TestResults/story-1-5-oct20-final/conformance.ctrf.json -result-trx TestResults/story-1-5-oct20-final/conformance.trx
+```
+
+- `LiveRecoveryValidationArchitectureTests.ReleasePublication_ShouldRequireFreshMainHeadImmediatelyBeforeSemanticRelease`: the existing release job has `timeout-minutes: 45`, but the guard expects 30 (already recorded by Story 1.6 R22Build-VG-1).
+- `ScaffoldArchitectureTests.RootDeclaredSiblingPackageWrappersShouldDelegateVersionsToSharedBuildsCatalog`: ten local version declarations remain in the EventStore/Parties/Works wrappers.
+- `DaprAccessControlConformanceTests.EventStorePolicyMustGrantEveryMappedSdkPostRoute`: the existing production ACL lacks `/project/rebuild/reclaim-guarded/v1`, `/project/rebuild/reclaim-recovery/v1`, `/project/source-guard/applied-receipt/v1`, `/project/source-guard/owner-proof/v1`, and `/project/source-guard/reconcile-applied-receipt/v1`.
+
+`git diff --exit-code HEAD -- .github/workflows/release.yml tests/Hexalith.ChatBot.Architecture.Tests/LiveRecoveryValidationArchitectureTests.cs tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs tests/Hexalith.ChatBot.Conformance.Tests/DaprAccessControlConformanceTests.cs src/Hexalith.ChatBot.AppHost/DaprComponents/accesscontrol.yaml references/Hexalith.EventStore/Directory.Packages.props references/Hexalith.Parties/Directory.Packages.props references/Hexalith.Works/Directory.Packages.props` returned exit 0 with no diff. No assertions, dependencies, submodules, ACLs or release gates were changed to mask these failures.
+
+The required Aspire baseline was attempted before code changes with `aspire start --non-interactive --apphost /home/administrator/projects/hexalith/chatbot/src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj`. Build passed, but startup returned exit **2**, AppHost exit **134**, because `ChatBot:LiveRecoveryValidation:MailboxClientSecret` (or legacy `LiveRecoveryValidation:MailboxClientSecret`) is unconfigured. Diagnostics: `/home/administrator/.aspire/logs/cli_20261020T105333_6ec9078b.log`. Exact-target `aspire describe --apphost /home/administrator/projects/hexalith/chatbot/src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --format Json --non-interactive` reported no running ChatBot host. Native owner/persisted-end-state acceptance remains unavailable.
+
+The frozen block is byte-identical to HEAD; `git -c core.whitespace=cr-at-eol diff --check` passes. Story 1.6's ADR, spec, `CommandGateway.cs`, `CommandGatewayAdmissionApiE2ETests.cs` and `CommandGatewayTests.cs` are unchanged. The only shared-source change is the caller-token check after the policy gate. Story 1.6 remains literal `review` in both its spec and sprint tracking.
+
+Story 1.5 is consistently spec `in-review` / sprint `review` after the requested patches and review. Required broad verification, native owner/protection evidence, retry-profile approval and the original explicit deferrals still prevent a done transition. No commit, push, completion attestation or runtime activation is proposed by this Story 1.5 pass.
 
 ## File List
 

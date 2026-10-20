@@ -209,6 +209,7 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // Lookup failure (including a dependency-cancelled read) has no reservation or effect to release.
             return ChatBotCommandAdmissionDecision.Rejected("idempotency_outcome_unavailable", submission.CorrelationId, submission.TaskId);
         }

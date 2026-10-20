@@ -277,6 +277,7 @@ public static class ChatBotCliCommandTests
     }
 
     [Theory]
+    [InlineData("accepted-operation", "historical-task", "accepted-operation")]
     [InlineData(null, "historical-task", "historical-task")]
     [InlineData("", "historical-task", "historical-task")]
     [InlineData(" ", null, "caller-command")]

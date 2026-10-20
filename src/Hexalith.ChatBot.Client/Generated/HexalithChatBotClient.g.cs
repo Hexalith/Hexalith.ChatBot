@@ -33,7 +33,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Submit a typed ChatBot command for governed processing.
         /// </summary>
         /// <remarks>
-        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. Requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal.
+        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. After earlier admission checks, including authorization and the policy persistence gate, requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal. The policy persistence gate takes precedence for all eight policy snapshot commands, returning HTTP 503 dependency_degraded with retryable: true and clientAction: retry-later even when concurrency is present.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
@@ -46,7 +46,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Submit a typed ChatBot command for governed processing.
         /// </summary>
         /// <remarks>
-        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. Requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal.
+        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. After earlier admission checks, including authorization and the policy persistence gate, requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal. The policy persistence gate takes precedence for all eight policy snapshot commands, returning HTTP 503 dependency_degraded with retryable: true and clientAction: retry-later even when concurrency is present.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
@@ -283,7 +283,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Submit a typed ChatBot command for governed processing.
         /// </summary>
         /// <remarks>
-        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. Requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal.
+        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. After earlier admission checks, including authorization and the policy persistence gate, requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal. The policy persistence gate takes precedence for all eight policy snapshot commands, returning HTTP 503 dependency_degraded with retryable: true and clientAction: retry-later even when concurrency is present.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
@@ -299,7 +299,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Submit a typed ChatBot command for governed processing.
         /// </summary>
         /// <remarks>
-        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. Requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal.
+        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. After earlier admission checks, including authorization and the policy persistence gate, requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal. The policy persistence gate takes precedence for all eight policy snapshot commands, returning HTTP 503 dependency_degraded with retryable: true and clientAction: retry-later even when concurrency is present.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
