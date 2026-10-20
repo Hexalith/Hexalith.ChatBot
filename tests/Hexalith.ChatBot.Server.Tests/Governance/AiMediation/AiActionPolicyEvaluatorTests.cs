@@ -1,5 +1,6 @@
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Server.Acceptance;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 
 using Shouldly;
@@ -26,6 +27,20 @@ public sealed class AiActionPolicyEvaluatorTests
         decision.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskExecuteAllowed);
         decision.ReasonCode.ShouldBe("low-risk-execute-allowed");
         decision.SafeNextAction.ShouldBe("none");
+        decision.TenantId.ShouldBe("tenant-alpha");
+        decision.PolicySnapshotId.ShouldBe("policy-snap-001");
+        decision.PolicyVersion.ShouldBe(1);
+    }
+
+    /// <summary>Pins the Story 13.2 acceptance provider to the exact tuple the evaluator requires.</summary>
+    [Fact]
+    public async Task Story132AcceptanceProviderMustResolveTheExactRequestedTuple()
+    {
+        DefaultAiActionPolicyEvaluator evaluator = new(new Story132AcceptanceTenantAiPolicySnapshotProvider());
+
+        AiActionPolicyDecision decision = await evaluator.EvaluateAsync(Request(), TestContext.Current.CancellationToken);
+
+        decision.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskExecuteAllowed);
         decision.TenantId.ShouldBe("tenant-alpha");
         decision.PolicySnapshotId.ShouldBe("policy-snap-001");
         decision.PolicyVersion.ShouldBe(1);

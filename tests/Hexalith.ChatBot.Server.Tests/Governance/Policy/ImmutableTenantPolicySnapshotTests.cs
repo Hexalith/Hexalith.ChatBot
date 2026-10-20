@@ -214,10 +214,11 @@ public sealed class ImmutableTenantPolicySnapshotTests
         retained.Snapshots.ShouldHaveSingleItem().ShouldBeSameAs(original);
     }
 
-    /// <summary>Keeps M0 and M1 declared knob sets separate and complete.</summary>
+    /// <summary>Keeps M0 and M1 declared knob sets separate and complete, and rejects unknown schema versions.</summary>
     [Fact]
     public void SyntheticSchemaMustRejectM1KnobsInM0AndIncompleteM1Values()
     {
+        Should.Throw<ArgumentException>(() => Snapshot(schema: "synthetic-unknown-schema"));
         TenantPolicyChangeSet completeM1 = M1Values();
         Snapshot(schema: TenantPolicySchemaVersions.M1Preview, values: completeM1).SchemaVersion.ShouldBe(TenantPolicySchemaVersions.M1Preview);
         Should.Throw<ArgumentException>(() => Snapshot(values: new([.. TenantPolicySchema.DefaultM0Values,
