@@ -37,8 +37,9 @@ The retention and inventory contracts and their suspended admission are also
 documented in [`data-class-inventory-and-retention-policy.md`](data-class-inventory-and-retention-policy.md).
 
 The [2026-10-17 Story 1.6 code-review scope decision](../../_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md#review-findings-round-14)
-keeps the per-actor `Submit*RateLimit` and disable/quarantine controls outside this
-gate: these are operational controls with
+keeps the per-target `Submit*RateLimit` and disable/quarantine controls for AI
+actors, service clients, mailbox sources, command capabilities and outbound
+channels outside this gate: these are operational controls with
 no proposed snapshot or old/new snapshot fingerprints. `SubmitConsentLawfulBasisRecord`
 also stays outside the gate because it records per-subject consent, rather than
 proposing a replacement tenant policy or configuration snapshot.
@@ -48,14 +49,17 @@ This exclusion does not establish A6 acceptance for either workflow.
 
 All eight commands are denied before admission reservation or dispatch. This applies to legacy HTTP requests, canonical requests, SDK `/process`
 requests, and correctly signed admission markers. A marker proves transport
-integrity; it is not protection or isolation approval. Existing authentication and
-tenant-binding failures keep their safe semantics. HTTP admission runs the gate
-after grant authorization, so authorization denials keep their reason and spike
-counter. SDK `/process` runs it after authentication and tenant binding but before
-grant authorization: an authenticated, tenant-bound caller without a grant, such as
-a relayed `service-account-*` subject, receives `policy-snapshot-unavailable`
-instead of `authorization_denied`, without a spike-counter increment. This order is
-decided; the request is denied either way. The SDK check is the only `/process`
+integrity; it is not protection or isolation approval. HTTP admission runs the gate
+after authentication, tenant binding (including payload tenant targets) and grant
+authorization, so those denials keep their reason and spike counter. SDK `/process`
+runs it after authentication and the envelope tenant check but before payload
+validation, the canonical-target check, payload tenant-target binding and grant
+authorization. A caller whose envelope subject and tenant match therefore receives
+`policy-snapshot-unavailable`, without a spike-counter increment, where the
+ungated path would return `authorization_denied` (no grant, such as a relayed
+`service-account-*` subject, or a misrouted aggregate), `invalid_command_payload`
+(a malformed payload) or `tenant_mismatch` (a payload naming another tenant). This
+order is decided; the request is denied either way. The SDK check is the only `/process`
 gate for these commands: without it, an unmarked relay would still meet the shared
 pipeline gate after authorization, but a validly marked command would return
 accepted without reaching that gate. Denials record the existing
