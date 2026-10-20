@@ -44,7 +44,7 @@ no proposed snapshot or old/new snapshot fingerprints. `SubmitConsentLawfulBasis
 also stays outside the gate because it records per-subject consent, rather than
 proposing a replacement tenant policy or configuration snapshot.
 `SubmitTenantExportRequest` and `SubmitDeletionErasureRequest` also stay outside
-this gate because they reference existing snapshots rather than propose replacements.
+this gate because they reference snapshot identifiers rather than propose replacements.
 This exclusion does not establish A6 acceptance for either workflow.
 
 All eight commands are denied before admission reservation or dispatch. This applies to legacy HTTP requests, canonical requests, SDK `/process`
