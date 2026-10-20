@@ -1658,3 +1658,10 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Reconcile the release job timeout with its existing Architecture guard (pre-existing, medium).
   evidence: R22Build-VG-1: release.yml:269 says timeout-minutes: 45, but LiveRecoveryValidationArchitectureTests.cs:633 requires 30. A fresh Debug build passed, then the exact native test ReleasePublication_ShouldRequireFreshMainHeadImmediatelyBeforeSemanticRelease failed 0/1 passed with zero skips. Current failed CTRF/TRX/logs are TestResults/story-1-6/round-22-release-guard.*; do not weaken the guard without deciding the intended release budget.
+
+
+## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-20, round 25)
+
+- source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
+  summary: Addendum to the round-15 `"unavailable"` sentinel entry: the approved-AI dispatch marks an external effect attempted before the aggregate's policy guard runs, so fixing only the guard is not enough (pre-existing, unverified medium).
+  evidence: `AcceptedCommandDispatcher.cs:757` (unchanged since baseline `38ca946:757`) substitutes the literal `"unavailable"` for a missing `ExecuteApprovedAIAction.PolicySnapshotId`, then calls `MarkExternalEffectAttempted` and `PrepareAppendConversationMessageAsync` before `GovernedOperationAggregate.cs:2465` can refuse. If human-approved execution must require a resolved policy snapshot, the dispatcher has to treat the sentinel as missing before the external effect, not only the aggregate guard. Settle together with the existing sentinel entry.
