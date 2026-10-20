@@ -68,11 +68,11 @@ would get `tenant_mismatch`, and a caller without a grant, such as a relayed
 `notification_routing_unauthorized` for `SubmitNotificationRoutingChange`,
 otherwise `threshold_policy_unauthorized`. Each of those authorization reasons
 would record the fact and increment the spike counter. This order is decided; the
-request is denied either way. The SDK check is the only `/process` gate for these
-commands: without it, an unmarked request would still be denied before admission
-(at the canonical-target check, by authorization, or by the shared pipeline gate),
-but a validly marked command would return accepted without reaching the pipeline
-gate. Denials record the existing
+request is denied either way. The SDK check is the only gate on the validly marked
+`/process` path for these commands: without it, an unmarked request would still
+be denied before admission (at the canonical-target check, by authorization, or
+by the shared pipeline gate), but a validly marked command would return accepted
+without reaching the pipeline gate. Denials record the existing
 metadata-only authorization-failure fact with `policy-snapshot-unavailable`, mapped
 by the safe-message catalog to `dependency_degraded`. No protected policy values
 are included in that outcome. Denials with `policy-snapshot-unavailable` do not
