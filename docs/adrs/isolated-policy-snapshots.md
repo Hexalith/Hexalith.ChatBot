@@ -55,14 +55,24 @@ authorization, so those denials keep their reason and spike counter. SDK `/proce
 runs it after authentication and the envelope tenant check but before payload
 validation, the canonical-target check, payload tenant-target binding and grant
 authorization. A caller whose envelope subject and tenant match therefore receives
-`policy-snapshot-unavailable`, without a spike-counter increment, where the
-ungated path would return `authorization_denied` (no grant, such as a relayed
-`service-account-*` subject, or a misrouted aggregate), `invalid_command_payload`
-(a malformed payload) or `tenant_mismatch` (a payload naming another tenant). This
-order is decided; the request is denied either way. The SDK check is the only `/process`
-gate for these commands: without it, an unmarked relay would still meet the shared
-pipeline gate after authorization, but a validly marked command would return
-accepted without reaching that gate. Denials record the existing
+`policy-snapshot-unavailable`, recorded without a spike-counter increment, where
+the ungated path would return another reason. A malformed payload gets
+`invalid_command_payload`, which records no authorization-failure fact and no
+increment. `SubmitEscalationPolicyChange`, `SubmitMailboxConfigurationChange`,
+`SubmitRetentionConfigurationChange` and `SubmitDataClassInventoryChange` have no
+canonical dispatch target, so every other unmarked request for them gets
+`authorization_denied` at the canonical-target check. For the other four, a
+misrouted aggregate gets `authorization_denied`, a payload naming another tenant
+gets `tenant_mismatch`, and a caller without a grant, such as a relayed
+`service-account-*` subject, gets the command's authorization reason:
+`notification_routing_unauthorized` for `SubmitNotificationRoutingChange`,
+otherwise `threshold_policy_unauthorized`. Each of those authorization reasons
+records the fact and increments the spike counter. This order is decided; the
+request is denied either way. The SDK check is the only `/process` gate for these
+commands: without it, an unmarked request would still be denied before admission
+(at the canonical-target check, by authorization, or by the shared pipeline gate),
+but a validly marked command would return accepted without reaching the pipeline
+gate. Denials record the existing
 metadata-only authorization-failure fact with `policy-snapshot-unavailable`, mapped
 by the safe-message catalog to `dependency_degraded`. No protected policy values
 are included in that outcome. Denials with `policy-snapshot-unavailable` do not
