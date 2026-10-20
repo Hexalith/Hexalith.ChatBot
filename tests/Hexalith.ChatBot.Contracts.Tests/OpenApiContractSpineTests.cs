@@ -128,6 +128,68 @@ public static partial class OpenApiContractSpineTests
             .ShouldBe("#/components/schemas/PriorCommandOutcome");
     }
 
+    [Theory]
+    [InlineData("01ARZ3NDEKTSV4RRFFQ69G5FAY", true)]
+    [InlineData("01ARZ3NDEKTSV4RRFFQ69G5FAZ", true)]
+    [InlineData("", false)]
+    [InlineData("not-an-operation", false)]
+    [InlineData("01arz3ndektsv4rrffq69g5fay", false)]
+    [InlineData("01ARZ3NDEKTSV4RRFFQ69G5FAI", false)]
+    [InlineData("01ARZ3NDEKTSV4RRFFQ69G5FAY0", false)]
+    public static void OperationIdentifiersShouldValidateTheirCommonUlidShapeAtEveryHistoricalLocation(string identifier, bool valid)
+    {
+        YamlMappingNode root = LoadContract();
+        YamlMappingNode schemas = Mapping(Mapping(root, "components"), "schemas");
+        YamlMappingNode[] locations = [
+            Mapping(Sequence(Operation(root, "/api/v1/operations/{operationId}", "get"), "parameters").Children[0].ShouldBeOfType<YamlMappingNode>(), "schema"),
+            Mapping(Sequence(Operation(root, "/api/v1/operations/{operationId}/audit-history", "get"), "parameters").Children[0].ShouldBeOfType<YamlMappingNode>(), "schema"),
+            Mapping(Mapping(Mapping(schemas, "OperationStatus"), "properties"), "originalOperationId"),
+            Mapping(Mapping(Mapping(schemas, "OperationAuditHistory"), "properties"), "operationId"),
+        ];
+        foreach (YamlMappingNode schema in locations)
+        {
+            Scalar(schema, "$ref").ShouldBe("#/components/schemas/CommandId");
+            if (valid) { ValidateExampleNode(root, new YamlScalarNode(identifier), schema, "operation-identifier"); }
+            else { Should.Throw<ShouldAssertException>(() => ValidateExampleNode(root, new YamlScalarNode(identifier), schema, "operation-identifier")); }
+        }
+    }
+
+    [Theory]
+    [InlineData("01ARZ3NDEKTSV4RRFFQ69G5FAY", true)]
+    [InlineData("invalid", false)]
+    public static void ExampleValidationMustRejectBothOverlappingAndUnmatchedOneOfBranches(string identifier, bool overlaps)
+    {
+        YamlMappingNode root = LoadContract();
+        YamlMappingNode schema = new()
+        {
+            { new YamlScalarNode("oneOf"), new YamlSequenceNode(
+                new YamlMappingNode { { new YamlScalarNode("$ref"), new YamlScalarNode("#/components/schemas/TaskId") } },
+                new YamlMappingNode { { new YamlScalarNode("$ref"), new YamlScalarNode("#/components/schemas/CommandId") } }) },
+        };
+        Should.Throw<ShouldAssertException>(() => ValidateExampleNode(root, new YamlScalarNode(identifier), schema, "overlap"))
+            .Message.ShouldContain("exactly one");
+        if (overlaps)
+        {
+            foreach (YamlMappingNode branch in Sequence(schema, "oneOf").Children.OfType<YamlMappingNode>())
+            {
+                ValidateExampleNode(root, new YamlScalarNode(identifier), branch, "valid-branch");
+            }
+        }
+    }
+
+    [Fact]
+    public static void ExampleValidationMustAcceptExactlyOneMatchingOneOfBranch()
+    {
+        YamlMappingNode root = LoadContract();
+        YamlMappingNode schema = new()
+        {
+            { new YamlScalarNode("oneOf"), new YamlSequenceNode(
+                new YamlMappingNode { { new YamlScalarNode("$ref"), new YamlScalarNode("#/components/schemas/TaskId") } },
+                new YamlMappingNode { { new YamlScalarNode("type"), new YamlScalarNode("integer") } }) },
+        };
+        ValidateExampleNode(root, new YamlScalarNode("01ARZ3NDEKTSV4RRFFQ69G5FAY"), schema, "one-match");
+    }
+
     [Fact]
     public static void ExampleValidationMustRejectEmptyDeclaredSafeNextActions()
     {
@@ -610,10 +672,13 @@ public static partial class OpenApiContractSpineTests
 
         if (schema.Children.TryGetValue(new YamlScalarNode("oneOf"), out YamlNode? oneOf))
         {
-            // The existing TaskId/CommandId alternatives share the same ULID shape.
-            // Validate their common wire shape without treating the overlap as an example error.
-            ValidateExampleNode(root, value, oneOf.ShouldBeOfType<YamlSequenceNode>().Children[0]
-                .ShouldBeOfType<YamlMappingNode>(), path);
+            int matches = 0;
+            foreach (YamlMappingNode branch in oneOf.ShouldBeOfType<YamlSequenceNode>().Children.OfType<YamlMappingNode>())
+            {
+                try { ValidateExampleNode(root, value, branch, path); matches++; }
+                catch (ShouldAssertException) { }
+            }
+            matches.ShouldBe(1, $"{path} must match exactly one oneOf branch");
             return;
         }
 

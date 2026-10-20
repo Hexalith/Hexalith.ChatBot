@@ -22,14 +22,6 @@ internal sealed class OperationStatusWorkflowStatusSink(
             return;
         }
 
-        OperationStatusRecord? existing = await statusStore
-            .TryGetAsync(request.TenantId, request.OperationId, cancellationToken)
-            .ConfigureAwait(false);
-        if (existing is null)
-        {
-            return;
-        }
-
         string? currentFailure = string.IsNullOrWhiteSpace(workflowLastFailureCode)
             || string.Equals(workflowLastFailureCode, CorrectionPropagationWorkflowFailureCodes.None, StringComparison.Ordinal)
             ? null
@@ -46,26 +38,35 @@ internal sealed class OperationStatusWorkflowStatusSink(
             : completed
                 ? ChatBotMessageCodes.AssociationCorrectionPropagationComplete
                 : ChatBotMessageCodes.AssociationCorrectionPropagationPending;
-        OperationStatusRecord updated = existing with
+        await statusStore.UpdateAsync(request.TenantId, request.OperationId, existing =>
         {
-            WorkflowInstanceId = request.WorkflowInstanceId,
-            WorkflowStatus = workflowStatus,
-            WorkflowRetryCount = workflowRetryCount,
-            WorkflowLastFailureCode = currentFailure,
-            FailureReasonCode = currentFailure,
-            TerminalReasonCode = failed ? ChatBotMessageCodes.AssociationCorrectionPropagationFailed : null,
-            ReasonCode = reason,
-            SafeNextActions = [ChatBotMessageCatalog.Resolve(reason).NextAction],
-            CompletionStatus = failed ? OperationStatusRecord.Failed
-                : completed ? OperationStatusRecord.Completed
-                : existing.CompletionStatus == OperationStatusRecord.Failed
-                    ? OperationStatusRecord.AcceptedProjectionPending
-                    : existing.CompletionStatus,
-            MaxAttempts = retrying || failed ? Math.Max(existing.MaxAttempts, 5) : existing.MaxAttempts,
-            RetryCount = retrying || failed ? workflowRetryCount : existing.RetryCount,
-            NextRetryAt = retrying ? retryDueAt : null,
-            LastUpdatedAt = now,
-        };
-        await statusStore.UpsertAsync(updated, cancellationToken).ConfigureAwait(false);
+            if (existing is null) { return null; }
+            // Completion is final for this instance; failed workflows may still intentionally restart.
+            if (existing.WorkflowStatus == CorrectionPropagationWorkflowStatuses.Completed &&
+                string.Equals(existing.WorkflowInstanceId, request.WorkflowInstanceId, StringComparison.Ordinal))
+            {
+                return null;
+            }
+            return existing with
+            {
+                WorkflowInstanceId = request.WorkflowInstanceId,
+                WorkflowStatus = workflowStatus,
+                WorkflowRetryCount = workflowRetryCount,
+                WorkflowLastFailureCode = currentFailure,
+                FailureReasonCode = currentFailure,
+                TerminalReasonCode = failed ? ChatBotMessageCodes.AssociationCorrectionPropagationFailed : null,
+                ReasonCode = reason,
+                SafeNextActions = [ChatBotMessageCatalog.Resolve(reason).NextAction],
+                CompletionStatus = failed ? OperationStatusRecord.Failed
+                    : completed ? OperationStatusRecord.Completed
+                    : existing.CompletionStatus == OperationStatusRecord.Failed
+                        ? OperationStatusRecord.AcceptedProjectionPending
+                        : existing.CompletionStatus,
+                MaxAttempts = retrying || failed ? Math.Max(existing.MaxAttempts, 5) : existing.MaxAttempts,
+                RetryCount = retrying || failed ? workflowRetryCount : existing.RetryCount,
+                NextRetryAt = retrying ? retryDueAt : null,
+                LastUpdatedAt = now < existing.LastUpdatedAt ? existing.LastUpdatedAt : now,
+            };
+        }, cancellationToken).ConfigureAwait(false);
     }
 }

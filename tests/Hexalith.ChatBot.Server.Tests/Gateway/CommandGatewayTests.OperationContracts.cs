@@ -10,6 +10,8 @@ using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Tests.Operations;
+using Hexalith.ChatBot.Server.Tests.Gateway.Status;
+using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 
 using Shouldly;
 
@@ -17,6 +19,146 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway;
 
 public sealed partial class CommandGatewayTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task ConcurrentDuplicateSuppressionsShouldIncrementExactlyOnceEachAndRetainTerminalWorkflowGuidance(bool sdk, bool failed)
+    {
+        using RacingOperationStatusStore status = new(sdk);
+        RecordingDispatcher dispatcher = new();
+        MutableClock clock = new(FixedClock.FixedUtcNow);
+        CommandGateway gateway = Gateway(dispatcher, clock: clock, operationStatusStore: status,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+        ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), MailboxCommand(), origin: Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigin.Mailbox);
+        CommandSubmissionResponse receipt = (await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken)).Accepted!;
+        OperationStatusWorkflowStatusSink sink = new(status, clock);
+        CorrectionPropagationRequest request = WorkflowRequest(receipt);
+        clock.UtcNow += TimeSpan.FromSeconds(2);
+        await sink.ReportAsync(request, failed ? CorrectionPropagationWorkflowStatuses.Failed : CorrectionPropagationWorkflowStatuses.Completed,
+            3, failed ? ChatBotMessageCodes.AssociationCorrectionStoreUnavailable : null, TestContext.Current.CancellationToken);
+        OperationStatusRecord terminal = (await status.TryGetAsync(BoundTenant, receipt.OperationId, TestContext.Current.CancellationToken))!;
+        await status.UpsertAsync(terminal with { PartialOutputCodes = ["retained-output"] }, TestContext.Current.CancellationToken);
+        // A regressed clock must not make the legacy timestamp policy discard the successful increment.
+        clock.UtcNow -= TimeSpan.FromSeconds(1);
+        status.Arm();
+        Task<ChatBotGatewayResult> Replay() => Task.Run(async () => await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken).ConfigureAwait(false), TestContext.Current.CancellationToken);
+        ChatBotGatewayResult[] results = await Task.WhenAll(Replay(), Replay());
+        foreach (ChatBotGatewayResult result in results) { result.IsAccepted.ShouldBeTrue(); AssertPreparedOutcome(result.Accepted!, receipt); }
+        OperationStatusRecord stored = (await status.TryGetAsync(BoundTenant, receipt.OperationId, TestContext.Current.CancellationToken))!;
+        stored.DuplicateAttemptCount.ShouldBe(2);
+        stored.CompletionStatus.ShouldBe(terminal.CompletionStatus);
+        stored.WorkflowStatus.ShouldBe(terminal.WorkflowStatus);
+        stored.WorkflowRetryCount.ShouldBe(3);
+        stored.ReasonCode.ShouldBe(terminal.ReasonCode);
+        stored.SafeNextActions.ShouldBe(terminal.SafeNextActions);
+        stored.TerminalReasonCode.ShouldBe(terminal.TerminalReasonCode);
+        stored.WorkflowLastFailureCode.ShouldBe(terminal.WorkflowLastFailureCode);
+        stored.LastUpdatedAt.ShouldBe(terminal.LastUpdatedAt);
+        stored.PartialOutputCodes.ShouldBe(["retained-output", "duplicate_suppressed"]);
+        stored.AuditStatus.ShouldBe(OperationStatusRecord.AuditCommitted);
+        stored.PriorOutcome.ShouldNotBeNull();
+        AssertPreparedOutcome(stored.PriorOutcome, receipt);
+        dispatcher.DispatchCount.ShouldBe(1);
+        status.CallbackCount.ShouldBe(3);
+        if (sdk) { status.ConditionalConflicts.ShouldBe(1); }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task DuplicateReplayRacingTerminalWorkflowShouldRetainBothLatestFieldsAndExactCount(bool sdk, bool failed)
+    {
+        using RacingOperationStatusStore status = new(sdk) { SecondWriterWins = true };
+        RecordingDispatcher dispatcher = new();
+        MutableClock clock = new(FixedClock.FixedUtcNow);
+        CommandGateway gateway = Gateway(dispatcher, clock: clock, operationStatusStore: status,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+        ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), MailboxCommand(), origin: Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigin.Mailbox);
+        CommandSubmissionResponse receipt = (await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken)).Accepted!;
+        OperationStatusWorkflowStatusSink sink = new(status, clock);
+        clock.UtcNow += TimeSpan.FromSeconds(2);
+        status.Arm();
+        Task workflow = Task.Run(async () => await sink.ReportAsync(WorkflowRequest(receipt),
+            failed ? CorrectionPropagationWorkflowStatuses.Failed : CorrectionPropagationWorkflowStatuses.Completed,
+            3, failed ? ChatBotMessageCodes.AssociationCorrectionStoreUnavailable : null, TestContext.Current.CancellationToken).ConfigureAwait(false), TestContext.Current.CancellationToken);
+        await status.FirstSnapshotRead.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        clock.UtcNow += TimeSpan.FromSeconds(1);
+        Task replay = Task.Run(async () => (await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken).ConfigureAwait(false)).IsAccepted.ShouldBeTrue(), TestContext.Current.CancellationToken);
+        await Task.WhenAll(replay, workflow);
+        OperationStatusRecord stored = (await status.TryGetAsync(BoundTenant, receipt.OperationId, TestContext.Current.CancellationToken))!;
+        stored.OperationId.ShouldBe(receipt.OperationId);
+        stored.CommandId.ShouldBe(receipt.CommandId);
+        stored.CorrelationId.ShouldBe(receipt.CorrelationId);
+        stored.AcceptedAt.ShouldBe(receipt.AcceptedAt);
+        stored.DuplicateAttemptCount.ShouldBe(1);
+        stored.WorkflowStatus.ShouldBe(failed ? CorrectionPropagationWorkflowStatuses.Failed : CorrectionPropagationWorkflowStatuses.Completed);
+        stored.CompletionStatus.ShouldBe(failed ? OperationStatusRecord.Failed : OperationStatusRecord.Completed);
+        stored.ReasonCode.ShouldBe(failed ? ChatBotMessageCodes.AssociationCorrectionPropagationFailed : ChatBotMessageCodes.AssociationCorrectionPropagationComplete);
+        stored.SafeNextActions.ShouldBe([ChatBotMessageCatalog.Resolve(stored.ReasonCode).NextAction]);
+        stored.TerminalReasonCode.ShouldBe(failed ? ChatBotMessageCodes.AssociationCorrectionPropagationFailed : null);
+        stored.PartialOutputCodes.ShouldNotBeNull().ShouldContain("duplicate_suppressed");
+        stored.AuditStatus.ShouldBe(OperationStatusRecord.AuditCommitted);
+        stored.LastUpdatedAt.ShouldBe(clock.UtcNow);
+        stored.PriorOutcome.ShouldNotBeNull();
+        AssertPreparedOutcome(stored.PriorOutcome, receipt);
+        dispatcher.DispatchCount.ShouldBe(1);
+        status.CallbackCount.ShouldBe(3);
+        if (sdk) { status.ConditionalConflicts.ShouldBe(1); }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task ReplayAtomicRetryShouldRecheckCallerCancellationAndCurrentAuthorityBeforeMutation(bool sdk, bool cancel)
+    {
+        using RacingOperationStatusStore status = new(sdk) { SecondWriterWins = true };
+        TrustedAuthorityClock clock = new();
+        SyntheticOwnerAuthorityProvider owner = new(clock) { Transform = evidence => evidence with { ExpiresAt = clock.UtcNow.AddSeconds(1) } };
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter audit = new();
+        InMemoryAuthorizationFailureCounter counter = new(clock);
+        CommandGateway gateway = Gateway(dispatcher, clock: clock, operationStatusStore: status, auditWriter: audit,
+            authorizationFailureCounter: counter, requestAuthorizer: TrustedAuthorityFixture.Authorizer(clock, owner));
+        ChatBotCommandSubmission submission = Submission(TrustedAuthorityFixture.Principal(),
+            new Hexalith.ChatBot.Contracts.Commands.RecordGovernedNote("01ARZ3NDEKTSV4RRFFQ69G5FAZ"));
+        CommandSubmissionResponse receipt = (await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken)).Accepted!;
+        using CancellationTokenSource caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        status.BeforeRetry = () => { if (cancel) { caller.Cancel(); } else { clock.UtcNow += TimeSpan.FromSeconds(2); } };
+        status.Arm();
+        Task<ChatBotGatewayResult> replay = Task.Run(async () => await gateway.SubmitAsync(submission, caller.Token).ConfigureAwait(false), TestContext.Current.CancellationToken);
+        await status.FirstSnapshotRead.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await Task.Run(async () => await status.UpdateAsync(BoundTenant, receipt.OperationId,
+            current => current! with { DuplicateAttemptCount = 1 }, TestContext.Current.CancellationToken).ConfigureAwait(false), TestContext.Current.CancellationToken);
+        if (cancel)
+        {
+            (await Should.ThrowAsync<OperationCanceledException>(() => replay)).CancellationToken.ShouldBe(caller.Token);
+            audit.AuthorizationFailures.ShouldBeEmpty();
+        }
+        else
+        {
+            (await replay.ConfigureAwait(true)).Problem.ShouldNotBeNull().Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+            audit.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+            counter.ReadAndReset().ShouldHaveSingleItem().FailureCount.ShouldBe(1);
+        }
+        OperationStatusRecord stored = (await status.TryGetAsync(BoundTenant, receipt.OperationId, TestContext.Current.CancellationToken))!;
+        stored.DuplicateAttemptCount.ShouldBe(1);
+        stored.PriorOutcome.ShouldBeNull();
+        stored.AuditStatus.ShouldBe(OperationStatusRecord.AuditCommitted);
+        dispatcher.DispatchCount.ShouldBe(1);
+        status.CallbackCount.ShouldBe(3);
+        if (sdk) { status.ConditionalConflicts.ShouldBe(1); }
+    }
+
+    private static CorrectionPropagationRequest WorkflowRequest(CommandSubmissionResponse receipt)
+        => new(BoundTenant, "actor", "association", "intake", "correction", "workflow", "prior-project", "corrected-project", 1,
+            receipt.CorrelationId, receipt.AcceptedAt, receipt.AcceptedAt.AddMinutes(1), OperationId: receipt.OperationId);
+
     [Fact]
     public async Task NewCommandIdShouldNotAliasHistoricalTaskBasedOperationBeforeDispatch()
     {

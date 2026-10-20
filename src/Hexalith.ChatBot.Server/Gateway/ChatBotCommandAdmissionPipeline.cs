@@ -378,31 +378,31 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         }
 
         RequireCurrentAuthority(context);
-        OperationStatusRecord? existingStatus = await operationStatusStore
-            .TryGetAsync(context.TenantBinding.TenantId, OperationStatusRecord.OperationIdFor(priorOutcome), cancellationToken)
-            .ConfigureAwait(false);
-        RequireCurrentAuthority(context);
-        OperationStatusRecord replayStatus = existingStatus is not null
-            ? existingStatus with { LastUpdatedAt = clock.UtcNow }
-            : OperationStatusRecord.Accepted(context.TenantBinding.TenantId, priorOutcome, true, clock.UtcNow,
-                idempotencyDecision.Metadata.OperationClass);
-        replayStatus = replayStatus with { PriorOutcome = priorOutcome };
-        if (string.Equals(idempotencyDecision.Metadata.OperationClass, CoarseIdempotencyOperationClass.MessageIntake.Code, StringComparison.Ordinal))
+        await operationStatusStore.UpdateAsync(context.TenantBinding.TenantId, OperationStatusRecord.OperationIdFor(priorOutcome), existingStatus =>
         {
-            replayStatus = replayStatus with
+            cancellationToken.ThrowIfCancellationRequested();
+            RequireCurrentAuthority(context);
+            OperationStatusRecord replayStatus = existingStatus is not null
+                ? existingStatus with { LastUpdatedAt = clock.UtcNow < existingStatus.LastUpdatedAt ? existingStatus.LastUpdatedAt : clock.UtcNow }
+                : OperationStatusRecord.Accepted(context.TenantBinding.TenantId, priorOutcome, true, clock.UtcNow,
+                    idempotencyDecision.Metadata.OperationClass);
+            replayStatus = replayStatus with { PriorOutcome = priorOutcome };
+            if (string.Equals(idempotencyDecision.Metadata.OperationClass, CoarseIdempotencyOperationClass.MessageIntake.Code, StringComparison.Ordinal))
             {
-                OperationClass = CoarseIdempotencyOperationClass.MessageIntake.Code,
-                OriginalOperationId = OperationStatusRecord.OperationIdFor(priorOutcome),
-                DuplicateAttemptCount = replayStatus.DuplicateAttemptCount + 1,
-                DuplicateSafetyNote = "duplicate-provider-message-suppressed",
-                SafeNextActions = [Hexalith.ChatBot.Contracts.Messages.ChatBotMessageNextActions.None],
-                PartialOutputCodes = ["duplicate_suppressed"],
-            };
-        }
-
-        await operationStatusStore
-            .UpsertAsync(replayStatus, cancellationToken)
-            .ConfigureAwait(false);
+                replayStatus = replayStatus with
+                {
+                    OperationClass = CoarseIdempotencyOperationClass.MessageIntake.Code,
+                    OriginalOperationId = OperationStatusRecord.OperationIdFor(priorOutcome),
+                    DuplicateAttemptCount = replayStatus.DuplicateAttemptCount + 1,
+                    DuplicateSafetyNote = "duplicate-provider-message-suppressed",
+                    SafeNextActions = existingStatus?.WorkflowStatus is not null ? replayStatus.SafeNextActions
+                        : [Hexalith.ChatBot.Contracts.Messages.ChatBotMessageNextActions.None],
+                    PartialOutputCodes = [.. (replayStatus.PartialOutputCodes ?? []).Union(["duplicate_suppressed"], StringComparer.Ordinal)],
+                };
+            }
+            return replayStatus;
+        }, cancellationToken).ConfigureAwait(false);
+        RequireCurrentAuthority(context);
     }
 
     private void RequireCurrentAuthority(ChatBotGatewayContext context)

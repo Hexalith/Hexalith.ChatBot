@@ -9,6 +9,16 @@ namespace Hexalith.ChatBot.Server.Gateway.Status;
 /// <summary>Shared policy evaluated inside each atomic update, including every SDK ETag retry.</summary>
 internal static class OperationStatusUpdatePolicy
 {
+    /// <summary>Validates the addressed key as well as the immutable stored identity.</summary>
+    public static OperationStatusRecord ApplyUpdate(string tenantId, string operationId, OperationStatusRecord? current, OperationStatusRecord incoming)
+    {
+        if (incoming.TenantId != tenantId || incoming.OperationId != operationId)
+        {
+            throw new OperationStatusUpdateConflictException();
+        }
+        return Apply(current, incoming);
+    }
+
     /// <summary>Preserves immutable identity and monotonic canonical state; rejects conflicting equal revisions.</summary>
     public static OperationStatusRecord Apply(OperationStatusRecord? current, OperationStatusRecord incoming)
     {

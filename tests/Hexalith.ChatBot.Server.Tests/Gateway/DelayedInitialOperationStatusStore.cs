@@ -29,4 +29,8 @@ internal sealed class DelayedInitialOperationStatusStore(bool failInitialWrite) 
 
     public ValueTask<OperationStatusRecord?> TryGetAsync(string tenantId, string operationId, CancellationToken cancellationToken)
         => _inner.TryGetAsync(tenantId, operationId, cancellationToken);
+
+    public ValueTask UpdateAsync(string tenantId, string operationId,
+        Func<OperationStatusRecord?, OperationStatusRecord?> update, CancellationToken cancellationToken)
+        => _inner.UpdateAsync(tenantId, operationId, update, cancellationToken);
 }

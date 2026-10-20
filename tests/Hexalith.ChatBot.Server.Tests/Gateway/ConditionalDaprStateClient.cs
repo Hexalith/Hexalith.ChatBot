@@ -13,11 +13,17 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway;
 /// production client passes <see cref="ConcurrencyMode.FirstWrite"/> on the save call.
 /// State crosses the configured JSON byte boundary on every write and read.
 /// </summary>
-internal sealed class ConditionalDaprStateClient : DaprClient
+internal sealed class ConditionalDaprStateClient(JsonSerializerOptions? jsonOptions = null) : DaprClient
 {
     private readonly Lock _sync = new();
     private readonly Dictionary<string, (byte[] Bytes, int Version)> _records = new(StringComparer.Ordinal);
     private readonly List<IdentitySave> _identitySaves = [];
+
+    private int _racingSaves;
+    private readonly TaskCompletionSource _pairReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public bool RaceNextPair { get; set; }
+    public int ConditionalConflicts { get; private set; }
 
     public string? BlockNextWriteKind { get; set; }
     public ManualResetEventSlim? OwnershipWriteEntered { get; set; }
@@ -55,7 +61,7 @@ internal sealed class ConditionalDaprStateClient : DaprClient
     /// Gets the serializer options; defaults to the production options of the dedicated idempotency DAPR client so the
     /// persisted bytes match what production writes.
     /// </summary>
-    public override JsonSerializerOptions JsonSerializerOptions { get; } = CoarseIdempotencyStateJson.Options;
+    public override JsonSerializerOptions JsonSerializerOptions { get; } = jsonOptions ?? CoarseIdempotencyStateJson.Options;
 
     /// <summary>Returns the persisted JSON of a key, exactly as it crossed the byte boundary.</summary>
     public string StoredJson(string key)
@@ -85,7 +91,7 @@ internal sealed class ConditionalDaprStateClient : DaprClient
         }
     }
 
-    public override Task<bool> TrySaveStateAsync<TValue>(
+    public override async Task<bool> TrySaveStateAsync<TValue>(
         string storeName,
         string key,
         TValue value,
@@ -94,6 +100,13 @@ internal sealed class ConditionalDaprStateClient : DaprClient
         IReadOnlyDictionary<string, string>? metadata = null,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (RaceNextPair)
+        {
+            int attempt = Interlocked.Increment(ref _racingSaves);
+            if (attempt == 2) { _pairReady.TrySetResult(); }
+            if (attempt <= 2) { await _pairReady.Task.WaitAsync(cancellationToken).ConfigureAwait(false); }
+        }
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(value, JsonSerializerOptions);
         if (value is CoarseCommandIdentityRecord { Released: true })
         {
@@ -130,6 +143,7 @@ internal sealed class ConditionalDaprStateClient : DaprClient
                 string currentEtag = current.Version.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 if (firstWrite && etag != currentEtag)
                 {
+                    ConditionalConflicts++;
                     saved = false;
                 }
                 else
@@ -153,7 +167,7 @@ internal sealed class ConditionalDaprStateClient : DaprClient
                 _identitySaves.Add(new IdentitySave(storeName, stateOptions, etag, saved));
             }
 
-            return Task.FromResult(saved);
+            return saved;
         }
     }
 
@@ -207,7 +221,15 @@ internal sealed class ConditionalDaprStateClient : DaprClient
         => throw Unsupported();
 
     public override Task<(ReadOnlyMemory<byte>, string etag)> GetByteStateAndETagAsync(string storeName, string key, ConsistencyMode? consistencyMode = null, IReadOnlyDictionary<string, string>? metadata = null, CancellationToken cancellationToken = default)
-        => throw Unsupported();
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_sync)
+        {
+            return Task.FromResult(_records.TryGetValue(key, out var current)
+                ? ((ReadOnlyMemory<byte>)current.Bytes.ToArray(), current.Version.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                : (ReadOnlyMemory<byte>.Empty, string.Empty));
+        }
+    }
 
     public override Task ExecuteStateTransactionAsync(string storeName, IReadOnlyList<StateTransactionRequest> operations, IReadOnlyDictionary<string, string>? metadata = null, CancellationToken cancellationToken = default)
         => throw Unsupported();

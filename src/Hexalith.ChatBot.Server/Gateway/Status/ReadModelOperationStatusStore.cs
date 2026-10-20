@@ -8,18 +8,39 @@ namespace Hexalith.ChatBot.Server.Gateway.Status;
 /// </summary>
 internal sealed class ReadModelOperationStatusStore(IReadModelStore store) : IOperationStatusStore
 {
-    public async ValueTask UpsertAsync(OperationStatusRecord record, CancellationToken cancellationToken)
+    public ValueTask UpsertAsync(OperationStatusRecord record, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(record);
-        _ = await ReadModelWritePolicy
+        return UpdateAsync(record.TenantId, record.OperationId, _ => record, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public async ValueTask UpdateAsync(string tenantId, string operationId,
+        Func<OperationStatusRecord?, OperationStatusRecord?> update, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        try
+        {
+            _ = await ReadModelWritePolicy
             .UpdateAsync<OperationStatusRecord>(
                 store,
                 ChatBotReadModelStoreNames.StateStoreName,
-                KeyFor(record.TenantId, record.OperationId),
-                current => OperationStatusUpdatePolicy.Apply(current, record),
-                new ReadModelWriteContext(Category: nameof(OperationStatusRecord), CorrelationId: record.CorrelationId),
+                KeyFor(tenantId, operationId),
+                current =>
+                {
+                    OperationStatusRecord? incoming = update(current is null ? null : OperationStatusUpdatePolicy.Snapshot(current));
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return incoming is null ? throw new OperationStatusUpdateSkippedException()
+                        : OperationStatusUpdatePolicy.ApplyUpdate(tenantId, operationId, current, incoming);
+                },
+                new ReadModelWriteContext(Category: nameof(OperationStatusRecord)),
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
+        }
+        catch (OperationStatusUpdateSkippedException)
+        {
+            // The SDK has no nullable transform: stop before TrySaveAsync for an intentional no-op.
+        }
     }
 
     public async ValueTask<OperationStatusRecord?> TryGetAsync(

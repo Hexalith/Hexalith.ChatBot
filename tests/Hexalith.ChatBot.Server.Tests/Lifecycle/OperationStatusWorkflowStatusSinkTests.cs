@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
+using Hexalith.ChatBot.Server.Tests.Gateway.Status;
 
 using Shouldly;
 
@@ -319,12 +320,14 @@ public sealed class OperationStatusWorkflowStatusSinkTests
         wire.GetRawText().ShouldNotContain("private-unsafe-action");
     }
 
-    [Fact]
-    public async Task RetryActivityShouldPublishDueTimeAndEligibilityUntilAttemptLimit()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RetryActivityShouldPublishDueTimeAndEligibilityUntilAttemptLimit(bool sdk)
     {
         DateTimeOffset now = new(2026, 8, 9, 10, 0, 0, TimeSpan.Zero);
         FixedClock clock = new(now);
-        InMemoryOperationStatusStore store = new();
+        IOperationStatusStore store = sdk ? new ReadModelOperationStatusStore(new AtomicOperationStatusReadModelStore()) : new InMemoryOperationStatusStore();
         CommandSubmissionResponse accepted = new()
         {
             CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
@@ -394,10 +397,78 @@ public sealed class OperationStatusWorkflowStatusSinkTests
         completed.SafeNextActions.Single().ShouldBe("none");
     }
 
-    [Fact]
-    public async Task ReportAsyncShouldWriteWorkflowFieldsOntoExistingOperationStatus()
+    [Theory]
+    [InlineData(false, CorrectionPropagationWorkflowStatuses.Started)]
+    [InlineData(false, CorrectionPropagationWorkflowStatuses.Retrying)]
+    [InlineData(true, CorrectionPropagationWorkflowStatuses.Started)]
+    [InlineData(true, CorrectionPropagationWorkflowStatuses.Retrying)]
+    public async Task OlderWorkflowReportLosingAtomicWriteShouldPreserveCompletedProgressAndDisableRetry(bool sdk, string olderStatus)
     {
-        InMemoryOperationStatusStore store = new();
+        using RacingOperationStatusStore store = new(sdk) { SecondWriterWins = true };
+        DateTimeOffset now = new(2026, 8, 9, 10, 0, 0, TimeSpan.Zero);
+        OperationStatusWorkflowStatusSink olderSink = new(store, new FixedClock(now));
+        OperationStatusWorkflowStatusSink completionSink = new(store, new FixedClock(now.AddSeconds(1)));
+        CommandSubmissionResponse accepted = new()
+        {
+            CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY", CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            OperationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX", LifecycleState = LifecycleState.Correcting, AcceptedAt = now,
+        };
+        await store.UpsertAsync(OperationStatusRecord.Accepted("tenant-alpha", accepted, false, now), TestContext.Current.CancellationToken);
+        CorrectionPropagationRequest request = new("tenant-alpha", "actor", "association", "intake", "correction", "workflow",
+            "prior-project", "corrected-project", 1, accepted.CorrelationId, now, now.AddMinutes(1), OperationId: accepted.OperationId);
+        await olderSink.ReportAsync(request, CorrectionPropagationWorkflowStatuses.Retrying, 1,
+            CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable, TestContext.Current.CancellationToken, retryDueAt: now);
+        OperationStatusRecord pending = (await store.TryGetAsync(request.TenantId, request.OperationId, TestContext.Current.CancellationToken))!;
+        OperationStatusHttpResults.ToJsonElement(pending, now).GetProperty("retryEligible").GetBoolean().ShouldBeTrue();
+        store.Arm();
+        Task older = Task.Run(async () => await olderSink.ReportAsync(request, olderStatus, 3,
+            CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable, TestContext.Current.CancellationToken,
+            retryDueAt: now.AddSeconds(30)).ConfigureAwait(false), TestContext.Current.CancellationToken);
+        await store.FirstSnapshotRead.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await completionSink.ReportAsync(request, CorrectionPropagationWorkflowStatuses.Completed, 0,
+            CorrectionPropagationWorkflowFailureCodes.None, TestContext.Current.CancellationToken);
+        await older.ConfigureAwait(true);
+        OperationStatusRecord completed = (await store.TryGetAsync(request.TenantId, request.OperationId, TestContext.Current.CancellationToken))!;
+        completed.WorkflowInstanceId.ShouldBe(request.WorkflowInstanceId);
+        completed.WorkflowStatus.ShouldBe(CorrectionPropagationWorkflowStatuses.Completed);
+        completed.WorkflowRetryCount.ShouldBe(0);
+        completed.CompletionStatus.ShouldBe(OperationStatusRecord.Completed);
+        completed.ReasonCode.ShouldBe(ChatBotMessageCodes.AssociationCorrectionPropagationComplete);
+        completed.SafeNextActions.ShouldBe([ChatBotMessageNextActions.None]);
+        completed.NextRetryAt.ShouldBeNull();
+        completed.FailureReasonCode.ShouldBeNull();
+        completed.WorkflowLastFailureCode.ShouldBeNull();
+        completed.LastUpdatedAt.ShouldBe(now.AddSeconds(1));
+        JsonElement wire = OperationStatusHttpResults.ToJsonElement(completed, now.AddMinutes(1));
+        wire.GetProperty("workflowStatus").GetString().ShouldBe(CorrectionPropagationWorkflowStatuses.Completed);
+        wire.GetProperty("reasonCode").GetString().ShouldBe(ChatBotMessageCodes.AssociationCorrectionPropagationComplete);
+        wire.GetProperty("safeNextActions").EnumerateArray().Single().GetString().ShouldBe(ChatBotMessageNextActions.None);
+        wire.GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
+        store.CallbackCount.ShouldBe(3);
+        if (sdk) { store.ConditionalConflicts.ShouldBe(1); }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WorkflowReportForAbsentOperationShouldRemainAbsent(bool sdk)
+    {
+        IOperationStatusStore store = sdk ? new ReadModelOperationStatusStore(new AtomicOperationStatusReadModelStore()) : new InMemoryOperationStatusStore();
+        FixedClock clock = new(new DateTimeOffset(2026, 8, 9, 10, 0, 0, TimeSpan.Zero));
+        OperationStatusWorkflowStatusSink sink = new(store, clock);
+        CorrectionPropagationRequest request = new("tenant-alpha", "actor", "association", "intake", "correction", "workflow",
+            "prior-project", "corrected-project", 1, "01ARZ3NDEKTSV4RRFFQ69G5FAW", clock.UtcNow, clock.UtcNow.AddMinutes(1),
+            OperationId: "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        await sink.ReportAsync(request, CorrectionPropagationWorkflowStatuses.Completed, 0, null, TestContext.Current.CancellationToken);
+        (await store.TryGetAsync(request.TenantId, request.OperationId, TestContext.Current.CancellationToken)).ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReportAsyncShouldWriteWorkflowFieldsOntoExistingOperationStatus(bool sdk)
+    {
+        IOperationStatusStore store = sdk ? new ReadModelOperationStatusStore(new AtomicOperationStatusReadModelStore()) : new InMemoryOperationStatusStore();
         FixedClock clock = new(new DateTimeOffset(2026, 8, 9, 10, 0, 0, TimeSpan.Zero));
         OperationStatusWorkflowStatusSink sink = new(store, clock);
         CommandSubmissionResponse accepted = new()

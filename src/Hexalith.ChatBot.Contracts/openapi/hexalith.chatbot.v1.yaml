@@ -101,9 +101,7 @@ paths:
           required: true
           description: Opaque operation identifier.
           schema:
-            oneOf:
-              - $ref: "#/components/schemas/TaskId"
-              - $ref: "#/components/schemas/CommandId"
+            $ref: "#/components/schemas/CommandId"
         - $ref: "#/components/parameters/CorrelationId"
         - $ref: "#/components/parameters/TaskId"
       responses:
@@ -136,9 +134,7 @@ paths:
           required: true
           description: Opaque operation identifier.
           schema:
-            oneOf:
-              - $ref: "#/components/schemas/TaskId"
-              - $ref: "#/components/schemas/CommandId"
+            $ref: "#/components/schemas/CommandId"
         - $ref: "#/components/parameters/CorrelationId"
         - $ref: "#/components/parameters/TaskId"
       responses:
@@ -1394,9 +1390,7 @@ components:
         terminalReasonCode:
           $ref: "#/components/schemas/ChatBotMessageCode"
         originalOperationId:
-          oneOf:
-            - $ref: "#/components/schemas/TaskId"
-            - $ref: "#/components/schemas/CommandId"
+          $ref: "#/components/schemas/CommandId"
         duplicateAttemptCount:
           type: integer
           format: int32
@@ -1488,9 +1482,7 @@ components:
         - entries
       properties:
         operationId:
-          oneOf:
-            - $ref: "#/components/schemas/TaskId"
-            - $ref: "#/components/schemas/CommandId"
+          $ref: "#/components/schemas/CommandId"
         auditStatus:
           $ref: "#/components/schemas/OperationAuditStatus"
         entries:

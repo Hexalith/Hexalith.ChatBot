@@ -28,6 +28,67 @@ public sealed class OperationStatusMonotonicityTests
             LifecycleState = Hexalith.ChatBot.Client.Generated.LifecycleState.Proposed,
         }, false, CommandOperationContractTests.CreatedAt);
 
+    [Fact]
+    public async Task ProductionDaprSerializerShouldPreserveCanonicalEqualRevisionAndNestedPredecessorMetadata()
+    {
+        AtomicOperationStatusReadModelStore backing = new();
+        IOperationStatusStore store = new ReadModelOperationStatusStore(backing);
+        CommandOperationState failed = CommandOperationContractTests.Advance(
+            CommandOperationContractTests.Advance(CommandOperationContractTests.Received(2), CommandExecutionState.Admitted),
+            CommandExecutionState.Failed, preEffectFailure: true);
+        var retryIdentity = CommandOperationContractTests.Identity("01ARZ3NDEKTSV4RRFFQ69G5FAX",
+            createdAt: failed.Transitions[^1].OccurredAt.AddSeconds(1), predecessor: failed.Identity.OperationId);
+        CommandOperationState retry = CommandOperationReducer.Retry(failed, retryIdentity, CommandOperationContractTests.Input(), 0).State!;
+        OperationStatusRecord original = OperationStatusRecord.FromCanonical(retry);
+        original.PriorOutcome!.PriorOutcome = new()
+        {
+            OperationId = "01ARZ3NDEKTSV4RRFFQ69G5FAY", CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            CorrelationId = original.CorrelationId, TaskId = "01ARZ3NDEKTSV4RRFFQ69G5FAZ", AcceptedAt = original.AcceptedAt.AddMinutes(-1),
+            LifecycleState = Hexalith.ChatBot.Client.Generated.LifecycleState.Failed,
+            ReasonCode = Hexalith.ChatBot.Client.Generated.ChatBotMessageCode.Audit_unavailable,
+        };
+        await store.UpsertAsync(original, Token);
+        string bytes = backing.StoredJson(ReadModelOperationStatusStore.KeyFor(original.TenantId, original.OperationId));
+        bytes.ShouldContain("\"lifecycleState\":\"Failed\"");
+        bytes.ShouldContain("\"reasonCode\":\"audit_unavailable\"");
+        OperationStatusRecord first = (await store.TryGetAsync(original.TenantId, original.OperationId, Token))!;
+        OperationStatusRecord second = (await store.TryGetAsync(original.TenantId, original.OperationId, Token))!;
+        ReferenceEquals(first, second).ShouldBeFalse();
+        ReferenceEquals(first.PriorOutcome, second.PriorOutcome).ShouldBeFalse();
+        ReferenceEquals(first.PriorOutcome!.PriorOutcome, second.PriorOutcome!.PriorOutcome).ShouldBeFalse();
+        JsonSerializer.Serialize(first).ShouldBe(JsonSerializer.Serialize(original));
+        await store.UpsertAsync(original, Token);
+        await store.UpsertAsync(second, Token);
+        backing.StoredJson(ReadModelOperationStatusStore.KeyFor(original.TenantId, original.OperationId)).ShouldBe(bytes);
+        await Should.ThrowAsync<OperationStatusUpdateConflictException>(() => store.UpsertAsync(original with { DuplicateAttemptCount = 1 }, Token).AsTask());
+        first.PriorOutcome.PriorOutcome!.ReasonCode = Hexalith.ChatBot.Client.Generated.ChatBotMessageCode.Command_accepted;
+        await Should.ThrowAsync<OperationStatusUpdateConflictException>(() => store.UpsertAsync(first, Token).AsTask());
+        backing.StoredJson(ReadModelOperationStatusStore.KeyFor(original.TenantId, original.OperationId)).ShouldBe(bytes);
+        JsonSerializer.Serialize(await store.TryGetAsync(original.TenantId, original.OperationId, Token)).ShouldBe(JsonSerializer.Serialize(original));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AtomicCallbackShouldSkipAbsentWorkflowAndRejectCancellationOrIdentityDriftWithoutPersisting(bool sdk)
+    {
+        IOperationStatusStore store = Store(sdk);
+        OperationStatusRecord original = Legacy();
+        await store.UpdateAsync(original.TenantId, original.OperationId, _ => null, Token);
+        (await store.TryGetAsync(original.TenantId, original.OperationId, Token)).ShouldBeNull();
+        await store.UpsertAsync(original, Token);
+        await Should.ThrowAsync<OperationStatusUpdateConflictException>(() => store.UpdateAsync(original.TenantId, original.OperationId,
+            current => current! with { OperationId = "other-operation" }, Token).AsTask());
+        using CancellationTokenSource cancelled = new();
+        await Should.ThrowAsync<OperationCanceledException>(() => store.UpdateAsync(original.TenantId, original.OperationId, current =>
+        {
+            current!.SafeNextActions[0] = "mutated-callback-copy";
+            cancelled.Cancel();
+            return current with { DuplicateAttemptCount = 1 };
+        }, cancelled.Token).AsTask());
+        JsonSerializer.Serialize(await store.TryGetAsync(original.TenantId, original.OperationId, Token)).ShouldBe(JsonSerializer.Serialize(original));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
