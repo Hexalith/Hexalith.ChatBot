@@ -2389,7 +2389,7 @@ public sealed partial class AcceptedCommandDispatcherTests
         => new(
             ContractAiActionRiskClass.LowRisk,
             [],
-            "chatbot.ai-action-risk-classifier.m0.v1",
+            "chatbot.ai-action-risk-classifier.m0.v2",
             new ContractAiActionRiskInputTuple(
                 "ChatBot.ExecuteLowRiskAssistance",
                 [],
