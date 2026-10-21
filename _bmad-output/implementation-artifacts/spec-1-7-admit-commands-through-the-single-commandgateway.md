@@ -176,6 +176,53 @@ Rejected:
 - `low` — The every-origin matrix covers one profile, but profile selection and the evidence validator never read origin.
 - `low` — Commit `3868242` also moved 15 root submodule pointers (routine sync). The Fluent pin is 5.0.1 at both Builds revisions, so the four UI pin failures predate it, and the commit is already pushed.
 
+### Review Findings — round 3 (2026-10-21)
+
+Code review round 3 (bmad-code-review, full mode, baseline `cd83144` → HEAD `175fb30`, clean working tree; 87 files outside `_bmad-output/` and `references/`, 6,420 diff lines, reviewed unchunked). Four layers ran: Blind Hunter, Edge Case Hunter, Verification Gap and Acceptance Auditor; none failed. All 14 round-2 patches were confirmed landed. Of 40 raw findings (Blind Hunter 17, Edge Case Hunter 15, Verification Gap 3, Acceptance Auditor 5), 4 survived as 3 entries: 2 patch and 1 defer, with no decisions. 36 were rejected; 23 of them repeat round-1, round-2 or resumed-build decisions. IDs below are prefixed `CR3-` so they do not collide with the resumed-build `R3-` triage.
+
+- [x] [Review][Patch] No test checks the classification the dispatcher attaches to dispatched AI payloads (medium) [src/Hexalith.ChatBot.Server/Gateway/Stages/AcceptedCommandDispatcher.cs:682] — CR3-V1, pre-verified. The rewritten API tests (baseline `CommandGatewayAdmissionApiE2ETests.cs:486` and `:555`) were the only ones reading the dispatched `RiskClassification`. Now the UI sends none and admission rejects caller records, so the dispatcher (`:682` for `ProposeAIAction`, `:704` for `ExecuteLowRiskAIAssistance`) is the only producer of the record the owner requires (`GovernedOperationAggregate.cs:1980`, `:2198`). Dropping either enrichment leaves every test green, and after Story 1.8 the owner would reject every UI Ask-AI proposal and low-risk execution. Add a `ProposeAIAction` case to `AcceptedCommandDispatcherTests` and extend `DispatchShouldSubmitLowRiskAdmissionWithoutInvokingProvider` (`tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.cs:486`) to assert that the payload's risk class, action classes, `m0.v2` classifier version and input tuple equal the context record.
+- [x] [Review][Patch] `TrustedAuthorityAdvancingRiskClassifier` is orphaned (low) [tests/Hexalith.ChatBot.Server.Tests/TrustedAuthorityAdvancingRiskClassifier.cs:7] — CR3-E15. Its only consumer (`TrustedAuthorityReviewTests.cs:477` at baseline) now advances the clock through the synthetic validator's profile hook in `SyntheticOwnerExpiryDuringProfileAwaitDeniesBeforeDurableAdmissionAndAllowsFreshRetry`, and nothing references the class. Delete the file.
+- [x] [Review][Defer] Marked revalidation also rejects the dispatcher's own `executionRecord` [src/Hexalith.ChatBot.Server/Gateway/Admission/ChatBotAdmissionEvidenceValidator.cs:55] — deferred: extends D8, which Story 1.8's commit-participation contract owns; masked while atomic participation always refuses. CR3-E1 + CR3-V2. The round-2 patch made `ValidateOperationAsync` reject any non-null `executionRecord`, and `RevalidateMarkedCommitAsync` (`ChatBotCommandAdmissionPipeline.cs:72`) runs that caller-input check on signed payloads. The dispatcher signs `ExecuteApprovedAIAction` with `ExecutionRecord = record` (`AcceptedCommandDispatcher.cs:794`), and `ProposeAIAction`/`ExecuteLowRiskAIAssistance` with `RiskClassification` (`:682`, `:704`). So every gateway-dispatched AI command would self-reject at `/process` with `command_contract_invalid`. D8 names only `riskClassification`; Story 1.8 must exempt both server-enriched fields on marked commits.
+
+Rejected:
+
+- CR3-B1 `false` / carried — The approval gate's `Blocked(classifier-indeterminate)` branches apply only to `ExecuteLowRiskAIAssistance`, which requires classification. The pipeline returns `classifier-indeterminate` first for unreadable, recordless, indeterminate or undeclared-subtype input (`ChatBotCommandAdmissionPipeline.cs:203-225`; round-1 refutation). The policy-outage 403 is the round-2 deferral (`deferred-work.md:1608`).
+- CR3-B2 `low` — Routing `missing_context_package` and `policy_surface_mismatch` to approval is pre-existing evaluator semantics: the baseline opened an approval request for both. It is unreachable until the Story 1.6 policy source and owner evidence exist, and giving them their own codes is a contract decision.
+- CR3-B3 carried — Marked revalidation skipping classification, approval and profile stages is D8.
+- CR3-B4 carried — Opaque governance and data-rights references are owner proofs (round-2 rejection). Decision-command independence is the D3 deferral.
+- CR3-B5 carried — Requester authority from a token label: `ChatBotAuthorityPrincipal` strips caller authority claims, so production stays indeterminate (round-1 B1, R3-B8).
+- CR3-B6 carried — A retryable `policy-snapshot-unavailable` for a policy mismatch is unreachable and a contract decision (round-1 and round-2 rejections).
+- CR3-B7 `low` — The HTTP shapes of the profile-stage refusals (`approval-state-invalid`, scope, context package) are unreachable until owner evidence exists. Re-coding them is a contract decision, as with the round-1 context-package and stale-revision rejections.
+- CR3-B8 carried — Catalog and UI copy give the same remediation (round-2 rejection).
+- CR3-B9 `low` — The M2 seed's failure message includes the response body with `canonical_execution_unavailable`, and release.yml documents the Story 1.8 exit condition. The extra ~50 s of retries falls on a step that is intentionally red.
+- CR3-B10 carried — Moving M2 out of PR CI is the approved D1 split (release-only until Story 1.8).
+- CR3-B11 `low` — `GovernedNoteShouldProjectIdenticalDurableEndStateRegardlessOfDeclaredOrigin` seeded no grants at baseline either, and the authorizer is unchanged, so it already failed with 403. No workflow selects it.
+- CR3-B12 carried — Production validator wiring: the null fallback is the production validator, and a second internal implementation is hypothetical (round-1 and round-2 rejections).
+- CR3-B13 carried — Qualification sample minima: the registry-computed `approved-current` status encodes thresholds and strata, and the addendum computes a missing stratum as `open` (round-1 rejection).
+- CR3-B14 carried — Per-browser probes and browser timing are R3-B3/R3-B4, and the fixture cannot reach submission before R3-B2 is fixed.
+- CR3-B15 carried — The default-interface problem builders cannot diverge (round-1 rejection).
+- CR3-B16 carried — The kebab-case literal names are D10, and the "denied" state group was a round-2 rejection.
+- CR3-B17 carried — The fallback validator's clock is irrelevant because the fallback source is always unavailable (round-1 rejection).
+- CR3-E2 carried — The marked payload is server-serialized JSON covered by the marker digest (round-1 rejection).
+- CR3-E3 carried — Marked revalidation without request concurrency is round-1 B4 and D8.
+- CR3-E4 carried — Marked internal producers without a catalog row or relay issuer are the round-2 D8-extension deferral, which already names the uncatalogued correction-propagation types.
+- CR3-E5 `false` / carried — Same claim and refutation as CR3-B1.
+- CR3-E6 `low` — An unreadable decision payload in the gate becomes a safe 503 over HTTP (`CommandGateway.cs:83`), not a 500. The gate's decision branch is unchanged from baseline, and production refuses at the operation stage first.
+- CR3-E7 carried — An approver principal is trusted-source evidence (round-1 B7, round-2 B5).
+- CR3-E8 carried — A retry-later code for a context-package caller mismatch is unreachable and a contract decision (round-1 rejection).
+- CR3-E9 `false` — A profile-stage payload deserialization failure cannot occur. All three classified commands are deserialized into the same contract type first by `DeterministicAiActionRiskClassifier` (`:150-170`) and the gate, and those failures return `classifier-indeterminate`.
+- CR3-E10 carried — Binding the executor to the requester is not in the addendum (round-2 rejection; R3-B10).
+- CR3-E11 `false` — Ask AI cannot pass on stale Message state. `ReduceSetComposerMode` clears `SubmissionErrorCode` in the same state change that sets `aria-pressed`, and the test waits for `aria-pressed=true` before it submits.
+- CR3-E12 carried — Probing more stores in the Story 13.2 HTTP refusal was rejected in round 2: the in-process suites pin it, and the live test is blocked by R3-B2.
+- CR3-E13 `low` — `SyntheticLegacyRiskClassifier` is a labeled synthetic fixture. Every `classifier-indeterminate` test passes the real `DeterministicAiActionRiskClassifier` explicitly, no test was shown to pass wrongly, and changing the fallback has an unmeasured effect on the default `Gateway()` fixture.
+- CR3-E14 `low` — The aggregate's non-null `ExecutionRecord` routing branch is dead: no source producer sets it, and admission rejects it on every transport. Round 2 chose to close the input path, and removing owner aggregate behaviour plus its helper and tests is outside 1.7's admission scope.
+- CR3-V3 carried — Same as CR3-E4: uncatalogued background command types are in the round-2 D8-extension deferral.
+- CR3-A1 `low` — The live smoke's 503 comes from the operation-evidence stage, not the atomic boundary. The externally visible fail-closed contract is correct, and the fix is either editing this spec or renaming the test along with its workflow selectors and guards.
+- CR3-A2 `low` — The SDK path denies unknown command types at canonical-target resolution before admission. Identity and revision checks are the shared `ValidateOperationAsync`, covered over HTTP, and the six-row SDK theory proves the hook reaches that stage. The catalog-null branches are shadowed defence in depth.
+- CR3-A3 `low` — The selector names the fitness guard misses are rejected at runtime on every request, so a contract property with one of those names fails loudly in tests.
+- CR3-A4 `false` — The two `Production*` tests exercise the production validator and the production atomic refusal and assert refusal. Synthetic evidence only reaches that stage, and nothing is presented as owner execution.
+- CR3-A5 carried — Same claim as CR3-E12 (round-2 rejection).
+
 ## Implementation Notes
 
 - Approved by the user on 2026-10-20; frozen intent unchanged.

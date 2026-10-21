@@ -496,7 +496,8 @@ public sealed partial class AcceptedCommandDispatcherTests
         ChatBotGatewayContext context = Context(
             WireLowRiskExecutionCommand(),
             commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteLowRiskAIAssistance));
-        context.SetRiskClassification(ChatBotRiskClassification.Classified(LowRiskClassification()));
+        Hexalith.ChatBot.Contracts.Queries.AiActionRiskClassificationRecord classification = LowRiskClassification();
+        context.SetRiskClassification(ChatBotRiskClassification.Classified(classification));
         context.SetApprovalResult(ChatBotApprovalResult.AllowedLowRiskExecution("policy-snap-001", "low-risk-execute-allowed"));
 
         ChatBotDispatchResult result = await dispatcher.DispatchAsync(context, TestContext.Current.CancellationToken);
@@ -511,9 +512,36 @@ public sealed partial class AcceptedCommandDispatcherTests
         JsonElement payload = request.Payload;
         payload.TryGetProperty("ExecutionRecord", out JsonElement record).ShouldBeTrue();
         record.ValueKind.ShouldBe(JsonValueKind.Null);
+        ShouldCarryAdmissionClassification(payload, classification);
         payload.GetRawText().ShouldNotContain("prompt", Case.Insensitive);
         payload.GetRawText().ShouldNotContain("completion", Case.Insensitive);
         payload.GetRawText().ShouldNotContain("/home/administrator", Case.Insensitive);
+    }
+
+    /// <summary>The dispatcher is the only producer of the classification the owner requires on a proposal.</summary>
+    [Fact]
+    public async Task DispatchShouldAttachAdmissionClassificationToAiActionProposal()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+        ChatBotGatewayContext context = Context(WireAiActionProposalCommand(), commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ProposeAIAction));
+        Hexalith.ChatBot.Contracts.Queries.AiActionRiskClassificationRecord classification =
+            Hexalith.ChatBot.Server.Governance.AiMediation.AiActionRiskClassifier.Classify(new ContractAiActionRiskInputTuple(
+                Hexalith.ChatBot.Server.Governance.AiMediation.AiActionCommandMetadataProvider.AppendConversationMessageCommandName,
+                [], null, null, "project-contributor", "policy-snap-001", null, null, null, "authorized", CorrelationId));
+        context.SetRiskClassification(ChatBotRiskClassification.Classified(classification));
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(context, TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("project-001");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ProposeAIAction));
+        result.ResourceId.ShouldBe("project-001");
+        ShouldCarryAdmissionClassification(request.Payload, classification);
+
+        Hexalith.ChatBot.Contracts.Commands.ProposeAIAction dispatched = request.Payload.Deserialize<Hexalith.ChatBot.Contracts.Commands.ProposeAIAction>().ShouldNotBeNull();
+        Hexalith.ChatBot.Server.Operations.GovernedOperationAggregate.IsSafeClassificationMetadata(dispatched.RiskClassification).ShouldBeTrue();
+        dispatched.RiskClassification!.InputTuple.IntendedCommandName.ShouldBe(dispatched.IntendedCommandName);
     }
 
     /// <summary>Approval routing terminates at admission and cannot create a downstream execution record.</summary>
@@ -2292,6 +2320,27 @@ public sealed partial class AcceptedCommandDispatcherTests
             }
             """).RootElement.Clone();
 
+    private static JsonElement WireAiActionProposalCommand()
+        => JsonDocument.Parse(
+            """
+            {
+              "projectId": "project-001",
+              "taskIntentId": "task-intent-001",
+              "sourceMessageId": "graph-message-001",
+              "requesterId": "party-001",
+              "intendedCommandName": "Project.AppendConversationMessage",
+              "actionKind": "append-conversation-message",
+              "expectedSourceVersion": 8,
+              "evidenceReferences": ["evidence-001"],
+              "affectedResourceReferences": ["project:project-001"],
+              "recipientReferences": ["party-001"],
+              "policySnapshotId": "policy-snap-001",
+              "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+              "transitionId": "proposal-transition-001",
+              "sourceConversationItemId": "conversation-item-001"
+            }
+            """).RootElement.Clone();
+
     private static JsonElement WireApprovedAiExecutionCommand(string commandName = "Project.AppendConversationMessage")
         => JsonDocument.Parse(
             $$"""
@@ -2363,6 +2412,18 @@ public sealed partial class AcceptedCommandDispatcherTests
             "chatbot.ai-action-risk-classification.v1",
             CorrelationId,
             FixedClock.FixedUtcNow);
+
+    /// <summary>Asserts the submitted payload carries exactly the admission-produced classification record.</summary>
+    private static void ShouldCarryAdmissionClassification(
+        JsonElement payload,
+        Hexalith.ChatBot.Contracts.Queries.AiActionRiskClassificationRecord expected)
+    {
+        payload.TryGetProperty("RiskClassification", out JsonElement classification).ShouldBeTrue();
+        classification.ValueKind.ShouldBe(JsonValueKind.Object);
+        classification.GetProperty("ClassifierVersion").GetString().ShouldBe(expected.ClassifierVersion);
+        classification.GetProperty("InputTuple").GetProperty("IntendedCommandName").GetString().ShouldBe(expected.InputTuple.IntendedCommandName);
+        classification.GetRawText().ShouldBe(JsonSerializer.Serialize(expected));
+    }
 
     private sealed class FixedClock : ISystemClock
     {
