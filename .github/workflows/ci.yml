@@ -451,12 +451,12 @@ jobs:
         run: dapr init --runtime-version 1.18.0
       - name: Record DAPR runtime state
         run: docker ps --format '{{.Names}}\t{{.Status}}\t{{.Ports}}' --filter name=dapr_
-      - name: Run required tenant-bound topology smoke
+      - name: Run required fail-closed tenant-bound topology smoke
         run: >-
           XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
           tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests
           TestResults/topology-acceptance.ctrf.json
-          -method "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
+          -method "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests.GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology"
           -result-trx TestResults/topology-acceptance.trx
       - name: Require one executed topology acceptance test and zero skips
         run: >-

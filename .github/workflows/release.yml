@@ -49,21 +49,12 @@ jobs:
         run: dapr init --runtime-version 1.18.0
       - name: Record DAPR runtime state
         run: docker ps --format '{{.Names}}\t{{.Status}}\t{{.Ports}}' --filter name=dapr_
-      # This step is the M2 stop-ship gate (Story 12.14, AC3), not only a topology smoke test. Its final leg polls the
-      # token-gated /health/chatbot/periodic-enforcement/m2 endpoint on the live topology and fails when the gate
-      # reports stop-ship — a broken WORM chain, a cross-tenant isolation breach, a sweep that never completed, or a
-      # sweep that verified nothing where it should have. Because `semantic-release` needs this job, a real breach
-      # blocks the release rather than merely being observable.
-      #
-      # The gate is asserted inside this test rather than as a separate step because it needs the live topology *and*
-      # real post-command state: the sweeps verify tenant data that only exists once a governed command has flowed
-      # through the spine, which is exactly what this test does first.
-      - name: Run required tenant-bound topology smoke and M2 stop-ship gate
+      - name: Run required fail-closed tenant-bound topology smoke
         run: >-
           XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
           tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests
           TestResults/topology-acceptance.ctrf.json
-          -method "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
+          -method "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests.GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology"
           -result-trx TestResults/topology-acceptance.trx
       - name: Require one executed topology acceptance test and zero skips
         run: >-
@@ -78,6 +69,20 @@ jobs:
       - name: Require one executed Story 13.2 test and zero skips
         run: >-
           python3 -c "import xml.etree.ElementTree as E; r=E.parse('TestResults/story132-topology-acceptance.trx').getroot(); c=next(x for x in r.iter() if x.tag.endswith('Counters')).attrib; assert c.get('executed') == '1' and c.get('passed') == '1' and c.get('notExecuted') == '0', c"
+      # The release-only M2 gate requires real committed two-tenant governed state and positive sweep coverage.
+      # Story 1.7's refusal smoke cannot supply that state. This separate gate remains red until Story 1.8 supplies
+      # accepted atomic participation, and semantic-release still requires this job. Run it after Story 13.2 so
+      # expected M2 unavailability cannot prevent the independent production-client refusal matrix from running.
+      - name: Run required committed-state M2 stop-ship gate
+        run: >-
+          XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
+          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests
+          TestResults/m2-stop-ship.ctrf.json
+          -method "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests.CommittedGovernedStateShouldPassM2StopShipSweepsInRealDaprTopology"
+          -result-trx TestResults/m2-stop-ship.trx
+      - name: Require one executed M2 stop-ship test and zero skips
+        run: >-
+          python3 -c "import xml.etree.ElementTree as E; r=E.parse('TestResults/m2-stop-ship.trx').getroot(); c=next(x for x in r.iter() if x.tag.endswith('Counters')).attrib; assert c.get('executed') == '1' and c.get('passed') == '1' and c.get('notExecuted') == '0', c"
       - name: Upload topology acceptance evidence
         if: always()
         uses: actions/upload-artifact@v7

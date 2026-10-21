@@ -1467,7 +1467,7 @@ public static class ScaffoldArchitectureTests
             "--output \"${{ runner.temp }}/machine-results/recovery-primary/live-recovery-validation.trx\"");
         workflow.ShouldContain(
             "-method \"Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests."
-            + "TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology");
+            + "GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology");
         workflow.ShouldContain(
             "-method \"Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests."
             + "AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix");
@@ -1481,7 +1481,7 @@ public static class ScaffoldArchitectureTests
         workflow.ShouldContain("c.get('notExecuted') == '0'");
         releaseWorkflow.ShouldContain(
             "-method \"Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests."
-            + "TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology");
+            + "GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology");
         releaseWorkflow.ShouldContain(
             "-method \"Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests."
             + "AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix");
@@ -1491,6 +1491,15 @@ public static class ScaffoldArchitectureTests
         releaseWorkflow.ShouldContain("E.parse('TestResults/topology-acceptance.trx')");
         releaseWorkflow.ShouldContain("Require one executed Story 13.2 test and zero skips");
         releaseWorkflow.ShouldContain("E.parse('TestResults/story132-topology-acceptance.trx')");
+        releaseWorkflow.ShouldContain(
+            "-method \"Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests."
+            + "CommittedGovernedStateShouldPassM2StopShipSweepsInRealDaprTopology");
+        releaseWorkflow.ShouldContain("TestResults/m2-stop-ship.ctrf.json");
+        releaseWorkflow.ShouldContain("Require one executed M2 stop-ship test and zero skips");
+        releaseWorkflow.ShouldContain("E.parse('TestResults/m2-stop-ship.trx')");
+        workflow.ShouldNotContain("CommittedGovernedStateShouldPassM2StopShipSweepsInRealDaprTopology");
+        releaseWorkflow.IndexOf("- name: Run required committed-state M2 stop-ship gate", StringComparison.Ordinal)
+            .ShouldBeGreaterThan(releaseWorkflow.IndexOf("- name: Require one executed Story 13.2 test and zero skips", StringComparison.Ordinal));
         releaseWorkflow.ShouldContain("c.get('notExecuted') == '0'");
         releaseWorkflow.ShouldContain(
             "semantic-release:\n"
@@ -1559,6 +1568,53 @@ public static class ScaffoldArchitectureTests
         workflow.ShouldContain("StoryEvidenceGate.Tests");
         workflow.ShouldNotContain("git submodule update --init --recursive");
         toolProject.ShouldNotContain("PackageReference");
+    }
+
+    /// <summary>Separates production refusal proof from the release-only committed-state M2 requirement.</summary>
+    [Fact]
+    public static void TopologySmokeShouldPreserveRefusalOrderAndIndependentCommittedStateReleaseGate()
+    {
+        string root = RepositoryRoot();
+        string source = File.ReadAllText(Path.Combine(root, "tests", "Hexalith.ChatBot.IntegrationTests",
+            "TrivialGovernedCommandAspireE2eTests.cs"));
+        MethodDeclarationSyntax[] methods = CSharpSyntaxTree.ParseText(source,
+                cancellationToken: TestContext.Current.CancellationToken).GetRoot(TestContext.Current.CancellationToken)
+            .DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
+        const string smokeName = "GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology";
+        const string m2Name = "CommittedGovernedStateShouldPassM2StopShipSweepsInRealDaprTopology";
+        string smoke = methods.Single(method => method.Identifier.ValueText == smokeName).Body!.ToString();
+        string release = methods.Single(method => method.Identifier.ValueText == m2Name).Body!.ToString();
+        smoke.ShouldContain("EnsureCurrentRequesterOwnersAsync");
+        smoke.ShouldContain("HttpStatusCode.ServiceUnavailable");
+        smoke.ShouldContain("ChatBotMessageCodes.CanonicalExecutionUnavailable");
+        smoke.ShouldContain("HttpStatusCode.Forbidden");
+        smoke.ShouldContain("ChatBotMessageCodes.AuthorizationDenied");
+        smoke.IndexOf("SubmitGovernedNoteAsync", StringComparison.Ordinal)
+            .ShouldBeGreaterThan(smoke.IndexOf("ChatBotMessageCodes.CanonicalExecutionUnavailable", StringComparison.Ordinal));
+        smoke.ShouldContain("ReadGovernedStateSnapshotAsync");
+        smoke.ShouldContain("AssertRefusedCommandHasNoReservationsAsync");
+        smoke.ShouldNotContain("SeedCurrentGovernedNoteAuthorityAsync");
+        smoke.ShouldNotContain("AssertM2ReleaseGateIsClearAsync");
+        release.ShouldContain("SeedCurrentGovernedNoteAuthorityAsync");
+        release.ShouldContain("SubmitGovernedNoteUntilAcceptedAsync");
+        release.ShouldContain("AssertM2ReleaseGateIsClearAsync");
+        release.IndexOf("AssertM2ReleaseGateIsClearAsync", StringComparison.Ordinal)
+            .ShouldBeGreaterThan(release.IndexOf("SubmitGovernedNoteUntilAcceptedAsync", StringComparison.Ordinal));
+
+        string ci = WorkflowBlock(File.ReadAllText(Path.Combine(root, ".github", "workflows", "ci.yml")),
+            "topology-acceptance", "live-recovery-validation");
+        string releaseWorkflow = WorkflowBlock(File.ReadAllText(Path.Combine(root, ".github", "workflows", "release.yml")),
+            "topology-acceptance", "live-recovery-validation");
+        Regex.Matches(ci, Regex.Escape("-method \"Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests." + smokeName + "\""))
+            .Count.ShouldBe(1);
+        Regex.Matches(releaseWorkflow, Regex.Escape("-method \"Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests." + smokeName + "\""))
+            .Count.ShouldBe(1);
+        Regex.Matches(releaseWorkflow, Regex.Escape("-method \"Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests." + m2Name + "\""))
+            .Count.ShouldBe(1);
+        ci.ShouldNotContain(m2Name);
+        releaseWorkflow.ShouldNotContain("continue-on-error");
+        releaseWorkflow.ShouldNotContain("if: false");
+        releaseWorkflow.ShouldContain("E.parse('TestResults/m2-stop-ship.trx')");
     }
 
     [Fact]

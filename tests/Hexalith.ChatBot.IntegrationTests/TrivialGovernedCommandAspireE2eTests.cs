@@ -19,6 +19,8 @@ using CommunityToolkit.Aspire.Hosting.Dapr;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.IntegrationTests.Recovery;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -30,18 +32,13 @@ using Xunit;
 namespace Hexalith.ChatBot.IntegrationTests;
 
 /// <summary>
-/// Tier-3 end-to-end proof that the trivial governed command flows through the REAL DAPR topology
-/// (ChatBot + sidecars + EventStore + Tenants + Keycloak). The full vertical is wired and this runs GREEN against
-/// the live topology: an unauthenticated submit is rejected fail-closed; a tenant-bound Keycloak bearer is minted
-/// and an authenticated <c>RecordGovernedNote</c> (origin=ui) is dispatched into EventStore, whose aggregate
-/// actor round-trips to the chatbot <c>/process</c> domain service, persists + publishes the governed event, and
-/// the chatbot projection subscriber materialises the durable <c>GovernedOperationView</c> in
-/// <c>chatbot-statestore</c>; the view is read back (tenant-partitioned, metadata-only, source version 1),
-/// idempotent replay yields one durable effect with an identical body, and no restricted evidence leaks.
-/// It self-skips unless deliberately opted in, keeping the runnable suite honest (never a spurious pass or fail).
+/// Tier-3 tests of the real DAPR topology (ChatBot, sidecars, EventStore, Tenants and Keycloak).
+/// The fresh-state smoke proves production refusal without governed mutation or reservations. The separate
+/// release-only M2 test requires committed two-tenant state and positive sweep coverage; it remains blocked
+/// until accepted atomic participation exists. Live tests require explicit runtime opt-in.
 /// </summary>
 /// <remarks>
-/// To run it green, opt in with <c>HEXALITH_CHATBOT_TIER3=1</c> on a host that has a Docker runtime and the DAPR
+/// Opt in with <c>HEXALITH_CHATBOT_TIER3=1</c> on a host that has a Docker runtime and the DAPR
 /// CLI/runtime (<c>dapr init</c>), with <c>~/.dapr/bin</c> on PATH. The test mints the tenant-bound token from the
 /// provisioned Keycloak realm itself (the <c>hexalith-chatbot</c> direct-access-grant client + the
 /// <c>actor-alpha</c> user whose <c>tenants:[tenant-alpha]</c> attribute maps to the <c>eventstore:tenant</c>
@@ -175,28 +172,8 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         string? projectId,
         CancellationToken cancellationToken)
     {
-        string adminToken = await AcquireTenantBoundAccessTokenAsync(app, "admin-user", "admin-pass",
-            "hexalith-eventstore", cancellationToken).ConfigureAwait(false);
-        if (bootstrapGlobalAdmin)
-        {
-            await SubmitOwnerCommandAndWaitAsync(eventStore, adminToken, "system", "global-administrators",
-                "global-administrators", "BootstrapGlobalAdmin", new { userId = "admin-user" }, cancellationToken,
-                alreadySatisfiedReasonCode: "global-admin-already-bootstrapped-rejection").ConfigureAwait(false);
-        }
-        await WaitForCurrentGlobalAdministratorAsync(eventStore, adminToken, cancellationToken).ConfigureAwait(false);
-        await SubmitOwnerCommandAndWaitAsync(eventStore, adminToken, "system", "tenants", tenantId,
-            "CreateTenant", new { tenantId, name = $"Authority {tenantId}", description = "Live owner authority evidence" },
-            cancellationToken, alreadySatisfiedReasonCode: "tenant-already-exists-rejection").ConfigureAwait(false);
-        await SubmitOwnerCommandAndWaitAsync(eventStore, adminToken, "system", "tenants", tenantId,
-            "AddUserToTenant", new { tenantId, userId = principalId, role = "TenantOwner" },
-            cancellationToken, alreadySatisfiedReasonCode: "user-already-in-tenant-rejection").ConfigureAwait(false);
-
-        string eventStoreActorToken = await AcquireTenantBoundAccessTokenAsync(app, principalId,
-            $"{principalId}-pass", "hexalith-eventstore", cancellationToken).ConfigureAwait(false);
-        await SubmitOwnerCommandAndWaitAsync(eventStore, eventStoreActorToken, tenantId, "party", principalId,
-            "Hexalith.Parties.Contracts.Commands.CreateParty",
-            new { partyId = principalId, type = 1, personDetails = new { firstName = "Live", lastName = principalId } },
-            cancellationToken).ConfigureAwait(false);
+        string eventStoreActorToken = await EnsureCurrentRequesterOwnersAsync(app, eventStore,
+            tenantId, principalId, bootstrapGlobalAdmin, cancellationToken).ConfigureAwait(false);
 
         (string Operation, string Resource)[] scopes = principalId == "actor-alpha"
             ? [(nameof(RecordGovernedNote), noteId), ("operation-status", taskId),
@@ -262,6 +239,37 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 tenantId, principalId, operation, resource, accepted = true,
             }));
         }
+    }
+
+    /// <summary>Establishes real tenant ownership and Party identity without issuing any ChatBot authority.</summary>
+    private async Task<string> EnsureCurrentRequesterOwnersAsync(
+        DistributedApplication app, HttpClient eventStore, string tenantId, string principalId,
+        bool bootstrapGlobalAdmin, CancellationToken cancellationToken)
+    {
+        string adminToken = await AcquireTenantBoundAccessTokenAsync(app, "admin-user", "admin-pass",
+            "hexalith-eventstore", cancellationToken).ConfigureAwait(false);
+        if (bootstrapGlobalAdmin)
+        {
+            await SubmitOwnerCommandAndWaitAsync(eventStore, adminToken, "system", "global-administrators",
+                "global-administrators", "BootstrapGlobalAdmin", new { userId = "admin-user" }, cancellationToken,
+                alreadySatisfiedReasonCode: "global-admin-already-bootstrapped-rejection").ConfigureAwait(false);
+        }
+        await WaitForCurrentGlobalAdministratorAsync(eventStore, adminToken, cancellationToken).ConfigureAwait(false);
+        await SubmitOwnerCommandAndWaitAsync(eventStore, adminToken, "system", "tenants", tenantId,
+            "CreateTenant", new { tenantId, name = $"Authority {tenantId}", description = "Live owner authority evidence" },
+            cancellationToken, alreadySatisfiedReasonCode: "tenant-already-exists-rejection").ConfigureAwait(false);
+        await SubmitOwnerCommandAndWaitAsync(eventStore, adminToken, "system", "tenants", tenantId,
+            "AddUserToTenant", new { tenantId, userId = principalId, role = "TenantOwner" },
+            cancellationToken, alreadySatisfiedReasonCode: "user-already-in-tenant-rejection").ConfigureAwait(false);
+
+        string eventStoreActorToken = await AcquireTenantBoundAccessTokenAsync(app, principalId,
+            $"{principalId}-pass", "hexalith-eventstore", cancellationToken).ConfigureAwait(false);
+        await SubmitOwnerCommandAndWaitAsync(eventStore, eventStoreActorToken, tenantId, "party", principalId,
+            "Hexalith.Parties.Contracts.Commands.CreateParty",
+            new { partyId = principalId, type = 1, personDetails = new { firstName = "Live", lastName = principalId } },
+            cancellationToken).ConfigureAwait(false);
+
+        return eventStoreActorToken;
     }
 
     private static async Task<bool> WasOwnerCommandDefinitivelyRejectedAsync(
@@ -486,8 +494,202 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         throw new TimeoutException($"Owner command {domain}/{commandType} did not complete in {ProjectionTimeout}.");
     }
 
+    /// <summary>Proves fresh-state grant and note refusal through production admission without durable effects.</summary>
     [Fact]
-    public async Task TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology()
+    public async Task GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology()
+    {
+        RequireTier3Runtime("The production refusal smoke requires HEXALITH_CHATBOT_TIER3=1, Docker and DAPR.");
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        const string tenantId = "tenant-alpha";
+        const string principalId = "actor-alpha";
+        string noteId = GovernedNoteId.New().ToString();
+        string noteCommandId = ChatBotCommandId.New().ToString();
+        string noteTaskId = ChatBotCommandId.New().ToString();
+        string noteCorrelationId = ChatBotCommandId.New().ToString();
+        string grantCommandId = ChatBotCommandId.New().ToString();
+        string grantTaskId = ChatBotCommandId.New().ToString();
+        string grantCorrelationId = ChatBotCommandId.New().ToString();
+        noteTaskId.ShouldNotBe(noteCommandId);
+        grantTaskId.ShouldNotBe(grantCommandId);
+        string authorityKey = ChatBotAuthorityGrantKey.For(tenantId, principalId, noteId,
+            nameof(RecordGovernedNote), "operation", "human", ChatBotSurfaceOrigin.Ui);
+
+        DistributedApplication app = await StartTestingApplicationAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            await WaitForAndRecordRequiredTopologyAsync(app, cancellationToken).ConfigureAwait(true);
+            using HttpClient client = app.CreateHttpClient(ChatBotResourceName);
+            client.Timeout = TimeSpan.FromSeconds(120);
+            using HttpClient eventStore = app.CreateHttpClient(EventStoreResourceName, "http");
+            using HttpClient tenants = app.CreateHttpClient(TenantsResourceName, "http");
+            using HttpClient parties = app.CreateHttpClient(PartiesResourceName, "http");
+            await WaitForListenerAsync(eventStore, cancellationToken).ConfigureAwait(true);
+            await WaitForListenerAsync(tenants, cancellationToken).ConfigureAwait(true);
+            await WaitForListenerAsync(parties, cancellationToken).ConfigureAwait(true);
+            await WaitForChatBotListeningAsync(client, cancellationToken).ConfigureAwait(true);
+            string accessToken = await AcquireTenantBoundAccessTokenAsync(app, cancellationToken).ConfigureAwait(true);
+            await WaitForChatBotDaprSidecarAsync(client, accessToken, noteCorrelationId, cancellationToken).ConfigureAwait(true);
+
+            // Tenants and Parties establish current real identity/owner prerequisites. No synthetic admission,
+            // ChatBot grant, raw state write or authorization override is installed in this smoke.
+            _ = await EnsureCurrentRequesterOwnersAsync(app, eventStore, tenantId, principalId,
+                true, cancellationToken).ConfigureAwait(true);
+            using HttpClient ownerState = new() { BaseAddress = app.GetEndpoint("eventstore-dapr-cli", "http") };
+            using HttpClient chatBotState = new() { BaseAddress = app.GetEndpoint("chatbot-dapr-cli", "http") };
+            string[] ownerPaths = [GovernedActorMetadataPath(tenantId, authorityKey), GovernedActorMetadataPath(tenantId, noteId)];
+            string[] projectionPaths = [GovernedProjectionPath(tenantId, authorityKey), GovernedProjectionPath(tenantId, noteId)];
+            string[] ownerBefore = new string[ownerPaths.Length];
+            string[] projectionBefore = new string[projectionPaths.Length];
+            for (int index = 0; index < ownerPaths.Length; index++)
+            {
+                ownerBefore[index] = await ReadGovernedStateSnapshotAsync(ownerState, ownerPaths[index], cancellationToken).ConfigureAwait(true);
+                projectionBefore[index] = await ReadGovernedStateSnapshotAsync(chatBotState, projectionPaths[index], cancellationToken).ConfigureAwait(true);
+            }
+            await AssertRefusedCommandHasNoReservationsAsync(chatBotState, tenantId, grantCommandId,
+                cancellationToken).ConfigureAwait(true);
+            await AssertRefusedCommandHasNoReservationsAsync(chatBotState, tenantId, noteCommandId,
+                cancellationToken).ConfigureAwait(true);
+
+            using HttpResponseMessage unauthenticated = await SubmitUnauthenticatedGovernedNoteAsync(client,
+                noteId, noteCommandId, noteTaskId, noteCorrelationId, cancellationToken).ConfigureAwait(true);
+            unauthenticated.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+
+            var grant = new GrantChatBotAuthority(authorityKey, ChatBotCommandId.New().ToString(), principalId,
+                noteId, nameof(RecordGovernedNote), "operation", "human", ChatBotSurfaceOrigin.Ui,
+                DateTimeOffset.UtcNow.AddHours(1));
+            using HttpRequestMessage grantRequest = new(HttpMethod.Post, "/api/v1/commands")
+            {
+                Content = JsonContent.Create(new
+                {
+                    commandId = grantCommandId, commandType = nameof(GrantChatBotAuthority), command = grant,
+                    origin = "ui", requestSchemaVersion = "v1",
+                }),
+            };
+            grantRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            grantRequest.Headers.Add("X-Correlation-Id", grantCorrelationId);
+            grantRequest.Headers.Add("X-Hexalith-Task-Id", grantTaskId);
+            using HttpResponseMessage refusedGrant = await client.SendAsync(grantRequest, cancellationToken).ConfigureAwait(true);
+            string grantBody = await refusedGrant.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(true);
+            AssertProductionRefusal(refusedGrant.StatusCode, grantBody, HttpStatusCode.ServiceUnavailable,
+                ChatBotMessageCodes.CanonicalExecutionUnavailable, "canonical-execution-unavailable");
+
+            // A refused grant cannot authorize the note. Universal authorization therefore stops it at 403,
+            // before operation/profile/atomic checks; expecting another 503 would invent owner authority.
+            CommandSubmissionOutcome refusedNote = await SubmitGovernedNoteAsync(client, accessToken, noteId,
+                noteCommandId, noteTaskId, noteCorrelationId, cancellationToken).ConfigureAwait(true);
+            AssertProductionRefusal(refusedNote.StatusCode, refusedNote.Body, HttpStatusCode.Forbidden,
+                ChatBotMessageCodes.AuthorizationDenied, "authorization-denied");
+
+            Stopwatch stability = Stopwatch.StartNew();
+            do
+            {
+                for (int index = 0; index < ownerPaths.Length; index++)
+                {
+                    (await ReadGovernedStateSnapshotAsync(ownerState, ownerPaths[index], cancellationToken).ConfigureAwait(true))
+                        .ShouldBe(ownerBefore[index], "Refused commands must preserve authoritative grant/note stream metadata.");
+                    (await ReadGovernedStateSnapshotAsync(chatBotState, projectionPaths[index], cancellationToken).ConfigureAwait(true))
+                        .ShouldBe(projectionBefore[index], "Refused commands must preserve governed projections.");
+                }
+                await AssertRefusedCommandHasNoReservationsAsync(chatBotState, tenantId, grantCommandId,
+                    cancellationToken).ConfigureAwait(true);
+                await AssertRefusedCommandHasNoReservationsAsync(chatBotState, tenantId, noteCommandId,
+                    cancellationToken).ConfigureAwait(true);
+                await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(true);
+            }
+            while (stability.Elapsed < ProjectionStabilityWindow);
+        }
+        finally
+        {
+            await app.DisposeAsync().ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>Checks the exact typed production refusal; an infrastructure fault cannot substitute for it.</summary>
+    private static void AssertProductionRefusal(HttpStatusCode actualStatus, string body, HttpStatusCode expectedStatus,
+        string expectedCode, string expectedProblemType)
+    {
+        actualStatus.ShouldBe(expectedStatus, body);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(expectedCode);
+        problem.RootElement.GetProperty("type").GetString().ShouldBe($"https://hexalith.dev/errors/chatbot/{expectedProblemType}");
+        problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeFalse();
+    }
+
+    /// <summary>Locates authoritative stream metadata through the existing actor read endpoint.</summary>
+    private static string GovernedActorMetadataPath(string tenantId, string aggregateId)
+    {
+        string actorId = $"{tenantId}:chatbot:{aggregateId}";
+        return $"v1.0/actors/AggregateActor/{Uri.EscapeDataString(actorId)}/state/{Uri.EscapeDataString(actorId + ":metadata")}";
+    }
+
+    /// <summary>Locates the tenant-partitioned governed projection with a strong-consistency read.</summary>
+    private static string GovernedProjectionPath(string tenantId, string aggregateId)
+        => $"v1.0/state/chatbot-statestore/{Uri.EscapeDataString(tenantId + ":governed-operation:" + aggregateId)}?consistency=strong";
+
+    /// <summary>Reads actual persisted contents; transport failures never count as missing state.</summary>
+    private static async Task<string> ReadGovernedStateSnapshotAsync(HttpClient state, string path, CancellationToken cancellationToken)
+    {
+        using HttpResponseMessage response = await state.GetAsync(path, cancellationToken).ConfigureAwait(false);
+        response.StatusCode.ShouldBeOneOf(HttpStatusCode.OK, HttpStatusCode.NoContent, HttpStatusCode.NotFound);
+        return $"{(int)response.StatusCode}:" + await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Proves absent operation status and both identity/domain idempotency reservations for a refused command.</summary>
+    private static async Task AssertRefusedCommandHasNoReservationsAsync(HttpClient state, string tenantId,
+        string commandId, CancellationToken cancellationToken)
+    {
+        string identityKey = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
+            string.Join('\u001f', tenantId, "command-identity", commandId))));
+        string domainKey = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
+            string.Join('\u001f', tenantId, "command-execution", commandId))));
+        foreach (string key in new[] { $"{tenantId}:operation-status:{commandId}", identityKey, domainKey })
+        {
+            using HttpResponseMessage persisted = await state.GetAsync(
+                $"v1.0/state/chatbot-statestore/{Uri.EscapeDataString(key)}?consistency=strong", cancellationToken).ConfigureAwait(false);
+            persisted.StatusCode.ShouldBe(HttpStatusCode.NoContent, "A refused command must create no operation or reservation.");
+        }
+    }
+
+    /// <summary>Proves persisted status at the canonical command key fails the probe even when the task key is absent.</summary>
+    [Fact]
+    public async Task RefusedCommandReservationProbeShouldRejectPersistedCanonicalOperationStatus()
+    {
+        const string tenantId = "tenant-alpha";
+        const string commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+        const string taskId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
+        const string canonicalKey = $"{tenantId}:operation-status:{commandId}";
+        const string taskKey = $"{tenantId}:operation-status:{taskId}";
+        Dictionary<string, string> persisted = [];
+        List<string> requestedKeys = [];
+        using SequenceHttpMessageHandler handler = new((_, request) =>
+        {
+            string key = Uri.UnescapeDataString(request.RequestUri!.AbsolutePath.Split('/')[^1]);
+            requestedKeys.Add(key);
+            return persisted.TryGetValue(key, out string? body)
+                ? SequenceHttpMessageHandler.Json(body)
+                : new HttpResponseMessage(HttpStatusCode.NoContent);
+        });
+        using HttpClient state = new(handler) { BaseAddress = new Uri("http://state.test/") };
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+
+        await AssertRefusedCommandHasNoReservationsAsync(state, tenantId, commandId, cancellationToken).ConfigureAwait(true);
+        requestedKeys.ShouldContain(canonicalKey);
+        requestedKeys.ShouldNotContain(taskKey);
+        persisted[canonicalKey] = JsonSerializer.Serialize(new { operationId = commandId, taskId });
+        persisted.ContainsKey(taskKey).ShouldBeFalse();
+
+        Exception? failure = await Record.ExceptionAsync(() =>
+            AssertRefusedCommandHasNoReservationsAsync(state, tenantId, commandId, cancellationToken)).ConfigureAwait(true);
+        failure.ShouldBeOfType<ShouldAssertException>();
+    }
+
+    /// <summary>
+    /// Requires committed two-tenant governed state before testing the M2 stop-ship sweeps. Release selects this
+    /// independently of the refusal smoke; it must remain failing until Story 1.8 supplies atomic participation.
+    /// </summary>
+    [Fact]
+    [Trait("ReleaseGate", "M2")]
+    public async Task CommittedGovernedStateShouldPassM2StopShipSweepsInRealDaprTopology()
     {
         RequireTier3Runtime(
             "Tier-3 Aspire E2E requires a Docker runtime and the DAPR CLI/runtime (dapr init). Set "
@@ -684,12 +886,9 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 body.ShouldNotContain("raw exception", Case.Insensitive);
             }
 
-            // AC3 (Story 12.14): the M2 stop-ship gate, asserted against the live topology. This is deliberately the
-            // last leg of the *required* acceptance test rather than a separate job: this test already gates
-            // `semantic-release` in release.yml, and by this point a real governed command has flowed through the real
-            // spine, so the WORM chain and outbound-trace stores hold genuine tenant state for the sweeps to verify.
-            // A real breach here fails this test, fails the job, and blocks the release — which is what "block release
-            // on a real (not merely provable) breach signal" asks for.
+            // AC3 (Story 12.14): the release-only gate requires real committed two-tenant state before sweeping.
+            // The independent fresh-state smoke cannot satisfy this positive-coverage requirement. A failure here
+            // blocks semantic-release, including the current absence of accepted atomic commit participation.
             await AssertM2ReleaseGateIsClearAsync(client, cancellationToken).ConfigureAwait(true);
         }
         finally
