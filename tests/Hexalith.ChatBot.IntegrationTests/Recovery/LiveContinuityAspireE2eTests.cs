@@ -1005,8 +1005,9 @@ public sealed class LiveContinuityAspireE2eTests
                     ? problemDetails[..512]
                     : problemDetails;
 
-                // The only admission proof (see the remarks above): only the accepted branch of CommandGateway can
-                // emit this type, so observing it proves the bearer was admitted.
+                // The only boundary proof (see the remarks above): these problem types are emitted only after
+                // authentication, tenant binding and authorization, so observing one proves the bearer passed that
+                // boundary -- not that any mutation was admitted.
                 if (ProvesMailboxAdmission(response.StatusCode, problemDetails))
                 {
                     return;

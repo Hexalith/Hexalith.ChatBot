@@ -43,6 +43,16 @@ public sealed class AdmissionProfileFitnessTests
                 (property.Name.EndsWith("Version", StringComparison.Ordinal) || property.Name.EndsWith("Revision", StringComparison.Ordinal))) > 1)
             .Select(type => type.Name).Order(StringComparer.Ordinal)
             .ShouldBe(new[] { nameof(ExecuteApprovedAIAction), nameof(ExecuteApprovedOutboundDraft) }.Order(StringComparer.Ordinal));
+        // AI-profile classification and structured approval are selected by command name. Freeze both sets so a new
+        // AI contract cannot silently skip classification or pass approval lifetime/drift on an opaque reference.
+        catalog.Commands.Where(row => row.Value is ChatBotAdmissionProfile.AiRead or ChatBotAdmissionProfile.AiEffect)
+            .Where(row => !ChatBotCommandAdmissionCatalog.RequiresClassification(row.Key))
+            .Select(row => row.Key).Order(StringComparer.Ordinal)
+            .ShouldBe(new[] { nameof(DecideAiActionApproval), nameof(MarkAiActionProposalInvalidatedByCorrection) }.Order(StringComparer.Ordinal));
+        catalog.Commands.Where(row => row.Value == ChatBotAdmissionProfile.AiEffect)
+            .Where(row => ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(row.Key).Contains("approval-lifetime-drift"))
+            .Select(row => row.Key)
+            .ShouldBe(new[] { nameof(ExecuteApprovedAIAction) });
         catalog.Find("unmapped").ShouldBeNull();
         catalog.Find("RetryCommandExecution").ShouldBeNull();
         catalog.Find(nameof(ExecuteLowRiskAIAssistance)).ShouldBe(ChatBotAdmissionProfile.AiRead);

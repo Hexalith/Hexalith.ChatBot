@@ -250,6 +250,11 @@ public sealed class ProjectConversationServiceTests
         command.RiskClassification.ShouldBeNull();
         command.IntendedCommandName.ShouldBe("Project.AppendConversationMessage");
         command.CommandDefaultRisk.ShouldBe(Hexalith.ChatBot.Contracts.Enums.AiActionRiskClass.ApprovalRequired);
+        // Admission rejects any claim that differs from the server's M0 Project.AppendConversationMessage metadata.
+        command.EffectSurface.ShouldBe("project-conversation");
+        command.TenantPolicyClassification.ShouldBe("approval-required");
+        command.CommandAllowlistVersion.ShouldBe("ai-action-command-allowlist.m0");
+        command.CommandMetadataSupported.ShouldBe(true);
         command.ProposalInputMetadata.ShouldNotBeNull()["composerOrigin"].ShouldBe("ui");
         command.ToString().ShouldNotContain("Summarize the latest project state");
     }
