@@ -166,6 +166,123 @@ public sealed partial class CommandGatewayTests
         (await statuses.TryGetAsync(BoundTenant, operation, TestContext.Current.CancellationToken)).ShouldBeNull();
     }
 
+    /// <summary>The SDK admission hook enforces the same classifier, approval and caller-metadata failures as HTTP.</summary>
+    [Theory]
+    [InlineData("classifier", ChatBotMessageCodes.ClassifierIndeterminate)]
+    [InlineData("approval-required", ChatBotMessageCodes.ApprovalRequired)]
+    [InlineData("selector", ChatBotMessageCodes.CommandContractInvalid)]
+    [InlineData("subtype", ChatBotMessageCodes.ClassifierIndeterminate)]
+    [InlineData("approval-failure", ChatBotRefusalReasonCodes.ApprovalStateInvalid)]
+    public async Task SdkProcessMustContainEveryProfileFailureWithoutBookkeeping(string failure, string reason)
+    {
+        SyntheticAdmissionEvidenceSource source = new();
+        object command = failure == "approval-failure" ? ApprovedExecutionCommand() : LowRiskExecutionCommand();
+        string commandType = command.GetType().Name;
+        System.Text.Json.JsonElement payload = System.Text.Json.JsonSerializer.SerializeToElement(command, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        if (failure is "selector" or "subtype")
+        {
+            Dictionary<string, object?> fields = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payload.GetRawText())!;
+            fields[failure == "selector" ? "admissionProfile" : "assistanceKind"] = failure == "selector" ? "ai-read-v1" : "undeclared-subtype";
+            payload = System.Text.Json.JsonSerializer.SerializeToElement(fields);
+        }
+        const string operation = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
+        ChatBotAdmissionProfile profile = failure == "approval-failure" ? ChatBotAdmissionProfile.AiEffect : ChatBotAdmissionProfile.AiRead;
+        source.ProfileEvidence = new(BoundTenant, ActorId, commandType, operation, profile, 8, "synthetic:owner-concurrency",
+            ChatBotCommandAdmissionCatalog.RequiredStages(profile).ToDictionary(stage => stage, stage => "synthetic:" + stage),
+            source.UtcNow.AddSeconds(-1), source.UtcNow.AddMinutes(1),
+            new(BoundTenant, 1, "policy-snap-001", true, "read-only", ["summarize-visible-context"], true, true));
+        SyntheticObservedAtomicAdmissionValidator evidence = new(new ChatBotAdmissionEvidenceValidator(source, source));
+        RecordingAuditWriter audit = new();
+        RecordingReplayIntentQueue replay = new();
+        RecordingOperatorAlertSink alerts = new();
+        InMemoryCoarseIdempotencyStore identities = new(source);
+        InMemoryOperationStatusStore statuses = new();
+        IRiskClassifier classifier = failure == "classifier" ? new SyntheticMissingRiskClassifier(0)
+            : failure == "subtype" ? new DeterministicAiActionRiskClassifier()
+            : new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticLegacyRiskClassifier();
+        ChatBotCommandAdmissionPipeline pipeline = new(new ClaimsAuthenticationStage(), new ClaimsTenantBindingStage(), new PassThroughAuthorizationStage(),
+            classifier, new AiActionApprovalGate(new Hexalith.ChatBot.Server.Governance.AiMediation.DefaultAiActionPolicyEvaluator(new FixedTenantAiPolicySnapshotProvider(false))),
+            identities, audit, replay, alerts, statuses, source, new CommandSubmissionLifecycleTransitionGuard(), new PermissiveSpineCommandAllowlist(),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(source), admissionEvidence: evidence);
+        Microsoft.AspNetCore.Http.HttpContextAccessor accessor = new()
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext { User = Principal(BoundTenant) },
+        };
+        DataProtectionChatBotAdmissionMarker marker = new(new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider());
+        Hexalith.EventStore.Contracts.Commands.CommandEnvelope envelope = new(operation, BoundTenant, "chatbot", "project-001", commandType,
+            System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(payload), CorrelationId, null, ActorId, new Dictionary<string, string> { ["actorId"] = ActorId, ["surfaceOrigin"] = "api" });
+        ChatBotDomainServiceAdmissionStage stage = new(pipeline, identities, marker, new(accessor));
+
+        Hexalith.EventStore.DomainService.DomainServiceAdmissionResult result = await stage.EvaluateAsync(
+            new(new Hexalith.EventStore.Contracts.Commands.DomainServiceRequest(envelope, null)), TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.RejectionEvents.ShouldHaveSingleItem().ShouldBeOfType<ChatBotDomainServiceAdmissionRejected>().ReasonCode.ShouldBe(reason);
+        evidence.OperationCalls.ShouldBe(1);
+        evidence.ClassificationCalls.ShouldBe(failure is "approval-required" or "approval-failure" ? 1 : 0);
+        evidence.ProfileCalls.ShouldBe(failure == "approval-failure" ? 1 : 0);
+        evidence.AtomicCalls.ShouldBe(0);
+        identities.RecordCount.ShouldBe(0);
+        audit.Envelopes.ShouldBeEmpty();
+        audit.AuthorizationFailures.ShouldBeEmpty();
+        replay.Intents.ShouldBeEmpty();
+        alerts.Alerts.ShouldBeEmpty();
+        (await statuses.TryGetAsync(BoundTenant, operation, TestContext.Current.CancellationToken)).ShouldBeNull();
+    }
+
+    /// <summary>Authentic markers never bypass current transport subject and tenant binding.</summary>
+    [Theory]
+    [InlineData("missing-tenant", "authentication_denied")]
+    [InlineData("conflicting-tenant", "authentication_denied")]
+    [InlineData("mismatched-tenant", "tenant_mismatch")]
+    [InlineData("missing-subject", "authentication_denied")]
+    [InlineData("conflicting-subject", "authentication_denied")]
+    [InlineData("mismatched-user", "authentication_denied")]
+    public async Task MarkedBookkeepingMustRejectInvalidCurrentTransportBindingBeforeOperationValidation(string binding, string reason)
+    {
+        FixedClock clock = new();
+        SyntheticObservedAtomicAdmissionValidator evidence = SyntheticBookkeepingEvidence(clock);
+        RecordingAuditWriter audit = new();
+        InMemoryCoarseIdempotencyStore identities = new(clock);
+        List<System.Security.Claims.Claim> claims = [new("sub", ActorId), new("eventstore:tenant", BoundTenant)];
+        if (binding == "missing-tenant") { claims.RemoveAll(claim => claim.Type == "eventstore:tenant"); }
+        if (binding == "conflicting-tenant") { claims.Add(new("eventstore:tenant", "synthetic-foreign")); }
+        if (binding == "missing-subject") { claims.RemoveAll(claim => claim.Type == "sub"); }
+        if (binding == "conflicting-subject") { claims.Add(new("sub", "synthetic-other")); }
+        System.Security.Claims.ClaimsPrincipal principal = new(new System.Security.Claims.ClaimsIdentity(claims, "synthetic-authenticated"));
+        string tenant = binding == "mismatched-tenant" ? "synthetic-foreign" : BoundTenant;
+        string user = binding == "mismatched-user" ? "synthetic-other" : ActorId;
+        const string operation = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
+        System.Text.Json.JsonElement payload = System.Text.Json.JsonSerializer.SerializeToElement(new Contracts.Commands.RecordGovernedNote(operation));
+        DataProtectionChatBotAdmissionMarker marker = new(new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider());
+        Dictionary<string, string> extensions = new() { ["actorId"] = user, ["surfaceOrigin"] = "api" };
+        extensions[DataProtectionChatBotAdmissionMarker.ExtensionKey] = marker.Create(operation, tenant, operation,
+            nameof(Contracts.Commands.RecordGovernedNote), payload, CorrelationId, user, "api", null);
+        Hexalith.EventStore.Contracts.Commands.CommandEnvelope envelope = new(operation, tenant, "chatbot", operation,
+            nameof(Contracts.Commands.RecordGovernedNote), System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(payload), CorrelationId, null, user, extensions);
+        marker.IsValid(envelope).ShouldBeTrue();
+        ChatBotCommandAdmissionPipeline pipeline = new(new ClaimsAuthenticationStage(), new ClaimsTenantBindingStage(), new PassThroughAuthorizationStage(),
+            new PassThroughRiskClassifier(), new PassThroughApprovalGate(), identities, audit, new RecordingReplayIntentQueue(), new RecordingOperatorAlertSink(),
+            new InMemoryOperationStatusStore(), clock, new CommandSubmissionLifecycleTransitionGuard(), new PermissiveSpineCommandAllowlist(),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock), admissionEvidence: evidence);
+        Microsoft.AspNetCore.Http.HttpContextAccessor accessor = new()
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext { User = principal },
+        };
+        ChatBotDomainServiceAdmissionStage stage = new(pipeline, identities, marker, new(accessor));
+
+        Hexalith.EventStore.DomainService.DomainServiceAdmissionResult result = await stage.EvaluateAsync(
+            new(new Hexalith.EventStore.Contracts.Commands.DomainServiceRequest(envelope, null)), TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.RejectionEvents.ShouldHaveSingleItem().ShouldBeOfType<ChatBotDomainServiceAdmissionRejected>().ReasonCode.ShouldBe(reason);
+        audit.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(reason);
+        evidence.OperationCalls.ShouldBe(0);
+        evidence.AtomicCalls.ShouldBe(0);
+        identities.RecordCount.ShouldBe(0);
+        audit.Envelopes.ShouldBeEmpty();
+    }
+
     private static SyntheticObservedAtomicAdmissionValidator SyntheticBookkeepingEvidence(FixedClock clock)
     {
         SyntheticAdmissionEvidenceSource source = new() { UtcNow = clock.UtcNow };

@@ -610,7 +610,10 @@ internal sealed class RecoveryDependencyExercise(
             clock,
             new CommandSubmissionLifecycleTransitionGuard(),
             new ChatBotSpineCommandAllowlist(),
-            new ChatBotRequestAuthorizer(new ChatBotAuthorityCatalog(), owners, clock, new ServiceClientGrantProjectionCache(clock)));
+            new ChatBotRequestAuthorizer(new ChatBotAuthorityCatalog(), owners, clock, new ServiceClientGrantProjectionCache(clock)),
+            // Synthetic recovery mechanics only: this bypass cannot establish owner execution, qualification,
+            // or accepted atomic participation, and is never registered in the production topology.
+            admissionEvidence: new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticLegacyAdmissionEvidenceValidator());
         return await pipeline.AdmitAsync(submission, cancellationToken).ConfigureAwait(false);
     }
 }

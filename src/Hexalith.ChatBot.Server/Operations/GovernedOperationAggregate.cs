@@ -4033,6 +4033,7 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             !string.Equals(request.ProposalId, command.ProposalId, StringComparison.Ordinal) ||
             !string.Equals(request.TaskIntentId, command.TaskIntentId, StringComparison.Ordinal) ||
             !string.Equals(request.SourceMessageId, command.SourceMessageId, StringComparison.Ordinal) ||
+            !string.Equals(request.SourceConversationItemId, command.SourceConversationItemId, StringComparison.Ordinal) ||
             !string.Equals(request.RequesterId, command.RequesterId, StringComparison.Ordinal))
         {
             return ChatBotRefusalReasonCodes.ApprovedCommandScopeExceeded;
@@ -4048,7 +4049,8 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             return ChatBotRefusalReasonCodes.CommandNotAllowlisted;
         }
 
-        if (request.SourceVersion != command.ExpectedProposalSourceVersion)
+        if (request.SourceVersion != command.ExpectedProposalSourceVersion ||
+            decision.ExpectedApprovalSourceVersion != request.SourceVersion)
         {
             return ChatBotRefusalReasonCodes.ApprovalStateInvalid;
         }
@@ -4176,7 +4178,8 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             ? "tuple:unavailable"
             : $"tuple:{tuple.IntendedCommandName}:{tuple.EffectSurface}:{tuple.RequesterAuthorityClass}:{tuple.TenantPolicyClassification}";
 
-    private static string AiRiskActionClassToken(AiActionRiskActionClass value)
+    /// <summary>Maps each persisted approval effect to its closed wire token.</summary>
+    internal static string AiRiskActionClassToken(AiActionRiskActionClass value)
         => value switch
         {
             AiActionRiskActionClass.ModifiesState => "modifies-state",
@@ -4925,6 +4928,11 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 : null;
 
     private static bool IsSafeClassification(AiActionRiskClassificationRecord? classification, ProposeAIAction command)
+        => IsSafeClassificationMetadata(classification) &&
+            string.Equals(classification!.InputTuple.IntendedCommandName, command.IntendedCommandName, StringComparison.Ordinal);
+
+    /// <summary>Validates the persisted classifier result's bounded metadata contract without granting execution authority.</summary>
+    internal static bool IsSafeClassificationMetadata(AiActionRiskClassificationRecord? classification)
         => classification is not null &&
             !classification.Rejected &&
             classification.RiskClass is AiActionRiskClass.LowRisk or AiActionRiskClass.ApprovalRequired &&
@@ -4934,7 +4942,6 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             IsSafeMetadataToken(classification.ClassifierVersion) &&
             classification.InputTuple is not null &&
             IsSafeMetadataToken(classification.InputTuple.IntendedCommandName) &&
-            string.Equals(classification.InputTuple.IntendedCommandName, command.IntendedCommandName, StringComparison.Ordinal) &&
             IsSafeOptionalMetadataToken(classification.InputTuple.EffectSurface) &&
             IsSafeOptionalMetadataToken(classification.InputTuple.TenantPolicyClassification) &&
             IsSafeOptionalMetadataToken(classification.InputTuple.RequesterAuthorityClass) &&

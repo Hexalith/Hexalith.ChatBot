@@ -247,6 +247,7 @@ public sealed class ProjectConversationServiceTests
         client.LastSubmitOrigin.ShouldBe(ChatBotSurfaceOrigin.Ui);
         Hexalith.ChatBot.Contracts.Commands.ProposeAIAction command =
             client.LastSubmittedCommand.ShouldBeOfType<Hexalith.ChatBot.Contracts.Commands.ProposeAIAction>();
+        command.RiskClassification.ShouldBeNull();
         command.IntendedCommandName.ShouldBe("Project.AppendConversationMessage");
         command.CommandDefaultRisk.ShouldBe(Hexalith.ChatBot.Contracts.Enums.AiActionRiskClass.ApprovalRequired);
         command.ProposalInputMetadata.ShouldNotBeNull()["composerOrigin"].ShouldBe("ui");

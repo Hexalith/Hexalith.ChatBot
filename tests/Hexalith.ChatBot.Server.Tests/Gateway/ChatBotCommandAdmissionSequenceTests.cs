@@ -14,6 +14,8 @@ public sealed class ChatBotCommandAdmissionSequenceTests
     [Theory]
     [InlineData(nameof(ExecuteLowRiskAIAssistance), (int)ChatBotAdmissionProfile.AiRead, "operation,classify,qualification,approval,profile,envelope,atomic")]
     [InlineData(nameof(ProposeAIAction), (int)ChatBotAdmissionProfile.AiEffect, "operation,classify,qualification,approval,profile,envelope,atomic")]
+    [InlineData(nameof(DecideAiActionApproval), (int)ChatBotAdmissionProfile.AiEffect, "operation,approval,profile,envelope,atomic")]
+    [InlineData(nameof(MarkAiActionProposalInvalidatedByCorrection), (int)ChatBotAdmissionProfile.AiEffect, "operation,approval,profile,envelope,atomic")]
     [InlineData(nameof(ExecuteApprovedOutboundDraft), (int)ChatBotAdmissionProfile.HumanEffect, "operation,approval,profile,envelope,atomic")]
     [InlineData(nameof(RecordGovernedNote), (int)ChatBotAdmissionProfile.CommandExecution, "operation,profile,envelope,atomic")]
     public async Task CommonAdmissionShouldRunEachRequiredStageOnceBeforeTheUnavailableAtomicBoundary(

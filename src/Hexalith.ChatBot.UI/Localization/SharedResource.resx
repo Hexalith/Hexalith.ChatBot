@@ -1116,4 +1116,8 @@
   <data name="Failure_CatalogReason_idempotency_conflict_ai_action_proposal" xml:space="preserve"><value>This AI action proposal conflicts with an existing proposal request.</value></data>
   <data name="Failure_Catalog_canonical_execution_unavailable" xml:space="preserve"><value>Command execution unavailable.</value></data>
   <data name="Failure_CatalogReason_canonical_execution_unavailable" xml:space="preserve"><value>This command is unavailable in the current configuration.</value></data>
+  <data name="Failure_Catalog_approval-required" xml:space="preserve"><value>Human approval required.</value></data>
+  <data name="Failure_CatalogReason_approval-required" xml:space="preserve"><value>This action needs an authorized human review. Request approval before submitting a new action.</value></data>
+  <data name="Failure_Catalog_classifier-indeterminate" xml:space="preserve"><value>Action classification unavailable.</value></data>
+  <data name="Failure_CatalogReason_classifier-indeterminate" xml:space="preserve"><value>The action could not be classified safely. Contact support, then submit a new linked request after remediation.</value></data>
 </root>

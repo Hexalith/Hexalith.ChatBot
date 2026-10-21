@@ -91,6 +91,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
         response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         using JsonDocument problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        problem.RootElement.GetProperty("type").GetString().ShouldBe(ChatBotProblemTypes.ApprovalRequired);
         problem.RootElement.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.ApprovalRequired);
         problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeFalse();
         problem.RootElement.GetProperty("clientAction").GetString().ShouldBe("escalate");
@@ -563,6 +564,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         idempotencyStore.RecordCount.ShouldBe(0);
         string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         using JsonDocument problem = JsonDocument.Parse(body);
+        problem.RootElement.GetProperty("type").GetString().ShouldBe(ChatBotProblemTypes.ClassifierIndeterminate);
         problem.RootElement.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.ClassifierIndeterminate);
         problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeFalse();
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
@@ -596,6 +598,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         idempotencyStore.RecordCount.ShouldBe(0);
         string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         using JsonDocument problem = JsonDocument.Parse(body);
+        problem.RootElement.GetProperty("type").GetString().ShouldBe(ChatBotProblemTypes.ClassifierIndeterminate);
         problem.RootElement.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.ClassifierIndeterminate);
         problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeFalse();
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
@@ -629,6 +632,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         idempotencyStore.RecordCount.ShouldBe(0);
         string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         using JsonDocument problem = JsonDocument.Parse(body);
+        problem.RootElement.GetProperty("type").GetString().ShouldBe(ChatBotProblemTypes.ClassifierIndeterminate);
         problem.RootElement.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.ClassifierIndeterminate);
         problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeFalse();
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);

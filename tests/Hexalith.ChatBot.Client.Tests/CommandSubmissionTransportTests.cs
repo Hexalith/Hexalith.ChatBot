@@ -274,6 +274,41 @@ public sealed class CommandSubmissionTransportTests
         response.ShouldNotContain("secret", Case.Insensitive);
     }
 
+    /// <summary>The generated 422 response branch decodes the terminal classifier disposition as a typed problem.</summary>
+    [Fact]
+    public async Task SubmitCommandShouldDecodeTerminalClassifierIndeterminateProblemFor422()
+    {
+        const string body =
+            """
+            {
+              "type":"https://hexalith.dev/errors/chatbot/classifier-indeterminate",
+              "title":"Action classification unavailable",
+              "schemaVersion":"chatbot.message-catalog.v1",
+              "status":422,
+              "category":"validation_error",
+              "code":"classifier-indeterminate",
+              "message":"The action could not be classified safely.",
+              "correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW",
+              "taskId":"01ARZ3NDEKTSV4RRFFQ69G5FAX",
+              "retryable":false,
+              "clientAction":"correct-request",
+              "details":{"visibility":"metadata_only"}
+            }
+            """;
+        GeneratedClient client = NewClient(new CapturingHandler(HttpStatusCode.UnprocessableEntity, body));
+
+        HexalithChatBotApiException<ProblemDetails> exception = await Should.ThrowAsync<HexalithChatBotApiException<ProblemDetails>>(
+            () => client.SubmitCommandAsync(CorrelationId, TaskId, Request(), TestContext.Current.CancellationToken));
+
+        exception.StatusCode.ShouldBe(422);
+        exception.Result.Status.ShouldBe(422);
+        exception.Result.Type.ShouldBe("https://hexalith.dev/errors/chatbot/classifier-indeterminate");
+        exception.Result.Code.ShouldBe("classifier-indeterminate");
+        exception.Result.Retryable.ShouldBeFalse();
+        exception.Result.ClientAction.ShouldBe(ProblemDetailsClientAction.CorrectRequest);
+        exception.Result.Details.Visibility.ShouldBe(ProblemDetailsDetailsVisibility.Metadata_only);
+    }
+
     public static IEnumerable<object[]> RequiredResponseMembers()
     {
         string[] acceptance = ["commandId", "correlationId", "operationId", "lifecycleState", "acceptedAt", "reasonCode", "retryEligible"];

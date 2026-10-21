@@ -89,7 +89,7 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
         => IsSubmissionFailureMarker(submissionError).ShouldBe(expected);
 
     [Fact]
-    public async Task AuthenticatedProductionClientShouldMessageAskAndStopAcrossRequiredChromeMatrix()
+    public async Task AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix()
     {
         TrivialGovernedCommandAspireE2eTests.RequireTier3Runtime(
             "Story 13.2 production-browser acceptance requires HEXALITH_CHATBOT_TIER3=1, Docker, DAPR, and Chrome.");
@@ -165,104 +165,18 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
             await AuthenticateActorAlphaAsync(page, uiEndpoint).ConfigureAwait(true);
             AssertNoBrowserErrors(browserErrors);
 
-            try
-            {
-                await SubmitComposerAsync(page, "Message", "Story 13.2 production route message").ConfigureAwait(true);
-            }
-            catch
-            {
-                ProjectConversationResponse diagnostic = await ReadConversationAsync(
-                    chatBot,
-                    accessToken,
-                    cancellationToken).ConfigureAwait(true);
-                output.WriteLine(
-                    $"STORY132_MESSAGE_PROJECTION_DIAGNOSTIC status={diagnostic.Status} "
-                    + $"safeNextAction={diagnostic.SafeNextAction ?? "<null>"} items={diagnostic.Items.Count}");
-                foreach (ProjectConversationItem item in diagnostic.Items)
-                {
-                    output.WriteLine(
-                        $"STORY132_MESSAGE_ITEM kind={item.Kind} lifecycle={item.LifecycleState} sourceVersion={item.SourceVersion} "
-                        + $"failureReason={item.FailureReasonCode ?? "<null>"} blockedReason={item.BlockedReason ?? "<null>"} "
-                        + $"auditStatus={item.AuditStatus ?? "<null>"} safeNextAction={item.SafeNextAction ?? "<null>"}");
-                }
+            // Story 1.7 keeps production admission. The M0 message/approval/execution/stop loop needs
+            // Story 1.8 commit participation; this live contract proves refusal and persisted-state invariance.
+            using HttpClient chatBotState = new() { BaseAddress = app.GetEndpoint("chatbot-dapr-cli", "http") };
+            using HttpClient ownerState = new() { BaseAddress = app.GetEndpoint("eventstore-dapr-cli", "http") };
+            const string tenant = "tenant-alpha";
+            string actorId = $"{tenant}:chatbot:{ProjectId}";
+            string ownerPath = $"v1.0/actors/AggregateActor/{Uri.EscapeDataString(actorId)}/state/{Uri.EscapeDataString(actorId + ":metadata")}";
+            string projectionPath = $"v1.0/state/chatbot-statestore/{Uri.EscapeDataString(tenant + ":project-conversation:" + ProjectId + ":index")}?consistency=strong";
+            string ownerBefore = await ReadPersistedSnapshotAsync(ownerState, ownerPath, cancellationToken).ConfigureAwait(true);
+            string projectionBefore = await ReadPersistedSnapshotAsync(chatBotState, projectionPath, cancellationToken).ConfigureAwait(true);
 
-                throw;
-            }
-            try
-            {
-                await WaitForAsync(
-                    async () => await page.Locator(".chatbot-conversation-stream__entry").CountAsync().ConfigureAwait(true) >= 1,
-                    "the production Message command projection",
-                    cancellationToken).ConfigureAwait(true);
-            }
-            catch
-            {
-                ILocator composer = page.Locator(".chatbot-governed-composer");
-                ILocator retryableCode = page.Locator(
-                    "[data-chatbot-stable-id='project-conversation-retryable'] code");
-                ILocator conversationCode = page.Locator(
-                    "[data-chatbot-stable-id='project-conversation-status'] code");
-                string correlationId = await AttributeOrAbsentAsync(
-                    composer,
-                    "data-chatbot-pending-correlation-id").ConfigureAwait(true);
-                ProjectConversationResponse diagnostic = await ReadConversationAsync(
-                    chatBot,
-                    accessToken,
-                    cancellationToken).ConfigureAwait(true);
-                output.WriteLine(
-                    $"STORY132_MESSAGE_POLL_DIAGNOSTIC uiError={await TextOrAbsentAsync(retryableCode).ConfigureAwait(true)} "
-                    + $"uiStatus={await TextOrAbsentAsync(conversationCode).ConfigureAwait(true)} correlation={correlationId} "
-                    + $"expectedItem={UserMessageProjectionIdentity(correlationId)}");
-                foreach (ProjectConversationItem item in diagnostic.Items)
-                {
-                    output.WriteLine(
-                        $"STORY132_MESSAGE_POLL_ITEM itemId={item.ItemId} lifecycle={item.LifecycleState} "
-                        + $"sourceVersion={item.SourceVersion} auditStatus={item.AuditStatus ?? "<null>"}");
-                }
-
-                throw;
-            }
-            await AssertHealthyCurrentStatusAsync(page).ConfigureAwait(true);
-
-            await SubmitComposerAsync(page, "Ask AI", "Summarize the visible governed context").ConfigureAwait(true);
-            ILocator proposal = page.Locator(".chatbot-ai-outcome-conversation-item").Last;
-            await proposal.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 90_000 }).ConfigureAwait(true);
-
-            ProjectConversationResponse beforeExecution = await ReadConversationAsync(
-                chatBot,
-                accessToken,
-                cancellationToken).ConfigureAwait(true);
-            ProjectConversationItem proposalItem = beforeExecution.Items
-                .Where(static item => item.AiOutcomeKind is AiOutcomeKind.Proposal)
-                .OrderByDescending(static item => item.SourceVersion)
-                .First();
-            proposalItem.AiRiskClass.ShouldBe(AiActionRiskClass.ApprovalRequired);
-            proposalItem.AiSafeNextAction.ShouldBe("review-ai-action");
-            (await proposal.InnerTextAsync().ConfigureAwait(true)).ShouldContain("approval", Case.Insensitive);
-            AssertNoBrowserErrors(browserErrors);
-
-            long expectedProposalSourceVersion = beforeExecution.Items.Max(static item => item.SourceVersion);
-            string executionId = ChatBotCommandId.New().ToString();
-            string executionCorrelationId = ChatBotCommandId.New().ToString();
-            await SubmitLowRiskExecutionAsync(
-                chatBot,
-                accessToken,
-                proposalItem,
-                expectedProposalSourceVersion,
-                executionId,
-                executionCorrelationId,
-                cancellationToken).ConfigureAwait(true);
-
-            ILocator stopSlot = page.Locator("[data-chatbot-stable-id='project-conversation-ai-response-stop']");
-            ILocator stopControl = stopSlot.Locator("fluent-button");
-            await WaitForAsync(
-                async () => string.Equals(
-                    await stopControl.GetAttributeAsync("data-chatbot-streaming-stop-active").ConfigureAwait(true),
-                    "true",
-                    StringComparison.Ordinal),
-                "the SignalR-nudged active generation",
-                cancellationToken).ConfigureAwait(true);
-
+            await AssertLowRiskHttpRefusalAsync(chatBot, chatBotState, accessToken, cancellationToken).ConfigureAwait(true);
             BrowserMatrix.Length.ShouldBe(24);
             foreach (BrowserMatrixRow row in BrowserMatrix)
             {
@@ -272,9 +186,6 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
                     ReducedMotion = row.ReducedMotion ? ReducedMotion.Reduce : ReducedMotion.NoPreference,
                     ForcedColors = row.ForcedColors ? ForcedColors.Active : ForcedColors.None,
                 }).ConfigureAwait(true);
-                // The interactive Blazor circuit negotiates culture on its WebSocket request, where the page query
-                // string is absent. Set the standard localization cookie as well so both prerender and the live
-                // circuit exercise the requested EN/FR culture.
                 await context.AddCookiesAsync(
                 [
                     new Microsoft.Playwright.Cookie
@@ -284,56 +195,23 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
                         Url = uiEndpoint.ToString(),
                     },
                 ]).ConfigureAwait(true);
-                await page.GotoAsync(
-                    ConversationUri(uiEndpoint, row.Culture),
+                await page.GotoAsync(ConversationUri(uiEndpoint, row.Culture),
                     new PageGotoOptions { WaitUntil = WaitUntilState.NetworkIdle }).ConfigureAwait(true);
-                await stopControl.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 90_000 }).ConfigureAwait(true);
-
                 (await page.Locator("#project-conversation-title").InnerTextAsync().ConfigureAwait(true))
                     .ShouldContain(row.Culture == "fr" ? "Conversation projet" : "Project conversation");
-                (await stopControl.GetAttributeAsync("aria-disabled").ConfigureAwait(true)).ShouldBe("false");
-                (await stopControl.GetAttributeAsync("data-chatbot-streaming-stop-active").ConfigureAwait(true)).ShouldBe("true");
-                (await page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches").ConfigureAwait(true))
-                    .ShouldBe(row.ReducedMotion);
-                (await page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches").ConfigureAwait(true))
-                    .ShouldBe(row.ForcedColors);
-                await AssertHealthyCurrentStatusAsync(page).ConfigureAwait(true);
-                await AssertEveryCriticalSurfaceInMatrixRowAsync(page, stopSlot, stopControl, row).ConfigureAwait(true);
-                await AssertCriticalControlNotClippedAsync(stopControl, row).ConfigureAwait(true);
-                AssertNoBrowserErrors(browserErrors);
-                output.WriteLine("STORY132_BROWSER_MATRIX {0}", row);
-            }
-
-            await page.EvaluateAsync(
-                """
-                () => {
-                    window.__story132Announcements = 0;
-                    const live = document.querySelector("[data-chatbot-stable-id='project-conversation-ai-response-stop'] [role='status']");
-                    let previous = (live?.textContent || '').trim();
-                    new MutationObserver(() => {
-                        const current = (live?.textContent || '').trim();
-                        if (current && current !== previous) window.__story132Announcements++;
-                        previous = current;
-                    }).observe(live, { subtree: true, childList: true, characterData: true });
+                foreach (string mode in new[] { "Message", "Ask AI" })
+                {
+                    await SubmitComposerAndExpectSafeRefusalAsync(page, mode, "Story 1.7 governed refusal", row.Culture).ConfigureAwait(true);
                 }
-                """).ConfigureAwait(true);
-            await stopControl.ClickAsync().ConfigureAwait(true);
-            await page.Locator("[data-chatbot-streaming-state='stopped']")
-                .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 90_000 }).ConfigureAwait(true);
-            (await page.Locator("[data-chatbot-streaming-state='stopped']").InnerTextAsync().ConfigureAwait(true))
-                .ShouldBe(BrowserMatrix[^1].Culture == "fr" ? "Réponse arrêtée." : "Response stopped.");
-            await WaitForAsync(
-                async () => await page.EvaluateAsync<int>("() => window.__story132Announcements || 0").ConfigureAwait(true) == 1,
-                "exactly one verified-stop live announcement",
-                cancellationToken).ConfigureAwait(true);
-            (await stopSlot.Locator("[role='status']").InnerTextAsync().ConfigureAwait(true))
-                .ShouldBe(BrowserMatrix[^1].Culture == "fr" ? "Réponse arrêtée" : "Response stopped");
-            await Task.Delay(1_000, cancellationToken).ConfigureAwait(true);
-            (await page.EvaluateAsync<int>("() => window.__story132Announcements || 0").ConfigureAwait(true)).ShouldBe(1);
-            (await page.Locator("#project-conversation-composer-input")
-                .EvaluateAsync<bool>("element => document.activeElement === element").ConfigureAwait(true)).ShouldBeTrue();
-            (await stopControl.GetAttributeAsync("aria-disabled").ConfigureAwait(true)).ShouldBe("true");
-            AssertNoBrowserErrors(browserErrors);
+                ILocator input = page.Locator("#project-conversation-composer-input");
+                await AssertCriticalControlNotClippedAsync(input, row).ConfigureAwait(true);
+                (await page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches").ConfigureAwait(true)).ShouldBe(row.ReducedMotion);
+                (await page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches").ConfigureAwait(true)).ShouldBe(row.ForcedColors);
+                AssertNoBrowserErrors(browserErrors);
+                output.WriteLine("STORY132_FAIL_CLOSED_BROWSER_MATRIX {0}", row);
+            }
+            (await ReadPersistedSnapshotAsync(ownerState, ownerPath, cancellationToken).ConfigureAwait(true)).ShouldBe(ownerBefore);
+            (await ReadPersistedSnapshotAsync(chatBotState, projectionPath, cancellationToken).ConfigureAwait(true)).ShouldBe(projectionBefore);
         }
         catch
         {
@@ -429,10 +307,10 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
             .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 90_000 }).ConfigureAwait(true);
     }
 
-    private static async Task SubmitComposerAsync(IPage page, string mode, string text)
+    private static async Task SubmitComposerAndExpectSafeRefusalAsync(IPage page, string mode, string text, string culture)
     {
         ILocator composer = page.Locator(".chatbot-governed-composer");
-        ILocator submitControl = composer.Locator("fluent-button").Filter(new() { HasText = "Submit" }).First;
+        ILocator submitControl = composer.Locator("fluent-button").Filter(new() { HasText = culture == "fr" ? "Envoyer" : "Submit" }).First;
         await submitControl.WaitForAsync(new LocatorWaitForOptions
         {
             State = WaitForSelectorState.Visible,
@@ -447,7 +325,7 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
 
         if (!string.Equals(mode, "Message", StringComparison.Ordinal))
         {
-            ILocator modeControl = composer.Locator("fluent-button[aria-pressed]").Filter(new() { HasText = mode }).First;
+            ILocator modeControl = composer.Locator("fluent-button[aria-pressed]").Filter(new() { HasText = mode == "Ask AI" && culture == "fr" ? "Demander à l'IA" : mode }).First;
             await modeControl.WaitForAsync(new LocatorWaitForOptions
             {
                 State = WaitForSelectorState.Visible,
@@ -476,16 +354,10 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
             $"the accepted {mode} receipt or a rendered rejection",
             TestContext.Current.CancellationToken).ConfigureAwait(true);
 
-        if (!await IsAcceptedReceiptAsync(input, status).ConfigureAwait(true))
-        {
-            throw new InvalidOperationException(await ComposerFailureDiagnosticAsync(
-                mode,
-                inputHost,
-                input,
-                submitControl,
-                status,
-                validation).ConfigureAwait(true));
-        }
+        (await IsRenderedSubmissionFailureAsync(status).ConfigureAwait(true)).ShouldBeTrue();
+        (await composer.GetAttributeAsync("data-chatbot-submission-error-code").ConfigureAwait(true))
+            .ShouldBe(Hexalith.ChatBot.Contracts.Messages.ChatBotMessageCodes.CanonicalExecutionUnavailable);
+        (await input.InputValueAsync().ConfigureAwait(true)).ShouldBe(text);
     }
 
     private static async Task<bool> IsAcceptedReceiptAsync(ILocator input, ILocator status)
@@ -577,73 +449,40 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
             ?? throw new InvalidOperationException("The project conversation response was empty.");
     }
 
-    private static async Task SubmitLowRiskExecutionAsync(
-        HttpClient client,
-        string accessToken,
-        ProjectConversationItem proposal,
-        long expectedProposalSourceVersion,
-        string executionId,
-        string correlationId,
-        CancellationToken cancellationToken)
+    /// <summary>Exercises production HTTP admission and directly verifies absent durable operation and identity state.</summary>
+    private static async Task AssertLowRiskHttpRefusalAsync(HttpClient client, HttpClient state, string accessToken, CancellationToken cancellationToken)
     {
-        ExecuteLowRiskAIAssistance command = new(
-            ProjectId,
-            proposal.AiProposalId ?? throw new InvalidOperationException("The proposal projection has no proposal id."),
-            $"task-intent:{executionId}",
-            proposal.AiSourceMessageId ?? $"source-message:{executionId}",
-            "actor-alpha",
-            LowRiskAiAssistanceKind.SummarizeVisibleContext,
-            $"context:{executionId}",
-            "1",
-            "metadata_only",
-            "collaboration_input",
-            "disabled",
-            [$"evidence:{executionId}"],
-            [$"project:{ProjectId}"],
-            [],
-            expectedProposalSourceVersion,
-            "story-13-2-acceptance-policy",
-            correlationId,
-            executionId,
-            $"transition:{executionId}",
-            proposal.AiSourceConversationItemId);
-        string commandId = ChatBotCommandId.New().ToString();
-        string taskId = ChatBotCommandId.New().ToString();
-        JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web);
-        JsonElement commandPayload = JsonSerializer.SerializeToElement(command, jsonOptions);
-        string[] commandProjectIds = commandPayload
-            .EnumerateObject()
-            .Where(static property => string.Equals(property.Name, "projectId", StringComparison.OrdinalIgnoreCase))
-            .Select(static property => property.Value.ValueKind == JsonValueKind.String ? property.Value.GetString() ?? string.Empty : string.Empty)
-            .ToArray();
-        if (commandProjectIds.Length != 1 || !string.Equals(commandProjectIds[0], ProjectId, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException("The low-risk execution wire command does not carry exactly one authorized project id.");
-        }
-
-        string wirePayload = JsonSerializer.Serialize(new
-        {
-            commandId,
-            commandType = nameof(ExecuteLowRiskAIAssistance),
-            command = commandPayload,
-            origin = "ui",
-            requestSchemaVersion = "v1",
-        }, jsonOptions);
+        string operation = ChatBotCommandId.New().ToString();
+        string correlation = ChatBotCommandId.New().ToString();
+        ExecuteLowRiskAIAssistance command = new(ProjectId, $"refused-proposal:{operation}", $"refused-intent:{operation}",
+            $"refused-source:{operation}", "actor-alpha", LowRiskAiAssistanceKind.SummarizeVisibleContext,
+            $"refused-context:{operation}", "1", "metadata_only", "collaboration_input", "disabled", [], [], [], 0,
+            "story-13-2-acceptance-policy", correlation, operation, $"refused-transition:{operation}");
         using HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands")
         {
-            Content = new StringContent(wirePayload, Encoding.UTF8, "application/json"),
+            Content = JsonContent.Create(new { commandId = operation, commandType = nameof(ExecuteLowRiskAIAssistance), command, origin = "ui", requestSchemaVersion = "v1" }),
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        request.Headers.Add("X-Correlation-Id", correlationId);
-        request.Headers.Add("X-Hexalith-Task-Id", taskId);
+        request.Headers.Add("X-Correlation-Id", correlation);
         using HttpResponseMessage response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        string body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        if (response.StatusCode != HttpStatusCode.Accepted)
+        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        using JsonDocument problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(Hexalith.ChatBot.Contracts.Messages.ChatBotMessageCodes.CanonicalExecutionUnavailable);
+        problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeFalse();
+        string identity = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\u001f', "tenant-alpha", "command-identity", operation))));
+        foreach (string key in new[] { $"tenant-alpha:operation-status:{operation}", identity })
         {
-            throw new InvalidOperationException(
-                $"ExecuteLowRiskAIAssistance required 202 Accepted but received {(int)response.StatusCode} "
-                + $"{response.StatusCode}: {body}");
+            using HttpResponseMessage persisted = await state.GetAsync($"v1.0/state/chatbot-statestore/{Uri.EscapeDataString(key)}?consistency=strong", cancellationToken).ConfigureAwait(false);
+            persisted.StatusCode.ShouldBe(HttpStatusCode.NoContent);
         }
+    }
+
+    /// <summary>Reads authoritative persisted contents; transport faults cannot stand in for absence.</summary>
+    private static async Task<string> ReadPersistedSnapshotAsync(HttpClient client, string path, CancellationToken cancellationToken)
+    {
+        using HttpResponseMessage response = await client.GetAsync(path, cancellationToken).ConfigureAwait(false);
+        response.StatusCode.ShouldBeOneOf(HttpStatusCode.OK, HttpStatusCode.NoContent, HttpStatusCode.NotFound);
+        return $"{(int)response.StatusCode}:" + await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task AssertHealthyCurrentStatusAsync(IPage page)

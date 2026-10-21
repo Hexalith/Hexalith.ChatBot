@@ -129,7 +129,7 @@ public sealed class AiActionPolicyEvaluatorTests
     }
 
     [Fact]
-    public async Task PerActionClassPolicyShouldRequireEveryRequestedClassToBeAllowed()
+    public async Task PerActionClassPolicyCannotDowngradeMandatoryEffectsEvenWhenEnabled()
     {
         DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new(
             "tenant-alpha",
@@ -150,20 +150,20 @@ public sealed class AiActionPolicyEvaluatorTests
                 [AiActionRiskActionClass.ActsOnBehalf] = false,
             })));
 
-        AiActionPolicyDecision allowed = await evaluator.EvaluateAsync(
+        AiActionPolicyDecision enabledEffect = await evaluator.EvaluateAsync(
             Request(actionClasses: ["modifies-state"]),
             TestContext.Current.CancellationToken);
-        AiActionPolicyDecision denied = await evaluator.EvaluateAsync(
+        AiActionPolicyDecision mixedEffects = await evaluator.EvaluateAsync(
             Request(actionClasses: ["modifies-state", "exposes-files"]),
             TestContext.Current.CancellationToken);
 
-        allowed.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
-        allowed.ReasonCode.ShouldBe("risk_not_low_risk");
-        denied.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
-        denied.ReasonCode.ShouldBe("risk_not_low_risk");
-        denied.TenantId.ShouldBeNull();
-        denied.PolicyVersion.ShouldBeNull();
-        denied.PolicySnapshotId.ShouldBe("unavailable");
+        enabledEffect.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
+        enabledEffect.ReasonCode.ShouldBe("risk_not_low_risk");
+        mixedEffects.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
+        mixedEffects.ReasonCode.ShouldBe("risk_not_low_risk");
+        mixedEffects.TenantId.ShouldBeNull();
+        mixedEffects.PolicyVersion.ShouldBeNull();
+        mixedEffects.PolicySnapshotId.ShouldBe("unavailable");
     }
 
     [Fact]

@@ -466,7 +466,7 @@ jobs:
           XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
           tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests
           TestResults/story132-topology-acceptance.ctrf.json
-          -method "Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests.AuthenticatedProductionClientShouldMessageAskAndStopAcrossRequiredChromeMatrix"
+          -method "Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests.AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix"
           -result-trx TestResults/story132-topology-acceptance.trx
       - name: Require one executed Story 13.2 test and zero skips
         run: >-

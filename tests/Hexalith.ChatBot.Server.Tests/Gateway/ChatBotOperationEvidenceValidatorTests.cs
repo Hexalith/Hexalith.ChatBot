@@ -15,7 +15,7 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway;
 public sealed class ChatBotOperationEvidenceValidatorTests
 {
     private const string OperationId = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
-    private const string ValidPayload = "{\"noteId\":\"note-alpha\",\"expectedRevision\":8}";
+    private const string ValidPayload = "{\"noteId\":\"note-alpha\",\"expectedSourceVersion\":8}";
 
     /// <summary>Maps owner-reader exceptions to dependency unavailability rather than caller contract errors.</summary>
     [Theory]
@@ -80,12 +80,12 @@ public sealed class ChatBotOperationEvidenceValidatorTests
     [Theory]
     [InlineData("null")]
     [InlineData("[]")]
-    [InlineData("{\"expectedRevision\":-1}")]
-    [InlineData("{\"expectedRevision\":null}")]
+    [InlineData("{\"expectedSourceVersion\":-1}")]
+    [InlineData("{\"expectedSourceVersion\":null}")]
     [InlineData("{\"expectedVersion\":\"8\"}")]
     [InlineData("{\"expectedSourceVersion\":1.5}")]
-    [InlineData("{\"expectedRevision\":9223372036854775808}")]
-    [InlineData("{\"expectedRevision\":8,\"ExpectedRevision\":8}")]
+    [InlineData("{\"expectedSourceVersion\":9223372036854775808}")]
+    [InlineData("{\"expectedSourceVersion\":8,\"ExpectedSourceVersion\":8}")]
     public async Task MalformedPayloadOrRevisionShouldFailBeforeOwnerRead(string payload)
     {
         ChatBotGatewayContext context = Context(payload);
@@ -101,10 +101,9 @@ public sealed class ChatBotOperationEvidenceValidatorTests
     /// <summary>Rejects absent or stale revisions without a qualifying owner concurrency guard.</summary>
     [Theory]
     [InlineData("{}", null, ChatBotMessageCodes.CanonicalExecutionUnavailable)]
-    [InlineData("{\"expectedRevision\":7}", null, ChatBotMessageCodes.CommandContractInvalid)]
+    [InlineData("{\"expectedSourceVersion\":7}", null, ChatBotMessageCodes.CommandContractInvalid)]
     [InlineData(ValidPayload, -1L, ChatBotMessageCodes.CommandContractInvalid)]
     [InlineData(ValidPayload, 7L, ChatBotMessageCodes.CommandContractInvalid)]
-    [InlineData("{\"expectedSourceVersion\":8,\"expectedTargetRevision\":9}", null, ChatBotMessageCodes.CanonicalExecutionUnavailable)]
     public async Task MissingOrStaleRevisionWithoutAnOwnerGuardShouldDeny(string payload, long? concurrency, string expected)
     {
         ChatBotGatewayContext context = Context(payload, concurrency: concurrency);
@@ -173,7 +172,6 @@ public sealed class ChatBotOperationEvidenceValidatorTests
     [InlineData(ValidPayload, null, false)]
     [InlineData("{}", 8L, false)]
     [InlineData("{}", null, true)]
-    [InlineData("{\"expectedSourceVersion\":8,\"expectedTargetRevision\":9}", null, true)]
     public async Task ValidatedOperationProofShouldBeReadOnceAndReusedByProfileChecksWithoutEnablingCommit(string payload, long? concurrency, bool ownerGuard)
     {
         ChatBotGatewayContext context = Context(payload, concurrency: concurrency);
@@ -196,17 +194,48 @@ public sealed class ChatBotOperationEvidenceValidatorTests
         context.Idempotency.ShouldBeNull();
     }
 
+    /// <summary>Caller-invented expected fields cannot replace a contract revision or an owner concurrency guard.</summary>
+    [Theory]
+    [InlineData("{\"expectedFooRevision\":8}")]
+    [InlineData("{\"expectedRevision\":8}")]
+    [InlineData("{\"expectedOther\":8}")]
+    public async Task UndeclaredExpectedFieldsCannotBypassOwnerConcurrency(string payload)
+    {
+        ChatBotGatewayContext context = Context(payload);
+        context.Submission.Request.CommandType = nameof(RecordGovernedNote);
+        SyntheticOperationOwnerEvidenceSource source = new(context);
+        (await new ChatBotAdmissionEvidenceValidator(source, source).ValidateOperationAsync(context, TestContext.Current.CancellationToken))
+            .ShouldBe(ChatBotMessageCodes.CommandContractInvalid);
+        source.ReadCount.ShouldBe(0);
+        context.AdmissionEvidence.ShouldBeNull();
+    }
+
+    /// <summary>The real validator refuses unknown intended and non-allowlisted execution targets before owner reads.</summary>
+    [Theory]
+    [InlineData(nameof(ProposeAIAction), "{\"intendedCommandName\":\"Unknown.Command\"}")]
+    [InlineData(nameof(ExecuteApprovedAIAction), "{\"commandName\":\"Unknown.Command\"}")]
+    public async Task NonAllowlistedCommandMustFailBeforeOwnerEvidence(string commandType, string payload)
+    {
+        ChatBotGatewayContext context = Context(payload);
+        context.Submission.Request.CommandType = commandType;
+        SyntheticOperationOwnerEvidenceSource source = new(context);
+        (await new ChatBotAdmissionEvidenceValidator(source, source).ValidateOperationAsync(context, TestContext.Current.CancellationToken))
+            .ShouldBe(ChatBotAuthorizationReasonCodes.CommandNotAllowlisted);
+        source.ReadCount.ShouldBe(0);
+        context.AdmissionEvidence.ShouldBeNull();
+    }
+
     private static ChatBotGatewayContext Context(string payload = ValidPayload, string? operationId = OperationId, long? concurrency = null)
     {
         ClaimsPrincipal principal = new(new ClaimsIdentity([new Claim("sub", "synthetic-requester")], "synthetic"));
         using JsonDocument document = JsonDocument.Parse(payload);
         ChatBotCommandSubmission submission = new(principal, new CommandSubmissionRequest
         {
-            CommandId = operationId!, CommandType = nameof(RecordGovernedNote), Command = document.RootElement.Clone(),
+            CommandId = operationId!, CommandType = nameof(RecordProjectConversationMessage), Command = document.RootElement.Clone(),
             Concurrency = concurrency.HasValue ? new() { ExpectedRevision = concurrency.Value } : null,
         }, "01ARZ3NDEKTSV4RRFFQ69G5FAW", null);
         ChatBotGatewayContext context = new(submission, new("synthetic-requester", principal), new("synthetic-tenant"));
-        context.SelectAdmissionProfile(ChatBotAdmissionProfile.CommandExecution);
+        context.SelectAdmissionProfile(ChatBotAdmissionProfile.GovernedChat);
         return context;
     }
 }

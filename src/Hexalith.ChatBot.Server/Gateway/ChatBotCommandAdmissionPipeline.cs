@@ -200,7 +200,7 @@ internal sealed class ChatBotCommandAdmissionPipeline(
             return ChatBotCommandAdmissionDecision.Rejected(operationFailure, submission.CorrelationId, submission.TaskId);
         }
 
-        if (profile is ChatBotAdmissionProfile.AiRead or ChatBotAdmissionProfile.AiEffect)
+        if (ChatBotCommandAdmissionCatalog.RequiresClassification(submission.Request.CommandType))
         {
             ChatBotRiskClassification classification;
             try

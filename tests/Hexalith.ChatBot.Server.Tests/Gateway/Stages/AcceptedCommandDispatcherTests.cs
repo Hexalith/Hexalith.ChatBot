@@ -516,8 +516,9 @@ public sealed partial class AcceptedCommandDispatcherTests
         payload.GetRawText().ShouldNotContain("/home/administrator", Case.Insensitive);
     }
 
+    /// <summary>Approval routing terminates at admission and cannot create a downstream execution record.</summary>
     [Fact]
-    public async Task DispatchShouldRoutePolicyFalseLowRiskAssistanceWithoutProviderCall()
+    public async Task DispatchShouldRejectApprovalRoutingWithoutProviderOrOwnerCommand()
     {
         RecordingEventStoreGatewayClient gateway = new();
         RecordingAiAssistanceProvider provider = new();
@@ -533,15 +534,11 @@ public sealed partial class AcceptedCommandDispatcherTests
         context.SetRiskClassification(ChatBotRiskClassification.Classified(LowRiskClassification()));
         context.SetApprovalResult(ChatBotApprovalResult.RoutedToApproval("policy-snap-001", "low_risk_policy_false"));
 
-        _ = await dispatcher.DispatchAsync(context, TestContext.Current.CancellationToken);
+        await Should.ThrowAsync<InvalidOperationException>(() => dispatcher.DispatchAsync(context, TestContext.Current.CancellationToken).AsTask());
 
         provider.ExecuteCount.ShouldBe(0);
-        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
-        JsonElement record = request.Payload.GetProperty("ExecutionRecord");
-        record.GetProperty("Outcome").GetString().ShouldBe("pending-approval");
-        record.GetProperty("ProviderName").GetString().ShouldBe("not-invoked");
-        record.GetProperty("PolicyReasonCode").GetString().ShouldBe("low_risk_policy_false");
-        record.GetProperty("SafeNextAction").GetString().ShouldBe("review-ai-action");
+        provider.LastRequest.ShouldBeNull();
+        gateway.Submitted.ShouldBeEmpty();
     }
 
     [Fact]

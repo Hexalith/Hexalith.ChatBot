@@ -9,8 +9,14 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway;
 /// <summary>Synthetic immutable qualification and owner proofs for pure validator tests; no release authority.</summary>
 internal sealed class SyntheticAdmissionEvidenceSource : IChatBotAdmissionEvidenceSource, ISystemClock
 {
+    private DateTimeOffset? _utcNow;
+
     /// <inheritdoc />
-    public DateTimeOffset UtcNow { get; set; } = new(2026, 10, 20, 10, 0, 0, TimeSpan.Zero);
+    public DateTimeOffset UtcNow
+    {
+        get => _utcNow ?? DateTimeOffset.UtcNow;
+        set => _utcNow = value;
+    }
     /// <inheritdoc />
     public ChatBotClassifierRuntimeIdentity? RuntimeIdentity { get; set; } = new(
         AiActionRiskClassifier.CurrentVersion, "synthetic-artifact-hash", "synthetic-candidate",

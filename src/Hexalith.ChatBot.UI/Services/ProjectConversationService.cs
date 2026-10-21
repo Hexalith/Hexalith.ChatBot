@@ -262,33 +262,7 @@ public sealed class ProjectConversationService(IChatBotClient client)
             TenantPolicyClassification: "approval-required",
             CommandAllowlistVersion: "ai-action-command-allowlist.m0",
             CommandDefaultRisk: AiActionRiskClass.ApprovalRequired,
-            CommandMetadataSupported: true,
-            RiskClassification: new AiActionRiskClassificationRecord(
-                AiActionRiskClass.ApprovalRequired,
-                [AiActionRiskActionClass.ModifiesState],
-                "chatbot.ai-action-risk-classifier.m0.v1",
-                new AiActionRiskInputTuple(
-                    AppendConversationMessageCommandName,
-                    [AiActionRiskActionClass.ModifiesState],
-                    "project-conversation",
-                    "approval-required",
-                    "project-contributor",
-                    null,
-                    "ai-action-command-allowlist.m0",
-                    AiActionRiskClass.ApprovalRequired,
-                    "supported",
-                    "authorized",
-                    correlationId),
-                "approval-required",
-                "ai-action-command-allowlist.m0",
-                AiActionRiskClass.ApprovalRequired,
-                "project-contributor",
-                "risky_action_class",
-                "metadata_only",
-                "collaboration_input",
-                "chatbot.ai-action-risk-classification.v1",
-                correlationId,
-                DateTimeOffset.UtcNow))
+            CommandMetadataSupported: true)
         {
             StateOwnerAggregateId = projectId,
         };

@@ -436,6 +436,8 @@ public static partial class MessageCatalogContractTests
         }
     }
 
+    // The PRD names approval-required and classifier-indeterminate literally; these two product codes
+    // intentionally retain kebab case alongside the existing snake_case catalog convention.
     [GeneratedRegex("^(?:[a-z][a-z0-9_]*|classifier-indeterminate|approval-required)$", RegexOptions.CultureInvariant)]
     private static partial Regex MessageCodeRegex();
 }

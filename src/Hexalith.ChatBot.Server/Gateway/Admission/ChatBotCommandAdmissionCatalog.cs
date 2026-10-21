@@ -231,6 +231,27 @@ internal sealed class ChatBotCommandAdmissionCatalog
             ["DispatchWorkflowNotification"] = [],
             ["RetryWorkflowNotification"] = [],
         });
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> StageExemptions =
+        new ReadOnlyDictionary<string, IReadOnlyList<string>>(new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+        {
+            [nameof(AssociateEmailToProject)] = ["correction-impact-manifest"],
+            [nameof(CaptureTaskIntent)] = ["correction-impact-manifest"],
+            [nameof(DeferEmailProjectAssociation)] = ["correction-impact-manifest"],
+            [nameof(MarkEmailAssociationNeedsReview)] = ["correction-impact-manifest"],
+            [nameof(MarkTaskIntentDisposition)] = ["correction-impact-manifest"],
+            [nameof(RejectEmailProjectAssociation)] = ["correction-impact-manifest"],
+            [nameof(ResolveMailboxMessageParticipants)] = ["correction-impact-manifest"],
+            [nameof(ScoreMailboxMessageAssociation)] = ["correction-impact-manifest"],
+            // These commands create or decide approval, or invalidate a proposal; execution validates its lifetime.
+            [nameof(ProposeAIAction)] = ["human-approval-lifetime-drift"],
+            [nameof(DecideAiActionApproval)] = ["human-approval-lifetime-drift"],
+            [nameof(MarkAiActionProposalInvalidatedByCorrection)] = ["human-approval-lifetime-drift"],
+            // Draft/approval commands do not send and cannot yet have provider or completed human approval evidence.
+            [nameof(CreateOutboundDraft)] = ["human-approval-lifetime-drift", "provider-evidence", "no-blind-retry"],
+            [nameof(RequestOutboundSendApproval)] = ["human-approval-lifetime-drift", "provider-evidence", "no-blind-retry"],
+            [nameof(DecideOutboundApproval)] = ["human-approval-lifetime-drift", "provider-evidence", "no-blind-retry"],
+        });
+
     private readonly IReadOnlyDictionary<string, ChatBotAdmissionProfile> _commands;
 
     /// <summary>Creates the product mapping.</summary>
@@ -289,6 +310,22 @@ internal sealed class ChatBotCommandAdmissionCatalog
         ChatBotAdmissionProfile.ProjectionDelivery => ["source-watermark-or-recipient-redaction-routing"],
         _ => throw new InvalidOperationException("Unknown admission profile."),
     };
+
+    /// <summary>Per-command stages that are inapplicable before the corresponding lifecycle transition.</summary>
+    public static IReadOnlyDictionary<string, IReadOnlyList<string>> NotApplicableStages => StageExemptions;
+
+    /// <summary>Resolves the applicable proof stages centrally; unknown commands cannot obtain an empty profile.</summary>
+    public static IReadOnlyList<string> RequiredStagesForCommand(string command)
+    {
+        ChatBotAdmissionProfile profile = ConcreteDefinitions.Single(row => row.Key == command).Value;
+        return StageExemptions.TryGetValue(command, out IReadOnlyList<string>? excluded)
+            ? RequiredStages(profile).Except(excluded, StringComparer.Ordinal).ToArray()
+            : RequiredStages(profile);
+    }
+
+    /// <summary>Only new AI requests and execution classify; approval decisions do not reclassify committed proposals.</summary>
+    public static bool RequiresClassification(string? command)
+        => command is nameof(ExecuteLowRiskAIAssistance) or nameof(ProposeAIAction) or nameof(ExecuteApprovedAIAction);
 
     /// <summary>All currently supported concrete command contracts, each mapped exactly once.</summary>
     public IReadOnlyDictionary<string, ChatBotAdmissionProfile> Commands => _commands;

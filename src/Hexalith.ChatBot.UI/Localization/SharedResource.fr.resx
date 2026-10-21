@@ -1116,4 +1116,8 @@
   <data name="Failure_CatalogReason_idempotency_conflict_ai_action_proposal" xml:space="preserve"><value>Cette proposition d’action IA est en conflit avec une demande de proposition existante.</value></data>
   <data name="Failure_Catalog_canonical_execution_unavailable" xml:space="preserve"><value>Exécution de la commande indisponible.</value></data>
   <data name="Failure_CatalogReason_canonical_execution_unavailable" xml:space="preserve"><value>Cette commande est indisponible dans la configuration actuelle.</value></data>
+  <data name="Failure_Catalog_approval-required" xml:space="preserve"><value>Approbation humaine requise.</value></data>
+  <data name="Failure_CatalogReason_approval-required" xml:space="preserve"><value>Cette action nécessite la validation d’une personne autorisée. Demandez une approbation avant de soumettre une nouvelle action.</value></data>
+  <data name="Failure_Catalog_classifier-indeterminate" xml:space="preserve"><value>Classification de l’action indisponible.</value></data>
+  <data name="Failure_CatalogReason_classifier-indeterminate" xml:space="preserve"><value>L’action n’a pas pu être classifiée de manière sûre. Contactez le support, puis soumettez une nouvelle demande liée après résolution.</value></data>
 </root>

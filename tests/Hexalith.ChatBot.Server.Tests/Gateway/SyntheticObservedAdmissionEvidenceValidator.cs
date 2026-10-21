@@ -34,7 +34,7 @@ internal sealed class SyntheticObservedAdmissionEvidenceValidator(List<string> c
     /// <inheritdoc />
     public ValueTask<string?> ValidateProfileAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
     {
-        (context.RiskClassification is not null).ShouldBe(profile is ChatBotAdmissionProfile.AiRead or ChatBotAdmissionProfile.AiEffect);
+        (context.RiskClassification is not null).ShouldBe(ChatBotCommandAdmissionCatalog.RequiresClassification(context.Submission.Request.CommandType));
         (context.ApprovalResult is not null).ShouldBe(profile is ChatBotAdmissionProfile.AiRead or ChatBotAdmissionProfile.AiEffect or ChatBotAdmissionProfile.HumanEffect);
         return Observe(context, "profile");
     }

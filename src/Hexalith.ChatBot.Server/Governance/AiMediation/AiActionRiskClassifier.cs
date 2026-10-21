@@ -6,7 +6,12 @@ namespace Hexalith.ChatBot.Server.Governance.AiMediation;
 
 internal static class AiActionRiskClassifier
 {
-    public const string CurrentVersion = "chatbot.ai-action-risk-classifier.m0.v1";
+    public const string CurrentVersion = "chatbot.ai-action-risk-classifier.m0.v2";
+
+    /// <summary>The closed requester-authority vocabulary shared by classification and qualification.</summary>
+    public static bool IsDeclaredRequesterAuthority(string? authority)
+        => authority is "project-contributor" or "project-approver" or "ai-action-approver" or "read-only-assistant"
+            or "delegated-project-contributor" or "tenant-admin" or "admin";
 
     private static readonly IReadOnlyDictionary<AiActionRiskActionClass, int> ClassOrder =
         new Dictionary<AiActionRiskActionClass, int>
@@ -131,7 +136,7 @@ internal static class AiActionRiskClassifier
         {
             return "missing_requester_authority";
         }
-        if (input.RequesterAuthorityClass is not ("project-contributor" or "project-approver" or "ai-action-approver" or "read-only-assistant" or "delegated-project-contributor" or "tenant-admin" or "admin"))
+        if (!IsDeclaredRequesterAuthority(input.RequesterAuthorityClass))
         {
             return "undeclared_requester_authority";
         }

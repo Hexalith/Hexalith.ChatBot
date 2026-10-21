@@ -1470,7 +1470,7 @@ public static class ScaffoldArchitectureTests
             + "TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology");
         workflow.ShouldContain(
             "-method \"Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests."
-            + "AuthenticatedProductionClientShouldMessageAskAndStopAcrossRequiredChromeMatrix");
+            + "AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix");
         workflow.ShouldContain("TestResults/topology-acceptance.ctrf.json");
         workflow.ShouldContain("TestResults/story132-topology-acceptance.ctrf.json");
         // Retain the consumer-facing TRX counter guard in addition to the xUnit v4 boundary's CTRF validation.
@@ -1484,7 +1484,7 @@ public static class ScaffoldArchitectureTests
             + "TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology");
         releaseWorkflow.ShouldContain(
             "-method \"Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests."
-            + "AuthenticatedProductionClientShouldMessageAskAndStopAcrossRequiredChromeMatrix");
+            + "AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix");
         releaseWorkflow.ShouldContain("TestResults/topology-acceptance.ctrf.json");
         releaseWorkflow.ShouldContain("TestResults/story132-topology-acceptance.ctrf.json");
         releaseWorkflow.ShouldContain("Require one executed topology acceptance test and zero skips");

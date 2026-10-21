@@ -71,7 +71,9 @@ internal sealed class CoarseUserFacingRedactionStage : IUserFacingRedactionStage
             ChatBotProblemTypes.DispatchUnavailable or
             ChatBotProblemTypes.IdempotencyConflict or
             ChatBotProblemTypes.InvalidLifecycleTransition or
-            ChatBotProblemTypes.CommandNotAllowlisted => type,
+            ChatBotProblemTypes.CommandNotAllowlisted or
+            ChatBotProblemTypes.ClassifierIndeterminate or
+            ChatBotProblemTypes.ApprovalRequired => type,
             _ => ChatBotProblemTypes.AuthorizationDenied,
         };
 

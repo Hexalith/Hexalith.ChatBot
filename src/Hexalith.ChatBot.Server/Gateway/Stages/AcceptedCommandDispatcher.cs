@@ -691,25 +691,18 @@ internal sealed class AcceptedCommandDispatcher(
                 string.IsNullOrWhiteSpace(execution.ProposalId) ||
                 string.IsNullOrWhiteSpace(execution.ContextPackageId) ||
                 context.RiskClassification?.Record is null ||
-                context.ApprovalResult?.Kind is not (ChatBotApprovalResultKind.AllowedLowRiskExecution or ChatBotApprovalResultKind.RoutedToApproval))
+                context.ApprovalResult?.Kind is not ChatBotApprovalResultKind.AllowedLowRiskExecution)
             {
                 throw new InvalidOperationException("The low-risk AI assistance execution command is missing trusted admission metadata.");
             }
 
             string policySnapshotId = context.ApprovalResult.PolicySnapshotId ?? execution.PolicySnapshotId ?? "unavailable";
-            string assistanceKind = AiActionApprovalGate.AssistanceKindToken(execution.AssistanceKind);
-            // The command receipt is admission only. A provider call here ran before EventStore persisted Started and
-            // could therefore escape audit/recovery or be duplicated after a gateway retry. The persisted-event
-            // coordinator is the sole low-risk provider invocation path.
-            LowRiskAiAssistanceExecutionRecord? providerRecord = context.ApprovalResult.Kind is ChatBotApprovalResultKind.RoutedToApproval
-                ? RoutedToApprovalRecord(context, execution, policySnapshotId, assistanceKind)
-                : null;
-
+            // Provider invocation belongs to the persisted-event coordinator after Started commits.
             ExecuteLowRiskAIAssistance enriched = execution with
             {
                 PolicySnapshotId = policySnapshotId,
                 RiskClassification = context.RiskClassification.Record,
-                ExecutionRecord = providerRecord,
+                ExecutionRecord = null,
             };
             JsonElement payload = JsonSerializer.SerializeToElement(enriched);
             return new EventStoreDispatchPlan(enriched.StateOwnerAggregateId ?? enriched.ProjectId, commandType, payload);
@@ -1066,35 +1059,6 @@ internal sealed class AcceptedCommandDispatcher(
         // branch nor that check is dead code. Bootstrap tests also reach it through a permissive allowlist.
         return new EventStoreDispatchPlan(context.Submission.Request.CommandId, commandType, command);
     }
-
-    private LowRiskAiAssistanceExecutionRecord RoutedToApprovalRecord(
-        ChatBotGatewayContext context,
-        ExecuteLowRiskAIAssistance execution,
-        string policySnapshotId,
-        string assistanceKind)
-        => new(
-            execution.ExecutionId,
-            execution.ProposalId,
-            assistanceKind,
-            "pending-approval",
-            "not-invoked",
-            "not-invoked",
-            clock.UtcNow,
-            execution.SourceEvidenceReferences,
-            execution.ContextPackageId,
-            execution.ContextPackageVersion,
-            execution.ContextPackageRedactionState,
-            policySnapshotId,
-            context.ApprovalResult!.ReasonCode,
-            $"audit:{execution.ExecutionId}",
-            "available",
-            context.Submission.CorrelationId,
-            "metadata_only",
-            "metadata_only",
-            "review-ai-action",
-            FailureCode: context.ApprovalResult.ReasonCode,
-            Retryability: null,
-            RetentionClass: execution.RetentionClass);
 
     private static JsonElement ToElement(object? command)
         => command is JsonElement element

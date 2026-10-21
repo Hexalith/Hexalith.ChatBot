@@ -28,6 +28,34 @@ public static class GovernedOperationAggregateTests
     private const string NoteId = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
     private const string IntakeId = "01ARZ3NDEKTSV4RRFFQ69G5FAZ";
 
+    /// <summary>The approved source conversation item cannot be substituted or omitted at execution.</summary>
+    [Theory]
+    [InlineData("other-conversation-item")]
+    [InlineData(null)]
+    public static void ApprovedExecutionMustBindTheExactSourceConversationItem(string? sourceConversationItemId)
+    {
+        ExecuteApprovedAIAction command = ApprovedExecutionCommand();
+        GovernedOperationState state = ApprovedExecutionState();
+        AiActionApprovalRequested request = state.ApprovalRequests[command.ApprovalId];
+        AiActionApprovalDecisionRecorded decision = state.ApprovalDecisions[command.ApprovalId];
+        GovernedOperationAggregate.ValidateApprovedExecutionApproval(command, request, decision).ShouldBeNull();
+        GovernedOperationAggregate.ValidateApprovedExecutionApproval(command with { SourceConversationItemId = sourceConversationItemId }, request, decision)
+            .ShouldBe(ChatBotRefusalReasonCodes.ApprovedCommandScopeExceeded);
+    }
+
+    /// <summary>Approval must have consumed the exact request revision even when execution's two revisions match.</summary>
+    [Fact]
+    public static void ApprovedExecutionMustBindTheRequestRevisionConsumedByTheDecision()
+    {
+        ExecuteApprovedAIAction command = ApprovedExecutionCommand();
+        GovernedOperationState state = ApprovedExecutionState();
+        AiActionApprovalRequested request = state.ApprovalRequests[command.ApprovalId];
+        AiActionApprovalDecisionRecorded decision = state.ApprovalDecisions[command.ApprovalId];
+        GovernedOperationAggregate.ValidateApprovedExecutionApproval(command, request, decision).ShouldBeNull();
+        GovernedOperationAggregate.ValidateApprovedExecutionApproval(command, request, decision with { ExpectedApprovalSourceVersion = request.SourceVersion - 1 })
+            .ShouldBe(ChatBotRefusalReasonCodes.ApprovalStateInvalid);
+    }
+
     [Fact]
     public static void HandleLowRiskAiExecutionShouldEmitOnlyStartedBeforeProviderCompletion()
     {

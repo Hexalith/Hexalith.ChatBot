@@ -39,6 +39,13 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
     [InlineData("unknown-effect")]
     [InlineData("blank-authority")]
     [InlineData("undeclared-authority")]
+    [InlineData("null-reason")]
+    [InlineData("unsafe-reason")]
+    [InlineData("unknown-schema")]
+    [InlineData("visible-result")]
+    [InlineData("missing-retention")]
+    [InlineData("missing-produced-time")]
+    [InlineData("future-produced-time")]
     public async Task QualifiedClassificationMustBindTheCurrentRequestAndTrustedEffectRiskFloor(string mismatch)
     {
         SyntheticAdmissionEvidenceSource source = new();
@@ -47,6 +54,13 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
         context.SetRiskClassification(ChatBotRiskClassification.Classified(mismatch switch
         {
             "missing-input" => record with { InputTuple = null! },
+            "null-reason" => record with { ReasonCode = null! },
+            "unsafe-reason" => record with { ReasonCode = "raw result reason" },
+            "unknown-schema" => record with { SchemaVersion = "unknown.v9" },
+            "visible-result" => record with { RedactionState = "visible" },
+            "missing-retention" => record with { RetentionClass = null! },
+            "missing-produced-time" => record with { ProducedAtUtc = default },
+            "future-produced-time" => record with { ProducedAtUtc = source.UtcNow.AddMinutes(1) },
             "output-correlation" => record with { CorrelationId = "another-correlation" },
             "input-correlation" => record with { InputTuple = record.InputTuple with { CorrelationId = "another-correlation" } },
             "command" => record with { InputTuple = record.InputTuple with { IntendedCommandName = AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName } },
@@ -167,6 +181,131 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
         (await validator.ValidateProfileAsync(context, TestContext.Current.CancellationToken)).ShouldBe(expected);
         source.ProfileEvidence.Approval.ShouldBeNull();
         (await validator.ValidateAtomicParticipationAsync(context, TestContext.Current.CancellationToken)).ShouldBe(ChatBotMessageCodes.CanonicalExecutionUnavailable);
+    }
+
+    /// <summary>All collections supplied to the provider must equal the operation-bound package's references and exclusion reasons.</summary>
+    [Theory]
+    [InlineData("current")]
+    [InlineData("source-substitution")]
+    [InlineData("context-substitution")]
+    [InlineData("exclusion-substitution")]
+    [InlineData("missing-source")]
+    [InlineData("missing-context")]
+    [InlineData("missing-exclusions")]
+    [InlineData("extra-context")]
+    [InlineData("extra-exclusion")]
+    public async Task ReadProfileMustBindEveryProviderCollectionToTheTrustedPackage(string mutation)
+    {
+        ChatBotGatewayContext context = ReadContext();
+        ExecuteLowRiskAIAssistance command = (ExecuteLowRiskAIAssistance)context.Submission.Request.Command;
+        command = command with
+        {
+            SourceEvidenceReferences = ["source-two", "source-one"],
+            AuthorizedContextReferences = ["file-two", "file-one"],
+            ExcludedContextReasons = ["restricted", "unsafe"],
+        };
+        context.Submission.Request.Command = mutation switch
+        {
+            "source-substitution" => command with { SourceEvidenceReferences = ["other-source", "source-one"] },
+            "context-substitution" => command with { AuthorizedContextReferences = ["other-file", "file-one"] },
+            "exclusion-substitution" => command with { ExcludedContextReasons = ["other-reason", "unsafe"] },
+            "missing-source" => command with { SourceEvidenceReferences = null! },
+            "missing-context" => command with { AuthorizedContextReferences = null! },
+            "missing-exclusions" => command with { ExcludedContextReasons = null! },
+            "extra-context" => command with { AuthorizedContextReferences = ["file-one", "file-two", "other-file"] },
+            "extra-exclusion" => command with { ExcludedContextReasons = ["restricted", "unsafe", "other-reason"] },
+            _ => command,
+        };
+        SyntheticAdmissionEvidenceSource source = new();
+        ProjectAiContextPackage package = new("synthetic-tenant", command.ProjectId, "synthetic-policy", "metadata_only", "collaboration_input", "disabled",
+            command.ContextPackageId, command.ContextPackageVersion, ProjectAiContextPackage.SchemaVersionValue, 1, context.Submission.CorrelationId,
+            [new("file-one", "folder-one", "one", "attachment-one", "metadata_only", "collaboration_input", "source-one"),
+                new("file-two", "folder-two", "two", "attachment-two", "metadata_only", "collaboration_input", "source-two")],
+            [new("excluded-one", "unsafe"), new("excluded-two", "restricted")], ["source-one", "source-two"], "synthetic", ProjectAiContextPackage.DerivationKernelVersionValue);
+        source.ProfileEvidence = new("synthetic-tenant", "synthetic-requester", context.Submission.Request.CommandType, context.Submission.Request.CommandId,
+            ChatBotAdmissionProfile.AiRead, 1, null,
+            ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(context.Submission.Request.CommandType).ToDictionary(stage => stage, stage => "synthetic:" + stage),
+            source.UtcNow.AddSeconds(-1), source.UtcNow.AddMinutes(1),
+            new("synthetic-tenant", 1, "synthetic-policy", true, "read-only", ["summarize-visible-context"], true, true), package);
+        ChatBotAdmissionEvidenceValidator validator = new(source, source);
+        (await validator.ValidateProfileAsync(context, TestContext.Current.CancellationToken))
+            .ShouldBe(mutation == "current" ? null : ChatBotMessageCodes.ProjectAiContextPackageUnavailable);
+        context.AdmissionEnvelope.ShouldBeNull();
+        context.Idempotency.ShouldBeNull();
+        (await validator.ValidateAtomicParticipationAsync(context, TestContext.Current.CancellationToken)).ShouldBe(ChatBotMessageCodes.CanonicalExecutionUnavailable);
+    }
+
+    /// <summary>Commands without a classification input retain current operation-bound owner policy instead of requiring an absent wire field.</summary>
+    [Theory]
+    [InlineData(nameof(DecideAiActionApproval), "current", null)]
+    [InlineData(nameof(MarkAiActionProposalInvalidatedByCorrection), "current", null)]
+    [InlineData(nameof(DecideAiActionApproval), "stale-policy", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData(nameof(MarkAiActionProposalInvalidatedByCorrection), "stale-policy", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData(nameof(DecideAiActionApproval), "invalid-policy", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData(nameof(MarkAiActionProposalInvalidatedByCorrection), "invalid-policy", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData(nameof(DecideAiActionApproval), "foreign-tenant", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData(nameof(MarkAiActionProposalInvalidatedByCorrection), "foreign-tenant", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData(nameof(DecideAiActionApproval), "missing-policy", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData(nameof(MarkAiActionProposalInvalidatedByCorrection), "missing-policy", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData(nameof(DecideAiActionApproval), "other-operation", ChatBotMessageCodes.CanonicalExecutionUnavailable)]
+    [InlineData(nameof(MarkAiActionProposalInvalidatedByCorrection), "other-operation", ChatBotMessageCodes.CanonicalExecutionUnavailable)]
+    [InlineData(nameof(ProposeAIAction), "current", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData(nameof(ExecuteApprovedAIAction), "current", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData(nameof(ExecuteLowRiskAIAssistance), "current", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    public async Task OwnerPolicyWithoutAWireSnapshotOnlyAppliesToClassificationExemptCommands(string commandType, string state, string? expected)
+    {
+        ChatBotGatewayContext original = ReadContext();
+        original.Submission.Request.CommandType = commandType;
+        original.Submission.Request.Command = new { projectId = "synthetic-project" };
+        ChatBotGatewayContext context = new(original.Submission, original.Actor, original.TenantBinding);
+        ChatBotAdmissionProfile profile = commandType == nameof(ExecuteLowRiskAIAssistance) ? ChatBotAdmissionProfile.AiRead : ChatBotAdmissionProfile.AiEffect;
+        context.SelectAdmissionProfile(profile);
+        SyntheticAdmissionEvidenceSource source = new();
+        TenantAiPolicySnapshot policy = new("synthetic-tenant", 1, "synthetic-policy", false, "project-conversation", [], true, true);
+        source.ProfileEvidence = new("synthetic-tenant", "synthetic-requester", commandType, context.Submission.Request.CommandId, profile, 1, null,
+            ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(commandType).ToDictionary(stage => stage, stage => "synthetic:" + stage),
+            source.UtcNow.AddSeconds(-1), source.UtcNow.AddMinutes(1), state switch
+            {
+                "stale-policy" => policy with { IsFresh = false },
+                "invalid-policy" => policy with { IsValid = false },
+                "foreign-tenant" => policy with { TenantId = "other-tenant" },
+                "missing-policy" => null,
+                _ => policy,
+            });
+        if (state == "other-operation") { source.ProfileEvidence = source.ProfileEvidence with { OperationId = "other-operation" }; }
+        ChatBotAdmissionEvidenceValidator validator = new(source, source);
+        (await validator.ValidateProfileAsync(context, TestContext.Current.CancellationToken)).ShouldBe(expected);
+        context.RiskClassification.ShouldBeNull();
+        context.AdmissionEnvelope.ShouldBeNull();
+        context.Idempotency.ShouldBeNull();
+        (await validator.ValidateAtomicParticipationAsync(context, TestContext.Current.CancellationToken)).ShouldBe(ChatBotMessageCodes.CanonicalExecutionUnavailable);
+    }
+
+    /// <summary>Pre-send commands need their applicable sender/content proofs, while opaque approval references never authorize a send.</summary>
+    [Theory]
+    [InlineData(nameof(CreateOutboundDraft), null)]
+    [InlineData(nameof(RequestOutboundSendApproval), null)]
+    [InlineData(nameof(DecideOutboundApproval), null)]
+    [InlineData(nameof(ExecuteApprovedOutboundDraft), ChatBotRefusalReasonCodes.ApprovalStateInvalid)]
+    public async Task OutboundStagesMustMatchTheCommandLifecycleAndRequireStructuredSendApproval(string commandType, string? expected)
+    {
+        ChatBotGatewayContext context = ReadContext();
+        context.Submission.Request.CommandType = commandType;
+        context.Submission.Request.Command = new { draftId = "synthetic-draft" };
+        context.Submission.Request.Concurrency = null;
+        context = new(context.Submission, context.Actor, context.TenantBinding);
+        context.SelectAdmissionProfile(ChatBotAdmissionProfile.HumanEffect);
+        SyntheticAdmissionEvidenceSource source = new();
+        source.ProfileEvidence = new(context.TenantBinding.TenantId, context.Actor.ActorId, commandType, context.Submission.Request.CommandId,
+            ChatBotAdmissionProfile.HumanEffect, 1, "synthetic:owner-concurrency",
+            ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(commandType).ToDictionary(stage => stage, stage => "synthetic:opaque-" + stage),
+            source.UtcNow.AddSeconds(-1), source.UtcNow.AddMinutes(1));
+
+        (await new ChatBotAdmissionEvidenceValidator(source, source).ValidateProfileAsync(context, TestContext.Current.CancellationToken)).ShouldBe(expected);
+        context.Idempotency.ShouldBeNull();
+        context.AdmissionEnvelope.ShouldBeNull();
+        (await new ChatBotAdmissionEvidenceValidator(source, source).ValidateAtomicParticipationAsync(context, TestContext.Current.CancellationToken))
+            .ShouldBe(ChatBotMessageCodes.CanonicalExecutionUnavailable);
     }
 
     /// <summary>Verifies mandatory Effect Must Stop Before Even APermissive Policy Can Downgrade It.</summary>

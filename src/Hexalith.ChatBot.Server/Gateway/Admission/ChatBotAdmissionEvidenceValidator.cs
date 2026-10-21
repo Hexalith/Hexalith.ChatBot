@@ -81,19 +81,11 @@ internal sealed class ChatBotAdmissionEvidenceValidator(
             {
                 return ChatBotMessageCodes.CommandContractInvalid;
             }
-            bool hasRevision = context.Submission.Request.Concurrency is not null;
-            foreach (JsonProperty property in payload.EnumerateObject())
+            if (!TryReadDeclaredRevisions(context, payload, out long[] expected))
             {
-                if (property.Name.StartsWith("expected", StringComparison.OrdinalIgnoreCase) &&
-                    (property.Name.EndsWith("Version", StringComparison.OrdinalIgnoreCase) || property.Name.EndsWith("Revision", StringComparison.OrdinalIgnoreCase)))
-                {
-                    if (property.Value.ValueKind != JsonValueKind.Number || !property.Value.TryGetInt64(out long revision) || revision < 0)
-                    {
-                        return ChatBotMessageCodes.CommandContractInvalid;
-                    }
-                    hasRevision = true;
-                }
+                return ChatBotMessageCodes.CommandContractInvalid;
             }
+            bool hasRevision = context.Submission.Request.Concurrency is not null || expected.Length > 0;
             ChatBotProfileAdmissionEvidence? proof;
             try
             {
@@ -109,10 +101,6 @@ internal sealed class ChatBotAdmissionEvidenceValidator(
             {
                 return ChatBotMessageCodes.CommandContractInvalid;
             }
-            long[] expected = payload.EnumerateObject().Where(property => property.Name.StartsWith("expected", StringComparison.OrdinalIgnoreCase) &&
-                (property.Name.EndsWith("Version", StringComparison.OrdinalIgnoreCase) || property.Name.EndsWith("Revision", StringComparison.OrdinalIgnoreCase)))
-                .Select(property => property.Value.GetInt64()).ToArray();
-            if (expected.Length > 1 && context.Submission.Request.Concurrency is null && string.IsNullOrWhiteSpace(proof!.OwnerConcurrencyGuardReference)) { return ChatBotMessageCodes.CanonicalExecutionUnavailable; }
             if (expected.Length == 1 && expected[0] != proof!.CurrentRevision) { return ChatBotMessageCodes.CommandContractInvalid; }
             context.SetAdmissionEvidence(proof!);
             return null;
@@ -140,7 +128,9 @@ internal sealed class ChatBotAdmissionEvidenceValidator(
             ChatBotClassifierRuntimeIdentity? runtime = _evidenceSource.RuntimeIdentity;
             ChatBotClassifierQualification? qualification = await _evidenceSource.ReadQualificationAsync(cancellationToken).ConfigureAwait(false);
             if (runtime is null || qualification is null || context.RiskClassification?.Record is not { } record ||
-                record.IndeterminateReason is not null || record.Rejected || !Enum.IsDefined(record.RiskClass) || !MatchesClassificationRequest(context, record) ||
+                !GovernedOperationAggregate.IsSafeClassificationMetadata(record) ||
+                record.SchemaVersion != "chatbot.ai-action-risk-classification.v1" || record.RedactionState != "metadata_only" ||
+                record.ProducedAtUtc > _clock.UtcNow || record.IndeterminateReason is not null || !MatchesClassificationRequest(context, record) ||
                 record.ClassifierVersion != AiActionRiskClassifier.CurrentVersion || record.ClassifierVersion != runtime.ArtifactVersion ||
                 qualification.ComputedStatus != "approved-current" || !SameIdentity(runtime, qualification.Identity) ||
                 string.IsNullOrWhiteSpace(qualification.OwnerId) || string.IsNullOrWhiteSpace(qualification.IndependentApproverId) ||
@@ -187,7 +177,7 @@ internal sealed class ChatBotAdmissionEvidenceValidator(
             input.EffectSurface != metadata.EffectSurface || input.TenantPolicyClassification != metadata.TenantPolicyClassification ||
             input.AllowlistMetadataState != "declared" || input.ProjectAuthorizationState != "authorized" ||
             record.RequesterAuthorityClass != input.RequesterAuthorityClass ||
-            input.RequesterAuthorityClass is not ("project-contributor" or "project-approver" or "ai-action-approver" or "read-only-assistant" or "delegated-project-contributor" or "tenant-admin" or "admin") ||
+            !AiActionRiskClassifier.IsDeclaredRequesterAuthority(input.RequesterAuthorityClass) ||
             record.RiskActionClasses.Any(effect => !Enum.IsDefined(effect)) || input.ActionClasses.Any(effect => !Enum.IsDefined(effect)) ||
             !record.RiskActionClasses.ToHashSet().SetEquals(input.ActionClasses) ||
             metadata.ActionClasses.Any(effect => !record.RiskActionClasses.Contains(effect)) ||
@@ -230,10 +220,10 @@ internal sealed class ChatBotAdmissionEvidenceValidator(
                 return ChatBotMessageCodes.CommandContractInvalid;
             }
             JsonElement payload = Payload(context);
-            long[] expectedRevisions = payload.EnumerateObject()
-                .Where(property => property.Name.StartsWith("expected", StringComparison.OrdinalIgnoreCase) &&
-                    (property.Name.EndsWith("Version", StringComparison.OrdinalIgnoreCase) || property.Name.EndsWith("Revision", StringComparison.OrdinalIgnoreCase)))
-                .Select(property => property.Value.GetInt64()).ToArray();
+            if (!TryReadDeclaredRevisions(context, payload, out long[] expectedRevisions))
+            {
+                return ChatBotMessageCodes.CommandContractInvalid;
+            }
             if (expectedRevisions.Length == 1 && expectedRevisions[0] != proof.CurrentRevision)
             {
                 return ChatBotMessageCodes.CommandContractInvalid;
@@ -243,19 +233,23 @@ internal sealed class ChatBotAdmissionEvidenceValidator(
             {
                 return ChatBotMessageCodes.CanonicalExecutionUnavailable;
             }
-            IEnumerable<string> required = ChatBotCommandAdmissionCatalog.RequiredStages(profile);
-            if (context.Submission.Request.CommandType != nameof(CorrectEmailProjectAssociation))
-            {
-                required = required.Where(stage => stage != "correction-impact-manifest");
-            }
+            IReadOnlyList<string> required = ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(context.Submission.Request.CommandType);
             if (required.Any(stage => !proof.StageReferences.TryGetValue(stage, out string? reference) || string.IsNullOrWhiteSpace(reference)))
             {
                 return ChatBotMessageCodes.CanonicalExecutionUnavailable;
             }
+            if (context.Submission.Request.CommandType == nameof(ExecuteApprovedOutboundDraft))
+            {
+                // No owner source supplies structured outbound approval yet. A nonblank reference cannot prove
+                // independent human presence, expiry, exact scope or the two expected revisions.
+                return ChatBotRefusalReasonCodes.ApprovalStateInvalid;
+            }
             if (profile is ChatBotAdmissionProfile.AiRead or ChatBotAdmissionProfile.AiEffect)
             {
                 if (proof.Policy is not { IsValid: true, IsFresh: true, PolicyVersion: > 0 } policy ||
-                    policy.TenantId != context.TenantBinding.TenantId || policy.PolicySnapshotId != ReadString(payload, "policySnapshotId"))
+                    policy.TenantId != context.TenantBinding.TenantId || string.IsNullOrWhiteSpace(policy.PolicySnapshotId) ||
+                    ChatBotCommandAdmissionCatalog.RequiresClassification(context.Submission.Request.CommandType) &&
+                        policy.PolicySnapshotId != ReadString(payload, "policySnapshotId"))
                 {
                     return ChatBotRefusalReasonCodes.PolicySnapshotUnavailable;
                 }
@@ -275,7 +269,10 @@ internal sealed class ChatBotAdmissionEvidenceValidator(
                         package.PackageId != command.ContextPackageId || package.PackageVersion != command.ContextPackageVersion ||
                         package.PolicySnapshotId != policy.PolicySnapshotId || package.SourceVersion < 0 ||
                         package.RedactionDecision != command.ContextPackageRedactionState || package.RetentionClass != command.RetentionClass ||
-                        package.ProviderReuseSetting != command.ProviderReuseSetting)
+                        package.ProviderReuseSetting != command.ProviderReuseSetting ||
+                        !SameReferences(command.SourceEvidenceReferences, package.SourceEvidenceReferences) ||
+                        !SameReferences(command.AuthorizedContextReferences, package.IncludedFiles?.Select(file => file.ReferenceToken)) ||
+                        !SameReferences(command.ExcludedContextReasons, package.ExcludedFiles?.Select(file => file.ReasonCode)))
                     {
                         return ChatBotMessageCodes.ProjectAiContextPackageUnavailable;
                     }
@@ -304,10 +301,14 @@ internal sealed class ChatBotAdmissionEvidenceValidator(
             approval.Approver.Context.SubjectId != approval.Decision.DecisionActorId ||
             approval.Decision.DecisionActorId == approval.Request.RequesterId ||
             !approval.Approver.IsCurrent(_clock.UtcNow) || !approval.Approver.HasProject(command.ProjectId) ||
-            string.IsNullOrWhiteSpace(approval.PresenceReference) || approval.Decision.DecidedAtUtc > _clock.UtcNow ||
+            string.IsNullOrWhiteSpace(approval.PresenceReference) || approval.Request.RequestedAtUtc == default ||
+            approval.Decision.DecidedAtUtc == default || approval.Request.RequestedAtUtc > _clock.UtcNow ||
+            approval.Request.RequestedAtUtc > approval.Decision.DecidedAtUtc || approval.Decision.DecidedAtUtc > _clock.UtcNow ||
             approval.ExpiresAt <= _clock.UtcNow || approval.ExpiresAt <= approval.Decision.DecidedAtUtc ||
             string.IsNullOrWhiteSpace(approval.ScopeDigest) || approval.ScopeDigest != approval.CurrentScopeDigest ||
-            approval.ClassifierVersion != context.RiskClassification?.Record?.ClassifierVersion ||
+            context.RiskClassification?.Record is not { RiskActionClasses: not null } classification ||
+            approval.ClassifierVersion != classification.ClassifierVersion || approval.Request.AiRiskClass != classification.RiskClass ||
+            !SameReferences(approval.Request.AiRiskActionClasses, classification.RiskActionClasses.Select(GovernedOperationAggregate.AiRiskActionClassToken)) ||
             command.PolicySnapshotId != approval.Request.PolicySnapshotId || command.PolicySnapshotId != approval.Decision.PolicySnapshotId)
         {
             return ChatBotRefusalReasonCodes.ApprovalStateInvalid;
@@ -318,12 +319,36 @@ internal sealed class ChatBotAdmissionEvidenceValidator(
         {
             return ChatBotRefusalReasonCodes.CommandNotAllowlisted;
         }
-        bool sensitive = context.RiskClassification!.Record!.RiskActionClasses.Any(effect => effect != AiActionRiskActionClass.ModifiesState);
+        bool sensitive = classification.RiskActionClasses.Any(effect => effect != AiActionRiskActionClass.ModifiesState);
         if (approval.ExpiresAt - approval.Decision.DecidedAtUtc > TimeSpan.FromMinutes(sensitive ? 10 : 30))
         {
             return ChatBotRefusalReasonCodes.ApprovalStateInvalid;
         }
         return GovernedOperationAggregate.ValidateApprovedExecutionApproval(command, approval.Request, approval.Decision);
+    }
+
+    private static bool SameReferences(IEnumerable<string>? supplied, IEnumerable<string>? trusted)
+        => supplied is not null && trusted is not null &&
+            supplied.Order(StringComparer.Ordinal).SequenceEqual(trusted.Order(StringComparer.Ordinal), StringComparer.Ordinal);
+
+    private static bool TryReadDeclaredRevisions(ChatBotGatewayContext context, JsonElement payload, out long[] revisions)
+    {
+        revisions = [];
+        Type? contract = typeof(IChatBotCommand).Assembly.GetType($"Hexalith.ChatBot.Contracts.Commands.{context.Submission.Request.CommandType}");
+        if (contract is null || !typeof(IChatBotCommand).IsAssignableFrom(contract)) { return false; }
+        HashSet<string> declared = contract.GetProperties().Select(property => property.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        List<long> values = [];
+        foreach (JsonProperty property in payload.EnumerateObject().Where(property => property.Name.StartsWith("expected", StringComparison.OrdinalIgnoreCase)))
+        {
+            if (!declared.Contains(property.Name)) { return false; }
+            if (property.Name.EndsWith("Version", StringComparison.OrdinalIgnoreCase) || property.Name.EndsWith("Revision", StringComparison.OrdinalIgnoreCase))
+            {
+                if (property.Value.ValueKind != JsonValueKind.Number || !property.Value.TryGetInt64(out long revision) || revision < 0) { return false; }
+                values.Add(revision);
+            }
+        }
+        revisions = values.ToArray();
+        return true;
     }
 
     private static JsonElement Payload(ChatBotGatewayContext context)
