@@ -23,7 +23,8 @@ public sealed class AiActionRiskClassifierTests
         AiActionRiskClassificationRecord result = AiActionRiskClassifier.Classify(Input(actionClasses: [actionClass]));
 
         result.RiskClass.ShouldBe(AiActionRiskClass.ApprovalRequired);
-        result.RiskActionClasses.ShouldBe([actionClass], ignoreOrder: false);
+        result.RiskActionClasses.ShouldContain(actionClass);
+        result.RiskActionClasses.ShouldContain(AiActionRiskActionClass.ModifiesState);
         result.ReasonCode.ShouldBe("risky_action_class");
     }
 
@@ -43,7 +44,7 @@ public sealed class AiActionRiskClassifierTests
     public void ReadOnlyKnownAuthorizedTupleMayBeLowRisk()
     {
         AiActionRiskClassificationRecord result = AiActionRiskClassifier.Classify(Input(
-            intendedCommandName: "Project.ReadConversation",
+            intendedCommandName: AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName,
             actionClasses: [],
             effectSurface: "read-only",
             tenantPolicyClassification: "low-risk",
@@ -67,7 +68,8 @@ public sealed class AiActionRiskClassifierTests
 
         result.RiskClass.ShouldBe(AiActionRiskClass.ApprovalRequired);
         result.IndeterminateReason.ShouldBe("missing_effect_surface");
-        result.ReasonCode.ShouldBe("indeterminate_missing_effect_surface");
+        result.Rejected.ShouldBeTrue();
+        result.ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.UnsupportedAction);
     }
 
     [Fact]
@@ -95,7 +97,7 @@ public sealed class AiActionRiskClassifierTests
     public void UnknownActionClassShouldFailClosedWithoutSerializingInvalidEnumValues()
     {
         AiActionRiskClassificationRecord result = AiActionRiskClassifier.Classify(Input(
-            intendedCommandName: "Project.ReadConversation",
+            intendedCommandName: AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName,
             actionClasses: [(AiActionRiskActionClass)999],
             effectSurface: "read-only",
             tenantPolicyClassification: "low-risk",

@@ -4023,7 +4023,8 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 ? "evidence-expired"
                 : null;
 
-    private static string? ValidateApprovedExecutionApproval(
+    /// <summary>Pure owner scope/revision/freshness validation reused by pre-effect admission.</summary>
+    internal static string? ValidateApprovedExecutionApproval(
         ExecuteApprovedAIAction command,
         AiActionApprovalRequested request,
         AiActionApprovalDecisionRecorded decision)

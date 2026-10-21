@@ -25,6 +25,12 @@ internal static class ChatBotProblemTypes
     /// <summary>Canonical execution is disabled pending accepted owner and protection evidence.</summary>
     public const string CanonicalExecutionUnavailable = "https://hexalith.dev/errors/chatbot/canonical-execution-unavailable";
 
+    /// <summary>Terminal classifier failure requires a newly linked request after remediation.</summary>
+    public const string ClassifierIndeterminate = "https://hexalith.dev/errors/chatbot/classifier-indeterminate";
+
+    /// <summary>An effect requires the distinct human-reviewed action proposal command.</summary>
+    public const string ApprovalRequired = "https://hexalith.dev/errors/chatbot/approval-required";
+
     /// <summary>A required state or recovery dependency is unavailable.</summary>
     public const string DependencyUnavailable = "https://hexalith.dev/errors/chatbot/dependency-degraded";
 

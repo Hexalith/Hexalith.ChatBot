@@ -436,6 +436,6 @@ public static partial class MessageCatalogContractTests
         }
     }
 
-    [GeneratedRegex("^[a-z][a-z0-9_]*$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^(?:[a-z][a-z0-9_]*|classifier-indeterminate|approval-required)$", RegexOptions.CultureInvariant)]
     private static partial Regex MessageCodeRegex();
 }

@@ -512,6 +512,7 @@ public sealed class AssociationProjectionTests
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
                 Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                 services.AddSingleton<IAssociationProjectionStore>(store);
                 if (authenticated)
                 {

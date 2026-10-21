@@ -35,12 +35,17 @@ paths:
         metadata. The operation records only contract-level submission intent; it
         does not execute domain behavior or expose internal processing stages.
         After earlier admission checks, including authorization and the policy persistence
-        gate, requests carrying concurrency fail closed with HTTP 503 and the non-retryable
-        canonical_execution_unavailable catalog code until canonical execution is enabled;
+        gate, every mutation and bookkeeping write, with or without caller concurrency,
+        fails closed with HTTP 503 and the non-retryable canonical_execution_unavailable
+        catalog code until accepted atomic owner participation is available;
         callers must not automatically retry that refusal. The policy persistence gate
         takes precedence for all eight policy snapshot commands, returning HTTP 503
         dependency_degraded with retryable: true and clientAction: retry-later even when
-        concurrency is present.
+        concurrency is present. Required classification that is missing, invalid, unqualified,
+        failed or indeterminate returns terminal HTTP 422 classifier-indeterminate before any
+        proposal, approval or idempotency record. Remediation requires a new linked request.
+        An assistance request requiring human approval returns HTTP 409 approval-required and
+        must be submitted separately through the governed action proposal command.
       parameters:
         - $ref: "#/components/parameters/CorrelationId"
         - $ref: "#/components/parameters/TaskId"
@@ -64,6 +69,12 @@ paths:
           $ref: "#/components/responses/SafeAuthorizationDenial403"
         "409":
           $ref: "#/components/responses/Conflict"
+        "422":
+          description: Terminal classifier failure; remedy the cause and submit a new linked request.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
         "503":
           $ref: "#/components/responses/InternalFailure"
         "500":
@@ -3369,6 +3380,8 @@ components:
         - idempotency_conflict_approved_ai_action_execution
         - idempotency_conflict_ai_action_proposal
         - canonical_execution_unavailable
+        - classifier-indeterminate
+        - approval-required
     ProblemDetails:
       type: object
       additionalProperties: false

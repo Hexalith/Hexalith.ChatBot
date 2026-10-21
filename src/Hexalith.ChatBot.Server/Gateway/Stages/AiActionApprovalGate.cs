@@ -68,11 +68,30 @@ internal sealed class AiActionApprovalGate(IAiActionPolicyEvaluator policyEvalua
             return ChatBotApprovalResult.Approved;
         }
 
-        ExecuteLowRiskAIAssistance command = ReadExecutionCommand(context);
-        AiActionRiskClassificationRecord? risk = context.RiskClassification?.Record;
-        if (risk is null || risk.Rejected)
+        ExecuteLowRiskAIAssistance command;
+        try
         {
-            return ChatBotApprovalResult.Blocked("risk_classification_unavailable");
+            command = ReadExecutionCommand(context);
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException or NotSupportedException)
+        {
+            return ChatBotApprovalResult.Blocked(Contracts.Messages.ChatBotMessageCodes.ClassifierIndeterminate);
+        }
+        AiActionRiskClassificationRecord? risk = context.RiskClassification?.Record;
+        if (risk is null || risk.Rejected || risk.IndeterminateReason is not null)
+        {
+            return ChatBotApprovalResult.Blocked(Contracts.Messages.ChatBotMessageCodes.ClassifierIndeterminate);
+        }
+
+        // Every declared boundary-crossing effect requires a distinct effect command and an independent human
+        // decision. Policy never evaluates, approves or downgrades these six effect classes.
+        if (!Enum.IsDefined(command.AssistanceKind))
+        {
+            return ChatBotApprovalResult.Blocked(Contracts.Messages.ChatBotMessageCodes.ClassifierIndeterminate);
+        }
+        if (risk.RiskClass != AiActionRiskClass.LowRisk || risk.RiskActionClasses.Count > 0)
+        {
+            return ChatBotApprovalResult.RoutedToApproval(command.PolicySnapshotId ?? "unavailable", "approval-required");
         }
 
         AiActionPolicyDecision policyDecision = await _policyEvaluator

@@ -124,7 +124,7 @@ public sealed class TrustedAuthorityReReviewTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task ExpiryInsideDurableAdmissionOrSdkAbortRejectsBeforeProtectedEffect(bool sdkAbort)
+    public async Task SyntheticExpiryInsideDurableAdmissionOrSdkAbortRejectsBeforeProtectedEffect(bool sdkAbort)
     {
         TrustedAuthorityClock clock = new();
         SyntheticOwnerAuthorityProvider owner = new(clock) { Transform = evidence => evidence with { ExpiresAt = clock.UtcNow.AddSeconds(1) } };
@@ -220,6 +220,7 @@ public sealed class TrustedAuthorityReReviewTests
             services.AddSingleton<ISystemClock>(clock);
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
             services.AddSingleton<IIdempotencyStore>(store);
+            RegressionAuthorityFixture.AddSyntheticAdmission(services);
             services.AddSingleton<IAuditWriter>(audit);
         }));
 

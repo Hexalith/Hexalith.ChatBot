@@ -56,6 +56,62 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway;
 
 public sealed class CommandGatewayAdmissionApiE2ETests
 {
+    /// <summary>Contains a determinate synthetic-qualified read request routed by the real approval gate without creating any proposal or execution.</summary>
+    [Fact]
+    public async Task CommandGatewayApi_ShouldMapRealApprovalRoutingToTerminalConflictWithoutBookkeeping()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAiAssistanceProvider provider = new();
+        RecordingAuditWriter audit = new();
+        InMemoryAuditReplayIntentQueue replay = new();
+        InMemoryOperatorAlertSink alerts = new();
+        InMemoryOperationStatusStore statuses = new();
+        InMemoryCoarseIdempotencyStore identities = new(new SystemClock());
+        SyntheticAdmissionEvidenceSource syntheticSource = new();
+        syntheticSource.ProfileEvidence = new("tenant-alpha", "actor-alpha", nameof(ExecuteLowRiskAIAssistance), "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            Hexalith.ChatBot.Server.Gateway.Admission.ChatBotAdmissionProfile.AiRead, 8, null, new Dictionary<string, string>(),
+            syntheticSource.UtcNow.AddSeconds(-1), syntheticSource.UtcNow.AddMinutes(1));
+        SyntheticObservedAtomicAdmissionValidator evidence = new(new Hexalith.ChatBot.Server.Gateway.Admission.ChatBotAdmissionEvidenceValidator(syntheticSource, syntheticSource));
+        using WebApplicationFactory<Program> factory = GatewayFactory("tenant-alpha", dispatcher, audit, replay, alerts, statuses, identities,
+            projectOwners: ["project-001"], admissionEvidence: evidence)
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IRiskClassifier, Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticLegacyRiskClassifier>();
+                services.AddSingleton<IApprovalGate, AiActionApprovalGate>();
+                services.AddSingleton<IAiActionPolicyEvaluator, DefaultAiActionPolicyEvaluator>();
+                services.AddSingleton<ITenantAiPolicySnapshotProvider>(new FixedTenantAiPolicySnapshotProvider(lowRiskAllowed: false));
+                services.AddSingleton<IEventStoreGatewayClient>(eventStore);
+                services.AddSingleton<IAiAssistanceProvider>(provider);
+            }));
+        using HttpClient client = factory.CreateClient();
+        using HttpRequestMessage request = LowRiskAiExecutionSubmissionRequest();
+
+        using HttpResponseMessage response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        using JsonDocument problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.ApprovalRequired);
+        problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeFalse();
+        problem.RootElement.GetProperty("clientAction").GetString().ShouldBe("escalate");
+        evidence.OperationCalls.ShouldBe(1);
+        evidence.OperationFailure.ShouldBeNull();
+        evidence.ClassificationCalls.ShouldBe(1);
+        evidence.ClassificationFailure.ShouldBeNull();
+        evidence.ProfileCalls.ShouldBe(0);
+        evidence.AtomicCalls.ShouldBe(0);
+        identities.RecordCount.ShouldBe(0);
+        identities.Records.ShouldBeEmpty();
+        audit.Envelopes.ShouldBeEmpty();
+        audit.AuthorizationFailures.ShouldBeEmpty();
+        replay.Intents.ShouldBeEmpty();
+        alerts.Alerts.ShouldBeEmpty();
+        dispatcher.DispatchCount.ShouldBe(0);
+        eventStore.Submitted.ShouldBeEmpty();
+        provider.ExecuteCount.ShouldBe(0);
+        (await statuses.TryGetAsync("tenant-alpha", "01ARZ3NDEKTSV4RRFFQ69G5FAY", TestContext.Current.CancellationToken)).ShouldBeNull();
+    }
+
     private static void AssertReplayBody(string firstBody, string replayBody)
     {
         using JsonDocument first = JsonDocument.Parse(firstBody);
@@ -68,17 +124,19 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         replay.RootElement.GetProperty("priorOutcome").GetRawText().ShouldBe(first.RootElement.GetRawText());
     }
 
-    [Fact]
-    public async Task CanonicalConcurrencyHttpRequestShouldFailClosedBeforeReservationAuditOrDispatch()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CanonicalConcurrencyHttpRequestShouldFailClosedBeforeReservationAuditOrDispatch(bool withConcurrency)
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter audit = new();
         InMemoryCoarseIdempotencyStore idempotency = new(new SystemClock());
-        using WebApplicationFactory<Program> factory = GatewayFactory("tenant-alpha", dispatcher, audit, idempotencyStore: idempotency);
+        using WebApplicationFactory<Program> factory = GatewayFactory("tenant-alpha", dispatcher, audit, idempotencyStore: idempotency, admissionEvidence: new Hexalith.ChatBot.Server.Gateway.Admission.ChatBotAdmissionEvidenceValidator());
         using HttpClient client = factory.CreateClient();
         using HttpRequestMessage request = CommandSubmissionRequest("tenant-alpha", "resource");
         string payload = await request.Content!.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        request.Content = new StringContent(payload.Replace("\"requestSchemaVersion\": \"v1\"", "\"requestSchemaVersion\": \"v1\", \"concurrency\": {\"expectedRevision\": 0}", StringComparison.Ordinal), Encoding.UTF8, "application/json");
+        if (withConcurrency) { request.Content = new StringContent(payload.Replace("\"requestSchemaVersion\": \"v1\"", "\"requestSchemaVersion\": \"v1\", \"concurrency\": {\"expectedRevision\": 0}", StringComparison.Ordinal), Encoding.UTF8, "application/json"); }
         using HttpResponseMessage response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
         using JsonDocument problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
@@ -483,7 +541,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Fact]
-    public async Task CommandGatewayApi_ShouldClassifyAiActionProposalBeforeEventStoreSubmission()
+    public async Task CommandGatewayApi_ShouldTerminateIndeterminateProposalBeforeEventStoreSubmission()
     {
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAuditWriter auditWriter = new();
@@ -499,60 +557,20 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             .SendAsync(AiActionProposalSubmissionRequest(), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
-        submitted.Tenant.ShouldBe("tenant-alpha");
-        submitted.Domain.ShouldBe("chatbot");
-        submitted.AggregateId.ShouldBe("project-001");
-        submitted.CommandType.ShouldBe(nameof(ProposeAIAction));
-
-        JsonElement payload = submitted.Payload;
-        payload.GetProperty("ProjectId").GetString().ShouldBe("project-001");
-        JsonElement risk = payload.GetProperty("RiskClassification");
-        risk.GetProperty("RiskClass").GetString().ShouldBe("approval-required");
-        risk.GetProperty("RiskActionClasses").EnumerateArray().Select(static value => value.GetString()).ShouldBe(
-            [
-                "modifies-state",
-                "exposes-files",
-                "sends-external",
-                "creates-tasks",
-                "invokes-tools",
-                "acts-on-behalf",
-            ],
-            ignoreOrder: false);
-        risk.GetProperty("ClassifierVersion").GetString().ShouldBe("chatbot.ai-action-risk-classifier.m0.v1");
-        risk.GetProperty("ReasonCode").GetString().ShouldBe("indeterminate_missing_requester_authority");
-        risk.GetProperty("RequesterAuthorityClass").GetString().ShouldBe("undeclared");
-        risk.GetProperty("CommandAllowlistVersion").GetString().ShouldBe("ai-action-command-allowlist.m0");
-        risk.GetProperty("InputTuple").GetProperty("TenantPolicyClassification").GetString().ShouldBe("approval-required");
-
-        auditWriter.AuthorizationFailures.ShouldBeEmpty();
-        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
-            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
-        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.CommandName == nameof(ProposeAIAction));
-        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("risk-class:approval-required"));
-        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("reason:indeterminate_missing_requester_authority"));
-        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("risk-action:modifies-state"));
-        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("risk-action:acts-on-behalf"));
-        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
-            CoarseIdempotencyOperationClass.CommandExecution.Code);
-
-        string body = await response.Content
-            .ReadAsStringAsync(TestContext.Current.CancellationToken)
-            .ConfigureAwait(true);
-        using JsonDocument accepted = JsonDocument.Parse(body);
-        JsonElement root = accepted.RootElement;
-        root.GetProperty("commandId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
-        root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
-        root.GetProperty("taskId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        eventStore.Submitted.ShouldBeEmpty();
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.ClassifierIndeterminate);
+        problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeFalse();
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
         body.ShouldNotContain("project-001", Case.Insensitive);
-        body.ShouldNotContain("raw prompt", Case.Insensitive);
-        body.ShouldNotContain("provider payload", Case.Insensitive);
     }
 
     [Fact]
-    public async Task CommandGatewayApi_ShouldRouteUnmappedRequesterAuthorityToApprovalWithoutStartingProvider()
+    public async Task CommandGatewayApi_ShouldTerminateUnmappedRequesterAuthorityWithoutStartingProvider()
     {
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAuditWriter auditWriter = new();
@@ -571,49 +589,21 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             .SendAsync(LowRiskAiExecutionSubmissionRequest(), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         provider.ExecuteCount.ShouldBe(0);
-        provider.LastRequest.ShouldBeNull();
-
-        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
-        submitted.Tenant.ShouldBe("tenant-alpha");
-        submitted.Domain.ShouldBe("chatbot");
-        submitted.AggregateId.ShouldBe("project-001");
-        submitted.CommandType.ShouldBe(nameof(ExecuteLowRiskAIAssistance));
-        JsonElement payload = submitted.Payload;
-        payload.GetProperty("ExecutionRecord").GetProperty("PolicyReasonCode").GetString().ShouldBe("risk_not_low_risk");
-        payload.GetProperty("PolicySnapshotId").GetString().ShouldBe("unavailable");
-        payload.GetProperty("ExecutionRecord").GetProperty("PolicySnapshotId").GetString().ShouldBe("unavailable");
-        payload.GetProperty("RiskClassification").GetProperty("RiskClass").GetString().ShouldBe("approval-required");
-        payload.GetRawText().ShouldNotContain("prompt", Case.Insensitive);
-        payload.GetRawText().ShouldNotContain("completion", Case.Insensitive);
-        payload.GetRawText().ShouldNotContain("raw provider payload", Case.Insensitive);
-        payload.GetRawText().ShouldNotContain("/home/administrator", Case.Insensitive);
-
-        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
-            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
-        auditWriter.Envelopes.ShouldAllBe(static envelope =>
-            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:risk_not_low_risk") &&
-            envelope.SourceEvidenceRefs.Contains("context-package:context-package-001") &&
-            envelope.SourceEvidenceRefs.Contains("execution:ai-execution-001"));
-        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
-            CoarseIdempotencyOperationClass.LowRiskAiAssistance.Code);
-
-        string body = await response.Content
-            .ReadAsStringAsync(TestContext.Current.CancellationToken)
-            .ConfigureAwait(true);
-        using JsonDocument accepted = JsonDocument.Parse(body);
-        accepted.RootElement.GetProperty("commandId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
-        accepted.RootElement.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
-        accepted.RootElement.GetProperty("taskId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        eventStore.Submitted.ShouldBeEmpty();
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.ClassifierIndeterminate);
+        problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeFalse();
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
-        body.ShouldNotContain("provider payload", Case.Insensitive);
-        body.ShouldNotContain("prompt", Case.Insensitive);
-        body.ShouldNotContain("completion", Case.Insensitive);
+        body.ShouldNotContain("project-001", Case.Insensitive);
     }
 
     [Fact]
-    public async Task CommandGatewayApi_ShouldRoutePolicyFalseLowRiskAiAssistanceToApprovalWithoutProviderCall()
+    public async Task CommandGatewayApi_ShouldTerminateIndeterminateAssistanceBeforePolicyOrProviderCall()
     {
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAuditWriter auditWriter = new();
@@ -632,36 +622,17 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             .SendAsync(LowRiskAiExecutionSubmissionRequest(), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         provider.ExecuteCount.ShouldBe(0);
-        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
-        submitted.CommandType.ShouldBe(nameof(ExecuteLowRiskAIAssistance));
-        JsonElement record = submitted.Payload.GetProperty("ExecutionRecord");
-        record.GetProperty("Outcome").GetString().ShouldBe("pending-approval");
-        record.GetProperty("ProviderName").GetString().ShouldBe("not-invoked");
-        record.GetProperty("PolicyReasonCode").GetString().ShouldBe("risk_not_low_risk");
-        submitted.Payload.GetProperty("PolicySnapshotId").GetString().ShouldBe("unavailable");
-        record.GetProperty("PolicySnapshotId").GetString().ShouldBe("unavailable");
-        record.GetProperty("SafeNextAction").GetString().ShouldBe("review-ai-action");
-        submitted.Payload.GetRawText().ShouldNotContain("provider payload", Case.Insensitive);
-        submitted.Payload.GetRawText().ShouldNotContain("prompt", Case.Insensitive);
-        submitted.Payload.GetRawText().ShouldNotContain("completion", Case.Insensitive);
-
-        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
-            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
-        auditWriter.Envelopes.ShouldAllBe(static envelope =>
-            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:risk_not_low_risk") &&
-            envelope.SourceEvidenceRefs.Contains("context-package:context-package-001") &&
-            envelope.SourceEvidenceRefs.Contains("execution:ai-execution-001"));
-        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
-            CoarseIdempotencyOperationClass.LowRiskAiAssistance.Code);
-
-        string body = await response.Content
-            .ReadAsStringAsync(TestContext.Current.CancellationToken)
-            .ConfigureAwait(true);
+        eventStore.Submitted.ShouldBeEmpty();
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.ClassifierIndeterminate);
+        problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeFalse();
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
-        body.ShouldNotContain("provider payload", Case.Insensitive);
-        body.ShouldNotContain("raw-body", Case.Insensitive);
+        body.ShouldNotContain("project-001", Case.Insensitive);
     }
 
     [Fact]
@@ -2828,13 +2799,16 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         ICommandCapabilityRateLimitProvider? commandCapabilityRateLimitProvider = null,
         ICommandCapabilityCommandHistory? commandCapabilityCommandHistory = null,
         string? principalSubject = null,
-        IReadOnlyCollection<Claim>? additionalClaims = null)
+        IReadOnlyCollection<Claim>? additionalClaims = null,
+        Hexalith.ChatBot.Server.Gateway.Admission.IChatBotAdmissionEvidenceValidator? admissionEvidence = null)
         => new WebApplicationFactory<Program>()
             .WithWebHostBuilder(
                 builder => builder.ConfigureServices(
                     services =>
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                        Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
+                        if (admissionEvidence is not null) { services.AddSingleton(admissionEvidence); }
                         if (tenantId is not null)
                         {
                             services.AddSingleton<IStartupFilter>(
@@ -2925,6 +2899,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     services =>
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                        Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                         services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
                         services.AddSingleton<IEventStoreGatewayClient>(eventStore);
                         services.AddSingleton<IAuditWriter>(auditWriter);
@@ -2945,6 +2920,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     services =>
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                        Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                         services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
                         services.AddSingleton<IEventStoreGatewayClient>(eventStore);
                         services.AddSingleton<IAuditWriter>(auditWriter);
@@ -2966,6 +2942,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     services =>
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                        Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                         services.AddSingleton<IStartupFilter>(
                             new TestPrincipalStartupFilter(tenantId, projectOwners: ["project-alpha", "project-beta"]));
                         services.AddSingleton<IEventStoreGatewayClient>(eventStore);
@@ -2988,6 +2965,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     services =>
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                        Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                         services.AddSingleton<IStartupFilter>(
                             new TestPrincipalStartupFilter(tenantId, projectOwners: ["project-001"]));
                         services.AddSingleton<IEventStoreGatewayClient>(eventStore);
@@ -3009,6 +2987,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     services =>
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                        Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                         services.AddSingleton<IStartupFilter>(
                             new TestPrincipalStartupFilter(tenantId, projectOwners: ["project-001"]));
                         services.AddSingleton<IEventStoreGatewayClient>(eventStore);
@@ -3032,12 +3011,14 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     services =>
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                        Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                         services.AddSingleton<IStartupFilter>(
                             new TestPrincipalStartupFilter(tenantId, projectOwners: ["project-001"]));
                         services.AddSingleton<IEventStoreGatewayClient>(eventStore);
                         services.AddSingleton<IAuditWriter>(auditWriter);
                         services.AddSingleton<IIdempotencyStore>(idempotencyStore);
                         services.AddSingleton<IConversationWriter>(conversationWriter);
+                        services.AddSingleton<IRiskClassifier, Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticLegacyRiskClassifier>();
                         services.AddSingleton<ISpineCommandAllowlist>(new ChatBotSpineCommandAllowlist());
                     }));
 
@@ -3053,6 +3034,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     services =>
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                        Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                         services.AddSingleton<IStartupFilter>(
                             new TestPrincipalStartupFilter(
                                 tenantId,

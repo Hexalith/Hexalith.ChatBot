@@ -90,6 +90,7 @@ public sealed class ServerBootstrapApiTests
                     services =>
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                        Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                         services.AddSingleton<IAssociationProjectionStore>(associationStore);
                     }));
 
@@ -638,7 +639,7 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
-    public async Task ProcessEndpointShouldPreserveValidAdmissionMarkerWithoutTransportAuthentication()
+    public async Task ProcessEndpointShouldDenyValidAdmissionMarkerWithoutTransportAuthentication()
     {
         TrustedAuthorityClock clock = new();
         SyntheticOwnerAuthorityProvider owner = new(clock) { Allows = static _ => false };
@@ -655,8 +656,8 @@ public sealed class ServerBootstrapApiTests
         };
         using HttpResponseMessage response = await client.PostAsJsonAsync("/process", request with { Command = command with { Extensions = extensions } }, TestContext.Current.CancellationToken);
         DomainServiceWireResult result = await ReadDomainServiceResultAsync(response);
-        result.IsRejection.ShouldBeFalse();
-        result.Events.ShouldContain(static item => item.EventTypeName.EndsWith("GovernedNoteRecorded", StringComparison.Ordinal));
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldNotContain(static item => item.EventTypeName.EndsWith("GovernedNoteRecorded", StringComparison.Ordinal));
         owner.Requests.ShouldBeEmpty();
     }
 
@@ -2930,7 +2931,7 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
-    public async Task CommandEndpointShouldRouteUnmappedRequesterAuthorityToApprovalAndReplayDuplicate()
+    public async Task CommandEndpointShouldTerminateUnmappedRequesterAuthorityAndNeverCreateReplayState()
     {
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAiAssistanceProvider provider = new("success");
@@ -2954,34 +2955,16 @@ public sealed class ServerBootstrapApiTests
             .SendAsync(LowRiskAiAssistanceRequest(), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
-        first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        replay.StatusCode.ShouldBe(HttpStatusCode.Accepted);
-        string firstBody = await first.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
-        string replayBody = await replay.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
-        AssertReplayMatchesStoredOutcome(firstBody, replayBody);
-
+        first.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        replay.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         provider.ExecuteCount.ShouldBe(0);
         provider.LastRequest.ShouldBeNull();
-
-        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
-        submitted.CommandType.ShouldBe("ExecuteLowRiskAIAssistance");
-        submitted.AggregateId.ShouldBe("project-001");
-        submitted.Payload.GetProperty("ExecutionRecord").GetProperty("PolicyReasonCode").GetString().ShouldBe("risk_not_low_risk");
-        string submittedPayload = submitted.Payload.GetRawText();
-        submittedPayload.ShouldNotContain("raw prompt", Case.Insensitive);
-        submittedPayload.ShouldNotContain("raw provider payload", Case.Insensitive);
-        submittedPayload.ShouldNotContain("/home/administrator", Case.Insensitive);
-        submittedPayload.ShouldNotContain("secret", Case.Insensitive);
-
-        auditWriter.Envelopes.Count.ShouldBe(2);
-        auditWriter.Envelopes.ShouldAllBe(static envelope =>
-            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:risk_not_low_risk") &&
-            envelope.SourceEvidenceRefs.Contains("context-package:context-package-001") &&
-            envelope.SourceEvidenceRefs.Contains("execution:ai-execution-001"));
+        eventStore.Submitted.ShouldBeEmpty();
+        auditWriter.Envelopes.ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task CommandEndpointShouldRoutePolicyFalseLowRiskAiAssistanceToApprovalWithoutProviderCall()
+    public async Task CommandEndpointShouldTerminateIndeterminateAssistanceBeforePolicyOrProviderCall()
     {
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAiAssistanceProvider provider = new("success");
@@ -3002,17 +2985,11 @@ public sealed class ServerBootstrapApiTests
             .SendAsync(LowRiskAiAssistanceRequest(), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         provider.ExecuteCount.ShouldBe(0);
-        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
-        submitted.Payload.GetProperty("ExecutionRecord").GetProperty("Outcome").GetString().ShouldBe("pending-approval");
-        submitted.Payload.GetProperty("ExecutionRecord").GetProperty("PolicyReasonCode").GetString().ShouldBe("risk_not_low_risk");
-        submitted.Payload.GetProperty("ExecutionRecord").GetProperty("SafeNextAction").GetString().ShouldBe("review-ai-action");
-        auditWriter.Envelopes.Count.ShouldBe(2);
-        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
-        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
-        body.ShouldNotContain("raw provider payload", Case.Insensitive);
-        body.ShouldNotContain("secret", Case.Insensitive);
+        provider.LastRequest.ShouldBeNull();
+        eventStore.Submitted.ShouldBeEmpty();
+        auditWriter.Envelopes.ShouldBeEmpty();
     }
 
     [Fact]
@@ -3182,6 +3159,7 @@ public sealed class ServerBootstrapApiTests
                     services =>
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                        Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                         services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
                         services.AddSingleton<IIdempotencyStore>(_ => new InMemoryCoarseIdempotencyStore(new SystemClock()));
 
@@ -3226,6 +3204,7 @@ public sealed class ServerBootstrapApiTests
                     services =>
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                        Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                         services.AddSingleton<IProjectConversationProjectionStore>(conversationStore);
                         services.AddSingleton<IStartupFilter>(new ProjectConversationPrincipalStartupFilter());
                     }));

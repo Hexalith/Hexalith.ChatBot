@@ -20,7 +20,7 @@ internal sealed class DefaultAiActionPolicyEvaluator(ITenantAiPolicySnapshotProv
             return AiActionPolicyDecision.Routed("unavailable", "missing_project_authorization");
         }
 
-        if (request.RiskClass is not AiActionRiskClass.LowRisk ||
+        if (request.RiskActionClasses.Count > 0 || request.RiskClass is not AiActionRiskClass.LowRisk ||
             !string.Equals(request.EffectSurface, "read-only", StringComparison.Ordinal))
         {
             return AiActionPolicyDecision.Routed("unavailable", "risk_not_low_risk");

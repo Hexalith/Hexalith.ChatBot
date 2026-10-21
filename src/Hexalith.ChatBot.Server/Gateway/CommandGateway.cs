@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Server.Gateway.Admission;
 using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
@@ -38,7 +39,8 @@ internal sealed class CommandGateway(
         ISpineCommandAllowlist commandAllowlist,
         IChatBotMetrics? metrics = null,
         IAuthorizationFailureCounter? authorizationFailureCounter = null,
-        ChatBotRequestAuthorizer? requestAuthorizer = null)
+        ChatBotRequestAuthorizer? requestAuthorizer = null,
+        IChatBotAdmissionEvidenceValidator? admissionEvidence = null)
         : this(
             new ChatBotCommandAdmissionPipeline(
                 authentication,
@@ -56,7 +58,8 @@ internal sealed class CommandGateway(
                 commandAllowlist,
                 requestAuthorizer ?? new ChatBotRequestAuthorizer(new ChatBotAuthorityCatalog(), new UnavailableChatBotOwnerAuthorityProvider(), clock, new ServiceClientGrantProjectionCache(clock)),
                 metrics,
-                authorizationFailureCounter),
+                authorizationFailureCounter,
+                admissionEvidence),
             idempotencyStore,
             auditWriter,
             replayIntentQueue,
@@ -323,6 +326,19 @@ internal sealed class CommandGateway(
         if (string.Equals(reasonCode, AuditFailureReasonCodes.AuditUnavailable, StringComparison.Ordinal))
         {
             return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateAuditUnavailable(decision.CorrelationId, decision.TaskId));
+        }
+
+        if (reasonCode == Contracts.Messages.ChatBotMessageCodes.ApprovalRequired)
+        {
+            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateApprovalRequired(decision.CorrelationId, decision.TaskId));
+        }
+        if (reasonCode == Contracts.Messages.ChatBotMessageCodes.ClassifierIndeterminate)
+        {
+            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateClassifierIndeterminate(decision.CorrelationId, decision.TaskId));
+        }
+        if (reasonCode == Contracts.Messages.ChatBotMessageCodes.CommandContractInvalid)
+        {
+            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateValidationProblem(decision.CorrelationId, decision.TaskId));
         }
 
         if (reasonCode == Contracts.Messages.ChatBotMessageCodes.CanonicalExecutionUnavailable)

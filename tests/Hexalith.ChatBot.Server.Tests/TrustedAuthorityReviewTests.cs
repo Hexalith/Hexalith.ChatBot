@@ -58,7 +58,7 @@ public sealed class TrustedAuthorityReviewTests
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]
-    public async Task ProductionMachineAdmissionAndAuditUseOwnerGrantInsteadOfCallerLabels(bool fakeTokenGrant, bool longReferences)
+    public async Task SyntheticMachineAdmissionAndAuditUseOwnerGrantInsteadOfCallerLabels(bool fakeTokenGrant, bool longReferences)
     {
         TrustedAuthorityClock clock = new();
         string evidenceId = longReferences ? new string('e', 200) : "machine-owner-evidence";
@@ -71,6 +71,7 @@ public sealed class TrustedAuthorityReviewTests
             services.AddSingleton<ISystemClock>(clock);
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
             services.AddSingleton<IIdempotencyStore>(new InMemoryCoarseIdempotencyStore(clock));
+            RegressionAuthorityFixture.AddSyntheticAdmission(services);
             services.AddSingleton<IAuditWriter>(audit);
         }));
         ClaimsPrincipal principal = TrustedAuthorityFixture.Principal(actorClass: "service");
@@ -100,7 +101,7 @@ public sealed class TrustedAuthorityReviewTests
     }
 
     [Fact]
-    public async Task HumanProjectAdmissionPersistsIdentityAndProjectOwnerReferences()
+    public async Task SyntheticHumanProjectAdmissionPreservesIdentityAndProjectOwnerReferences()
     {
         TrustedAuthorityClock clock = new();
         SyntheticOwnerAuthorityProvider owner = new(clock) { Transform = evidence => evidence with
@@ -114,6 +115,7 @@ public sealed class TrustedAuthorityReviewTests
             services.AddSingleton<ISystemClock>(clock);
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
             services.AddSingleton<IIdempotencyStore>(new InMemoryCoarseIdempotencyStore(clock));
+            RegressionAuthorityFixture.AddSyntheticAdmission(services);
             services.AddSingleton<IAuditWriter>(audit);
         }));
         AssociateEmailToProject command = new(
@@ -292,6 +294,7 @@ public sealed class TrustedAuthorityReviewTests
             SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
             services.AddSingleton<ISystemClock>(clock);
             services.AddSingleton<IIdempotencyStore>(new InMemoryCoarseIdempotencyStore(clock));
+            RegressionAuthorityFixture.AddSyntheticAdmission(services);
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
             services.AddSingleton<IGovernedOperationProjectionStore>(store);
             services.AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(Relay));
@@ -461,7 +464,7 @@ public sealed class TrustedAuthorityReviewTests
     }
 
     [Fact]
-    public async Task OwnerExpiryDuringRiskAwaitDeniesBeforeDurableAdmissionAndAllowsFreshRetry()
+    public async Task SyntheticOwnerExpiryDuringProfileAwaitDeniesBeforeDurableAdmissionAndAllowsFreshRetry()
     {
         TrustedAuthorityClock clock = new();
         SyntheticOwnerAuthorityProvider owner = new(clock) { Transform = evidence => evidence with { ExpiresAt = clock.UtcNow.AddSeconds(1) } };
@@ -474,7 +477,7 @@ public sealed class TrustedAuthorityReviewTests
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
             services.AddSingleton<IIdempotencyStore>(idempotency);
             services.AddSingleton<IAuditWriter>(audit);
-            services.AddSingleton<IRiskClassifier>(new TrustedAuthorityAdvancingRiskClassifier(() => { if (advance) { clock.UtcNow += TimeSpan.FromSeconds(2); } }));
+            services.AddSingleton<Hexalith.ChatBot.Server.Gateway.Admission.IChatBotAdmissionEvidenceValidator>(new SyntheticLegacyAdmissionEvidenceValidator(() => { if (advance) { clock.UtcNow += TimeSpan.FromSeconds(2); } }));
         }));
         using IServiceScope scope = factory.Services.CreateScope();
         ChatBotCommandAdmissionPipeline admission = scope.ServiceProvider.GetRequiredService<ChatBotCommandAdmissionPipeline>();

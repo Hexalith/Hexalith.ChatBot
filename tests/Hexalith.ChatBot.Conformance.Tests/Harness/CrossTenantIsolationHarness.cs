@@ -260,5 +260,5 @@ internal static class CrossTenantIsolationHarness
             dispatcher,
             new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry()),
             new ChatBotSpineCommandAllowlist(),
-            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock));
+            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock), admissionEvidence: new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticLegacyAdmissionEvidenceValidator());
 }

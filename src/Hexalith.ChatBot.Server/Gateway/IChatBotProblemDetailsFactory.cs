@@ -25,6 +25,43 @@ internal interface IChatBotProblemDetailsFactory
             SchemaVersion = Hexalith.ChatBot.Contracts.Messages.ChatBotMessageCatalogVersion.Current,
         };
     }
+    /// <summary>Returns the terminal classifier failure; no proposal or approval can remediate this operation.</summary>
+    ProblemDetails CreateClassifierIndeterminate(string correlationId, string? taskId)
+    {
+        Hexalith.ChatBot.Contracts.Messages.ChatBotMessageCatalogEntry entry =
+            Hexalith.ChatBot.Contracts.Messages.ChatBotMessageCatalog.Resolve(Hexalith.ChatBot.Contracts.Messages.ChatBotMessageCodes.ClassifierIndeterminate);
+        return new()
+        {
+            Type = ChatBotProblemTypes.ClassifierIndeterminate,
+            Title = entry.Headline,
+            Status = StatusCodes.Status422UnprocessableEntity,
+            Category = ProblemDetailsCategory.Validation_error,
+            Code = entry.Code,
+            Message = entry.Reason,
+            CorrelationId = correlationId,
+            TaskId = taskId,
+            Retryable = false,
+            ClientAction = ProblemDetailsClientAction.CorrectRequest,
+            Details = new ProblemDetailsDetails { Visibility = ProblemDetailsDetailsVisibility.Metadata_only },
+            SchemaVersion = Hexalith.ChatBot.Contracts.Messages.ChatBotMessageCatalogVersion.Current,
+        };
+    }
+
+    /// <summary>Returns the distinct-command approval disposition without creating proposal state.</summary>
+    ProblemDetails CreateApprovalRequired(string correlationId, string? taskId)
+    {
+        Hexalith.ChatBot.Contracts.Messages.ChatBotMessageCatalogEntry entry = Hexalith.ChatBot.Contracts.Messages.ChatBotMessageCatalog.Resolve(Hexalith.ChatBot.Contracts.Messages.ChatBotMessageCodes.ApprovalRequired);
+        return new()
+        {
+            Type = ChatBotProblemTypes.ApprovalRequired, Title = entry.Headline,
+            Status = StatusCodes.Status409Conflict, Category = ProblemDetailsCategory.Conflict,
+            Code = entry.Code, Message = entry.Reason, CorrelationId = correlationId, TaskId = taskId,
+            Retryable = false, ClientAction = ProblemDetailsClientAction.Escalate,
+            Details = new ProblemDetailsDetails { Visibility = ProblemDetailsDetailsVisibility.Metadata_only },
+            SchemaVersion = Hexalith.ChatBot.Contracts.Messages.ChatBotMessageCatalogVersion.Current,
+        };
+    }
+
     ProblemDetails CreateAuthorizationProblem(string reasonCode, string correlationId, string? taskId);
 
     ProblemDetails CreateAuditUnavailable(string correlationId, string? taskId);

@@ -23,11 +23,11 @@ namespace Hexalith.ChatBot.Server.Tests;
 /// <summary>Verifies that only exact trusted server-produced envelopes use the admission-marker seam.</summary>
 public sealed class TrustedAuthorityInternalProducerTests
 {
-    /// <summary>Both internal producers mint markers that SDK admission accepts and binds to the exact command.</summary>
+    /// <summary>Both internal producers bind exact envelope integrity, but a marker cannot authorize mutation.</summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task InternalWorkflowProducerMarkerAdmitsOnlyItsExactEnvelope(bool invalidation)
+    public async Task InternalWorkflowProducerMarkerProvesIntegrityWithoutAdmittingMutation(bool invalidation)
     {
         TrustedAuthorityClock clock = new();
         SyntheticOwnerAuthorityProvider owner = new(clock) { Allows = static _ => false };
@@ -63,7 +63,7 @@ public sealed class TrustedAuthorityInternalProducerTests
         CommandEnvelope envelope = new(submitted.MessageId, submitted.Tenant, submitted.Domain, submitted.AggregateId, submitted.CommandType, JsonSerializer.SerializeToUtf8Bytes(submitted.Payload),
             submitted.CorrelationId!, null, extensions["actorId"], extensions);
         marker.IsValid(envelope).ShouldBeTrue();
-        (await stage.EvaluateAsync(new DomainServiceAdmissionContext(new DomainServiceRequest(envelope, null)), TestContext.Current.CancellationToken)).IsAccepted.ShouldBeTrue();
+        (await stage.EvaluateAsync(new DomainServiceAdmissionContext(new DomainServiceRequest(envelope, null)), TestContext.Current.CancellationToken)).IsAccepted.ShouldBeFalse();
         owner.Requests.ShouldBeEmpty();
         foreach (CommandEnvelope changed in new[]
         {

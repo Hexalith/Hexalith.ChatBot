@@ -4451,20 +4451,16 @@ public static class GovernedOperationAggregateTests
             UserId: "actor-alpha",
             Extensions: null);
 
+    // Synthetic historical replay data intentionally does not re-run the current closed admission classifier.
     private static AiActionRiskClassificationRecord Classification(
         string intendedCommandName,
         string correlationId,
         string? policySnapshotId)
-        => AiActionRiskClassifier.Classify(new AiActionRiskInputTuple(
-            intendedCommandName,
-            [AiActionRiskActionClass.CreatesTasks],
-            "project-conversation",
-            "approval-required",
-            "project-contributor",
-            policySnapshotId,
-            "ai-action-command-allowlist.m0",
-            AiActionRiskClass.ApprovalRequired,
-            "declared",
-            "authorized",
-            correlationId));
+    {
+        AiActionRiskInputTuple historical = new(intendedCommandName, [AiActionRiskActionClass.CreatesTasks], "project-conversation", "approval-required",
+            "project-contributor", policySnapshotId, "ai-action-command-allowlist.m0", AiActionRiskClass.ApprovalRequired, "declared", "authorized", correlationId);
+        return new(AiActionRiskClass.ApprovalRequired, [AiActionRiskActionClass.CreatesTasks], AiActionRiskClassifier.CurrentVersion,
+            historical, policySnapshotId, "ai-action-command-allowlist.m0", AiActionRiskClass.ApprovalRequired, "project-contributor", "risky_action_class",
+            "metadata_only", "collaboration_input", "chatbot.ai-action-risk-classification.v1", correlationId, DateTimeOffset.UtcNow);
+    }
 }

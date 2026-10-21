@@ -90,7 +90,7 @@ public sealed partial class CommandGatewayTests
             dispatcher,
             DefaultProblemDetailsFactory(),
             new PermissiveSpineCommandAllowlist(),
-            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(new FixedClock()));
+            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(new FixedClock()), admissionEvidence: new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticLegacyAdmissionEvidenceValidator());
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
             Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed-resource")),
@@ -103,8 +103,6 @@ public sealed partial class CommandGatewayTests
                 "auth",
                 "tenant-bind",
                 "authorize",
-                "risk-classify",
-                "approval-gate",
                 "operation-status-collision",
                 "coarse-idempotency",
                 "lifecycle-validation",
@@ -3537,10 +3535,10 @@ public sealed partial class CommandGatewayTests
             new RecordingDispatcher(),
             DefaultProblemDetailsFactory(),
             new PermissiveSpineCommandAllowlist(),
-            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(new FixedClock()));
+            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(new FixedClock()), admissionEvidence: new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticLegacyAdmissionEvidenceValidator());
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
-            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed-resource"), origin: ChatBotSurfaceOrigin.Ui),
+            Submission(Principal(BoundTenant), AiProposalCommand(), origin: ChatBotSurfaceOrigin.Ui),
             TestContext.Current.CancellationToken);
 
         result.IsAccepted.ShouldBeTrue();
@@ -3585,7 +3583,7 @@ public sealed partial class CommandGatewayTests
     }
 
     [Fact]
-    public async Task AiActionProposalRiskStageShouldAttachMetadataOnlyAuditRefsBeforeDispatch()
+    public async Task AiActionProposalIndeterminateRiskShouldStopBeforeDurableWork()
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new();
@@ -3601,16 +3599,11 @@ public sealed partial class CommandGatewayTests
                 AiProposalCommand()),
             TestContext.Current.CancellationToken);
 
-        result.IsAccepted.ShouldBeTrue();
-        dispatcher.DispatchCount.ShouldBe(1);
-        auditWriter.Envelopes.Count.ShouldBe(2);
-        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
-        {
-            envelope.SourceEvidenceRefs.ShouldContain("classifier:chatbot.ai-action-risk-classifier.m0.v1");
-            envelope.SourceEvidenceRefs.ShouldContain("risk-class:approval-required");
-            envelope.SourceEvidenceRefs.ShouldContain("risk-action:modifies-state");
-            envelope.SourceEvidenceRefs.ShouldContain("reason:indeterminate_missing_requester_authority");
-        }
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem!.Code.ShouldBe(ChatBotMessageCodes.ClassifierIndeterminate);
+        result.Problem.Retryable.ShouldBeFalse();
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
     }
 
     [Fact]
@@ -3716,7 +3709,7 @@ public sealed partial class CommandGatewayTests
             dispatcher,
             auditWriter: auditWriter,
             idempotencyStore: idempotencyStore,
-            riskClassifier: new DeterministicAiActionRiskClassifier(),
+            riskClassifier: new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticLegacyRiskClassifier(),
             commandAllowlist: new ChatBotSpineCommandAllowlist());
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
@@ -3998,7 +3991,7 @@ public sealed partial class CommandGatewayTests
     }
 
     [Fact]
-    public async Task LowRiskAiExecutionPolicyFalseShouldPersistApprovalRouteWithoutProviderExecution()
+    public async Task LowRiskAiExecutionIndeterminateRequestShouldStopBeforePolicyOrProvider()
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new();
@@ -4018,14 +4011,11 @@ public sealed partial class CommandGatewayTests
                 LowRiskExecutionCommand()),
             TestContext.Current.CancellationToken);
 
-        result.IsAccepted.ShouldBeTrue();
-        dispatcher.DispatchCount.ShouldBe(1);
-        idempotencyStore.RecordCount.ShouldBe(1);
-        auditWriter.Envelopes.Count.ShouldBe(2);
-        auditWriter.Envelopes.ShouldAllBe(static envelope =>
-            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:risk_not_low_risk") &&
-            envelope.SourceEvidenceRefs.Contains("context-package:context-package-001") &&
-            envelope.SourceEvidenceRefs.Contains("execution:ai-execution-001"));
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem!.Code.ShouldBe(ChatBotMessageCodes.ClassifierIndeterminate);
+        result.Problem.Retryable.ShouldBeFalse();
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
     }
 
     [Fact]
@@ -4047,13 +4037,11 @@ public sealed partial class CommandGatewayTests
                 LowRiskExecutionCommand()),
             TestContext.Current.CancellationToken);
 
-        result.IsAccepted.ShouldBeTrue();
-        dispatcher.DispatchCount.ShouldBe(1);
-        auditWriter.Envelopes.Count.ShouldBe(2);
-        auditWriter.Envelopes.ShouldAllBe(static envelope =>
-            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:risk_not_low_risk") &&
-            envelope.SourceEvidenceRefs.Contains("context-package:context-package-001") &&
-            envelope.SourceEvidenceRefs.Contains("execution:ai-execution-001"));
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem!.Code.ShouldBe(ChatBotMessageCodes.ClassifierIndeterminate);
+        result.Problem.Retryable.ShouldBeFalse();
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
     }
 
     [Fact]
@@ -4122,7 +4110,7 @@ public sealed partial class CommandGatewayTests
         CommandGateway gateway = Gateway(
             dispatcher,
             idempotencyStore: idempotencyStore,
-            riskClassifier: new DeterministicAiActionRiskClassifier(),
+            riskClassifier: new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticLegacyRiskClassifier(),
             approvalGate: new AiActionApprovalGate(
                 new DefaultAiActionPolicyEvaluator(new FixedTenantAiPolicySnapshotProvider(true))),
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -6035,12 +6023,13 @@ public sealed partial class CommandGatewayTests
         IApprovalGate? approvalGate = null,
         IChatBotMetrics? metrics = null,
         IAuthorizationFailureCounter? authorizationFailureCounter = null,
-        Hexalith.ChatBot.Server.Authorization.ChatBotRequestAuthorizer? requestAuthorizer = null)
+        Hexalith.ChatBot.Server.Authorization.ChatBotRequestAuthorizer? requestAuthorizer = null,
+        Hexalith.ChatBot.Server.Gateway.Admission.IChatBotAdmissionEvidenceValidator? admissionEvidence = null)
         => new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),
             authorizationStage ?? new PassThroughAuthorizationStage(),
-            riskClassifier ?? new PassThroughRiskClassifier(),
+            riskClassifier ?? new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticLegacyRiskClassifier(),
             approvalGate ?? new PassThroughApprovalGate(),
             idempotencyStore ?? new InMemoryCoarseIdempotencyStore(clock ?? new FixedClock()),
             auditWriter ?? new RecordingAuditWriter(),
@@ -6054,7 +6043,8 @@ public sealed partial class CommandGatewayTests
             commandAllowlist ?? new PermissiveSpineCommandAllowlist(),
             metrics,
             authorizationFailureCounter,
-            requestAuthorizer: requestAuthorizer ?? Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock ?? new FixedClock()));
+            requestAuthorizer: requestAuthorizer ?? Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock ?? new FixedClock()),
+            admissionEvidence: admissionEvidence ?? new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticLegacyAdmissionEvidenceValidator());
 
     private static IChatBotProblemDetailsFactory DefaultProblemDetailsFactory()
         => new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry());
@@ -6868,7 +6858,7 @@ public sealed partial class CommandGatewayTests
             // copy that is discarded; the gateway's submission is untouched.
             _ = context.Submission with { Origin = ChatBotSurfaceOrigin.Cli };
             OriginObservedAfterTamperAttempt = context.Submission.Origin;
-            return ValueTask.FromResult(ChatBotRiskClassification.PassThrough);
+            return new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticLegacyRiskClassifier().ClassifyAsync(context, cancellationToken);
         }
     }
 

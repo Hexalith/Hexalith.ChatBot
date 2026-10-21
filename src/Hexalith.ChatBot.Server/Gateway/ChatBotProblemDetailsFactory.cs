@@ -39,6 +39,27 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
         });
     }
 
+    /// <summary>Returns a terminal failure without retaining the failed request as a proposal or retry.</summary>
+    public ProblemDetails CreateClassifierIndeterminate(string correlationId, string? taskId)
+        => CreateAdmissionFailure(ChatBotMessageCodes.ClassifierIndeterminate, ChatBotProblemTypes.ClassifierIndeterminate,
+            StatusCodes.Status422UnprocessableEntity, ProblemDetailsCategory.Validation_error, correlationId, taskId);
+
+    /// <summary>Requires a distinct governed action proposal without persisting one on this command's behalf.</summary>
+    public ProblemDetails CreateApprovalRequired(string correlationId, string? taskId)
+        => CreateAdmissionFailure(ChatBotMessageCodes.ApprovalRequired, ChatBotProblemTypes.ApprovalRequired,
+            StatusCodes.Status409Conflict, ProblemDetailsCategory.Conflict, correlationId, taskId);
+
+    private ProblemDetails CreateAdmissionFailure(string code, string type, int status, ProblemDetailsCategory category, string correlationId, string? taskId)
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(code);
+        return _redactionStage.Apply(new ProblemDetails
+        {
+            Type = type, Title = entry.Headline, Status = status, Category = category,
+            Code = entry.Code, Message = entry.Reason, CorrelationId = correlationId, TaskId = taskId,
+            Retryable = false, ClientAction = ClientAction(entry.NextAction),
+        });
+    }
+
     public ProblemDetails CreateAuthorizationProblem(string reasonCode, string correlationId, string? taskId)
     {
         bool known = IsKnownAuthorizationReason(reasonCode);
@@ -218,6 +239,8 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
             ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized => ChatBotMessageCodes.AssociationCorrectionTargetUnauthorizedSuppressed,
             ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable => ChatBotMessageCodes.AssociationCorrectionProjectionUnavailable,
             ChatBotAuthorizationReasonCodes.AssociationCorrectionWorkflowUnavailable => ChatBotMessageCodes.AssociationCorrectionWorkflowUnavailable,
+            ChatBotRefusalReasonCodes.ApprovalStateInvalid => ChatBotRefusalReasonCodes.CatalogCodeFor(ChatBotRefusalReasonCodes.ApprovalStateInvalid),
+            ChatBotRefusalReasonCodes.ApprovedCommandScopeExceeded => ChatBotMessageCodes.RefusalBlockedAction,
             ChatBotRefusalReasonCodes.EvidenceExpired => ChatBotRefusalReasonCodes.CatalogCodeFor(ChatBotRefusalReasonCodes.EvidenceExpired),
             ChatBotMessageCodes.AssociationCorrectionAuditUnavailable => ChatBotMessageCodes.AssociationCorrectionAuditUnavailable,
             ChatBotMessageCodes.DependencyDegraded => ChatBotMessageCodes.DependencyDegraded,
@@ -268,6 +291,10 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
             ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited or
             ChatBotDisabledActionReasons.InsufficientAuthority or
             ChatBotDisabledActionReasons.PolicyBlocked or
+            ChatBotRefusalReasonCodes.ApprovalStateInvalid or
+            ChatBotRefusalReasonCodes.ApprovedCommandScopeExceeded or
+            ChatBotRefusalReasonCodes.CommandNotAllowlisted or
+            ChatBotMessageCodes.ProjectAiContextPackageUnavailable or
             ChatBotRefusalReasonCodes.EvidenceExpired;
 
     private static ProblemDetailsClientAction ClientAction(string action)

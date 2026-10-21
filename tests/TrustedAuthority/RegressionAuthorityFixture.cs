@@ -111,6 +111,10 @@ internal static class RegressionAuthorityFixture
     public static void AddOwners(IServiceCollection services)
         => services.AddScoped<IChatBotOwnerAuthorityProvider>(static provider => new RegressionOwnerAuthorityProvider(provider.GetRequiredService<ISystemClock>()));
 
+    /// <summary>Explicitly enables synthetic downstream reducer mechanics; never establishes runtime qualification.</summary>
+    public static void AddSyntheticAdmission(IServiceCollection services)
+        => services.AddSingleton<Hexalith.ChatBot.Server.Gateway.Admission.IChatBotAdmissionEvidenceValidator, SyntheticLegacyAdmissionEvidenceValidator>();
+
     /// <summary>Reads synthetic grant fixture records, independent of the production token resolver.</summary>
     public static ServiceClientGrant? ReadServiceGrant(ClaimsPrincipal? principal)
     {

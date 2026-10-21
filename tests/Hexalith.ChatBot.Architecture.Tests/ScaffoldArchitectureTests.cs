@@ -363,6 +363,8 @@ public static class ScaffoldArchitectureTests
         string[] forbidden =
         [
             "IRiskClassifier",
+            "IChatBotAdmissionEvidenceValidator",
+            "IChatBotAdmissionEvidenceSource",
             "SenderAuthorityClassifier",
             "Server.Governance.Outbound",
             "IApprovalGate",

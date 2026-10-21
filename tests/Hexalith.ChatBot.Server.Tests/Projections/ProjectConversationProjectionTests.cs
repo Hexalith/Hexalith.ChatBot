@@ -528,6 +528,7 @@ public sealed class ProjectConversationProjectionTests
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
                 Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
                     new MailboxMessageContentResult(true, "available", "authorized body for review", "text/plain", "metadata_only")));
@@ -557,6 +558,7 @@ public sealed class ProjectConversationProjectionTests
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
                 Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
                     new MailboxMessageContentResult(false, "task_intent_source_unavailable")));
@@ -589,6 +591,7 @@ public sealed class ProjectConversationProjectionTests
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
                 Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
                     new MailboxMessageContentResult(
@@ -630,6 +633,7 @@ public sealed class ProjectConversationProjectionTests
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
                 Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
                     new MailboxMessageContentResult(true, "available", "authorized body for review", "text/plain", "metadata_only")));
@@ -665,6 +669,7 @@ public sealed class ProjectConversationProjectionTests
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
                 Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(source);
                 services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
@@ -701,6 +706,7 @@ public sealed class ProjectConversationProjectionTests
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
                 Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
                     new MailboxMessageContentResult(true, "available", "raw provider payload graph-message-001 tenant-beta restricted@example.com", "text/plain", "metadata_only")));
@@ -2425,6 +2431,7 @@ public sealed class ProjectConversationProjectionTests
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
                 Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(conversationStore);
                 services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(projectId));
             }));

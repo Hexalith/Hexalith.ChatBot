@@ -157,12 +157,13 @@ public sealed class AiActionPolicyEvaluatorTests
             Request(actionClasses: ["modifies-state", "exposes-files"]),
             TestContext.Current.CancellationToken);
 
-        allowed.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskExecuteAllowed);
+        allowed.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
+        allowed.ReasonCode.ShouldBe("risk_not_low_risk");
         denied.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
-        denied.ReasonCode.ShouldBe("low_risk_policy_false");
-        denied.TenantId.ShouldBe("tenant-alpha");
-        denied.PolicyVersion.ShouldBe(1);
-        denied.PolicySnapshotId.ShouldBe("policy-snap-001");
+        denied.ReasonCode.ShouldBe("risk_not_low_risk");
+        denied.TenantId.ShouldBeNull();
+        denied.PolicyVersion.ShouldBeNull();
+        denied.PolicySnapshotId.ShouldBe("unavailable");
     }
 
     [Fact]
@@ -198,10 +199,10 @@ public sealed class AiActionPolicyEvaluatorTests
             TestContext.Current.CancellationToken);
 
         decision.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
-        decision.ReasonCode.ShouldBe("low_risk_policy_false");
-        decision.TenantId.ShouldBe("tenant-alpha");
-        decision.PolicyVersion.ShouldBe(1);
-        decision.PolicySnapshotId.ShouldBe("policy-snap-001");
+        decision.ReasonCode.ShouldBe("risk_not_low_risk");
+        decision.TenantId.ShouldBeNull();
+        decision.PolicyVersion.ShouldBeNull();
+        decision.PolicySnapshotId.ShouldBe("unavailable");
     }
 
     [Fact]

@@ -42,6 +42,7 @@ public sealed record ChatBotMessageCatalogEntry(
         ChatBotMessageCodes.RefusalBlockedAction or
         ChatBotMessageCodes.AssociationCorrectionPolicyBlocked or
         ChatBotMessageCodes.AssociationAiContextBlocked => "blocked",
+        ChatBotMessageCodes.ClassifierIndeterminate or
         ChatBotMessageCodes.TerminalFailure or
         ChatBotMessageCodes.FailedCommand or
         ChatBotMessageCodes.MemoriesCorrectionFailed or

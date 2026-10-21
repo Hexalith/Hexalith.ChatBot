@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Server.Authentication;
+using Hexalith.ChatBot.Server.Gateway.Admission;
 using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Adapters.Conversations;
@@ -73,6 +74,9 @@ internal static class CommandGatewayServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         services.AddHttpContextAccessor();
         services.TryAddSingleton<ChatBotAuthorityCatalog>();
+        services.TryAddSingleton<ChatBotCommandAdmissionCatalog>();
+        services.TryAddSingleton<IChatBotAdmissionEvidenceSource, UnavailableChatBotAdmissionEvidenceSource>();
+        services.TryAddSingleton<IChatBotAdmissionEvidenceValidator, ChatBotAdmissionEvidenceValidator>();
         services.TryAddSingleton<ServiceClientGrantProjectionCache>();
         services.TryAddScoped<ChatBotRequestContextResolver>();
         services.TryAddScoped<IChatBotOwnerAuthorityProvider, CurrentChatBotOwnerAuthorityProvider>();

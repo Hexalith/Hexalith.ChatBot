@@ -15,7 +15,7 @@ internal sealed class SyntheticLowRiskPolicyRiskClassifier : IRiskClassifier
     {
         cancellationToken.ThrowIfCancellationRequested();
         ExecuteLowRiskAIAssistance command = (ExecuteLowRiskAIAssistance)context.Submission.Request.Command;
-        AiActionRiskInputTuple input = new(nameof(ExecuteLowRiskAIAssistance), [], "read-only", "low-risk", "project-contributor",
+        AiActionRiskInputTuple input = new(AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName, [], "read-only", "low-risk", "project-contributor",
             command.PolicySnapshotId, "synthetic-allowlist-v1", AiActionRiskClass.LowRisk, "declared", "authorized", context.Submission.CorrelationId);
         return ValueTask.FromResult(ChatBotRiskClassification.Classified(AiActionRiskClassifier.Classify(input)));
     }

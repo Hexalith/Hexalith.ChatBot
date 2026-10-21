@@ -8,6 +8,10 @@ public static class ChatBotMessageCodes
     public const string CommandAccepted = "command_accepted";
     /// <summary>Canonical command execution is disabled until the required acceptance gates are satisfied.</summary>
     public const string CanonicalExecutionUnavailable = "canonical_execution_unavailable";
+    /// <summary>The request must be resubmitted through the distinct governed effect proposal chain.</summary>
+    public const string ApprovalRequired = "approval-required";
+    /// <summary>Classification cannot authorize this operation; remediation requires a new linked request.</summary>
+    public const string ClassifierIndeterminate = "classifier-indeterminate";
     public const string CommandContractInvalid = "command_contract_invalid";
     public const string AssociationCorrectionCaseResolutionUnavailable = "association_correction_case_resolution_unavailable";
     public const string AssociationCorrectionStoreUnavailable = "association_correction_store_unavailable";

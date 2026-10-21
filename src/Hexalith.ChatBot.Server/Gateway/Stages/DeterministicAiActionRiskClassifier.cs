@@ -25,16 +25,28 @@ internal sealed class DeterministicAiActionRiskClassifier : IRiskClassifier
             return ValueTask.FromResult(ChatBotRiskClassification.PassThrough);
         }
 
-        AiActionRiskInputTuple input = context.Submission.Request.CommandType switch
+        try
         {
-            nameof(ExecuteLowRiskAIAssistance) => BuildExecutionInput(context),
-            nameof(ExecuteApprovedAIAction) => BuildApprovedExecutionInput(context),
-            _ => BuildProposalInput(context),
-        };
-
-        ChatBotRiskClassification classification = ChatBotRiskClassification.Classified(AiActionRiskClassifier.Classify(input));
-        context.SetRiskClassification(classification);
-        return ValueTask.FromResult(classification);
+            if (context.Submission.Request.CommandType == nameof(ExecuteLowRiskAIAssistance) &&
+                !Enum.IsDefined(ReadExecutionCommand(context).AssistanceKind))
+            {
+                return ValueTask.FromResult(ChatBotRiskClassification.Indeterminate);
+            }
+            AiActionRiskInputTuple input = context.Submission.Request.CommandType switch
+            {
+                nameof(ExecuteLowRiskAIAssistance) => BuildExecutionInput(context),
+                nameof(ExecuteApprovedAIAction) => BuildApprovedExecutionInput(context),
+                _ => BuildProposalInput(context),
+            };
+            ChatBotRiskClassification classification = ChatBotRiskClassification.Classified(AiActionRiskClassifier.Classify(input));
+            context.SetRiskClassification(classification);
+            return ValueTask.FromResult(classification);
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException or InvalidOperationException or NotSupportedException)
+        {
+            context.SetRiskClassification(ChatBotRiskClassification.Indeterminate);
+            return ValueTask.FromResult(ChatBotRiskClassification.Indeterminate);
+        }
     }
 
     private static AiActionRiskInputTuple BuildProposalInput(ChatBotGatewayContext context)

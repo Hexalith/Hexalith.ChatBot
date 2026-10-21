@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Server.Gateway.Admission;
 using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Contracts.Enums;
@@ -30,7 +31,9 @@ internal sealed class ChatBotCommandAdmissionPipeline(
     ISpineCommandAllowlist commandAllowlist,
     ChatBotRequestAuthorizer requestAuthorizer,
     IChatBotMetrics? metrics = null,
-    IAuthorizationFailureCounter? authorizationFailureCounter = null)
+    IAuthorizationFailureCounter? authorizationFailureCounter = null,
+    IChatBotAdmissionEvidenceValidator? admissionEvidence = null,
+    ChatBotCommandAdmissionCatalog? admissionCatalog = null)
 {
     /// <summary>Revalidates retained owner bounds immediately before SDK admission effects.</summary>
     public bool IsCurrent(ChatBotAuthorityPrincipal principal) => requestAuthorizer.IsCurrent(principal);
@@ -38,6 +41,9 @@ internal sealed class ChatBotCommandAdmissionPipeline(
     /// <summary>Records the same safe authorization denial after admission as before admission.</summary>
     public ValueTask<ChatBotCommandAdmissionDecision> RejectAuthorityLapseAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
         => DenyAsync(context.Submission, context.TenantBinding.TenantId, context.Actor.ActorId, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken);
+
+    private readonly IChatBotAdmissionEvidenceValidator _admissionEvidence = admissionEvidence ?? new ChatBotAdmissionEvidenceValidator();
+    private readonly ChatBotCommandAdmissionCatalog _admissionCatalog = admissionCatalog ?? new();
 
     private readonly IChatBotMetrics _metrics = metrics ?? NullChatBotMetrics.Instance;
 
@@ -49,6 +55,22 @@ internal sealed class ChatBotCommandAdmissionPipeline(
             new CommandSubmissionRequest { CommandId = AuditMetadata.SafeOptionalToken(command.MessageId) ?? "unavailable", CommandType = AuditMetadata.SafeCommandName(command.CommandType) },
             AuditMetadata.SafeOptionalToken(command.CorrelationId) ?? "unavailable", AuditMetadata.SafeOptionalToken(command.Extensions?.GetValueOrDefault("taskId")), context?.Origin ?? ChatBotSurfaceOrigin.Api);
         return DenyAsync(metadata, context?.TenantId ?? "unavailable", context?.SubjectId ?? "anonymous", reasonCode, cancellationToken);
+    }
+
+    /// <summary>Rechecks the common commit boundary for an integrity-protected, already-admitted envelope without repeating admission or dispatch.</summary>
+    public async ValueTask<string?> RevalidateMarkedCommitAsync(CommandEnvelope command, ChatBotRequestContext issuer, CancellationToken cancellationToken)
+    {
+        ChatBotAdmissionProfile? profile = _admissionCatalog.Find(command.CommandType);
+        if (profile is null) { return ChatBotAuthorizationReasonCodes.CommandNotAllowlisted; }
+        using System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(command.Payload);
+        ChatBotCommandSubmission submission = new(issuer.Principal, new CommandSubmissionRequest
+        {
+            CommandId = command.MessageId, CommandType = command.CommandType, Command = document.RootElement.Clone(),
+        }, command.CorrelationId, null, issuer.Origin);
+        ChatBotGatewayContext context = new(submission, new(issuer.SubjectId, issuer.Principal, RequestContext: issuer), new(issuer.TenantId!));
+        context.SelectAdmissionProfile(profile.Value);
+        string? operationFailure = await _admissionEvidence.ValidateOperationAsync(context, cancellationToken).ConfigureAwait(false);
+        return operationFailure ?? await _admissionEvidence.ValidateAtomicParticipationAsync(context, cancellationToken).ConfigureAwait(false);
     }
 
     public async ValueTask<ChatBotCommandAdmissionDecision> AdmitAsync(
@@ -163,37 +185,84 @@ internal sealed class ChatBotCommandAdmissionPipeline(
                 ChatBotRefusalReasonCodes.PolicySnapshotUnavailable, cancellationToken).ConfigureAwait(false);
         }
 
+        ChatBotAdmissionProfile? profile = _admissionCatalog.Find(submission.Request.CommandType);
+        if (profile is null)
+        {
+            return await DenyAsync(submission, binding.TenantId, actor.ActorId,
+                ChatBotAuthorizationReasonCodes.CommandNotAllowlisted, cancellationToken).ConfigureAwait(false);
+        }
+
         ChatBotGatewayContext context = new(submission, actor, binding, authorizationResult.ServiceClientGrantEvidence, authority.EvidenceReferences);
-        ChatBotRiskClassification riskClassification = await riskClassifier.ClassifyAsync(context, cancellationToken).ConfigureAwait(false);
-        context.SetRiskClassification(riskClassification);
-        if (riskClassification.Rejected)
+        context.SelectAdmissionProfile(profile.Value);
+        string? operationFailure = await _admissionEvidence.ValidateOperationAsync(context, cancellationToken).ConfigureAwait(false);
+        if (operationFailure is not null)
         {
-            return ChatBotCommandAdmissionDecision.Rejected(
-                ChatBotAuthorizationReasonCodes.CommandNotAllowlisted,
-                submission.CorrelationId,
-                submission.TaskId);
+            return ChatBotCommandAdmissionDecision.Rejected(operationFailure, submission.CorrelationId, submission.TaskId);
         }
 
-        ChatBotApprovalResult approvalResult = await approvalGate.EvaluateAsync(context, cancellationToken).ConfigureAwait(false);
-        context.SetApprovalResult(approvalResult);
-        if (approvalResult.Kind is ChatBotApprovalResultKind.Blocked)
+        if (profile is ChatBotAdmissionProfile.AiRead or ChatBotAdmissionProfile.AiEffect)
         {
-            return ChatBotCommandAdmissionDecision.Rejected(
-                ChatBotAuthorizationReasonCodes.CommandNotAllowlisted,
-                submission.CorrelationId,
-                submission.TaskId);
+            ChatBotRiskClassification classification;
+            try
+            {
+                classification = await riskClassifier.ClassifyAsync(context, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ChatBotCommandAdmissionDecision.Rejected(ChatBotMessageCodes.ClassifierIndeterminate, submission.CorrelationId, submission.TaskId);
+            }
+            if (classification is not null) { context.SetRiskClassification(classification); }
+            if (classification?.Record is { Rejected: true })
+            {
+                return ChatBotCommandAdmissionDecision.Rejected(ChatBotAuthorizationReasonCodes.CommandNotAllowlisted, submission.CorrelationId, submission.TaskId);
+            }
+            if (classification?.Record is null || classification.RejectionReasonCode == ChatBotMessageCodes.ClassifierIndeterminate || classification.Record is { IndeterminateReason: not null } ||
+                classification.Record is { } record && (!Enum.IsDefined(record.RiskClass) || record.RiskActionClasses is null || record.InputTuple is null ||
+                    record.RiskActionClasses.Any(value => !Enum.IsDefined(value))))
+            {
+                return ChatBotCommandAdmissionDecision.Rejected(ChatBotMessageCodes.ClassifierIndeterminate, submission.CorrelationId, submission.TaskId);
+            }
+            if (classification.Rejected)
+            {
+                return ChatBotCommandAdmissionDecision.Rejected(ChatBotAuthorizationReasonCodes.CommandNotAllowlisted, submission.CorrelationId, submission.TaskId);
+            }
+            string? classificationFailure = await _admissionEvidence.ValidateClassificationAsync(context, cancellationToken).ConfigureAwait(false);
+            if (classificationFailure is not null)
+            {
+                return ChatBotCommandAdmissionDecision.Rejected(classificationFailure, submission.CorrelationId, submission.TaskId);
+            }
         }
 
+        if (profile is ChatBotAdmissionProfile.AiRead or ChatBotAdmissionProfile.AiEffect or ChatBotAdmissionProfile.HumanEffect)
+        {
+            ChatBotApprovalResult approval = await approvalGate.EvaluateAsync(context, cancellationToken).ConfigureAwait(false);
+            context.SetApprovalResult(approval);
+            if (approval.Kind is ChatBotApprovalResultKind.RoutedToApproval)
+            {
+                return ChatBotCommandAdmissionDecision.Rejected(ChatBotMessageCodes.ApprovalRequired, submission.CorrelationId, submission.TaskId);
+            }
+            if (approval.Kind is ChatBotApprovalResultKind.Blocked)
+            {
+                return ChatBotCommandAdmissionDecision.Rejected(ChatBotAuthorizationReasonCodes.CommandNotAllowlisted, submission.CorrelationId, submission.TaskId);
+            }
+        }
+
+        string? profileFailure = await _admissionEvidence.ValidateProfileAsync(context, cancellationToken).ConfigureAwait(false);
+        if (profileFailure is not null)
+        {
+            return ChatBotCommandAdmissionDecision.Rejected(profileFailure, submission.CorrelationId, submission.TaskId);
+        }
         if (!authority.Principal!.IsCurrent(clock.UtcNow))
         {
             return await DenyAsync(submission, binding.TenantId, actor.ActorId, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken).ConfigureAwait(false);
         }
 
-        // Canonical execution requires accepted owner/protection evidence (A6/A13). This is unconditional in live
-        // runtime; synthetic reducer tests cannot enable it, and no caller flag is an approval substitute.
-        if (submission.Request.Concurrency is not null)
+        context.SetAdmissionEnvelope(AuditEnvelopeFactory.PreCommit(context, new LifecycleTransitionDefinition("Received", "Admitted"), clock.UtcNow));
+        string? atomicFailure = await _admissionEvidence.ValidateAtomicParticipationAsync(context, cancellationToken).ConfigureAwait(false);
+        if (atomicFailure is not null)
         {
-            return ChatBotCommandAdmissionDecision.Rejected(ChatBotMessageCodes.CanonicalExecutionUnavailable, submission.CorrelationId, submission.TaskId);
+            return ChatBotCommandAdmissionDecision.Rejected(atomicFailure, submission.CorrelationId, submission.TaskId);
         }
 
         // Read-only legacy collision protection precedes reservation and pre-commit audit. This is not

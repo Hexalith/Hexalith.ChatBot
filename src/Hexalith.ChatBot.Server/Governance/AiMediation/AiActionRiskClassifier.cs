@@ -81,21 +81,17 @@ internal static class AiActionRiskClassifier
         AiActionCommandMetadata? metadata = AiActionCommandMetadataProvider.TryGet(input.IntendedCommandName);
         if (metadata is null)
         {
-            return input;
+            return input with { AllowlistMetadataState = "unsupported" };
         }
 
         return input with
         {
-            ActionClasses = input.ActionClasses is { Count: > 0 } ? input.ActionClasses : metadata.ActionClasses,
-            EffectSurface = string.IsNullOrWhiteSpace(input.EffectSurface) ? metadata.EffectSurface : input.EffectSurface,
-            TenantPolicyClassification = string.IsNullOrWhiteSpace(input.TenantPolicyClassification)
-                ? metadata.TenantPolicyClassification
-                : input.TenantPolicyClassification,
-            CommandAllowlistVersion = string.IsNullOrWhiteSpace(input.CommandAllowlistVersion)
-                ? metadata.CommandAllowlistVersion
-                : input.CommandAllowlistVersion,
-            CommandDefaultRisk = input.CommandDefaultRisk ?? metadata.CommandDefaultRisk,
-            AllowlistMetadataState = string.IsNullOrWhiteSpace(input.AllowlistMetadataState) ? "declared" : input.AllowlistMetadataState,
+            ActionClasses = metadata.ActionClasses.Concat(input.ActionClasses ?? []).Distinct().ToArray(),
+            EffectSurface = metadata.EffectSurface,
+            TenantPolicyClassification = input.TenantPolicyClassification is "disallowed" or "unsupported" ? input.TenantPolicyClassification : metadata.TenantPolicyClassification,
+            CommandAllowlistVersion = metadata.CommandAllowlistVersion,
+            CommandDefaultRisk = metadata.CommandDefaultRisk,
+            AllowlistMetadataState = input.AllowlistMetadataState is "disallowed" or "unsupported" ? input.AllowlistMetadataState : metadata.Supported ? "declared" : "unsupported",
         };
     }
 
@@ -134,6 +130,10 @@ internal static class AiActionRiskClassifier
         if (string.IsNullOrWhiteSpace(input.RequesterAuthorityClass))
         {
             return "missing_requester_authority";
+        }
+        if (input.RequesterAuthorityClass is not ("project-contributor" or "project-approver" or "ai-action-approver" or "read-only-assistant" or "delegated-project-contributor" or "tenant-admin" or "admin"))
+        {
+            return "undeclared_requester_authority";
         }
 
         if (string.IsNullOrWhiteSpace(input.CommandAllowlistVersion) ||

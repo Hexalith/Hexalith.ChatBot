@@ -50,7 +50,7 @@ public static class ContractSpineOracleTests
             dispatcher,
             new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry()),
             new OracleAllowlist(),
-            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock));
+            requestAuthorizer: Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock), admissionEvidence: new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticLegacyAdmissionEvidenceValidator());
         ClaimsPrincipal principal = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
             [new Claim("sub", "actor-alpha"), new Claim("eventstore:tenant", "tenant-alpha")], "oracle")));
         ChatBotCommandSubmission submission = Submission(principal, "allowed-resource");

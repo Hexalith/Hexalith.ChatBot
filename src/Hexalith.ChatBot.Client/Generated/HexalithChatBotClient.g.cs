@@ -33,7 +33,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Submit a typed ChatBot command for governed processing.
         /// </summary>
         /// <remarks>
-        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. After earlier admission checks, including authorization and the policy persistence gate, requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal. The policy persistence gate takes precedence for all eight policy snapshot commands, returning HTTP 503 dependency_degraded with retryable: true and clientAction: retry-later even when concurrency is present.
+        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. After earlier admission checks, including authorization and the policy persistence gate, every mutation and bookkeeping write, with or without caller concurrency, fails closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until accepted atomic owner participation is available; callers must not automatically retry that refusal. The policy persistence gate takes precedence for all eight policy snapshot commands, returning HTTP 503 dependency_degraded with retryable: true and clientAction: retry-later even when concurrency is present. Required classification that is missing, invalid, unqualified, failed or indeterminate returns terminal HTTP 422 classifier-indeterminate before any proposal, approval or idempotency record. Remediation requires a new linked request. An assistance request requiring human approval returns HTTP 409 approval-required and must be submitted separately through the governed action proposal command.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
@@ -46,7 +46,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Submit a typed ChatBot command for governed processing.
         /// </summary>
         /// <remarks>
-        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. After earlier admission checks, including authorization and the policy persistence gate, requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal. The policy persistence gate takes precedence for all eight policy snapshot commands, returning HTTP 503 dependency_degraded with retryable: true and clientAction: retry-later even when concurrency is present.
+        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. After earlier admission checks, including authorization and the policy persistence gate, every mutation and bookkeeping write, with or without caller concurrency, fails closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until accepted atomic owner participation is available; callers must not automatically retry that refusal. The policy persistence gate takes precedence for all eight policy snapshot commands, returning HTTP 503 dependency_degraded with retryable: true and clientAction: retry-later even when concurrency is present. Required classification that is missing, invalid, unqualified, failed or indeterminate returns terminal HTTP 422 classifier-indeterminate before any proposal, approval or idempotency record. Remediation requires a new linked request. An assistance request requiring human approval returns HTTP 409 approval-required and must be submitted separately through the governed action proposal command.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
@@ -283,7 +283,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Submit a typed ChatBot command for governed processing.
         /// </summary>
         /// <remarks>
-        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. After earlier admission checks, including authorization and the policy persistence gate, requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal. The policy persistence gate takes precedence for all eight policy snapshot commands, returning HTTP 503 dependency_degraded with retryable: true and clientAction: retry-later even when concurrency is present.
+        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. After earlier admission checks, including authorization and the policy persistence gate, every mutation and bookkeeping write, with or without caller concurrency, fails closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until accepted atomic owner participation is available; callers must not automatically retry that refusal. The policy persistence gate takes precedence for all eight policy snapshot commands, returning HTTP 503 dependency_degraded with retryable: true and clientAction: retry-later even when concurrency is present. Required classification that is missing, invalid, unqualified, failed or indeterminate returns terminal HTTP 422 classifier-indeterminate before any proposal, approval or idempotency record. Remediation requires a new linked request. An assistance request requiring human approval returns HTTP 409 approval-required and must be submitted separately through the governed action proposal command.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
@@ -299,7 +299,7 @@ namespace Hexalith.ChatBot.Client.Generated
         /// Submit a typed ChatBot command for governed processing.
         /// </summary>
         /// <remarks>
-        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. After earlier admission checks, including authorization and the policy persistence gate, requests carrying concurrency fail closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until canonical execution is enabled; callers must not automatically retry that refusal. The policy persistence gate takes precedence for all eight policy snapshot commands, returning HTTP 503 dependency_degraded with retryable: true and clientAction: retry-later even when concurrency is present.
+        /// Accepts a typed ChatBot command shape from an adapter and returns accepted metadata. The operation records only contract-level submission intent; it does not execute domain behavior or expose internal processing stages. After earlier admission checks, including authorization and the policy persistence gate, every mutation and bookkeeping write, with or without caller concurrency, fails closed with HTTP 503 and the non-retryable canonical_execution_unavailable catalog code until accepted atomic owner participation is available; callers must not automatically retry that refusal. The policy persistence gate takes precedence for all eight policy snapshot commands, returning HTTP 503 dependency_degraded with retryable: true and clientAction: retry-later even when concurrency is present. Required classification that is missing, invalid, unqualified, failed or indeterminate returns terminal HTTP 422 classifier-indeterminate before any proposal, approval or idempotency record. Remediation requires a new linked request. An assistance request requiring human approval returns HTTP 409 approval-required and must be submitted separately through the governed action proposal command.
         /// </remarks>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
@@ -405,6 +405,16 @@ namespace Hexalith.ChatBot.Client.Generated
                                 throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only conflict response.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 422)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Terminal classifier failure; remedy the cause and submit a new linked request.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -4571,6 +4581,12 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"canonical_execution_unavailable")]
         Canonical_execution_unavailable = 94,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"classifier-indeterminate")]
+        ClassifierIndeterminate = 95,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"approval-required")]
+        ApprovalRequired = 96,
 
     }
 

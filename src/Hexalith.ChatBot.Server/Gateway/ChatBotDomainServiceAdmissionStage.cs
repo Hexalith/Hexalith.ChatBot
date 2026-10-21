@@ -70,7 +70,15 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
                 }
             }
 
-            return DomainServiceAdmissionResult.Accepted();
+            ChatBotRequestContext? signedIssuer = requestContextResolver.ResolveCommand(context.Command)
+                ?? requestContextResolver.ResolveBoundGrantIssuer(context.Command);
+            string? commitReason = signedIssuer is null || signedIssuer.SubjectId != context.Command.UserId
+                ? ChatBotAuthorizationReasonCodes.AuthenticationDenied
+                : signedIssuer.TenantId != context.Command.TenantId
+                    ? ChatBotAuthorizationReasonCodes.TenantMismatch
+                    : await admission.RevalidateMarkedCommitAsync(context.Command, signedIssuer, cancellationToken).ConfigureAwait(false);
+            return commitReason is null ? DomainServiceAdmissionResult.Accepted()
+                : await RejectTransportAsync(context.Command, signedIssuer, commitReason, cancellationToken).ConfigureAwait(false);
         }
 
         ChatBotRequestContext? requestContext = requestContextResolver.ResolveCommand(context.Command);
