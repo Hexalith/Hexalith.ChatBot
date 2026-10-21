@@ -9,6 +9,7 @@ fi
 
 repository_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd -- "$repository_root"
+export HexalithBuildsRoot="${HexalithBuildsRoot:-${repository_root}/references/Hexalith.Builds}"
 
 for project in "$@"; do
     if [[ ! -f "$project" ]]; then

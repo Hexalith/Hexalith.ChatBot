@@ -16,6 +16,10 @@ on:
 
 env:
   HexalithCommonsRoot: ${{ github.workspace }}/references/Hexalith.Commons
+  # Parties imports its package catalog from HexalithBuildsRoot and otherwise
+  # points at an uninitialized nested Builds checkout. The root catalog is the
+  # one this repository initializes.
+  HexalithBuildsRoot: ${{ github.workspace }}/references/Hexalith.Builds
   UseHexalithProjectReferences: "false"
 
 jobs:
