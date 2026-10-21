@@ -8,6 +8,7 @@ using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Admission;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Operations;
 using CommandSubmissionRequest = Hexalith.ChatBot.Client.Generated.CommandSubmissionRequest;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
@@ -38,7 +39,7 @@ internal sealed record SyntheticHumanApprovalFixture(ChatBotGatewayContext Conte
         context.SetRiskClassification(ChatBotRiskClassification.Classified(AiActionRiskClassifier.Classify(new AiActionRiskInputTuple(
             commandName, [], null, null, "project-contributor", "policy", null, null, null, "authorized", correlation))));
         AiActionApprovalRequested request = new("approval", "project", "proposal", "intent", "source", null, "requester", "human", source.UtcNow.AddMinutes(-2),
-            commandName, allowlist, AiActionRiskClass.ApprovalRequired, ["modifies-state"], "synthetic-tuple", "policy", "metadata_only", ["evidence"],
+            commandName, allowlist, AiActionRiskClass.ApprovalRequired, ["modifies-state"], GovernedOperationAggregate.RiskInputTupleRef(context.RiskClassification!.Record!.InputTuple), "policy", "metadata_only", ["evidence"],
             [ApprovalEvidenceFreshness.Fresh], ["resource"], ["recipient"], "draft-only", "metadata_only", "metadata_only", 1, correlation);
         AiActionApprovalDecisionRecorded decision = new("approval", "project", "proposal", "source", ApprovalDecisionKind.Approve,
             "approver", "human", source.UtcNow.AddMinutes(-1), 1, "authorized", null, "metadata_only", "audit:synthetic", "available", "policy", "execute-approved-ai-action", 2, correlation);

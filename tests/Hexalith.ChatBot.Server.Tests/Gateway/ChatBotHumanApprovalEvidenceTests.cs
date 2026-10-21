@@ -1,6 +1,10 @@
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Server.Gateway.Admission;
+using Hexalith.ChatBot.Server.Authentication;
+using Hexalith.ChatBot.Server.Authorization;
+using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Shouldly;
 
@@ -100,16 +104,36 @@ public sealed class ChatBotHumanApprovalEvidenceTests
     [InlineData("classifier-v1", false)]
     [InlineData("policy-drift", false)]
     [InlineData("revision-drift", false)]
+    [InlineData("requester-authority-drift", false)]
+    [InlineData("machine-approver", false)]
+    [InlineData("non-human-approver", false)]
+    [InlineData("approver-tenant", false)]
+    [InlineData("approver-subject", false)]
+    [InlineData("approver-not-current", false)]
+    [InlineData("approver-project", false)]
+    [InlineData("future-decision", false)]
+    [InlineData("expiry-before-decision", false)]
+    [InlineData("blank-scope", false)]
+    [InlineData("command-request-policy", false)]
     public async Task IndependentHumanApprovalMustMatchPresenceLifetimeAndEveryScopeBinding(string state, bool valid)
     {
         SyntheticHumanApprovalFixture fixture = SyntheticHumanApprovalFixture.Create();
         ChatBotHumanApprovalEvidence proof = fixture.Source.ProfileEvidence!.Approval!;
+        if (state == "command-request-policy")
+        {
+            ExecuteApprovedAIAction command = (ExecuteApprovedAIAction)fixture.Context.Submission.Request.Command;
+            fixture.Context.Submission.Request.Command = command with { PolicySnapshotId = "drift" };
+            fixture.Source.ProfileEvidence = fixture.Source.ProfileEvidence with
+            {
+                Policy = fixture.Source.ProfileEvidence.Policy! with { PolicySnapshotId = "drift" },
+            };
+        }
         fixture.Source.ProfileEvidence = fixture.Source.ProfileEvidence with
         {
             Approval = state switch
             {
                 "missing" => null,
-                "self" => proof with { Decision = proof.Decision with { DecisionActorId = "requester" } },
+                "self" => proof with { Decision = proof.Decision with { DecisionActorId = "requester" }, Approver = Approver(proof, "requester") },
                 "service" => proof with { Decision = proof.Decision with { DecisionActorType = "service" } },
                 "presence" => proof with { PresenceReference = "" },
                 "expired" => proof with { ExpiresAt = fixture.Source.UtcNow },
@@ -119,13 +143,68 @@ public sealed class ChatBotHumanApprovalEvidenceTests
                 "classifier-v1" => proof with { ClassifierVersion = "chatbot.ai-action-risk-classifier.m0.v1" },
                 "policy-drift" => proof with { Decision = proof.Decision with { PolicySnapshotId = "drift" } },
                 "revision-drift" => proof with { Decision = proof.Decision with { SourceVersion = 3 } },
+                "requester-authority-drift" => proof with { Request = proof.Request with { RiskInputTuple = proof.Request.RiskInputTuple.Replace("project-contributor", "tenant-admin", StringComparison.Ordinal) } },
+                "machine-approver" => proof with { Approver = Approver(proof, "approver", actor: "service") },
+                "non-human-approver" => proof with { Approver = Approver(proof, "approver", actor: "system") },
+                "approver-tenant" => proof with { Approver = Approver(proof, "approver", tenant: "another-tenant") },
+                "approver-subject" => proof with { Approver = Approver(proof, "another-subject") },
+                "approver-not-current" => proof with { Approver = Approver(proof, "approver", expiredAt: fixture.Source.UtcNow.AddMinutes(-1)) },
+                "approver-project" => proof with { Approver = Approver(proof, "approver", project: "another-project") },
+                "future-decision" => proof with { Decision = proof.Decision with { DecidedAtUtc = fixture.Source.UtcNow.AddMinutes(1) } },
+                "expiry-before-decision" => proof with { ExpiresAt = proof.Decision.DecidedAtUtc },
+                "blank-scope" => proof with { ScopeDigest = "", CurrentScopeDigest = "" },
                 _ => proof,
             },
         };
         ChatBotAdmissionEvidenceValidator validator = new(fixture.Source, fixture.Source);
         string? result = await validator.ValidateProfileAsync(fixture.Context, TestContext.Current.CancellationToken);
         if (valid) { result.ShouldBeNull(); }
-        else { result.ShouldNotBeNull(); }
+        else { result.ShouldBe(ChatBotRefusalReasonCodes.ApprovalStateInvalid); }
         (await validator.ValidateAtomicParticipationAsync(fixture.Context, TestContext.Current.CancellationToken)).ShouldBe(ChatBotMessageCodes.CanonicalExecutionUnavailable);
     }
+    /// <summary>Sensitive approvals may last at most ten minutes; reversible writes may last at most thirty.</summary>
+    [Theory]
+    [InlineData(false, 30, true)]
+    [InlineData(false, 31, false)]
+    [InlineData(true, 10, true)]
+    [InlineData(true, 11, false)]
+    public async Task ApprovalLifetimeMustRespectTheExactEffectClassMaximum(bool sensitive, int minutes, bool valid)
+    {
+        SyntheticHumanApprovalFixture fixture = SyntheticHumanApprovalFixture.Create();
+        ChatBotHumanApprovalEvidence proof = fixture.Source.ProfileEvidence!.Approval!;
+        if (sensitive)
+        {
+            var classification = fixture.Context.RiskClassification!.Record!;
+            fixture.Context.SetRiskClassification(ChatBotRiskClassification.Classified(classification with
+            {
+                RiskActionClasses = [AiActionRiskActionClass.ModifiesState, AiActionRiskActionClass.ExposesFiles],
+            }));
+            proof = proof with { Request = proof.Request with { AiRiskActionClasses = ["modifies-state", "exposes-files"] } };
+        }
+        fixture.Source.ProfileEvidence = fixture.Source.ProfileEvidence with
+        {
+            Approval = proof with { ExpiresAt = proof.Decision.DecidedAtUtc.AddMinutes(minutes) },
+        };
+        (await new ChatBotAdmissionEvidenceValidator(fixture.Source, fixture.Source)
+            .ValidateProfileAsync(fixture.Context, TestContext.Current.CancellationToken))
+            .ShouldBe(valid ? null : ChatBotRefusalReasonCodes.ApprovalStateInvalid);
+        fixture.Context.Idempotency.ShouldBeNull();
+        fixture.Context.AdmissionEnvelope.ShouldBeNull();
+    }
+
+    /// <summary>Creates independently varied synthetic approver identity and current-authority bounds.</summary>
+    private static ChatBotAuthorityPrincipal Approver(ChatBotHumanApprovalEvidence proof, string subject,
+        string actor = "human", string tenant = "synthetic-tenant", string project = "project", DateTimeOffset? expiredAt = null)
+    {
+        ChatBotRequestContext original = proof.Approver.Context;
+        ChatBotRequestContext context = new(subject, tenant, actor, actor == "service" ? subject : null, original.Origin, original.Principal);
+        ChatBotOwnerAuthorityRequest request = new("ChatBot", subject, tenant, project, nameof(ExecuteApprovedAIAction),
+            "operation", actor, original.Origin, true);
+        var evidence = expiredAt is { } expiry
+            ? new[] { (new ChatBotOwnerAuthorityEvidence(request, "synthetic:approval", "1", expiry.AddMinutes(-1),
+                expiry.AddMinutes(-1), expiry, true, false), expiry.AddMinutes(-1)) }
+            : [];
+        return new(context, null, [project], validatedEvidence: evidence);
+    }
+
 }

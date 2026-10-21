@@ -72,7 +72,15 @@ public sealed class AdmissionProfileFitnessTests
             }
         }
         ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(nameof(CorrectEmailProjectAssociation)).ShouldContain("correction-impact-manifest");
-        ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(nameof(ProposeAIAction)).ShouldNotContain("human-approval-lifetime-drift");
+        foreach (string command in new[] { nameof(ProposeAIAction), nameof(MarkAiActionProposalInvalidatedByCorrection) })
+        {
+            ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(command).ShouldNotContain("human-only-non-self-approval");
+            ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(command).ShouldNotContain("approval-lifetime-drift");
+        }
+        ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(nameof(DecideAiActionApproval)).ShouldContain("human-only-non-self-approval");
+        ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(nameof(DecideAiActionApproval)).ShouldNotContain("approval-lifetime-drift");
+        ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(nameof(ExecuteApprovedAIAction)).ShouldContain("human-only-non-self-approval");
+        ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(nameof(ExecuteApprovedAIAction)).ShouldContain("approval-lifetime-drift");
         ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(nameof(CreateOutboundDraft)).ShouldNotContain("provider-evidence");
         ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(nameof(ExecuteApprovedOutboundDraft)).ShouldContain("provider-evidence");
     }
@@ -118,6 +126,8 @@ public sealed class AdmissionProfileFitnessTests
     [InlineData("src/Hexalith.ChatBot.Server/Other.cs", "public partial class ChatBotDomainServiceAdmissionStage {}")]
     [InlineData("src/Hexalith.ChatBot.Server/Other.cs", "public readonly struct ChatBotDomainServiceAdmissionStage {}")]
     [InlineData("src/Hexalith.ChatBot.Server/Other.cs", "public sealed record ChatBotDomainServiceAdmissionStage;")]
+    [InlineData("src/Hexalith.ChatBot.Client/Adapter.cs", "RiskClassification = new AiActionRiskClassificationRecord(...);")]
+    [InlineData("src/Hexalith.ChatBot.Client/Adapter.cs", "await pipeline.ClassifyAsync(command);")]
     [InlineData("src/Hexalith.ChatBot.UI/Adapter.cs", "RiskClassification = new AiActionRiskClassificationRecord(...);")]
     [InlineData("src/Hexalith.ChatBot.UI/Adapter.cs", "AiActionRiskClassificationRecord record = new(...);")]
     [InlineData("src/Hexalith.ChatBot.UI/Composer.razor", "@code { private AiActionRiskClassificationRecord _record = new(...); }")]
@@ -154,7 +164,7 @@ public sealed class AdmissionProfileFitnessTests
             Regex.IsMatch(source, @"(?:class|record|struct)\s+(?:(?:class|struct)\s+)?\w*AdmissionPipeline\b")) { return true; }
         if (Regex.IsMatch(source, @"public\s+(?:(?:sealed|abstract|partial|readonly|ref)\s+)*(?:class|interface|record|struct)\s+(?:(?:class|struct)\s+)?(?:IChatBotAdmissionEvidenceValidator|IChatBotAdmissionEvidenceSource|ChatBotDomainServiceAdmissionStage)\b")) { return true; }
         if (Regex.IsMatch(source, @"\.\s*ProcessAsync\s*\(")) { return true; }
-        bool adapter = path.Contains("/Adapters/", StringComparison.Ordinal) || path.Contains(".Cli/", StringComparison.Ordinal) || path.Contains(".Mcp/", StringComparison.Ordinal) || path.Contains(".UI/", StringComparison.Ordinal) || path.Contains(".Workers/", StringComparison.Ordinal);
+        bool adapter = path.Contains(".Client/", StringComparison.Ordinal) || path.Contains("/Adapters/", StringComparison.Ordinal) || path.Contains(".Cli/", StringComparison.Ordinal) || path.Contains(".Mcp/", StringComparison.Ordinal) || path.Contains(".UI/", StringComparison.Ordinal) || path.Contains(".Workers/", StringComparison.Ordinal);
         if (adapter && (Regex.IsMatch(source, @"\bnew\s+(?:[\w]+\.)*AiActionRiskClassificationRecord\s*\(") ||
             Regex.IsMatch(source, @"\bAiActionRiskClassificationRecord\??\s+\w+\s*=\s*new\s*\("))) { return true; }
         if (adapter && Regex.IsMatch(source, @"\.\s*(?:AuthorizeAsync|ClassifyAsync|RecordPreCommitAsync|AdmitAsync)\s*\(")) { return true; }

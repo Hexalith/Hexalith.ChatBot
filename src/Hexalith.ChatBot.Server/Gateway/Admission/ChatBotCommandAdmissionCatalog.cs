@@ -242,10 +242,10 @@ internal sealed class ChatBotCommandAdmissionCatalog
             [nameof(RejectEmailProjectAssociation)] = ["correction-impact-manifest"],
             [nameof(ResolveMailboxMessageParticipants)] = ["correction-impact-manifest"],
             [nameof(ScoreMailboxMessageAssociation)] = ["correction-impact-manifest"],
-            // These commands create or decide approval, or invalidate a proposal; execution validates its lifetime.
-            [nameof(ProposeAIAction)] = ["human-approval-lifetime-drift"],
-            [nameof(DecideAiActionApproval)] = ["human-approval-lifetime-drift"],
-            [nameof(MarkAiActionProposalInvalidatedByCorrection)] = ["human-approval-lifetime-drift"],
+            // Proposal creation and invalidation have no human decision; deciding approval still requires an independent human.
+            [nameof(ProposeAIAction)] = ["human-only-non-self-approval", "approval-lifetime-drift"],
+            [nameof(DecideAiActionApproval)] = ["approval-lifetime-drift"],
+            [nameof(MarkAiActionProposalInvalidatedByCorrection)] = ["human-only-non-self-approval", "approval-lifetime-drift"],
             // Draft/approval commands do not send and cannot yet have provider or completed human approval evidence.
             [nameof(CreateOutboundDraft)] = ["human-approval-lifetime-drift", "provider-evidence", "no-blind-retry"],
             [nameof(RequestOutboundSendApproval)] = ["human-approval-lifetime-drift", "provider-evidence", "no-blind-retry"],
@@ -302,7 +302,7 @@ internal sealed class ChatBotCommandAdmissionCatalog
         ChatBotAdmissionProfile.Workflow => ["family-state", "evidence-freshness", "project-authority", "correction-impact-manifest"],
         ChatBotAdmissionProfile.GovernedChat => ["conversation-authority", "origin-instruction-boundary", "attempt-identity-revision", "stream-race-guard"],
         ChatBotAdmissionProfile.AiRead => ["origin-instruction-boundary", "policy-context-scope", "project-authority"],
-        ChatBotAdmissionProfile.AiEffect => ["origin-instruction-boundary", "human-approval-lifetime-drift", "allowlist-effect-target"],
+        ChatBotAdmissionProfile.AiEffect => ["origin-instruction-boundary", "human-only-non-self-approval", "approval-lifetime-drift", "allowlist-effect-target"],
         ChatBotAdmissionProfile.HumanEffect => ["frozen-content-recipients", "sender-authority", "human-approval-lifetime-drift", "provider-evidence", "no-blind-retry"],
         ChatBotAdmissionProfile.CommandExecution => ["exposed-command-effect", "caller-authority", "prior-attempt-state", "target-idempotency-concurrency", "uncertain-effect-denial"],
         ChatBotAdmissionProfile.Governance => ["closed-role-scope", "separation-of-duty", "independent-approval", "safer-state"],

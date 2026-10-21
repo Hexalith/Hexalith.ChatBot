@@ -149,10 +149,9 @@ public sealed class LiveContinuityAspireE2eContractTests
     }
 
     /// <summary>
-    /// The admission proof is the problem <c>type</c>. <c>dispatch-unavailable</c> is emitted only from
-    /// <c>CommandGateway</c>'s accepted branch, so it proves admission; <c>audit-unavailable</c> (the pre-commit
-    /// denial), an authorization denial, a body that is not a problem document, and a matching <c>code</c> under a
-    /// different <c>type</c> must not.
+    /// Canonical-execution-unavailable and historical dispatch-unavailable prove the mailbox caller cleared the
+    /// authentication and authority checks. Neither proves mutation admission; audit or authorization failures,
+    /// malformed documents and matching catalog codes under unrelated types prove nothing.
     /// </summary>
     /// <param name="problemDetails">The verbatim response body.</param>
     /// <param name="expected">Whether the body proves the caller was admitted.</param>
@@ -171,8 +170,10 @@ public sealed class LiveContinuityAspireE2eContractTests
     [InlineData("[\"dispatch-unavailable\"]", false)]
     [InlineData("not json at all", false)]
     [InlineData("", false)]
-    public void MailboxAdmissionProofRequiresTheDispatchUnavailableProblemType(string problemDetails, bool expected)
-        => LiveContinuityAspireE2eTests.IsDispatchUnavailableProblem(problemDetails).ShouldBe(expected);
+    [InlineData("{\"type\":\"https://hexalith.dev/errors/chatbot/canonical-execution-unavailable\",\"status\":503}", true)]
+    [InlineData("{\"type\":\"https://hexalith.dev/errors/chatbot/canonical-execution-unavailable-x\"}", false)]
+    public void MailboxAdmissionProofRequiresAPostAuthorizationUnavailableProblemType(string problemDetails, bool expected)
+        => LiveContinuityAspireE2eTests.IsPostAuthorizationUnavailableProblem(problemDetails).ShouldBe(expected);
 
     /// <summary>
     /// The live mailbox-bearer probes are only meaningful when their body passes the OpenAPI request contract, which is
@@ -198,21 +199,29 @@ public sealed class LiveContinuityAspireE2eContractTests
     }
 
     /// <summary>
-    /// The admission proof requires BOTH the dispatch-unavailable problem type AND a 503; the body predicate alone
+    /// The mailbox proof requires BOTH a recognized post-authorization problem type AND a 503; the body predicate alone
     /// would accept that document under any status, which is not what the production check does.
     /// </summary>
-    /// <param name="statusCode">The status observed alongside the dispatch-unavailable body.</param>
+    /// <param name="statusCode">The status observed alongside the problem body.</param>
+    /// <param name="canonical">Whether to use the current canonical-execution boundary or historical dispatch boundary.</param>
     /// <param name="expectedAdmissionProof">Whether that pair proves admission.</param>
     [Theory]
-    [InlineData(HttpStatusCode.ServiceUnavailable, true)]
-    [InlineData(HttpStatusCode.InternalServerError, false)]
-    [InlineData(HttpStatusCode.BadGateway, false)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, false, true)]
+    [InlineData(HttpStatusCode.InternalServerError, false, false)]
+    [InlineData(HttpStatusCode.BadGateway, false, false)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, true, true)]
+    [InlineData(HttpStatusCode.InternalServerError, true, false)]
+    [InlineData(HttpStatusCode.BadGateway, true, false)]
     public void MailboxAdmissionProofRequiresServiceUnavailableAlongsideTheProblemType(
         HttpStatusCode statusCode,
+        bool canonical,
         bool expectedAdmissionProof)
     {
-        const string body =
-            "{\"type\":\"https://hexalith.dev/errors/chatbot/dispatch-unavailable\",\"status\":503}";
+        string body = JsonSerializer.Serialize(new
+        {
+            type = canonical ? ChatBotProblemTypes.CanonicalExecutionUnavailable : ChatBotProblemTypes.DispatchUnavailable,
+            status = 503,
+        });
 
         // Drives the PRODUCTION predicate. Recomputing the conjunction inline here asserted the test against its
         // own re-implementation: deleting the ServiceUnavailable half of the production check left this green.

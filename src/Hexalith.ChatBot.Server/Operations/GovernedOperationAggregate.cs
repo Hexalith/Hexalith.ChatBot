@@ -4173,7 +4173,8 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 SafeRejectionToken(command.RetentionClass)),
         });
 
-    private static string RiskInputTupleRef(AiActionRiskInputTuple? tuple)
+    /// <summary>Builds the persisted approval binding for the classified command, effect, requester authority and policy class.</summary>
+    internal static string RiskInputTupleRef(AiActionRiskInputTuple? tuple)
         => tuple is null
             ? "tuple:unavailable"
             : $"tuple:{tuple.IntendedCommandName}:{tuple.EffectSurface}:{tuple.RequesterAuthorityClass}:{tuple.TenantPolicyClassification}";

@@ -951,17 +951,11 @@ public sealed class LiveContinuityAspireE2eTests
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The admission proof is the emitted problem <c>type</c>, not a status class. For an admitted bearer the
-    /// deliberately invalid <c>IntakeId</c> of <see cref="MailboxAdmissionProbeBody"/> is rejected inside
-    /// <c>AcceptedCommandDispatcher.BuildPlanAsync</c>, before any external write, and <c>CommandGateway</c> answers
-    /// the safe <c>503</c> <c>dispatch-unavailable</c> problem; no post-admission <c>400</c>/<c>422</c> exists.
-    /// </para>
-    /// <para>
-    /// <c>dispatch-unavailable</c> is emitted from exactly one place — the <c>catch</c> around
-    /// <c>dispatcher.DispatchAsync</c>, which is reachable only after <c>admissionDecision.IsAccepted</c> — so it is
-    /// categorical proof that the bearer cleared authentication, authorization, tenant binding and the service-client
-    /// grant. A credential rejection (<c>401</c>/<c>403</c>) and the pre-commit <c>audit-unavailable</c> denial are
-    /// deliberately NOT accepted: both are emitted before or instead of admission acceptance.
+    /// The problem type proves the bearer cleared authentication, trusted tenant binding, authorization and its
+    /// service-client grant. Production currently returns <c>503 canonical-execution-unavailable</c> at the owner
+    /// evidence/atomic-participation boundary, before any dispatch or mutation. The historical
+    /// <c>503 dispatch-unavailable</c> path also follows those checks and remains recognized.
+    /// Neither response proves accepted mutation or owner execution.
     /// </para>
     /// <para>
     /// A <c>400</c>/<c>422</c> is never admission proof. The OpenAPI request contract is validated BEFORE
@@ -978,8 +972,8 @@ public sealed class LiveContinuityAspireE2eTests
         CancellationToken cancellationToken)
     {
         using HttpClient client = application.CreateHttpClient("chatbot");
-        // Contract-valid but deliberately invalid after admission: IntakeId is not a ULID. Auth must pass; the command
-        // must not be Accepted.
+        // Contract-valid but deliberately non-executable: Auth must pass; atomic participation remains unavailable
+        // and IntakeId is not a ULID if dispatch is ever reached. The command must not be Accepted.
         string body = MailboxAdmissionProbeBody(ChatBotCommandId.New().Value);
         HttpStatusCode? lastStatus = null;
         // The probe used to report only the status code, so a persistent 503 could not be told apart from a slow
@@ -1052,11 +1046,11 @@ public sealed class LiveContinuityAspireE2eTests
     }
 
     /// <summary>
-    /// Recognises the one problem type that <c>CommandGateway</c> can only emit after admission accepted the caller.
+    /// Recognises the bounded problem types emitted after the mailbox authentication and authority checks.
     /// </summary>
     /// <param name="problemDetails">The verbatim response body.</param>
-    /// <returns><see langword="true"/> when the body is a dispatch-unavailable problem document.</returns>
-    internal static bool IsDispatchUnavailableProblem(string problemDetails)
+    /// <returns><see langword="true"/> for a canonical-execution-unavailable or dispatch-unavailable problem.</returns>
+    internal static bool IsPostAuthorizationUnavailableProblem(string problemDetails)
     {
         if (string.IsNullOrWhiteSpace(problemDetails))
         {
@@ -1069,10 +1063,8 @@ public sealed class LiveContinuityAspireE2eTests
             return document.RootElement.ValueKind == JsonValueKind.Object
                 && document.RootElement.TryGetProperty("type", out JsonElement type)
                 && type.ValueKind == JsonValueKind.String
-                && string.Equals(
-                    type.GetString(),
-                    ChatBotProblemTypes.DispatchUnavailable,
-                    StringComparison.Ordinal);
+                && (string.Equals(type.GetString(), ChatBotProblemTypes.DispatchUnavailable, StringComparison.Ordinal)
+                    || string.Equals(type.GetString(), ChatBotProblemTypes.CanonicalExecutionUnavailable, StringComparison.Ordinal));
         }
         catch (JsonException)
         {
@@ -1083,8 +1075,8 @@ public sealed class LiveContinuityAspireE2eTests
 
     /// <summary>Whether a response pair proves the caller was admitted past the auth boundary.</summary>
     /// <remarks>
-    /// Both halves are required: the body predicate alone would accept a dispatch-unavailable document under any
-    /// status, which is not what admission means. Exposed rather than inlined so the contract test can drive this
+    /// Both halves are required: a matching post-authorization problem document under another HTTP status
+    /// does not prove the mailbox boundary checks. Exposed rather than inlined so the contract test can drive this
     /// decision instead of re-implementing it -- an inline copy asserted itself and left the production
     /// conjunction unpinned.
     /// </remarks>
@@ -1093,7 +1085,7 @@ public sealed class LiveContinuityAspireE2eTests
     /// <returns><see langword="true"/> when the pair proves admission.</returns>
     internal static bool ProvesMailboxAdmission(HttpStatusCode statusCode, string problemDetails)
         => statusCode == HttpStatusCode.ServiceUnavailable
-            && IsDispatchUnavailableProblem(problemDetails);
+            && IsPostAuthorizationUnavailableProblem(problemDetails);
 
     /// <summary>Classifies only startup statuses that can become healthy without changing the probe request.</summary>
     /// <remarks>

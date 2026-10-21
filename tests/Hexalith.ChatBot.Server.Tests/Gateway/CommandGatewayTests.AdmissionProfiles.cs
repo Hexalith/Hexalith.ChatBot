@@ -58,6 +58,7 @@ public sealed partial class CommandGatewayTests
     [InlineData("nextCommand")]
     [InlineData("successorCommand")]
     [InlineData("riskClassification")]
+    [InlineData("executionRecord")]
     public async Task CallerAdmissionSelectorsShouldFailBeforeReservation(string selector)
     {
         RecordingDispatcher dispatcher = new();
@@ -171,6 +172,7 @@ public sealed partial class CommandGatewayTests
     [InlineData("classifier", ChatBotMessageCodes.ClassifierIndeterminate)]
     [InlineData("approval-required", ChatBotMessageCodes.ApprovalRequired)]
     [InlineData("selector", ChatBotMessageCodes.CommandContractInvalid)]
+    [InlineData("execution-record", ChatBotMessageCodes.CommandContractInvalid)]
     [InlineData("subtype", ChatBotMessageCodes.ClassifierIndeterminate)]
     [InlineData("approval-failure", ChatBotRefusalReasonCodes.ApprovalStateInvalid)]
     public async Task SdkProcessMustContainEveryProfileFailureWithoutBookkeeping(string failure, string reason)
@@ -179,10 +181,11 @@ public sealed partial class CommandGatewayTests
         object command = failure == "approval-failure" ? ApprovedExecutionCommand() : LowRiskExecutionCommand();
         string commandType = command.GetType().Name;
         System.Text.Json.JsonElement payload = System.Text.Json.JsonSerializer.SerializeToElement(command, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
-        if (failure is "selector" or "subtype")
+        if (failure is "selector" or "subtype" or "execution-record")
         {
             Dictionary<string, object?> fields = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payload.GetRawText())!;
-            fields[failure == "selector" ? "admissionProfile" : "assistanceKind"] = failure == "selector" ? "ai-read-v1" : "undeclared-subtype";
+            fields[failure switch { "selector" => "admissionProfile", "execution-record" => "executionRecord", _ => "assistanceKind" }]
+                = failure switch { "selector" => "ai-read-v1", "execution-record" => new { outcome = "forged" }, _ => (object)"undeclared-subtype" };
             payload = System.Text.Json.JsonSerializer.SerializeToElement(fields);
         }
         const string operation = "01ARZ3NDEKTSV4RRFFQ69G5FAY";

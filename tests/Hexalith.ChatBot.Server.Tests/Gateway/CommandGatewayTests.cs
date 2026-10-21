@@ -3545,6 +3545,13 @@ public sealed partial class CommandGatewayTests
         tamperer.OriginObservedAfterTamperAttempt.ShouldBe(ChatBotSurfaceOrigin.Ui);
         auditWriter.Envelopes.Count.ShouldBe(2);
         auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SurfaceOrigin == "ui");
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            // Explicit synthetic admission proves audit formatting only, never qualification or owner execution.
+            envelope.SourceEvidenceRefs.ShouldContain("classifier:chatbot.ai-action-risk-classifier.m0.v2");
+            envelope.SourceEvidenceRefs.ShouldContain("risk-class:approval-required");
+            envelope.SourceEvidenceRefs.ShouldContain("risk-action:modifies-state");
+        }
     }
 
     [Fact]
@@ -4106,9 +4113,11 @@ public sealed partial class CommandGatewayTests
     public async Task LowRiskAiExecutionReplayShouldIgnoreClientChangedExecutionIdForSameLogicalRequest()
     {
         RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
         InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
         CommandGateway gateway = Gateway(
             dispatcher,
+            auditWriter: auditWriter,
             idempotencyStore: idempotencyStore,
             riskClassifier: new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticLegacyRiskClassifier(),
             approvalGate: new AiActionApprovalGate(
@@ -4134,6 +4143,15 @@ public sealed partial class CommandGatewayTests
         replay.Accepted.AcceptedAt.ShouldBe(first.Accepted.AcceptedAt);
         dispatcher.DispatchCount.ShouldBe(1);
         idempotencyStore.RecordCount.ShouldBe(1);
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            // These synthetic success fixtures cannot enable production admission.
+            envelope.SourceEvidenceRefs.ShouldContain("classifier:chatbot.ai-action-risk-classifier.m0.v2");
+            envelope.SourceEvidenceRefs.ShouldContain("risk-class:low-risk");
+            envelope.SourceEvidenceRefs.ShouldContain("context-package:context-package-001");
+            envelope.SourceEvidenceRefs.ShouldContain("execution:ai-execution-001");
+        }
     }
 
     [Fact]

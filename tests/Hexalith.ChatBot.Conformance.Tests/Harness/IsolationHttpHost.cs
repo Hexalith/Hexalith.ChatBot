@@ -65,7 +65,7 @@ internal static class IsolationHttpHost
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
             {
                 Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
-                        Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
+                Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                 services.AddSingleton<IStartupFilter>(new IsolationPrincipalStartupFilter(CrossTenantLeakageCorpus.BoundTenant));
                 services.AddSingleton<IGovernedOperationProjectionStore>(projectionStore);
                 services.AddSingleton<IOperationStatusStore>(statusStore);

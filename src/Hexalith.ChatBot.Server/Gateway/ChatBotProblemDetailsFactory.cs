@@ -293,7 +293,6 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
             ChatBotDisabledActionReasons.PolicyBlocked or
             ChatBotRefusalReasonCodes.ApprovalStateInvalid or
             ChatBotRefusalReasonCodes.ApprovedCommandScopeExceeded or
-            ChatBotRefusalReasonCodes.CommandNotAllowlisted or
             ChatBotMessageCodes.ProjectAiContextPackageUnavailable or
             ChatBotRefusalReasonCodes.EvidenceExpired;
 

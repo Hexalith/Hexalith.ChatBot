@@ -3,6 +3,7 @@ using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Observability;
@@ -91,7 +92,7 @@ internal sealed class AiActionApprovalGate(IAiActionPolicyEvaluator policyEvalua
         }
         if (risk.RiskClass != AiActionRiskClass.LowRisk || risk.RiskActionClasses.Count > 0)
         {
-            return ChatBotApprovalResult.RoutedToApproval(command.PolicySnapshotId ?? "unavailable", "approval-required");
+            return ChatBotApprovalResult.RoutedToApproval(command.PolicySnapshotId ?? "unavailable", ChatBotMessageCodes.ApprovalRequired);
         }
 
         AiActionPolicyDecision policyDecision = await _policyEvaluator

@@ -52,7 +52,8 @@ internal sealed class ChatBotAdmissionEvidenceValidator(
                     property.Name.Equals("profile", StringComparison.OrdinalIgnoreCase) ||
                     property.Name.Equals("successorCommand", StringComparison.OrdinalIgnoreCase) ||
                     property.Name.Equals("nextCommand", StringComparison.OrdinalIgnoreCase) ||
-                    (property.Name.Equals("riskClassification", StringComparison.OrdinalIgnoreCase) && property.Value.ValueKind != JsonValueKind.Null))
+                    ((property.Name.Equals("riskClassification", StringComparison.OrdinalIgnoreCase) ||
+                        property.Name.Equals("executionRecord", StringComparison.OrdinalIgnoreCase)) && property.Value.ValueKind != JsonValueKind.Null))
                 {
                     return ChatBotMessageCodes.CommandContractInvalid;
                 }
@@ -207,14 +208,11 @@ internal sealed class ChatBotAdmissionEvidenceValidator(
         try
         {
             ChatBotProfileAdmissionEvidence? proof = context.AdmissionEvidence ?? await _evidenceSource.ReadProfileEvidenceAsync(context, cancellationToken).ConfigureAwait(false);
-            if (proof is null || context.AdmissionProfile is not { } profile || proof.Profile != profile ||
-                proof.TenantId != context.TenantBinding.TenantId || proof.ActorId != context.Actor.ActorId ||
-                proof.CommandType != context.Submission.Request.CommandType || proof.OperationId != context.Submission.Request.CommandId ||
-                proof.ObservedAt > _clock.UtcNow || proof.ExpiresAt <= _clock.UtcNow || proof.ObservedAt >= proof.ExpiresAt ||
-                proof.CurrentRevision < 0)
+            if (!MatchesCurrentOperation(context, proof) || proof is null)
             {
                 return ChatBotMessageCodes.CanonicalExecutionUnavailable;
             }
+            ChatBotAdmissionProfile profile = context.AdmissionProfile!.Value;
             if (context.Submission.Request.Concurrency is { } concurrency && concurrency.ExpectedRevision != proof.CurrentRevision)
             {
                 return ChatBotMessageCodes.CommandContractInvalid;
@@ -308,6 +306,7 @@ internal sealed class ChatBotAdmissionEvidenceValidator(
             string.IsNullOrWhiteSpace(approval.ScopeDigest) || approval.ScopeDigest != approval.CurrentScopeDigest ||
             context.RiskClassification?.Record is not { RiskActionClasses: not null } classification ||
             approval.ClassifierVersion != classification.ClassifierVersion || approval.Request.AiRiskClass != classification.RiskClass ||
+            approval.Request.RiskInputTuple != GovernedOperationAggregate.RiskInputTupleRef(classification.InputTuple) ||
             !SameReferences(approval.Request.AiRiskActionClasses, classification.RiskActionClasses.Select(GovernedOperationAggregate.AiRiskActionClassToken)) ||
             command.PolicySnapshotId != approval.Request.PolicySnapshotId || command.PolicySnapshotId != approval.Decision.PolicySnapshotId)
         {

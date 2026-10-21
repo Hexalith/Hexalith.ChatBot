@@ -105,14 +105,41 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
     [InlineData("boundary-downgrade")]
     [InlineData("invalid-output")]
     [InlineData("missing-effect-partition")]
+    [InlineData("missing-runtime")]
+    [InlineData("artifact-version")]
+    [InlineData("zero-evaluated")]
+    [InlineData("negative-misclassified")]
+    [InlineData("too-many-misclassified")]
+    [InlineData("future-approved")]
+    [InlineData("approved-at-expiry")]
+    [InlineData("approved-after-expiry")]
+    [InlineData("blank-owner")]
+    [InlineData("empty-evidence")]
+    [InlineData("blank-evidence")]
+    [InlineData("added-dependency")]
+    [InlineData("removed-dependency")]
     public async Task QualificationMustMatchEveryCurrentBindingAndThreshold(string failure)
     {
         SyntheticAdmissionEvidenceSource source = new();
         ChatBotClassifierQualification qualified = source.Qualification!;
+        if (failure == "missing-runtime") { source.RuntimeIdentity = null; }
         source.Qualification = failure switch
         {
             "missing" => null,
+            "missing-runtime" => qualified,
             "artifact" => qualified with { Identity = qualified.Identity with { ArtifactHash = "drift" } },
+            "artifact-version" => qualified with { Identity = qualified.Identity with { ArtifactVersion = "drift" } },
+            "zero-evaluated" => qualified with { EvaluatedCount = 0 },
+            "negative-misclassified" => qualified with { MisclassificationCount = -1 },
+            "too-many-misclassified" => qualified with { MisclassificationCount = qualified.EvaluatedCount + 1 },
+            "future-approved" => qualified with { ApprovedAt = source.UtcNow.AddMinutes(1) },
+            "approved-at-expiry" => qualified with { ApprovedAt = source.UtcNow.AddMinutes(-1), ExpiresAt = source.UtcNow.AddMinutes(-1) },
+            "approved-after-expiry" => qualified with { ApprovedAt = source.UtcNow.AddMinutes(-1), ExpiresAt = source.UtcNow.AddMinutes(-2) },
+            "blank-owner" => qualified with { OwnerId = "" },
+            "empty-evidence" => qualified with { EvidenceReferences = [] },
+            "blank-evidence" => qualified with { EvidenceReferences = [""] },
+            "added-dependency" => qualified with { Identity = qualified.Identity with { DependencyRevisions = new Dictionary<string, string> { ["owner"] = "synthetic-dependency", ["other"] = "extra" } } },
+            "removed-dependency" => qualified with { Identity = qualified.Identity with { DependencyRevisions = new Dictionary<string, string>() } },
             "candidate" => qualified with { Identity = qualified.Identity with { CandidateRevision = "drift" } },
             "dependencies" => qualified with { Identity = qualified.Identity with { DependencyRevisions = new Dictionary<string, string> { ["owner"] = "drift" } } },
             "dataset" => qualified with { Identity = qualified.Identity with { DatasetHash = "drift" } },
@@ -130,10 +157,13 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
     }
 
     /// <summary>Verifies synthetic Qualified Record Only Validates Classification And Never Enables Atomic Execution.</summary>
-    [Fact]
-    public async Task SyntheticQualifiedRecordOnlyValidatesClassificationAndNeverEnablesAtomicExecution()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(10)]
+    public async Task SyntheticQualifiedRecordOnlyValidatesClassificationAndNeverEnablesAtomicExecution(int misclassified)
     {
         SyntheticAdmissionEvidenceSource source = new();
+        source.Qualification = source.Qualification! with { MisclassificationCount = misclassified };
         ChatBotAdmissionEvidenceValidator validator = new(source, source);
         ChatBotGatewayContext context = Context();
         (await validator.ValidateClassificationAsync(context, TestContext.Current.CancellationToken)).ShouldBeNull();
@@ -154,6 +184,9 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
     [Theory]
     [InlineData("current", null)]
     [InlineData("missing-policy", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData("policy-low-risk-disallowed", ChatBotMessageCodes.ApprovalRequired)]
+    [InlineData("policy-effect-surface", ChatBotMessageCodes.ApprovalRequired)]
+    [InlineData("policy-kind-missing", ChatBotMessageCodes.ApprovalRequired)]
     [InlineData("context-drift", ChatBotMessageCodes.ProjectAiContextPackageUnavailable)]
     [InlineData("revision-drift", ChatBotMessageCodes.CommandContractInvalid)]
     [InlineData("expired", ChatBotMessageCodes.CanonicalExecutionUnavailable)]
@@ -171,6 +204,9 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
         source.ProfileEvidence = state switch
         {
             "missing-policy" => source.ProfileEvidence with { Policy = null },
+            "policy-low-risk-disallowed" => source.ProfileEvidence with { Policy = policy with { LowRiskAllowed = false } },
+            "policy-effect-surface" => source.ProfileEvidence with { Policy = policy with { EffectSurface = "project-conversation" } },
+            "policy-kind-missing" => source.ProfileEvidence with { Policy = policy with { AssistanceKinds = [] } },
             "context-drift" => source.ProfileEvidence with { ContextPackage = package with { PackageVersion = "v2" } },
             "revision-drift" => source.ProfileEvidence with { CurrentRevision = 2 },
             "expired" => source.ProfileEvidence with { ExpiresAt = source.UtcNow },
