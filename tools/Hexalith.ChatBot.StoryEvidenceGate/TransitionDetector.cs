@@ -253,9 +253,11 @@ public static class TransitionDetector
         try
         {
             JsonObject? candidate = JsonNode.Parse(
-                File.ReadAllText(path),
+                BoundedEvidenceInput.ReadFileText(
+                    path, BoundedEvidenceInput.MaximumJsonBytes, GateReason.ScopeDigestMismatch, "json-input-limit"),
                 documentOptions: new JsonDocumentOptions
                 {
+                    MaxDepth = BoundedEvidenceInput.MaximumJsonDepth,
                     AllowTrailingCommas = false,
                     CommentHandling = JsonCommentHandling.Disallow,
                 }) as JsonObject;
@@ -266,6 +268,7 @@ public static class TransitionDetector
                 : null;
         }
         catch (Exception exception) when (exception is JsonException
+            or GateValidationException
             or IOException
             or UnauthorizedAccessException)
         {
@@ -329,9 +332,13 @@ public static class TransitionDetector
 
     private static bool ReadBootstrap(string json, string subject)
     {
+        BoundedEvidenceInput.ValidateJsonText(json, GateReason.StatusMismatch);
         try
         {
-            JsonObject value = JsonNode.Parse(json)?.AsObject()
+            JsonObject value = JsonNode.Parse(json, documentOptions: new JsonDocumentOptions
+            {
+                MaxDepth = BoundedEvidenceInput.MaximumJsonDepth,
+            })?.AsObject()
                 ?? throw new JsonException("Contract root is not an object.");
             return EvidenceJson.RequiredBoolean(value, "bootstrap", GateReason.StatusMismatch);
         }

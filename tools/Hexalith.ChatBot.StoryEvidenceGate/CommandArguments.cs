@@ -36,12 +36,12 @@ public sealed class CommandArguments
         ArgumentNullException.ThrowIfNull(args);
         if (args.Length == 0 || args[0].StartsWith("--", StringComparison.Ordinal))
         {
-            throw new GateValidationException(GateReason.StatusMismatch, "command");
+            throw new GateValidationException(GateReason.StatusMismatch, "cli-command");
         }
 
         if (!AllowedOptions.TryGetValue(args[0], out IReadOnlySet<string>? allowedOptions))
         {
-            throw new GateValidationException(GateReason.StatusMismatch, "command");
+            throw new GateValidationException(GateReason.StatusMismatch, "cli-command");
         }
 
         Dictionary<string, string> values = new(StringComparer.Ordinal);
@@ -49,13 +49,18 @@ public sealed class CommandArguments
         {
             if (index + 1 >= args.Length || !args[index].StartsWith("--", StringComparison.Ordinal))
             {
-                throw new GateValidationException(GateReason.StatusMismatch, "arguments");
+                throw new GateValidationException(GateReason.StatusMismatch, "cli-arguments");
             }
 
             string key = args[index][2..];
-            if (key.Length == 0 || !allowedOptions.Contains(key) || !values.TryAdd(key, args[index + 1]))
+            if (key.Length == 0 || !allowedOptions.Contains(key))
             {
-                throw new GateValidationException(GateReason.StatusMismatch, key);
+                throw new GateValidationException(GateReason.StatusMismatch, "cli-option");
+            }
+
+            if (!values.TryAdd(key, args[index + 1]))
+            {
+                throw new GateValidationException(GateReason.StatusMismatch, "cli-duplicate-option");
             }
         }
 
@@ -69,7 +74,7 @@ public sealed class CommandArguments
     {
         if (!_values.TryGetValue(name, out string? value) || string.IsNullOrWhiteSpace(value))
         {
-            throw new GateValidationException(GateReason.StatusMismatch, name);
+            throw new GateValidationException(GateReason.StatusMismatch, "cli-required-option");
         }
 
         return value;

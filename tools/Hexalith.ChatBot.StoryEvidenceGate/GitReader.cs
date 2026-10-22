@@ -125,7 +125,15 @@ public static class GitReader
     /// <returns>The file text, or null when absent.</returns>
     public static string? Show(string repositoryPath, string revision, string path)
     {
-        GitCommandResult result = Run(repositoryPath, "show", $"{revision}:{path}");
+        ArgumentNullException.ThrowIfNull(path);
+        bool json = path.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
+        GitCommandResult result = RunWithInputLimit(
+            repositoryPath,
+            CommandTimeout,
+            json ? BoundedEvidenceInput.MaximumJsonBytes : BoundedEvidenceInput.MaximumInputBytes,
+            json ? "json-input-limit" : "git-stdout-input-limit",
+            "show",
+            $"{revision}:{path}");
         return result.ExitCode == 0 ? result.StandardOutput : null;
     }
 
@@ -168,7 +176,11 @@ public static class GitReader
     }
 
     /// <summary>Reads exact blob bytes without checkout encoding or line-ending transformation.</summary>
-    public static byte[] BlobBytes(string repositoryPath, string objectId)
+    public static byte[] BlobBytes(string repositoryPath, string objectId) =>
+        BlobBytes(repositoryPath, objectId, BoundedEvidenceInput.MaximumInputBytes, "git-blob-input-limit");
+
+    /// <summary>Reads an exact blob with the ceiling appropriate to its known evidence format.</summary>
+    internal static byte[] BlobBytes(string repositoryPath, string objectId, int maximumBytes, string subject)
     {
         ProcessStartInfo startInfo = StartInfo(repositoryPath);
         startInfo.ArgumentList.Add("cat-file");
@@ -176,7 +188,7 @@ public static class GitReader
         startInfo.ArgumentList.Add(objectId);
         try
         {
-            return ReadBlobAsync(startInfo).GetAwaiter().GetResult();
+            return ReadBlobAsync(startInfo, maximumBytes, subject).GetAwaiter().GetResult();
         }
         catch (GateValidationException)
         {
@@ -224,6 +236,17 @@ public static class GitReader
         TimeSpan timeout,
         params string[] arguments)
     {
+        return RunWithInputLimit(
+            repositoryPath, timeout, BoundedEvidenceInput.MaximumInputBytes, "git-stdout-input-limit", arguments);
+    }
+
+    private static GitCommandResult RunWithInputLimit(
+        string repositoryPath,
+        TimeSpan timeout,
+        int maximumStdoutBytes,
+        string stdoutSubject,
+        params string[] arguments)
+    {
         ArgumentNullException.ThrowIfNull(arguments);
         if (timeout <= TimeSpan.Zero)
         {
@@ -243,7 +266,7 @@ public static class GitReader
 
         try
         {
-            return RunAsync(startInfo, timeout).GetAwaiter().GetResult();
+            return RunAsync(startInfo, timeout, maximumStdoutBytes, stdoutSubject).GetAwaiter().GetResult();
         }
         catch (GateValidationException)
         {
@@ -258,17 +281,21 @@ public static class GitReader
         }
     }
 
-    private static async Task<GitCommandResult> RunAsync(ProcessStartInfo startInfo, TimeSpan commandTimeout)
+    private static async Task<GitCommandResult> RunAsync(
+        ProcessStartInfo startInfo, TimeSpan commandTimeout, int maximumStdoutBytes, string stdoutSubject)
     {
         using Process process = Process.Start(startInfo)
             ?? throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-process");
         using CancellationTokenSource timeout = new(commandTimeout);
-        Task<string> standardOutput = process.StandardOutput.ReadToEndAsync(timeout.Token);
-        Task<string> standardError = process.StandardError.ReadToEndAsync(timeout.Token);
+        Task<byte[]> standardOutput = ReadProcessStreamAsync(
+            process, process.StandardOutput.BaseStream, stdoutSubject, timeout.Token, maximumStdoutBytes);
+        Task<byte[]> standardError = ReadProcessStreamAsync(
+            process, process.StandardError.BaseStream, "git-stderr-input-limit", timeout.Token);
         try
         {
-            await Task.WhenAll(process.WaitForExitAsync(timeout.Token), standardOutput, standardError).ConfigureAwait(false);
-            return new GitCommandResult(process.ExitCode, standardOutput.Result, standardError.Result);
+            await Task.WhenAll(standardOutput, standardError, process.WaitForExitAsync(timeout.Token)).ConfigureAwait(false);
+            return new GitCommandResult(
+                process.ExitCode, DecodeOutput(standardOutput.Result), DecodeOutput(standardError.Result));
         }
         catch (OperationCanceledException)
         {
@@ -277,29 +304,61 @@ public static class GitReader
         }
     }
 
-    private static async Task<byte[]> ReadBlobAsync(ProcessStartInfo startInfo)
+    private static async Task<byte[]> ReadBlobAsync(ProcessStartInfo startInfo, int maximumBytes, string subject)
     {
         using Process process = Process.Start(startInfo)
             ?? throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-process");
         using CancellationTokenSource timeout = new(CommandTimeout);
-        using MemoryStream output = new();
-        Task copyOutput = process.StandardOutput.BaseStream.CopyToAsync(output, timeout.Token);
-        Task<string> standardError = process.StandardError.ReadToEndAsync(timeout.Token);
+        Task<byte[]> output = ReadProcessStreamAsync(
+            process, process.StandardOutput.BaseStream, subject, timeout.Token, maximumBytes);
+        Task<byte[]> standardError = ReadProcessStreamAsync(
+            process, process.StandardError.BaseStream, "git-stderr-input-limit", timeout.Token);
         try
         {
-            await Task.WhenAll(process.WaitForExitAsync(timeout.Token), copyOutput, standardError).ConfigureAwait(false);
+            await Task.WhenAll(output, standardError, process.WaitForExitAsync(timeout.Token)).ConfigureAwait(false);
             if (process.ExitCode != 0)
             {
                 throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-blob");
             }
 
-            return output.ToArray();
+            return output.Result;
         }
         catch (OperationCanceledException)
         {
             Kill(process);
             throw new GateValidationException(GateReason.ScopeDigestMismatch, "git-timeout");
         }
+    }
+
+    private static async Task<byte[]> ReadProcessStreamAsync(
+        Process process,
+        Stream stream,
+        string subject,
+        CancellationToken cancellationToken,
+        int maximumBytes = BoundedEvidenceInput.MaximumInputBytes)
+    {
+        try
+        {
+            return await BoundedEvidenceInput.ReadBytesAsync(
+                stream,
+                maximumBytes,
+                GateReason.ScopeDigestMismatch,
+                subject,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            // A refused stream must terminate its producer before waiting on the other redirected pipe.
+            Kill(process);
+            throw;
+        }
+    }
+
+    private static string DecodeOutput(byte[] bytes)
+    {
+        using MemoryStream stream = new(bytes, writable: false);
+        using StreamReader reader = new(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
     }
 
     private static void Kill(Process process)

@@ -77,6 +77,7 @@ public static partial class EvidenceJson
     /// <returns>The parsed contract.</returns>
     public static JsonObject ParseContract(string json, string subject)
     {
+        BoundedEvidenceInput.ValidateJsonText(json, GateReason.ScopeDigestMismatch);
         JsonObject contract;
         try
         {
@@ -84,6 +85,7 @@ public static partial class EvidenceJson
                 json,
                 documentOptions: new JsonDocumentOptions
                 {
+                    MaxDepth = BoundedEvidenceInput.MaximumJsonDepth,
                     AllowTrailingCommas = false,
                     CommentHandling = JsonCommentHandling.Disallow,
                 }) as JsonObject ?? throw new JsonException("Contract root is not an object.");
@@ -397,9 +399,11 @@ public static partial class EvidenceJson
             }
 
             JsonNode? node = JsonNode.Parse(
-                File.ReadAllText(path),
+                BoundedEvidenceInput.ReadFileText(
+                    path, BoundedEvidenceInput.MaximumJsonBytes, reasonCode, "json-input-limit"),
                 documentOptions: new JsonDocumentOptions
                 {
+                    MaxDepth = BoundedEvidenceInput.MaximumJsonDepth,
                     AllowTrailingCommas = false,
                     CommentHandling = JsonCommentHandling.Disallow,
                 });

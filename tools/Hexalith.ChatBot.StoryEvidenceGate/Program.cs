@@ -45,7 +45,6 @@ public static class Program
             or UnauthorizedAccessException
             or NotSupportedException
             or InvalidOperationException
-            or OutOfMemoryException
             or System.Security.SecurityException
             or System.ComponentModel.Win32Exception)
         {

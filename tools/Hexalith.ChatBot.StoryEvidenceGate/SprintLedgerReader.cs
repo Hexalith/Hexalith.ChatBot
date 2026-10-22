@@ -13,7 +13,8 @@ public static partial class SprintLedgerReader
     /// <returns>The status, or null when absent.</returns>
     public static string? StoryStatus(string path, string key)
     {
-        return StoryStatusFromText(File.ReadAllText(path), key);
+        return StoryStatusFromText(BoundedEvidenceInput.ReadFileText(
+            path, BoundedEvidenceInput.MaximumInputBytes, GateReason.StatusMismatch, "sprint-input-limit"), key);
     }
 
     /// <summary>Reads an exact development status from sprint-ledger text.</summary>
@@ -49,7 +50,8 @@ public static partial class SprintLedgerReader
     /// <returns>The status, or null when absent.</returns>
     public static string? ActionStatus(string path, string actionText)
     {
-        return ActionStatusFromText(File.ReadAllText(path), actionText);
+        return ActionStatusFromText(BoundedEvidenceInput.ReadFileText(
+            path, BoundedEvidenceInput.MaximumInputBytes, GateReason.StatusMismatch, "sprint-input-limit"), actionText);
     }
 
     /// <summary>Reads an exact action status from sprint-ledger text.</summary>

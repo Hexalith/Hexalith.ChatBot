@@ -257,7 +257,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: StoryEvidenceGate hardening
 severity: low
 reason: **[LOW · hardening] Unbounded JSON/TRX/scope file reads and JSON depth.** **Release-claim impact:** pathological inputs can OOM/crash instead of stable fail-closed. **Owner:** StoryEvidenceGate hardening. **Closure evidence:** size/depth caps with negative tests.
-status: open
+status: done 2026-10-22
+resolution: BoundedEvidenceInput now enforces 4 MiB JSON, 64 MiB TRX/source/text/Git-stream ceilings during reads, explicit JSON depth 64, 65,536 retained-line ceiling, and XML character limits. Named evidence: JsonReadersShouldRefuseOversizedFiles, JsonReadersShouldRejectDepthBeyond64, BoundedReadsShouldRefuseGrowingStreams, OversizedTrxShouldLeaveSidecarAtomic, OversizedWorktreeSourceShouldRefuseBeforeHashing, OversizedGitSourceShouldRefuseBoundedly, OversizedGitJsonShouldUseJsonCeiling, OversizedGitStderrShouldKillTheProducerPromptly, MetadataReadersShouldRefuseOversizedText, BoundedLineReaderShouldRefuseExcessLinesWithoutChangingSidecar, ScopeEvaluatorShouldRefuseOversizedCommittedContractWithoutChangingSidecar, LifecycleValidatorShouldRefuseOversizedCommittedContractWithoutChangingSidecar, and UnchangedOversizedInactiveContractShouldNotBlockActiveCompletion. Debug build passes with zero warnings/errors; TestResults/deferred-five-verified.ctrf.json and .trx record 276 passed, zero failures/skips.
 
 ### DW-30: [LOW · reason taxonomy] Broad reuse of `scope_digest_mismatch`/`status_mismatch` for I/O and CLI errors via subjects.
 
@@ -265,7 +266,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: TE-2/policy if reason set expands
 severity: low
 reason: **[LOW · reason taxonomy] Broad reuse of `scope_digest_mismatch`/`status_mismatch` for I/O and CLI errors via subjects.** **Release-claim impact:** dashboards keyed only on reason codes blur failure classes. **Owner:** TE-2/policy if reason set expands. **Closure evidence:** new stable reasons or documented subject convention.
-status: open
+status: done 2026-10-22
+resolution: Preserved all nine reason codes and documented bounded CLI/process/I/O/scope/limit subject conventions plus remediation in docs/story-evidence-integrity.md. Unknown command/option input is absent from CLI syntax diagnostics. Named evidence: CliFailureShouldUseExactStaticSubject, OperationalFailureShouldRetainExactMetadataSubject, and HungAllowlistedGitOperationShouldFailWithinInjectedTimeout; TestResults/deferred-five-verified.ctrf.json records 276 passed, zero failures/skips.
 decision: 2026-08-28 Document subject convention — Keep the nine stable reason codes, define bounded subject tokens for CLI syntax, process launch, file I/O, and scope evaluation, and add focused tests and runbook mappings.
 decision: 2026-08-28 Document subject convention — Keep the nine stable reason codes, define bounded subject tokens for CLI syntax, process launch, file I/O, and scope evaluation, and add focused tests and runbook mappings.
 
@@ -275,7 +277,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: gate test harness
 severity: low
 reason: **[LOW · test harness] `GateFixture.FindPolicy` parent-walk discovery.** **Release-claim impact:** opaque failure if test output leaves the repo tree. **Owner:** gate test harness. **Closure evidence:** embed/copy policy as a test asset or pin via env.
-status: open
+status: done 2026-10-22
+resolution: The test project copies story-evidence-policy.json to build and publish output; GateFixture resolves it directly from AppContext.BaseDirectory. Complete Debug output copied to /tmp/story-evidence-parent-relocated-htiq44nj passed seven bootstrap/snapshot/fully-bound-primary fixture cases without repository ancestry (TestResults/deferred-five-relocated-verified.ctrf.json and .trx, zero failures/skips). Debug publish to /tmp/story-evidence-publish-4wBogQS4 succeeded, and its policy SHA-256 matches the root policy exactly.
 
 ### DW-32: [MEDIUM · story-evidence bash] Fail-closed bash paths and event bounds lack executable negative coverage.
 
@@ -1070,7 +1073,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15 chunk 
 location: ProvenanceAttestor.cs:110
 severity: medium
 reason: **[MEDIUM · evidence-integrity] The per-lane freshness ceiling is keyed on a contract-author-controlled lane name with no allowlist.** `ProvenanceAttestor.cs:110` and `StoryEvidenceValidator.cs:828` resolve the ceiling from `contract.results[].lane`, and the binding cross-checks that verify selector/trx/sources against the policy binding run only for `requiredClasses` (`StoryEvidenceValidator.cs:309-350`); `TrxEvidenceReader.ReadDefinition` (`:265`) applies no lane-name allowlist. **Not covered:** a story with `primaryPaths: []` that touches nothing recovery-related can name an ordinary lane `recovery-primary` and inherit the relaxed current-run window for arbitrary TRX content. **Why deferred:** this is the pre-existing lane-resolution shape rather than something the per-lane ceiling introduced, and the exposure depends on which direction the open ceiling decision takes. **Owner:** ChatBot story-evidence gate. **Closure evidence:** lane names carrying an override are allowlisted or bound-verified regardless of `requiredClasses`, with a test that a contract naming `recovery-primary` without the corresponding trigger is refused.
-status: open
+status: done 2026-10-22
+resolution: PrimaryLaneBinding shares complete declaration/class/selector/source/pinned-path/skip checks between attestation and validation for every freshness-overridden result, independent of triggered classes. Named evidence: FreshnessOverrideShouldRequireCompleteBindingBeforeAnySidecarWrite (ten refusal mutations), InvalidLaterFreshnessOverrideShouldLeaveAllSidecarsUntouched, FullyBoundPrimaryLaneShouldRetainExtendedFreshness (all five primary classes), and RecoveryLaneCeilingShouldFlowThroughAttestationAndValidation. Existing windows and sidecar preflight atomicity are preserved; TestResults/deferred-five-verified.ctrf.json records 276 passed, zero failures/skips. This is gate evidence, not live recovery qualification.
 
 ### DW-125: [LOW · robustness] `OutOfMemoryException` is caught in `when` filters in the sanitizer and the summarizer.
 
@@ -1078,7 +1082,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15 chunk 
 location: RecoveryTrxSanitizer.cs:57
 severity: low
 reason: **[LOW · robustness] `OutOfMemoryException` is caught in `when` filters in the sanitizer and the summarizer.** `RecoveryTrxSanitizer.cs:57` and `RecoveryAttemptSummarizer.cs:118`. **Not covered:** OOM is not reliably recoverable, the exception filter runs before unwinding, and the XML reader may be left mid-state; if the new size caps work the catch is unreachable, and if they do not it will not save the process. **Owner:** ChatBot story-evidence gate. **Closure evidence:** the size caps are the sole defence and the OOM filters are removed, or a documented rationale replaces them.
-status: open
+status: done 2026-10-22
+resolution: Removed OutOfMemoryException filters from RecoveryTrxSanitizer, RecoveryAttemptSummarizer, and Program; bounded reads and XML limits remain the malformed-input defence. Named evidence: OversizedRecoveryInputShouldRefuseSanitizingAndSummarizeAsMalformed, RecoveryTrxSanitizerShouldProjectOnlyBoundMetadata, RecoveryTrxSanitizerShouldRejectAdversarialInput, RecoveryAttemptSummarizerShouldDescribeMalformedAndTruncatedInputPrecisely, and SanitizedRecoveryTrxShouldBeAcceptedByTheReaderThatConsumesIt. TestResults/deferred-five-verified.ctrf.json and .trx record 276 passed, zero failures/skips; no live recovery qualification is claimed.
 
 ### DW-126: [HIGH · data-integrity] Two routed governance surfaces present hard-coded fixture data as live product data.
 
@@ -1763,3 +1768,13 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-7-admit-commands-through-the-single-commandgateway.md`
   summary: Restore package-only CI/CD dependency validation after qualifying the required EventStore APIs in packages.
   evidence: R4-B1 (medium, verified): independent CI commit 0954093bb0e69775291298c7076a4eb1375e2b34 sets HexalithEventStoreFromSource=true in ci.yml, release.yml and build-release-configuration.sh; Parties and Tenants select EventStore ProjectReference on that flag even with UseHexalithProjectReferences=false. This predates the resumed Story 1.7 patches and conflicts with the mandatory package-only CI/CD baseline; do not remove the override until the required packaged API is qualified and the packaged Release graph passes.
+
+
+## Deferred from: five evidence-gate fixes review (2026-10-22)
+
+- source_spec: `spec-five-deferred-evidence-gate-fixes.md`
+  summary: Add structural XML budgets or streaming projection to prevent DOM amplification inside the 64 MiB TRX byte/character limit (medium; pre-existing; BH-2).
+  evidence: TrxEvidenceReader.ValidateTrx, RecoveryTrxSanitizer.Sanitize and RecoveryAttemptSummarizer.TryLoad all materialize XDocument before validating canonical structure, both at baseline fdeb341ee2b31dc54f3a5a0551de9e303544c457 and after the bounded-read fix. Millions of small elements fit inside the byte cap and retain a much larger DOM. Closure evidence: node/depth or streaming limits with adversarial TRX tests that refuse before large DOM construction.
+- source_spec: `spec-five-deferred-evidence-gate-fixes.md`
+  summary: Bound aggregate discovery allocation and retain only identity metadata for inactive evidence contracts (medium; pre-existing; BH-3).
+  evidence: TransitionDetector.FindSingleContract stores every full parsed candidate in its candidates list before filtering, as it did at baseline fdeb341ee2b31dc54f3a5a0551de9e303544c457. Many individually compliant contracts can exceed a reasonable aggregate memory budget. Closure evidence: identity-only candidate records plus a documented discovery budget and multi-candidate negative coverage preserving active duplicate detection.

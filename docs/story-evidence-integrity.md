@@ -71,6 +71,37 @@ Scheduled and release live-recovery producers still write `live-recovery-validat
 
 Retained evidence on lanes whose policy binding permits it is accepted only when its immutable downloaded sidecar and locator bind to the policy's `repositoryIdentity`, the same exact implementation digest, full revisions, source, checksum, and the `maximumRetainedEvidenceAgeHours` window. The gate never infers retained identity from a Git remote or ambient repository variable. Current-run locators must exactly equal `file:<declared-trx>`. Result paths reject traversal and symbolic links in the results root, its ancestry, or the declared path. After resolving exact bounds, candidate detection loads only changed or selected contracts, then CI downloads only retained artifacts declared by those active contracts into collision-checked `retained/<run>/<artifact>/` directories. An unchanged malformed inactive contract cannot block an unrelated or no-transition run; a changed or selected malformed contract fails closed. A diagnostic fallback, unrelated aggregate suite, zero/all-skipped run, stale artifact, or screenshot without a direct invariant assertion cannot satisfy a triggered browser, SignalR, hosting/assets, Aspire/Dapr, or recovery primary path.
 
+Every result using a policy freshness override must satisfy its complete primary binding before either attestation or validation grants that window, even when no changed path or story claim triggers the class. The contract must declare the matching primary class and lane; the result must bind that class, the pinned selector, an allowed source, any pinned TRX/provenance paths, and a zero-skip policy. A lane name alone grants no extended freshness. A fully bound lane retains the existing 360-minute ceiling; the global 60-minute ceiling, retained-evidence ceiling, and future-skew bound remain unchanged. Every lane preflights before any sidecar write, so an invalid override on a later lane leaves all existing sidecars unchanged and creates none.
+
+## Input limits and failure subjects
+
+JSON policy, contract, discovery, and provenance inputs are limited to 4 MiB of input bytes with an explicit maximum depth of 64. TRX, source files, local Markdown/YAML/gitmodules text, and each redirected Git stdout/stderr stream are limited to 64 MiB. Known JSON Git blobs and `show` reads use the 4 MiB ceiling. Local story and root `.gitmodules` line arrays also admit at most 65,536 lines, refusing before retaining an excess entry. All byte ceilings are enforced during reads as well as through available file-length checks, so a growing file or pipe cannot bypass them. TRX readers also limit XML document characters to 64 MiB and prohibit DTDs. Exact source bytes, BOMs, line endings, and executable/symlink modes keep their existing digest semantics.
+
+The nine reason codes below remain stable. Operational categories use the following bounded subject tokens; for CLI syntax failures, unknown command/option names and option values are never echoed. Other validation subjects retain their established metadata fields, safe paths, lane names, or scope tokens. Reports redact subjects longer than 160 characters, containing control characters, or matching sensitive fragments.
+
+| Reason | Subject | Remediation |
+| --- | --- | --- |
+| `status_mismatch` | `cli-command` | Select a supported command. |
+| `status_mismatch` | `cli-arguments` | Supply complete `--option value` pairs. |
+| `status_mismatch` | `cli-option` | Use only the selected command's allowed options. |
+| `status_mismatch` | `cli-duplicate-option` | Supply each option once. |
+| `status_mismatch` | `cli-required-option` | Supply every required nonempty option. |
+| `scope_digest_mismatch` | `git-process`, `git-timeout` | Check Git availability, repository access, and the five-minute command timeout. |
+| `scope_digest_mismatch` | `io-or-process`, `io-or-path` | Check input existence, filesystem access, and output paths; rerun the failed command. |
+| `scope_digest_mismatch` | `revision`, `head`, `diff`, `worktree-diff`, `untracked-files`, `git-blob` | Check exact available revisions and the repository/index/worktree scope. |
+| `scope_digest_mismatch` | `implementation-digest`, `implementation-digest-mask` | Reconcile owned scope and strict contract JSON, then regenerate attestation. |
+| `scope_digest_mismatch` (contract/policy/Git) or `evidence_stale_or_unbound` (sidecar) | `json-input-limit` | Reduce the JSON input below 4 MiB; preserve the strict schema and depth bound. |
+| `machine_results_invalid` | `trx-input-limit` | Produce a bounded TRX, keeping required test identities, times, counters, and outcomes. |
+| `scope_digest_mismatch` | `source-input-limit`, `git-blob-input-limit`, `git-stdout-input-limit`, `git-stderr-input-limit` | Reduce or split the source/scope/output below its ceiling and rerun; a refused Git producer is terminated. |
+| `status_mismatch` | `story-input-limit`, `sprint-input-limit`, `ledger-input-limit` | Reduce the corresponding local metadata file below 64 MiB; local stories also require at most 65,536 lines. |
+| `gitlink_scope_mismatch` | `gitmodules-input-limit` | Correct the root submodule declarations within 64 MiB and 65,536 lines. |
+| `machine_results_invalid` | `recovery-sanitize` | Correct malformed/oversized raw TRX and rerun projection; existing sanitized output is preserved on input refusal. |
+| `primary_path_not_executed` | Policy primary class (`browser`, `signalr`, `hosting-assets`, `aspire-dapr`, `recovery`) | Restore the full primary declaration/result binding and produce its actual required evidence. |
+
+Missing or malformed JSON (including excessive depth) retains the loader's reason and source metadata subject; malformed ordinary TRX retains its lane subject. Recovery attempt summaries describe missing input as `absent` and malformed or oversized input as `malformed`, without copying its payload. Size/depth limits are the input defence: allocation failures propagate rather than being treated as recoverable malformed input. Gate unit tests verify parser, binding, projection, and summary behavior; they do not qualify a live recovery drill.
+
+The gate test project copies its pinned policy to both build and publish output. Fixtures resolve that asset directly from `AppContext.BaseDirectory`, so running copied output requires no repository ancestry.
+
 ## Stable reason codes
 
 | Reason | Meaning |

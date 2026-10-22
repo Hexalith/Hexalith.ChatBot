@@ -324,7 +324,7 @@ public static partial class ScopeEvaluator
         string modulesPath = Path.Combine(root, ".gitmodules");
         if (File.Exists(modulesPath))
         {
-            foreach (string line in File.ReadLines(modulesPath))
+            foreach (string line in BoundedEvidenceInput.ReadFileLines(modulesPath, GateReason.GitlinkScopeMismatch, "gitmodules-input-limit"))
             {
                 Match match = SubmodulePath().Match(line);
                 if (match.Success)
@@ -411,7 +411,11 @@ public static partial class ScopeEvaluator
                 throw new GateValidationException(GateReason.ScopeDigestMismatch, path);
             }
 
-            byte[] treeBytes = GitReader.BlobBytes(repositoryPath, entry.Value.ObjectId);
+            byte[] treeBytes = GitReader.BlobBytes(
+                repositoryPath,
+                entry.Value.ObjectId,
+                maskImplementationDigest ? BoundedEvidenceInput.MaximumJsonBytes : BoundedEvidenceInput.MaximumInputBytes,
+                maskImplementationDigest ? "json-input-limit" : "git-blob-input-limit");
             byte[] canonicalTreeBytes = CanonicalBytes(treeBytes, maskImplementationDigest);
             string treeObjectId = Convert.ToHexString(SHA256.HashData(canonicalTreeBytes)).ToLowerInvariant();
             return new ChangedPath(repositoryName, path, status, entry.Value.Mode, treeObjectId);
@@ -442,7 +446,13 @@ public static partial class ScopeEvaluator
             throw new GateValidationException(GateReason.FileListDiffMismatch, path);
         }
 
-        byte[] bytes = CanonicalBytes(File.ReadAllBytes(fullPath), maskImplementationDigest);
+        byte[] bytes = CanonicalBytes(
+            BoundedEvidenceInput.ReadFileBytes(
+                fullPath,
+                maskImplementationDigest ? BoundedEvidenceInput.MaximumJsonBytes : BoundedEvidenceInput.MaximumInputBytes,
+                GateReason.ScopeDigestMismatch,
+                maskImplementationDigest ? "json-input-limit" : "source-input-limit"),
+            maskImplementationDigest);
         string objectId = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
         string mode = GitReader.IndexMode(repositoryPath, path) ?? GetUntrackedMode(fullPath);
         if (mode is not ("100644" or "100755"))
@@ -494,6 +504,7 @@ public static partial class ScopeEvaluator
     {
         Utf8JsonReader reader = new(bytes, new JsonReaderOptions
         {
+            MaxDepth = BoundedEvidenceInput.MaximumJsonDepth,
             AllowTrailingCommas = false,
             CommentHandling = JsonCommentHandling.Disallow,
         });

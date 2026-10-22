@@ -935,15 +935,7 @@ internal sealed class GateFixture : IDisposable
 
     private static string FindPolicy()
     {
-        DirectoryInfo? directory = new(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "story-evidence-policy.json")))
-        {
-            directory = directory.Parent;
-        }
-
-        return Path.Combine(
-            directory?.FullName ?? throw new InvalidOperationException("Could not locate policy."),
-            "story-evidence-policy.json");
+        return Path.Combine(AppContext.BaseDirectory, "story-evidence-policy.json");
     }
 
     private static JsonObject CreateContract()
@@ -1074,7 +1066,8 @@ internal sealed class GateFixture : IDisposable
             PolicyPath);
     }
 
-    private static string PrimaryTestClass(string pathClass) => pathClass switch
+    /// <summary>Gets the shipped class pinned to a primary evidence category.</summary>
+    internal static string PrimaryTestClass(string pathClass) => pathClass switch
     {
         "browser" => "Hexalith.ChatBot.UI.E2E.Tests.RealRenderCrossSurfaceE2ETests",
         "signalr" => "Hexalith.ChatBot.Server.Tests.Projections.ChatBotProjectConversationHubE2ETests",

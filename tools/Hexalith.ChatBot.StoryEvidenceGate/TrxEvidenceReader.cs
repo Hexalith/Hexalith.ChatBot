@@ -155,6 +155,7 @@ public static class TrxEvidenceReader
             {
                 DtdProcessing = DtdProcessing.Prohibit,
                 XmlResolver = null,
+                MaxCharactersInDocument = BoundedEvidenceInput.MaximumInputBytes,
             };
             using MemoryStream stream = new(trxBytes, writable: false);
             using XmlReader reader = XmlReader.Create(stream, settings);
@@ -305,7 +306,8 @@ public static class TrxEvidenceReader
     {
         try
         {
-            return File.ReadAllBytes(trxPath);
+            return BoundedEvidenceInput.ReadFileBytes(
+                trxPath, BoundedEvidenceInput.MaximumInputBytes, GateReason.MachineResultsInvalid, "trx-input-limit");
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {

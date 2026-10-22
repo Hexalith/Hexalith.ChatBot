@@ -109,7 +109,10 @@ public static class LifecycleTransitionValidator
         JsonObject baseContract;
         try
         {
-            baseContract = JsonNode.Parse(baseBytes)?.AsObject()
+            baseContract = JsonNode.Parse(baseBytes, documentOptions: new JsonDocumentOptions
+            {
+                MaxDepth = BoundedEvidenceInput.MaximumJsonDepth,
+            })?.AsObject()
                 ?? throw new JsonException("Contract is not an object.");
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException)
@@ -140,7 +143,10 @@ public static class LifecycleTransitionValidator
 
     private static byte[] ReplaceJsonValues(byte[] bytes, string headDigest)
     {
-        Utf8JsonReader reader = new(bytes);
+        Utf8JsonReader reader = new(bytes, new JsonReaderOptions
+        {
+            MaxDepth = BoundedEvidenceInput.MaximumJsonDepth,
+        });
         int scopeDepth = -1;
         bool nextObjectIsScope = false;
         string? pending = null;
@@ -261,7 +267,12 @@ public static class LifecycleTransitionValidator
             throw new GateValidationException(GateReason.StatusMismatch, path);
         }
 
-        return GitReader.BlobBytes(repositoryRoot, entry.Value.ObjectId);
+        bool json = path.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
+        return GitReader.BlobBytes(
+            repositoryRoot,
+            entry.Value.ObjectId,
+            json ? BoundedEvidenceInput.MaximumJsonBytes : BoundedEvidenceInput.MaximumInputBytes,
+            json ? "json-input-limit" : "git-blob-input-limit");
     }
 
     private static string NormalizePath(string path)

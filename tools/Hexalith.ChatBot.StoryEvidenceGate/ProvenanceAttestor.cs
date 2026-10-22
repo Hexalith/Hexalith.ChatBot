@@ -82,6 +82,7 @@ public static class ProvenanceAttestor
         {
             JsonObject lane = node as JsonObject
                 ?? throw new GateValidationException(GateReason.MachineResultsInvalid, "results");
+            int maximumCurrentRunAgeMinutes = PrimaryLaneBinding.ResolveCurrentRunAgeMinutes(policy, contract, lane);
             string trxPath = TrxEvidenceReader.ResolveSafeResultPath(
                 resultsRoot,
                 EvidenceJson.RequiredString(lane, "trx", GateReason.MachineResultsInvalid));
@@ -105,9 +106,7 @@ public static class ProvenanceAttestor
                 lane,
                 resultsRoot,
                 repositoryIdentity,
-                EvidenceJson.ResolveCurrentRunAgeMinutes(
-                    policy,
-                    EvidenceJson.RequiredString(lane, "lane", GateReason.MachineResultsInvalid)),
+                maximumCurrentRunAgeMinutes,
                 maximumFutureClockSkewMinutes,
                 producedAtUtc);
             currentRunLanes.Add(new AttestationLane(lane, checksum));

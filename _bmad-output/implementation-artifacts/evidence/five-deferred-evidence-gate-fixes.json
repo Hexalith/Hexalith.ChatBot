@@ -1,0 +1,202 @@
+{
+  "schemaVersion": "2.0",
+  "recordKind": "technicalEnabler",
+  "recordLedgerKey": "TE-3",
+  "storyKey": "five-deferred-evidence-gate-fixes",
+  "storyTitle": "Resolve five deferred evidence-gate reliability items",
+  "storyPath": "_bmad-output/implementation-artifacts/spec-five-deferred-evidence-gate-fixes.md",
+  "targetStatus": "done",
+  "persistedStatus": "complete",
+  "sprintStatusKey": "Resolve five deferred story-evidence gate reliability items (DW-29, DW-30, DW-31, DW-124, DW-125).",
+  "bootstrap": false,
+  "scope": {
+    "mode": "diff",
+    "implementationDigest": "9754b541baf121fb82ea14c74ba010d9166a3cf4cc6c755824ef69319112a15d",
+    "transitionPaths": [],
+    "repositories": [
+      {
+        "name": "root",
+        "path": ".",
+        "baseCommit": "$BASE",
+        "headCommit": "$HEAD",
+        "includeWorkingTree": false,
+        "includePaths": [
+          "_bmad-output/implementation-artifacts/deferred-work.md",
+          "_bmad-output/implementation-artifacts/evidence/five-deferred-evidence-gate-fixes.json",
+          "_bmad-output/implementation-artifacts/spec-five-deferred-evidence-gate-fixes.md",
+          "_bmad-output/implementation-artifacts/sprint-status.yaml",
+          "_bmad-output/planning-artifacts/technical-enablers.md",
+          "docs/story-evidence-integrity.md",
+          "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/GateFixture.cs",
+          "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/GrowingEvidenceStream.cs",
+          "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj",
+          "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/StoryEvidenceGateTests.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/BoundedEvidenceInput.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/CommandArguments.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/EvidenceJson.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/GitReader.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/LifecycleTransitionValidator.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/MarkdownStoryReader.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/PrimaryLaneBinding.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/Program.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/ProvenanceAttestor.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/RecoveryAttemptSummarizer.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/RecoveryTrxSanitizer.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/ScopeEvaluator.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/SprintLedgerReader.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/StoryEvidenceValidator.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/TechnicalEnablerLedgerReader.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/TransitionDetector.cs",
+          "tools/Hexalith.ChatBot.StoryEvidenceGate/TrxEvidenceReader.cs"
+        ]
+      }
+    ]
+  },
+  "results": [
+    {
+      "lane": "story-evidence-gate",
+      "trx": "story-evidence-gate/story-evidence-gate.trx",
+      "provenance": "story-evidence-gate/story-evidence-gate.provenance.json",
+      "artifactLocator": "file:story-evidence-gate/story-evidence-gate.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    }
+  ],
+  "primaryPaths": [],
+  "mappings": [
+    {
+      "id": "task-1",
+      "kind": "task",
+      "paths": [
+        "tools/Hexalith.ChatBot.StoryEvidenceGate/BoundedEvidenceInput.cs",
+        "tools/Hexalith.ChatBot.StoryEvidenceGate/GitReader.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.OversizedTrxShouldLeaveSidecarAtomic",
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.OversizedWorktreeSourceShouldRefuseBeforeHashing"
+      ]
+    },
+    {
+      "id": "task-2",
+      "kind": "task",
+      "paths": [
+        "tools/Hexalith.ChatBot.StoryEvidenceGate/CommandArguments.cs",
+        "docs/story-evidence-integrity.md"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.CliFailureShouldUseExactStaticSubject"
+      ]
+    },
+    {
+      "id": "task-3",
+      "kind": "task",
+      "paths": [
+        "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/GateFixture.cs",
+        "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.ValidTechnicalEnablerBootstrapShouldPass"
+      ]
+    },
+    {
+      "id": "task-4",
+      "kind": "task",
+      "paths": [
+        "tools/Hexalith.ChatBot.StoryEvidenceGate/PrimaryLaneBinding.cs",
+        "tools/Hexalith.ChatBot.StoryEvidenceGate/ProvenanceAttestor.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.InvalidLaterFreshnessOverrideShouldLeaveAllSidecarsUntouched"
+      ]
+    },
+    {
+      "id": "task-5",
+      "kind": "task",
+      "paths": [
+        "tools/Hexalith.ChatBot.StoryEvidenceGate/RecoveryTrxSanitizer.cs",
+        "tools/Hexalith.ChatBot.StoryEvidenceGate/RecoveryAttemptSummarizer.cs",
+        "tools/Hexalith.ChatBot.StoryEvidenceGate/Program.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.OversizedRecoveryInputShouldRefuseSanitizingAndSummarizeAsMalformed"
+      ]
+    },
+    {
+      "id": "task-6",
+      "kind": "task",
+      "paths": [
+        "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/StoryEvidenceGateTests.cs",
+        "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/GrowingEvidenceStream.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.UnchangedOversizedInactiveContractShouldNotBlockActiveCompletion"
+      ]
+    },
+    {
+      "id": "task-7",
+      "kind": "task",
+      "paths": [
+        "_bmad-output/implementation-artifacts/deferred-work.md"
+      ],
+      "assertions": []
+    },
+    {
+      "id": "ac-1",
+      "kind": "acceptanceCriterion",
+      "paths": [
+        "tools/Hexalith.ChatBot.StoryEvidenceGate/BoundedEvidenceInput.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.BoundedReadsShouldRefuseGrowingStreams"
+      ]
+    },
+    {
+      "id": "ac-2",
+      "kind": "acceptanceCriterion",
+      "paths": [
+        "tools/Hexalith.ChatBot.StoryEvidenceGate/PrimaryLaneBinding.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.FreshnessOverrideShouldRequireCompleteBindingBeforeAnySidecarWrite"
+      ]
+    },
+    {
+      "id": "ac-3",
+      "kind": "acceptanceCriterion",
+      "paths": [
+        "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/GateFixture.cs",
+        "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.ValidTechnicalEnablerBootstrapShouldPass"
+      ]
+    },
+    {
+      "id": "ac-4",
+      "kind": "acceptanceCriterion",
+      "paths": [
+        "tools/Hexalith.ChatBot.StoryEvidenceGate/CommandArguments.cs"
+      ],
+      "assertions": [
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.CliFailureShouldUseExactStaticSubject",
+        "Hexalith.ChatBot.StoryEvidenceGate.Tests.StoryEvidenceGateTests.OperationalFailureShouldRetainExactMetadataSubject"
+      ]
+    },
+    {
+      "id": "ac-5",
+      "kind": "acceptanceCriterion",
+      "paths": [
+        "_bmad-output/implementation-artifacts/spec-five-deferred-evidence-gate-fixes.md",
+        "_bmad-output/planning-artifacts/technical-enablers.md",
+        "_bmad-output/implementation-artifacts/sprint-status.yaml"
+      ],
+      "assertions": []
+    }
+  ],
+  "outOfScopeDisclosures": [],
+  "reportPath": "_bmad-output/implementation-artifacts/evidence/reports/five-deferred-evidence-gate-fixes.json"
+}

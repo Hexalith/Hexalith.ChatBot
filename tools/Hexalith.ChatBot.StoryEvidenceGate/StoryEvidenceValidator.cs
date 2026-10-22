@@ -328,39 +328,12 @@ public static class StoryEvidenceValidator
                 trigger,
                 "recognizedLaneBindings",
                 GateReason.PrimaryPathNotExecuted)[0]!.AsObject();
-            string? pinnedTrx = binding["trx"] is null
-                ? null
-                : EvidenceJson.RequiredString(binding, "trx", GateReason.PrimaryPathNotExecuted);
-            string? pinnedProvenance = binding["provenance"] is null
-                ? null
-                : EvidenceJson.RequiredString(binding, "provenance", GateReason.PrimaryPathNotExecuted);
-            if (!EvidenceJson.RequiredString(binding, "lane", GateReason.PrimaryPathNotExecuted)
-                    .Equals(laneName, StringComparison.Ordinal)
-                || !string.Equals(
-                    EvidenceJson.RequiredNullableString(result, "primaryPathClass", GateReason.PrimaryPathNotExecuted),
-                    requiredClass,
-                    StringComparison.Ordinal)
-                || !EvidenceJson.RequiredStrings(result, "selectors", GateReason.PrimaryPathNotExecuted)
-                    .Contains(
-                        EvidenceJson.RequiredString(binding, "selector", GateReason.PrimaryPathNotExecuted),
-                        StringComparer.Ordinal)
-                || !EvidenceJson.RequiredStrings(binding, "sources", GateReason.PrimaryPathNotExecuted)
-                    .Contains(
-                        EvidenceJson.RequiredString(result, "source", GateReason.EvidenceStaleOrUnbound),
-                        StringComparer.Ordinal)
-                || (pinnedTrx is not null
-                    && !EvidenceJson.RequiredString(result, "trx", GateReason.PrimaryPathNotExecuted)
-                        .Equals(pinnedTrx, StringComparison.Ordinal))
-                || (pinnedProvenance is not null
-                    && !EvidenceJson.RequiredString(result, "provenance", GateReason.PrimaryPathNotExecuted)
-                        .Equals(pinnedProvenance, StringComparison.Ordinal)))
-            {
-                throw new GateValidationException(GateReason.PrimaryPathNotExecuted, requiredClass);
-            }
+            PrimaryLaneBinding.Validate(contract, trigger, binding, result);
         }
 
         foreach ((string laneName, JsonObject result) in resultContracts)
         {
+            _ = PrimaryLaneBinding.ResolveCurrentRunAgeMinutes(policy, contract, result);
             string? primaryPathClass = EvidenceJson.RequiredNullableString(
                 result,
                 "primaryPathClass",
@@ -851,9 +824,7 @@ public static class StoryEvidenceValidator
                 options.HeadCommit,
                 implementationDigest,
                 EvidenceJson.RequiredString(policy, "repositoryIdentity", GateReason.EvidenceStaleOrUnbound),
-                EvidenceJson.ResolveCurrentRunAgeMinutes(
-                    policy,
-                    EvidenceJson.RequiredString(laneContract, "lane", GateReason.MachineResultsInvalid)),
+                PrimaryLaneBinding.ResolveCurrentRunAgeMinutes(policy, contract, laneContract),
                 EvidenceJson.RequiredInteger(policy, "maximumRetainedEvidenceAgeHours", GateReason.EvidenceStaleOrUnbound),
                 EvidenceJson.RequiredInteger(policy, "maximumFutureClockSkewMinutes", GateReason.EvidenceStaleOrUnbound),
                 options.NowUtc));

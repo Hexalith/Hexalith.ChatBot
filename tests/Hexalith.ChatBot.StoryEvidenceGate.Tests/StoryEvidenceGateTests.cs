@@ -13,6 +13,526 @@ namespace Hexalith.ChatBot.StoryEvidenceGate.Tests;
 /// </summary>
 public static class StoryEvidenceGateTests
 {
+    /// <summary>Proves JSON files are refused before oversized policy, contract, or sidecar parsing.</summary>
+    [Theory]
+    [InlineData("policy")]
+    [InlineData("contract")]
+    [InlineData("provenance")]
+    public static void JsonReadersShouldRefuseOversizedFiles(string kind)
+    {
+        using GateFixture fixture = new();
+        string path = kind switch
+        {
+            "policy" => fixture.PolicyPath,
+            "contract" => fixture.ContractPath,
+            _ => fixture.ProvenancePath,
+        };
+        WriteOversizedFile(path, BoundedEvidenceInput.MaximumJsonBytes);
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() =>
+        {
+            _ = kind switch
+            {
+                "policy" => EvidenceJson.LoadPolicy(path),
+                "contract" => EvidenceJson.LoadContract(path),
+                _ => EvidenceJson.LoadProvenance(path),
+            };
+        });
+
+        exception.ReasonCode.ShouldBe(kind == "provenance"
+            ? GateReason.EvidenceStaleOrUnbound
+            : GateReason.ScopeDigestMismatch);
+        exception.Subject.ShouldBe("json-input-limit");
+        new FileInfo(path).Length.ShouldBe(BoundedEvidenceInput.MaximumJsonBytes + 1L);
+    }
+
+    /// <summary>Proves exact Git JSON text obeys the same four MiB ceiling as local JSON files.</summary>
+    [Fact]
+    public static void ContractGitTextShouldRefuseOversizedJson()
+    {
+        GateValidationException exception = Should.Throw<GateValidationException>(() =>
+            EvidenceJson.ParseContract(new string(' ', BoundedEvidenceInput.MaximumJsonBytes + 1), "contract"));
+
+        exception.ReasonCode.ShouldBe(GateReason.ScopeDigestMismatch);
+        exception.Subject.ShouldBe("json-input-limit");
+    }
+
+    /// <summary>Proves every strict JSON entry point explicitly refuses nesting beyond depth 64.</summary>
+    [Theory]
+    [InlineData("policy")]
+    [InlineData("contract")]
+    [InlineData("provenance")]
+    [InlineData("git-contract")]
+    public static void JsonReadersShouldRejectDepthBeyond64(string kind)
+    {
+        using GateFixture fixture = new();
+        string json = "{\"nested\":" + new string('[', 65) + "0" + new string(']', 65) + "}";
+        string path = Path.Combine(fixture.ResultsRoot, "deep.json");
+        File.WriteAllText(path, json);
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() =>
+        {
+            _ = kind switch
+            {
+                "policy" => EvidenceJson.LoadPolicy(path),
+                "contract" => EvidenceJson.LoadContract(path),
+                "provenance" => EvidenceJson.LoadProvenance(path),
+                _ => EvidenceJson.ParseContract(json, "git-contract"),
+            };
+        });
+
+        exception.ReasonCode.ShouldBe(kind == "provenance"
+            ? GateReason.EvidenceStaleOrUnbound
+            : GateReason.ScopeDigestMismatch);
+        exception.Subject.ShouldBe(kind == "git-contract" ? "git-contract" : "deep.json");
+    }
+
+    /// <summary>Proves a stream with no useful initial length stops at the first excess byte.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public static async Task BoundedReadsShouldRefuseGrowingStreams(bool asynchronous)
+    {
+        using GrowingEvidenceStream stream = new(long.MaxValue);
+        GateValidationException exception;
+        if (asynchronous)
+        {
+            exception = await Should.ThrowAsync<GateValidationException>(() =>
+                BoundedEvidenceInput.ReadBytesAsync(
+                    stream, 1024, GateReason.ScopeDigestMismatch, "stream-input-limit", CancellationToken.None));
+        }
+        else
+        {
+            exception = Should.Throw<GateValidationException>(() =>
+                BoundedEvidenceInput.ReadBytes(stream, 1024, GateReason.ScopeDigestMismatch, "stream-input-limit"));
+        }
+
+        exception.Subject.ShouldBe("stream-input-limit");
+        stream.BytesRead.ShouldBe(1025);
+    }
+
+    /// <summary>Proves bounded reads preserve exact bytes and accept a stream exactly at its ceiling.</summary>
+    [Fact]
+    public static void BoundedReadAtCeilingShouldPreserveExactBytes()
+    {
+        byte[] bytes = Encoding.UTF8.GetBytes("\uFEFFexact\r\nbytes\n\u00E9\0");
+        using MemoryStream stream = new(bytes, writable: false);
+
+        BoundedEvidenceInput.ReadBytes(stream, bytes.Length, GateReason.ScopeDigestMismatch, "stream-input-limit")
+            .ShouldBe(bytes);
+    }
+
+    /// <summary>Proves oversized ordinary TRX fails without replacing or minting sidecars.</summary>
+    [Fact]
+    public static void OversizedTrxShouldLeaveSidecarAtomic()
+    {
+        using GateFixture fixture = new();
+        byte[] before = File.ReadAllBytes(fixture.ProvenancePath);
+        WriteOversizedFile(fixture.TrxPath, BoundedEvidenceInput.MaximumInputBytes);
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() => fixture.Attest());
+        exception.ReasonCode.ShouldBe(GateReason.MachineResultsInvalid);
+        exception.Subject.ShouldBe("trx-input-limit");
+        fixture.Validate().Issues.Single().ShouldBe(new GateIssue(GateReason.MachineResultsInvalid, "trx-input-limit"));
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(before);
+
+        File.Delete(fixture.ProvenancePath);
+        Should.Throw<GateValidationException>(() => fixture.Attest());
+        File.Exists(fixture.ProvenancePath).ShouldBeFalse();
+    }
+
+    /// <summary>Proves source size is checked before worktree bytes are hashed or evidence is replaced.</summary>
+    [Fact]
+    public static void OversizedWorktreeSourceShouldRefuseBeforeHashing()
+    {
+        using GateFixture fixture = new();
+        byte[] before = File.ReadAllBytes(fixture.ProvenancePath);
+        WriteOversizedFile(fixture.SourcePath, BoundedEvidenceInput.MaximumInputBytes);
+
+        fixture.Validate().Issues.Single().ShouldBe(new GateIssue(GateReason.ScopeDigestMismatch, "source-input-limit"));
+        Should.Throw<GateValidationException>(() => fixture.Attest()).Subject.ShouldBe("source-input-limit");
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(before);
+    }
+
+    /// <summary>Proves exact Git blob and decoded Git text output enforce their own streaming ceilings.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public static void OversizedGitSourceShouldRefuseBoundedly(bool text)
+    {
+        using GateFixture fixture = new();
+        WriteOversizedFile(fixture.SourcePath, BoundedEvidenceInput.MaximumInputBytes);
+        RunGit(fixture.RepositoryRoot, "add", "src/gate.txt");
+        RunGit(fixture.RepositoryRoot, "commit", "-m", "test: add oversized source");
+        string revision = RunGit(fixture.RepositoryRoot, "rev-parse", "HEAD").Trim();
+        string objectId = GitReader.TreeEntry(fixture.RepositoryRoot, revision, "src/gate.txt")!.Value.ObjectId;
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() =>
+        {
+            if (text)
+            {
+                _ = GitReader.Show(fixture.RepositoryRoot, revision, "src/gate.txt");
+            }
+            else
+            {
+                _ = GitReader.BlobBytes(fixture.RepositoryRoot, objectId);
+            }
+        });
+
+        exception.ReasonCode.ShouldBe(GateReason.ScopeDigestMismatch);
+        exception.Subject.ShouldBe(text ? "git-stdout-input-limit" : "git-blob-input-limit");
+    }
+
+    /// <summary>Proves known JSON Git reads refuse at four MiB rather than the generic source ceiling.</summary>
+    [Fact]
+    public static void OversizedGitJsonShouldUseJsonCeiling()
+    {
+        using GateFixture fixture = new();
+        WriteOversizedFile(fixture.ContractPath, BoundedEvidenceInput.MaximumJsonBytes);
+        RunGit(fixture.RepositoryRoot, "add", ".");
+        RunGit(fixture.RepositoryRoot, "commit", "-m", "test: add oversized contract");
+        string revision = RunGit(fixture.RepositoryRoot, "rev-parse", "HEAD").Trim();
+        string path = Path.GetRelativePath(fixture.RepositoryRoot, fixture.ContractPath).Replace('\\', '/');
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() =>
+            GitReader.Show(fixture.RepositoryRoot, revision, path));
+
+        exception.ReasonCode.ShouldBe(GateReason.ScopeDigestMismatch);
+        exception.Subject.ShouldBe("json-input-limit");
+    }
+
+    /// <summary>Proves snapshot scope reads apply the JSON ceiling to exact committed contract blobs.</summary>
+    [Fact]
+    public static void ScopeEvaluatorShouldRefuseOversizedCommittedContractWithoutChangingSidecar()
+    {
+        using GateFixture fixture = new();
+        fixture.UseSnapshotBootstrap();
+        JsonObject policy = EvidenceJson.LoadPolicy(fixture.PolicyPath);
+        JsonObject contract = EvidenceJson.LoadContract(fixture.ContractPath);
+        byte[] before = File.ReadAllBytes(fixture.ProvenancePath);
+        File.AppendAllText(fixture.ContractPath, new string(' ', BoundedEvidenceInput.MaximumJsonBytes));
+        fixture.CommitAdditionalHead("test: commit oversized snapshot contract");
+        new FileInfo(fixture.ContractPath).Length.ShouldBeLessThan(BoundedEvidenceInput.MaximumInputBytes);
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() =>
+            ScopeEvaluator.Evaluate(
+                fixture.RepositoryRoot, policy, contract, fixture.BaseCommit, fixture.HeadCommit));
+
+        exception.ReasonCode.ShouldBe(GateReason.ScopeDigestMismatch);
+        exception.Subject.ShouldBe("json-input-limit");
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(before);
+    }
+
+    /// <summary>Proves lifecycle comparisons apply the JSON ceiling before reading a committed head contract.</summary>
+    [Fact]
+    public static void LifecycleValidatorShouldRefuseOversizedCommittedContractWithoutChangingSidecar()
+    {
+        using GateFixture fixture = new();
+        fixture.UseSnapshotCompletion();
+        JsonObject contract = EvidenceJson.LoadContract(fixture.ContractPath);
+        ScopeEvaluation scope = ScopeEvaluator.Evaluate(
+            fixture.RepositoryRoot, EvidenceJson.LoadPolicy(fixture.PolicyPath), contract, fixture.BaseCommit, fixture.HeadCommit);
+        byte[] before = File.ReadAllBytes(fixture.ProvenancePath);
+        File.AppendAllText(fixture.ContractPath, new string(' ', BoundedEvidenceInput.MaximumJsonBytes));
+        fixture.CommitAdditionalHead("test: commit oversized lifecycle contract");
+        new FileInfo(fixture.ContractPath).Length.ShouldBeLessThan(BoundedEvidenceInput.MaximumInputBytes);
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() =>
+            LifecycleTransitionValidator.Validate(
+                fixture.RepositoryRoot, contract, fixture.BaseCommit, fixture.HeadCommit, scope.EventPaths));
+
+        exception.ReasonCode.ShouldBe(GateReason.ScopeDigestMismatch);
+        exception.Subject.ShouldBe("json-input-limit");
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(before);
+    }
+
+    /// <summary>Proves refusal on redirected stderr kills the producer rather than waiting for its timeout.</summary>
+    [Fact]
+    public static void OversizedGitStderrShouldKillTheProducerPromptly()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Skip("The Git textconv producer requires a POSIX shell and /dev/zero.");
+        }
+
+        using GateFixture fixture = new();
+        string driver = Path.Combine(fixture.RepositoryRoot, "oversized-stderr.sh");
+        File.WriteAllText(driver, "#!/bin/sh\nprintf started > \"$PWD/producer-started\"\nhead -c 67108865 /dev/zero >&2\nsleep 30\n");
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(driver, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+        File.WriteAllText(Path.Combine(fixture.RepositoryRoot, ".gitattributes"), "src/gate.txt diff=bounded\n");
+        RunGit(fixture.RepositoryRoot, "config", "diff.bounded.textconv", driver);
+        RunGit(fixture.RepositoryRoot, "add", "src/gate.txt");
+        RunGit(fixture.RepositoryRoot, "commit", "-m", "test: track text conversion source");
+        File.AppendAllText(fixture.SourcePath, "changed\n");
+        Stopwatch elapsed = Stopwatch.StartNew();
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() =>
+            GitReader.RunWithTimeout(fixture.RepositoryRoot, TimeSpan.FromSeconds(10), "diff", "--", "src/gate.txt"));
+
+        exception.ReasonCode.ShouldBe(GateReason.ScopeDigestMismatch);
+        exception.Subject.ShouldBe("git-stderr-input-limit");
+        File.Exists(Path.Combine(fixture.RepositoryRoot, "producer-started")).ShouldBeTrue();
+        elapsed.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(10));
+    }
+
+    /// <summary>Proves local metadata readers use bounded text instead of unbounded line or text reads.</summary>
+    [Theory]
+    [InlineData("story", "story-input-limit")]
+    [InlineData("sprint", "sprint-input-limit")]
+    [InlineData("ledger", "ledger-input-limit")]
+    [InlineData("gitmodules", "gitmodules-input-limit")]
+    public static void MetadataReadersShouldRefuseOversizedText(string kind, string expectedSubject)
+    {
+        using GateFixture fixture = new();
+        string path = Path.Combine(fixture.ResultsRoot, "oversized.txt");
+        if (kind == "gitmodules")
+        {
+            path = Path.Combine(fixture.RepositoryRoot, ".gitmodules");
+        }
+
+        WriteOversizedFile(path, BoundedEvidenceInput.MaximumInputBytes);
+        GateValidationException exception = Should.Throw<GateValidationException>(() =>
+        {
+            switch (kind)
+            {
+                case "story":
+                    _ = MarkdownStoryReader.Read(path);
+                    break;
+                case "sprint":
+                    _ = SprintLedgerReader.StoryStatus(path, "fixture");
+                    break;
+                case "ledger":
+                    _ = TechnicalEnablerLedgerReader.Status(path, "TE-X");
+                    break;
+                default:
+                    fixture.Attest();
+                    break;
+            }
+        });
+
+        exception.Subject.ShouldBe(expectedSubject);
+        exception.ReasonCode.ShouldBe(kind == "gitmodules" ? GateReason.GitlinkScopeMismatch : GateReason.StatusMismatch);
+    }
+
+    /// <summary>Proves newline-only metadata cannot expand into an excessive retained line array.</summary>
+    [Fact]
+    public static void BoundedLineReaderShouldRefuseExcessLinesWithoutChangingSidecar()
+    {
+        using GateFixture fixture = new();
+        string path = Path.Combine(fixture.RepositoryRoot, ".gitmodules");
+        byte[] before = File.ReadAllBytes(fixture.ProvenancePath);
+        File.WriteAllText(path, new string('\n', BoundedEvidenceInput.MaximumTextLines));
+        BoundedEvidenceInput.ReadFileLines(path, GateReason.GitlinkScopeMismatch, "gitmodules-input-limit")
+            .Length.ShouldBe(BoundedEvidenceInput.MaximumTextLines);
+        File.AppendAllText(path, "\n");
+
+        GateValidationException exception = Should.Throw<GateValidationException>(() => fixture.Attest());
+
+        exception.ReasonCode.ShouldBe(GateReason.GitlinkScopeMismatch);
+        exception.Subject.ShouldBe("gitmodules-input-limit");
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(before);
+    }
+
+    /// <summary>Proves oversized recovery input is refused without replacing sanitized evidence.</summary>
+    [Fact]
+    public static void OversizedRecoveryInputShouldRefuseSanitizingAndSummarizeAsMalformed()
+    {
+        using GateFixture fixture = new();
+        string sanitized = Path.Combine(fixture.ResultsRoot, "sanitized.trx");
+        string summary = Path.Combine(fixture.ResultsRoot, "attempt.json");
+        File.WriteAllText(sanitized, "existing evidence");
+        WriteOversizedFile(fixture.TrxPath, BoundedEvidenceInput.MaximumInputBytes);
+
+        Should.Throw<GateValidationException>(() => RecoveryTrxSanitizer.Sanitize(fixture.TrxPath, sanitized))
+            .Subject.ShouldBe("recovery-sanitize");
+        File.ReadAllText(sanitized).ShouldBe("existing evidence");
+        RecoveryAttemptSummarizer.Summarize(
+            fixture.TrxPath, "failure", summary, EvidenceJson.LoadPolicy(fixture.PolicyPath));
+
+        JsonObject attempt = JsonNode.Parse(File.ReadAllText(summary))!.AsObject();
+        attempt["trxPresent"]!.GetValue<bool>().ShouldBeTrue();
+        attempt["trxState"]!.GetValue<string>().ShouldBe("malformed");
+        EvidenceJson.ValidateMetadataOnly(attempt, EvidenceJson.LoadPolicy(fixture.PolicyPath));
+    }
+
+    /// <summary>Proves overridden lanes need full bindings even when no path or claim triggers their class.</summary>
+    [Theory]
+    [InlineData("lane-name-only")]
+    [InlineData("declaration")]
+    [InlineData("declaration-lane")]
+    [InlineData("duplicate-declaration")]
+    [InlineData("class")]
+    [InlineData("selector")]
+    [InlineData("source")]
+    [InlineData("trx")]
+    [InlineData("provenance")]
+    [InlineData("allow-skipped")]
+    public static void FreshnessOverrideShouldRequireCompleteBindingBeforeAnySidecarWrite(string mutation)
+    {
+        using GateFixture fixture = new();
+        fixture.UseClaimPrimaryPath("recovery", "recovery-primary");
+        File.WriteAllText(fixture.StoryPath,
+            File.ReadAllText(fixture.StoryPath).Replace("[claim:recovery]", string.Empty, StringComparison.Ordinal));
+        byte[] before = File.ReadAllBytes(fixture.ProvenancePath);
+        fixture.MutateContract(contract =>
+        {
+            JsonObject result = EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid)[0]!.AsObject();
+            switch (mutation)
+            {
+                case "lane-name-only":
+                    contract["primaryPaths"] = new JsonArray();
+                    result["primaryPathClass"] = null;
+                    result["selectors"] = new JsonArray("class:GateFixture");
+                    break;
+                case "declaration":
+                    contract["primaryPaths"] = new JsonArray();
+                    break;
+                case "declaration-lane":
+                    contract["primaryPaths"]![0]!["lane"] = "other-lane";
+                    break;
+                case "duplicate-declaration":
+                    JsonArray declarations = EvidenceJson.RequiredArray(contract, "primaryPaths", GateReason.PrimaryPathNotExecuted);
+                    declarations.Add(declarations[0]!.DeepClone());
+                    break;
+                case "class":
+                    result["primaryPathClass"] = null;
+                    break;
+                case "selector":
+                    result["selectors"] = new JsonArray("class:GateFixture");
+                    break;
+                case "source":
+                    result["source"] = "retained";
+                    break;
+                case "trx":
+                    result["trx"] = "other.trx";
+                    result["artifactLocator"] = "file:other.trx";
+                    break;
+                case "provenance":
+                    result["provenance"] = "other.provenance.json";
+                    break;
+                case "allow-skipped":
+                    result["allowSkipped"] = true;
+                    break;
+            }
+        }, refreshEvidence: false);
+        RefreshContractDigestWithoutAttesting(fixture);
+
+        fixture.Validate().Issues.Single().ShouldBe(new GateIssue(GateReason.PrimaryPathNotExecuted, "recovery"));
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(before);
+        Should.Throw<GateValidationException>(() => fixture.Attest()).ReasonCode.ShouldBe(GateReason.PrimaryPathNotExecuted);
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(before);
+        File.Exists(Path.Combine(fixture.ResultsRoot, "other.provenance.json")).ShouldBeFalse();
+        File.Delete(fixture.ProvenancePath);
+        Should.Throw<GateValidationException>(() => fixture.Attest());
+        File.Exists(fixture.ProvenancePath).ShouldBeFalse();
+    }
+
+    /// <summary>Proves a later spoofed override cannot cause an earlier valid lane to write its sidecar.</summary>
+    [Fact]
+    public static void InvalidLaterFreshnessOverrideShouldLeaveAllSidecarsUntouched()
+    {
+        using GateFixture fixture = new();
+        string secondSidecar = Path.Combine(fixture.ResultsRoot, "second.provenance.json");
+        File.WriteAllText(secondSidecar, "existing metadata");
+        byte[] firstBefore = File.ReadAllBytes(fixture.ProvenancePath);
+        fixture.MutateContract(contract =>
+        {
+            JsonArray results = EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid);
+            JsonObject second = results[0]!.DeepClone().AsObject();
+            second["lane"] = "browser-primary";
+            second["trx"] = "second.trx";
+            second["provenance"] = "second.provenance.json";
+            second["artifactLocator"] = "file:second.trx";
+            results.Add(second);
+        }, refreshEvidence: false);
+        RefreshContractDigestWithoutAttesting(fixture);
+
+        Should.Throw<GateValidationException>(() => fixture.Attest()).ReasonCode.ShouldBe(GateReason.PrimaryPathNotExecuted);
+        File.ReadAllBytes(fixture.ProvenancePath).ShouldBe(firstBefore);
+        File.ReadAllText(secondSidecar).ShouldBe("existing metadata");
+        File.Delete(fixture.ProvenancePath);
+        File.Delete(secondSidecar);
+        Should.Throw<GateValidationException>(() => fixture.Attest());
+        File.Exists(fixture.ProvenancePath).ShouldBeFalse();
+        File.Exists(secondSidecar).ShouldBeFalse();
+    }
+
+    /// <summary>Proves complete bindings retain the existing extended window across every primary class.</summary>
+    [Theory]
+    [InlineData("browser", "browser-primary")]
+    [InlineData("signalr", "signalr-primary")]
+    [InlineData("hosting-assets", "hosting-assets-primary")]
+    [InlineData("aspire-dapr", "aspire-dapr-primary")]
+    [InlineData("recovery", "recovery-primary")]
+    public static void FullyBoundPrimaryLaneShouldRetainExtendedFreshness(string pathClass, string lane)
+    {
+        using GateFixture fixture = new();
+        fixture.UseClaimPrimaryPath(pathClass, lane);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        fixture.WriteTrx(1, 1, 1, 0, 0, "Completed", GateFixture.PrimaryTestClass(pathClass) + ".ValidAssertion", now.AddMinutes(-120));
+
+        fixture.Attest();
+
+        GateReport report = fixture.Validate(now);
+        report.Passed.ShouldBeTrue(string.Join(", ", report.Issues.Select(static issue => $"{issue.ReasonCode}:{issue.Subject}")));
+    }
+
+    /// <summary>Proves CLI failures distinguish categories without echoing caller-controlled options or values.</summary>
+    [Theory]
+    [InlineData("command", "cli-command")]
+    [InlineData("arguments", "cli-arguments")]
+    [InlineData("option", "cli-option")]
+    [InlineData("duplicate", "cli-duplicate-option")]
+    [InlineData("required", "cli-required-option")]
+    public static void CliFailureShouldUseExactStaticSubject(string category, string expectedSubject)
+    {
+        using GateFixture fixture = new();
+        string[] args = category switch
+        {
+            "command" => ["unknown-caller-input"],
+            "arguments" => ["validate", "--unknown-caller-input"],
+            "option" => ["validate", "--unknown-caller-input", "unknown-caller-value"],
+            "duplicate" => ["validate", "--base", "first", "--base", "unknown-caller-value"],
+            _ => ["validate"],
+        };
+
+        InvokeMain(fixture, out string stdout, args).ShouldBe(2);
+        JsonObject report = JsonNode.Parse(stdout)!.AsObject();
+        JsonObject issue = report["issues"]![0]!.AsObject();
+        issue["reasonCode"]!.GetValue<string>().ShouldBe(GateReason.StatusMismatch);
+        issue["subject"]!.GetValue<string>().ShouldBe(expectedSubject);
+        stdout.ShouldNotContain("unknown-caller");
+    }
+
+    /// <summary>Proves missing inputs, process launch, and scope failures retain distinct documented subjects.</summary>
+    [Theory]
+    [InlineData("missing-input", "missing-contract.json")]
+    [InlineData("git-process", "git-process")]
+    [InlineData("scope", "revision")]
+    public static void OperationalFailureShouldRetainExactMetadataSubject(string category, string expectedSubject)
+    {
+        using GateFixture fixture = new();
+        string[] args = category switch
+        {
+            "missing-input" => ["attest", "--repository-root", fixture.RepositoryRoot,
+                "--contract", "missing-contract.json", "--base", fixture.BaseCommit, "--head", fixture.HeadCommit,
+                "--results", fixture.ResultsRoot],
+            "git-process" => ["detect", "--repository-root", Path.Combine(fixture.RepositoryRoot, "missing-repository"),
+                "--base", fixture.BaseCommit, "--head", fixture.HeadCommit],
+            _ => ["detect", "--repository-root", fixture.RepositoryRoot,
+                "--base", "invalid-revision", "--head", fixture.HeadCommit],
+        };
+
+        InvokeMain(fixture, out string stdout, args).ShouldBe(2);
+        JsonObject issue = JsonNode.Parse(stdout)!["issues"]![0]!.AsObject();
+        issue["reasonCode"]!.GetValue<string>().ShouldBe(GateReason.ScopeDigestMismatch);
+        issue["subject"]!.GetValue<string>().ShouldBe(expectedSubject);
+        stdout.ShouldNotContain("invalid-revision");
+    }
+
     /// <summary>Proves the TE-2 prospective bootstrap path.</summary>
     [Fact]
     public static void ValidTechnicalEnablerBootstrapShouldPass()
@@ -1115,7 +1635,7 @@ public static class StoryEvidenceGateTests
             EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid)[0]!.AsObject()["selectors"] =
                 new JsonArray("class:GateFixture"), refreshEvidence: false);
         fixture.WriteTrx(1, 1, 1, 0, 0, "Completed");
-        fixture.RefreshEvidence();
+        RefreshContractDigestWithoutAttesting(fixture);
 
         fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.PrimaryPathNotExecuted);
     }
@@ -1138,7 +1658,8 @@ public static class StoryEvidenceGateTests
         fixture.UseBrowserPrimaryPath("browser-primary");
         fixture.MutateContract(contract =>
             EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid)[0]!.AsObject()["primaryPathClass"] =
-                "recovery");
+                "recovery", refreshEvidence: false);
+        RefreshContractDigestWithoutAttesting(fixture);
 
         fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.PrimaryPathNotExecuted);
     }
@@ -1150,7 +1671,7 @@ public static class StoryEvidenceGateTests
         using GateFixture fixture = new();
         fixture.UseBrowserPrimaryPath("browser-primary");
         fixture.MutateContract(contract =>
-            EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid)[0]!.AsObject()["allowSkipped"] = true);
+            EvidenceJson.RequiredArray(contract, "results", GateReason.MachineResultsInvalid)[0]!.AsObject()["allowSkipped"] = true, refreshEvidence: false);
         fixture.WriteTrx(
             2,
             1,
@@ -1159,7 +1680,7 @@ public static class StoryEvidenceGateTests
             1,
             "Completed",
             "Hexalith.ChatBot.UI.E2E.Tests.RealRenderCrossSurfaceE2ETests.ValidAssertion");
-        fixture.RefreshEvidence();
+        RefreshContractDigestWithoutAttesting(fixture);
 
         fixture.Validate().Issues.Single().ReasonCode.ShouldBe(GateReason.PrimaryPathNotExecuted);
     }
@@ -1624,6 +2145,45 @@ public static class StoryEvidenceGateTests
             string headCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
 
             TransitionDetector.Detect(temporaryRoot, baseCommit, headCommit).ShouldBeEmpty();
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    /// <summary>Proves active discovery ignores an unchanged oversized inactive contract.</summary>
+    [Fact]
+    public static void UnchangedOversizedInactiveContractShouldNotBlockActiveCompletion()
+    {
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"inactive-oversized-contract-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            RunGit(temporaryRoot, "init", "--initial-branch=main");
+            RunGit(temporaryRoot, "config", "user.email", "gate@example.invalid");
+            RunGit(temporaryRoot, "config", "user.name", "Story Evidence Gate Tests");
+            string artifacts = Path.Combine(temporaryRoot, "_bmad-output", "implementation-artifacts");
+            string evidence = Path.Combine(artifacts, "evidence");
+            Directory.CreateDirectory(evidence);
+            WriteOversizedFile(Path.Combine(evidence, "inactive.json"), BoundedEvidenceInput.MaximumJsonBytes);
+            File.WriteAllText(Path.Combine(evidence, "explicit-transition.json"), TransitionContract());
+            string story = Path.Combine(artifacts, "unrelated-name.md");
+            File.WriteAllText(story, "---\ntitle: 'Explicit Transition'\nstatus: 'review'\n---\n");
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: create oversized inactive contract");
+            string baseCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+            File.WriteAllText(story, "---\ntitle: 'Explicit Transition'\nstatus: 'done'\n---\n");
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: activate valid completion");
+            string headCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+
+            IReadOnlyList<TransitionRecord> transitions = TransitionDetector.Detect(temporaryRoot, baseCommit, headCommit);
+
+            GitReader.Diff(temporaryRoot, baseCommit, headCommit).Keys.ShouldBe(
+                ["_bmad-output/implementation-artifacts/unrelated-name.md"]);
+            transitions.ShouldHaveSingleItem();
+            transitions[0].StoryKey.ShouldBe("explicit-transition");
         }
         finally
         {
@@ -2106,7 +2666,8 @@ public static class StoryEvidenceGateTests
             {
                 lane["artifactLocator"] = "file:recovery-primary/other.trx";
             }
-        });
+        }, refreshEvidence: false);
+        RefreshContractDigestWithoutAttesting(fixture);
 
         GateIssue issue = fixture.Validate().Issues.Single();
         issue.ReasonCode.ShouldBe(GateReason.PrimaryPathNotExecuted);
@@ -2667,7 +3228,10 @@ public static class StoryEvidenceGateTests
     /// <summary>Proves byte and character admission limits cannot disagree for an ASCII TRX.</summary>
     [Fact]
     public static void RecoveryTrxSanitizerSizeBoundsShouldBeConsistent()
-        => RecoveryTrxSanitizer.MaximumTrxCharacters.ShouldBe(RecoveryTrxSanitizer.MaximumTrxBytes);
+    {
+        RecoveryTrxSanitizer.MaximumTrxBytes.ShouldBe(BoundedEvidenceInput.MaximumInputBytes);
+        RecoveryTrxSanitizer.MaximumTrxCharacters.ShouldBe(RecoveryTrxSanitizer.MaximumTrxBytes);
+    }
 
     /// <summary>Proves a lane may raise its own current-run ceiling but never lower the global floor.</summary>
     [Fact]
@@ -3227,6 +3791,23 @@ public static class StoryEvidenceGateTests
         exitCode.ShouldBe(2);
         stdout.ShouldContain("\"passed\": false");
         stdout.ShouldContain("io-or-process");
+    }
+
+    private static void WriteOversizedFile(string path, long maximumBytes)
+    {
+        using FileStream stream = File.Create(path);
+        stream.SetLength(maximumBytes + 1);
+    }
+
+    private static void RefreshContractDigestWithoutAttesting(GateFixture fixture)
+    {
+        JsonObject policy = EvidenceJson.LoadPolicy(fixture.PolicyPath);
+        JsonObject contract = EvidenceJson.LoadContract(fixture.ContractPath);
+        ScopeEvaluation scope = ScopeEvaluator.Evaluate(
+            fixture.RepositoryRoot, policy, contract, fixture.BaseCommit, fixture.HeadCommit);
+        fixture.MutateContract(value =>
+            EvidenceJson.RequiredObject(value, "scope", GateReason.ScopeDigestMismatch)["implementationDigest"] = scope.Digest,
+            refreshEvidence: false);
     }
 
     private static int InvokeMain(GateFixture fixture, out string stdout, params string[] args)

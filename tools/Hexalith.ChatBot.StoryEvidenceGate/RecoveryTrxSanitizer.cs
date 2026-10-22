@@ -22,7 +22,7 @@ public static class RecoveryTrxSanitizer
     /// The producer runs for hours, so its raw TRX has no natural size bound. Refusing an oversized document with a
     /// reason code beats an <see cref="OutOfMemoryException"/> that discards a completed drill's evidence.
     /// </remarks>
-    internal const long MaximumTrxBytes = 64L * 1024 * 1024;
+    internal const long MaximumTrxBytes = BoundedEvidenceInput.MaximumInputBytes;
 
     /// <summary>The largest raw producer TRX admitted, in characters.</summary>
     internal const long MaximumTrxCharacters = MaximumTrxBytes;
@@ -44,15 +44,16 @@ public static class RecoveryTrxSanitizer
                 XmlResolver = null,
                 MaxCharactersInDocument = MaximumTrxCharacters,
             };
-            using FileStream stream = File.OpenRead(inputPath);
+            byte[] bytes = BoundedEvidenceInput.ReadFileBytes(
+                inputPath, BoundedEvidenceInput.MaximumInputBytes, GateReason.MachineResultsInvalid, "recovery-sanitize");
+            using MemoryStream stream = new(bytes, writable: false);
             using XmlReader reader = XmlReader.Create(stream, settings);
             source = XDocument.Load(reader, LoadOptions.None);
         }
         catch (Exception exception) when (exception is XmlException
             or IOException
             or UnauthorizedAccessException
-            or NotSupportedException
-            or OutOfMemoryException)
+            or NotSupportedException)
         {
             throw new GateValidationException(GateReason.MachineResultsInvalid, "recovery-sanitize");
         }

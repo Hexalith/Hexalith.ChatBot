@@ -50,3 +50,12 @@ TE-1 remains complete only while the linked architecture decision and implementa
 ### Completion evidence rule
 
 TE-2 cannot waive its own gate. While its record is still `review`, CI evaluates it with `targetStatus=done`; after all negative mutations are proven to fail and the positive exact-scope run passes, its status may change to `complete`. The Epic 13 action stays open until that self-validation and required branch check are both active.
+
+
+## TE-3 — Story-Evidence Gate Reliability Follow-ups
+
+- **Status:** complete
+- **Source:** `../implementation-artifacts/spec-five-deferred-evidence-gate-fixes.md`
+- **Product impact:** none; closes DW-29, DW-30, DW-31, DW-124, and DW-125 without changing product behavior or release qualification.
+- **Evidence contract:** `../implementation-artifacts/evidence/five-deferred-evidence-gate-fixes.json` binds the full exact root diff, gate test class, and checked task/acceptance mappings. The ordinary gate self-test producer supplies the current-run lane.
+- **Verification:** Debug build has zero warnings/errors; 276 gate cases and seven relocated-output cases pass with zero failures/skips. Three independent review layers completed; applicable findings were patched, and the older XML DOM and aggregate discovery budgets remain separately deferred.

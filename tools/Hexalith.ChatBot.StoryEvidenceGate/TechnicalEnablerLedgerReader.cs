@@ -11,7 +11,8 @@ public static class TechnicalEnablerLedgerReader
     /// <returns>The normalized status word, or null when absent.</returns>
     public static string? Status(string path, string recordKey)
     {
-        return StatusFromText(File.ReadAllText(path), recordKey);
+        return StatusFromText(BoundedEvidenceInput.ReadFileText(
+            path, BoundedEvidenceInput.MaximumInputBytes, GateReason.StatusMismatch, "ledger-input-limit"), recordKey);
     }
 
     /// <summary>Reads the leading status word from exact ledger text.</summary>

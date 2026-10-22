@@ -256,3 +256,7 @@ action_items:
       transport or correct its stale generated-client-lag documentation."
     owner: "Paige / Amelia"
     status: open
+  - epic: 13
+    action: "Resolve five deferred story-evidence gate reliability items (DW-29, DW-30, DW-31, DW-124, DW-125)."
+    owner: "Delivery engineering"
+    status: done

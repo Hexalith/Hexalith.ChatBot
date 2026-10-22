@@ -3,6 +3,9 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="..\..\story-evidence-policy.json" Link="story-evidence-policy.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\tools\Hexalith.ChatBot.StoryEvidenceGate\Hexalith.ChatBot.StoryEvidenceGate.csproj" />
   </ItemGroup>
   <ItemGroup>

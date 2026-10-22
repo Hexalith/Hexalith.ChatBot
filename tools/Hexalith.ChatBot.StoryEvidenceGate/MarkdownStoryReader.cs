@@ -17,7 +17,7 @@ public static partial class MarkdownStoryReader
             throw new GateValidationException(GateReason.StatusMismatch, Path.GetFileName(path));
         }
 
-        string[] lines = VisibleLines(File.ReadAllLines(path));
+        string[] lines = VisibleLines(BoundedEvidenceInput.ReadFileLines(path, GateReason.StatusMismatch, "story-input-limit"));
         bool canonical = lines.Any(static line => CanonicalTitle().IsMatch(line));
         string title = canonical
             ? SingleMatch(lines, CanonicalTitle(), "title")
