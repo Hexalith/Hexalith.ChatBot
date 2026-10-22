@@ -34,16 +34,25 @@ internal sealed class LiveContinuityDrillScenarioRunner(
             throw new InvalidOperationException("The live continuity scenario is outside the configured closed sandbox boundary.");
         }
 
-        using CancellationTokenSource scenarioDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        scenarioDeadline.CancelAfter(options.PerScenarioTimeout);
-        return scenario switch
+        using CancellationTokenSource scenarioBudget = new(options.PerScenarioTimeout);
+        using CancellationTokenSource scenarioDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, scenarioBudget.Token);
+        using CancellationTokenRegistration stopBudget = RecoveryCancellation.StopBudgetOnCallerCancellation(cancellationToken, scenarioBudget);
+        try
         {
-            ContinuityDrillScenarios.EventStoreOutage =>
-                await RunEventStoreOutageAsync(testTenantRef, correlationId, scenarioDeadline.Token).ConfigureAwait(false),
-            ContinuityDrillScenarios.M365SubscriptionFailure =>
-                await RunSubscriptionFailureAsync(testTenantRef, correlationId, scenarioDeadline.Token).ConfigureAwait(false),
-            _ => throw new InvalidOperationException("The live continuity scenario is outside the configured closed sandbox boundary."),
-        };
+            return scenario switch
+            {
+                ContinuityDrillScenarios.EventStoreOutage =>
+                    await RunEventStoreOutageAsync(testTenantRef, correlationId, scenarioDeadline.Token).ConfigureAwait(false),
+                ContinuityDrillScenarios.M365SubscriptionFailure =>
+                    await RunSubscriptionFailureAsync(testTenantRef, correlationId, scenarioDeadline.Token).ConfigureAwait(false),
+                _ => throw new InvalidOperationException("The live continuity scenario is outside the configured closed sandbox boundary."),
+            };
+        }
+        catch (OperationCanceledException exception) when (RecoveryCancellation.IsCallerCancellation(
+            exception, scenarioDeadline.Token, cancellationToken, scenarioBudget.Token))
+        {
+            throw new OperationCanceledException("The recovery scenario was canceled by its caller.", exception, cancellationToken);
+        }
     }
 
     private async ValueTask<ContinuityDrillMeasurement> RunEventStoreOutageAsync(

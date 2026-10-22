@@ -994,9 +994,8 @@ public sealed class LiveContinuityAspireE2eTests
                 request.Headers.Add("X-Correlation-Id", ChatBotCorrelationId.New().Value);
                 using HttpResponseMessage response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
-                // Resource Healthy means the adapter endpoint is serving, not that the EventStore/DAPR command spine
-                // behind admission has finished warming up. That path intentionally returns 503 until it is ready,
-                // matching the ordinary Tier-3 acceptance test's first-command retry discipline.
+                // This probe proves only that the bearer crossed the authority boundary. A recognized 503 can
+                // return immediately; it does not establish EventStore/DAPR readiness or successful mutation.
                 lastStatus = response.StatusCode;
                 string problemDetails = await response.Content
                     .ReadAsStringAsync(cancellationToken)

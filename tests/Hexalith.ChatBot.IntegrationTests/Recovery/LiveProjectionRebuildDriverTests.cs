@@ -10,6 +10,39 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 /// <summary>Focused coordinator and immutable-source contract tests for the live projection-rebuild driver.</summary>
 public sealed class LiveProjectionRebuildDriverTests
 {
+    /// <summary>Real rebuild cancellation is attributed to its caller across the scenario deadline and decorator.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CallerCancellationThroughDecoratorDoesNotRetainScenarioFailure(bool beforeStart)
+    {
+        string tenantRef = RecoveryValidationTopology.LogicalTenantRef;
+        InMemoryWormAuditStore worm = new();
+        _ = await worm.AppendAsync(Envelope(tenantRef, "resource-001"), TestContext.Current.CancellationToken);
+        InMemoryRecoveryReadModelStore readModels = new();
+        ProjectionRebuildBaselineEvidence baseline = await LiveProjectionRebuildDriver.SeedBaselineAsync(
+            readModels, tenantRef, Descriptor(), [Source(tenantRef)], worm.EnumerateChain(tenantRef),
+            TestContext.Current.CancellationToken);
+        using CancellationTokenSource caller = new();
+        if (beforeStart)
+        {
+            await caller.CancelAsync();
+        }
+        else
+        {
+            readModels.OnReadKey = _ => caller.Cancel();
+        }
+
+        CapturingProjectionRebuildDriver driver = new(new LiveProjectionRebuildDriver(
+            [Source(tenantRef)], worm, baseline, readModels, readModels, Descriptor(), Options(), new SystemClock()));
+
+        OperationCanceledException thrown = await Should.ThrowAsync<OperationCanceledException>(() => driver.RebuildAsync(
+            tenantRef, "recovery-baseline", "01ARZ3NDEKTSV4RRFFQ69G5FAW", caller.Token).AsTask());
+
+        thrown.CancellationToken.ShouldBe(caller.Token);
+        driver.Failures.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task RebuildUsesOnlyTheSelectedTenantImmutableSourceAndWormChain()
     {

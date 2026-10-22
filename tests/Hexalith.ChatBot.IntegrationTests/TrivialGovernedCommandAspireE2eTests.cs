@@ -1692,35 +1692,39 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     public async Task TierThreeParallelValidationShouldRetainEveryNonCancellationSiblingFailure()
     {
         IReadOnlyDictionary<string, int> selectedPorts = FourSelectedPorts();
-        TaskCompletionSource allEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        int entered = 0;
+        // Repeat the full concurrent-failure regression to cover the former sibling-cancellation race.
+        for (int repetition = 0; repetition < 64; repetition++)
+        {
+            TaskCompletionSource allEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            int entered = 0;
 
-        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
-            TopologyReadinessCoordinator.ValidateAsync(
-                selectedPorts,
-                async (resourceName, _, token) =>
-                {
-                    if (Interlocked.Increment(ref entered) == selectedPorts.Count)
+            InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+                TopologyReadinessCoordinator.ValidateAsync(
+                    selectedPorts,
+                    async (resourceName, _, token) =>
                     {
-                        allEntered.TrySetResult();
-                    }
+                        if (Interlocked.Increment(ref entered) == selectedPorts.Count)
+                        {
+                            allEntered.TrySetResult();
+                        }
 
-                    // All four intentional faults must commit independently of sibling cancellation; using the
-                    // coordinator token here can turn a scheduled concurrent fault into a cancellation race.
-                    await allEntered.Task.WaitAsync(TestContext.Current.CancellationToken).ConfigureAwait(false);
-                    throw new InvalidOperationException($"{resourceName} failed concurrently.");
-                },
-                static (_, _, _) => Task.CompletedTask,
-                TestContext.Current.CancellationToken)).ConfigureAwait(true);
+                        // All four intentional faults must commit independently of sibling cancellation; using the
+                        // coordinator token here can turn a scheduled concurrent fault into a cancellation race.
+                        await allEntered.Task.WaitAsync(TestContext.Current.CancellationToken).ConfigureAwait(false);
+                        throw new InvalidOperationException($"{resourceName} failed concurrently.");
+                    },
+                    static (_, _, _) => Task.CompletedTask,
+                    TestContext.Current.CancellationToken)).ConfigureAwait(true);
 
-        AggregateException siblingFailures = thrown.Data["TopologySiblingValidationExceptions"]
-            .ShouldBeOfType<AggregateException>();
-        siblingFailures.InnerExceptions.Count.ShouldBe(selectedPorts.Count - 1);
-        new[] { thrown.Message }
-            .Concat(siblingFailures.InnerExceptions.Select(static failure => failure.Message))
-            .ShouldBe(
-                selectedPorts.Keys.Select(static resourceName => $"{resourceName} failed concurrently."),
-                ignoreOrder: true);
+            AggregateException siblingFailures = thrown.Data["TopologySiblingValidationExceptions"]
+                .ShouldBeOfType<AggregateException>();
+            siblingFailures.InnerExceptions.Count.ShouldBe(selectedPorts.Count - 1);
+            new[] { thrown.Message }
+                .Concat(siblingFailures.InnerExceptions.Select(static failure => failure.Message))
+                .ShouldBe(
+                    selectedPorts.Keys.Select(static resourceName => $"{resourceName} failed concurrently."),
+                    ignoreOrder: true);
+        }
     }
 
     [Fact]

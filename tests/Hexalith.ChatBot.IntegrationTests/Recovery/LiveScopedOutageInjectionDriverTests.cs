@@ -298,9 +298,9 @@ public sealed class LiveScopedOutageInjectionDriverTests
     {
         using CancellationTokenSource canceled = new();
         RecordingOperations operations = new() { CancelObservationToken = canceled };
-        LiveScopedOutageInjectionDriver driver = new(operations, Options());
+        CapturingScopedOutageInjectionDriver driver = new(new LiveScopedOutageInjectionDriver(operations, Options()));
 
-        _ = await Should.ThrowAsync<OperationCanceledException>(() => driver.InjectAndMeasureAsync(
+        OperationCanceledException thrown = await Should.ThrowAsync<OperationCanceledException>(() => driver.InjectAndMeasureAsync(
             ScopedOutageDependencies.AiProvider,
             RecoveryValidationTopology.LogicalTenantRef,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
@@ -310,6 +310,8 @@ public sealed class LiveScopedOutageInjectionDriverTests
         operations.Cleaned.ShouldContain(ScopedOutageDependencies.AiProvider);
         operations.RestoreTokenWasCanceled.ShouldAllBe(static canceledToken => !canceledToken);
         operations.CleanupTokenWasCanceled.ShouldAllBe(static canceledToken => !canceledToken);
+        thrown.CancellationToken.ShouldBe(canceled.Token);
+        driver.Failures.ShouldBeEmpty();
     }
 
     [Fact]

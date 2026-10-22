@@ -147,9 +147,9 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
     {
         using CancellationTokenSource canceled = new();
         RecordingOperations operations = new() { CancelObservationToken = canceled };
-        LiveContinuityDrillScenarioRunner runner = new(operations, Options());
+        CapturingContinuityDrillScenarioRunner runner = new(new LiveContinuityDrillScenarioRunner(operations, Options()));
 
-        _ = await Should.ThrowAsync<OperationCanceledException>(() => runner.RunAsync(
+        OperationCanceledException thrown = await Should.ThrowAsync<OperationCanceledException>(() => runner.RunAsync(
             ContinuityDrillScenarios.EventStoreOutage,
             Tenant,
             Correlation,
@@ -160,6 +160,8 @@ public sealed class LiveContinuityDrillScenarioRunnerTests
         operations.StartEventStoreTokenWasCanceled.ShouldBe(false);
         operations.WaitEventStoreTokenWasCanceled.ShouldBe(false);
         operations.CleanupEventStoreTokenWasCanceled.ShouldBe(false);
+        thrown.CancellationToken.ShouldBe(canceled.Token);
+        runner.Failures.ShouldBeEmpty();
     }
 
     [Fact]

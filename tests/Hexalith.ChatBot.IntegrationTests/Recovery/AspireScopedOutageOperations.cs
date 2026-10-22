@@ -374,7 +374,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
             unauthorizedMutationDetected = root.GetProperty("unauthorizedMutationDetected").GetBoolean();
         }
 
-        ControlAvailability controlAvailability = await IsChatBotControlAvailableAsync(dependency, cancellationToken)
+        ScopedOutageControlAvailability controlAvailability = await IsChatBotControlAvailableAsync(dependency, cancellationToken)
             .ConfigureAwait(false);
         return new ScopedOutageFaultObservation(
             observedAtUtc,
@@ -932,75 +932,72 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         }
     }
 
-    private async Task<ControlAvailability> IsChatBotControlAvailableAsync(
+    /// <summary>Checks the independent control, classifying only failures of the command POST as unobserved.</summary>
+    internal async Task<ScopedOutageControlAvailability> IsChatBotControlAvailableAsync(
         string dependency,
         CancellationToken cancellationToken)
     {
+        // During the identity outage the independent control must use the bearer minted at checkpoint; trying
+        // to refresh it would test the known-faulted token endpoint instead of ChatBot's cached-key validation.
+        // Other scenarios mint at point of use, and RestoreAsync refreshes the retained bearer after Keycloak
+        // restarts so no post-recovery operation relies on the pre-restart signing key.
+        string controlAccessToken = string.Equals(dependency, ScopedOutageDependencies.Identity, StringComparison.Ordinal)
+            ? ControlAccessToken
+            : await AcquireControlAccessTokenAsync(cancellationToken).ConfigureAwait(false);
+        string noteRef = GovernedNoteId.New().Value;
+        string commandRef = ChatBotCommandId.New().Value;
+        string operationRef = ChatBotTaskId.New().Value;
+        string correlationId = ChatBotCorrelationId.New().Value;
+        _cleanupState.ControlOperationRefs.Add(noteRef);
+        string body = $$"""
+            {"commandId":"{{commandRef}}","commandType":"RecordGovernedNote","command":{"noteId":"{{noteRef}}"},"origin":"ui","requestSchemaVersion":"v1"}
+            """;
+        using HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands")
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", controlAccessToken);
+        request.Headers.Add("X-Correlation-Id", correlationId);
+        request.Headers.Add("X-Hexalith-Task-Id", operationRef);
+        HttpResponseMessage response;
         try
         {
-            // During the identity outage the independent control must use the bearer minted at checkpoint; trying
-            // to refresh it would test the known-faulted token endpoint instead of ChatBot's cached-key validation.
-            // Other scenarios mint at point of use, and RestoreAsync refreshes the retained bearer after Keycloak
-            // restarts so no post-recovery operation relies on the pre-restart signing key.
-            string controlAccessToken = string.Equals(dependency, ScopedOutageDependencies.Identity, StringComparison.Ordinal)
-                ? ControlAccessToken
-                : await AcquireControlAccessTokenAsync(cancellationToken).ConfigureAwait(false);
-            string noteRef = GovernedNoteId.New().Value;
-            string commandRef = ChatBotCommandId.New().Value;
-            string operationRef = ChatBotTaskId.New().Value;
-            string correlationId = ChatBotCorrelationId.New().Value;
-            _cleanupState.ControlOperationRefs.Add(noteRef);
-            string body = $$"""
-                {"commandId":"{{commandRef}}","commandType":"RecordGovernedNote","command":{"noteId":"{{noteRef}}"},"origin":"ui","requestSchemaVersion":"v1"}
-                """;
-            using HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands")
-            {
-                Content = new StringContent(body, Encoding.UTF8, "application/json"),
-            };
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", controlAccessToken);
-            request.Headers.Add("X-Correlation-Id", correlationId);
-            request.Headers.Add("X-Hexalith-Task-Id", operationRef);
-            using HttpResponseMessage response = await ChatBotClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode != HttpStatusCode.Accepted)
-            {
-                // A real answer from ChatBot: negative containment evidence, not a missing observation.
-                return new ControlAvailability(
-                    Succeeded: false,
-                    Unobserved: false,
-                    Cause: string.Create(CultureInfo.InvariantCulture, $"status-{(int)response.StatusCode}"));
-            }
-
-            await _durableState.WaitForGovernedNoteAsync(
-                RecoveryValidationTopology.ControlTenantRef,
-                noteRef,
-                cancellationToken).ConfigureAwait(false);
-            await WaitForControlOperationProjectionAsync(
-                noteRef,
-                correlationId,
-                controlAccessToken,
-                cancellationToken).ConfigureAwait(false);
-            return new ControlAvailability(Succeeded: true, Unobserved: false, Cause: null);
+            response = await ChatBotClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         }
         catch (HttpRequestException exception)
         {
-            // Never reached ChatBot. Previously reported as "did not succeed", i.e. indistinguishable from a
-            // refusal — but a connection that never landed is a missing observation, not negative evidence.
-            return new ControlAvailability(
+            // No command response was observed. Acquisition and post-202 failures propagate separately.
+            return new ScopedOutageControlAvailability(
                 Succeeded: false,
                 Unobserved: true,
                 Cause: $"transport-{exception.HttpRequestError}");
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            // Distinct from a non-202: the control operation was never answered, so this run cannot say whether the
-            // unaffected path kept working. Deliberately NOT retried and NOT treated as available — widening this
-            // would let a genuine degradation of the control path read as containment (the NFR58 evidence).
-            return new ControlAvailability(Succeeded: false, Unobserved: true, Cause: "client-timeout");
+            return new ScopedOutageControlAvailability(Succeeded: false, Unobserved: true, Cause: "client-timeout");
         }
-    }
 
-    /// <summary>A control result plus whether its absence was observed and a metadata-only cause.</summary>
-    private sealed record ControlAvailability(bool Succeeded, bool Unobserved, string? Cause);
+        using HttpResponseMessage controlResponse = response;
+        if (response.StatusCode != HttpStatusCode.Accepted)
+        {
+            // A real answer from ChatBot: negative containment evidence, not a missing observation.
+            return new ScopedOutageControlAvailability(
+                Succeeded: false,
+                Unobserved: false,
+                Cause: string.Create(CultureInfo.InvariantCulture, $"status-{(int)response.StatusCode}"));
+        }
+
+        await _durableState.WaitForGovernedNoteAsync(
+            RecoveryValidationTopology.ControlTenantRef,
+            noteRef,
+            cancellationToken).ConfigureAwait(false);
+        await WaitForControlOperationProjectionAsync(
+            noteRef,
+            correlationId,
+            controlAccessToken,
+            cancellationToken).ConfigureAwait(false);
+        return new ScopedOutageControlAvailability(Succeeded: true, Unobserved: false, Cause: null);
+    }
 
     private async Task WaitForIdentityAsync(CancellationToken cancellationToken)
     {
@@ -1099,7 +1096,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
     private IResource SecurityResource => _securityResource ??
         throw new InvalidOperationException("This scoped-outage operation requires the live identity resource.");
 
-    private HttpClient ChatBotClient => _chatBotClient ??
+    private HttpClient ChatBotClient => _chatBotClient ?? _testSeam?.ChatBotClient ??
         throw new InvalidOperationException("This scoped-outage operation requires the live ChatBot client.");
 
     private HttpClient SandboxClient => _sandboxClient ??

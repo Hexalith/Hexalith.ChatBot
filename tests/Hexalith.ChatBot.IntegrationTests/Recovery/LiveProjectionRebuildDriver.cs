@@ -53,9 +53,25 @@ internal sealed class LiveProjectionRebuildDriver(
                 "Projection rebuild is restricted to the enabled dataset and replay-test tenant configuration.");
         }
 
-        using CancellationTokenSource scenarioDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        scenarioDeadline.CancelAfter(options.PerScenarioTimeout);
-        CancellationToken scenarioToken = scenarioDeadline.Token;
+        cancellationToken.ThrowIfCancellationRequested();
+        using CancellationTokenSource scenarioBudget = new(options.PerScenarioTimeout);
+        using CancellationTokenSource scenarioDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, scenarioBudget.Token);
+        using CancellationTokenRegistration stopBudget = RecoveryCancellation.StopBudgetOnCallerCancellation(cancellationToken, scenarioBudget);
+        try
+        {
+            return await RebuildWithinScenarioAsync(testTenantRef, correlationId, scenarioDeadline.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception) when (RecoveryCancellation.IsCallerCancellation(
+            exception, scenarioDeadline.Token, cancellationToken, scenarioBudget.Token))
+        {
+            throw new OperationCanceledException("The recovery scenario was canceled by its caller.", exception, cancellationToken);
+        }
+    }
+
+    /// <summary>Runs all rebuild reads, writes and cleanup under the known scenario token.</summary>
+    private async ValueTask<ProjectionRebuildMeasurement> RebuildWithinScenarioAsync(
+        string testTenantRef, string correlationId, CancellationToken scenarioToken)
+    {
         scenarioToken.ThrowIfCancellationRequested();
         string? datasetError = dataset.Validate(
             options.DatasetRef,

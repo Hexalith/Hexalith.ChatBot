@@ -536,7 +536,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: TrivialGovernedCommandAspireE2eTests.cs
 severity: low
 reason: **[LOW] `TierThreeParallelValidationShouldRetainEveryNonCancellationSiblingFailure` is a flaky concurrency test.** The test asserts `siblingFailures.InnerExceptions.Count == selectedPorts.Count - 1` (3), but `TopologyReadinessCoordinator.ValidateAsync` intermittently retains only 2 sibling failures: observed one failure followed by three passes on identical code with no intervening edit. The race is in the coordinator's sibling-exception aggregation when several validators throw concurrently after a shared `TaskCompletionSource` gate releases. Pre-existing and out of scope for Story 12.15 — `TrivialGovernedCommandAspireE2eTests.cs` is unmodified at baseline `1493ff8f`; it surfaced only because the Story 12.15 review ran the Integration suite repeatedly. Release-claim impact: a Tier-3 topology-readiness failure could under-report which resources failed, making a multi-resource startup failure look like a smaller one. Closure evidence: a deterministic reproduction (loop the test ≥50×) plus a fix that aggregates all non-cancellation sibling failures under a lock or `ConcurrentBag` before the coordinator throws. [`tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:1007`]
-status: open
+status: done 2026-10-22
+resolution: The existing barrier correctly uses the outer test token. TierThreeParallelValidationShouldRetainEveryNonCancellationSiblingFailure now repeats its full concurrent-failure assertion 64 times; the final runner passed in TestResults/five-recovery-diagnostics-concurrency-final.{ctrf.json,trx}, with zero failures/skips. No coordinator locking change was necessary.
 
 ### DW-61: [MEDIUM] The live-recovery evidence gate never asserts that a manifest's `ResidualIds` covers the scenario's required residual set.
 
@@ -860,7 +861,8 @@ origin: migrated from legacy ledger ("Deferred from: 12-15 adversarial batch, st
 location: ChatBot Tier-3 harness
 severity: medium
 reason: **[MEDIUM · diagnosis] B4 — the scoped-outage control probe's catch scope is wider than the request it classifies.** `IsChatBotControlAvailableAsync` wraps the whole method in `catch (HttpRequestException)` / `catch (TaskCanceledException)`, so `AcquireControlAsync` before the POST and the durable/projection waits *after* a successful `202` are inside it. **Not covered:** a genuine post-admission containment failure can still be attributed to the transport and reported as `client-timeout` with `IndependentControlUnobserved = true`, i.e. "never reached ChatBot" when it did. **Partial mitigation already in place:** the cause is now reported (`status-…` / `transport-…` / `client-timeout`), so the misattribution is visible in the failure message instead of silent — but the classification itself is still wrong in that case. **Fix:** narrow both catches to the control POST only. **Owner:** ChatBot Tier-3 harness.
-status: open
+status: done 2026-10-22
+resolution: IsChatBotControlAvailableAsync catches only the command POST, uses ResponseHeadersRead, and propagates acquisition/durable/projection errors. ScopedOutageControlProbeTests covers both error kinds at every non-POST stage, POST transport/timeout and caller cancellation, observed refusal/success, failing response content, and the retained Identity bearer. Final focused runner passed 181 tests with zero failures/skips in TestResults/five-recovery-diagnostics-final.{ctrf.json,trx}.
 
 ### DW-98: [LOW · correctness] C7 — `observedAtLeastOnce` guards nothing it appears to guard.
 
@@ -868,7 +870,8 @@ origin: migrated from legacy ledger ("Deferred from: 12-15 adversarial batch, st
 location: ChatBot Tier-3 harness
 severity: low
 reason: **[LOW · correctness] C7 — `observedAtLeastOnce` guards nothing it appears to guard.** In `RemainsGovernedOperationProjectionAbsentAsync` it is set unconditionally on the first loop iteration, so it is only ever false when the loop body never ran; in that case the method reports "present" from a window whose final read was null. **Not covered:** a zero-length absence window silently inverts the result. The variable is documented in place but its guard is unchanged. **Owner:** ChatBot Tier-3 harness.
-status: open
+status: done 2026-10-22
+resolution: RemainsGovernedOperationProjectionAbsentAsync uses an initial do/while read plus a final closing read; constructors retain the nonpositive-window refusal. RecoveryAbsenceObservationTests covers the smallest positive window, initial/final presence, initial/final failures, actual delay cancellation and sustained intermediate polling. Final focused runner passed 181 tests with zero failures/skips.
 
 ### DW-99: [LOW · api-hygiene] C10 (second half) — `RecoveryResourceLogTail.Render(string? matching)` exposes a filter no call site uses.
 
@@ -893,7 +896,8 @@ origin: migrated from legacy ledger ("Deferred from: 12-15 adversarial batch, st
 location: ChatBot Tier-3 harness
 severity: medium
 reason: **[MEDIUM · test-design] D5 — the capture-filter fix is untested and its token check is approximate.** The `|| !cancellationToken.IsCancellationRequested` guard is copy-pasted byte-identically across the three capturing runners with no unit test. **Not covered:** it reads the caller token's state at catch time rather than identifying which token actually cancelled, so an internal deadline firing concurrently with caller cancellation is still dropped, and the comment claims a stronger guarantee than the code provides. **Fix:** compare token identity, and cover it. **Owner:** ChatBot Tier-3 harness.
-status: open
+status: done 2026-10-22
+resolution: All three capturing decorators compare the exception cancellation token with the caller token. Real drivers retain an independent scenario budget, normalize only caller-triggered known linked cancellation, and stop a pending scenario timer on caller cancellation so successful cleanup cannot reclassify it. RecoveryFailureCaptureTests covers every decorator, simultaneous independent/caller cancellation and cleanup after the former deadline; all three concrete driver suites exercise composed cancellation. Final focused runner passed 181 tests with zero failures/skips.
 
 ### DW-102: [LOW · dead-code] D6 — `WaitForGovernedOperationAsync`'s absence path is unreachable.
 
@@ -910,7 +914,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15 chunk 
 location: LiveContinuityAspireE2eTests.cs:745-750
 severity: medium
 reason: **[MEDIUM · claim-accuracy] The mailbox admission probe's retained warm-up comment describes a barrier the code no longer provides.** `AssertMailboxTokenAdmissionAsync` returns on `503 + dispatch-unavailable` (`LiveContinuityAspireE2eTests.cs:745-750`), while the comment immediately above at `:733-736` still says that path "intentionally returns 503 until it is ready, matching the ordinary Tier-3 acceptance test's first-command retry discipline". `CommandGateway` emits that same problem type for `EventStoreGatewayException` and `HttpRequestException` as well as the probe's deliberately invalid `IntakeId` (`CommandGateway.cs:95-111`). **Not covered:** the admission assertion itself is sound — only the accepted branch can emit that type, so observing it does prove the bearer was admitted — but the downstream first-command warm-up barrier the comment describes is gone, and restoring it is a separate design change rather than a comment fix. **Owner:** ChatBot Tier-3 harness. **Closure evidence:** either a decided warm-up gate distinct from the admission proof, or the comment corrected to state that admission, not readiness, is what the probe establishes.
-status: open
+status: done 2026-10-22
+resolution: Corrected the mailbox probe comment to state admission/authority-boundary proof only, with no readiness or mutation claim. Existing LiveContinuityAspireE2eContractTests positive and negative problem/status/body cases all passed within the 181-test final focused run; no warm-up gate was introduced.
 
 ### DW-104: [MEDIUM · claim-accuracy] Claim B2's "every absence result" holds at one of three absence call sites.
 
@@ -1783,3 +1788,10 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-five-deferred-evidence-gate-fixes.md`
   summary: Bound aggregate discovery allocation and retain only identity metadata for inactive evidence contracts (medium; pre-existing; BH-3).
   evidence: TransitionDetector.FindSingleContract stores every full parsed candidate in its candidates list before filtering, as it did at baseline fdeb341ee2b31dc54f3a5a0551de9e303544c457. Many individually compliant contracts can exceed a reasonable aggregate memory budget. Closure evidence: identity-only candidate records plus a documented discovery budget and multi-candidate negative coverage preserving active duplicate detection.
+
+
+## Deferred from: five recovery-harness diagnostics review (2026-10-22)
+
+- source_spec: `spec-five-deferred-recovery-diagnostics.md`
+  summary: Captured recovery failures retain original inner exceptions whose rendered diagnostic text can escape the metadata-only wrapper message (medium; pre-existing).
+  evidence: At baseline 6b92c2970d8fd7fb6bc2d3ad26f864e80313e111, all three Capturing* decorators retain the original exception as InnerException; LiveContinuityAspireE2eTests later aggregates those failures, so Exception.ToString can include provider messages or stack traces in raw TRX. The new capture tests verify wrapper-message redaction and exact cause retention, not full rendered-output sanitization. Closure requires an explicit diagnostic retention/redaction boundary with injected sensitive inner-message tests, coordinated with the still-open scheduled/release raw-TRX sanitization work (DW-95). This batch preserves the existing diagnostic contract and does not claim full exception rendering is sanitized.

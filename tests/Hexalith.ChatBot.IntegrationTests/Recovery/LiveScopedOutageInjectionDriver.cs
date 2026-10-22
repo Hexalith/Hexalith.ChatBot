@@ -33,8 +33,9 @@ internal sealed class LiveScopedOutageInjectionDriver(
                 "Live scoped-outage validation requires enabled configuration, a closed dependency, and the configured replay-test tenant.");
         }
 
-        using CancellationTokenSource scenarioDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        scenarioDeadline.CancelAfter(options.PerScenarioTimeout);
+        using CancellationTokenSource scenarioBudget = new(options.PerScenarioTimeout);
+        using CancellationTokenSource scenarioDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, scenarioBudget.Token);
+        using CancellationTokenRegistration stopBudget = RecoveryCancellation.StopBudgetOnCallerCancellation(cancellationToken, scenarioBudget);
         CancellationToken scenarioToken = scenarioDeadline.Token;
         string expectedScope = ExpectedScope(dependency);
         DateTimeOffset startedAtUtc = operations.UtcNow;
@@ -144,7 +145,9 @@ internal sealed class LiveScopedOutageInjectionDriver(
 
         if (failure is not null)
         {
-            throw PreserveCancellationOrWrap(failure, "The scoped-outage exercise or cleanup did not complete.");
+            throw PreserveCancellationOrWrap(
+                RecoveryCancellation.Normalize(failure, scenarioToken, cancellationToken, scenarioBudget.Token),
+                "The scoped-outage exercise or cleanup did not complete.");
         }
 
         ScopedOutageFaultObservation completedObservation = observation!;

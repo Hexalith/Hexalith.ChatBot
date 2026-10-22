@@ -1693,19 +1693,17 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     /// <param name="noteRef">The governed note that must never have landed.</param>
     /// <param name="cancellationToken">Cancels the observation.</param>
     /// <returns><see langword="true"/> when the projection stayed absent for the whole window.</returns>
-    private async Task<bool> RemainsGovernedOperationProjectionAbsentAsync(
+    internal async Task<bool> RemainsGovernedOperationProjectionAbsentAsync(
         string tenantRef,
         string noteRef,
         CancellationToken cancellationToken)
     {
         Stopwatch timer = Stopwatch.StartNew();
-        bool observedAtLeastOnce = false;
-        while (timer.Elapsed < _absenceConfirmationWindow)
+        do
         {
             GovernedOperationView? view = await _governedOperationProjections
                 .GetAsync(tenantRef, noteRef, cancellationToken)
                 .ConfigureAwait(false);
-            observedAtLeastOnce = true;
             if (view is not null)
             {
                 return false;
@@ -1713,16 +1711,14 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
 
             await Task.Delay(_pollInterval, cancellationToken).ConfigureAwait(false);
         }
+        while (timer.Elapsed < _absenceConfirmationWindow);
 
-        // Close the final-delay race, and never report absence from a window in which nothing was read.
+        // Close the final-delay race; the initial read above also runs for a tiny positive window.
         GovernedOperationView? finalView = await _governedOperationProjections
             .GetAsync(tenantRef, noteRef, cancellationToken)
             .ConfigureAwait(false);
 
-        // The loop always sets observedAtLeastOnce on its first iteration, so it only guarded the case where the
-        // window was zero — and there the method would otherwise report a null final read as "present". Keep the
-        // explicit requirement that at least one in-window read completed.
-        return observedAtLeastOnce && finalView is null;
+        return finalView is null;
     }
 
     /// <summary>
