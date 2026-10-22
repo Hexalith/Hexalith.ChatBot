@@ -6,6 +6,7 @@ using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Admission;
+using Hexalith.ChatBot.Server.Governance.AiMediation;
 
 using Shouldly;
 
@@ -106,7 +107,8 @@ public sealed class ChatBotOperationEvidenceValidatorTests
     [InlineData(ValidPayload, 7L, ChatBotMessageCodes.CommandContractInvalid)]
     public async Task MissingOrStaleRevisionWithoutAnOwnerGuardShouldDeny(string payload, long? concurrency, string expected)
     {
-        ChatBotGatewayContext context = Context(payload, concurrency: concurrency);
+        ChatBotGatewayContext context = Context(payload, concurrency: concurrency,
+            commandType: payload == "{}" ? nameof(RecordGovernedNote) : nameof(RecordProjectConversationMessage));
         SyntheticOperationOwnerEvidenceSource source = new(context);
 
         (await new ChatBotAdmissionEvidenceValidator(source, source).ValidateOperationAsync(context, TestContext.Current.CancellationToken)).ShouldBe(expected);
@@ -174,7 +176,8 @@ public sealed class ChatBotOperationEvidenceValidatorTests
     [InlineData("{}", null, true)]
     public async Task ValidatedOperationProofShouldBeReadOnceAndReusedByProfileChecksWithoutEnablingCommit(string payload, long? concurrency, bool ownerGuard)
     {
-        ChatBotGatewayContext context = Context(payload, concurrency: concurrency);
+        ChatBotGatewayContext context = Context(payload, concurrency: concurrency,
+            commandType: payload == "{}" ? nameof(RecordGovernedNote) : nameof(RecordProjectConversationMessage));
         SyntheticOperationOwnerEvidenceSource source = new(context);
         source.Proof = source.Proof! with { OwnerConcurrencyGuardReference = ownerGuard ? "synthetic:owner-concurrency-guard" : null };
         ChatBotProfileAdmissionEvidence expected = source.Proof;
@@ -190,6 +193,47 @@ public sealed class ChatBotOperationEvidenceValidatorTests
 
         source.ReadCount.ShouldBe(1);
         context.AdmissionEvidence.ShouldBeSameAs(expected);
+        context.AdmissionEnvelope.ShouldBeNull();
+        context.Idempotency.ShouldBeNull();
+    }
+
+    /// <summary>Neither request concurrency nor an owner guard can replace a revision required by the command contract.</summary>
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData(null, true)]
+    [InlineData(8L, false)]
+    [InlineData(8L, true)]
+    public async Task MissingContractRevisionMustFailBeforeOwnerReadEvenWithConcurrencyOrOwnerGuard(long? concurrency, bool ownerGuard)
+    {
+        ChatBotGatewayContext context = Context("{}", concurrency: concurrency);
+        SyntheticOperationOwnerEvidenceSource source = new(context);
+        source.Proof = source.Proof! with { OwnerConcurrencyGuardReference = ownerGuard ? "synthetic:owner-concurrency-guard" : null };
+        ChatBotAdmissionEvidenceValidator validator = new(source, source);
+
+        (await validator.ValidateOperationAsync(context, TestContext.Current.CancellationToken)).ShouldBe(ChatBotMessageCodes.CommandContractInvalid);
+        source.ReadCount.ShouldBe(0);
+        context.AdmissionEvidence.ShouldBeNull();
+        context.AdmissionEnvelope.ShouldBeNull();
+        context.Idempotency.ShouldBeNull();
+    }
+
+    /// <summary>Each revision on a multi-revision command remains required even when the other revision is supplied.</summary>
+    [Theory]
+    [InlineData(nameof(ExecuteApprovedAIAction), "{\"commandName\":\"Project.AppendConversationMessage\",\"expectedApprovalSourceVersion\":8}")]
+    [InlineData(nameof(ExecuteApprovedAIAction), "{\"commandName\":\"Project.AppendConversationMessage\",\"expectedProposalSourceVersion\":8}")]
+    [InlineData(nameof(ExecuteApprovedOutboundDraft), "{\"expectedApprovalSourceVersion\":8}")]
+    [InlineData(nameof(ExecuteApprovedOutboundDraft), "{\"expectedDraftSourceVersion\":8}")]
+    public async Task EveryDeclaredRevisionMustBePresentBeforeOwnerRead(string commandType, string payload)
+    {
+        ChatBotGatewayContext context = Context(payload, concurrency: 8);
+        context.Submission.Request.CommandType = commandType;
+        SyntheticOperationOwnerEvidenceSource source = new(context);
+        source.Proof = source.Proof! with { OwnerConcurrencyGuardReference = "synthetic:owner-concurrency-guard" };
+
+        (await new ChatBotAdmissionEvidenceValidator(source, source).ValidateOperationAsync(context, TestContext.Current.CancellationToken))
+            .ShouldBe(ChatBotMessageCodes.CommandContractInvalid);
+        source.ReadCount.ShouldBe(0);
+        context.AdmissionEvidence.ShouldBeNull();
         context.AdmissionEnvelope.ShouldBeNull();
         context.Idempotency.ShouldBeNull();
     }
@@ -233,28 +277,36 @@ public sealed class ChatBotOperationEvidenceValidatorTests
     [Theory]
     [InlineData(nameof(ProposeAIAction), "{\"intendedCommandName\":\"Unknown.Command\"}")]
     [InlineData(nameof(ExecuteApprovedAIAction), "{\"commandName\":\"Unknown.Command\"}")]
+    [InlineData(nameof(ExecuteApprovedAIAction), "{\"commandName\":\"ChatBot.ExecuteLowRiskAssistance\",\"commandAllowlistVersion\":\"ai-action-command-allowlist.m0\",\"expectedApprovalSourceVersion\":8,\"expectedProposalSourceVersion\":8}")]
+    [InlineData(nameof(ExecuteApprovedAIAction), "{\"commandName\":\"ChatBot.ExecuteLowRiskAssistance\",\"commandAllowlistVersion\":\"ai-action-command-allowlist.v1\",\"expectedApprovalSourceVersion\":8,\"expectedProposalSourceVersion\":8}")]
     public async Task NonAllowlistedCommandMustFailBeforeOwnerEvidence(string commandType, string payload)
     {
+        ArgumentNullException.ThrowIfNull(payload);
         ChatBotGatewayContext context = Context(payload);
         context.Submission.Request.CommandType = commandType;
         SyntheticOperationOwnerEvidenceSource source = new(context);
+        if (payload.Contains(AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName, StringComparison.Ordinal))
+        {
+            AiActionCommandMetadataProvider.TryGet(AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName).ShouldNotBeNull();
+        }
         (await new ChatBotAdmissionEvidenceValidator(source, source).ValidateOperationAsync(context, TestContext.Current.CancellationToken))
             .ShouldBe(ChatBotAuthorizationReasonCodes.CommandNotAllowlisted);
         source.ReadCount.ShouldBe(0);
         context.AdmissionEvidence.ShouldBeNull();
     }
 
-    private static ChatBotGatewayContext Context(string payload = ValidPayload, string? operationId = OperationId, long? concurrency = null)
+    private static ChatBotGatewayContext Context(string payload = ValidPayload, string? operationId = OperationId, long? concurrency = null,
+        string commandType = nameof(RecordProjectConversationMessage))
     {
         ClaimsPrincipal principal = new(new ClaimsIdentity([new Claim("sub", "synthetic-requester")], "synthetic"));
         using JsonDocument document = JsonDocument.Parse(payload);
         ChatBotCommandSubmission submission = new(principal, new CommandSubmissionRequest
         {
-            CommandId = operationId!, CommandType = nameof(RecordProjectConversationMessage), Command = document.RootElement.Clone(),
+            CommandId = operationId!, CommandType = commandType, Command = document.RootElement.Clone(),
             Concurrency = concurrency.HasValue ? new() { ExpectedRevision = concurrency.Value } : null,
         }, "01ARZ3NDEKTSV4RRFFQ69G5FAW", null);
         ChatBotGatewayContext context = new(submission, new("synthetic-requester", principal), new("synthetic-tenant"));
-        context.SelectAdmissionProfile(ChatBotAdmissionProfile.GovernedChat);
+        context.SelectAdmissionProfile(commandType == nameof(RecordGovernedNote) ? ChatBotAdmissionProfile.CommandExecution : ChatBotAdmissionProfile.GovernedChat);
         return context;
     }
 }

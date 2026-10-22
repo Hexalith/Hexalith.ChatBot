@@ -336,6 +336,14 @@ internal sealed class ChatBotAdmissionEvidenceValidator(
         Type? contract = typeof(IChatBotCommand).Assembly.GetType($"Hexalith.ChatBot.Contracts.Commands.{context.Submission.Request.CommandType}");
         if (contract is null || !typeof(IChatBotCommand).IsAssignableFrom(contract)) { return false; }
         HashSet<string> declared = contract.GetProperties().Select(property => property.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> supplied = payload.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (contract.GetProperties().Any(property => property.PropertyType == typeof(long) &&
+            property.Name.StartsWith("Expected", StringComparison.OrdinalIgnoreCase) &&
+            (property.Name.EndsWith("Version", StringComparison.OrdinalIgnoreCase) || property.Name.EndsWith("Revision", StringComparison.OrdinalIgnoreCase)) &&
+            !supplied.Contains(property.Name)))
+        {
+            return false;
+        }
         List<long> values = [];
         foreach (JsonProperty property in payload.EnumerateObject().Where(property => property.Name.StartsWith("expected", StringComparison.OrdinalIgnoreCase)))
         {

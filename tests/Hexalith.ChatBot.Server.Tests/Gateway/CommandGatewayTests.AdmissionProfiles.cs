@@ -157,6 +157,7 @@ public sealed partial class CommandGatewayTests
         result.RejectionEvents.ShouldHaveSingleItem().ShouldBeOfType<ChatBotDomainServiceAdmissionRejected>().ReasonCode.ShouldBe(ChatBotMessageCodes.CanonicalExecutionUnavailable);
         evidence.OperationCalls.ShouldBe(1);
         evidence.OperationFailure.ShouldBeNull();
+        // The marked path skips profile checks under D8/D9, deferred to Story 1.8's commit-participation contract.
         evidence.ProfileCalls.ShouldBe(signed ? 0 : 1);
         evidence.AtomicCalls.ShouldBe(1);
         evidence.AtomicContext!.AdmissionEvidence.ShouldNotBeNull();
@@ -300,6 +301,7 @@ public sealed partial class CommandGatewayTests
     [InlineData("risk")]
     [InlineData("effect")]
     [InlineData("policy")]
+    [InlineData("metadata-supported")]
     public async Task CallerCannotForgeTrustedCommandRiskOrEffectMetadata(string field)
     {
         RecordingDispatcher dispatcher = new();
@@ -309,6 +311,7 @@ public sealed partial class CommandGatewayTests
         {
             "risk" => proposal with { CommandDefaultRisk = AiActionRiskClass.LowRisk },
             "effect" => proposal with { EffectSurface = "read-only" },
+            "metadata-supported" => proposal with { CommandMetadataSupported = false },
             _ => proposal with { TenantPolicyClassification = "low-risk" },
         };
         ChatBotGatewayResult result = await Gateway(dispatcher, idempotencyStore: identities, admissionEvidence: new ChatBotAdmissionEvidenceValidator())

@@ -717,8 +717,9 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         body.ShouldNotContain("raw-body", Case.Insensitive);
     }
 
+    /// <summary>Verifies v1 dispatcher mechanics with synthetic admission and classification; production refuses this target.</summary>
     [Fact]
-    public async Task CommandGatewayApi_ShouldExecuteApprovedAiActionForV1OnlyCommandWhenPinnedToV1()
+    public async Task SyntheticDispatcherMechanics_ShouldPreserveApprovedAiActionV1TargetAndVersion()
     {
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAuditWriter auditWriter = new();

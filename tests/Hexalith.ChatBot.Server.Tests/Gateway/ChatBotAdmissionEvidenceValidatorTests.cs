@@ -47,6 +47,10 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
     [InlineData("missing-produced-time")]
     [InlineData("future-produced-time")]
     [InlineData("undeclared-proposed-effect")]
+    [InlineData("payload-allowlist")]
+    [InlineData("allowlist-metadata")]
+    [InlineData("project-authorization")]
+    [InlineData("requester-authority-binding")]
     public async Task QualifiedClassificationMustBindTheCurrentRequestAndTrustedEffectRiskFloor(string mismatch)
     {
         SyntheticAdmissionEvidenceSource source = new();
@@ -61,10 +65,21 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
                 policySnapshotId = "synthetic-policy", proposedActionClasses = new[] { AiActionRiskActionClass.SendsExternal },
             };
         }
+        if (mismatch == "payload-allowlist")
+        {
+            context.Submission.Request.Command = new
+            {
+                intendedCommandName = AiActionCommandMetadataProvider.AppendConversationMessageCommandName, expectedSourceVersion = 1,
+                policySnapshotId = "synthetic-policy", commandAllowlistVersion = "stale",
+            };
+        }
         context.SetRiskClassification(ChatBotRiskClassification.Classified(mismatch switch
         {
             "missing-input" => record with { InputTuple = null! },
-            "undeclared-proposed-effect" => record,
+            "undeclared-proposed-effect" or "payload-allowlist" => record,
+            "allowlist-metadata" => record with { InputTuple = record.InputTuple with { AllowlistMetadataState = "unsupported" } },
+            "project-authorization" => record with { InputTuple = record.InputTuple with { ProjectAuthorizationState = "denied" } },
+            "requester-authority-binding" => record with { RequesterAuthorityClass = "project-approver" },
             "null-reason" => record with { ReasonCode = null! },
             "unsafe-reason" => record with { ReasonCode = "raw result reason" },
             "unknown-schema" => record with { SchemaVersion = "unknown.v9" },
@@ -131,6 +146,16 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
     [InlineData("removed-dependency")]
     [InlineData("runtime-version")]
     [InlineData("stale-code-version")]
+    [InlineData("blank-independent-approver")]
+    [InlineData("blank-runtime-artifact-hash")]
+    [InlineData("blank-runtime-candidate")]
+    [InlineData("blank-runtime-environment")]
+    [InlineData("blank-runtime-dataset-version")]
+    [InlineData("blank-runtime-dataset-hash")]
+    [InlineData("empty-runtime-dependencies")]
+    [InlineData("blank-runtime-dependency-name")]
+    [InlineData("blank-runtime-dependency-revision")]
+    [InlineData("dataset-version")]
     public async Task QualificationMustMatchEveryCurrentBindingAndThreshold(string failure)
     {
         const string priorVersion = "chatbot.ai-action-risk-classifier.m0.v1";
@@ -148,6 +173,23 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
         {
             context.SetRiskClassification(ChatBotRiskClassification.Classified(context.RiskClassification!.Record! with { ClassifierVersion = priorVersion }));
         }
+        // Match qualification and runtime exactly so only the required nonblank identity clause can reject these rows.
+        source.RuntimeIdentity = failure switch
+        {
+            "blank-runtime-artifact-hash" => source.RuntimeIdentity! with { ArtifactHash = " " },
+            "blank-runtime-candidate" => source.RuntimeIdentity! with { CandidateRevision = " " },
+            "blank-runtime-environment" => source.RuntimeIdentity! with { EnvironmentProfile = " " },
+            "blank-runtime-dataset-version" => source.RuntimeIdentity! with { DatasetVersion = " " },
+            "blank-runtime-dataset-hash" => source.RuntimeIdentity! with { DatasetHash = " " },
+            "empty-runtime-dependencies" => source.RuntimeIdentity! with { DependencyRevisions = new Dictionary<string, string>() },
+            "blank-runtime-dependency-name" => source.RuntimeIdentity! with { DependencyRevisions = new Dictionary<string, string> { [" "] = "synthetic-dependency" } },
+            "blank-runtime-dependency-revision" => source.RuntimeIdentity! with { DependencyRevisions = new Dictionary<string, string> { ["owner"] = " " } },
+            _ => source.RuntimeIdentity,
+        };
+        if (failure.StartsWith("blank-runtime-", StringComparison.Ordinal) || failure == "empty-runtime-dependencies")
+        {
+            qualified = qualified with { Identity = source.RuntimeIdentity! };
+        }
         source.Qualification = failure switch
         {
             "missing" => null,
@@ -162,6 +204,11 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
             "approved-at-expiry" => qualified with { ApprovedAt = source.UtcNow.AddMinutes(-1), ExpiresAt = source.UtcNow.AddMinutes(-1) },
             "approved-after-expiry" => qualified with { ApprovedAt = source.UtcNow.AddMinutes(-1), ExpiresAt = source.UtcNow.AddMinutes(-2) },
             "blank-owner" => qualified with { OwnerId = "" },
+            "blank-independent-approver" => qualified with { IndependentApproverId = " " },
+            "dataset-version" => qualified with { Identity = qualified.Identity with { DatasetVersion = "drift" } },
+            "blank-runtime-artifact-hash" or "blank-runtime-candidate" or "blank-runtime-environment" or
+                "blank-runtime-dataset-version" or "blank-runtime-dataset-hash" or "empty-runtime-dependencies" or
+                "blank-runtime-dependency-name" or "blank-runtime-dependency-revision" => qualified,
             "empty-evidence" => qualified with { EvidenceReferences = [] },
             "blank-evidence" => qualified with { EvidenceReferences = [""] },
             "added-dependency" => qualified with { Identity = qualified.Identity with { DependencyRevisions = new Dictionary<string, string> { ["owner"] = "synthetic-dependency", ["other"] = "extra" } } },
@@ -328,7 +375,14 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
     {
         ChatBotGatewayContext original = ReadContext();
         original.Submission.Request.CommandType = commandType;
-        original.Submission.Request.Command = new { projectId = "synthetic-project" };
+        original.Submission.Request.Command = commandType switch
+        {
+            nameof(DecideAiActionApproval) => new { projectId = "synthetic-project", expectedApprovalSourceVersion = 1 },
+            nameof(ProposeAIAction) => new { projectId = "synthetic-project", expectedSourceVersion = 1 },
+            nameof(ExecuteApprovedAIAction) => new { projectId = "synthetic-project", expectedApprovalSourceVersion = 1, expectedProposalSourceVersion = 1 },
+            nameof(ExecuteLowRiskAIAssistance) => new { projectId = "synthetic-project", expectedProposalSourceVersion = 1 },
+            _ => new { projectId = "synthetic-project" },
+        };
         ChatBotGatewayContext context = new(original.Submission, original.Actor, original.TenantBinding);
         ChatBotAdmissionProfile profile = commandType == nameof(ExecuteLowRiskAIAssistance) ? ChatBotAdmissionProfile.AiRead : ChatBotAdmissionProfile.AiEffect;
         context.SelectAdmissionProfile(profile);
@@ -363,7 +417,13 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
     {
         ChatBotGatewayContext context = ReadContext();
         context.Submission.Request.CommandType = commandType;
-        context.Submission.Request.Command = new { draftId = "synthetic-draft" };
+        context.Submission.Request.Command = commandType switch
+        {
+            nameof(RequestOutboundSendApproval) => new { draftId = "synthetic-draft", expectedDraftSourceVersion = 1 },
+            nameof(DecideOutboundApproval) => new { draftId = "synthetic-draft", expectedApprovalSourceVersion = 1 },
+            nameof(ExecuteApprovedOutboundDraft) => new { draftId = "synthetic-draft", expectedApprovalSourceVersion = 1, expectedDraftSourceVersion = 1 },
+            _ => new { draftId = "synthetic-draft" },
+        };
         context.Submission.Request.Concurrency = null;
         context = new(context.Submission, context.Actor, context.TenantBinding);
         context.SelectAdmissionProfile(ChatBotAdmissionProfile.HumanEffect);

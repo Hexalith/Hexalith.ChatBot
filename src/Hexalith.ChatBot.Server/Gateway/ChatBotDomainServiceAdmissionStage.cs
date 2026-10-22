@@ -129,8 +129,8 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
         // HTTP gateway returns AcceptedResult(priorOutcome) (idempotent success), while this SDK /process path
         // surfaces a typed rejection (IsRejection == true) carrying DuplicateReplayPriorOutcome. The duplicate's
         // side effects (operation-status upsert, suppressed-intake audit) are still recorded once inside the shared
-        // pipeline; only the wire shape differs. In the live topology /process is only reached via the marker
-        // short-circuit above, so callers observe the gateway's idempotent-success surface.
+        // pipeline; only the wire shape differs. Production currently refuses atomic participation before
+        // replay, and marked envelopes also revalidate that boundary, so neither replay surface is reachable.
         if (decision.Kind == ChatBotCommandAdmissionDecisionKind.ReplayPriorOutcome)
         {
             return Rejected(context.Command, ChatBotAuthorizationReasonCodes.DuplicateReplayPriorOutcome);

@@ -64,10 +64,30 @@ public sealed class AdmissionProfileFitnessTests
     public void CommandStageApplicabilityShouldRemainBoundedAndNonVacuous()
     {
         ChatBotCommandAdmissionCatalog catalog = new();
+        // Freeze the approved lifecycle exemptions: adding or changing one requires an explicit product decision.
+        Dictionary<string, string[]> expected = new(StringComparer.Ordinal)
+        {
+            [nameof(AssociateEmailToProject)] = ["correction-impact-manifest"],
+            [nameof(CaptureTaskIntent)] = ["correction-impact-manifest"],
+            [nameof(DeferEmailProjectAssociation)] = ["correction-impact-manifest"],
+            [nameof(MarkEmailAssociationNeedsReview)] = ["correction-impact-manifest"],
+            [nameof(MarkTaskIntentDisposition)] = ["correction-impact-manifest"],
+            [nameof(RejectEmailProjectAssociation)] = ["correction-impact-manifest"],
+            [nameof(ResolveMailboxMessageParticipants)] = ["correction-impact-manifest"],
+            [nameof(ScoreMailboxMessageAssociation)] = ["correction-impact-manifest"],
+            [nameof(ProposeAIAction)] = ["human-only-non-self-approval", "approval-lifetime-drift"],
+            [nameof(DecideAiActionApproval)] = ["approval-lifetime-drift"],
+            [nameof(MarkAiActionProposalInvalidatedByCorrection)] = ["human-only-non-self-approval", "approval-lifetime-drift"],
+            [nameof(CreateOutboundDraft)] = ["human-approval-lifetime-drift", "provider-evidence", "no-blind-retry"],
+            [nameof(RequestOutboundSendApproval)] = ["human-approval-lifetime-drift", "provider-evidence", "no-blind-retry"],
+            [nameof(DecideOutboundApproval)] = ["human-approval-lifetime-drift", "provider-evidence", "no-blind-retry"],
+        };
+        ChatBotCommandAdmissionCatalog.NotApplicableStages.Keys.Order(StringComparer.Ordinal).ShouldBe(expected.Keys.Order(StringComparer.Ordinal));
         foreach (KeyValuePair<string, IReadOnlyList<string>> exemption in ChatBotCommandAdmissionCatalog.NotApplicableStages)
         {
             ChatBotAdmissionProfile profile = catalog.Find(exemption.Key).ShouldNotBeNull();
             exemption.Value.ShouldNotBeEmpty();
+            exemption.Value.ShouldBe(expected[exemption.Key], ignoreOrder: true);
             exemption.Value.Distinct(StringComparer.Ordinal).Count().ShouldBe(exemption.Value.Count);
             exemption.Value.ShouldAllBe(stage => ChatBotCommandAdmissionCatalog.RequiredStages(profile).Contains(stage));
             ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(exemption.Key)
@@ -166,6 +186,8 @@ public sealed class AdmissionProfileFitnessTests
     [InlineData("src/Hexalith.ChatBot.Client/Adapter.cs", "await pipeline.ClassifyAsync(command);")]
     [InlineData("src/Hexalith.ChatBot.UI/Adapter.cs", "RiskClassification = new AiActionRiskClassificationRecord(...);")]
     [InlineData("src/Hexalith.ChatBot.UI/Adapter.cs", "AiActionRiskClassificationRecord record = new(...);")]
+    [InlineData("src/Hexalith.ChatBot.UI/Adapter.cs", "AiActionRiskClassificationRecord Classify(Request request) => new(...);")]
+    [InlineData("src/Hexalith.ChatBot.UI/Composer.razor", "@code { private AiActionRiskClassificationRecord Classify(Request request) => new(...); }")]
     [InlineData("src/Hexalith.ChatBot.UI/Composer.razor", "@code { private AiActionRiskClassificationRecord _record = new(...); }")]
     [InlineData("src/Hexalith.ChatBot.UI/Composer.razor", "@code { private object Classify() => new AiActionRiskClassificationRecord(...); }")]
     [InlineData("src/Hexalith.ChatBot.UI/Composer.razor", "@code { private Task Admit() => pipeline.AdmitAsync(command); }")]
@@ -202,7 +224,7 @@ public sealed class AdmissionProfileFitnessTests
         if (Regex.IsMatch(source, @"\.\s*ProcessAsync\s*\(")) { return true; }
         bool adapter = path.Contains(".Client/", StringComparison.Ordinal) || path.Contains("/Adapters/", StringComparison.Ordinal) || path.Contains(".Cli/", StringComparison.Ordinal) || path.Contains(".Mcp/", StringComparison.Ordinal) || path.Contains(".UI/", StringComparison.Ordinal) || path.Contains(".Workers/", StringComparison.Ordinal);
         if (adapter && (Regex.IsMatch(source, @"\bnew\s+(?:[\w]+\.)*AiActionRiskClassificationRecord\s*\(") ||
-            Regex.IsMatch(source, @"\bAiActionRiskClassificationRecord\??\s+\w+\s*=\s*new\s*\("))) { return true; }
+            Regex.IsMatch(source, @"\bAiActionRiskClassificationRecord\??\s+\w+\s*(?:=\s*|\([^)]*\)\s*=>\s*)new\s*\("))) { return true; }
         if (adapter && Regex.IsMatch(source, @"\.\s*(?:AuthorizeAsync|ClassifyAsync|RecordPreCommitAsync|AdmitAsync)\s*\(")) { return true; }
         return path.Contains(".Contracts/", StringComparison.Ordinal) && Regex.IsMatch(source, @"public\s+\w+\??\s+AdmissionProfile\b");
     }

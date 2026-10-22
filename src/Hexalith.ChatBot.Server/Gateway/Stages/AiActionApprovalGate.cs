@@ -84,12 +84,12 @@ internal sealed class AiActionApprovalGate(IAiActionPolicyEvaluator policyEvalua
             return ChatBotApprovalResult.Blocked(Contracts.Messages.ChatBotMessageCodes.ClassifierIndeterminate);
         }
 
-        // Every declared boundary-crossing effect requires a distinct effect command and an independent human
-        // decision. Policy never evaluates, approves or downgrades these six effect classes.
         if (!Enum.IsDefined(command.AssistanceKind))
         {
             return ChatBotApprovalResult.Blocked(Contracts.Messages.ChatBotMessageCodes.ClassifierIndeterminate);
         }
+        // Every declared boundary-crossing effect requires a distinct effect command and an independent human
+        // decision. Policy never evaluates, approves or downgrades these six effect classes.
         if (risk.RiskClass != AiActionRiskClass.LowRisk || risk.RiskActionClasses.Count > 0)
         {
             return ChatBotApprovalResult.RoutedToApproval(command.PolicySnapshotId ?? "unavailable", ChatBotMessageCodes.ApprovalRequired);
