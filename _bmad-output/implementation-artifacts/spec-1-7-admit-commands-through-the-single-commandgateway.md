@@ -738,3 +738,129 @@ Root then ran the full final Architecture lane with the same native command abov
 All seven original round-6 patch checkboxes and both new direct review patches are complete. All ten new findings were triaged independently, the one pre-existing CI source-reference conflict was appended to the deferred ledger, and previous approved deferrals were not duplicated. The final cumulative baseline-to-worktree diff is retained in a system-temp snapshot; the real index is unchanged. Frozen intent and the canonical baseline revision are preserved.
 
 Step 04 requires: "if verification fails and the failure cannot be fixed, HALT and escalate to the human." The unrelated failing broad gates and unavailable live topology cannot be fixed inside this story's authorized boundaries without altering independent configuration or sibling/gate prerequisites. Closeout therefore stops before step 05 or any completion transition. Spec remains in-review and sprint review under the repository baseline and docs/story-evidence-integrity.md. No owner execution, live success, readiness, A5/A6/A9a/A13 closure, deployment, real-index staging, commit, push, dependency update or sibling tracked change is claimed.
+
+
+### Verification blocker resolution — 2026-10-22
+
+The user's current instruction authorizes configuration fixes in the owning root-declared siblings and preservation of the existing implementation. This narrowly extends the earlier no-sibling-edit boundary for these five blockers; the frozen intent, production admission, approved Story 1.8 deferrals and all dependency version numbers remain unchanged. The initial ChatBot tree was clean at `e6f36d4d6da448e0bdbf04c077ee6c2b3e4cee34`; the prior work was already in that local commit and was preserved. No index, commit, branch, push, dependency update or nested-submodule initialization is part of this change.
+
+Resolved in the coordinated working trees:
+
+- `.github/workflows/release.yml`: semantic-release timeout is 30 minutes, as required by the existing architecture guard.
+- `references/Hexalith.Builds/Props/Directory.Packages.props` owns the existing cryptography 10.0.13 pins and Works.Contracts 1.0.2 pin. EventStore's three other 10.0.13 servicing pins were already identical in Builds, so their duplicate overrides were removed. The seventh reported wrapper item was Works' deliberate source-only EventStore.Contracts removal, not a version declaration: the catalog now conditions that single Include to preserve its behavior for Works source builds. All seven wrapper items are removed without weakening the architecture guard or changing package versions. EventStore's owner adapter now delegates to the original hash-verified shared validators without an exception overlay; its fixtures reject reintroduced local pins and retain raw/effective/hash negative controls.
+- `LiveRecoveryValidationArchitectureTests.RunSettingsIsAcceptedByTheTestPlatform` invokes the executable beside its own assembly through `AppContext.BaseDirectory`, retaining the positive named-test/exit checks in Debug and Release.
+- Production `accesscontrol.yaml` and its reviewed conformance list add only the five mapped POST routes: `/project/rebuild/reclaim-guarded/v1`, `/project/rebuild/reclaim-recovery/v1`, `/project/source-guard/applied-receipt/v1`, `/project/source-guard/owner-proof/v1`, `/project/source-guard/reconcile-applied-receipt/v1`. Caller identity, trust domain, namespace, global/per-policy denial and empty ChatBot grants are unchanged.
+- Parties' root build/package wrappers respect an explicit Builds root, otherwise select the existing root-declared Builds sibling before the standalone fallback. No nested checkout is used or initialized. Its ownership test pins the new guarded fallback and still rejects local version declarations and source/package-mode defaults.
+
+Commands and evidence (all local builds use Debug; each native runner requires zero skips):
+
+    aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj
+    dotnet restore src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj -p:Configuration=Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false
+    dotnet build tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj --configuration Debug -p:UseHexalithProjectReferences=true -p:HexalithBuildsRoot=/home/administrator/projects/hexalith/chatbot/references/Hexalith.Builds -p:HexalithMcpCliFromSource=false -m:1 /nr:false
+    dotnet build tests/<project>/<project>.csproj --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false
+    UseHexalithProjectReferences=true aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj
+
+Pre-edit start: exit 2, four Parties NU1010 failures plus NuGet's Object reference error; CLI log `cli_20261022T155044_449422b2.log`. AppHost restore after the fix: exit 0 with no Builds override (`TestResults/story-1-7-blockers-apphost-restore.log`). The former McpCli package-mode workaround failed compilation with 78 missing-attribute errors in Tenants; rerunning the full source graph without that workaround passed. Architecture, Conformance and Integration full source-graph builds passed with zero warnings/errors, using the fourth command with `<project>` respectively `Hexalith.ChatBot.Architecture.Tests`, `Hexalith.ChatBot.Conformance.Tests`, `Hexalith.ChatBot.IntegrationTests`. Logs use `TestResults/story-1-7-blockers-{architecture-source,conformance,integration}-build.log`.
+
+Unqualified AppHost start after the restore fix reaches a separate Tenants `NativeSourceProof` source/package mismatch, exit 2 (`story-1-7-blockers-apphost-start.log`). Explicit source-mode start builds successfully (one transient MSB3026 retry, zero errors) and exits 2 after the process exits 134 at the existing missing `ChatBot:LiveRecoveryValidation:MailboxClientSecret` check (`story-1-7-blockers-apphost-source-start.log`, CLI `cli_20261022T155817_d3d66400.log`). The live test fixture supplies its existing local placeholder configuration, and the first real live run recorded all required topology resources healthy, including Parties and ChatBot. Thus NU1010 is resolved; no unconfigured-start success is claimed.
+
+For Architecture and Conformance, root executed the focused three methods and three ACL tests first, then each complete lane:
+
+    XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/<project>/bin/Debug/net10.0/<project> TestResults/story-1-7-blockers-<lane>.ctrf.json -result-trx TestResults/story-1-7-blockers-<lane>.trx
+
+Architecture focus added `-method Hexalith.ChatBot.Architecture.Tests.LiveRecoveryValidationArchitectureTests.ReleasePublication_ShouldRequireFreshMainHeadImmediatelyBeforeSemanticRelease -method Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.RootDeclaredSiblingPackageWrappersShouldDelegateVersionsToSharedBuildsCatalog -method Hexalith.ChatBot.Architecture.Tests.LiveRecoveryValidationArchitectureTests.RunSettingsIsAcceptedByTheTestPlatform` with lane `architecture-focused`: exit 0, 3/3 passed. Conformance focus added `-class Hexalith.ChatBot.Conformance.Tests.DaprAccessControlConformanceTests`, lane `conformance-focused`: exit 0, 3/3 passed.
+
+Additional full lane builds used:
+
+    dotnet build tests/<project>/<project>.csproj --configuration Debug -p:UseHexalithProjectReferences=true -p:BuildProjectReferences=false -m:1 /nr:false
+
+Projects were Server.Tests, Contracts.Tests, Client.Tests, UI.Tests and AppHost.Tests with the `Hexalith.ChatBot.` prefix. All five builds passed with zero warnings/errors after the production source graph had been built. Each full native lane used the command above; exact expanded argument vectors and exit codes are retained in `TestResults/story-1-7-blockers-additional-lanes.json`.
+
+| Full ChatBot lane | Exit | Passed / executed | Failed | Skipped |
+| --- | --- | --- | --- | --- |
+| Architecture | 0 | 151 / 151 | 0 | 0 |
+| Conformance | 0 | 151 / 151 | 0 | 0 |
+| Server | 0 | 3234 / 3234 | 0 | 0 |
+| Contracts | 0 | 531 / 531 | 0 | 0 |
+| Client | 0 | 95 / 95 | 0 | 0 |
+| UI | 1 | 495 / 499 | 4 | 0 |
+| AppHost | 0 | 18 / 18 | 0 | 0 |
+
+UI's four failures are the previously recorded Fluent UI test expectations of 5.0.0 against the unchanged shared catalog's 5.0.1, in ChatBotResponsiveTouchContractTests, ChatBotLiveRegionReducedMotionContractTests, ChatBotLocalizationContractTests and ChatBotAccessibilityFocusContractTests. Their canonical TRX is retained; no dependency version was changed to satisfy them.
+
+Owning-repository checks:
+
+    # From references/Hexalith.Builds
+    pwsh -NoProfile -File Tools/validate-central-package-versions.ps1
+    pwsh -NoProfile -File Tools/test-authoritative-package-catalog.ps1
+    pwsh -NoProfile -File Tools/validate-package-version-exceptions.ps1 -InventoryPath Tools/package-version-exceptions.json -CatalogPath Props/Directory.Packages.props
+    pwsh -NoProfile -File Tools/validate-package-version-exceptions.ps1 -InventoryPath Tools/package-version-exceptions.json -CatalogPath Props/Directory.Packages.props -WorkspaceRoot /home/administrator/projects/hexalith/chatbot
+    pwsh -NoProfile -File Tools/validate-consumer-package-authority.ps1 -RepositoryRoot /home/administrator/projects/hexalith/chatbot/references/Hexalith.<owner> -CatalogPath Props/Directory.Packages.props
+
+Catalog validation: exit 0, 310 entries. Authoritative catalog tests: exit 0, 50 identities and three shared versions. Exception schema: exit 0, 15 allowlisted entries. Workspace-wide exception check: exit 1, null-valued expression; the ChatBot AppHost SDK is independently still 13.5.3 while the existing inventory says 13.6.1, and no SDK version was changed. Consumer authority checks used `<owner>` EventStore, Timesheets, Works and Parties: Timesheets passes all 16 projects; EventStore stops on an existing empty XML file inside sealed historical evidence; Works rejects its existing EventStore/Parties version properties and a sealed 3.122.0 probe; Parties' static import resolver assumes the standalone nested default instead of evaluating the guarded sibling fallback. Logs are retained under `/tmp/story17-{catalog-validation-final,catalog-authority,exception-schema,exception-validation,eventstore-authority,timesheets-authority,works-authority,parties-authority}.log`. These guards were not weakened. An isolated MSBuild catalog matrix evaluated Works.Contracts, Works.Server, Timesheets.Works and EventStore.Contracts in both source/package modes: 8/8 pass, all five servicing pins remain 10.0.13, Works.Contracts remains 1.0.2 and only Works source omits the transitive EventStore.Contracts pin. Results: `TestResults/story-1-7-blockers-catalog-matrix.json`.
+
+    # From references/Hexalith.EventStore
+    pwsh -NoProfile -File scripts/validate-eventstore-package-authority.ps1 -RepositoryRoot . -CatalogPath ../Hexalith.Builds/Props/Directory.Packages.props -ValidateWrapperOnly
+    dotnet build tests/Hexalith.EventStore.Contracts.Tests/Hexalith.EventStore.Contracts.Tests.csproj --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false
+    XUNIT_REQUIRE_ZERO_SKIPS=1 bash /home/administrator/projects/hexalith/chatbot/.github/scripts/run-xunit-v4.sh tests/Hexalith.EventStore.Contracts.Tests/bin/Debug/net10.0/Hexalith.EventStore.Contracts.Tests /home/administrator/projects/hexalith/chatbot/TestResults/story-1-7-blockers-eventstore-packaging.ctrf.json -result-trx /home/administrator/projects/hexalith/chatbot/TestResults/story-1-7-blockers-eventstore-packaging.trx -class Hexalith.EventStore.Contracts.Tests.Packaging.ContractsPackageDependencyTests
+
+Wrapper check and build: exit 0, zero build warnings/errors. Complete packaging class: exit 1, 64/65 passed, zero skipped. Canonical TestDefinitions/testId reconciliation confirms every one of the 21 changed wrapper/adapter cases passed, including reintroduced pins, raw/effective overrides and modified shared validators. The single broad failure is `SharedConsumerAuthorityValidatorPassesForEveryTrackedMsBuildSurfaceAsync`: the unchanged strict shared validator reports 10,898 violations in existing sealed historical probe trees. Those artifacts were preserved and no exclusion waiver was added. This was the full packaging class, not the whole EventStore Contracts test project.
+
+    # From references/Hexalith.Parties
+    dotnet build tests/Hexalith.Parties.Ci.Tests/Hexalith.Parties.Ci.Tests.csproj --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false
+    XUNIT_REQUIRE_ZERO_SKIPS=1 bash /home/administrator/projects/hexalith/chatbot/.github/scripts/run-xunit-v4.sh tests/Hexalith.Parties.Ci.Tests/bin/Debug/net10.0/Hexalith.Parties.Ci.Tests /home/administrator/projects/hexalith/chatbot/TestResults/story-1-7-blockers-parties-focused.ctrf.json -result-trx /home/administrator/projects/hexalith/chatbot/TestResults/story-1-7-blockers-parties-focused.trx -method Hexalith.Parties.Ci.Tests.CommonsHttpRestoreRoutingTests.DirectoryBuildPropsLeavesSourceAndPackageSelectionToThePinnedTool
+    XUNIT_REQUIRE_ZERO_SKIPS=1 bash /home/administrator/projects/hexalith/chatbot/.github/scripts/run-xunit-v4.sh tests/Hexalith.Parties.Ci.Tests/bin/Debug/net10.0/Hexalith.Parties.Ci.Tests /home/administrator/projects/hexalith/chatbot/TestResults/story-1-7-blockers-parties-ci.ctrf.json -result-trx /home/administrator/projects/hexalith/chatbot/TestResults/story-1-7-blockers-parties-ci.trx
+
+Build: exit 0, zero warnings/errors. Changed ownership test: 1/1 passed. Full CI lane: exit 1, 177/188 passed, zero skipped. Remaining failures are three direct nested Builds file assumptions, the pinned domain-ci workflow revision lookup, six required restore/publish assets missing for projects outside ChatBot's graph, and SupportPackingRequiresExactProducedPackageMetadata. Exact failing names/messages are retained in the canonical TRX; no nested dependency was initialized to satisfy them.
+
+Three independent reviewers inspected the blocker diff. Edge review returned no findings. Blind and verification reviews independently identified the two owner-test/adapter regressions now fixed. The other three blind findings identify coordinated integration constraints: standalone EventStore, Timesheets and Works still name older nested Builds gitlinks without the newly centralized rows/condition. These wrappers must be integrated together with the Builds catalog and then their dependency pointers adopted by their owners; this uncommitted workspace change is not a claim that those standalone pins have advanced. The current instruction prohibits commits and nested-submodule updates, so no pointer movement or local-version fallback was introduced to mask that coordination requirement.
+
+
+### Live fixture follow-up and final verification — 2026-10-22
+
+The first live smoke command was:
+
+    HEXALITH_CHATBOT_TIER3=1 HEXALITH_CHATBOT_TIER3_REQUIRED=1 XUNIT_REQUIRE_ZERO_SKIPS=1 UseHexalithProjectReferences=true bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests TestResults/story-1-7-blockers-topology.ctrf.json -result-trx TestResults/story-1-7-blockers-topology.trx -method Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology
+
+It executed 1 test, failed 1, skipped 0, exit 1: all twelve required resources were Running/Healthy, then MemoriesProbeCommandGateway incorrectly required Release instead of the current Debug configuration. The fixture now compares the live owner configuration with its test assembly's AssemblyConfigurationAttribute. Exact live executable/project binding, deployed owner assembly hashes and dependency-graph binding remain intact.
+
+The initial browser invocation used the same environment plus `CHROME_EXECUTABLE_PATH=/usr/bin/google-chrome`, the selector `Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests.AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix` and prefix `TestResults/story-1-7-blockers-browser`. Its ChatBot process stopped because the fixture set Testing while configuring local HTTP identity metadata; the SDK correctly requires HTTPS outside Development. `aspire logs chatbot-xvjbrnpn --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --tail 50` exited 0 and retained that startup exception in `story-1-7-blockers-browser-chatbot.log`. The structured-log attempt `aspire otel logs chatbot-xvjbrnpn --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --format Json` exited 12 because this test host has no enabled telemetry dashboard. After diagnosing the terminal startup failure, root stopped only its own ChatBot test host with `aspire stop --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj` (exit 0); the stalled initial native browser process consequently exited 137 with no completed test artifact. It is not passing browser evidence. The separately running Tenants AppHost was left alone.
+
+The browser fixture now selects the already-supported Development environment for its local HTTP topology. Production HTTPS validation, the production prohibition on acceptance fixtures, authorization, owner evidence and unconditional atomic refusal are unchanged. No synthetic admission authority or commit participation was enabled.
+
+    dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug --no-restore -p:UseHexalithProjectReferences=true -p:BuildProjectReferences=false -m:1 /nr:false
+    XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests TestResults/story-1-7-blockers-integration-focused.ctrf.json -result-trx TestResults/story-1-7-blockers-integration-focused.trx -method 'Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests.TierThree*' -method Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests.RefusedCommandReservationProbeShouldRejectPersistedCanonicalOperationStatus -method Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests.AcceptanceFixtureShouldFailProductionAndReplaceOnlyGuardedProvidersInDevelopment -method Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests.ComposerBlockedPresentationShouldOnlyBeARejectionWithAnExplicitSubmissionError
+    XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests TestResults/story-1-7-blockers-architecture-final.ctrf.json -result-trx TestResults/story-1-7-blockers-architecture-final.trx
+
+Final Integration build: exit 0, zero warnings/errors. Focused integration contracts: exit 0, 47/47 passed, zero skips. Complete final Architecture lane: exit 0, 151/151 passed, zero skips. These are compiled contract/architecture evidence, not live acceptance.
+
+Root reran the two exact live selectors sequentially, with the environment from the initial smoke plus `CHROME_EXECUTABLE_PATH=/usr/bin/google-chrome`, changing evidence prefixes to `story-1-7-blockers-topology-final` and `story-1-7-blockers-browser-final`. Exact expanded native argument vectors and exit codes are retained in `TestResults/story-1-7-blockers-live-final-commands.json`. The existing local environment reports Dapr CLI 1.18.2/runtime 1.18.7 (`dapr --version`), Docker 29.8.2 (`docker info --format '{{.ServerVersion}}'`) and `/usr/bin/google-chrome`; no runtime, SDK, package or tool version was installed or changed and this is not CI's pinned-runtime qualification.
+
+Final live smoke: exit 1, 0/1 passed, 1 failed, zero skipped; 242.369 seconds. All twelve required resources again reported Running/Healthy. Owner provisioning reached `MemoriesProbeCommandGateway`, but `MEMORIES_OWNER_GATEWAY_STATUS_EVIDENCE` recorded HTTP 500 for domain memories-tenants / command register-tenant, acceptedCommands 0. The supported workflow never reached active and exhausted its existing three-minute deadline in ProvisionMemoriesProbeTenantsAsync, line 2630, producing TaskCanceledException. No governed admission assertion, persisted owner provisioning, canonical no-write smoke success or M2 completion is claimed from that run. This owner workflow is a remaining live prerequisite, not permission to bypass it or seed storage directly.
+
+
+### Blocker follow-up review triage
+
+| Finding | Verdict | Disposition and evidence |
+| --- | --- | --- |
+| Blind B1 — Parties forbids Exists in its wrapper | medium | Patched the ownership test for the guarded root-declared fallback; its focused native test passes and still rejects local versions/source-mode defaults. |
+| Blind B2 — Timesheets standalone selects the older catalog | medium | Coordinated integration prerequisite: Works.Contracts 1.0.2 is now in the edited shared catalog; adopting only the Timesheets wrapper against its unchanged standalone Builds gitlink is unsupported. Preserve the version and integrate the catalog before owner pointer adoption. No commit or nested update is authorized here. |
+| Blind B3 — Works standalone loses the source pin exclusion | medium | Coordinated integration prerequisite: the edited shared catalog preserves the exclusion, demonstrated in both Works source evaluations. Its old standalone catalog must adopt that change before the wrapper migration is integrated separately. No local fallback was added because the required guard forbids a second authority. |
+| Blind B4 — EventStore standalone lacks the centralized security rows | medium | Coordinated integration prerequisite: both 10.0.13 cryptography rows are in the edited shared catalog and all five servicing versions are preserved. The standalone dependency must adopt that catalog before separate integration of the wrapper change. No security floor was downgraded in this workspace. |
+| Verification V1 — EventStore adapter requires five removed pins | medium | Patched to enforce a version-free wrapper and invoke the original hash-verified authority. All 21 affected wrapper/adapter cases passed in the complete packaging-class run; the independent historical-probe broad failure remains disclosed. |
+| Verification V2 — Parties ownership test forbids the fallback | medium | Independently verified duplicate of Blind B1; patched once, with passing focused execution and the full CI lane retained. |
+
+The edge-case reviewer returned no findings. Review covered the current blocker follow-up; prior approved Story 1.8 findings were neither reopened nor duplicated.
+
+
+### Final closeout — 2026-10-22
+
+Final browser matrix: exit 1, 0/1 passed, 1 failed, zero skipped; 149.763 seconds (`TestResults/story-1-7-blockers-browser-final.{ctrf.json,trx}`). Security, EventStore, Tenants, ChatBot and UI all report Running/Healthy and the test verifies the tenant-bound project-owner claim. It then fails in AuthenticateActorAlphaAsync waiting 90,000 ms for `Locator("#username")` to become visible. The expected browser refusal matrix and its unchanged-state assertions did not execute. The previously documented owner-authority fixture prerequisite also remains unproven; this result does not replace it with a successful authorization claim.
+
+The final native commands for both live selectors, including argument vectors and exit codes, are recorded in `TestResults/story-1-7-blockers-live-final-commands.json`; their environment is explicitly recorded above. Live topology startup is established, but live governed-command refusal, browser acceptance, committed-state M2 and owner workflow qualification are not. No Story 1.8 work was implemented or enabled to make those tests pass.
+
+Root reconciled every completed current-run TRX result against canonical TestDefinitions/testId records and retained the audit in `TestResults/story-1-7-blockers-result-audit.json`. Native CTRF/TRX and checksum sidecars preserve both passing and failing results; a checksum is integrity metadata, not a pass. The initial interrupted browser attempt has no completed TRX and is excluded from executed-test counts. Revisions and unstaged file inventories for the six owning repositories are in `TestResults/story-1-7-blockers-repositories.json`.
+
+Remaining blockers are the final Memories owner registration HTTP 500/provisioning timeout; browser login timeout and unproven owner-authority fixture; the four existing UI catalog-expectation failures; the broad sibling CI/authority failures disclosed above; standalone adoption of the coordinated Builds catalog; and, for unconfigured direct startup, the explicit-source mode prerequisite and missing recovery mailbox secret. The independent committed-state M2 release gate remains intentionally blocked until approved Story 1.8 atomic participation. No failing lane was filtered or waived. A TE-2 completion transition is not proposed while these obligations fail.
+
+The spec stays in-review and sprint status stays review. Production owner/classifier qualification sources and atomic participation remain fail-closed; A5/A6/A9a/A13 remain open. Frozen intent matches HEAD byte-for-byte, the approved deferral ledger and sprint file are unchanged, and whitespace checks pass in all six repositories. No real-index staging, commit, push, branch switch, deployment, version upgrade or nested-submodule initialization/update occurred.

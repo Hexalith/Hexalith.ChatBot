@@ -2,6 +2,7 @@ using System.Net;
 using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -176,7 +177,10 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
         Path.GetFileName(projectPath).ShouldBe("Hexalith.Memories.Server.csproj");
         ownerResource.Snapshot.Properties.Single(property => property.Name == "project.path").Value.ShouldBe(projectPath);
         string configuration = arguments[configurationIndex + 1];
-        configuration.ShouldBe("Release", "The owner transport must execute the same Release owner module as the live server.");
+        string expectedConfiguration = typeof(MemoriesProbeCommandGateway).Assembly
+            .GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration
+            ?? throw new InvalidOperationException("The test build configuration is required for exact owner binding.");
+        configuration.ShouldBe(expectedConfiguration, "The owner transport must execute the current build's live owner module.");
         string serverAssembly = Path.Combine(Path.GetDirectoryName(projectPath)!, "bin", configuration, "net10.0", "Hexalith.Memories.Server.dll");
         _domain = new MemoriesProbeDomainTransport(serverAssembly);
 

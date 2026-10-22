@@ -82,6 +82,22 @@ spec:
           - name: /project/rebuild/shared/v1
             httpVerb: ["POST"]
             action: allow
+          # Guarded rebuild recovery and source-guard evidence routes.
+          - name: /project/rebuild/reclaim-guarded/v1
+            httpVerb: ["POST"]
+            action: allow
+          - name: /project/rebuild/reclaim-recovery/v1
+            httpVerb: ["POST"]
+            action: allow
+          - name: /project/source-guard/applied-receipt/v1
+            httpVerb: ["POST"]
+            action: allow
+          - name: /project/source-guard/owner-proof/v1
+            httpVerb: ["POST"]
+            action: allow
+          - name: /project/source-guard/reconcile-applied-receipt/v1
+            httpVerb: ["POST"]
+            action: allow
           # Operational index metadata for the admin surface.
           - name: /admin/operational-index-metadata
             httpVerb: ["POST"]

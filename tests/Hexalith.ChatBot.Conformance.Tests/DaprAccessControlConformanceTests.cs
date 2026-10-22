@@ -43,6 +43,11 @@ public static partial class DaprAccessControlConformanceTests
         "/project/rebuild/abort/v1",
         "/project/rebuild/verify/v1",
         "/project/rebuild/shared/v1",
+        "/project/rebuild/reclaim-guarded/v1",
+        "/project/rebuild/reclaim-recovery/v1",
+        "/project/source-guard/applied-receipt/v1",
+        "/project/source-guard/owner-proof/v1",
+        "/project/source-guard/reconcile-applied-receipt/v1",
         "/admin/operational-index-metadata",
     ];
 

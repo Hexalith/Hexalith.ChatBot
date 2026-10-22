@@ -689,13 +689,7 @@ public static class LiveRecoveryValidationArchitectureTests
         foreach (string argument in new[]
         {
             Path.Combine(".github", "scripts", "run-xunit-v4.sh"),
-            Path.Combine(
-                "tests",
-                "Hexalith.ChatBot.Architecture.Tests",
-                "bin",
-                "Release",
-                "net10.0",
-                "Hexalith.ChatBot.Architecture.Tests"),
+            Path.Combine(AppContext.BaseDirectory, "Hexalith.ChatBot.Architecture.Tests"),
             Path.Combine("TestResults", "architecture", "direct-runner-acceptance.ctrf.json"),
             "-method",
             "Hexalith.ChatBot.Architecture.Tests.LiveRecoveryValidationArchitectureTests.RunSettingsPlatformAcceptanceProbe",

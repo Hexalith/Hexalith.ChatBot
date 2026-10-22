@@ -240,8 +240,8 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
             string.Equals(resource.Name, ChatBotResourceName, StringComparison.Ordinal));
         chatBot.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
         {
-            context.EnvironmentVariables["DOTNET_ENVIRONMENT"] = "Testing";
-            context.EnvironmentVariables["ASPNETCORE_ENVIRONMENT"] = "Testing";
+            context.EnvironmentVariables["DOTNET_ENVIRONMENT"] = "Development";
+            context.EnvironmentVariables["ASPNETCORE_ENVIRONMENT"] = "Development";
             context.EnvironmentVariables["ChatBot__Story132Acceptance__Enabled"] = "true";
             context.EnvironmentVariables["Logging__LogLevel__Hexalith.ChatBot.Server.Lifecycle.AiExecution.AiExecutionCoordinator"] = "Information";
         }));
