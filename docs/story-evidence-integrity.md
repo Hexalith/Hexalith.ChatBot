@@ -51,6 +51,11 @@ Only repositories declared by the root `.gitmodules` are accepted, at any declar
 
 Every lane must have a secure, canonical Microsoft TeamTest 2010 TRX: one namespaced `TestRun` root, one direct `Times`, `Results`, `TestDefinitions`, and `ResultSummary/Counters` structure, unique result `testId` values, and exactly one direct canonical `TestMethod` per `UnitTest`. Foreign-namespace local-name injection and duplicate structural elements fail as `machine_results_invalid`. Summary counters reconcile exactly with one `UnitTestResult` per reported total, with non-zero total/executed/passed counts, no failures, selectors resolved through each result's `testId` and canonical `TestMethod` class/name, and no skips unless that lane explicitly permits them. Display-name spoofing cannot satisfy a selector. A required primary lane never permits skips and must match the policy's exact lane, selector, source, and primary class. Policy path patterns use `**/` as zero or more directory segments; explicit claim triggers are recognized only outside Markdown fences. Current-run TRX start/finish times and provenance must be within the policy's current-run window and future-skew bound. Attestation validates the complete pinned policy, the contract version, safe non-aliasing TRX/provenance paths, and every current-run lane before creating or replacing any sidecar; one invalid lane leaves every existing sidecar byte-identical and creates none. The provenance sidecar binds the policy repository identity, exact base/head, implementation digest, TRX checksum, lane/source/selectors, UTC timestamp, and contract-declared artifact locator.
 
+Primary binding consumers select exactly one complete binding by the declared lane, keeping its selector, source,
+and pinned paths together independently of array order. Missing, duplicate, malformed, or cross-bound selections
+fail closed. Synthetic multi-binding tests exercise this selection seam; production policy pinning still permits
+exactly the existing single approved binding per primary class and authorizes no additional lanes.
+
 Policy v2 binds the logical primary lanes to shipped test classes exactly:
 
 | Primary class | Logical lane | Required class selector |
@@ -117,6 +122,26 @@ The gate test project copies its pinned policy to both build and publish output.
 | `evidence_payload_forbidden` | Contract/provenance grammar contains an unknown, secret-shaped, or payload-shaped field. |
 
 ## CI behavior
+
+The enforcing CI platform is Linux (`ubuntu-latest`), including the gate self-tests and ordinary test lanes.
+The gate's POSIX process, executable-mode, and symlink scenarios are exercised there with zero skips. Windows
+execution is unsupported for this evidence boundary: a platform-specific skipped test is unexecuted evidence and
+does not establish a Windows pass. Linux results must not be reported as Windows evidence.
+
+The workflow invokes repository-owned Bash guards: `resolve-story-evidence-bounds.sh` preserves exact event
+revisions and the zero/empty push-base-only fallback; `collect-story-evidence-artifacts.sh` preflights every safe
+same-repository locator and destination, then downloads each exact named artifact once into an isolated directory;
+`check-story-evidence-reserve.sh` enforces the fixed 2400-second admission threshold. The executable Python suite
+uses temporary Git repositories and fake `gh`/`date` processes without network access, plus an already-built native
+xUnit runner to prove a real zero-match ordinary lane refuses without success checksums. Build the gate tests in
+Debug, then run `python3 -m unittest discover -s .github/scripts/tests -p 'test_story_evidence_guards.py' -v` locally.
+CI supplies its already-built Release runner through `STORY_EVIDENCE_TEST_RUNNER`; a missing runner fails the suite.
+
+At or after 2400 elapsed seconds, the reserve guard fails before DAPR initialization and retains
+`completion-reserve.json` in the always-uploaded story-evidence report directory. Its bounded metadata-only JSON
+contains `passed: false`, stable workflow code `completion_reserve_exhausted`, `elapsedSeconds`, and
+`thresholdSeconds: 2400`. This workflow refusal code is separate from the nine stable TE-2 reasons. Admission below
+the threshold still fixes closeout at job start plus 330 minutes; the reserve and freshness ceilings are unchanged.
 
 Pull requests also run an isolated `pull-request synthetic merge build and test` check. It checks out GitHub's
 synthetic merge SHA, verifies that the commit has exactly the advertised base then head parents, initializes only

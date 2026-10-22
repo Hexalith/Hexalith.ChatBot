@@ -249,7 +249,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: Story 12.15 follow-up or Windows runner job
 severity: low
 reason: **[LOW · platform] Windows skips symlink-ancestry / immutable digest / executable-bit gate tests.** **Release-claim impact:** those fail-closed paths are unverified on Windows CI hosts. **Owner:** Story 12.15 follow-up or Windows runner job. **Closure evidence:** compensating Windows coverage or documented Linux-only gate CI.
-status: open
+status: done 2026-10-22
+resolution: Documented Linux-only enforcing gate CI in docs/story-evidence-integrity.md; StoryEvidenceIntegrityGateShouldRemainFailClosedAndMachineBound and Linux gate suite (305 passed, zero skipped) verify ubuntu-latest wiring and symlink/digest/mode checks.
 
 ### DW-29: [LOW · hardening] Unbounded JSON/TRX/scope file reads and JSON depth.
 
@@ -286,7 +287,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: extracted script tests or follow-up
 severity: medium
 reason: **[MEDIUM · story-evidence bash] Fail-closed bash paths and event bounds lack executable negative coverage.** **Partial close 2026-08-24 (chunk E):** the workflow now rejects an unavailable non-zero push base, uses an empty range for schedule/manual events, recursively discovers test projects, and fails on zero discovery; policy and architecture guards pin those branches. **Still open:** executable PR/normal-push/zero-base/unavailable-base/checkout-mismatch and unsafe-locator tests rather than source-text assertions. **Owner:** extracted script tests or follow-up. **Closure evidence:** BATS/script unit tests for the remaining bash guards.
-status: open
+status: done 2026-10-22
+resolution: Extracted resolve-story-evidence-bounds.sh and collect-story-evidence-artifacts.sh; python3 -m unittest discover -s .github/scripts/tests -p test_story_evidence_guards.py -v passed 12 tests including PR/push/zero-base/manual bounds, unavailable-base/checkout refusals and exact isolated downloads plus unsafe locators/collisions/failure.
 
 ### DW-33: [LOW · story-evidence policy] `aspire-dapr` pathPatterns are repo-wide `*Dapr*`/`*Aspire*` globs.
 
@@ -792,7 +794,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: .github/workflows/ci.yml:215-231
 severity: low
 reason: **[LOW · observability] The 40-minute completion reserve refusal has no gate reason code.** `.github/workflows/ci.yml:215-231` fails the job when `elapsed_seconds >= 2400`, measured from before checkout, so unrelated CI slowness (this repo has a documented history of 13+ minute restore hangs) surfaces as a red required check with only a shell message and no machine-readable reason. `review-reality.md` R7 already conceded this failure class has no stable code and marked it "Resolved by claim correction". Release-claim impact: a reserve refusal is indistinguishable from an evidence breach in automated triage. Closure evidence: a dedicated reason code emitted on the refusal path.
-status: open
+status: done 2026-10-22
+resolution: check-story-evidence-reserve.sh emits metadata-only completion_reserve_exhausted JSON into the always-uploaded report directory at elapsed >= 2400; executable 2399/2400 and invalid-clock cases pass in the 12-test Python guard suite.
 
 ### DW-91: [LOW · latent] `recognizedLaneBindings[0]` is hardcoded.
 
@@ -800,7 +803,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: StoryEvidenceValidator.cs:872
 severity: low
 reason: **[LOW · latent] `recognizedLaneBindings[0]` is hardcoded.** `StoryEvidenceValidator.cs:872` and the new production-declaration preflight both take `RequiredArray(trigger, "recognizedLaneBindings", …)[0]` and then require `binding["lane"] == laneName`. Every trigger in `story-evidence-policy.json` has exactly one binding today, so this passes; the new `trx`/`provenance` pinning inherits the same index. Release-claim impact: adding a second binding to any trigger would silently ignore it while rejecting its lane as unrecognised. Closure evidence: iterate all bindings and match by lane.
-status: open
+status: done 2026-10-22
+resolution: PrimaryLaneBinding.Select matches exactly one lane and both validator consumers use its own metadata; synthetic two-binding, ordering, malformed/duplicate/missing/cross-binding tests and unchanged production pins pass in the 305-test gate suite.
 
 ### DW-92: [MEDIUM · governance] `ModelContextProtocol` 1.4.1 → 2.2.0 major bump is unratified.
 
@@ -1126,7 +1130,8 @@ location: .github/workflows/ci.yml:130
 source_spec: `spec-release-workflow-safety.md`
 severity: medium
 reason: `.github/workflows/ci.yml`'s `Test` step runs each of the 13 ordinary lanes as `dotnet test "$project" --no-build --configuration Release --logger trx ...` with no `RunConfiguration.TreatNoTestsAsError=true`. Reproduced in this repository: the same command form with a filter matching nothing prints "No test matches the given testcase filter" and exits 0, still writes the TRX, so `sha256sum` succeeds and `executed` still reaches 13. The `build` loop is unchanged by this story -- the gap predates it and was surfaced only because the new merge lane adopted the override. The merge lane is `pull_request`-only, so pushes to `main` and the whole release path remain unguarded.
-status: open
+status: done 2026-10-22
+resolution: Verified the existing run-merge-test-lanes.sh/run-xunit-v4.sh CTRF executed-count refusal: a real native runner returns zero for no tests but the ordinary wrapper exits nonzero without checksums. Python guard suite and focused architecture zero-test cases pass.
 
 ### DW-131: Follow-up review still recommended for dw-release-workflow-safety after the damping cap was spent
 origin: review-budget-followup

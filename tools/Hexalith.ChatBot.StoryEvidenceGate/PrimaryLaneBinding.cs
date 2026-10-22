@@ -5,6 +5,48 @@ namespace Hexalith.ChatBot.StoryEvidenceGate;
 /// <summary>Checks complete policy bindings before granting a primary lane's freshness override.</summary>
 internal static class PrimaryLaneBinding
 {
+    /// <summary>Selects exactly one complete binding for an explicitly recognized lane.</summary>
+    internal static JsonObject Select(JsonObject trigger, string lane)
+    {
+        string pathClass = EvidenceJson.RequiredString(trigger, "class", GateReason.PrimaryPathNotExecuted);
+        IReadOnlyList<string> recognized = EvidenceJson.RequiredStrings(
+            trigger, "recognizedLanes", GateReason.PrimaryPathNotExecuted);
+        HashSet<string> seen = new(StringComparer.Ordinal);
+        JsonObject? selected = null;
+        foreach (JsonNode? node in EvidenceJson.RequiredArray(
+                     trigger, "recognizedLaneBindings", GateReason.PrimaryPathNotExecuted))
+        {
+            JsonObject binding = node as JsonObject
+                ?? throw new GateValidationException(GateReason.PrimaryPathNotExecuted, pathClass);
+            string candidate = EvidenceJson.RequiredString(binding, "lane", GateReason.PrimaryPathNotExecuted);
+            _ = EvidenceJson.RequiredString(binding, "selector", GateReason.PrimaryPathNotExecuted);
+            IReadOnlyList<string> sources = EvidenceJson.RequiredStrings(
+                binding, "sources", GateReason.PrimaryPathNotExecuted);
+            if (!seen.Add(candidate) || !recognized.Contains(candidate, StringComparer.Ordinal)
+                || sources.Count == 0
+                || sources.Any(static source => source is not ("current-run" or "retained")))
+            {
+                throw new GateValidationException(GateReason.PrimaryPathNotExecuted, pathClass);
+            }
+
+            foreach (string property in new[] { "trx", "provenance" })
+            {
+                if (binding.ContainsKey(property))
+                {
+                    _ = EvidenceJson.RequiredString(binding, property, GateReason.PrimaryPathNotExecuted);
+                }
+            }
+
+            _ = EvidenceJson.OptionalInteger(binding, "maximumCurrentRunAgeMinutes", GateReason.PrimaryPathNotExecuted);
+            if (candidate.Equals(lane, StringComparison.Ordinal))
+            {
+                selected = binding;
+            }
+        }
+
+        return selected ?? throw new GateValidationException(GateReason.PrimaryPathNotExecuted, pathClass);
+    }
+
     /// <summary>Resolves a freshness ceiling only after checking every override binding for the result.</summary>
     internal static int ResolveCurrentRunAgeMinutes(JsonObject policy, JsonObject contract, JsonObject result)
     {

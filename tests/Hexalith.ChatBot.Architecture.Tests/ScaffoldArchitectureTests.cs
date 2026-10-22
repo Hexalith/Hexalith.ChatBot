@@ -1383,6 +1383,10 @@ public static class ScaffoldArchitectureTests
         recoveryPrimarySource.ShouldContain("public sealed class LiveContinuityAspireE2eTests");
         workflow.ShouldContain("story-evidence-integrity:");
         workflow.ShouldContain("name: story-evidence-integrity");
+        completionJob.ShouldContain("runs-on: ubuntu-latest");
+        WorkflowBlock(workflow, "build", "story-evidence-integrity").ShouldContain("runs-on: ubuntu-latest");
+        workflow.ShouldContain("python3 -m unittest discover -s .github/scripts/tests -p 'test_story_evidence_guards.py' -v");
+        workflow.ShouldContain("STORY_EVIDENCE_TEST_RUNNER:");
         workflow.ShouldContain("needs: [build, topology-acceptance]\n    if: always()");
         workflow.ShouldContain("timeout-minutes: 360");
         workflow.ShouldContain("if: needs.build.result != 'success'");
@@ -1399,8 +1403,10 @@ public static class ScaffoldArchitectureTests
         mergeLaneScript.ShouldContain("the merge lane set must match the build job exactly");
         mergeLaneScript.ShouldContain("Colliding merge test lane");
         mergeLaneScript.ShouldContain("run-xunit-v4.sh");
-        workflow.ShouldContain("Non-zero push base %s is unavailable; refusing a one-commit fallback.");
-        workflow.ShouldContain("base_sha=\"$head_sha\"");
+        workflow.ShouldContain("bash .github/scripts/resolve-story-evidence-bounds.sh");
+        string boundsScript = File.ReadAllText(Path.Combine(root, ".github", "scripts", "resolve-story-evidence-bounds.sh"));
+        boundsScript.ShouldContain("Non-zero push base %s is unavailable; refusing a one-commit fallback.");
+        boundsScript.ShouldContain("base_sha=\"$head_sha\"");
         workflow.ShouldContain("Plan proposed completion production");
         workflow.ShouldContain("--configuration Release --no-build -- plan");
         workflow.ShouldContain("--output \"$PRODUCTION_PLAN_PATH\"");
@@ -1449,8 +1455,12 @@ public static class ScaffoldArchitectureTests
         scheduledRecoveryProducer.ShouldContain("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: \"265\"");
         scheduledRecoveryProducer.ShouldContain("bash .github/scripts/run-xunit-v4.sh");
         scheduledRecoveryProducer.ShouldContain("XUNIT_REQUIRE_ZERO_SKIPS=1");
-        workflow.ShouldContain("elapsed_seconds >= 2400");
-        workflow.ShouldContain("job_start_epoch + (330 * 60)");
+        workflow.ShouldContain("bash .github/scripts/check-story-evidence-reserve.sh");
+        workflow.ShouldContain("RESERVE_REPORT_PATH: ${{ runner.temp }}/story-evidence-reports/completion-reserve.json");
+        string reserveScript = File.ReadAllText(Path.Combine(root, ".github", "scripts", "check-story-evidence-reserve.sh"));
+        reserveScript.ShouldContain("elapsed_seconds >= 2400");
+        reserveScript.ShouldContain("job_start_epoch + (330 * 60)");
+        reserveScript.ShouldContain("completion_reserve_exhausted");
         workflow.ShouldContain("remaining_seconds - 900");
         workflow.ShouldContain("timeout --signal=INT --kill-after=15m");
         workflow.ShouldContain("dapr init --runtime-version 1.18.0");
@@ -1515,11 +1525,13 @@ public static class ScaffoldArchitectureTests
             + "LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate");
         releaseWorkflow.ShouldContain("live-recovery-validation.ctrf.json");
         workflow.ShouldContain("Collect transition-declared retained exact-run artifacts");
-        workflow.ShouldContain("done < \"$RETAINED_LOCATORS_PATH\"");
+        workflow.ShouldContain("bash .github/scripts/collect-story-evidence-artifacts.sh");
+        string retainedScript = File.ReadAllText(Path.Combine(root, ".github", "scripts", "collect-story-evidence-artifacts.sh"));
+        retainedScript.ShouldContain("done < \"$RETAINED_LOCATORS_PATH\"");
         workflow.ShouldNotContain("_bmad-output/implementation-artifacts/evidence/*.json | sort -u");
-        workflow.ShouldContain("gh run download \"$run_id\"");
-        workflow.ShouldContain("github-actions://([A-Za-z0-9_.-]+)");
-        workflow.ShouldContain("if [[ \"$repository\" != \"$GITHUB_REPOSITORY\" ]]; then");
+        retainedScript.ShouldContain("gh run download \"$run_id\"");
+        retainedScript.ShouldContain("github-actions://([A-Za-z0-9_.-]+)");
+        retainedScript.ShouldContain("if [[ \"$repository\" != \"$GITHUB_REPOSITORY\" ]]; then");
         workflow.ShouldContain("Verify general producer artifact binds the exact event head");
         workflow.ShouldContain(
             "- name: Verify topology producer artifact binds the exact event head when transition-declared\n"

@@ -66,6 +66,10 @@ jobs:
           XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
           tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
           TestResults/story-evidence-gate.ctrf.json
+      - name: Test synthetic merge executable story-evidence workflow guards
+        env:
+          STORY_EVIDENCE_TEST_RUNNER: ${{ github.workspace }}/tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
+        run: python3 -m unittest discover -s .github/scripts/tests -p 'test_story_evidence_guards.py' -v
 
   build:
     runs-on: ubuntu-latest
@@ -105,6 +109,10 @@ jobs:
           tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
           TestResults/story-evidence-gate.ctrf.json
           -result-trx TestResults/story-evidence-gate.trx
+      - name: Test executable story-evidence workflow guards
+        env:
+          STORY_EVIDENCE_TEST_RUNNER: ${{ github.workspace }}/tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
+        run: python3 -m unittest discover -s .github/scripts/tests -p 'test_story_evidence_guards.py' -v
       - name: Record test producer head
         run: printf '%s\n' "$(git rev-parse HEAD)" > TestResults/producer-head.sha
       - name: Upload collision-safe machine results
@@ -164,36 +172,7 @@ jobs:
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           PUSH_BASE: ${{ github.event.before }}
           PUSH_HEAD: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            base_sha="$PR_BASE"
-            head_sha="$PR_HEAD"
-          elif [[ "$EVENT_NAME" == "push" ]]; then
-            head_sha="$PUSH_HEAD"
-            if [[ -z "${PUSH_BASE:-}" || "$PUSH_BASE" =~ ^0+$ ]]; then
-              base_sha="$(git rev-parse HEAD^)"
-            elif git cat-file -e "${PUSH_BASE}^{commit}"; then
-              base_sha="$PUSH_BASE"
-            else
-              printf 'Non-zero push base %s is unavailable; refusing a one-commit fallback.\n' "$PUSH_BASE" >&2
-              exit 1
-            fi
-          elif [[ "$EVENT_NAME" == "schedule" || "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            # These events do not propose a lifecycle transition. Use an empty exact range instead of
-            # re-evaluating HEAD^..HEAD as though the latest commit had just been pushed again.
-            head_sha="$PUSH_HEAD"
-            base_sha="$head_sha"
-          else
-            printf 'Unsupported story-evidence event %s.\n' "$EVENT_NAME" >&2
-            exit 1
-          fi
-          checked_out_head="$(git rev-parse HEAD)"
-          if [[ "$checked_out_head" != "$head_sha" ]]; then
-            printf 'Checked-out HEAD %s does not match event head %s.\n' "$checked_out_head" "$head_sha" >&2
-            exit 1
-          fi
-          printf 'base=%s\nhead=%s\n' "$base_sha" "$head_sha" >> "$GITHUB_OUTPUT"
+        run: bash .github/scripts/resolve-story-evidence-bounds.sh
       # Builds the gate tool for every `--no-build` step below. The gate self-tests used to sit here and
       # supplied this build as a side effect; moving them after the drill (so their TRX is a fresh in-job
       # current-run lane) removed the only build in this job and left `plan --no-build` with no assembly.
@@ -240,17 +219,11 @@ jobs:
         run: bash .github/scripts/install-dapr-cli.sh
       - name: Preserve recovery cleanup and publication reserve
         if: steps.artifacts.outputs.requires_recovery == 'true'
-        run: |
-          set -euo pipefail
-          job_start_epoch=$(cat "${{ runner.temp }}/story-evidence-job-start.epoch")
-          elapsed_seconds=$(($(date +%s) - job_start_epoch))
-          if (( elapsed_seconds >= 2400 )); then
-            printf 'Recovery producer refused after %s seconds; the 30-minute cleanup/publication reserve would be unsafe.\n' \
-              "$elapsed_seconds" >&2
-            exit 1
-          fi
-          printf '%s\n' "$((job_start_epoch + (330 * 60)))" \
-            > "${{ runner.temp }}/story-evidence-closeout-deadline.epoch"
+        env:
+          JOB_START_PATH: ${{ runner.temp }}/story-evidence-job-start.epoch
+          CLOSEOUT_DEADLINE_PATH: ${{ runner.temp }}/story-evidence-closeout-deadline.epoch
+          RESERVE_REPORT_PATH: ${{ runner.temp }}/story-evidence-reports/completion-reserve.json
+        run: bash .github/scripts/check-story-evidence-reserve.sh
       - name: Initialize DAPR runtime for transition-declared current recovery primary
         if: steps.artifacts.outputs.requires_recovery == 'true'
         timeout-minutes: 10
@@ -368,33 +341,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RESULTS_ROOT: ${{ runner.temp }}/machine-results
           RETAINED_LOCATORS_PATH: ${{ runner.temp }}/story-evidence-retained-locators.txt
-        run: |
-          set -euo pipefail
-          declare -A downloaded=()
-          while IFS= read -r locator; do
-            [[ -z "$locator" ]] && continue
-            if [[ ! "$locator" =~ ^github-actions://([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/runs/([1-9][0-9]{0,19})/artifacts/([A-Za-z0-9][A-Za-z0-9_.-]{0,127})$ ]]; then
-              printf 'Unsafe retained locator.\n' >&2
-              exit 1
-            fi
-            repository="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
-            run_id="${BASH_REMATCH[3]}"
-            artifact="${BASH_REMATCH[4]}"
-            if [[ "$repository" != "$GITHUB_REPOSITORY" ]]; then
-              printf 'Retained locator repository %s is not this repository (%s).\n' "$repository" "$GITHUB_REPOSITORY" >&2
-              exit 1
-            fi
-            key="${repository}/${run_id}/${artifact}"
-            [[ -n "${downloaded[$key]+present}" ]] && continue
-            destination="${RESULTS_ROOT}/retained/${run_id}/${artifact}"
-            if [[ -e "$destination" ]]; then
-              printf 'Retained destination collision.\n' >&2
-              exit 1
-            fi
-            mkdir -p "$destination"
-            gh run download "$run_id" --repo "$repository" --name "$artifact" --dir "$destination"
-            downloaded[$key]=1
-          done < "$RETAINED_LOCATORS_PATH"
+        run: bash .github/scripts/collect-story-evidence-artifacts.sh
       - name: Verify general producer artifact binds the exact event head
         run: |
           set -euo pipefail

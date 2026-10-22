@@ -224,7 +224,8 @@ public static class StoryEvidenceValidator
         return scope;
     }
 
-    private static void ValidateProductionDeclarations(
+    /// <summary>Preflights result and primary declarations before producing any evidence.</summary>
+    internal static void ValidateProductionDeclarations(
         string resultsRoot,
         JsonObject policy,
         JsonObject contract,
@@ -324,10 +325,7 @@ public static class StoryEvidenceValidator
                 throw new GateValidationException(GateReason.PrimaryPathNotExecuted, requiredClass);
             }
 
-            JsonObject binding = EvidenceJson.RequiredArray(
-                trigger,
-                "recognizedLaneBindings",
-                GateReason.PrimaryPathNotExecuted)[0]!.AsObject();
+            JsonObject binding = PrimaryLaneBinding.Select(trigger, laneName);
             PrimaryLaneBinding.Validate(contract, trigger, binding, result);
         }
 
@@ -838,19 +836,15 @@ public static class StoryEvidenceValidator
         return lanes;
     }
 
-    private static IReadOnlyList<PrimaryPathVerdict> ValidatePrimaryPaths(
+    /// <summary>Checks each required primary lane against its own binding and executed results.</summary>
+    internal static IReadOnlyList<PrimaryPathVerdict> ValidatePrimaryPaths(
         JsonObject policy,
         JsonObject contract,
         StoryRecord story,
         IReadOnlySet<string> changedPaths,
         IReadOnlyList<LaneResult> lanes)
     {
-        Dictionary<string, IReadOnlySet<string>> recognizedLanes = new(StringComparer.Ordinal);
-        Dictionary<string, (
-            string Selector,
-            string? Trx,
-            string? Provenance,
-            IReadOnlySet<string> Sources)> recognizedBindings = new(StringComparer.Ordinal);
+        Dictionary<string, JsonObject> recognizedTriggers = new(StringComparer.Ordinal);
         HashSet<string> requiredClasses = new(StringComparer.Ordinal);
         JsonArray triggers = EvidenceJson.RequiredArray(
             policy,
@@ -865,23 +859,7 @@ public static class StoryEvidenceValidator
                 trigger,
                 "pathPatterns",
                 GateReason.PrimaryPathNotExecuted);
-            recognizedLanes[pathClass] = EvidenceJson
-                .RequiredStrings(trigger, "recognizedLanes", GateReason.PrimaryPathNotExecuted)
-                .ToHashSet(StringComparer.Ordinal);
-            JsonObject binding = EvidenceJson.RequiredArray(
-                trigger,
-                "recognizedLaneBindings",
-                GateReason.PrimaryPathNotExecuted)[0]!.AsObject();
-            recognizedBindings[pathClass] = (
-                EvidenceJson.RequiredString(binding, "selector", GateReason.PrimaryPathNotExecuted),
-                binding["trx"] is null
-                    ? null
-                    : EvidenceJson.RequiredString(binding, "trx", GateReason.PrimaryPathNotExecuted),
-                binding["provenance"] is null
-                    ? null
-                    : EvidenceJson.RequiredString(binding, "provenance", GateReason.PrimaryPathNotExecuted),
-                EvidenceJson.RequiredStrings(binding, "sources", GateReason.PrimaryPathNotExecuted)
-                    .ToHashSet(StringComparer.Ordinal));
+            recognizedTriggers[pathClass] = trigger;
             IReadOnlyList<string> claims = EvidenceJson.RequiredStrings(
                 trigger,
                 "claimPatterns",
@@ -919,20 +897,21 @@ public static class StoryEvidenceValidator
                     && EvidenceJson.RequiredString(candidate, "lane", GateReason.MachineResultsInvalid)
                         .Equals(declared, StringComparison.Ordinal));
             if (!declarations.TryGetValue(requiredClass, out string? laneName)
-                || !recognizedLanes.TryGetValue(requiredClass, out IReadOnlySet<string>? allowed)
-                || !allowed.Contains(laneName)
-                || !recognizedBindings.TryGetValue(requiredClass, out var binding)
+                || !recognizedTriggers.TryGetValue(requiredClass, out JsonObject? trigger)
                 || lanes.SingleOrDefault(lane => lane.Lane.Equals(laneName, StringComparison.Ordinal)) is not LaneResult lane
-                || laneContract is null
-                || (binding.Trx is not null
-                    && !EvidenceJson.RequiredString(laneContract, "trx", GateReason.PrimaryPathNotExecuted)
-                        .Equals(binding.Trx, StringComparison.Ordinal))
-                || (binding.Provenance is not null
-                    && !EvidenceJson.RequiredString(laneContract, "provenance", GateReason.PrimaryPathNotExecuted)
-                        .Equals(binding.Provenance, StringComparison.Ordinal))
-                || !string.Equals(lane.PrimaryPathClass, requiredClass, StringComparison.Ordinal)
-                || !lane.Selectors.Contains(binding.Selector, StringComparer.Ordinal)
-                || !binding.Sources.Contains(lane.Source)
+                || laneContract is null)
+            {
+                throw new GateValidationException(GateReason.PrimaryPathNotExecuted, requiredClass);
+            }
+
+            JsonObject binding = PrimaryLaneBinding.Select(trigger, laneName);
+            PrimaryLaneBinding.Validate(contract, trigger, binding, laneContract);
+            if (!string.Equals(lane.PrimaryPathClass, requiredClass, StringComparison.Ordinal)
+                || !lane.Selectors.Contains(
+                    EvidenceJson.RequiredString(binding, "selector", GateReason.PrimaryPathNotExecuted),
+                    StringComparer.Ordinal)
+                || !EvidenceJson.RequiredStrings(binding, "sources", GateReason.PrimaryPathNotExecuted)
+                    .Contains(lane.Source, StringComparer.Ordinal)
                 || lane.Executed <= 0
                 || lane.Failed != 0
                 || lane.Skipped != 0)

@@ -3268,6 +3268,178 @@ public static class StoryEvidenceGateTests
             string.Join(", ", report.Issues.Select(static issue => $"{issue.ReasonCode}:{issue.Subject}")));
     }
 
+    /// <summary>Proves both primary consumers use each lane's own metadata in either binding order.</summary>
+    [Theory]
+    [InlineData("alpha", false)]
+    [InlineData("alpha", true)]
+    [InlineData("beta", false)]
+    [InlineData("beta", true)]
+    public static void SyntheticPrimaryBindingsShouldSelectByExactLane(string laneName, bool reverse)
+    {
+        using GateFixture fixture = new();
+        var (policy, contract, trigger, result, story, lane) = SyntheticPrimaryBindings(laneName, reverse);
+
+        PrimaryLaneBinding.Select(trigger, laneName)["selector"]!.GetValue<string>()
+            .ShouldBe($"class:Fixture.{laneName}");
+        StoryEvidenceValidator.ValidateProductionDeclarations(
+            fixture.ResultsRoot, policy, contract, story, new HashSet<string>());
+        StoryEvidenceValidator.ValidatePrimaryPaths(policy, contract, story, new HashSet<string>(), [lane])
+            .Single().Lane.ShouldBe(laneName);
+        PrimaryLaneBinding.Validate(contract, trigger, PrimaryLaneBinding.Select(trigger, laneName), result);
+    }
+
+    /// <summary>Proves missing, ambiguous, malformed, and cross-bound selections refuse in both consumers.</summary>
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("duplicate")]
+    [InlineData("null-entry")]
+    [InlineData("scalar-entry")]
+    [InlineData("missing-lane")]
+    [InlineData("missing-selector")]
+    [InlineData("malformed-sources")]
+    [InlineData("empty-sources")]
+    [InlineData("malformed-trx")]
+    [InlineData("malformed-provenance")]
+    [InlineData("malformed-other-entry")]
+    [InlineData("unrecognized-lane")]
+    [InlineData("cross-selector")]
+    [InlineData("cross-trx")]
+    [InlineData("cross-provenance")]
+    [InlineData("cross-source")]
+    [InlineData("cross-class")]
+    [InlineData("allow-skipped")]
+    public static void SyntheticPrimaryBindingsShouldFailClosed(string mutation)
+    {
+        using GateFixture fixture = new();
+        var (policy, contract, trigger, result, story, lane) = SyntheticPrimaryBindings("beta", false);
+        JsonArray bindings = EvidenceJson.RequiredArray(trigger, "recognizedLaneBindings", GateReason.PrimaryPathNotExecuted);
+        JsonObject selected = bindings[1]!.AsObject();
+        switch (mutation)
+        {
+            case "missing": bindings.RemoveAt(1); break;
+            case "duplicate": bindings.Add(selected.DeepClone()); break;
+            case "null-entry": bindings.Add((JsonNode?)null); break;
+            case "scalar-entry": bindings.Add("malformed"); break;
+            case "missing-lane": selected.Remove("lane"); break;
+            case "missing-selector": selected.Remove("selector"); break;
+            case "malformed-sources": selected["sources"] = new JsonArray(42); break;
+            case "empty-sources": selected["sources"] = new JsonArray(); break;
+            case "malformed-trx": selected["trx"] = 42; break;
+            case "malformed-provenance": selected["provenance"] = null; break;
+            case "malformed-other-entry": bindings[0]!.AsObject().Remove("selector"); break;
+            case "unrecognized-lane": trigger["recognizedLanes"] = new JsonArray("alpha"); break;
+            case "cross-selector": selected["selector"] = "class:Fixture.alpha"; break;
+            case "cross-trx": selected["trx"] = "alpha.trx"; break;
+            case "cross-provenance": selected["provenance"] = "alpha.provenance.json"; break;
+            case "cross-source": selected["sources"] = new JsonArray("retained"); break;
+            case "cross-class": result["primaryPathClass"] = "signalr"; break;
+            case "allow-skipped": result["allowSkipped"] = true; break;
+        }
+
+        Should.Throw<GateValidationException>(() => StoryEvidenceValidator.ValidateProductionDeclarations(
+            fixture.ResultsRoot, policy, contract, story, new HashSet<string>()))
+            .ReasonCode.ShouldBe(GateReason.PrimaryPathNotExecuted);
+        Should.Throw<GateValidationException>(() => StoryEvidenceValidator.ValidatePrimaryPaths(
+            policy, contract, story, new HashSet<string>(), [lane]))
+            .ReasonCode.ShouldBe(GateReason.PrimaryPathNotExecuted);
+    }
+
+    /// <summary>Proves valid declarations cannot authorize mismatched or unsuccessful observed primary evidence.</summary>
+    [Theory]
+    [InlineData("selector")]
+    [InlineData("source")]
+    [InlineData("class")]
+    [InlineData("zero-executed")]
+    [InlineData("failed")]
+    [InlineData("skipped")]
+    public static void SyntheticPrimaryBindingsShouldRefuseInvalidObservedEvidence(string mutation)
+    {
+        using GateFixture fixture = new();
+        var (policy, contract, _, _, story, lane) = SyntheticPrimaryBindings("beta", false);
+        StoryEvidenceValidator.ValidateProductionDeclarations(
+            fixture.ResultsRoot, policy, contract, story, new HashSet<string>());
+        LaneResult observed = mutation switch
+        {
+            "selector" => lane with { Selectors = ["class:Fixture.alpha"] },
+            "source" => lane with { Source = "retained" },
+            "class" => lane with { PrimaryPathClass = "signalr" },
+            "zero-executed" => lane with { Total = 0, Executed = 0, Passed = 0 },
+            "failed" => lane with { Passed = 0, Failed = 1 },
+            _ => lane with { Total = 2, Skipped = 1 },
+        };
+
+        Should.Throw<GateValidationException>(() => StoryEvidenceValidator.ValidatePrimaryPaths(
+            policy, contract, story, new HashSet<string>(), [observed]))
+            .ReasonCode.ShouldBe(GateReason.PrimaryPathNotExecuted);
+    }
+
+    /// <summary>Proves synthetic multi-binding support never expands the production policy's approved lanes.</summary>
+    [Fact]
+    public static void PinnedPolicyShouldStillRejectAdditionalPrimaryBindings()
+    {
+        using GateFixture fixture = new();
+        JsonObject policy = EvidenceJson.LoadPolicy(fixture.PolicyPath);
+        JsonObject trigger = EvidenceJson.RequiredArray(policy, "primaryPathTriggers", GateReason.ScopeDigestMismatch)[0]!.AsObject();
+        JsonArray bindings = EvidenceJson.RequiredArray(trigger, "recognizedLaneBindings", GateReason.ScopeDigestMismatch);
+        bindings.Add(bindings[0]!.DeepClone());
+
+        Should.Throw<GateValidationException>(() => StoryEvidenceValidator.ValidatePinnedPolicy(policy))
+            .Subject.ShouldBe("primary-lane-policy");
+    }
+
+    private static (JsonObject Policy, JsonObject Contract, JsonObject Trigger, JsonObject Result, StoryRecord Story, LaneResult Lane)
+        SyntheticPrimaryBindings(string laneName, bool reverse)
+    {
+        JsonArray bindings = new();
+        foreach (string name in reverse ? new[] { "beta", "alpha" } : new[] { "alpha", "beta" })
+        {
+            bindings.Add(new JsonObject
+            {
+                ["lane"] = name,
+                ["selector"] = $"class:Fixture.{name}",
+                ["trx"] = $"{name}.trx",
+                ["provenance"] = $"{name}.provenance.json",
+                ["sources"] = new JsonArray("current-run"),
+            });
+        }
+
+        JsonObject trigger = new()
+        {
+            ["class"] = "browser",
+            ["pathPatterns"] = new JsonArray(),
+            ["claimPatterns"] = new JsonArray(),
+            ["recognizedLanes"] = new JsonArray("alpha", "beta"),
+            ["recognizedLaneBindings"] = bindings,
+        };
+        JsonObject policy = new()
+        {
+            ["repositoryIdentity"] = "Hexalith/Hexalith.ChatBot",
+            ["maximumCurrentRunAgeMinutes"] = 60,
+            ["maximumLaneCurrentRunAgeMinutes"] = 1440,
+            ["primaryPathTriggers"] = new JsonArray(trigger),
+        };
+        JsonObject result = new()
+        {
+            ["lane"] = laneName,
+            ["trx"] = $"{laneName}.trx",
+            ["provenance"] = $"{laneName}.provenance.json",
+            ["artifactLocator"] = $"file:{laneName}.trx",
+            ["source"] = "current-run",
+            ["selectors"] = new JsonArray($"class:Fixture.{laneName}"),
+            ["allowSkipped"] = false,
+            ["primaryPathClass"] = "browser",
+        };
+        JsonObject contract = new()
+        {
+            ["primaryPaths"] = new JsonArray(new JsonObject { ["class"] = "browser", ["lane"] = laneName }),
+            ["results"] = new JsonArray(result),
+        };
+        StoryRecord story = new("Synthetic", "review", new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), "");
+        LaneResult lane = new(laneName, "browser", "current-run", 1, 1, 1, 0, 0,
+            $"file:{laneName}.trx", "checksum", new HashSet<string>(), [$"class:Fixture.{laneName}"]);
+        return (policy, contract, trigger, result, story, lane);
+    }
+
     /// <summary>Proves duplicate lane bindings cannot disagree by declaring and omitting an override.</summary>
     [Fact]
     public static void PerLaneCurrentRunCeilingShouldRejectPresentVersusAbsentOverrides()
