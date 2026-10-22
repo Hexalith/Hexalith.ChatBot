@@ -592,10 +592,10 @@ internal sealed class RecoveryDependencyExercise(
                 },
         };
 
-        // The production classifier reads requester authority from the stripped token label, so it routes every
-        // ExecuteLowRiskAIAssistance to approval and the provider seam is never reached. Like the owner evidence
-        // above, this test-only host supplies fixed synthetic project-contributor requester authority for that one
-        // command; every other command uses the production classifier.
+        // The production classifier reads requester authority from the stripped token label, so every
+        // ExecuteLowRiskAIAssistance ends as a terminal classifier-indeterminate and the provider seam is never
+        // reached. Like the owner evidence above, this test-only host supplies fixed synthetic project-contributor
+        // requester authority for that one command; every other command uses the production classifier.
         ChatBotCommandAdmissionPipeline pipeline = new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),

@@ -46,14 +46,25 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
     [InlineData("missing-retention")]
     [InlineData("missing-produced-time")]
     [InlineData("future-produced-time")]
+    [InlineData("undeclared-proposed-effect")]
     public async Task QualifiedClassificationMustBindTheCurrentRequestAndTrustedEffectRiskFloor(string mismatch)
     {
         SyntheticAdmissionEvidenceSource source = new();
         ChatBotGatewayContext context = Context();
         AiActionRiskClassificationRecord record = context.RiskClassification!.Record!;
+        if (mismatch == "undeclared-proposed-effect")
+        {
+            // The caller declares an effect that the otherwise current classification does not cover.
+            context.Submission.Request.Command = new
+            {
+                intendedCommandName = AiActionCommandMetadataProvider.AppendConversationMessageCommandName, expectedSourceVersion = 1,
+                policySnapshotId = "synthetic-policy", proposedActionClasses = new[] { AiActionRiskActionClass.SendsExternal },
+            };
+        }
         context.SetRiskClassification(ChatBotRiskClassification.Classified(mismatch switch
         {
             "missing-input" => record with { InputTuple = null! },
+            "undeclared-proposed-effect" => record,
             "null-reason" => record with { ReasonCode = null! },
             "unsafe-reason" => record with { ReasonCode = "raw result reason" },
             "unknown-schema" => record with { SchemaVersion = "unknown.v9" },
@@ -118,15 +129,30 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
     [InlineData("blank-evidence")]
     [InlineData("added-dependency")]
     [InlineData("removed-dependency")]
+    [InlineData("runtime-version")]
+    [InlineData("stale-code-version")]
     public async Task QualificationMustMatchEveryCurrentBindingAndThreshold(string failure)
     {
+        const string priorVersion = "chatbot.ai-action-risk-classifier.m0.v1";
         SyntheticAdmissionEvidenceSource source = new();
         ChatBotClassifierQualification qualified = source.Qualification!;
+        ChatBotGatewayContext context = Context();
         if (failure == "missing-runtime") { source.RuntimeIdentity = null; }
+        // runtime-version: only the deployed artifact and its qualification name the prior version.
+        // stale-code-version: the record, artifact and qualification all agree on it, but the code is newer.
+        if (failure is "runtime-version" or "stale-code-version")
+        {
+            source.RuntimeIdentity = source.RuntimeIdentity! with { ArtifactVersion = priorVersion };
+        }
+        if (failure == "stale-code-version")
+        {
+            context.SetRiskClassification(ChatBotRiskClassification.Classified(context.RiskClassification!.Record! with { ClassifierVersion = priorVersion }));
+        }
         source.Qualification = failure switch
         {
             "missing" => null,
             "missing-runtime" => qualified,
+            "runtime-version" or "stale-code-version" => qualified with { Identity = source.RuntimeIdentity! },
             "artifact" => qualified with { Identity = qualified.Identity with { ArtifactHash = "drift" } },
             "artifact-version" => qualified with { Identity = qualified.Identity with { ArtifactVersion = "drift" } },
             "zero-evaluated" => qualified with { EvaluatedCount = 0 },
@@ -153,7 +179,7 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
             _ => qualified with { CoveredEffectClasses = new HashSet<AiActionRiskActionClass> { AiActionRiskActionClass.ModifiesState } },
         };
         ChatBotAdmissionEvidenceValidator validator = new(source, source);
-        (await validator.ValidateClassificationAsync(Context(), TestContext.Current.CancellationToken)).ShouldBe(ChatBotMessageCodes.ClassifierIndeterminate);
+        (await validator.ValidateClassificationAsync(context, TestContext.Current.CancellationToken)).ShouldBe(ChatBotMessageCodes.ClassifierIndeterminate);
     }
 
     /// <summary>Verifies synthetic Qualified Record Only Validates Classification And Never Enables Atomic Execution.</summary>
@@ -191,6 +217,8 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
     [InlineData("revision-drift", ChatBotMessageCodes.CommandContractInvalid)]
     [InlineData("expired", ChatBotMessageCodes.CanonicalExecutionUnavailable)]
     [InlineData("project-proof-missing", ChatBotMessageCodes.CanonicalExecutionUnavailable)]
+    [InlineData("one-stage-missing", ChatBotMessageCodes.CanonicalExecutionUnavailable)]
+    [InlineData("blank-stage-reference", ChatBotMessageCodes.CanonicalExecutionUnavailable)]
     public async Task SyntheticQualifiedReadProofsRequireCurrentPolicyContextAndProjectAuthorityWithoutProposalApproval(string state, string? expected)
     {
         SyntheticAdmissionEvidenceSource source = new();
@@ -211,6 +239,14 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
             "revision-drift" => source.ProfileEvidence with { CurrentRevision = 2 },
             "expired" => source.ProfileEvidence with { ExpiresAt = source.UtcNow },
             "project-proof-missing" => source.ProfileEvidence with { StageReferences = new Dictionary<string, string>() },
+            "one-stage-missing" => source.ProfileEvidence with
+            {
+                StageReferences = source.ProfileEvidence.StageReferences.Where(pair => pair.Key != "project-authority").ToDictionary(),
+            },
+            "blank-stage-reference" => source.ProfileEvidence with
+            {
+                StageReferences = source.ProfileEvidence.StageReferences.ToDictionary(pair => pair.Key, pair => pair.Key == "project-authority" ? " " : pair.Value),
+            },
             _ => source.ProfileEvidence,
         };
         ChatBotAdmissionEvidenceValidator validator = new(source, source);

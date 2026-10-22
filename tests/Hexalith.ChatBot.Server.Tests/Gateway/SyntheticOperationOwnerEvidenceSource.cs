@@ -8,7 +8,7 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway;
 internal sealed class SyntheticOperationOwnerEvidenceSource : IChatBotAdmissionEvidenceSource, ISystemClock
 {
     /// <inheritdoc />
-    public DateTimeOffset UtcNow { get; } = new(2026, 10, 20, 10, 0, 0, TimeSpan.Zero);
+    public DateTimeOffset UtcNow { get; set; } = new(2026, 10, 20, 10, 0, 0, TimeSpan.Zero);
     /// <inheritdoc />
     public ChatBotClassifierRuntimeIdentity? RuntimeIdentity => null;
     /// <summary>Synthetic owner proof returned by the next read.</summary>

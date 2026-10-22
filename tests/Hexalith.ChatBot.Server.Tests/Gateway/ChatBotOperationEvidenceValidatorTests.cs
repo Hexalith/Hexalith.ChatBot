@@ -194,6 +194,25 @@ public sealed class ChatBotOperationEvidenceValidatorTests
         context.Idempotency.ShouldBeNull();
     }
 
+    /// <summary>The profile stage re-checks cached owner evidence, so a proof that expires after the operation stage is refused.</summary>
+    [Fact]
+    public async Task CachedOperationProofThatExpiresBeforeProfileChecksShouldFailClosed()
+    {
+        ChatBotGatewayContext context = Context();
+        SyntheticOperationOwnerEvidenceSource source = new(context);
+        ChatBotProfileAdmissionEvidence expected = source.Proof!;
+        ChatBotAdmissionEvidenceValidator validator = new(source, source);
+
+        (await validator.ValidateOperationAsync(context, TestContext.Current.CancellationToken)).ShouldBeNull();
+        context.AdmissionEvidence.ShouldBeSameAs(expected);
+        source.UtcNow = expected.ExpiresAt;
+        (await validator.ValidateProfileAsync(context, TestContext.Current.CancellationToken)).ShouldBe(ChatBotMessageCodes.CanonicalExecutionUnavailable);
+
+        source.ReadCount.ShouldBe(1);
+        context.AdmissionEnvelope.ShouldBeNull();
+        context.Idempotency.ShouldBeNull();
+    }
+
     /// <summary>Caller-invented expected fields cannot replace a contract revision or an owner concurrency guard.</summary>
     [Theory]
     [InlineData("{\"expectedFooRevision\":8}")]

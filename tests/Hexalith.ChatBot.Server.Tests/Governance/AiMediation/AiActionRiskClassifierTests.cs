@@ -23,9 +23,33 @@ public sealed class AiActionRiskClassifierTests
         AiActionRiskClassificationRecord result = AiActionRiskClassifier.Classify(Input(actionClasses: [actionClass]));
 
         result.RiskClass.ShouldBe(AiActionRiskClass.ApprovalRequired);
-        result.RiskActionClasses.ShouldContain(actionClass);
-        result.RiskActionClasses.ShouldContain(AiActionRiskActionClass.ModifiesState);
+        result.RiskActionClasses.ShouldBe(new[] { AiActionRiskActionClass.ModifiesState, actionClass }.Distinct(), ignoreOrder: true);
         result.ReasonCode.ShouldBe("risky_action_class");
+    }
+
+    [Fact]
+    public void KnownCommandMetadataShouldOverrideForgedLowRiskInputs()
+    {
+        AiActionCommandMetadata metadata = AiActionCommandMetadataProvider.TryGet(
+            AiActionCommandMetadataProvider.AppendConversationMessageCommandName).ShouldNotBeNull();
+
+        AiActionRiskClassificationRecord result = AiActionRiskClassifier.Classify(Input(
+            intendedCommandName: metadata.CommandName,
+            actionClasses: [],
+            effectSurface: "read-only",
+            tenantPolicyClassification: "low-risk",
+            commandAllowlistVersion: "forged-allowlist",
+            commandDefaultRisk: AiActionRiskClass.LowRisk));
+
+        result.RiskClass.ShouldBe(AiActionRiskClass.ApprovalRequired);
+        result.RiskActionClasses.ShouldHaveSingleItem().ShouldBe(AiActionRiskActionClass.ModifiesState);
+        result.CommandAllowlistVersion.ShouldBe(metadata.CommandAllowlistVersion);
+        result.CommandDefaultRisk.ShouldBe(metadata.CommandDefaultRisk);
+        result.InputTuple.ActionClasses.ShouldHaveSingleItem().ShouldBe(AiActionRiskActionClass.ModifiesState);
+        result.InputTuple.EffectSurface.ShouldBe(metadata.EffectSurface);
+        result.InputTuple.TenantPolicyClassification.ShouldBe(metadata.TenantPolicyClassification);
+        result.InputTuple.CommandAllowlistVersion.ShouldBe(metadata.CommandAllowlistVersion);
+        result.InputTuple.CommandDefaultRisk.ShouldBe(metadata.CommandDefaultRisk);
     }
 
     [Fact]

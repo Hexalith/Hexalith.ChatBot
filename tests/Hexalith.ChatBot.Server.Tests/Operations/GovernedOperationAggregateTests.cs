@@ -4479,7 +4479,8 @@ public static class GovernedOperationAggregateTests
             UserId: "actor-alpha",
             Extensions: null);
 
-    // Synthetic historical replay data intentionally does not re-run the current closed admission classifier.
+    // Synthetic aggregate input stamped with the current classifier version. It deliberately bypasses admission:
+    // the current classifier has no CreateProjectTask metadata and would reject these proposals as unsupported.
     private static AiActionRiskClassificationRecord Classification(
         string intendedCommandName,
         string correlationId,

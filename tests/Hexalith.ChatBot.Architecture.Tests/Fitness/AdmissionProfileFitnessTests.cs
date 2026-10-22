@@ -95,6 +95,32 @@ public sealed class AdmissionProfileFitnessTests
         ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(nameof(ExecuteApprovedOutboundDraft)).ShouldContain("provider-evidence");
     }
 
+    /// <summary>Each profile's owner proofs stay locked to the addendum's "Additional mandatory stages" column.</summary>
+    [Fact]
+    public void ProfileRequiredStagesShouldMatchTheLockedAddendumColumn()
+    {
+        // Locked list: changing a profile's stages must change the addendum and this pin together. AI risk
+        // classification is the pipeline's classifier stage, not an owner proof, so it is not listed here.
+        Dictionary<ChatBotAdmissionProfile, string[]> expected = new()
+        {
+            [ChatBotAdmissionProfile.MailboxIntake] = ["provider-identity-deduplication", "authenticity-state", "a6-retention", "attachment-quarantine"],
+            [ChatBotAdmissionProfile.Workflow] = ["family-state", "evidence-freshness", "project-authority", "correction-impact-manifest"],
+            [ChatBotAdmissionProfile.GovernedChat] = ["conversation-authority", "origin-instruction-boundary", "attempt-identity-revision", "stream-race-guard"],
+            [ChatBotAdmissionProfile.AiRead] = ["origin-instruction-boundary", "policy-context-scope", "project-authority"],
+            [ChatBotAdmissionProfile.AiEffect] = ["origin-instruction-boundary", "human-only-non-self-approval", "approval-lifetime-drift", "allowlist-effect-target"],
+            [ChatBotAdmissionProfile.HumanEffect] = ["frozen-content-recipients", "sender-authority", "human-approval-lifetime-drift", "provider-evidence", "no-blind-retry"],
+            [ChatBotAdmissionProfile.CommandExecution] = ["exposed-command-effect", "caller-authority", "prior-attempt-state", "target-idempotency-concurrency", "uncertain-effect-denial"],
+            [ChatBotAdmissionProfile.Governance] = ["closed-role-scope", "separation-of-duty", "independent-approval", "safer-state"],
+            [ChatBotAdmissionProfile.DataRights] = ["request-authority", "tenantowner-compliance-approval", "a6-policy", "hold-precedence", "owner-command-acknowledgement"],
+            [ChatBotAdmissionProfile.ProjectionDelivery] = ["source-watermark-or-recipient-redaction-routing"],
+        };
+        expected.Keys.Order().ShouldBe(Enum.GetValues<ChatBotAdmissionProfile>().Order());
+        foreach (KeyValuePair<ChatBotAdmissionProfile, string[]> profile in expected)
+        {
+            ChatBotCommandAdmissionCatalog.RequiredStages(profile.Key).ShouldBe(profile.Value, ignoreOrder: true);
+        }
+    }
+
     /// <summary>Verifies stable Product Map Should Remain Exhaustive And Unique.</summary>
     [Fact]
     public void StableProductMapShouldRemainExhaustiveAndUnique()

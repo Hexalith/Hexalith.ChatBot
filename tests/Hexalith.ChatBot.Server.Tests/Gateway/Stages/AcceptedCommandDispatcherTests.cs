@@ -544,6 +544,30 @@ public sealed partial class AcceptedCommandDispatcherTests
         dispatched.RiskClassification!.InputTuple.IntendedCommandName.ShouldBe(dispatched.IntendedCommandName);
     }
 
+    /// <summary>Caller-declared proposal effects widen the server metadata classes and reach the owner in the classification.</summary>
+    [Fact]
+    public async Task DispatchShouldCarryCallerDeclaredProposalEffectsUnionedWithServerMetadata()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+        System.Text.Json.Nodes.JsonObject wire = System.Text.Json.Nodes.JsonNode.Parse(WireAiActionProposalCommand().GetRawText())!.AsObject();
+        wire["proposedActionClasses"] = new System.Text.Json.Nodes.JsonArray("sends-external");
+        ChatBotGatewayContext context = Context(JsonSerializer.SerializeToElement(wire), commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ProposeAIAction));
+        ((ClaimsIdentity)context.Actor.Principal.Identity!).AddClaim(new("requester_authority_class", "project-contributor"));
+
+        ChatBotRiskClassification classification = await new DeterministicAiActionRiskClassifier().ClassifyAsync(context, TestContext.Current.CancellationToken);
+        classification.Rejected.ShouldBeFalse();
+        await dispatcher.DispatchAsync(context, TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        ShouldCarryAdmissionClassification(request.Payload, classification.Record!);
+        JsonElement risk = request.Payload.GetProperty("RiskClassification");
+        risk.GetProperty("RiskActionClasses").EnumerateArray().Select(static value => value.GetString())
+            .ShouldBe(["modifies-state", "sends-external"], ignoreOrder: false);
+        risk.GetProperty("InputTuple").GetProperty("ActionClasses").EnumerateArray().Select(static value => value.GetString())
+            .ShouldBe(["modifies-state", "sends-external"], ignoreOrder: false);
+    }
+
     /// <summary>Approval routing terminates at admission and cannot create a downstream execution record.</summary>
     [Fact]
     public async Task DispatchShouldRejectApprovalRoutingWithoutProviderOrOwnerCommand()
