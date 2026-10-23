@@ -47,7 +47,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: ops-harness cleanup integrity
 severity: medium
 reason: **[MEDIUM · cleanup integrity]** Cleanup methods only null tracked note/intake refs when `complete=true`, leaving stale refs after a partial cleanup failure; no test exercises "cleanup fails, then the next scenario runs". **Release-claim impact:** possible cross-scenario state contamination after an already-failed run. **Owner:** ops-harness cleanup integrity. **Closure evidence:** a cross-scenario isolation test after an induced cleanup failure.
-status: open
+status: done 2026-10-23
+resolution: Resolved 2026-10-23: existing DetachAndReset generation handoff is now exercised through subsequent cleanup after both thrown erasure failures and false-returning incomplete cleanup. AspireRecoveryCleanupStateTests covers EventStore, subscription, Graph and Identity, checks successor erasure and retained old residue, and executes fresh EventStore seeding after incomplete cleanup. Focused evidence: TestResults/five-recovery-contracts-final.{ctrf.json,trx} (128 passed, zero failed/skipped).
 
 ### DW-6: [LOW · cleanup integrity] `_checkpointNoteRefs.Add(noteRef)` records a note before its durable-commit wait confirms — intentional per this diff's "preserve cleanup metadata before first mutation" fix, but cleanup's handling of a never-actually-committed ref isn't explicitly tested.
 
@@ -55,7 +56,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: ops-harness cleanup integrity
 severity: low
 reason: **[LOW · cleanup integrity]** `_checkpointNoteRefs.Add(noteRef)` records a note before its durable-commit wait confirms — intentional per this diff's "preserve cleanup metadata before first mutation" fix, but cleanup's handling of a never-actually-committed ref isn't explicitly tested. **Release-claim impact:** unconfirmed, likely benign. **Owner:** ops-harness cleanup integrity. **Closure evidence:** a test inducing a mid-loop seeding failure and asserting cleanup handles the unconfirmed ref gracefully.
-status: open
+status: done 2026-10-23
+resolution: Resolved 2026-10-23: MidLoopSeedFailureCleansConfirmedAndUnconfirmedReferences covers second-submission failure with no projection and a durable-confirmation HTTP failure after projection persistence. Both retain two refs and one confirmed timestamp, clean both projections, reset the generation and preserve accurate cleanup diagnostics. Focused evidence: TestResults/five-recovery-contracts-final.{ctrf.json,trx} (128 passed, zero failed/skipped).
 
 ### DW-7: [MEDIUM · verification strategy] Most of this diff's Aspire ops-harness rewrite (fault/observe/recover/cleanup logic in both `Aspire*Operations` classes) is reachable only through `LiveContinuityAspireE2eTests`, gated behind `HEXALITH_CHATBOT_TIER3=1` and not rerun in this pass — unlike the pieces extracted into static/internal helpers (e.g. `StopReachedDependencyBoundary`), which got real always-run unit tests.
 
@@ -88,7 +90,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: Story 12.15 tests-contracts or recovery-sandbox follow-up
 severity: low
 reason: **[LOW · contract tests]** Ops-harness contract tests omit route/lane/composer guards. **Release-claim impact:** regression net for `RecoverySandboxRoute` / topology path is thin. **Owner:** Story 12.15 tests-contracts or recovery-sandbox follow-up. **Closure evidence:** focused negatives for lane headers, flat restore rejection, composer path resolution.
-status: open
+status: done 2026-10-23
+resolution: Resolved 2026-10-23: RecoverySandboxBoundaryTests covers correlation requirements, nonprocess locators, action refusal, escaped route segments, flat/missing restore snapshots and real header parsing. RecoverySandboxHttpBoundaryTests launches the actual sandbox on an ephemeral loopback port and asserts 404 plus unchanged zero worker counters for missing, unknown, repeated and cross-lane headers. Composer guards also pass. Evidence: TestResults/five-recovery-contracts-final.{ctrf.json,trx} and five-recovery-contracts-topology.{ctrf.json,trx} (128 + 9 passed, zero failed/skipped); this is harness-contract coverage, not live recovery qualification.
 
 ### DW-11: [LOW · topology path] `RecoverySandboxTopologyComposer` uses brittle relative `../../tests/...` from AppHost.
 
@@ -96,7 +99,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: AppHost/topology hygiene
 severity: low
 reason: **[LOW · topology path]** `RecoverySandboxTopologyComposer` uses brittle relative `../../tests/...` from AppHost. **Release-claim impact:** AppHost moves break composition silently. **Owner:** AppHost/topology hygiene. **Closure evidence:** project-reference or content-rooted path.
-status: open
+status: done 2026-10-23
+resolution: Resolved 2026-10-23: RecoverySandboxTopologyComposer.ResolveProjectPath discovers the nearest Hexalith.ChatBot.slnx content root and requires its sandbox project. Temp-tree tests cover root/ordinary/relocated AppHosts, absent root/project and refusal to fall back from an incomplete inner checkout to an outer checkout. Actual AddRecoverySandbox composition and opt-in guards pass. Evidence: TestResults/five-recovery-contracts-final.{ctrf.json,trx} and five-recovery-contracts-topology.{ctrf.json,trx} (128 + 9 passed, zero failed/skipped).
 
 ### DW-12: [LOW · test identity] Recovery validator passwords duplicated in token provider and Identity probe.
 
@@ -104,7 +108,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: ops-harness test-identity consolidation
 severity: low
 reason: **[LOW · test identity]** Recovery validator passwords duplicated in token provider and Identity probe. **Release-claim impact:** credential rotation desyncs Identity observation from minting. **Owner:** ops-harness test-identity consolidation. **Closure evidence:** single shared test identity source.
-status: open
+status: done 2026-10-23
+resolution: Resolved 2026-10-23: RecoveryValidatorIdentity.CreateTokenRequestFields is the sole validator form source used by ordinary token acquisition and the Identity outage probe. SharedRequestMatchesTheRealmValidatorAndUsesIndependentForms verifies the actual realm user, non-temporary password, enabled public direct-grant client and independent form instances, in the same sequential class as realm mutation. Evidence: TestResults/five-recovery-contracts-topology.{ctrf.json,trx} (9 passed, zero failed/skipped).
 
 ### DW-13: [HIGH · `RV-REBUILD-WORM`] Projection rebuild still identity-writes WORM/governed views and excludes them via `SourceDigestsOnly`.
 
@@ -1795,3 +1800,14 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-five-deferred-recovery-diagnostics.md`
   summary: Captured recovery failures retain original inner exceptions whose rendered diagnostic text can escape the metadata-only wrapper message (medium; pre-existing).
   evidence: At baseline 6b92c2970d8fd7fb6bc2d3ad26f864e80313e111, all three Capturing* decorators retain the original exception as InnerException; LiveContinuityAspireE2eTests later aggregates those failures, so Exception.ToString can include provider messages or stack traces in raw TRX. The new capture tests verify wrapper-message redaction and exact cause retention, not full rendered-output sanitization. Closure requires an explicit diagnostic retention/redaction boundary with injected sensitive inner-message tests, coordinated with the still-open scheduled/release raw-TRX sanitization work (DW-95). This batch preserves the existing diagnostic contract and does not claim full exception rendering is sanitized.
+
+
+## Deferred from: five recovery-harness contract checks (2026-10-23)
+
+- source_spec: `spec-five-deferred-recovery-contracts.md`
+  summary: The existing realm service-grant test still expects claims-only authority after the resolver switched to owner evidence (medium, pre-existing).
+  evidence: RecoveryValidationTopologyContractTests.RenderedRealmServiceClientGrantExpiryIsAcceptedByTheClaimsGrantResolver fails with service_client_grant_missing in TestResults/five-recovery-contracts.{ctrf.json,trx}. At baseline e97e7a8831768aee1ca1cb7cfc9ec5c64b7dfe68, the test already constructs ClaimsServiceClientGrantResolver without its optional authorizer, which deterministically denies; no owner RequestContext is established either. Neither resolver nor this existing test was changed by the batch. Repair the fixture with supported owner authority rather than restoring claim-derived authority.
+
+- source_spec: `spec-five-deferred-recovery-contracts.md`
+  summary: The existing mailbox realm assertion rejects unrelated runtime-generated workload secrets (low, pre-existing).
+  evidence: RecoveryValidationTopologyContractTests.RealmAddsClosedRecoveryMailboxServiceIdentityWithoutACommittedSecret rejects any RandomNumberGenerator substring in AppHost Program.cs, which already generates five non-mailbox workload secrets at baseline e97e7a8831768aee1ca1cb7cfc9ec5c64b7dfe68. This assertion and AppHost Program.cs were untouched. TestResults/five-recovery-contracts.{ctrf.json,trx} records the failure; scope a future assertion to the mailbox secret configuration boundary.

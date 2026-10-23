@@ -47,6 +47,32 @@ public sealed class RecoveryValidationTopologyContractTests
         $"--ChatBot:Memories:ApiToken={new string('c', 32)}",
     ];
 
+    // Keep realm readers in this class: its placeholder-mutation test rewrites the tracked fixture.
+    [Fact]
+    public void SharedRequestMatchesTheRealmValidatorAndUsesIndependentForms()
+    {
+        Dictionary<string, string> fields = RecoveryValidatorIdentity.CreateTokenRequestFields();
+        using JsonDocument realm = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepositoryRoot(),
+            "src", "Hexalith.ChatBot.AppHost", "KeycloakRealms", "hexalith-realm.json")));
+        JsonElement user = realm.RootElement.GetProperty("users").EnumerateArray()
+            .Single(value => value.GetProperty("username").GetString() == fields["username"]);
+        user.GetProperty("enabled").GetBoolean().ShouldBeTrue();
+        JsonElement credential = user.GetProperty("credentials").EnumerateArray()
+            .Single(value => value.GetProperty("type").GetString() == "password");
+        credential.GetProperty("value").GetString().ShouldBe(fields["password"]);
+        credential.GetProperty("temporary").GetBoolean().ShouldBeFalse();
+        JsonElement client = realm.RootElement.GetProperty("clients").EnumerateArray()
+            .Single(value => value.GetProperty("clientId").GetString() == fields["client_id"]);
+        client.GetProperty("directAccessGrantsEnabled").GetBoolean().ShouldBeTrue();
+        client.GetProperty("publicClient").GetBoolean().ShouldBeTrue();
+        client.GetProperty("enabled").GetBoolean().ShouldBeTrue();
+        fields["grant_type"].ShouldBe("password");
+        fields["scope"].ShouldBe("openid");
+        fields.Count.ShouldBe(5);
+        fields["password"] = "mutated-local-form";
+        RecoveryValidatorIdentity.CreateTokenRequestFields()["password"].ShouldNotBe(fields["password"]);
+    }
+
     [Fact]
     public void RealmKeepsControlTenantsAndAddsDedicatedReplayValidationIdentity()
     {

@@ -112,29 +112,12 @@ app.MapPost(
             return Results.NotFound();
         }
 
-        string scenarioLane = request.Headers["X-Recovery-Scenario-Lane"].ToString();
-        if (scenarioLane is not (
-            RecoveryNotificationIdentity.ContinuityLane or
-            RecoveryNotificationIdentity.GraphLane or
-            RecoveryNotificationIdentity.ControlledLossLane))
+        if (!RecoveryNotificationIdentity.TryComposeFromHeaders(request.Headers, providerMessageId, out string? notificationIdentity))
         {
             return Results.NotFound();
         }
 
         string notificationPhase = request.Headers[RecoveryNotificationIdentity.HeaderName].ToString();
-        string notificationIdentity;
-        try
-        {
-            notificationIdentity = RecoveryNotificationIdentity.Compose(
-                providerMessageId,
-                scenarioLane,
-                notificationPhase);
-        }
-        catch (InvalidOperationException)
-        {
-            return Results.NotFound();
-        }
-
         HttpClient http = httpClientFactory.CreateClient("chatbot-forward");
         using (RecoveryBearerForwardingHandler.Use(bearer.Parameter))
         {

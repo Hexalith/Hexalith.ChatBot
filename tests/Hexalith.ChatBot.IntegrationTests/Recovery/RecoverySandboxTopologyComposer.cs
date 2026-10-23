@@ -51,8 +51,7 @@ internal static class RecoverySandboxTopologyComposer
             .Where(resource => string.Equals(resource.Name, "chatbot", StringComparison.Ordinal))
             .Select(builder.CreateResourceBuilder)
             .Single();
-        string projectPath = Path.GetFullPath(
-            Path.Combine(builder.AppHostDirectory, "..", "..", "tests", "Hexalith.ChatBot.RecoverySandbox", "Hexalith.ChatBot.RecoverySandbox.csproj"));
+        string projectPath = ResolveProjectPath(builder.AppHostDirectory);
         return builder
             .AddProject("recovery-sandbox", projectPath)
             .WithReference(chatBot)
@@ -64,5 +63,28 @@ internal static class RecoverySandboxTopologyComposer
             .WithEnvironment("Recovery__ProviderMessageId", providerMessageId)
             .WithEnvironment("Recovery__ChatBotBaseAddress", chatBot.GetEndpoint("http"))
             .WithHttpHealthCheck("/health");
+    }
+
+    /// <summary>Finds the sandbox under the owning content root, independent of AppHost depth or working directory.</summary>
+    /// <param name="appHostDirectory">The selected AppHost's content directory.</param>
+    /// <returns>The existing sandbox project path.</returns>
+    internal static string ResolveProjectPath(string appHostDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(appHostDirectory);
+        for (DirectoryInfo? directory = new(Path.GetFullPath(appHostDirectory)); directory is not null; directory = directory.Parent)
+        {
+            if (!File.Exists(Path.Combine(directory.FullName, "Hexalith.ChatBot.slnx")))
+            {
+                continue;
+            }
+
+            string projectPath = Path.Combine(
+                directory.FullName, "tests", "Hexalith.ChatBot.RecoverySandbox", "Hexalith.ChatBot.RecoverySandbox.csproj");
+            return File.Exists(projectPath)
+                ? projectPath
+                : throw new InvalidOperationException("The ChatBot content root has no recovery sandbox project.");
+        }
+
+        throw new InvalidOperationException("The AppHost is outside a ChatBot content root.");
     }
 }

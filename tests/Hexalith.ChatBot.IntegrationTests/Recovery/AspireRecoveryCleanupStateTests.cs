@@ -53,6 +53,216 @@ public sealed class AspireRecoveryCleanupStateTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MidLoopSeedFailureCleansConfirmedAndUnconfirmedReferences(bool projectedBeforeConfirmationFailure)
+    {
+        InMemoryRecoveryReadModelStore store = new();
+        string? unconfirmedNote = null;
+        RecoveryDurableStateMessageHandler handler = new()
+        {
+            OnAggregateRead = (_, note) =>
+            {
+                if (projectedBeforeConfirmationFailure && string.Equals(note, unconfirmedNote, StringComparison.Ordinal))
+                {
+                    throw new HttpRequestException("injected durable confirmation failure");
+                }
+            },
+        };
+        List<string> diagnostics = [];
+        int submissions = 0;
+        RecoverySandboxOperationsTestSeam seam = SandboxSeam(
+            submit: async (note, _, _, _, _, cancellationToken) =>
+            {
+                if (++submissions == 2 && !projectedBeforeConfirmationFailure)
+                {
+                    throw new InvalidOperationException("injected second submission failure");
+                }
+
+                await store.SaveAsync(ChatBotReadModelStoreNames.StateStoreName,
+                    GovernedKey(RecoveryValidationTopology.StorageTenantRef, note),
+                    Governed(RecoveryValidationTopology.StorageTenantRef, note), cancellationToken).ConfigureAwait(false);
+                if (submissions == 2)
+                {
+                    unconfirmedNote = note;
+                    return;
+                }
+
+                handler.AddGovernedNote(RecoveryValidationTopology.StorageTenantRef, note);
+            },
+            diagnostic: (value, _) =>
+            {
+                diagnostics.Add(value);
+                return ValueTask.CompletedTask;
+            });
+        using EventStoreDurableStateProbe durable = Durable(handler);
+        AspireRecoverySandboxOperations operations = SandboxOperations(seam, store, durable);
+
+        if (projectedBeforeConfirmationFailure)
+        {
+            await Should.ThrowAsync<HttpRequestException>(() => operations.SeedCommittedOperationAsync(
+                RecoveryValidationTopology.LogicalTenantRef, Id8, TestContext.Current.CancellationToken).AsTask());
+        }
+        else
+        {
+            (await Should.ThrowAsync<InvalidOperationException>(() => operations.SeedCommittedOperationAsync(
+                RecoveryValidationTopology.LogicalTenantRef, Id8, TestContext.Current.CancellationToken).AsTask()))
+                .Message.ShouldBe("injected second submission failure");
+        }
+
+        string[] tracked = [.. operations.ActiveEventStoreCleanupState.CheckpointNoteRefs];
+        tracked.Length.ShouldBe(2);
+        operations.ActiveEventStoreCleanupState.CheckpointCommittedAtUtc.Count.ShouldBe(1);
+        await AssertPresentAsync(store, GovernedKey(RecoveryValidationTopology.StorageTenantRef, tracked[0]));
+        if (projectedBeforeConfirmationFailure)
+        {
+            await AssertPresentAsync(store, GovernedKey(RecoveryValidationTopology.StorageTenantRef, tracked[1]));
+        }
+        else
+        {
+            await AssertAbsentAsync(store, GovernedKey(RecoveryValidationTopology.StorageTenantRef, tracked[1]));
+        }
+
+        bool complete = await operations.CleanupEventStoreScenarioAsync(TestContext.Current.CancellationToken);
+        complete.ShouldBe(projectedBeforeConfirmationFailure);
+        diagnostics.ShouldBe(projectedBeforeConfirmationFailure
+            ? []
+            : ["RECOVERY_CLEANUP_INCOMPLETE checks=checkpoint-note-not-present"]);
+        foreach (string note in tracked)
+        {
+            await AssertAbsentAsync(store, GovernedKey(RecoveryValidationTopology.StorageTenantRef, note));
+        }
+
+        AssertEventStoreEmpty(operations.ActiveEventStoreCleanupState);
+    }
+
+    [Fact]
+    public async Task IncompleteEventStoreCleanupAllowsFreshSeedingAndCleanup()
+    {
+        InMemoryRecoveryReadModelStore store = new();
+        RecoveryDurableStateMessageHandler handler = new();
+        RecoverySandboxOperationsTestSeam seam = SandboxSeam(submit: async (note, _, _, _, token, cancellationToken) =>
+        {
+            string tenant = string.Equals(token, "control", StringComparison.Ordinal)
+                ? RecoveryValidationTopology.ControlTenantRef
+                : RecoveryValidationTopology.StorageTenantRef;
+            await store.SaveAsync(ChatBotReadModelStoreNames.StateStoreName, GovernedKey(tenant, note),
+                Governed(tenant, note), cancellationToken).ConfigureAwait(false);
+            handler.AddGovernedNote(tenant, note);
+        });
+        using EventStoreDurableStateProbe durable = Durable(handler);
+        AspireRecoverySandboxOperations operations = SandboxOperations(seam, store, durable);
+        SeedEventStoreState(operations.ActiveEventStoreCleanupState);
+        (await operations.CleanupEventStoreScenarioAsync(TestContext.Current.CancellationToken)).ShouldBeFalse();
+        AssertEventStoreEmpty(operations.ActiveEventStoreCleanupState);
+
+        _ = await operations.SeedCommittedOperationAsync(
+            RecoveryValidationTopology.LogicalTenantRef, Id7, TestContext.Current.CancellationToken);
+        string[] freshNotes = [.. operations.ActiveEventStoreCleanupState.CheckpointNoteRefs];
+        freshNotes.ShouldNotBeEmpty();
+        freshNotes.ShouldNotContain(Id1);
+        (await operations.CleanupEventStoreScenarioAsync(TestContext.Current.CancellationToken)).ShouldBeTrue();
+
+        AssertEventStoreEmpty(operations.ActiveEventStoreCleanupState);
+        store.Keys(ChatBotReadModelStoreNames.StateStoreName).ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("eventstore")]
+    [InlineData("subscription")]
+    [InlineData(ScopedOutageDependencies.Graph)]
+    [InlineData(ScopedOutageDependencies.Identity)]
+    public async Task FailedCleanupCannotReuseOldReferencesDuringTheNextScenario(string scenario)
+    {
+        InMemoryRecoveryReadModelStore store = new();
+        RecoveryDurableStateMessageHandler handler = new();
+        using EventStoreDurableStateProbe durable = Durable(handler);
+        string tenant = RecoveryValidationTopology.StorageTenantRef;
+        string oldKey;
+        string successorKey;
+        Func<Task<bool>> cleanup;
+        Action seedSuccessor;
+        Action assertEmpty;
+        if (string.Equals(scenario, "eventstore", StringComparison.Ordinal))
+        {
+            AspireRecoverySandboxOperations operations = SandboxOperations(SandboxSeam(), store, durable);
+            SeedEventStoreState(operations.ActiveEventStoreCleanupState);
+            oldKey = GovernedKey(tenant, Id1);
+            successorKey = GovernedKey(tenant, Id8);
+            await store.SaveAsync(ChatBotReadModelStoreNames.StateStoreName, oldKey, Governed(tenant, Id1), TestContext.Current.CancellationToken);
+            await store.SaveAsync(ChatBotReadModelStoreNames.StateStoreName, successorKey, Governed(tenant, Id8), TestContext.Current.CancellationToken);
+            cleanup = () => operations.CleanupEventStoreScenarioAsync(TestContext.Current.CancellationToken).AsTask();
+            seedSuccessor = () =>
+            {
+                operations.ActiveEventStoreCleanupState.CheckpointCorrelationId = Id7;
+                operations.ActiveEventStoreCleanupState.CheckpointNoteRefs.Add(Id8);
+            };
+            assertEmpty = () => AssertEventStoreEmpty(operations.ActiveEventStoreCleanupState);
+        }
+        else if (string.Equals(scenario, "subscription", StringComparison.Ordinal))
+        {
+            AspireRecoverySandboxOperations operations = SandboxOperations(SandboxSeam(), store, durable);
+            operations.ActiveSubscriptionCleanupState.StorageIntakeRefs.Add(Id1);
+            oldKey = IntakeKeys(tenant, Id1)[0];
+            successorKey = IntakeKeys(tenant, Id8)[0];
+            await SaveIntakeKeysAsync(store, tenant, Id1);
+            await SaveIntakeKeysAsync(store, tenant, Id8);
+            cleanup = () => operations.CleanupSubscriptionScenarioAsync(
+                RecoveryValidationTopology.LogicalTenantRef, TestContext.Current.CancellationToken).AsTask();
+            seedSuccessor = () => operations.ActiveSubscriptionCleanupState.StorageIntakeRefs.Add(Id8);
+            assertEmpty = () => AssertSubscriptionEmpty(operations.ActiveSubscriptionCleanupState);
+        }
+        else
+        {
+            ScopedOutageOperationsTestSeam seam = ScopedSeam(new Queue<string>(["{\"faulted\":false}", "{\"faulted\":false}"]));
+            AspireScopedOutageOperations operations = ScopedOperations(seam, store, durable);
+            oldKey = IntakeKeys(tenant, Id1)[0];
+            successorKey = IntakeKeys(tenant, Id8)[0];
+            await SaveIntakeKeysAsync(store, tenant, Id1);
+            await SaveIntakeKeysAsync(store, tenant, Id8);
+            if (string.Equals(scenario, ScopedOutageDependencies.Graph, StringComparison.Ordinal))
+            {
+                operations.ActiveCleanupState.GraphIntakeRefs.Add(Id1);
+                seedSuccessor = () => operations.ActiveCleanupState.GraphIntakeRefs.Add(Id8);
+            }
+            else
+            {
+                operations.ActiveCleanupState.IdentityAffectedSentinel = Sentinel(tenant, Id1);
+                seedSuccessor = () => operations.ActiveCleanupState.IdentityAffectedSentinel = Sentinel(tenant, Id8);
+            }
+
+            cleanup = () => operations.CleanupAsync(scenario, RecoveryValidationTopology.LogicalTenantRef,
+                TestContext.Current.CancellationToken).AsTask();
+            assertEmpty = () => AssertScopedEmpty(operations.ActiveCleanupState);
+        }
+
+        store.FailOnEraseKey = oldKey;
+        (await Should.ThrowAsync<InvalidOperationException>(cleanup)).Message.ShouldBe("Injected named read-model erase failure.");
+        assertEmpty();
+        await AssertPresentAsync(store, oldKey);
+        await AssertPresentAsync(store, successorKey);
+        seedSuccessor();
+        List<string> secondScenarioReads = [];
+        store.OnReadKey = secondScenarioReads.Add;
+
+        (await cleanup()).ShouldBeTrue();
+
+        assertEmpty();
+        secondScenarioReads.ShouldContain(successorKey);
+        secondScenarioReads.ShouldNotContain(oldKey);
+        store.OnReadKey = null;
+        await AssertPresentAsync(store, oldKey);
+        await AssertAbsentAsync(store, successorKey);
+        if (!string.Equals(scenario, "eventstore", StringComparison.Ordinal))
+        {
+            foreach (string key in IntakeKeys(tenant, Id8))
+            {
+                await AssertAbsentAsync(store, key);
+            }
+        }
+    }
+
+    [Theory]
     [InlineData("complete")]
     [InlineData("negative")]
     public async Task EventStoreCleanupCoversCompleteAndAuxiliaryNegativeOutcomes(string scenario)
@@ -382,6 +592,17 @@ public sealed class AspireRecoveryCleanupStateTests
             {
                 await AssertPresentAsync(store, key);
             }
+
+            store.OnEraseKey = null;
+            (await operations.CleanupSubscriptionScenarioAsync(
+                RecoveryValidationTopology.LogicalTenantRef, TestContext.Current.CancellationToken)).ShouldBeTrue();
+            AssertSubscriptionEmpty(operations.ActiveSubscriptionCleanupState);
+            foreach (string key in IntakeKeys(RecoveryValidationTopology.StorageTenantRef, successor))
+            {
+                await AssertAbsentAsync(store, key);
+            }
+
+            await AssertPresentAsync(store, recreatedKey);
         }
         else
         {
@@ -550,6 +771,17 @@ public sealed class AspireRecoveryCleanupStateTests
             {
                 await AssertPresentAsync(incompleteStore, successorKey);
             }
+
+            incompleteStore.OnEraseKey = null;
+            (await incomplete.CleanupAsync(dependency, RecoveryValidationTopology.LogicalTenantRef,
+                TestContext.Current.CancellationToken)).ShouldBeTrue();
+            AssertScopedEmpty(incomplete.ActiveCleanupState);
+            foreach (string successorKey in IntakeKeys(RecoveryValidationTopology.StorageTenantRef, Id8))
+            {
+                await AssertAbsentAsync(incompleteStore, successorKey);
+            }
+
+            await AssertPresentAsync(incompleteStore, recreated);
         }
         else
         {
@@ -612,6 +844,17 @@ public sealed class AspireRecoveryCleanupStateTests
             {
                 await AssertPresentAsync(incompleteStore, successorKey);
             }
+
+            incompleteStore.OnEraseKey = null;
+            (await incomplete.CleanupAsync(dependency, RecoveryValidationTopology.LogicalTenantRef,
+                TestContext.Current.CancellationToken)).ShouldBeTrue();
+            AssertScopedEmpty(incomplete.ActiveCleanupState);
+            foreach (string successorKey in IntakeKeys(RecoveryValidationTopology.StorageTenantRef, Id8))
+            {
+                await AssertAbsentAsync(incompleteStore, successorKey);
+            }
+
+            await AssertPresentAsync(incompleteStore, recreated);
         }
     }
 

@@ -13,14 +13,7 @@ internal static class RecoveryAccessTokenProvider
 {
     public static async Task<string> AcquireAsync(DistributedApplication application, CancellationToken cancellationToken)
     {
-        Dictionary<string, string> fields = new()
-        {
-            ["grant_type"] = "password",
-            ["client_id"] = "hexalith-chatbot",
-            ["username"] = "recovery-validator",
-            ["password"] = "recovery-validator-pass",
-            ["scope"] = "openid",
-        };
+        Dictionary<string, string> fields = RecoveryValidatorIdentity.CreateTokenRequestFields();
         return await AcquireTokenAsync(application, fields, cancellationToken).ConfigureAwait(false);
     }
 

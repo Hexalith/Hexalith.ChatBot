@@ -1057,14 +1057,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
 
         try
         {
-            using FormUrlEncodedContent form = new(new Dictionary<string, string>
-            {
-                ["grant_type"] = "password",
-                ["client_id"] = "hexalith-chatbot",
-                ["username"] = "recovery-validator",
-                ["password"] = "recovery-validator-pass",
-                ["scope"] = "openid",
-            });
+            using FormUrlEncodedContent form = new(RecoveryValidatorIdentity.CreateTokenRequestFields());
             using HttpResponseMessage response = await SecurityClient
                 .PostAsync("/realms/hexalith/protocol/openid-connect/token", form, cancellationToken)
                 .ConfigureAwait(false);
