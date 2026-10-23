@@ -63,7 +63,11 @@ internal sealed class ChatBotAdmissionEvidenceValidator(
             {
                 ProposeAIAction proposal = payload.Deserialize<ProposeAIAction>(ReadOptions)!;
                 AiActionCommandMetadata? metadata = AiActionCommandMetadataProvider.TryGet(proposal.IntendedCommandName);
-                if (metadata is null) { return ChatBotAuthorizationReasonCodes.CommandNotAllowlisted; }
+                // Proposals exist only for approval-required effects; a low-risk successor is the distinct assistance command.
+                if (metadata is null || metadata.CommandDefaultRisk != AiActionRiskClass.ApprovalRequired)
+                {
+                    return ChatBotAuthorizationReasonCodes.CommandNotAllowlisted;
+                }
                 if (proposal.CommandDefaultRisk is { } claimedRisk && claimedRisk != metadata.CommandDefaultRisk ||
                     proposal.EffectSurface is { } claimedEffect && claimedEffect != metadata.EffectSurface ||
                     proposal.TenantPolicyClassification is { } claimedPolicy && claimedPolicy != metadata.TenantPolicyClassification ||

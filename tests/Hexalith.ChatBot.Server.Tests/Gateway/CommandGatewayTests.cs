@@ -5150,6 +5150,8 @@ public sealed partial class CommandGatewayTests
             factory.CreateAuditUnavailable(CorrelationId, TaskId),
             factory.CreateIdempotencyConflict(CorrelationId, TaskId),
             factory.CreateInvalidLifecycleTransition(CorrelationId, TaskId),
+            factory.CreateClassifierIndeterminate(CorrelationId, TaskId),
+            factory.CreateApprovalRequired(CorrelationId, TaskId),
         ];
 
         problems.Select(static problem => problem.Type).ShouldBe(
@@ -5159,6 +5161,8 @@ public sealed partial class CommandGatewayTests
             ChatBotProblemTypes.AuditUnavailable,
             ChatBotProblemTypes.IdempotencyConflict,
             ChatBotProblemTypes.InvalidLifecycleTransition,
+            ChatBotProblemTypes.ClassifierIndeterminate,
+            ChatBotProblemTypes.ApprovalRequired,
         ]);
 
         foreach (ProblemDetails problem in problems)
@@ -5170,6 +5174,18 @@ public sealed partial class CommandGatewayTests
             problem.Details.Visibility.ShouldBe(ProblemDetailsDetailsVisibility.Metadata_only);
             Serialized(problem).ShouldNotContain("contact_support", Case.Insensitive);
         }
+
+        // The CLI and MCP formatters render category and client action, so pin both terminal admission dispositions.
+        ProblemDetails classifierIndeterminate = problems.Single(static problem => problem.Code == ChatBotMessageCodes.ClassifierIndeterminate);
+        classifierIndeterminate.Status.ShouldBe(422);
+        classifierIndeterminate.Category.ShouldBe(ProblemDetailsCategory.Validation_error);
+        classifierIndeterminate.ClientAction.ShouldBe(ProblemDetailsClientAction.CorrectRequest);
+        classifierIndeterminate.Retryable.ShouldBe(false);
+        ProblemDetails approvalRequired = problems.Single(static problem => problem.Code == ChatBotMessageCodes.ApprovalRequired);
+        approvalRequired.Status.ShouldBe(409);
+        approvalRequired.Category.ShouldBe(ProblemDetailsCategory.Conflict);
+        approvalRequired.ClientAction.ShouldBe(ProblemDetailsClientAction.Escalate);
+        approvalRequired.Retryable.ShouldBe(false);
 
         // Pins the PRODUCER to the shared constant. The constant's value was covered by the Tier-3 contract theory,
         // but nothing called this factory method, so decoupling line 70 from ChatBotProblemTypes.DispatchUnavailable

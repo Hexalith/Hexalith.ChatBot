@@ -273,9 +273,10 @@ public sealed class ChatBotOperationEvidenceValidatorTests
         context.AdmissionEvidence.ShouldBeNull();
     }
 
-    /// <summary>The real validator refuses unknown intended and non-allowlisted execution targets before owner reads.</summary>
+    /// <summary>The real validator refuses unknown or low-risk proposal targets and non-allowlisted execution targets before owner reads.</summary>
     [Theory]
     [InlineData(nameof(ProposeAIAction), "{\"intendedCommandName\":\"Unknown.Command\"}")]
+    [InlineData(nameof(ProposeAIAction), "{\"intendedCommandName\":\"ChatBot.ExecuteLowRiskAssistance\",\"expectedSourceVersion\":8}")]
     [InlineData(nameof(ExecuteApprovedAIAction), "{\"commandName\":\"Unknown.Command\"}")]
     [InlineData(nameof(ExecuteApprovedAIAction), "{\"commandName\":\"ChatBot.ExecuteLowRiskAssistance\",\"commandAllowlistVersion\":\"ai-action-command-allowlist.m0\",\"expectedApprovalSourceVersion\":8,\"expectedProposalSourceVersion\":8}")]
     [InlineData(nameof(ExecuteApprovedAIAction), "{\"commandName\":\"ChatBot.ExecuteLowRiskAssistance\",\"commandAllowlistVersion\":\"ai-action-command-allowlist.v1\",\"expectedApprovalSourceVersion\":8,\"expectedProposalSourceVersion\":8}")]
