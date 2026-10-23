@@ -125,7 +125,6 @@ public sealed class RecoveryValidationTopologyContractTests
         appHost.ShouldContain("__HEXALITH_CHATBOT_RECOVERY_CLIENT_SECRET__");
         appHost.ShouldContain("ChatBot:LiveRecoveryValidation:MailboxClientSecret");
         appHost.ShouldContain("A recovery mailbox client secret must be supplied");
-        appHost.ShouldNotContain("RandomNumberGenerator");
     }
 
     [Fact]
@@ -436,6 +435,14 @@ public sealed class RecoveryValidationTopologyContractTests
             string realmFile = Path.Combine(generatedDirectory, "hexalith-realm.json");
             File.Exists(realmFile).ShouldBeTrue();
 
+            using JsonDocument rendered = JsonDocument.Parse(
+                await File.ReadAllTextAsync(realmFile, TestContext.Current.CancellationToken).ConfigureAwait(true));
+            JsonElement mailboxClient = rendered.RootElement.GetProperty("clients").EnumerateArray()
+                .Single(client => client.GetProperty("clientId").GetString() == RecoveryValidationTopology.MailboxClientId);
+            // Compare as a Boolean so assertion failures cannot print the generated mailbox secret.
+            string.Equals(mailboxClient.GetProperty("secret").GetString(), mailboxSecret, StringComparison.Ordinal)
+                .ShouldBeTrue("The recovery mailbox client must render exactly its configured secret.");
+
             if (!OperatingSystem.IsWindows())
             {
                 File.GetUnixFileMode(realmFile).ShouldBe(UnixFileMode.UserRead | UnixFileMode.UserWrite);
@@ -624,21 +631,17 @@ public sealed class RecoveryValidationTopologyContractTests
     }
 
     /// <summary>
-    /// Renders the realm through the AppHost and reads EVERY substituted
-    /// <c>chatbot:service-client-grant-expiry</c> claim back out through the real consumer,
-    /// <c>ClaimsServiceClientGrantResolver</c>, asserting it does not collapse to
-    /// <c>service_client_grant_missing</c>.
+    /// Renders every service-client grant expiry as a future canonical UTC value while proving that
+    /// <c>ClaimsServiceClientGrantResolver</c> still requires authoritative grant dependencies.
     /// </summary>
     /// <remarks>
     /// This is the gap that let the <c>+00:00</c> rendering bug ship. <c>DateTimeOffset.ToString("O")</c> on a
     /// non-UTC-kind value renders a <c>+</c> offset, which <c>AuditMetadata.IsSafeStableIdentifier</c> rejects
-    /// (<c>+</c> is outside its charset), so every service client would have been denied. Nothing caught it: every
-    /// resolver unit test hand-writes a <c>...Z</c> literal, the AppHost guard asserted only that the placeholder
-    /// was present, and the Tier-3 lane mints a <b>user</b> token (<c>grant_type=password</c>) so it can never
-    /// exercise a service client. Only reading the actually-rendered value through the actual consumer closes it.
+    /// (<c>+</c> is outside its charset). Validate the actual rendered values rather than hand-written claims.
+    /// Valid serialization remains separate from current owner authority: claims alone cannot provide a grant.
     /// </remarks>
     [Fact]
-    public async Task RenderedRealmServiceClientGrantExpiryIsAcceptedByTheClaimsGrantResolver()
+    public async Task RenderedRealmServiceClientGrantExpiriesAreCanonicalFutureUtcButClaimsAloneCannotAuthorize()
     {
         string tempPath = Path.GetTempPath();
         HashSet<string> before = Directory
@@ -688,8 +691,7 @@ public sealed class RecoveryValidationTopologyContractTests
                     "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__",
                     customMessage: $"Client '{clientId}' kept the unsubstituted placeholder.");
 
-                // The two gates the resolver actually applies, in order, asserted individually so a failure names
-                // which one rejected the rendering rather than only that the grant went missing.
+                // Preserve the serialization contract independently of the authoritative grant decision.
                 AuditMetadata.IsSafeStableIdentifier(expiry).ShouldBeTrue(
                     $"Client '{clientId}' rendered the grant expiry as '{expiry}', which AuditMetadata rejects. "
                     + "A DateTimeOffset with a non-UTC Kind renders a '+00:00' offset, and '+' is outside the safe "
@@ -699,12 +701,15 @@ public sealed class RecoveryValidationTopologyContractTests
                     CultureInfo.InvariantCulture,
                     DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
                     out DateTimeOffset parsed).ShouldBeTrue(
-                    $"Client '{clientId}' rendered a grant expiry the resolver cannot parse: '{expiry}'.");
+                    $"Client '{clientId}' rendered an unparseable grant expiry: '{expiry}'.");
+                expiry.ShouldBe(
+                    parsed.UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
+                    $"Client '{clientId}' must render its grant expiry in canonical UTC form ending in 'Z'.");
                 parsed.ShouldBeGreaterThan(
                     DateTimeOffset.UtcNow,
                     $"Client '{clientId}' rendered an already-expired grant expiry.");
 
-                // ... and through the real consumer, end to end.
+                // A future expiry in token claims cannot replace the authorizer and trusted request context.
                 ServiceClientGrantResolution resolution = await resolver
                     .ResolveAsync(
                         ServiceClientSubmission(),
@@ -713,13 +718,11 @@ public sealed class RecoveryValidationTopologyContractTests
                         TestContext.Current.CancellationToken)
                     .ConfigureAwait(true);
 
-                resolution.ReasonCode.ShouldNotBe(
+                resolution.ReasonCode.ShouldBe(
                     ChatBotAuthorizationReasonCodes.ServiceClientGrantMissing,
-                    $"ClaimsServiceClientGrantResolver denied client '{clientId}' with service_client_grant_missing "
-                    + $"for the realm-rendered expiry '{expiry}'.");
-                resolution.IsResolved.ShouldBeTrue(
-                    $"Client '{clientId}' must resolve a grant from the realm-rendered expiry '{expiry}'.");
-                resolution.Grant.ShouldNotBeNull().ExpiresAt.ShouldBe(parsed);
+                    $"Client '{clientId}' must not gain current owner authority from claims alone.");
+                resolution.IsResolved.ShouldBeFalse();
+                resolution.Grant.ShouldBeNull();
             }
         }
         finally

@@ -162,11 +162,42 @@ public static class AppHostTopologyTests
     }
 
     /// <summary>
+    /// The imported realm must allow the browser's standard OIDC profile request before login can begin.
+    /// </summary>
+    [Fact]
+    public static void BrowserClientShouldAllowStandardProfileScopeWithUserClaims()
+    {
+        using JsonDocument realm = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "KeycloakRealms", "hexalith-realm.json")));
+        JsonElement browserClient = realm.RootElement.GetProperty("clients").EnumerateArray()
+            .Single(client => client.GetProperty("clientId").GetString() == "hexalith-chatbot");
+        string?[] allowedScopes = new[] { "defaultClientScopes", "optionalClientScopes" }
+            .SelectMany(name => browserClient.TryGetProperty(name, out JsonElement scopes)
+                ? scopes.EnumerateArray().Select(scope => scope.GetString())
+                : [])
+            .ToArray();
+        allowedScopes.ShouldContain("profile");
+
+        JsonElement profile = realm.RootElement.GetProperty("clientScopes").EnumerateArray()
+            .Single(scope => scope.GetProperty("name").GetString() == "profile");
+        profile.GetProperty("protocol").GetString().ShouldBe("openid-connect");
+        JsonElement usernameMapper = profile.GetProperty("protocolMappers").EnumerateArray()
+            .Single(mapper => mapper.GetProperty("config").TryGetProperty("claim.name", out JsonElement claim)
+                && claim.GetString() == "preferred_username");
+        usernameMapper.GetProperty("protocol").GetString().ShouldBe("openid-connect");
+        usernameMapper.GetProperty("protocolMapper").GetString().ShouldBe("oidc-usermodel-attribute-mapper");
+        JsonElement mapperConfig = usernameMapper.GetProperty("config");
+        mapperConfig.GetProperty("user.attribute").GetString().ShouldBe("username");
+        mapperConfig.GetProperty("id.token.claim").GetString().ShouldBe("true");
+        mapperConfig.GetProperty("access.token.claim").GetString().ShouldBe("true");
+    }
+
+    /// <summary>
     /// The service-grant expiry rendering is verified BEHAVIORALLY, not by source text: this project has no
     /// ProjectReference and cannot run the AppHost. <c>RecoveryValidationTopologyContractTests
-    /// .RenderedRealmServiceClientGrantExpiryIsAcceptedByTheClaimsGrantResolver</c> in the integration suite renders
-    /// the realm through the AppHost, reads every substituted <c>chatbot:service-client-grant-expiry</c> claim back
-    /// out, and asserts <c>ClaimsServiceClientGrantResolver</c> accepts it. That is what the previous source-text
+    /// .RenderedRealmServiceClientGrantExpiriesAreCanonicalFutureUtcButClaimsAloneCannotAuthorize</c> in the
+    /// integration suite renders every grant expiry and verifies its canonical future UTC form while preserving
+    /// the resolver's requirement for authoritative dependencies. That is what the previous source-text
     /// guard here could not do — the <c>+00:00</c> rendering bug shipped past a green suite because every resolver
     /// test hand-writes <c>...Z</c> literals and this guard only matched a source expression.
     /// </summary>

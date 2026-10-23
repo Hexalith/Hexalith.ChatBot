@@ -3,12 +3,14 @@ using System.Security.Claims;
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 
 using Shouldly;
 
@@ -22,6 +24,14 @@ public sealed class IdempotencyStateStoreIntegrationTests
         FixedClock clock = new();
         InMemoryCoarseIdempotencyStore store = new(clock);
         RecordingDispatcher dispatcher = new();
+        // RecoverySandbox already links and exposes these shared test fixtures to this assembly.
+        // Synthetic owner/admission evidence isolates coarse persistence and replay mechanics.
+        // This fixture does not qualify production owner authority or atomic execution.
+        ChatBotRequestAuthorizer authorizer = new(
+            new ChatBotAuthorityCatalog(),
+            new SyntheticOwnerAuthorityProvider(clock),
+            clock,
+            new ServiceClientGrantProjectionCache(clock));
         CommandGateway gateway = new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),
@@ -37,18 +47,21 @@ public sealed class IdempotencyStateStoreIntegrationTests
             new CommandSubmissionLifecycleTransitionGuard(),
             dispatcher,
             new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry()),
-            new ChatBotSpineCommandAllowlist());
+            new ChatBotSpineCommandAllowlist(),
+            requestAuthorizer: authorizer,
+            admissionEvidence: new SyntheticLegacyAdmissionEvidenceValidator());
         ChatBotCommandSubmission submission = Submission();
 
         ChatBotGatewayResult single = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
+        single.IsAccepted.ShouldBeTrue($"The first submission was denied with '{single.Problem?.Code}'.");
+        single.Accepted.ShouldNotBeNull();
         CoarseIdempotencyRecord storedAfterSingle = store.Records.Single();
         ChatBotGatewayResult repeat = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
+        repeat.IsAccepted.ShouldBeTrue($"The repeated submission was denied with '{repeat.Problem?.Code}'.");
+        repeat.Accepted.ShouldNotBeNull();
         CoarseIdempotencyRecord storedAfterRepeat = store.Records.Single();
 
-        single.IsAccepted.ShouldBeTrue();
-        repeat.IsAccepted.ShouldBeTrue();
-        repeat.Accepted.ShouldNotBeNull();
-        repeat.Accepted.CommandId.ShouldBe(single.Accepted!.CommandId);
+        repeat.Accepted.CommandId.ShouldBe(single.Accepted.CommandId);
         dispatcher.DispatchCount.ShouldBe(1);
         storedAfterRepeat.ShouldBe(storedAfterSingle);
     }
