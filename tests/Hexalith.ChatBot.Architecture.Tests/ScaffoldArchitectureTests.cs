@@ -479,7 +479,7 @@ public static class ScaffoldArchitectureTests
             .Select(static element => element.Attribute("Include")?.Value)
             .ShouldBe(["Microsoft.Extensions.Hosting", "ModelContextProtocol"], ignoreOrder: true);
 
-        PackageCatalogTestHelper.Version("ModelContextProtocol").ShouldBe("2.2.0");
+        PackageCatalogTestHelper.Version("ModelContextProtocol").ShouldBe("2.3.0");
 
         string[] forbidden =
         [
@@ -1038,19 +1038,15 @@ public static class ScaffoldArchitectureTests
             5,
             "root-declared package wrappers must remain present and centrally auditable");
 
-        string[] localVersionDeclarations = wrappers
-            .SelectMany(wrapper => XDocument.Load(wrapper)
-                .Descendants("PackageVersion")
-                .Select(version => Path.GetRelativePath(root, wrapper) + ":"
-                    + (version.Attribute("Include")?.Value ?? version.Attribute("Update")?.Value)))
-            .ToArray();
-        localVersionDeclarations.ShouldBeEmpty(
-            "root-declared sibling wrappers import the shared Builds catalog and must not become version authorities");
+        foreach (string wrapper in wrappers)
+        {
+            PackageCatalogTestHelper.AssertSiblingAuthority(wrapper);
+        }
 
-        PackageCatalogTestHelper.Version("Hexalith.Folders.Client").ShouldBe("1.3.0");
-        PackageCatalogTestHelper.Version("Hexalith.Folders.Contracts").ShouldBe("1.3.0");
-        PackageCatalogTestHelper.Version("Hexalith.Projects.Client").ShouldBe("1.0.0");
-        PackageCatalogTestHelper.Version("Hexalith.Projects.Contracts").ShouldBe("1.0.0");
+        PackageCatalogTestHelper.Version("Hexalith.Folders.Client").ShouldBe("1.3.1");
+        PackageCatalogTestHelper.Version("Hexalith.Folders.Contracts").ShouldBe("1.3.1");
+        PackageCatalogTestHelper.Version("Hexalith.Projects.Client").ShouldBe("1.2.0");
+        PackageCatalogTestHelper.Version("Hexalith.Projects.Contracts").ShouldBe("1.2.0");
         PackageCatalogTestHelper.Version("LibGit2Sharp").ShouldBe("0.32.0");
         PackageCatalogTestHelper.AssertExclusiveAuthority();
     }
