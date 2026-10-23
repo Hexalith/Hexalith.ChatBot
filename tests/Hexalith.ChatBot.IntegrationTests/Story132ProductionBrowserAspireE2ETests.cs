@@ -240,6 +240,9 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
             string.Equals(resource.Name, ChatBotResourceName, StringComparison.Ordinal));
         chatBot.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
         {
+            // Development only because this local topology serves HTTP identity metadata, which the EventStore SDK
+            // rejects outside Development. Development also relaxes that SDK's internal-credential, reminder and
+            // app-channel token checks, so this lane is client fail-closed evidence, not host-hardening evidence.
             context.EnvironmentVariables["DOTNET_ENVIRONMENT"] = "Development";
             context.EnvironmentVariables["ASPNETCORE_ENVIRONMENT"] = "Development";
             context.EnvironmentVariables["ChatBot__Story132Acceptance__Enabled"] = "true";

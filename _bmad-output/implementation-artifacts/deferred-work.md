@@ -1811,3 +1811,10 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-five-deferred-recovery-contracts.md`
   summary: The existing mailbox realm assertion rejects unrelated runtime-generated workload secrets (low, pre-existing).
   evidence: RecoveryValidationTopologyContractTests.RealmAddsClosedRecoveryMailboxServiceIdentityWithoutACommittedSecret rejects any RandomNumberGenerator substring in AppHost Program.cs, which already generates five non-mailbox workload secrets at baseline e97e7a8831768aee1ca1cb7cfc9ec5c64b7dfe68. This assertion and AppHost Program.cs were untouched. TestResults/five-recovery-contracts.{ctrf.json,trx} records the failure; scope a future assertion to the mailbox secret configuration boundary.
+
+
+## Deferred from: code review of spec-1-7-admit-commands-through-the-single-commandgateway (2026-10-23, round 7)
+
+- source_spec: `spec-1-7-admit-commands-through-the-single-commandgateway.md`
+  summary: `RunSettingsIsAcceptedByTheTestPlatform` never passes `live-recovery.runsettings`, so it proves only that the direct runner executes one probe; retire the probe and file or pass the settings (low; pre-existing since `bb64e24`; CR7-W1).
+  evidence: The argument vector in `tests/Hexalith.ChatBot.Architecture.Tests/LiveRecoveryValidationArchitectureTests.cs:676` holds only `run-xunit-v4.sh`, the runner beside the test assembly, a CTRF path and `-method ...RunSettingsPlatformAcceptanceProbe`, with no `--settings`. No workflow, script or project file references `live-recovery.runsettings`, so the remarks ("runs the real runner against the real file") are stale. The Story 1.7 blocker fix (`fdeb341`) changed only the runner path to `AppContext.BaseDirectory`, which still resolves to `bin/Release/net10.0` in the Release lane. The choice depends on whether the file still has a local use.

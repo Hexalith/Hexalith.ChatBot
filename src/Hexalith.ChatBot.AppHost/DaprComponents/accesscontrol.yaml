@@ -18,9 +18,10 @@ spec:
     # literals and fails naming any route this file omits.
     #
     # GET / (the SDK's banner endpoint) is deliberately EXCLUDED: it has no cross-app caller and this policy is
-    # POST-scoped. /project/rebuild/v1 and /project/rebuild/shared/v1 have no EventStore-side caller today but are
-    # granted with the rest of the rebuild family — splitting that family by current call sites is exactly the
-    # brittle, silently-denying failure mode the /process-only narrowing produced.
+    # POST-scoped. /project/rebuild/v1 has no EventStore-side caller today (SharedProjectionSourceBeginProducer now
+    # calls /project/rebuild/shared/v1) but is granted with the rest of the rebuild family — splitting that family
+    # by current call sites is exactly the brittle, silently-denying failure mode the /process-only narrowing
+    # produced.
     #
     # IMPORTANT — this deny-by-default policy only takes effect when mTLS is ENABLED: DAPR matches per-caller
     # policies against the caller's VERIFIED SPIFFE identity (trustDomain "public" + the deployment namespace),

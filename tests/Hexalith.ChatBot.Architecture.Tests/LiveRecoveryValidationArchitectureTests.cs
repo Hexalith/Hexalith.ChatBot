@@ -630,7 +630,10 @@ public static class LiveRecoveryValidationArchitectureTests
             "no named or unnamed workflow step may intervene between the publication guard and semantic-release");
 
         job.ShouldContain("fetch-depth: 0");
-        job.ShouldContain("timeout-minutes: 30");
+        // Job-level budget for submodule init, packing, publication and the 10-minute NuGet listing poll. Anchored,
+        // so neither a step-level timeout nor a longer value such as 300 can satisfy it.
+        Regex.IsMatch(job, "^    timeout-minutes: 45$", RegexOptions.Multiline).ShouldBeTrue(
+            "the semantic-release job must keep its 45-minute job-level timeout");
         publicationGuard.Value.ShouldContain("id: publication_guard");
         publicationGuard.Value.ShouldContain("RELEASE_BRANCH: ${{ github.ref_name }}");
         publicationGuard.Value.ShouldContain("VALIDATED_SHA: ${{ github.sha }}");

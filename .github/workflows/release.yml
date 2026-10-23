@@ -280,7 +280,7 @@ jobs:
       - topology-acceptance
       - live-recovery-evidence-gate
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
