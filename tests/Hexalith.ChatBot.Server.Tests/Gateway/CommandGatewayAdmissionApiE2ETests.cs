@@ -90,7 +90,10 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         using HttpResponseMessage response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
-        using JsonDocument problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("project-001", Case.Insensitive);
         problem.RootElement.GetProperty("type").GetString().ShouldBe(ChatBotProblemTypes.ApprovalRequired);
         problem.RootElement.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.ApprovalRequired);
         problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeFalse();
@@ -626,6 +629,8 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             .ConfigureAwait(true);
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        factory.Services.GetRequiredService<ITenantAiPolicySnapshotProvider>()
+            .ShouldBeOfType<FixedTenantAiPolicySnapshotProvider>().CallCount.ShouldBe(0);
         provider.ExecuteCount.ShouldBe(0);
         eventStore.Submitted.ShouldBeEmpty();
         auditWriter.Envelopes.ShouldBeEmpty();
@@ -639,8 +644,9 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         body.ShouldNotContain("project-001", Case.Insensitive);
     }
 
+    /// <summary>Verifies dispatcher mechanics under synthetic admission; production refuses until owner evidence and commit participation exist (Story 1.8).</summary>
     [Fact]
-    public async Task CommandGatewayApi_ShouldExecuteApprovedAiActionThroughAllowlistedConversationAppend()
+    public async Task SyntheticDispatcherMechanics_ShouldExecuteApprovedAiActionThroughAllowlistedConversationAppend()
     {
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAuditWriter auditWriter = new();
@@ -4072,6 +4078,9 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
     private sealed class FixedTenantAiPolicySnapshotProvider(bool lowRiskAllowed) : ITenantAiPolicySnapshotProvider
     {
+        /// <summary>Counts policy reads so admission-order assertions observe the actual dependency call.</summary>
+        public int CallCount { get; private set; }
+
         public ValueTask<TenantAiPolicySnapshot?> TryGetAsync(
             string tenantId,
             string projectId,
@@ -4079,6 +4088,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            CallCount++;
             ArgumentException.ThrowIfNullOrWhiteSpace(requestedPolicySnapshotId);
             TenantAiPolicySnapshot snapshot = new(
                 tenantId,

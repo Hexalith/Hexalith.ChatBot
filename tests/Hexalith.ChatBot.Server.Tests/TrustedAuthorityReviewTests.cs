@@ -280,11 +280,15 @@ public sealed class TrustedAuthorityReviewTests
         (await TrustedAuthorityFixture.Authorizer(clock, owner).AuthorizeAsync(TrustedAuthorityFixture.Context(), nameof(ExecuteAdminQueueOperation), false, payload, TestContext.Current.CancellationToken)).IsAllowed.ShouldBeTrue();
     }
 
+    /// <summary>
+    /// Verifies the workload relay's service-account and closed-origin binding. The <c>/process</c> acceptance runs under
+    /// synthetic admission mechanics; production refuses it until owner evidence and commit participation exist (Story 1.8).
+    /// </summary>
     [Theory]
     [InlineData(null, true)]
     [InlineData("worker", true)]
     [InlineData("invented", false)]
-    public async Task WorkloadAuthenticatedSdkRelayBindsServiceAccountAndClosedOrigin(string? origin, bool allowed)
+    public async Task SyntheticWorkloadAuthenticatedSdkRelayBindsServiceAccountAndClosedOrigin(string? origin, bool allowed)
     {
         TrustedAuthorityClock clock = new();
         SyntheticOwnerAuthorityProvider owner = new(clock);

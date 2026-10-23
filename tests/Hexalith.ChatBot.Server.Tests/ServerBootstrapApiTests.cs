@@ -657,6 +657,7 @@ public sealed class ServerBootstrapApiTests
         using HttpResponseMessage response = await client.PostAsJsonAsync("/process", request with { Command = command with { Extensions = extensions } }, TestContext.Current.CancellationToken);
         DomainServiceWireResult result = await ReadDomainServiceResultAsync(response);
         result.IsRejection.ShouldBeTrue();
+        AdmissionReason(result).ShouldBe(ChatBotAuthorizationReasonCodes.AuthenticationDenied);
         result.Events.ShouldNotContain(static item => item.EventTypeName.EndsWith("GovernedNoteRecorded", StringComparison.Ordinal));
         owner.Requests.ShouldBeEmpty();
     }
@@ -2957,6 +2958,14 @@ public sealed class ServerBootstrapApiTests
 
         first.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
         replay.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        foreach (HttpResponseMessage response in new[] { first, replay })
+        {
+            using JsonDocument problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+            problem.RootElement.GetProperty("type").GetString().ShouldBe(ChatBotProblemTypes.ClassifierIndeterminate);
+            problem.RootElement.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.ClassifierIndeterminate);
+        }
+        factory.Services.GetRequiredService<IIdempotencyStore>()
+            .ShouldBeOfType<InMemoryCoarseIdempotencyStore>().RecordCount.ShouldBe(0);
         provider.ExecuteCount.ShouldBe(0);
         provider.LastRequest.ShouldBeNull();
         eventStore.Submitted.ShouldBeEmpty();
@@ -2986,6 +2995,15 @@ public sealed class ServerBootstrapApiTests
             .ConfigureAwait(true);
 
         response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        problem.RootElement.GetProperty("type").GetString().ShouldBe(ChatBotProblemTypes.ClassifierIndeterminate);
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.ClassifierIndeterminate);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("raw provider payload", Case.Insensitive);
+        body.ShouldNotContain("secret", Case.Insensitive);
+        factory.Services.GetRequiredService<ITenantAiPolicySnapshotProvider>()
+            .ShouldBeOfType<FixedTenantAiPolicySnapshotProvider>().CallCount.ShouldBe(0);
         provider.ExecuteCount.ShouldBe(0);
         provider.LastRequest.ShouldBeNull();
         eventStore.Submitted.ShouldBeEmpty();
@@ -4045,12 +4063,16 @@ public sealed class ServerBootstrapApiTests
 
     private sealed class FixedTenantAiPolicySnapshotProvider(bool lowRiskAllowed) : ITenantAiPolicySnapshotProvider
     {
+        /// <summary>Counts policy reads so admission-order assertions observe the actual dependency call.</summary>
+        public int CallCount { get; private set; }
+
         public ValueTask<TenantAiPolicySnapshot?> TryGetAsync(
             string tenantId,
             string projectId,
             string? requestedPolicySnapshotId,
             CancellationToken cancellationToken)
         {
+            CallCount++;
             ArgumentException.ThrowIfNullOrWhiteSpace(requestedPolicySnapshotId);
             return ValueTask.FromResult<TenantAiPolicySnapshot?>(new TenantAiPolicySnapshot(
                 tenantId,

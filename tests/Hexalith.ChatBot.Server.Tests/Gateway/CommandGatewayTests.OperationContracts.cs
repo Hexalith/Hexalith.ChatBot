@@ -387,9 +387,12 @@ public sealed partial class CommandGatewayTests
         // Folding a synthetic operation must not enable a live canonical path or create an approval flag.
         CommandOperationContractTests.Received().Revision.ShouldBe(0);
         RecordingDispatcher dispatcher = new();
-        InMemoryCoarseIdempotencyStore idempotency = new(new FixedClock());
+        FixedClock clock = new();
+        SyntheticObservedAtomicAdmissionValidator evidence = SyntheticBookkeepingEvidence(clock);
+        InMemoryCoarseIdempotencyStore idempotency = new(clock);
         InMemoryOperationStatusStore status = new();
-        CommandGateway gateway = Gateway(dispatcher, idempotencyStore: idempotency, operationStatusStore: status);
+        CommandGateway gateway = Gateway(dispatcher, clock: clock, idempotencyStore: idempotency, operationStatusStore: status,
+            admissionEvidence: evidence);
         ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "resource"));
         submission.Request.Concurrency = new CommandOperationConcurrency { ExpectedRevision = 0, DecisionSlotId = "decision:alpha" };
         ChatBotGatewayResult result = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
@@ -398,6 +401,7 @@ public sealed partial class CommandGatewayTests
         result.Problem.Code.ShouldBe(ChatBotMessageCodes.CanonicalExecutionUnavailable);
         result.Problem.Retryable.ShouldBeFalse();
         result.Problem.ClientAction.ShouldBe(ProblemDetailsClientAction.None);
+        evidence.AtomicCalls.ShouldBe(1);
         dispatcher.DispatchCount.ShouldBe(0);
         idempotency.RecordCount.ShouldBe(0);
         (await status.TryGetAsync(BoundTenant, submission.Request.CommandId, TestContext.Current.CancellationToken)).ShouldBeNull();

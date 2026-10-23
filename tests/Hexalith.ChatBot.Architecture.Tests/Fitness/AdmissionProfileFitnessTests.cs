@@ -115,12 +115,17 @@ public sealed class AdmissionProfileFitnessTests
         ChatBotCommandAdmissionCatalog.RequiredStagesForCommand(nameof(ExecuteApprovedOutboundDraft)).ShouldContain("provider-evidence");
     }
 
-    /// <summary>Each profile's owner proofs stay locked to the addendum's "Additional mandatory stages" column.</summary>
+    /// <summary>
+    /// Each profile's owner proofs stay locked to the addendum's "Additional mandatory stages" column, plus the
+    /// Story 1.7 matrix's Project-authority requirement for ai-read-v1.
+    /// </summary>
     [Fact]
     public void ProfileRequiredStagesShouldMatchTheLockedAddendumColumn()
     {
-        // Locked list: changing a profile's stages must change the addendum and this pin together. AI risk
-        // classification is the pipeline's classifier stage, not an owner proof, so it is not listed here.
+        // Locked list: changing a profile's stages must change their source and this pin together. Every stage comes
+        // from the addendum column except ai-read-v1's project-authority, which the frozen Story 1.7 I/O matrix
+        // requires ("current policy/context/Project authority"); do not drop it to match the addendum row alone.
+        // AI risk classification is the pipeline's classifier stage, not an owner proof, so it is not listed here.
         Dictionary<ChatBotAdmissionProfile, string[]> expected = new()
         {
             [ChatBotAdmissionProfile.MailboxIntake] = ["provider-identity-deduplication", "authenticity-state", "a6-retention", "attachment-quarantine"],
@@ -170,6 +175,9 @@ public sealed class AdmissionProfileFitnessTests
         Should.Throw<InvalidOperationException>(() => new ChatBotCommandAdmissionCatalog(rows.Append(rows[0])));
         Should.Throw<InvalidOperationException>(() => new ChatBotCommandAdmissionCatalog(rows.Skip(1)));
         Should.Throw<InvalidOperationException>(() => new ChatBotCommandAdmissionCatalog(rows.Append(new("Unknown", ChatBotAdmissionProfile.Workflow))));
+        Should.Throw<InvalidOperationException>(() => new ChatBotCommandAdmissionCatalog(rows.Skip(1).Append(new("Unknown", rows[0].Value))));
+        ChatBotAdmissionProfile differentProfile = Enum.GetValues<ChatBotAdmissionProfile>().First(profile => profile != rows[0].Value);
+        Should.Throw<InvalidOperationException>(() => new ChatBotCommandAdmissionCatalog(rows.Skip(1).Append(new(rows[0].Key, differentProfile))));
         Should.Throw<InvalidOperationException>(() => new ChatBotCommandAdmissionCatalog(rows.Skip(1).Append(new(rows[0].Key, (ChatBotAdmissionProfile)900))));
     }
 

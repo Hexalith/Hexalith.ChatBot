@@ -557,20 +557,37 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             var grant = new GrantChatBotAuthority(authorityKey, ChatBotCommandId.New().ToString(), principalId,
                 noteId, nameof(RecordGovernedNote), "operation", "human", ChatBotSurfaceOrigin.Ui,
                 DateTimeOffset.UtcNow.AddHours(1));
-            using HttpRequestMessage grantRequest = new(HttpMethod.Post, "/api/v1/commands")
+            // Owner commands are awaited only until EventStore completes them; the Tenants/Parties read side the
+            // authorizer consults can still lag, which the authority seed tolerates too. Retry only that 403, with
+            // the same command id because a refusal reserves nothing; a persistent 403 still fails the assertion.
+            HttpStatusCode grantStatus = 0;
+            string grantBody = string.Empty;
+            for (int attempt = 1; attempt <= 5; attempt++)
             {
-                Content = JsonContent.Create(new
+                using HttpRequestMessage grantRequest = new(HttpMethod.Post, "/api/v1/commands")
                 {
-                    commandId = grantCommandId, commandType = nameof(GrantChatBotAuthority), command = grant,
-                    origin = "ui", requestSchemaVersion = "v1",
-                }),
-            };
-            grantRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-            grantRequest.Headers.Add("X-Correlation-Id", grantCorrelationId);
-            grantRequest.Headers.Add("X-Hexalith-Task-Id", grantTaskId);
-            using HttpResponseMessage refusedGrant = await client.SendAsync(grantRequest, cancellationToken).ConfigureAwait(true);
-            string grantBody = await refusedGrant.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(true);
-            AssertProductionRefusal(refusedGrant.StatusCode, grantBody, HttpStatusCode.ServiceUnavailable,
+                    Content = JsonContent.Create(new
+                    {
+                        commandId = grantCommandId, commandType = nameof(GrantChatBotAuthority), command = grant,
+                        origin = "ui", requestSchemaVersion = "v1",
+                    }),
+                };
+                grantRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                grantRequest.Headers.Add("X-Correlation-Id", grantCorrelationId);
+                grantRequest.Headers.Add("X-Hexalith-Task-Id", grantTaskId);
+                using HttpResponseMessage refusedGrant = await client.SendAsync(grantRequest, cancellationToken).ConfigureAwait(true);
+                grantStatus = refusedGrant.StatusCode;
+                grantBody = await refusedGrant.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(true);
+                if (grantStatus != HttpStatusCode.Forbidden || attempt == 5)
+                {
+                    break;
+                }
+
+                _output.WriteLine("LIVE_REFUSAL_GRANT_OWNER_READ_RETRY {0}", attempt);
+                await Task.Delay(TimeSpan.FromSeconds(5 * attempt), cancellationToken).ConfigureAwait(true);
+            }
+
+            AssertProductionRefusal(grantStatus, grantBody, HttpStatusCode.ServiceUnavailable,
                 ChatBotMessageCodes.CanonicalExecutionUnavailable, "canonical-execution-unavailable");
 
             // A refused grant cannot authorize the note. Universal authorization therefore stops it at 403,

@@ -3706,6 +3706,7 @@ public sealed partial class CommandGatewayTests
         idempotencyStore.Records.ShouldBeEmpty();
     }
 
+    /// <summary>Verifies dispatcher mechanics under synthetic admission; production refuses until owner evidence and commit participation exist (Story 1.8).</summary>
     [Fact]
     public async Task ApprovedAiActionExecutionShouldUseDedicatedIdempotencyOperationClassWhenAdmitted()
     {
@@ -4143,6 +4144,8 @@ public sealed partial class CommandGatewayTests
         replay.Accepted.AcceptedAt.ShouldBe(first.Accepted.AcceptedAt);
         dispatcher.DispatchCount.ShouldBe(1);
         idempotencyStore.RecordCount.ShouldBe(1);
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass
+            .ShouldBe(CoarseIdempotencyOperationClass.LowRiskAiAssistance.Code);
         auditWriter.Envelopes.Count.ShouldBe(2);
         foreach (AuditEnvelope envelope in auditWriter.Envelopes)
         {

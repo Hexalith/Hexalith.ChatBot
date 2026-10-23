@@ -59,6 +59,8 @@ public sealed partial class CommandGatewayTests
     [InlineData("successorCommand")]
     [InlineData("riskClassification")]
     [InlineData("executionRecord")]
+    [InlineData("ExecutionRecord")]
+    [InlineData("AdmissionProfile")]
     public async Task CallerAdmissionSelectorsShouldFailBeforeReservation(string selector)
     {
         RecordingDispatcher dispatcher = new();

@@ -203,14 +203,14 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
             "future-approved" => qualified with { ApprovedAt = source.UtcNow.AddMinutes(1) },
             "approved-at-expiry" => qualified with { ApprovedAt = source.UtcNow.AddMinutes(-1), ExpiresAt = source.UtcNow.AddMinutes(-1) },
             "approved-after-expiry" => qualified with { ApprovedAt = source.UtcNow.AddMinutes(-1), ExpiresAt = source.UtcNow.AddMinutes(-2) },
-            "blank-owner" => qualified with { OwnerId = "" },
+            "blank-owner" => qualified with { OwnerId = " " },
             "blank-independent-approver" => qualified with { IndependentApproverId = " " },
             "dataset-version" => qualified with { Identity = qualified.Identity with { DatasetVersion = "drift" } },
             "blank-runtime-artifact-hash" or "blank-runtime-candidate" or "blank-runtime-environment" or
                 "blank-runtime-dataset-version" or "blank-runtime-dataset-hash" or "empty-runtime-dependencies" or
                 "blank-runtime-dependency-name" or "blank-runtime-dependency-revision" => qualified,
             "empty-evidence" => qualified with { EvidenceReferences = [] },
-            "blank-evidence" => qualified with { EvidenceReferences = [""] },
+            "blank-evidence" => qualified with { EvidenceReferences = [" "] },
             "added-dependency" => qualified with { Identity = qualified.Identity with { DependencyRevisions = new Dictionary<string, string> { ["owner"] = "synthetic-dependency", ["other"] = "extra" } } },
             "removed-dependency" => qualified with { Identity = qualified.Identity with { DependencyRevisions = new Dictionary<string, string>() } },
             "candidate" => qualified with { Identity = qualified.Identity with { CandidateRevision = "drift" } },
@@ -250,6 +250,16 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
     {
         ChatBotAdmissionEvidenceValidator validator = new();
         ChatBotGatewayContext context = Context();
+        context.Submission.Request.Command = new
+        {
+            intendedCommandName = AiActionCommandMetadataProvider.AppendConversationMessageCommandName,
+            expectedSourceVersion = 1,
+            policySnapshotId = "synthetic-policy",
+            stageReferences = ChatBotCommandAdmissionCatalog.RequiredStages(ChatBotAdmissionProfile.AiEffect)
+                .ToDictionary(stage => stage, stage => "forged:" + stage),
+            ownerConcurrencyGuardReference = "forged:owner-concurrency",
+            admissionEvidence = new { approved = true, source = "caller" },
+        };
         (await validator.ValidateProfileAsync(context, TestContext.Current.CancellationToken)).ShouldBe(ChatBotMessageCodes.CanonicalExecutionUnavailable);
     }
 
@@ -261,6 +271,15 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
     [InlineData("policy-effect-surface", ChatBotMessageCodes.ApprovalRequired)]
     [InlineData("policy-kind-missing", ChatBotMessageCodes.ApprovalRequired)]
     [InlineData("context-drift", ChatBotMessageCodes.ProjectAiContextPackageUnavailable)]
+    [InlineData("missing-context-package", ChatBotMessageCodes.ProjectAiContextPackageUnavailable)]
+    [InlineData("context-tenant", ChatBotMessageCodes.ProjectAiContextPackageUnavailable)]
+    [InlineData("context-project", ChatBotMessageCodes.ProjectAiContextPackageUnavailable)]
+    [InlineData("context-package-id", ChatBotMessageCodes.ProjectAiContextPackageUnavailable)]
+    [InlineData("context-policy", ChatBotMessageCodes.ProjectAiContextPackageUnavailable)]
+    [InlineData("context-negative-source-version", ChatBotMessageCodes.ProjectAiContextPackageUnavailable)]
+    [InlineData("context-redaction", ChatBotMessageCodes.ProjectAiContextPackageUnavailable)]
+    [InlineData("context-retention", ChatBotMessageCodes.ProjectAiContextPackageUnavailable)]
+    [InlineData("context-provider-reuse", ChatBotMessageCodes.ProjectAiContextPackageUnavailable)]
     [InlineData("revision-drift", ChatBotMessageCodes.CommandContractInvalid)]
     [InlineData("expired", ChatBotMessageCodes.CanonicalExecutionUnavailable)]
     [InlineData("project-proof-missing", ChatBotMessageCodes.CanonicalExecutionUnavailable)]
@@ -283,6 +302,15 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
             "policy-effect-surface" => source.ProfileEvidence with { Policy = policy with { EffectSurface = "project-conversation" } },
             "policy-kind-missing" => source.ProfileEvidence with { Policy = policy with { AssistanceKinds = [] } },
             "context-drift" => source.ProfileEvidence with { ContextPackage = package with { PackageVersion = "v2" } },
+            "missing-context-package" => source.ProfileEvidence with { ContextPackage = null },
+            "context-tenant" => source.ProfileEvidence with { ContextPackage = package with { TenantId = "other-tenant" } },
+            "context-project" => source.ProfileEvidence with { ContextPackage = package with { ProjectId = "other-project" } },
+            "context-package-id" => source.ProfileEvidence with { ContextPackage = package with { PackageId = "other-package" } },
+            "context-policy" => source.ProfileEvidence with { ContextPackage = package with { PolicySnapshotId = "other-policy" } },
+            "context-negative-source-version" => source.ProfileEvidence with { ContextPackage = package with { SourceVersion = -1 } },
+            "context-redaction" => source.ProfileEvidence with { ContextPackage = package with { RedactionDecision = "other-redaction" } },
+            "context-retention" => source.ProfileEvidence with { ContextPackage = package with { RetentionClass = "other-retention" } },
+            "context-provider-reuse" => source.ProfileEvidence with { ContextPackage = package with { ProviderReuseSetting = "other-reuse" } },
             "revision-drift" => source.ProfileEvidence with { CurrentRevision = 2 },
             "expired" => source.ProfileEvidence with { ExpiresAt = source.UtcNow },
             "project-proof-missing" => source.ProfileEvidence with { StageReferences = new Dictionary<string, string>() },
@@ -366,6 +394,10 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
     [InlineData(nameof(MarkAiActionProposalInvalidatedByCorrection), "foreign-tenant", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
     [InlineData(nameof(DecideAiActionApproval), "missing-policy", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
     [InlineData(nameof(MarkAiActionProposalInvalidatedByCorrection), "missing-policy", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData(nameof(DecideAiActionApproval), "zero-version", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData(nameof(MarkAiActionProposalInvalidatedByCorrection), "zero-version", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData(nameof(DecideAiActionApproval), "blank-snapshot-id", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
+    [InlineData(nameof(MarkAiActionProposalInvalidatedByCorrection), "blank-snapshot-id", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
     [InlineData(nameof(DecideAiActionApproval), "other-operation", ChatBotMessageCodes.CanonicalExecutionUnavailable)]
     [InlineData(nameof(MarkAiActionProposalInvalidatedByCorrection), "other-operation", ChatBotMessageCodes.CanonicalExecutionUnavailable)]
     [InlineData(nameof(ProposeAIAction), "current", ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)]
@@ -394,6 +426,8 @@ public sealed class ChatBotAdmissionEvidenceValidatorTests
             {
                 "stale-policy" => policy with { IsFresh = false },
                 "invalid-policy" => policy with { IsValid = false },
+                "zero-version" => policy with { PolicyVersion = 0 },
+                "blank-snapshot-id" => policy with { PolicySnapshotId = " " },
                 "foreign-tenant" => policy with { TenantId = "other-tenant" },
                 "missing-policy" => null,
                 _ => policy,

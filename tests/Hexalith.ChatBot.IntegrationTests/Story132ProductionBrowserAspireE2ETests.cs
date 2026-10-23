@@ -186,6 +186,9 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
                     ReducedMotion = row.ReducedMotion ? ReducedMotion.Reduce : ReducedMotion.NoPreference,
                     ForcedColors = row.ForcedColors ? ForcedColors.Active : ForcedColors.None,
                 }).ConfigureAwait(true);
+                // The interactive Blazor circuit negotiates culture on its WebSocket request, where the page query
+                // string is absent. Set the standard localization cookie as well so both prerender and the live
+                // circuit exercise the requested EN/FR culture.
                 await context.AddCookiesAsync(
                 [
                     new Microsoft.Playwright.Cookie

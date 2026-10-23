@@ -6,6 +6,7 @@ using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Operations;
 using Shouldly;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
@@ -135,7 +136,7 @@ public sealed class ChatBotHumanApprovalEvidenceTests
                 "missing" => null,
                 "self" => proof with { Decision = proof.Decision with { DecisionActorId = "requester" }, Approver = Approver(proof, "requester") },
                 "service" => proof with { Decision = proof.Decision with { DecisionActorType = "service" } },
-                "presence" => proof with { PresenceReference = "" },
+                "presence" => proof with { PresenceReference = " " },
                 "expired" => proof with { ExpiresAt = fixture.Source.UtcNow },
                 "lifetime" => proof with { ExpiresAt = proof.Decision.DecidedAtUtc.AddMinutes(31) },
                 "scope-drift" => proof with { CurrentScopeDigest = "drift" },
@@ -152,7 +153,7 @@ public sealed class ChatBotHumanApprovalEvidenceTests
                 "approver-project" => proof with { Approver = Approver(proof, "approver", project: "another-project") },
                 "future-decision" => proof with { Decision = proof.Decision with { DecidedAtUtc = fixture.Source.UtcNow.AddMinutes(1) } },
                 "expiry-before-decision" => proof with { ExpiresAt = proof.Decision.DecidedAtUtc },
-                "blank-scope" => proof with { ScopeDigest = "", CurrentScopeDigest = "" },
+                "blank-scope" => proof with { ScopeDigest = " ", CurrentScopeDigest = " " },
                 _ => proof,
             },
         };
@@ -164,29 +165,46 @@ public sealed class ChatBotHumanApprovalEvidenceTests
     }
     /// <summary>Sensitive approvals may last at most ten minutes; reversible writes may last at most thirty.</summary>
     [Theory]
-    [InlineData(false, 30, true)]
-    [InlineData(false, 31, false)]
-    [InlineData(true, 10, true)]
-    [InlineData(true, 11, false)]
-    public async Task ApprovalLifetimeMustRespectTheExactEffectClassMaximum(bool sensitive, int minutes, bool valid)
+    [InlineData(AiActionRiskActionClass.ModifiesState, 30, true)]
+    [InlineData(AiActionRiskActionClass.ModifiesState, 31, false)]
+    [InlineData(AiActionRiskActionClass.ExposesFiles, 10, true)]
+    [InlineData(AiActionRiskActionClass.ExposesFiles, 11, false)]
+    [InlineData(AiActionRiskActionClass.SendsExternal, 10, true)]
+    [InlineData(AiActionRiskActionClass.SendsExternal, 11, false)]
+    [InlineData(AiActionRiskActionClass.CreatesTasks, 10, true)]
+    [InlineData(AiActionRiskActionClass.CreatesTasks, 11, false)]
+    [InlineData(AiActionRiskActionClass.InvokesTools, 10, true)]
+    [InlineData(AiActionRiskActionClass.InvokesTools, 11, false)]
+    [InlineData(AiActionRiskActionClass.ActsOnBehalf, 10, true)]
+    [InlineData(AiActionRiskActionClass.ActsOnBehalf, 11, false)]
+    public async Task ApprovalLifetimeMustRespectTheExactEffectClassMaximum(AiActionRiskActionClass effect, int minutes, bool valid)
     {
         SyntheticHumanApprovalFixture fixture = SyntheticHumanApprovalFixture.Create();
         ChatBotHumanApprovalEvidence proof = fixture.Source.ProfileEvidence!.Approval!;
-        if (sensitive)
+        AiActionRiskActionClass[] effects = effect == AiActionRiskActionClass.ModifiesState
+            ? [effect] : [AiActionRiskActionClass.ModifiesState, effect];
+        var classification = fixture.Context.RiskClassification!.Record!;
+        classification = classification with
         {
-            var classification = fixture.Context.RiskClassification!.Record!;
-            fixture.Context.SetRiskClassification(ChatBotRiskClassification.Classified(classification with
+            RiskActionClasses = effects,
+            InputTuple = classification.InputTuple with { ActionClasses = effects },
+        };
+        fixture.Context.SetRiskClassification(ChatBotRiskClassification.Classified(classification));
+        proof = proof with
+        {
+            Request = proof.Request with
             {
-                RiskActionClasses = [AiActionRiskActionClass.ModifiesState, AiActionRiskActionClass.ExposesFiles],
-            }));
-            proof = proof with { Request = proof.Request with { AiRiskActionClasses = ["modifies-state", "exposes-files"] } };
-        }
+                AiRiskActionClasses = effects.Select(GovernedOperationAggregate.AiRiskActionClassToken).ToArray(),
+                RiskInputTuple = GovernedOperationAggregate.RiskInputTupleRef(classification.InputTuple),
+            },
+        };
         fixture.Source.ProfileEvidence = fixture.Source.ProfileEvidence with
         {
             Approval = proof with { ExpiresAt = proof.Decision.DecidedAtUtc.AddMinutes(minutes) },
         };
-        (await new ChatBotAdmissionEvidenceValidator(fixture.Source, fixture.Source)
-            .ValidateProfileAsync(fixture.Context, TestContext.Current.CancellationToken))
+        ChatBotAdmissionEvidenceValidator validator = new(fixture.Source, fixture.Source);
+        (await validator.ValidateClassificationAsync(fixture.Context, TestContext.Current.CancellationToken)).ShouldBeNull();
+        (await validator.ValidateProfileAsync(fixture.Context, TestContext.Current.CancellationToken))
             .ShouldBe(valid ? null : ChatBotRefusalReasonCodes.ApprovalStateInvalid);
         fixture.Context.Idempotency.ShouldBeNull();
         fixture.Context.AdmissionEnvelope.ShouldBeNull();
