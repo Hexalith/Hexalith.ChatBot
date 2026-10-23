@@ -26,6 +26,7 @@ using Shouldly;
 namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 
 /// <summary>Story 12.15 Task 2 topology guards for the reserved identity, controls, and deterministic dataset.</summary>
+[Collection(RealmTemplateMutationCollection.Name)]
 public sealed class RecoveryValidationTopologyContractTests
 {
     // Program.cs fails closed without a configured recovery mailbox secret. These topology-only contract tests
@@ -47,7 +48,8 @@ public sealed class RecoveryValidationTopologyContractTests
         $"--ChatBot:Memories:ApiToken={new string('c', 32)}",
     ];
 
-    // Keep realm readers in this class: its placeholder-mutation test rewrites the tracked fixture.
+    // Keep realm readers in this class: its placeholder-mutation test rewrites the tracked fixture. The non-parallel
+    // collection keeps AppHost starts in other classes from reading the template while it is mutated.
     [Fact]
     public void SharedRequestMatchesTheRealmValidatorAndUsesIndependentForms()
     {
