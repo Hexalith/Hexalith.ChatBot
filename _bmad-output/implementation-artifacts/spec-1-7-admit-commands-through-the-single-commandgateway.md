@@ -578,6 +578,53 @@ Rejected:
 - CR7-Cc-E17 `low` — Same as CR7-Cc-B7.
 - CR7-Cc-E18 merged into CR7-Cc-P3.
 
+### Review Findings — round 8 (2026-10-23)
+
+Code review round 8 (bmad-code-review, full mode). Jerome chose the delta-only scope: tree `bce1211` (what round 7, chunk (c) reviewed) → `d8121d9`, which is HEAD `dc2ff36` with the same nine unrelated commits reverted in a scratch index (`e7b63f8 d718220 311233b e97e7a8 6b92c29 b16a185 39e4cb5 0954093 f45b155`); `_bmad-output/` and `references/` are excluded.
+- The delta is 4 files and 115 diff lines: the four CR7-Cc patches. The Cb-root-B5 fitness correction was already in `bce1211`.
+- The cumulative diff from `cd83144` (93 files, 7,238 lines) is otherwise unchanged since round 7.
+
+Four layers ran: Blind Hunter, Edge Case Hunter, Verification Gap and Acceptance Auditor; none failed. Raw findings 16 (B8/E2/V1/A5) → 0 decisions, 3 patches, 1 defer, 8 rejected (5 carried). IDs are prefixed `CR8-`. All four patches match their CR7-Cc entries; no `src/` file changed.
+
+- [x] [Review][Patch] CR8-P1: The topology guard's `HttpStatusCode.Forbidden` check now matches the new retry condition, not only the note's 403 assertion (low) [tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs:1598] — CR8-A1 + CR8-B1.
+  - Before CR7-Cc-P1, the only `HttpStatusCode.Forbidden` in the smoke body was the note's `AssertProductionRefusal(refusedNote.StatusCode, refusedNote.Body, HttpStatusCode.Forbidden, …)`. The retry condition `grantStatus != HttpStatusCode.Forbidden` now satisfies the bare `ShouldContain` on its own.
+  - `ChatBotMessageCodes.AuthorizationDenied` (`:1599`) still occurs only in the note assertion, so the likeliest regression (expecting another 503 for the note) is still caught; the guard is only partly weakened.
+  - Fix: anchor the check to the note, `smoke.ShouldContain("refusedNote.Body, HttpStatusCode.Forbidden")`.
+  - Not adopted: pinning the loop's limits (CR8-B1, second half). No regression was shown, and the post-loop exact 503 assertion plus the stability-window reservation check for `grantCommandId` already bound the loop.
+- [x] [Review][Patch] CR8-P2: The grant-retry comment says it retries only the owner-read-lag 403, but the loop retries every 403 and discards each retried body (low) [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:560] — CR8-A2 + CR8-B2 + CR8-E1.
+  - The break condition reads only `grantStatus`. A deterministic 403 such as `command-not-allowlisted` is retried for about 50 s, and each retry logs only `LIVE_REFUSAL_GRANT_OWNER_READ_RETRY <n>`, so CI cannot show which denial was retried.
+  - Not unsafe: a persistent 403 still fails the exact 503 assertion.
+  - Not adopted: narrowing the retry to `authorization_denied` (CR8-E1's fix). The authorizer maps Parties/Tenants read-side states to several 403 codes (`unresolved_participant`, `participant_directory_degraded` and the tenant reasons, through `ChatBotProblemDetailsFactory.CreateAuthorizationProblem`, `src/Hexalith.ChatBot.Server/Gateway/ChatBotProblemDetailsFactory.cs:63-75`, `:231-270`), and the seed this loop mirrors retries 403 by status alone (`:211`). Narrowing could bring the flake back, and the live lane cannot run here to prove otherwise.
+  - Fix: reword the comment to say the loop retries any 403, the status a lagging read side produces, as the seed does; and write the refused body with each retry line.
+- [x] [Review][Patch] CR8-P3: The stage-pin test's name still says the addendum column is its only source (low) [tests/Hexalith.ChatBot.Architecture.Tests/Fitness/AdmissionProfileFitnessTests.cs:123] — CR8-A3 + CR8-B7.
+  - CR7-Cc-P3 changed the summary and comment to name the Story 1.7 matrix as the source of ai-read-v1's `project-authority`. The method is still `ProfileRequiredStagesShouldMatchTheLockedAddendumColumn`, which is what failure reports show, and it invites the reconcile-with-the-addendum edit the comment forbids.
+  - Only this spec's review records mention the name: no workflow filter, evidence contract or source scan uses it.
+  - Fix: rename it `ProfileRequiredStagesShouldMatchTheLockedAddendumColumnAndStoryMatrix`.
+- [x] [Review][Defer] CR8-W1: The addendum's ai-read-v1 row omits the Project authority that the production catalog and the Story 1.7 matrix require (low) [_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/addendum.md:186] — CR8-B6 — deferred: the fix edits the PRD addendum, which `addendum.md:213` makes a versioned PRD/addendum decision; it is outside this story's code.
+  - `ChatBotCommandAdmissionCatalog.cs:304` gives ai-read-v1 `project-authority`, following the frozen matrix row "current policy/context/Project authority". `addendum.md:186` lists only origin/instruction-boundary validation, AI risk classification and current policy/context-package scope.
+  - CR7-Cc-P3 recorded the stage's source in a test comment only, and no ledger entry existed. A later story that derives profiles from the addendum would drop the stage.
+
+Applied 2026-10-23 after the user chose "apply every patch". Tests and comments only; no production code changed.
+- CR8-P1: the guard now requires `refusedNote.Body, HttpStatusCode.Forbidden` in the smoke body.
+- CR8-P2: the retry comment says the loop retries any 403 by status, as the seed does, because the lag's 403 code depends on which read lags; each `LIVE_REFUSAL_GRANT_OWNER_READ_RETRY` line now carries the refused body.
+- CR8-P3: the stage-pin test is now `ProfileRequiredStagesShouldMatchTheLockedAddendumColumnAndStoryMatrix` (the file stays all-CRLF).
+
+Verification:
+- The Architecture.Tests and IntegrationTests Debug builds (project references, `-p:BuildProjectReferences=false`, `-p:HexalithBuildsRoot=<root>/references/Hexalith.Builds`) had 0 warnings and 0 errors.
+- The full Architecture lane passed 159/159 with zero skips, including the renamed pin and `TopologySmokeShouldPreserveRefusalOrderAndIndependentCommittedStateReleaseGate`.
+- Mutation for CR8-P1: changing the note's expected status to `HttpStatusCode.ServiceUnavailable` (code left as `AuthorizationDenied`) passed the rebuilt pre-patch guard 1/1 and failed the patched guard on the new anchor. Both sources were restored byte-for-byte (SHA-256 checked), rebuilt, and the guard passed 1/1.
+- The grant retry still runs only live and was not executed; the Tier-3 lanes remain blocked as recorded below. The spec stays `in-review` and the sprint entry stays `review`.
+
+Rejected:
+- CR8-A4 carried — The done Story 1.3 evidence contract (task-6, `evidence/1-3-bind-every-request-to-trusted-tenant-and-actor-context.json:343`) still names the old relay test. CR6-B2 applies: it is a point-in-time attestation outside the TE-2 transition range, and `TransitionDetector` refuses edits to completed contracts (`completed-contract-change`). The CR7-Cc-P2 application note already records it.
+- CR8-A5 carried — The grant retry has not executed live. That is round-4 B11 / CR7-Cc-A6.
+- CR8-V1 rejected — The CR7-Cc-P2 entry's "The name is not referenced anywhere else" contradicts its own application note. The only fix is to edit this spec; the application note is the accurate record.
+- CR8-B3 `false` — Running out of retries is visible. Each of the four retries writes `LIVE_REFUSAL_GRANT_OWNER_READ_RETRY <n>` to the test output, and the final `ShouldBe(ServiceUnavailable, body)` message carries the 403 body. A persistent 403 is a real contract failure, not a mislabelled one.
+- CR8-B4 carried — Same as CR8-A5. Moving the loop into a delegate-driven helper with offline tests would be new harness infrastructure for a five-attempt loop whose bounds the exact post-loop assertion already enforces.
+- CR8-B5 carried — Same as CR8-A4 (evidence contract) and CR8-V1 (spec claim).
+- CR8-B8 `false` — The comment is the baseline text restored byte-for-byte (`cd83144`, lines 275–277). It says why the cookie is set, not what the row asserts. The hand-typed cookie name and value predate the diff.
+- CR8-E2 carried — Same as CR8-A4.
+
 ## Implementation Notes
 
 - Approved by the user on 2026-10-20; frozen intent unchanged.

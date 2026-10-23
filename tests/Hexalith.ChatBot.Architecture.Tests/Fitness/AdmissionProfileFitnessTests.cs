@@ -120,7 +120,7 @@ public sealed class AdmissionProfileFitnessTests
     /// Story 1.7 matrix's Project-authority requirement for ai-read-v1.
     /// </summary>
     [Fact]
-    public void ProfileRequiredStagesShouldMatchTheLockedAddendumColumn()
+    public void ProfileRequiredStagesShouldMatchTheLockedAddendumColumnAndStoryMatrix()
     {
         // Locked list: changing a profile's stages must change their source and this pin together. Every stage comes
         // from the addendum column except ai-read-v1's project-authority, which the frozen Story 1.7 I/O matrix

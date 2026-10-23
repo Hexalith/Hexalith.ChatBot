@@ -558,8 +558,9 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 noteId, nameof(RecordGovernedNote), "operation", "human", ChatBotSurfaceOrigin.Ui,
                 DateTimeOffset.UtcNow.AddHours(1));
             // Owner commands are awaited only until EventStore completes them; the Tenants/Parties read side the
-            // authorizer consults can still lag, which the authority seed tolerates too. Retry only that 403, with
-            // the same command id because a refusal reserves nothing; a persistent 403 still fails the assertion.
+            // authorizer consults can still lag. That lag surfaces as a 403 whose code depends on which read lags, so
+            // retry any 403 by status, as the authority seed does, with the same command id because a refusal
+            // reserves nothing; a persistent 403 still fails the assertion.
             HttpStatusCode grantStatus = 0;
             string grantBody = string.Empty;
             for (int attempt = 1; attempt <= 5; attempt++)
@@ -583,7 +584,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                     break;
                 }
 
-                _output.WriteLine("LIVE_REFUSAL_GRANT_OWNER_READ_RETRY {0}", attempt);
+                _output.WriteLine("LIVE_REFUSAL_GRANT_OWNER_READ_RETRY {0} {1}", attempt, grantBody);
                 await Task.Delay(TimeSpan.FromSeconds(5 * attempt), cancellationToken).ConfigureAwait(true);
             }
 

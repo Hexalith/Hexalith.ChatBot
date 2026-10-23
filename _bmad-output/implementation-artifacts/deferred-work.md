@@ -1826,3 +1826,9 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-7-admit-commands-through-the-single-commandgateway.md`
   summary: Apply the 65,536-line input limit before sprint and technical-enabler ledger readers allocate line arrays.
   evidence: Cb-root-E1; SprintLedgerReader splits byte-bounded text and TechnicalEnablerLedgerReader uses VisibleLines(string), bypassing BoundedEvidenceInput.MaximumTextLines. A reviewer probe accepted one-million-line inputs of about 1 MiB, allocating approximately 23.5 MiB and 39.9 MiB. Route file readers through a bounded line reader, retain stable sprint-input-limit and ledger-input-limit refusals, and test newline-heavy inputs below the byte ceiling.
+
+## Deferred from: code review of spec-1-7-admit-commands-through-the-single-commandgateway (2026-10-23, round 8)
+
+- source_spec: `spec-1-7-admit-commands-through-the-single-commandgateway.md`
+  summary: The addendum's ai-read-v1 row omits the Project authority that the production catalog and the frozen Story 1.7 matrix require; record it as a versioned PRD/addendum decision so profile derivation from the addendum keeps the stage (low; CR8-W1).
+  evidence: `src/Hexalith.ChatBot.Server/Gateway/Admission/ChatBotCommandAdmissionCatalog.cs:304` gives ai-read-v1 `project-authority`, following the Story 1.7 I/O matrix row "current policy/context/Project authority". `_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/addendum.md:186` lists only origin/instruction-boundary validation, AI risk classification and current policy/context-package scope, and `addendum.md:213` makes any profile change a versioned PRD/addendum decision. The divergence is recorded only in the `AdmissionProfileFitnessTests` stage-pin comment (CR7-Cc-P3).

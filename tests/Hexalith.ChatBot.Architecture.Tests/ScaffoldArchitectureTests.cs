@@ -1595,7 +1595,7 @@ public static class ScaffoldArchitectureTests
         smoke.ShouldContain("EnsureCurrentRequesterOwnersAsync");
         smoke.ShouldContain("HttpStatusCode.ServiceUnavailable");
         smoke.ShouldContain("ChatBotMessageCodes.CanonicalExecutionUnavailable");
-        smoke.ShouldContain("HttpStatusCode.Forbidden");
+        smoke.ShouldContain("refusedNote.Body, HttpStatusCode.Forbidden");
         smoke.ShouldContain("ChatBotMessageCodes.AuthorizationDenied");
         smoke.IndexOf("SubmitGovernedNoteAsync", StringComparison.Ordinal)
             .ShouldBeGreaterThan(smoke.IndexOf("ChatBotMessageCodes.CanonicalExecutionUnavailable", StringComparison.Ordinal));
