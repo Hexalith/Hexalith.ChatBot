@@ -625,6 +625,31 @@ Rejected:
 - CR8-B8 `false` — The comment is the baseline text restored byte-for-byte (`cd83144`, lines 275–277). It says why the cookie is set, not what the row asserts. The hand-typed cookie name and value predate the diff.
 - CR8-E2 carried — Same as CR8-A4.
 
+### Review Findings — round 9 (2026-10-23)
+
+Code review round 9 (bmad-code-review, full mode). Jerome chose the delta-only scope: tree `d8121d9` (what round 8 reviewed) → `a3303b6`, which is HEAD `17c5fbb` with the same nine unrelated commits reverted in a scratch index (`e7b63f8 d718220 311233b e97e7a8 6b92c29 b16a185 39e4cb5 0954093 f45b155`); `_bmad-output/` and `references/` are excluded.
+- The delta is 3 files and 51 diff lines: the three CR8 patches, committed as `17c5fbb`. No `src/` file changed.
+- The cumulative diff from `cd83144` (93 files, 7,239 lines) is otherwise unchanged since round 8.
+
+Four layers ran: Blind Hunter, Edge Case Hunter, Verification Gap and Acceptance Auditor; none failed. Raw findings 13 (B8/E3/V0/A2) → 0 decisions, 0 patches, 0 defers, 13 rejected (2 carried). IDs are prefixed `CR9-`. Clean review: every finding was rejected.
+- The Verification Gap layer found no gaps. The Acceptance Auditor found no AC or constraint violation; it ran `ProfileRequiredStagesShouldMatchTheLockedAddendumColumnAndStoryMatrix` and `TopologySmokeShouldPreserveRefusalOrderAndIndependentCommittedStateReleaseGate` from the existing Architecture Debug build (built at 20:09 from the round-8 working tree that `17c5fbb` committed): 2/2 passed.
+- No code changed in this round. The spec stays `in-review` and the sprint entry stays `review`.
+
+Rejected:
+- CR9-A1 `false` — The grant's bare `smoke.ShouldContain("HttpStatusCode.ServiceUnavailable")` (`ScaffoldArchitectureTests.cs:1596`) is not vacuous: the token occurs once in the smoke body, in the grant assertion (`TrivialGovernedCommandAspireE2eTests.cs:591`), so changing the grant's expected status fails it. Weakening it needs a 503 retry the loop does not have, and 503 is the grant's expected outcome.
+- CR9-A2 carried — The grant retry and its new log line have not executed live. That is round-4 B11 / CR7-Cc-A6 / CR8-A5.
+- CR9-B1 `false` — The `refusedNote.Body, HttpStatusCode.Forbidden` anchor occurs once in the smoke body (`:598`); no comment or `WriteLine` contains it. Re-wrapping the arguments or renaming the local fails the guard loudly, not silently. The other bare tokens each occur once in the smoke body (`ServiceUnavailable` `:591`, `CanonicalExecutionUnavailable` `:592`, `AuthorizationDenied` `:599`), so none is vacuous; a syntax-tree matcher would be new guard infrastructure for a guard that works.
+- CR9-B2 `false` — Since CR8-P2 each `LIVE_REFUSAL_GRANT_OWNER_READ_RETRY` line (`:587`) carries the refused body, so the 403's code is on the same line and a deterministic 403 cannot be read as lag. The label names why the loop exists. The body is ChatBot problem-details JSON, and round 8 chose the whole body deliberately.
+- CR9-B3 `false` — "as the authority seed does" qualifies "retry any 403 by status", which the seed does (`:211`: `Forbidden` is in its retried set and it keeps the command id). The seed's 500/503/504 and new-id branches cannot apply here, because 503 is the grant's expected outcome.
+- CR9-B4 `false` — The seed's unlogged retries predate the story (`cd83144`, line 234) and lose no failure evidence: a retry that later succeeds has nothing to diagnose, and the fifth attempt falls through to `ShouldBe(HttpStatusCode.Accepted, … {body})` (`:228-229`).
+- CR9-B5 carried — Parsing the addendum's prose stage column into the pin is CR6-E12/A2: the literal pin is a double-entry lock. CR8-P3 chose the name; the summary says the proofs "stay locked to" the column, and the pin fails when the catalog drifts from that transcription.
+- CR9-B6 `false` — The CR8-W1 ledger entry's evidence names the `AdmissionProfileFitnessTests` stage-pin comment, so whoever resolves it is pointed there. No `src/` or `tests/` comment cites review IDs.
+- CR9-B7 `low` — Nothing pins the loop's reuse of `grantCommandId` for the stability-window reservation check, but no edit has broken it and the comment states the rule. Pinning it would add a guard assertion for a hypothetical regression; CR8-B1's loop-limit pin was not adopted for the same reason.
+- CR9-B8 rejected — The CR8-B3 rejection quotes the pre-CR8-P2 log line. The only fix is to edit this spec. The CR8-P2 application note records the new format, and the logged body makes retries more visible, not less.
+- CR9-E1 `false` — Same as CR9-B1: re-wrapping the arguments fails the guard loudly.
+- CR9-E2 `false` — `ChatBotMessageCodes.AuthorizationDenied` occurs once in the smoke body (`:599`), in the note assertion, so the pin is not vacuous.
+- CR9-E3 `false` — A grant `SendAsync` that hits the 120 s client timeout (`:522`) throws and fails the smoke loudly, which is correct for a refusal that should return a fast 503. The seed tolerates timeouts because it must reach `Accepted`; the comment claims parity only for 403 retries.
+
 ## Implementation Notes
 
 - Approved by the user on 2026-10-20; frozen intent unchanged.
