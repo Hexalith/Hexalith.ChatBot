@@ -1,0 +1,216 @@
+{
+  "schemaVersion": "2.0",
+  "recordKind": "story",
+  "recordLedgerKey": "1-7-admit-commands-through-the-single-commandgateway",
+  "storyKey": "1-7-admit-commands-through-the-single-commandgateway",
+  "storyTitle": "Admit Commands Through the Single CommandGateway",
+  "storyPath": "_bmad-output/implementation-artifacts/spec-1-7-admit-commands-through-the-single-commandgateway.md",
+  "targetStatus": "done",
+  "persistedStatus": "done",
+  "sprintStatusKey": "1-7-admit-commands-through-the-single-commandgateway",
+  "bootstrap": false,
+  "scope": {
+    "mode": "diff",
+    "implementationDigest": "abece9d3bc5f5350f980e4acc38d0a148fe21f809c3d1104ca584e6b942aefeb",
+    "transitionPaths": [
+      "_bmad-output/implementation-artifacts/spec-1-7-admit-commands-through-the-single-commandgateway.md",
+      "_bmad-output/implementation-artifacts/evidence/1-7-admit-commands-through-the-single-commandgateway.json",
+      "_bmad-output/implementation-artifacts/sprint-status.yaml"
+    ],
+    "repositories": [
+      {
+        "name": "root",
+        "path": ".",
+        "baseCommit": "$BASE",
+        "headCommit": "$HEAD",
+        "includeWorkingTree": true,
+        "includePaths": [
+          "_bmad-output/implementation-artifacts/evidence/1-7-admit-commands-through-the-single-commandgateway.json",
+          "_bmad-output/implementation-artifacts/spec-1-7-admit-commands-through-the-single-commandgateway.md",
+          "_bmad-output/implementation-artifacts/sprint-status.yaml"
+        ]
+      }
+    ]
+  },
+  "results": [
+    {
+      "lane": "Hexalith.ChatBot.Server.Tests",
+      "trx": "merge-test-lanes/Hexalith.ChatBot.Server.Tests.trx",
+      "provenance": "merge-test-lanes/Hexalith.ChatBot.Server.Tests.provenance.json",
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Server.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests",
+        "class:Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests",
+        "class:Hexalith.ChatBot.Server.Tests.Gateway.ChatBotAdmissionMarkerTests",
+        "class:Hexalith.ChatBot.Server.Tests.Gateway.ChatBotAdmissionEvidenceValidatorTests",
+        "class:Hexalith.ChatBot.Server.Tests.Gateway.ChatBotCommandAdmissionSequenceTests",
+        "class:Hexalith.ChatBot.Server.Tests.Gateway.ChatBotHumanApprovalEvidenceTests",
+        "class:Hexalith.ChatBot.Server.Tests.Governance.AiMediation.AiActionRiskClassifierTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Architecture.Tests",
+      "trx": "merge-test-lanes/Hexalith.ChatBot.Architecture.Tests.trx",
+      "provenance": "merge-test-lanes/Hexalith.ChatBot.Architecture.Tests.provenance.json",
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Architecture.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Architecture.Tests.Fitness.AdmissionProfileFitnessTests",
+        "class:Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Contracts.Tests",
+      "trx": "merge-test-lanes/Hexalith.ChatBot.Contracts.Tests.trx",
+      "provenance": "merge-test-lanes/Hexalith.ChatBot.Contracts.Tests.provenance.json",
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Contracts.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Contracts.Tests.MessageCatalogContractTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    },
+    {
+      "lane": "Hexalith.ChatBot.Client.Tests",
+      "trx": "merge-test-lanes/Hexalith.ChatBot.Client.Tests.trx",
+      "provenance": "merge-test-lanes/Hexalith.ChatBot.Client.Tests.provenance.json",
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Client.Tests.trx",
+      "source": "current-run",
+      "selectors": [
+        "class:Hexalith.ChatBot.Client.Tests.ClientGenerationTests",
+        "class:Hexalith.ChatBot.Client.Tests.CommandSubmissionTransportTests"
+      ],
+      "allowSkipped": false,
+      "primaryPathClass": null
+    }
+  ],
+  "primaryPaths": [],
+  "mappings": [
+    {
+      "id": "task-1",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.Fitness.AdmissionProfileFitnessTests.EveryConcreteCommandShouldHaveExactlyOneClosedProfile",
+        "Hexalith.ChatBot.Architecture.Tests.Fitness.AdmissionProfileFitnessTests.StableProductMapShouldRemainExhaustiveAndUnique",
+        "Hexalith.ChatBot.Architecture.Tests.Fitness.AdmissionProfileFitnessTests.InvalidCatalogRowsShouldFailAtConstruction",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.CallerCannotForgeTrustedCommandRiskOrEffectMetadata"
+      ]
+    },
+    {
+      "id": "task-2",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.ChatBotAdmissionEvidenceValidatorTests.QualifiedClassificationMustBindTheCurrentRequestAndTrustedEffectRiskFloor",
+        "Hexalith.ChatBot.Server.Tests.Gateway.ChatBotAdmissionEvidenceValidatorTests.QualificationMustMatchEveryCurrentBindingAndThreshold",
+        "Hexalith.ChatBot.Server.Tests.Gateway.ChatBotAdmissionEvidenceValidatorTests.MissingCurrentOwnerProfileEvidenceCannotBeSuppliedByCallerPayload",
+        "Hexalith.ChatBot.Server.Tests.Gateway.ChatBotHumanApprovalEvidenceTests.IndependentHumanApprovalMustMatchPresenceLifetimeAndEveryScopeBinding"
+      ]
+    },
+    {
+      "id": "task-3",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.ChatBotCommandAdmissionSequenceTests.CommonAdmissionShouldRunEachRequiredStageOnceBeforeTheUnavailableAtomicBoundary",
+        "Hexalith.ChatBot.Server.Tests.Gateway.ChatBotCommandAdmissionSequenceTests.CommonAdmissionFailureShouldStopBeforeLaterStagesEnvelopeOrReservation",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ProductionAdmissionShouldRejectBookkeepingWithoutAtomicParticipationForEveryOrigin",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.CallerAdmissionSelectorsShouldFailBeforeReservation"
+      ]
+    },
+    {
+      "id": "task-4",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.RequiredClassificationShouldContainLiteralNullRecordlessFailedAndIndeterminateOutputs",
+        "Hexalith.ChatBot.Server.Tests.Gateway.ChatBotAdmissionEvidenceValidatorTests.UndeclaredAssistanceSubtypeMustStopBeforePolicyEvaluation",
+        "Hexalith.ChatBot.Server.Tests.Gateway.ChatBotAdmissionEvidenceValidatorTests.MandatoryEffectMustStopBeforeEvenAPermissivePolicyCanDowngradeIt",
+        "Hexalith.ChatBot.Server.Tests.Governance.AiMediation.AiActionRiskClassifierTests.MissingMetadataShouldFailClosedWithIndeterminateReason"
+      ]
+    },
+    {
+      "id": "task-5",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SdkAdmissionShouldRejectSignedAndUnsignedBookkeepingWithoutCommitParticipation",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.MarkedBookkeepingMustRejectInvalidCurrentTransportBindingBeforeOperationValidation",
+        "Hexalith.ChatBot.Server.Tests.Gateway.ChatBotAdmissionMarkerTests.ProductionAdmissionMarkerShouldRoundTripExactInternalFollowUpIdentity",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests.CanonicalConcurrencyHttpRequestShouldFailClosedBeforeReservationAuditOrDispatch"
+      ]
+    },
+    {
+      "id": "task-6",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Contracts.Tests.MessageCatalogContractTests.CatalogEntriesShouldBeSafeAndSerializationTolerant",
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.GeneratedOutputHashShouldMatchCheckedInFreshnessFixture",
+        "Hexalith.ChatBot.Client.Tests.ClientGenerationTests.IsolatedNswagGenerationShouldMatchCheckedInOutputByteForByte",
+        "Hexalith.ChatBot.Client.Tests.CommandSubmissionTransportTests.SubmitCommandShouldDecodeTerminalClassifierIndeterminateProblemFor422",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ProfileEvidenceFailuresShouldKeepTypedSafeCatalogOutcomes"
+      ]
+    },
+    {
+      "id": "task-7",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SdkProcessMustContainEveryProfileFailureWithoutBookkeeping",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ProductionAiAdmissionShouldTerminateWithoutCurrentQualificationAndNeverCreateProposal",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests.CommandGatewayApi_ShouldTerminateIndeterminateProposalBeforeEventStoreSubmission",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests.CommandGatewayApi_ShouldReturnCatalogBackedRedactedProblemsForStory17States",
+        "Hexalith.ChatBot.Server.Tests.Gateway.ChatBotAdmissionMarkerTests.ProductionAdmissionMarkerShouldRoundTripExactInternalFollowUpIdentity"
+      ]
+    },
+    {
+      "id": "task-8",
+      "kind": "task",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.Fitness.AdmissionProfileFitnessTests.NegativeFixturesShouldRejectCompetingSpinesStagesDispatchAndSelectors",
+        "Hexalith.ChatBot.Architecture.Tests.Fitness.AdmissionProfileFitnessTests.CurrentSourcesShouldObeyTheSameGuardsAsTheNegativeFixtures",
+        "Hexalith.ChatBot.Architecture.Tests.Fitness.AdmissionProfileFitnessTests.CommandStageApplicabilityShouldRemainBoundedAndNonVacuous",
+        "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.TopologySmokeShouldPreserveRefusalOrderAndIndependentCommittedStateReleaseGate"
+      ]
+    },
+    {
+      "id": "ac-1",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Architecture.Tests.Fitness.AdmissionProfileFitnessTests.EveryConcreteCommandShouldHaveExactlyOneClosedProfile",
+        "Hexalith.ChatBot.Architecture.Tests.Fitness.AdmissionProfileFitnessTests.ProfileRequiredStagesShouldMatchTheLockedAddendumColumnAndStoryMatrix",
+        "Hexalith.ChatBot.Architecture.Tests.Fitness.AdmissionProfileFitnessTests.NegativeFixturesShouldRejectCompetingSpinesStagesDispatchAndSelectors",
+        "Hexalith.ChatBot.Server.Tests.Gateway.ChatBotCommandAdmissionSequenceTests.CommonAdmissionShouldRunEachRequiredStageOnceBeforeTheUnavailableAtomicBoundary",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.ProductionAdmissionShouldRejectBookkeepingWithoutAtomicParticipationForEveryOrigin",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.CallerAdmissionSelectorsShouldFailBeforeReservation"
+      ]
+    },
+    {
+      "id": "ac-2",
+      "kind": "acceptanceCriterion",
+      "paths": [],
+      "assertions": [
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SdkProcessMustContainEveryProfileFailureWithoutBookkeeping",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.SdkAdmissionShouldRejectSignedAndUnsignedBookkeepingWithoutCommitParticipation",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests.CallerCannotForgeTrustedCommandRiskOrEffectMetadata",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests.CanonicalConcurrencyHttpRequestShouldFailClosedBeforeReservationAuditOrDispatch",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests.CommandGatewayApi_ShouldTerminateIndeterminateProposalBeforeEventStoreSubmission",
+        "Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests.CommandGatewayApi_ShouldReturnCatalogBackedRedactedProblemsForStory17States",
+        "Hexalith.ChatBot.Server.Tests.Gateway.ChatBotAdmissionEvidenceValidatorTests.MandatoryEffectMustStopBeforeEvenAPermissivePolicyCanDowngradeIt",
+        "Hexalith.ChatBot.Server.Tests.Gateway.ChatBotHumanApprovalEvidenceTests.IndependentHumanApprovalMustMatchPresenceLifetimeAndEveryScopeBinding"
+      ]
+    }
+  ],
+  "outOfScopeDisclosures": [],
+  "reportPath": "_bmad-output/implementation-artifacts/evidence/reports/1-7-admit-commands-through-the-single-commandgateway.json"
+}

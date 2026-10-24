@@ -44,7 +44,7 @@ development_status:
   1-4-return-versioned-safe-outcomes: done
   1-5-establish-stable-operation-identity-and-concurrency-contract: review
   1-6-persist-the-first-isolated-policy-snapshot: review
-  1-7-admit-commands-through-the-single-commandgateway: review
+  1-7-admit-commands-through-the-single-commandgateway: done
   1-8-commit-a-governed-mutation-and-canonical-audit-atomically: backlog
   1-9-handle-duplicate-conflicting-and-sensitive-non-mutating-atte: backlog
   1-10-complete-the-first-governed-ui-action: backlog

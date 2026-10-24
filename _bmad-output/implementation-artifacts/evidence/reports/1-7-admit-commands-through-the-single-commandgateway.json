@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "2.0",
+  "storyKey": "1-7-admit-commands-through-the-single-commandgateway",
+  "baseCommit": "d97ec7614ebc4c4ad18d1279afc693fd426451b4",
+  "headCommit": "d97ec7614ebc4c4ad18d1279afc693fd426451b4",
+  "implementationDigest": "abece9d3bc5f5350f980e4acc38d0a148fe21f809c3d1104ca584e6b942aefeb",
+  "policyVersion": "2.1",
+  "passed": true,
+  "fileListCount": 3,
+  "scopedDiffCount": 3,
+  "eventPathCount": 0,
+  "checkedItemCount": 10,
+  "mappedItemCount": 10,
+  "repositoryScopes": [
+    "."
+  ],
+  "lanes": [
+    {
+      "lane": "Hexalith.ChatBot.Server.Tests",
+      "source": "current-run",
+      "total": 3258,
+      "executed": 3258,
+      "passed": 3258,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Server.Tests.trx",
+      "checksumSha256": "8a48ba47643fc0d0f2a758b4e1f0f31f08496238fda299f18082f3e05650fe6c"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Architecture.Tests",
+      "source": "current-run",
+      "total": 159,
+      "executed": 159,
+      "passed": 159,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Architecture.Tests.trx",
+      "checksumSha256": "dc13f5a3d17a49f94e3ca3132339d928f1c9570bb09bf5f2c122dfa3c889c0a6"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Contracts.Tests",
+      "source": "current-run",
+      "total": 531,
+      "executed": 531,
+      "passed": 531,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Contracts.Tests.trx",
+      "checksumSha256": "89ad5d492a274000b7f708e34a94cbbc3e62e0ec3fb738b7ce5e37b3fa563114"
+    },
+    {
+      "lane": "Hexalith.ChatBot.Client.Tests",
+      "source": "current-run",
+      "total": 95,
+      "executed": 95,
+      "passed": 95,
+      "failed": 0,
+      "skipped": 0,
+      "artifactLocator": "file:merge-test-lanes/Hexalith.ChatBot.Client.Tests.trx",
+      "checksumSha256": "b0afe556fab133f80f4276687ba0c5ca340d79b94f3cb0a912238f13984b9c30"
+    }
+  ],
+  "primaryPaths": [],
+  "issues": [],
+  "evaluatedAtUtc": "2026-10-23T21:02:59.5166746+00:00"
+}

@@ -2,7 +2,7 @@
 title: 'Admit Commands Through the Single CommandGateway'
 type: 'feature'
 created: '2026-10-20'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'cd8314401488c7ba3453cec25bdf305e34e0d146'
 story_key: '1-7-admit-commands-through-the-single-commandgateway'
 route: 'dispatch'
@@ -657,6 +657,8 @@ Rejected:
 
 ## Spec Change Log
 
+- 2026-10-23: Proposed completion through the repository evidence gate. The completion scope is the transition alone (this spec, its evidence contract and the sprint entry), on top of `d97ec7614ebc4c4ad18d1279afc693fd426451b4`; the reviewed implementation is already committed from `cd8314401488c7ba3453cec25bdf305e34e0d146` through `2e97798252045619046e10e10c5759744bb37754`, and its inventory is retained under Historical Implementation Inventory. Story 1.4 used the same refinement-scope approach.
+
 ## Review Triage Log
 
 Review round 1: all three independent reports were collected before triage. Each finding is classified individually below; repeated findings retain separate rows. Severity reflects the demonstrated admission-validator or verification defect; the unavailable production source and unconditional atomic refusal still prevent owner execution.
@@ -1223,3 +1225,128 @@ Full cumulative diffs, including untracked paths, were retained in a unique syst
 The two newly verified independent package-output and ledger-input findings were appended to deferred-work.md. Carried findings retained their prior disposition with no duplicate ledger entries. The frozen intent is unchanged, src has no current-run diff, and no dependencies, sibling files, branches, staging, commits, pushes or deployments were changed.
 
 Completion is not proposed: the full Server gate is red and required Aspire startup remains blocked by the missing `ChatBot:LiveRecoveryValidation:MailboxClientSecret` recorded above. The workflow's post-patch verification failure requires escalation; it does not authorize owner-revision fabrication, disabling checks, Story 1.8 implementation or gate closure. Spec status remains in-review and the matching sprint entry is synchronized to review. No TE-2 completion transition or live owner-execution evidence is claimed.
+
+### Completion evidence — 2026-10-23
+
+Scope: the completion transition only. Base and head are `d97ec7614ebc4c4ad18d1279afc693fd426451b4` (the separate `test(integration)` fix that serializes the realm-template mutation test, which had turned the main CI build job red) plus the working tree. The transition changes three paths and no source; the implementation reviewed over nine rounds is already committed at that base.
+
+The four lanes were built and run as the CI build job runs them: Release configuration with package references (`bash .github/scripts/build-release-configuration.sh <project>`), then `bash .github/scripts/run-xunit-v4.sh <runner> TestResults/merge-test-lanes/<lane>.ctrf.json -result-trx TestResults/merge-test-lanes/<lane>.trx`. Every lane passed with zero failures and zero skips:
+
+| Lane | Passed | Failed / skipped |
+| --- | ---: | ---: |
+| Server | 3258 | 0 / 0 |
+| Architecture | 159 | 0 / 0 |
+| Contracts | 531 | 0 / 0 |
+| Client | 95 | 0 / 0 |
+
+- The contract maps all eight execution tasks and both acceptance criteria to 34 distinct passing test identities (48 mapping entries). No primary path is triggered by the transition paths, and none is declared.
+- The local `attest` and `validate --target-status done` preflight ran against that base and head with the working tree; its report is `_bmad-output/implementation-artifacts/evidence/reports/1-7-admit-commands-through-the-single-commandgateway.json`.
+- Disclosed, unchanged by this transition:
+  - The Debug project-reference Server lane still fails the seven `FoldersFolderStoreTests` cases recorded above (sibling Folders `expectedFileVersion` drift). The package-reference lane that CI runs passes 3,258 of 3,258.
+  - Ordinary `aspire start` remains blocked locally by the missing `ChatBot:LiveRecoveryValidation:MailboxClientSecret`. No live Aspire/DAPR, browser or recovery result is claimed.
+  - The CI topology job's Story 13.2 production-client step stays red under its high ledger entry (pre-existing at the baseline), and the release-only M2 stop-ship check stays red until Story 1.8 (CR5-B6).
+  - Every recorded deferral remains open in `deferred-work.md`, including D2 (Story 1.6), D3, CR4-A6 and CR5-A1 (Story 1.10), D4, D5, D8, D9, CR3-E1 and CR6-D1 (Story 1.8), and CR8-W1.
+
+## File List
+
+- `_bmad-output/implementation-artifacts/evidence/1-7-admit-commands-through-the-single-commandgateway.json`
+- `_bmad-output/implementation-artifacts/spec-1-7-admit-commands-through-the-single-commandgateway.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+## Historical Implementation Inventory
+
+Files changed by the reviewed implementation between `cd8314401488c7ba3453cec25bdf305e34e0d146` and `2e97798252045619046e10e10c5759744bb37754`, excluding `_bmad-output`, `references` and the nine unrelated `fix(ci)`, `fix(evidence)`, `fix(recovery)` and `fix: mcp` commits reverted for review:
+
+- `.github/workflows/ci.yml`
+- `.github/workflows/release.yml`
+- `src/Hexalith.ChatBot.AppHost/DaprComponents/accesscontrol.yaml`
+- `src/Hexalith.ChatBot.Client/Generated/HexalithChatBotClient.g.cs`
+- `src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCatalog.cs`
+- `src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCatalogEntry.cs`
+- `src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCodes.cs`
+- `src/Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml`
+- `src/Hexalith.ChatBot.Server/Gateway/Admission/ChatBotAdmissionEvidenceValidator.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Admission/ChatBotAdmissionProfile.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Admission/ChatBotClassifierQualification.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Admission/ChatBotClassifierRuntimeIdentity.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Admission/ChatBotCommandAdmissionCatalog.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Admission/ChatBotHumanApprovalEvidence.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Admission/ChatBotProfileAdmissionEvidence.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Admission/IChatBotAdmissionEvidenceSource.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Admission/IChatBotAdmissionEvidenceValidator.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Admission/UnavailableChatBotAdmissionEvidenceSource.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/ChatBotCommandAdmissionPipeline.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/ChatBotDomainServiceAdmissionStage.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/ChatBotGatewayContext.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/ChatBotProblemDetailsFactory.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/ChatBotProblemTypes.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/CommandGateway.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/CommandGatewayServiceCollectionExtensions.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/IChatBotProblemDetailsFactory.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Redaction/CoarseUserFacingRedactionStage.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Stages/AcceptedCommandDispatcher.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Stages/AiActionApprovalGate.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Stages/ChatBotRiskClassification.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Stages/DeterministicAiActionRiskClassifier.cs`
+- `src/Hexalith.ChatBot.Server/Governance/AiMediation/AiActionRiskClassifier.cs`
+- `src/Hexalith.ChatBot.Server/Governance/AiMediation/DefaultAiActionPolicyEvaluator.cs`
+- `src/Hexalith.ChatBot.Server/Operations/GovernedOperationAggregate.cs`
+- `src/Hexalith.ChatBot.UI/Localization/SharedResource.fr.resx`
+- `src/Hexalith.ChatBot.UI/Localization/SharedResource.resx`
+- `src/Hexalith.ChatBot.UI/Services/ProjectConversationService.cs`
+- `tests/Hexalith.ChatBot.Architecture.Tests/Fitness/AdmissionProfileFitnessTests.cs`
+- `tests/Hexalith.ChatBot.Architecture.Tests/LiveRecoveryValidationArchitectureTests.cs`
+- `tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs`
+- `tests/Hexalith.ChatBot.Client.Tests/CommandSubmissionTransportTests.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/ContractSpineOracleTests.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/DaprAccessControlConformanceTests.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/Harness/CrossTenantIsolationHarness.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/Harness/DenialConformanceHarness.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/Harness/GovernedCommandConformanceHarness.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/Harness/IsolationHttpHost.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/TenantAdminPermissionConformanceTests.cs`
+- `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`
+- `tests/Hexalith.ChatBot.IntegrationTests/MemoriesProbeCommandGateway.cs`
+- `tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eContractTests.cs`
+- `tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs`
+- `tests/Hexalith.ChatBot.IntegrationTests/Story132ProductionBrowserAspireE2ETests.cs`
+- `tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs`
+- `tests/Hexalith.ChatBot.RecoverySandbox/Hexalith.ChatBot.RecoverySandbox.csproj`
+- `tests/Hexalith.ChatBot.RecoverySandbox/RecoveryDependencyExercise.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Audit/ComplianceAuditInvestigationEndpointTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/ChatBotAdmissionEvidenceValidatorTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/ChatBotCommandAdmissionSequenceTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/ChatBotHumanApprovalEvidenceTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/ChatBotOperationEvidenceValidatorTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.AdmissionProfiles.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.OperationContracts.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/SyntheticAdmissionEvidenceSource.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/SyntheticAdmissionSequenceDispatcher.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/SyntheticAdmissionSequenceFixture.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/SyntheticHumanApprovalFixture.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/SyntheticLowRiskPolicyRiskClassifier.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/SyntheticMissingRiskClassifier.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/SyntheticObservedAdmissionApprovalGate.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/SyntheticObservedAdmissionEvidenceValidator.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/SyntheticObservedAdmissionRiskClassifier.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/SyntheticObservedAtomicAdmissionValidator.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/SyntheticOperationOwnerEvidenceSource.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/SyntheticPermissiveAiActionPolicyEvaluator.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Governance/AiMediation/AiActionPolicyEvaluatorTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Governance/AiMediation/AiActionRiskClassifierTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Projections/AssociationProjectionTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/TrustedAuthorityAdvancingRiskClassifier.cs` (deleted)
+- `tests/Hexalith.ChatBot.Server.Tests/TrustedAuthorityInternalProducerTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/TrustedAuthorityReReviewTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/TrustedAuthorityReviewTests.cs`
+- `tests/Hexalith.ChatBot.UI.Tests/ProjectConversationServiceTests.cs`
+- `tests/TrustedAuthority/RegressionAuthorityFixture.cs`
+- `tests/TrustedAuthority/SyntheticLegacyAdmissionEvidenceValidator.cs`
+- `tests/TrustedAuthority/SyntheticLegacyRiskClassifier.cs`
+- `tests/fixtures/hexalith-chatbot-generated-client.sha256`
