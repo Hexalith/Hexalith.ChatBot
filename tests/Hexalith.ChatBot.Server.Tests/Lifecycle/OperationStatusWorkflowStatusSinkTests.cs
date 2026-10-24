@@ -449,6 +449,94 @@ public sealed class OperationStatusWorkflowStatusSinkTests
     }
 
     [Theory]
+    [InlineData(false, CorrectionPropagationWorkflowStatuses.Retrying)]
+    [InlineData(false, CorrectionPropagationWorkflowStatuses.Delayed)]
+    [InlineData(true, CorrectionPropagationWorkflowStatuses.Retrying)]
+    [InlineData(true, CorrectionPropagationWorkflowStatuses.Delayed)]
+    public async Task OlderRetryingOrDelayedReportLosingAtomicWriteShouldPreserveFailedWorkflow(bool sdk, string olderStatus)
+    {
+        using RacingOperationStatusStore store = new(sdk) { SecondWriterWins = true };
+        DateTimeOffset now = new(2026, 8, 9, 10, 0, 0, TimeSpan.Zero);
+        OperationStatusWorkflowStatusSink olderSink = new(store, new FixedClock(now));
+        OperationStatusWorkflowStatusSink failureSink = new(store, new FixedClock(now.AddSeconds(1)));
+        CommandSubmissionResponse accepted = new()
+        {
+            CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY", CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            OperationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX", LifecycleState = LifecycleState.Correcting, AcceptedAt = now,
+        };
+        await store.UpsertAsync(OperationStatusRecord.Accepted("tenant-alpha", accepted, false, now), TestContext.Current.CancellationToken);
+        CorrectionPropagationRequest request = new("tenant-alpha", "actor", "association", "intake", "correction", "workflow",
+            "prior-project", "corrected-project", 1, accepted.CorrelationId, now, now.AddMinutes(1), OperationId: accepted.OperationId);
+        await olderSink.ReportAsync(request, CorrectionPropagationWorkflowStatuses.Retrying, 1,
+            CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable, TestContext.Current.CancellationToken, retryDueAt: now);
+        store.Arm();
+        Task older = Task.Run(async () => await olderSink.ReportAsync(request, olderStatus,
+            olderStatus == CorrectionPropagationWorkflowStatuses.Retrying ? 4 : 0,
+            CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable, TestContext.Current.CancellationToken,
+            retryDueAt: now.AddSeconds(30)).ConfigureAwait(false), TestContext.Current.CancellationToken);
+        await store.FirstSnapshotRead.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await failureSink.ReportAsync(request, CorrectionPropagationWorkflowStatuses.Failed, 5,
+            CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable, TestContext.Current.CancellationToken);
+        await older.ConfigureAwait(true);
+        OperationStatusRecord failed = (await store.TryGetAsync(request.TenantId, request.OperationId, TestContext.Current.CancellationToken))!;
+        failed.WorkflowStatus.ShouldBe(CorrectionPropagationWorkflowStatuses.Failed);
+        failed.WorkflowRetryCount.ShouldBe(5);
+        failed.RetryCount.ShouldBe(5);
+        failed.CompletionStatus.ShouldBe(OperationStatusRecord.Failed);
+        failed.ReasonCode.ShouldBe(ChatBotMessageCodes.AssociationCorrectionPropagationFailed);
+        failed.TerminalReasonCode.ShouldBe(ChatBotMessageCodes.AssociationCorrectionPropagationFailed);
+        failed.FailureReasonCode.ShouldBe(CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable);
+        failed.SafeNextActions.ShouldBe([ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AssociationCorrectionPropagationFailed).NextAction]);
+        failed.NextRetryAt.ShouldBeNull();
+        failed.LastUpdatedAt.ShouldBe(now.AddSeconds(1));
+        JsonElement wire = OperationStatusHttpResults.ToJsonElement(failed, now.AddMinutes(1));
+        wire.GetProperty("terminalReasonCode").GetString().ShouldBe(ChatBotMessageCodes.AssociationCorrectionPropagationFailed);
+        wire.GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
+        store.CallbackCount.ShouldBe(3);
+        if (sdk) { store.ConditionalConflicts.ShouldBe(1); }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LowerRetryingReportLosingAtomicWriteShouldNotRewindRetryProgress(bool sdk)
+    {
+        using RacingOperationStatusStore store = new(sdk) { SecondWriterWins = true };
+        DateTimeOffset now = new(2026, 8, 9, 10, 0, 0, TimeSpan.Zero);
+        OperationStatusWorkflowStatusSink olderSink = new(store, new FixedClock(now));
+        OperationStatusWorkflowStatusSink newerSink = new(store, new FixedClock(now.AddSeconds(1)));
+        CommandSubmissionResponse accepted = new()
+        {
+            CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY", CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            OperationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX", LifecycleState = LifecycleState.Correcting, AcceptedAt = now,
+        };
+        await store.UpsertAsync(OperationStatusRecord.Accepted("tenant-alpha", accepted, false, now), TestContext.Current.CancellationToken);
+        CorrectionPropagationRequest request = new("tenant-alpha", "actor", "association", "intake", "correction", "workflow",
+            "prior-project", "corrected-project", 1, accepted.CorrelationId, now, now.AddMinutes(1), OperationId: accepted.OperationId);
+        await olderSink.ReportAsync(request, CorrectionPropagationWorkflowStatuses.Retrying, 1,
+            CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable, TestContext.Current.CancellationToken, retryDueAt: now);
+        store.Arm();
+        Task older = Task.Run(async () => await olderSink.ReportAsync(request, CorrectionPropagationWorkflowStatuses.Retrying, 1,
+            CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable, TestContext.Current.CancellationToken,
+            retryDueAt: now.AddSeconds(30)).ConfigureAwait(false), TestContext.Current.CancellationToken);
+        await store.FirstSnapshotRead.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await newerSink.ReportAsync(request, CorrectionPropagationWorkflowStatuses.Retrying, 3,
+            CorrectionPropagationWorkflowFailureCodes.CaseResolutionUnavailable, TestContext.Current.CancellationToken,
+            retryDueAt: now.AddSeconds(90));
+        await older.ConfigureAwait(true);
+        OperationStatusRecord retrying = (await store.TryGetAsync(request.TenantId, request.OperationId, TestContext.Current.CancellationToken))!;
+        retrying.WorkflowStatus.ShouldBe(CorrectionPropagationWorkflowStatuses.Retrying);
+        retrying.WorkflowRetryCount.ShouldBe(3);
+        retrying.RetryCount.ShouldBe(3);
+        retrying.NextRetryAt.ShouldBe(now.AddSeconds(90));
+        retrying.LastUpdatedAt.ShouldBe(now.AddSeconds(1));
+        OperationStatusHttpResults.ToJsonElement(retrying, now.AddSeconds(30)).GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
+        OperationStatusHttpResults.ToJsonElement(retrying, now.AddSeconds(90)).GetProperty("retryEligible").GetBoolean().ShouldBeTrue();
+        store.CallbackCount.ShouldBe(3);
+        if (sdk) { store.ConditionalConflicts.ShouldBe(1); }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task WorkflowReportForAbsentOperationShouldRemainAbsent(bool sdk)

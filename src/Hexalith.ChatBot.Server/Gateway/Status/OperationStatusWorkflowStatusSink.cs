@@ -41,9 +41,13 @@ internal sealed class OperationStatusWorkflowStatusSink(
         await statusStore.UpdateAsync(request.TenantId, request.OperationId, existing =>
         {
             if (existing is null) { return null; }
-            // Completion is final for this instance; failed workflows may still intentionally restart.
-            if (existing.WorkflowStatus == CorrectionPropagationWorkflowStatuses.Completed &&
-                string.Equals(existing.WorkflowInstanceId, request.WorkflowInstanceId, StringComparison.Ordinal))
+            // Completion is final for this instance; failed workflows may still intentionally restart through
+            // Started. A report that lost the atomic write must not reopen a failure or rewind retry progress.
+            if (string.Equals(existing.WorkflowInstanceId, request.WorkflowInstanceId, StringComparison.Ordinal) &&
+                (existing.WorkflowStatus == CorrectionPropagationWorkflowStatuses.Completed ||
+                    (existing.WorkflowStatus == CorrectionPropagationWorkflowStatuses.Failed && (retrying || delayed)) ||
+                    (existing.WorkflowStatus == CorrectionPropagationWorkflowStatuses.Retrying && retrying &&
+                        workflowRetryCount < existing.WorkflowRetryCount)))
             {
                 return null;
             }
