@@ -1,10 +1,15 @@
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Projections.DerivedStores;
+using Hexalith.ChatBot.Server.Adapters.OwnerServices;
+using Hexalith.ChatBot.Server.Adapters.Projects;
+using Hexalith.EventStore.ServiceDefaults.Authentication;
+using Hexalith.Memories.Client.Rest;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 using Shouldly;
 
@@ -14,11 +19,40 @@ namespace Hexalith.ChatBot.Server.Tests.Projections.DerivedStores;
 public sealed class MemoriesDerivedStoreDependencyInjectionTests
 {
     [Fact]
+    public void OwnerClientCredentialsUseSeparateSdkIssuersWithoutChangingWorkloadOptionsOrMemoriesStaticToken()
+    {
+        IConfiguration configuration = OwnerConfiguration();
+        ServiceCollection services = new();
+        services.Configure<WorkloadAssertionIssuerOptions>(options => options.ClientId = "existing-workload");
+        _ = services.AddChatBotCommandGateway();
+        _ = services.AddChatBotMemoriesDerivedStores(configuration, Environment(Environments.Production));
+        using ServiceProvider provider = services.BuildServiceProvider();
+        provider.GetRequiredKeyedService<OwnerServiceTokenProvider>("Projects")
+            .ShouldNotBeSameAs(provider.GetRequiredKeyedService<OwnerServiceTokenProvider>("Memories"));
+        provider.GetRequiredService<IOptions<MemoriesClientOptions>>().Value.ApiToken.ShouldBeNull();
+        provider.GetRequiredService<IOptions<WorkloadAssertionIssuerOptions>>().Value.ClientId.ShouldBe("existing-workload");
+        provider.GetRequiredService<IMemoriesCaseResolver>().ShouldBeOfType<Hexalith.ChatBot.Server.Adapters.Projects.ProjectsMemoriesCaseResolver>();
+    }
+
+    [Theory]
+    [InlineData("ClientId")]
+    [InlineData("ClientSecret")]
+    public void OwnerClientCredentialsRejectSharedIdentitiesOrSecrets(string field)
+    {
+        IConfiguration configuration = OwnerConfiguration();
+        configuration["ChatBot:Memories:OwnerAuthentication:" + field] = configuration["ChatBot:Projects:OwnerAuthentication:" + field];
+        Should.Throw<InvalidOperationException>(() => new ServiceCollection()
+            .AddChatBotMemoriesDerivedStores(configuration, Environment(Environments.Production)))
+            .Message.ShouldContain("distinct owner identities and secrets");
+    }
+
+    [Fact]
     public void ProductionResolvesBothLiveAdaptersAndRemovesTheProcessLocalLedger()
     {
         IConfiguration configuration = Configuration(
-            (MemoriesDerivedStoreServiceCollectionExtensions.EndpointConfigurationKey, "http://memories/"),
-            (MemoriesDerivedStoreServiceCollectionExtensions.ProjectsEndpointConfigurationKey, "http://projects/"),
+            (MemoriesDerivedStoreServiceCollectionExtensions.EndpointConfigurationKey, "https://memories/"),
+            ("ChatBot:Memories:ApiToken", "test-memories-token"),
+            (MemoriesDerivedStoreServiceCollectionExtensions.ProjectsEndpointConfigurationKey, "https://projects/"),
             (MemoriesDerivedStoreServiceCollectionExtensions.ProjectsApiTokenConfigurationKey, "test-projects-token"),
             (MemoriesDerivedStoreServiceCollectionExtensions.WorkflowRuntimeConfigurationKey, "true"));
         ServiceCollection services = new();
@@ -55,7 +89,7 @@ public sealed class MemoriesDerivedStoreDependencyInjectionTests
     {
         IConfiguration configuration = Configuration(
             (MemoriesDerivedStoreServiceCollectionExtensions.EndpointConfigurationKey, endpoint),
-            (MemoriesDerivedStoreServiceCollectionExtensions.ProjectsEndpointConfigurationKey, "http://projects/"),
+            (MemoriesDerivedStoreServiceCollectionExtensions.ProjectsEndpointConfigurationKey, "https://projects/"),
             (MemoriesDerivedStoreServiceCollectionExtensions.ProjectsApiTokenConfigurationKey, "test-projects-token"),
             (MemoriesDerivedStoreServiceCollectionExtensions.WorkflowRuntimeConfigurationKey, "true"));
         ServiceCollection services = new();
@@ -71,8 +105,8 @@ public sealed class MemoriesDerivedStoreDependencyInjectionTests
     public void ProductionRejectsDisabledDurableWorkflowRuntime()
     {
         IConfiguration configuration = Configuration(
-            (MemoriesDerivedStoreServiceCollectionExtensions.EndpointConfigurationKey, "http://memories/"),
-            (MemoriesDerivedStoreServiceCollectionExtensions.ProjectsEndpointConfigurationKey, "http://projects/"),
+            (MemoriesDerivedStoreServiceCollectionExtensions.EndpointConfigurationKey, "https://memories/"),
+            (MemoriesDerivedStoreServiceCollectionExtensions.ProjectsEndpointConfigurationKey, "https://projects/"),
             (MemoriesDerivedStoreServiceCollectionExtensions.ProjectsApiTokenConfigurationKey, "test-projects-token"));
         ServiceCollection services = new();
         _ = services.AddChatBotCommandGateway();
@@ -93,7 +127,7 @@ public sealed class MemoriesDerivedStoreDependencyInjectionTests
     public void ProductionRejectsMissingOrInvalidProjectsAuthorityEndpoint(string? endpoint)
     {
         IConfiguration configuration = Configuration(
-            (MemoriesDerivedStoreServiceCollectionExtensions.EndpointConfigurationKey, "http://memories/"),
+            (MemoriesDerivedStoreServiceCollectionExtensions.EndpointConfigurationKey, "https://memories/"),
             (MemoriesDerivedStoreServiceCollectionExtensions.ProjectsEndpointConfigurationKey, endpoint),
             (MemoriesDerivedStoreServiceCollectionExtensions.ProjectsApiTokenConfigurationKey, "test-projects-token"),
             (MemoriesDerivedStoreServiceCollectionExtensions.WorkflowRuntimeConfigurationKey, "true"));
@@ -113,8 +147,8 @@ public sealed class MemoriesDerivedStoreDependencyInjectionTests
     public void ProductionRejectsMissingProjectsAuthorityToken(string? token)
     {
         IConfiguration configuration = Configuration(
-            (MemoriesDerivedStoreServiceCollectionExtensions.EndpointConfigurationKey, "http://memories/"),
-            (MemoriesDerivedStoreServiceCollectionExtensions.ProjectsEndpointConfigurationKey, "http://projects/"),
+            (MemoriesDerivedStoreServiceCollectionExtensions.EndpointConfigurationKey, "https://memories/"),
+            (MemoriesDerivedStoreServiceCollectionExtensions.ProjectsEndpointConfigurationKey, "https://projects/"),
             (MemoriesDerivedStoreServiceCollectionExtensions.ProjectsApiTokenConfigurationKey, token),
             (MemoriesDerivedStoreServiceCollectionExtensions.WorkflowRuntimeConfigurationKey, "true"));
         ServiceCollection services = new();
@@ -128,6 +162,32 @@ public sealed class MemoriesDerivedStoreDependencyInjectionTests
 
     private static IConfiguration Configuration(params (string Key, string? Value)[] values)
         => new ConfigurationBuilder().AddInMemoryCollection(values.ToDictionary(static pair => pair.Key, static pair => pair.Value)).Build();
+
+    private static IConfiguration OwnerConfiguration()
+    {
+        Dictionary<string, string?> settings = new()
+        {
+            [MemoriesDerivedStoreServiceCollectionExtensions.WorkflowRuntimeConfigurationKey] = "true",
+        };
+        foreach ((string owner, string audience, string operation) in new[]
+        {
+            ("Projects", "hexalith-eventstore", "projects:read"),
+            ("Memories", "hexalith-memories-server", "memories:derived-store"),
+        })
+        {
+            string prefix = "ChatBot:" + owner;
+            settings[prefix + ":Endpoint"] = "https://" + owner.ToLowerInvariant() + ".invalid";
+            settings[prefix + ":OwnerAuthentication:Authority"] = "https://issuer.invalid/realms/local";
+            settings[prefix + ":OwnerAuthentication:Issuer"] = "https://issuer.invalid/realms/local";
+            settings[prefix + ":OwnerAuthentication:TokenEndpoint"] = "https://issuer.invalid/realms/local/protocol/openid-connect/token";
+            settings[prefix + ":OwnerAuthentication:ClientId"] = "chatbot-" + owner.ToLowerInvariant() + "-owner";
+            settings[prefix + ":OwnerAuthentication:ClientSecret"] = "dedicated-" + owner.ToLowerInvariant() + "-secret";
+            settings[prefix + ":OwnerAuthentication:TenantId"] = "tenant-alpha";
+            settings[prefix + ":OwnerAuthentication:Audience"] = audience;
+            settings[prefix + ":OwnerAuthentication:Operation"] = operation;
+        }
+        return new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+    }
 
     private static IHostEnvironment Environment(string environmentName)
         => new TestHostEnvironment { EnvironmentName = environmentName };

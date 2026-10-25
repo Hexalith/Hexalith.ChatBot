@@ -12,7 +12,9 @@ using CommunityToolkit.Aspire.Hosting.Dapr;
 using Hexalith.ChatBot.AppHost.Aspire;
 using Hexalith.EventStore.Aspire;
 using Hexalith.Memories.Aspire;
+using Hexalith.Platform.Composition;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 
@@ -29,6 +31,10 @@ string chatBotAuthorityReaderSecret = Convert.ToHexString(RandomNumberGenerator.
 string tenantsAuthorityReaderSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
 string partiesAuthorityReaderSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
 string projectsAuthorityReaderSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+PlatformOwnerClientBinding projectsOwner = builder.AddPlatformOwnerClient(
+    "chatbot-projects-owner", "hexalith-eventstore", "projects:read", "tenant-alpha", "projects:read");
+PlatformOwnerClientBinding memoriesOwner = builder.AddPlatformOwnerClient(
+    "chatbot-memories-owner", "hexalith-memories-server", "memories:derived-store", "tenant-alpha", "memories:derived-store");
 using RSA authorityReadKey = RSA.Create(2048);
 string authorityReadPrivateKey = Convert.ToBase64String(authorityReadKey.ExportPkcs8PrivateKey());
 string authorityReadPublicKey = Convert.ToBase64String(authorityReadKey.ExportSubjectPublicKeyInfo());
@@ -48,7 +54,8 @@ string realmImportPath = PrepareKeycloakRealmImport(
     chatBotAuthorityReaderSecret,
     tenantsAuthorityReaderSecret,
     partiesAuthorityReaderSecret,
-    projectsAuthorityReaderSecret);
+    projectsAuthorityReaderSecret,
+    [projectsOwner, memoriesOwner]);
 HexalithEventStoreSecurityResources? security = builder.AddHexalithEventStoreSecurity(
     new HexalithEventStoreSecurityOptions { RealmImportPath = realmImportPath });
 IResourceBuilder<ParameterResource> eventStoreWorkloadClientSecretParameter = builder.AddParameter(
@@ -120,6 +127,9 @@ HexalithMemoriesSearchIndexServerResources memories = builder.AddHexalithMemorie
     ResolveDaprConfigPath(builder.AppHostDirectory, "llm.memories.yaml"),
     daprPlacementHostAddress: builder.Configuration["Dapr:PlacementHostAddress"],
     daprSchedulerHostAddress: builder.Configuration["Dapr:SchedulerHostAddress"]);
+// Memories and the UI both inherit port 5000 from their launch profiles. Allocate the owner proxy separately
+// so its endpoint reference always reaches Memories, even when both project processes are healthy.
+_ = memories.Server.WithEndpoint("http", endpoint => endpoint.Port = null);
 // Every sidecar in this self-hosted umbrella uses the same local DAPR configuration, including its disabled
 // component hot reload. Memories' hosting extension owns its sidecar; configure that existing sidecar here rather
 // than attaching a second one or changing the independently owned Memories runtime.
@@ -130,25 +140,42 @@ memoriesSidecar.Annotations.Add(new DaprSidecarOptionsAnnotation(memoriesSidecar
 EndpointReference memoriesHttp = memories.Server.GetEndpoint("http");
 ReferenceExpression memoriesEndpoint = ReferenceExpression.Create($"{memoriesHttp}");
 
-string projectsEndpoint = builder.Configuration["ChatBot:Projects:Endpoint"]
-    ?? throw new InvalidOperationException(
-        "ChatBot:Projects:Endpoint must identify the authorization-filtered Projects server when the live Memories topology is enabled.");
-string projectsApiToken = builder.Configuration["ChatBot:Projects:ApiToken"]
-    ?? throw new InvalidOperationException(
-        "ChatBot:Projects:ApiToken must supply the service bearer token for authorization-filtered Project Context reads.");
-string memoriesApiToken = builder.Configuration["ChatBot:Memories:ApiToken"]
-    ?? throw new InvalidOperationException(
-        "ChatBot:Memories:ApiToken must supply the tenant-scoped service bearer token for the Memories owner API.");
-IResourceBuilder<ParameterResource> memoriesApiTokenParameter = builder.AddParameter(
-    "memories-api-token",
-    () => memoriesApiToken,
-    publishValueAsDefault: false,
-    secret: true);
-IResourceBuilder<ParameterResource> projectsApiTokenParameter = builder.AddParameter(
-    "projects-api-token",
-    () => projectsApiToken,
-    publishValueAsDefault: false,
-    secret: true);
+// Any explicit owner setting selects the external/static path as a whole; incomplete overrides never fall back.
+bool externalOwners = new[] { "ChatBot:Projects:Endpoint", "ChatBot:Projects:ApiToken", "ChatBot:Projects:TenantId",
+    "ChatBot:Memories:Endpoint", "ChatBot:Memories:ApiToken", "ChatBot:Memories:TenantId" }
+    .Any(key => builder.Configuration[key] is not null)
+    || builder.Configuration.GetSection("ChatBot:Projects:OwnerAuthentication").Exists()
+    || builder.Configuration.GetSection("ChatBot:Memories:OwnerAuthentication").Exists();
+if (externalOwners)
+{
+    string projectsEndpoint = RequiredOwnerSetting("ChatBot:Projects:Endpoint");
+    string projectsApiToken = RequiredOwnerSetting("ChatBot:Projects:ApiToken");
+    string memoriesApiToken = RequiredOwnerSetting("ChatBot:Memories:ApiToken");
+    if (builder.Configuration.GetSection("ChatBot:Projects:OwnerAuthentication").Exists()
+        || builder.Configuration.GetSection("ChatBot:Memories:OwnerAuthentication").Exists())
+        throw new InvalidOperationException("The external AppHost owner setup requires complete static tokens without mixed client credentials.");
+    _ = chatBot.WithEnvironment("ChatBot__Projects__Endpoint", projectsEndpoint)
+        .WithEnvironment("ChatBot__Projects__ApiToken", builder.AddParameter("projects-api-token", () => projectsApiToken, publishValueAsDefault: false, secret: true))
+        .WithEnvironment("ChatBot__Memories__Endpoint", builder.Configuration["ChatBot:Memories:Endpoint"] is { } externalMemoriesEndpoint
+            ? ReferenceExpression.Create($"{externalMemoriesEndpoint}") : memoriesEndpoint)
+        .WithEnvironment("ChatBot__Memories__ApiToken", builder.AddParameter("memories-api-token", () => memoriesApiToken, publishValueAsDefault: false, secret: true));
+    foreach (string owner in new[] { "Projects", "Memories" })
+    {
+        if (builder.Configuration[$"ChatBot:{owner}:TenantId"] is not null)
+            _ = chatBot.WithEnvironment($"ChatBot__{owner}__TenantId", RequiredOwnerSetting($"ChatBot:{owner}:TenantId"));
+    }
+}
+else
+{
+    if (!builder.Environment.IsDevelopment() || security is null)
+        throw new InvalidOperationException("Local owner client credentials require Development and the existing Keycloak issuer.");
+    _ = chatBot.WithPlatformOwnerService("ChatBot:Projects", projects.GetEndpoint("http"), security, projectsOwner)
+        .WithPlatformOwnerService("ChatBot:Memories", memoriesHttp, security, memoriesOwner)
+        .WithReference(projects).WaitFor(projects);
+}
+
+string RequiredOwnerSetting(string key) => !string.IsNullOrWhiteSpace(builder.Configuration[key])
+    ? builder.Configuration[key]! : throw new InvalidOperationException($"{key} must be configured for an explicit external owner setup.");
 IResourceBuilder<ParameterResource> eventStoreAdminUsername = builder.AddParameter(
     "eventstore-admin-username",
     () => "admin-user",
@@ -169,10 +196,6 @@ _ = chatBot
     .WithReference(memories.Server)
     .WaitFor(memories.Server)
     .WithEnvironment("ChatBot__Memories__UseLiveBacking", "true")
-    .WithEnvironment("ChatBot__Memories__Endpoint", memoriesEndpoint)
-    .WithEnvironment("ChatBot__Memories__ApiToken", memoriesApiTokenParameter)
-    .WithEnvironment("ChatBot__Projects__Endpoint", projectsEndpoint)
-    .WithEnvironment("ChatBot__Projects__ApiToken", projectsApiTokenParameter)
     .WithEnvironment("ChatBot__UseDaprStateStores", "true")
     .WithEnvironment("ChatBot__UseDaprWorkflowRuntime", "true")
     .WithEnvironment("ChatBot__UsePeriodicEnforcementRuntime", "true")
@@ -231,6 +254,16 @@ ReferenceExpression adminSwaggerUrl = ReferenceExpression.Create($"{adminServerH
 
 if (security is not null)
 {
+    if (!externalOwners)
+    {
+        _ = memories.Server.WithSecurityDependency(security)
+            .WithEnvironment("Authentication__JwtBearer__Authority", security.RealmUrl)
+            .WithEnvironment("Authentication__JwtBearer__Issuer", security.RealmUrl)
+            .WithEnvironment("Authentication__JwtBearer__Audience", "hexalith-memories-server")
+            .WithEnvironment("Authentication__JwtBearer__SigningKey", "")
+            .WithEnvironment("Authentication__JwtBearer__RequireHttpsMetadata", "false")
+            .WithEnvironment("Authentication__JwtBearer__ValidAlgorithms__0", "RS256");
+    }
     _ = eventStore.WithJwtBearerSecurity(security, "hexalith-eventstore");
     _ = eventStore.WithEventStoreWorkloadClientCredentials("eventstore", eventStoreWorkloadClientSecretParameter);
     _ = eventStore.WithEnvironment("Authentication__BoundStreamRead__PublicKeys__chatbot", authorityReadPublicKeyParameter);
@@ -341,7 +374,8 @@ static string PrepareKeycloakRealmImport(
     string chatBotAuthorityReaderSecret,
     string tenantsAuthorityReaderSecret,
     string partiesAuthorityReaderSecret,
-    string projectsAuthorityReaderSecret)
+    string projectsAuthorityReaderSecret,
+    PlatformOwnerClientBinding[] ownerClients)
 {
     const string expiryPlaceholder = "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__";
     const string grantExpiryMapperName = "chatbot-service-client-grant-expiry";
@@ -518,6 +552,7 @@ static string PrepareKeycloakRealmImport(
         throw new InvalidOperationException("The Keycloak realm must contain exactly one Projects authority reader secret placeholder.");
     }
     realm = realm.Replace(projectsAuthorityReaderSecretPlaceholder, projectsAuthorityReaderSecret, StringComparison.Ordinal);
+    realm = PlatformOwnerServices.AppendOwnerClientsToRealm(realm, ownerClients);
 
     // Cleanup below is ProcessExit-only, which never fires on SIGKILL/OOM-kill/a hard container stop, so a killed
     // prior run can leave a secret-bearing directory behind (still owner-only per the mode set below — a

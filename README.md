@@ -47,6 +47,8 @@ dotnet run --project tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.S
 
 The retained AppHost is a local-development umbrella only. It wires ChatBot with EventStore, Tenants, Keycloak, and DAPR sidecars while reusable hosting behavior stays in the EventStore DomainService SDK.
 
+The default AppHost launch profile selects `Development`, which loads the AppHost user secrets (`hexalith-chatbot`). Configure the [mailbox secret](#local-service-credentials) before starting; external Projects/Memories endpoints and tokens are optional overrides. Start it from the repository root with `aspire run`, or use `aspire start --non-interactive` for a detached agent session. The dashboard uses `https://localhost:17278`.
+
 Runtime component names are intentional:
 
 - `statestore` is the canonical EventStore actor/status/archive/checkpoint store.
@@ -80,18 +82,38 @@ Epic 9 follows the same build-the-logic / defer-selected-live-drivers pattern. T
 
 Epic 10 adds the governed Project Workspace chat surface on the same command spine, plus FrontComposer Shell ownership for the UI. User messages use metadata-only `RecordProjectConversationMessage`; ask-AI requests route through the Epic 4 proposal path; Stop/Cancel uses `CancelAiResponseGeneration` through `IChatBotClient.SubmitAsync` and CommandGateway. AI response progress is exposed through typed project-conversation read models (`AiResponseProgress`) and nudged by a ChatBot-owned metadata-only SignalR hub at `/hubs/chatbot/project-conversation-changes`. The hub is enabled by `ChatBot:ProjectionChangeNotifications:Enabled=true`; the AppHost sets this for local runs. SignalR carries only a tenant-scoped "project conversation changed" signal, never response text, raw provider chunks, prompts, hidden policy detail, or exception content; the UI always re-queries typed server state before rendering progress or terminal Stop/Cancel results. Epic 10 also surfaced a UX-DR1/UX-DR2 component-conformance gap: Shell adoption landed correctly, but interior UI components still used raw controls and a custom `chatbot.tokens.css` layer. Epic 12 closed that gap by migrating ChatBot UI controls to Fluent v5 components, retiring the custom CSS primitive layer to Fluent-backed semantic aliases plus layout/accessibility hooks, and proving the empty guard through UI, E2E, conformance, CLI, MCP, and architecture lanes. Epic 13 then closed the page-level composition gap Epics 10 and 12 left open: pages had still hand-rolled chrome with `.chatbot-page-header`/`.chatbot-page`/`.chatbot-command-bar` CSS that overlapped the FrontComposer shell top bar, boxed content in a 1px border, and rendered primary data as monospace `<dl>` dumps. Each page was re-composed through `FcPageLayout` + `FcPageHeader` with Fluent layout/data components (`FluentDataGrid`, `FluentStack`, `FluentCard`, `FluentAccordion`), mirroring `Hexalith.Tenants.UI`; the retired layout CSS and the empty allowlists are enforced by the sibling `ChatBotLayoutCompositionConformanceTests` guard. Story 13.9 re-verified the six surfaces against the real rendered app (live Kestrel + Chromium), closing Story 12.9's static-fixture gap — and in doing so caught a production defect where `Components/App.razor` linked only `chatbot.tokens.css` and not the scoped `Hexalith.ChatBot.UI.styles.css` bundle, so the Fluent/FrontComposer layout grid never loaded; `App.razor` now links the scoped bundle and the real-render gate asserts `.fluent-layout` resolves to `display:grid`.
 
+### Local service credentials
+
 The AppHost renders the Keycloak realm on every run — including ordinary local development unrelated to Story 12.15's live-recovery lane — and fails closed if `ChatBot:LiveRecoveryValidation:MailboxClientSecret` is not configured. Supply a secret (ASCII letters/digits/`-`/`_` only, at least 32 characters) before running, e.g.:
 
 ```bash
 dotnet user-secrets set ChatBot:LiveRecoveryValidation:MailboxClientSecret "REPLACE-THIS-WITH-32+-RANDOM-CHARS" --project src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj
 ```
 
-The Memories integration also requires `ChatBot:Projects:Endpoint` and `ChatBot:Projects:ApiToken`, configured through
-AppHost user secrets or environment variables, for the authorization-filtered Projects server. Missing either value
-stops startup. Set `ChatBot:Memories:ApiToken` through the same secret configuration boundary; the AppHost passes it
-to ChatBot as a secret Aspire parameter. This service bearer must be accepted by Memories' configured issuer and
-audience and carry the tenant claims for the diagnostic and ingestion operations it performs. Memories continues
-to reject anonymous requests and tenants outside those claims. Register the target tenants through Memories'
+Normal Development startup binds the existing Projects and Memories resources through Platform's reusable owner-service
+helper. Each run enrolls separate `chatbot-projects-owner` and `chatbot-memories-owner` Keycloak clients with secret
+Aspire parameters and the explicit `tenant-alpha` binding. Their only optional scopes use `platform-owner-audience.`
+and `platform-owner-operation.`: Projects receives `hexalith-eventstore` / `projects:read`; Memories receives
+`hexalith-memories-server` / `memories:derived-store`. These REST identities do not gain SDK workload caller access.
+The operation scopes and permission claims identify the adapter's token requests and cache entries; they do not add
+receiver authorization. Memories natively grants authenticated tenant membership, including access to its supported
+owner API routes for that tenant, and does not enforce `eventstore:operation` or `eventstore:permission`. Projects
+continues to enforce its own permissions, tenant provisioning and project access gates.
+ChatBot reuses the EventStore SDK's token acquisition, cache, and refresh with separate owner options and no signing-key
+fallback. Foreign destinations, redirects, insecure non-loopback HTTP and cross-tenant Project-context requests are denied.
+
+To retain an external/static setup, configure all three `ChatBot:Projects:Endpoint`, `ChatBot:Projects:ApiToken` and
+`ChatBot:Memories:ApiToken` values through AppHost user secrets or environment variables. Optionally set
+`ChatBot:Memories:Endpoint`; otherwise it uses the existing Memories resource. Any partial or mixed override stops startup.
+Tokens must match each receiver's issuer/audience and tenant claims. Standalone Server deployments may instead configure
+`ChatBot:{Projects|Memories}:OwnerAuthentication` with `Authority`, `Issuer`, `TokenEndpoint`, `ClientId`, `ClientSecret`,
+`TenantId`, `Audience` and `Operation`. The token endpoint must remain within the configured authority, and HTTP is accepted
+only for Development loopback endpoints. A static Projects JWT supplies its single tenant claim; opaque tokens require
+an explicit `ChatBot:Projects:TenantId` for Project-context reads. Every recognized Projects JWT tenant selector must
+agree on one tenant; an override cannot narrow an ambiguous JWT. External Memories static credentials may retain
+multiple tenant claims because Memories checks the requested URL tenant against that membership list.
+Unbound or mismatched Project-context requests stop before network access.
+Memories continues to reject anonymous requests and tenants outside its claims. Register the target tenants through Memories'
 supported provisioning API before expecting derived-store probes to succeed; a ChatBot/Keycloak tenant claim does
 not create an owner tenant registry entry.
 

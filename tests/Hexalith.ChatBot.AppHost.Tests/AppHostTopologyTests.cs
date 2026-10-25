@@ -100,7 +100,11 @@ public static class AppHostTopologyTests
         source.ShouldContain("memoriesSidecarOptions.Options with { Config = accessControlConfigPath }");
         source.ShouldNotContain("Authentication__DaprInternal__AllowedCallers__1");
         source.ShouldContain("\"memories-api-token\"");
-        source.ShouldContain("ChatBot__Memories__ApiToken\", memoriesApiTokenParameter");
+        source.ShouldContain("ChatBot__Memories__ApiToken\", builder.AddParameter(\"memories-api-token\", () => memoriesApiToken, publishValueAsDefault: false, secret: true)");
+        source.ShouldContain("WithPlatformOwnerService(\"ChatBot:Memories\", memoriesHttp, security, memoriesOwner)");
+        string platform = File.ReadAllText(Path.Combine(RepositoryRoot(), "references", "Hexalith.Platform", "src", "Hexalith.Platform.Composition", "PlatformOwnerServices.cs"));
+        platform.ShouldContain("publishValueAsDefault: false, secret: true");
+        platform.ShouldContain("__OwnerAuthentication__ClientSecret\", binding.SecretParameter");
         source.ShouldNotContain("Memories:Testing:UseInMemoryCommandStore");
     }
 

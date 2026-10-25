@@ -1852,3 +1852,12 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Carried existing R4-BH-2 / Current-BH-3 obligation to establish provider-collection failure containment before live activation (unverified medium; no new scope).
   evidence: Round29-5 reconfirms enumeration and lookup outside `DefaultAiActionPolicyEvaluator`'s provider-call catch. Current providers return ordinary arrays/maps and production returns null. A supported provider whose collection access throws would settle reachability and require a redacted unavailable decision. This review references the existing verification obligation rather than creating another implementation task.
+
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-platform-owner-service-access.md`
+  summary: Supply owner-observed file version and lock-fence evidence in the ChatBot Folders attachment adapter before calling the current Folders upload API.
+  evidence: The final owner-service repair full Server lane ran 3303 tests with 3296 passing and seven unchanged FoldersFolderStoreTests failures. The unchanged adapter calls FileUpload.BuildInlineFileMutation without expectedFileVersion/expectedLockFence, which the unchanged current Folders SDK rejects before transport. Exact CTRF/TRX/log evidence is /tmp/chatbot-owner-final-full-server.*; no assertion or SDK guard was weakened.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-platform-owner-service-access.md`
+  summary: Reconcile legacy Platform composition test awaits with the umbrella repository's CA2007 requirement without suppressing the analyzer gate.
+  evidence: The broad Platform.Composition.Tests Debug build reports 36 CA2007 errors in unchanged legacy test helpers under the ancestor editor configuration (/tmp/chatbot-owner-platform-tests-build.log). New owner-service tests run in a focused test project and pass; the broad blocker remains explicit and unrelated legacy test files are unchanged.

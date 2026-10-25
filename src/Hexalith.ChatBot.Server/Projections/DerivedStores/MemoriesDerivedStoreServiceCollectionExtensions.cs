@@ -1,5 +1,6 @@
 using Hexalith.Memories.Client.Rest;
 using Hexalith.ChatBot.Server.Adapters.Projects;
+using Hexalith.ChatBot.Server.Adapters.OwnerServices;
 using Hexalith.Projects.Client;
 
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -38,46 +39,24 @@ internal static class MemoriesDerivedStoreServiceCollectionExtensions
                 $"{WorkflowRuntimeConfigurationKey} must be true when live Memories backing is enabled; production cannot silently skip durable ingestion or correction workflows.");
         }
 
-        string? configuredEndpoint = configuration[EndpointConfigurationKey];
-        if (!Uri.TryCreate(configuredEndpoint, UriKind.Absolute, out Uri? endpoint)
-            || (!string.Equals(endpoint.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(endpoint.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
-            || !string.IsNullOrEmpty(endpoint.UserInfo)
-            || !string.IsNullOrEmpty(endpoint.Query)
-            || !string.IsNullOrEmpty(endpoint.Fragment))
-        {
-            throw new InvalidOperationException(
-                $"{EndpointConfigurationKey} must be an absolute HTTP(S) server endpoint without credentials, query, or fragment when live Memories backing is enabled.");
-        }
+        OwnerServiceAuthenticationOptions projectsAuthentication = OwnerServiceAuthenticationOptions.Load(
+            configuration, "Projects", "hexalith-eventstore", "projects:read", environment);
+        OwnerServiceAuthenticationOptions memoriesAuthentication = OwnerServiceAuthenticationOptions.Load(
+            configuration, "Memories", "hexalith-memories-server", "memories:derived-store", environment);
+        if (projectsAuthentication.ClientId is not null && memoriesAuthentication.ClientId is not null
+            && (projectsAuthentication.ClientId == memoriesAuthentication.ClientId
+                || projectsAuthentication.ClientSecret == memoriesAuthentication.ClientSecret))
+            throw new InvalidOperationException("Projects and Memories require distinct owner identities and secrets.");
 
         _ = services.AddMemoriesClient(options =>
         {
-            options.Endpoint = endpoint;
-            options.ApiToken = configuration["ChatBot:Memories:ApiToken"];
-        });
-
-        string? configuredProjectsEndpoint = configuration[ProjectsEndpointConfigurationKey];
-        if (!Uri.TryCreate(configuredProjectsEndpoint, UriKind.Absolute, out Uri? projectsEndpoint)
-            || (!string.Equals(projectsEndpoint.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(projectsEndpoint.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
-            || !string.IsNullOrEmpty(projectsEndpoint.UserInfo)
-            || !string.IsNullOrEmpty(projectsEndpoint.Query)
-            || !string.IsNullOrEmpty(projectsEndpoint.Fragment))
-        {
-            throw new InvalidOperationException(
-                $"{ProjectsEndpointConfigurationKey} must be an absolute HTTP(S) server endpoint without credentials, query, or fragment when live Memories backing is enabled.");
-        }
-
-        string? projectsApiToken = configuration[ProjectsApiTokenConfigurationKey];
-        if (string.IsNullOrWhiteSpace(projectsApiToken))
-        {
-            throw new InvalidOperationException(
-                $"{ProjectsApiTokenConfigurationKey} must be configured for authorization-filtered Project Context reads when live Memories backing is enabled.");
-        }
+            options.Endpoint = memoriesAuthentication.Endpoint;
+            options.ApiToken = memoriesAuthentication.ApiToken;
+        }).WithOwnerAuthentication(memoriesAuthentication, environment, "Memories");
 
         _ = services
-            .AddProjectsClient(options => options.BaseAddress = projectsEndpoint)
-            .AddHttpMessageHandler(() => new ProjectsBearerTokenHandler(projectsApiToken));
+            .AddProjectsClient(options => options.BaseAddress = projectsAuthentication.Endpoint)
+            .WithOwnerAuthentication(projectsAuthentication, environment, "Projects");
 
         services.RemoveAll<IDerivedStore>();
         services.RemoveAll<IVectorReindexer>();
@@ -86,7 +65,8 @@ internal static class MemoriesDerivedStoreServiceCollectionExtensions
         services.AddSingleton<IIngestionBindingSourceAdapter, MemoriesIngestionBindingSourceAdapter>();
         services.AddSingleton<IDerivedStore, MemoriesDerivedStore>();
         services.AddSingleton<IVectorReindexer, MemoriesVectorReindexer>();
-        services.AddSingleton<IMemoriesCaseResolver, ProjectsMemoriesCaseResolver>();
+        services.AddSingleton<IMemoriesCaseResolver>(provider => new ProjectsMemoriesCaseResolver(
+            provider.GetRequiredService<Hexalith.Projects.Client.Generated.IClient>(), projectsAuthentication.TenantId));
         return services;
     }
 }

@@ -3,7 +3,7 @@ using Generated = Hexalith.Projects.Client.Generated;
 namespace Hexalith.ChatBot.Server.Adapters.Projects;
 
 /// <summary>Projects-client implementation of the authoritative Project-to-Memories-case lookup.</summary>
-internal sealed class ProjectsMemoriesCaseResolver(Generated.IClient projects) : IMemoriesCaseResolver
+internal sealed class ProjectsMemoriesCaseResolver(Generated.IClient projects, string? ownerTenantId) : IMemoriesCaseResolver
 {
     public const string ContextUnavailableReasonCode = "project_context_unavailable";
     public const string ContextStaleReasonCode = "project_context_stale";
@@ -19,6 +19,10 @@ internal sealed class ProjectsMemoriesCaseResolver(Generated.IClient projects) :
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
         ArgumentException.ThrowIfNullOrWhiteSpace(projectId);
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+        if (string.IsNullOrWhiteSpace(ownerTenantId) || !string.Equals(tenantId, ownerTenantId, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(ContextMismatchReasonCode);
+        }
 
         Generated.ProjectContext context;
         try
