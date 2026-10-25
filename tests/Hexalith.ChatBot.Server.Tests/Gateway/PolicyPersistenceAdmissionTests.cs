@@ -170,6 +170,54 @@ public sealed partial class CommandGatewayTests
         counter.RecordedTenants.ShouldBeEmpty();
     }
 
+    /// <summary>Pins the SDK policy gate before payload parsing with synthetic malformed input.</summary>
+    /// <param name="commandKind">The gated policy command fixture.</param>
+    [Theory]
+    [InlineData("submit")]
+    [InlineData("approval")]
+    [InlineData("thresholds")]
+    [InlineData("escalation")]
+    [InlineData("notification-routing")]
+    [InlineData("mailbox-configuration")]
+    [InlineData("retention-configuration")]
+    [InlineData("data-class-inventory")]
+    public async Task SyntheticSdkMalformedPolicyPayloadMustRetainDependencyDenialBeforeParsing(string commandKind)
+    {
+        FixedClock clock = new();
+        RecordingAuditWriter audit = new();
+        RecordingAuthorizationFailureCounter counter = new();
+        RecordingDispatcher dispatcher = new();
+        InMemoryCoarseIdempotencyStore reservations = new(clock);
+        string commandType = SyntheticPolicyCommand(commandKind).GetType().Name;
+        CommandEnvelope envelope = new("01ARZ3NDEKTSV4RRFFQ69G5FAY", BoundTenant, "chatbot", "policy-change-001", commandType,
+            "{ \"policySnapshotId\": \"restricted/policy-secret\" "u8.ToArray(), CorrelationId, null, ActorId,
+            new Dictionary<string, string> { ["actorId"] = ActorId, ["surfaceOrigin"] = "api" });
+        using WebApplicationFactory<Program> factory = SyntheticPolicyHost(SyntheticPolicyPrincipal(commandKind), clock, audit, reservations, dispatcher,
+            authorizationFailureCounter: counter);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client.PostAsJsonAsync("/process", new DomainServiceRequest(envelope, null), TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        DomainServiceWireResult wire = JsonSerializer.Deserialize<DomainServiceWireResult>(body, Program.QueryJsonOptions).ShouldNotBeNull();
+        wire.IsRejection.ShouldBeTrue();
+        DomainServiceWireEvent rejected = wire.Events.ShouldHaveSingleItem();
+        rejected.EventTypeName.ShouldBe(typeof(ChatBotDomainServiceAdmissionRejected).FullName);
+        JsonSerializer.Deserialize<ChatBotDomainServiceAdmissionRejected>(rejected.Payload)!.ReasonCode
+            .ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+        audit.AuthorizationFailures.ShouldHaveSingleItem().ShouldBe(new ChatBotAuthorizationFailureAuditFact(BoundTenant, ActorId,
+            commandType, ChatBotRefusalReasonCodes.PolicySnapshotUnavailable, CorrelationId, null, "api"));
+        counter.RecordedTenants.ShouldBeEmpty();
+        reservations.RecordCount.ShouldBe(0);
+        dispatcher.DispatchCount.ShouldBe(0);
+        audit.Envelopes.ShouldBeEmpty();
+        IOperationStatusStore status = factory.Services.GetRequiredService<IOperationStatusStore>();
+        (await status.TryGetAsync(BoundTenant, envelope.MessageId, TestContext.Current.CancellationToken)).ShouldBeNull();
+        body.ShouldNotContain("restricted/policy-secret");
+        JsonSerializer.Serialize(audit.AuthorizationFailures).ShouldNotContain("restricted/policy-secret");
+    }
+
     [Theory]
     [InlineData("submit", false)]
     [InlineData("submit", true)]
@@ -293,6 +341,7 @@ public sealed partial class CommandGatewayTests
         SyntheticAdmissionPolicySnapshotProvider provider = new(snapshot);
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter audit = new();
+        RecordingAuthorizationFailureCounter counter = new();
         InMemoryCoarseIdempotencyStore reservations = new(new FixedClock());
         InMemoryOperationStatusStore status = new();
         ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), LowRiskExecutionCommand());
@@ -303,7 +352,8 @@ public sealed partial class CommandGatewayTests
 
         ChatBotGatewayResult result = await Gateway(dispatcher, auditWriter: audit, idempotencyStore: reservations, operationStatusStore: status,
             riskClassifier: new SyntheticLowRiskPolicyRiskClassifier(),
-            approvalGate: new AiActionApprovalGate(new DefaultAiActionPolicyEvaluator(provider)))
+            approvalGate: new AiActionApprovalGate(new DefaultAiActionPolicyEvaluator(provider)),
+            authorizationFailureCounter: counter)
             .SubmitAsync(submission, TestContext.Current.CancellationToken);
 
         provider.ReadCount.ShouldBe(1);
@@ -314,6 +364,8 @@ public sealed partial class CommandGatewayTests
         dispatcher.DispatchCount.ShouldBe(0);
         reservations.RecordCount.ShouldBe(0);
         audit.Envelopes.ShouldBeEmpty();
+        audit.AuthorizationFailures.ShouldBeEmpty();
+        counter.RecordedTenants.ShouldBeEmpty();
         (await status.TryGetAsync(BoundTenant, submission.Request.CommandId, TestContext.Current.CancellationToken)).ShouldBeNull();
         string safe = JsonSerializer.Serialize(result);
         safe.ShouldNotContain("synthetic-foreign-tenant");
