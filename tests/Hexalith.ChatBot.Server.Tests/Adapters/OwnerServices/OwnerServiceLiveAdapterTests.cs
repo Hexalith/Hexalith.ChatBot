@@ -41,7 +41,7 @@ public sealed class OwnerServiceLiveAdapterTests
                 Claims = new Dictionary<string, object>
                 {
                     ["sub"] = "synthetic-owner-subject", ["azp"] = projects ? "projects-owner" : "memories-owner",
-                    ["tenant_id"] = "tenant-alpha", ["eventstore:tenant"] = "tenant-alpha",
+                    ["tenant_id"] = "tenant-alpha",
                     ["eventstore:permission"] = operation, ["eventstore:operation"] = operation,
                 },
             });

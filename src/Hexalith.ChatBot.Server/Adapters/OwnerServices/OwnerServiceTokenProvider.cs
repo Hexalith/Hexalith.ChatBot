@@ -92,11 +92,13 @@ internal sealed class OwnerServiceTokenProvider : IDisposable
         if (root.TryGetProperty("nbf", out JsonElement date)
             && (date.ValueKind != JsonValueKind.Number || !date.TryGetInt64(out long value) || value < 0 || value > now))
             return false;
+        // Projects shares EventStore's REST audience, so owner tokens must never carry the eventstore:tenant claim that
+        // EventStore's tenant-scoped endpoints accept on its own; both receivers derive the tenant from tenant_id.
         return !string.IsNullOrWhiteSpace(parsed.Subject) && parsed.Issuer == _options.Issuer
             && parsed.Alg == "RS256"
             && ExactClaim("azp", _options.ClientId!)
             && ExactClaim("tenant_id", _options.TenantId!)
-            && ExactClaim("eventstore:tenant", _options.TenantId!)
+            && !parsed.Claims.Any(claim => claim.Type == "eventstore:tenant")
             && OwnerServiceAuthenticationOptions.ReadSingleTenant(parsed) == _options.TenantId
             && ExactClaim("eventstore:permission", _options.Operation);
 

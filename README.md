@@ -95,6 +95,8 @@ helper. Each run enrolls separate `chatbot-projects-owner` and `chatbot-memories
 Aspire parameters and the explicit `tenant-alpha` binding. Their only optional scopes use `platform-owner-audience.`
 and `platform-owner-operation.`: Projects receives `hexalith-eventstore` / `projects:read`; Memories receives
 `hexalith-memories-server` / `memories:derived-store`. These REST identities do not gain SDK workload caller access.
+Owner tokens carry `tenant_id` but never `eventstore:tenant`: Projects shares EventStore's `hexalith-eventstore` audience,
+and EventStore's tenant-scoped endpoints authorize on that claim alone. Projects and Memories derive the tenant from `tenant_id`.
 The operation scopes and permission claims identify the adapter's token requests and cache entries; they do not add
 receiver authorization. Memories natively grants authenticated tenant membership, including access to its supported
 owner API routes for that tenant, and does not enforce `eventstore:operation` or `eventstore:permission`. Projects

@@ -65,6 +65,7 @@ public sealed class OwnerServiceAuthenticationTests
     [InlineData("audience")]
     [InlineData("operation")]
     [InlineData("tenant")]
+    [InlineData("eventstore-tenant")]
     [InlineData("identity")]
     [InlineData("oversized")]
     [InlineData("missing-exp")]
@@ -370,11 +371,12 @@ public sealed class OwnerServiceAuthenticationTests
             ["eventstore:permission"] = options.Operation,
             ["tenant_id"] = failure == "multi-memory-tenant" ? new[] { "tenant-alpha", "tenant-beta" }
                 : (object?)(failure == "tenant" ? "tenant-beta" : options.TenantId),
-            ["eventstore:tenant"] = failure == "multi-tenant" ? new[] { "tenant-alpha", "tenant-beta" } : (object?)options.TenantId,
             ["exp"] = now.AddSeconds(failure == "expired" ? -1 : 120).ToUnixTimeSeconds(),
         };
         switch (failure)
         {
+            case "multi-tenant": claims["eventstore:tenant"] = new[] { "tenant-alpha", "tenant-beta" }; break;
+            case "eventstore-tenant": claims["eventstore:tenant"] = options.TenantId; break;
             case "missing-exp": claims.Remove("exp"); break;
             case "zero-exp": claims["exp"] = 0; break;
             case "negative-exp": claims["exp"] = -1; break;

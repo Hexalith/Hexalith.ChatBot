@@ -1861,3 +1861,9 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-platform-owner-service-access.md`
   summary: Reconcile legacy Platform composition test awaits with the umbrella repository's CA2007 requirement without suppressing the analyzer gate.
   evidence: The broad Platform.Composition.Tests Debug build reports 36 CA2007 errors in unchanged legacy test helpers under the ancestor editor configuration (/tmp/chatbot-owner-platform-tests-build.log). New owner-service tests run in a focused test project and pass; the broad blocker remains explicit and unrelated legacy test files are unchanged.
+
+## Deferred from: code review of spec-1-6-platform-owner-service-access (2026-10-25, round 2)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-platform-owner-service-access.md`
+  summary: Give the Projects owner client a dedicated audience so its token no longer authenticates at EventStore and EventStore Admin.
+  evidence: Projects shares the `hexalith-eventstore` audience (`src/Hexalith.ChatBot.AppHost/Program.cs:267`, `:296`, `:319`). Round 2 closed the tenant-scoped reach by omitting `eventstore:tenant` from owner tokens. The token still authenticates at EventStore, so anything gated only on authentication is reachable. A dedicated audience needs a Projects-owned change: `ProjectsAuthenticationServiceCollectionExtensions.cs:90` validates a single `ValidAudience`, and `EventStoreGatewayTokenForwardingHandler` forwards caller bearers to the EventStore command gateway, which requires `hexalith-eventstore`.
