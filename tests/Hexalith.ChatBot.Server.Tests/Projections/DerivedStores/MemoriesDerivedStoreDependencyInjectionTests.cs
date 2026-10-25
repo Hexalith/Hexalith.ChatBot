@@ -47,6 +47,51 @@ public sealed class MemoriesDerivedStoreDependencyInjectionTests
     }
 
     [Fact]
+    public void StaticOwnersRejectTheSameBearerWithoutDisclosingIt()
+    {
+        const string sharedToken = "shared-owner-secret-token";
+        IConfiguration configuration = Configuration(
+            ("ChatBot:Memories:Endpoint", "https://memories/"),
+            ("ChatBot:Memories:ApiToken", sharedToken),
+            ("ChatBot:Projects:Endpoint", "https://projects/"),
+            ("ChatBot:Projects:ApiToken", sharedToken),
+            (MemoriesDerivedStoreServiceCollectionExtensions.WorkflowRuntimeConfigurationKey, "true"));
+        InvalidOperationException exception = Should.Throw<InvalidOperationException>(() => new ServiceCollection()
+            .AddChatBotMemoriesDerivedStores(configuration, Environment(Environments.Production)));
+        exception.Message.ShouldBe("Projects and Memories require distinct owner identities and secrets.");
+        exception.ToString().ShouldNotContain(sharedToken);
+    }
+
+    [Theory]
+    [InlineData("Projects", "Production", "http://remote.invalid/")]
+    [InlineData("Projects", "Development", "http://remote.invalid/")]
+    [InlineData("Projects", "Production", "http://localhost:65535/")]
+    [InlineData("Memories", "Production", "http://remote.invalid/")]
+    [InlineData("Memories", "Development", "http://remote.invalid/")]
+    [InlineData("Memories", "Production", "http://localhost:65535/")]
+    public void OwnerEndpointsRejectPlainHttpOutsideDevelopmentLoopback(string owner, string environment, string endpoint)
+    {
+        IConfiguration configuration = OwnerConfiguration();
+        configuration["ChatBot:" + owner + ":Endpoint"] = endpoint;
+        configuration[MemoriesDerivedStoreServiceCollectionExtensions.LiveBackingConfigurationKey] = "true";
+        Should.Throw<InvalidOperationException>(() => new ServiceCollection()
+            .AddChatBotMemoriesDerivedStores(configuration, Environment(environment)))
+            .Message.ShouldContain("ChatBot:" + owner + ":Endpoint must use HTTPS or Development loopback HTTP");
+    }
+
+    [Theory]
+    [InlineData("Projects")]
+    [InlineData("Memories")]
+    public void DevelopmentAcceptsLoopbackHttpOwnerEndpoints(string owner)
+    {
+        IConfiguration configuration = OwnerConfiguration();
+        configuration["ChatBot:" + owner + ":Endpoint"] = "http://localhost:65535/";
+        configuration[MemoriesDerivedStoreServiceCollectionExtensions.LiveBackingConfigurationKey] = "true";
+        Should.NotThrow(() => new ServiceCollection()
+            .AddChatBotMemoriesDerivedStores(configuration, Environment(Environments.Development)));
+    }
+
+    [Fact]
     public void ProductionResolvesBothLiveAdaptersAndRemovesTheProcessLocalLedger()
     {
         IConfiguration configuration = Configuration(

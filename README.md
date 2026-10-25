@@ -97,8 +97,9 @@ and `platform-owner-operation.`: Projects receives `hexalith-eventstore` / `proj
 `hexalith-memories-server` / `memories:derived-store`. These REST identities do not gain SDK workload caller access.
 Owner tokens carry `tenant_id` but never `eventstore:tenant`: Projects shares EventStore's `hexalith-eventstore` audience,
 and EventStore's tenant-scoped endpoints authorize on that claim alone. Projects and Memories derive the tenant from `tenant_id`.
-The operation scopes and permission claims identify the adapter's token requests and cache entries; they do not add
-receiver authorization. Memories natively grants authenticated tenant membership, including access to its supported
+The operation scopes identify the adapter's token requests and cache entries; they do not add receiver authorization.
+Projects requires the `eventstore:permission=projects:read` mapper at its claim-transformation authorization gate.
+Memories natively grants authenticated tenant membership, including access to its supported
 owner API routes for that tenant, and does not enforce `eventstore:operation` or `eventstore:permission`. Projects
 continues to enforce its own permissions, tenant provisioning and project access gates.
 ChatBot reuses the EventStore SDK's token acquisition, cache, and refresh with separate owner options and no signing-key
@@ -107,7 +108,8 @@ fallback. Foreign destinations, redirects, insecure non-loopback HTTP and cross-
 To retain an external/static setup, configure all three `ChatBot:Projects:Endpoint`, `ChatBot:Projects:ApiToken` and
 `ChatBot:Memories:ApiToken` values through AppHost user secrets or environment variables. Optionally set
 `ChatBot:Memories:Endpoint`; otherwise it uses the existing Memories resource. Any partial or mixed override stops startup.
-Tokens must match each receiver's issuer/audience and tenant claims. Standalone Server deployments may instead configure
+Use distinct static tokens for the two owners. Tokens must match each receiver's issuer/audience and tenant claims.
+Standalone Server deployments may instead configure
 `ChatBot:{Projects|Memories}:OwnerAuthentication` with `Authority`, `Issuer`, `TokenEndpoint`, `ClientId`, `ClientSecret`,
 `TenantId`, `Audience` and `Operation`. The token endpoint must remain within the configured authority, and HTTP is accepted
 only for Development loopback endpoints. A static Projects JWT supplies its single tenant claim; opaque tokens require
@@ -118,6 +120,12 @@ Unbound or mismatched Project-context requests stop before network access.
 Memories continues to reject anonymous requests and tenants outside its claims. Register the target tenants through Memories'
 supported provisioning API before expecting derived-store probes to succeed; a ChatBot/Keycloak tenant claim does
 not create an owner tenant registry entry.
+Projects additionally requires the owner service-account principal in the target tenant's `Principals` registry.
+Keycloak assigns that principal's `sub` randomly on every fresh realm import. Until the current run's principal is
+provisioned through Projects' [managed live fixture workflow](references/Hexalith.Projects/tests/e2e/README.md#live-apphost-route)
+and [production identity contract](references/Hexalith.Projects/docs/runbooks/projects-production-identity-contract.md),
+default local Project-context reads remain denied with an
+existence-neutral 404. Owner client enrollment creates neither principal grants nor tenant records.
 
 The local umbrella gives Memories' existing sidecar the same `accesscontrol.local.yaml` configuration as the other
 sidecars, including disabled component hot reload, and forwards `Dapr:PlacementHostAddress` and

@@ -1,0 +1,65 @@
+{
+  "kind": "final-owner-service-verification",
+  "utc": "2026-10-25T16:55:18.606429+00:00",
+  "sourceHead": "0468d19e56752bb70add6a8f885cfa8de0124260",
+  "sourceState": "uncommitted reviewed patches",
+  "runnerVersion": "4.0.2",
+  "ctrfTrxCountsReconciled": true,
+  "affectedTestsPassed": 180,
+  "affectedTestsSkipped": 0,
+  "lanes": {
+    "server-affected": {
+      "tests": 113,
+      "passed": 113,
+      "failed": 0,
+      "skipped": 0,
+      "classes": [
+        "MemoriesDerivedStoreDependencyInjectionTests",
+        "OwnerServiceAuthenticationTests",
+        "OwnerServiceHttpFactoryTests",
+        "OwnerServiceLiveAdapterTests",
+        "ProjectsMemoriesCaseResolverTests"
+      ]
+    },
+    "topology": {
+      "tests": 46,
+      "passed": 46,
+      "failed": 0,
+      "skipped": 0
+    },
+    "apphost": {
+      "tests": 19,
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0
+    },
+    "platform": {
+      "tests": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "fullServer": {
+    "tests": 3364,
+    "passed": 3357,
+    "failed": 7,
+    "skipped": 0,
+    "unchangedFailuresComparedWithPreviousRun": true,
+    "failures": [
+      "Hexalith.ChatBot.Server.Tests.Adapters.Folders.FoldersFolderStoreTests.StoreMailboxAttachmentShouldMapFoldersApiFailuresToSafeMetadata(statusCode: 401, expectedStatus: Unavailable, expectedDuplicateState: \"not-evaluated\", expectedRetryState: \"not-retryable\", expectedReasonCode: \"folders_authorization_unavailable\")",
+      "Hexalith.ChatBot.Server.Tests.Adapters.Folders.FoldersFolderStoreTests.StoreMailboxAttachmentShouldMapFoldersApiFailuresToSafeMetadata(statusCode: 409, expectedStatus: Retryable, expectedDuplicateState: \"duplicate-pending\", expectedRetryState: \"retryable\", expectedReasonCode: \"folders_duplicate_replay_pending\")",
+      "Hexalith.ChatBot.Server.Tests.Adapters.Folders.FoldersFolderStoreTests.StoreMailboxAttachmentShouldMapFoldersApiFailuresToSafeMetadata(statusCode: 403, expectedStatus: Unavailable, expectedDuplicateState: \"not-evaluated\", expectedRetryState: \"not-retryable\", expectedReasonCode: \"folders_authorization_unavailable\")",
+      "Hexalith.ChatBot.Server.Tests.Adapters.Folders.FoldersFolderStoreTests.StoreMailboxAttachmentShouldUseFoldersClientIdempotencyAndReturnStableReferences",
+      "Hexalith.ChatBot.Server.Tests.Adapters.Folders.FoldersFolderStoreTests.StoreMailboxAttachmentShouldMapFoldersApiFailuresToSafeMetadata(statusCode: 429, expectedStatus: Retryable, expectedDuplicateState: \"not-evaluated\", expectedRetryState: \"retryable\", expectedReasonCode: \"folders_store_retryable\")",
+      "Hexalith.ChatBot.Server.Tests.Adapters.Folders.FoldersFolderStoreTests.StoreMailboxAttachmentShouldMapFoldersApiFailuresToSafeMetadata(statusCode: 413, expectedStatus: Retryable, expectedDuplicateState: \"not-evaluated\", expectedRetryState: \"retryable\", expectedReasonCode: \"folders_store_retryable\")",
+      "Hexalith.ChatBot.Server.Tests.Adapters.Folders.FoldersFolderStoreTests.StoreMailboxAttachmentShouldMapFoldersApiFailuresToSafeMetadata(statusCode: 503, expectedStatus: Retryable, expectedDuplicateState: \"not-evaluated\", expectedRetryState: \"retryable\", expectedReasonCode: \"folders_store_retryable\")"
+    ]
+  },
+  "liveReceipt": "owner-service-provider-final-2026-10-25.json",
+  "limits": [
+    "A6/native policy-isolation acceptance remains absent.",
+    "No positive native Projects provisioning claim.",
+    "Tenants and EventStore Admin retained port conflicts."
+  ]
+}

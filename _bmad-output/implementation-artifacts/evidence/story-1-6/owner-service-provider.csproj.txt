@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Hexalith.ChatBot.IntegrationTests</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="$(ChatBotServerOutput)/*.dll" />
+  </ItemGroup>
+  <Target Name="RequireChatBotServerOutput" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(ChatBotServerOutput)' == '' Or !Exists('$(ChatBotServerOutput)/Hexalith.ChatBot.Server.dll')"
+           Text="Supply ChatBotServerOutput pointing to the existing ChatBot Server Debug output directory." />
+  </Target>
+</Project>

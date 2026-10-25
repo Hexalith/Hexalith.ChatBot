@@ -43,9 +43,10 @@ internal static class MemoriesDerivedStoreServiceCollectionExtensions
             configuration, "Projects", "hexalith-eventstore", "projects:read", environment);
         OwnerServiceAuthenticationOptions memoriesAuthentication = OwnerServiceAuthenticationOptions.Load(
             configuration, "Memories", "hexalith-memories-server", "memories:derived-store", environment);
-        if (projectsAuthentication.ClientId is not null && memoriesAuthentication.ClientId is not null
+        if ((projectsAuthentication.ApiToken is not null && projectsAuthentication.ApiToken == memoriesAuthentication.ApiToken)
+            || (projectsAuthentication.ClientId is not null && memoriesAuthentication.ClientId is not null
             && (projectsAuthentication.ClientId == memoriesAuthentication.ClientId
-                || projectsAuthentication.ClientSecret == memoriesAuthentication.ClientSecret))
+                || projectsAuthentication.ClientSecret == memoriesAuthentication.ClientSecret)))
             throw new InvalidOperationException("Projects and Memories require distinct owner identities and secrets.");
 
         _ = services.AddMemoriesClient(options =>

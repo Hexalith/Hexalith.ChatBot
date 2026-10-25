@@ -1867,3 +1867,16 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-platform-owner-service-access.md`
   summary: Give the Projects owner client a dedicated audience so its token no longer authenticates at EventStore and EventStore Admin.
   evidence: Projects shares the `hexalith-eventstore` audience (`src/Hexalith.ChatBot.AppHost/Program.cs:267`, `:296`, `:319`). Round 2 closed the tenant-scoped reach by omitting `eventstore:tenant` from owner tokens. The token still authenticates at EventStore, so anything gated only on authentication is reachable. A dedicated audience needs a Projects-owned change: `ProjectsAuthenticationServiceCollectionExtensions.cs:90` validates a single `ValidAudience`, and `EventStoreGatewayTokenForwardingHandler` forwards caller bearers to the EventStore command gateway, which requires `hexalith-eventstore`.
+
+
+## Folders attachment owner-evidence follow-up (2026-10-25)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-fix-folders-attachment-owner-evidence.md`
+  summary: Provide owner-authorized absent-path and original replay preconditions for native ChatBot attachment Add/replay.
+  evidence: `AuthoritativeWorkspaceFileContextSource.QueryAsync` returns the same safe 404 for absent and forbidden direct paths, while `WorkspaceContentAuthority.ValidateIngressAsync` requires expectedFileVersion=0 for fresh Add and original version/fence for replay. Visible metadata supplies only a current positive version. The repaired ChatBot adapter forwards observations unchanged, preserves owner conflict rejection, and never interprets 404/empty metadata as version zero. Stubbed AcceptedCommand tests verify adapter behavior only; native Add/replay remains blocked on a supported owner API.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-fix-folders-attachment-owner-evidence.md`
+  summary: Serialize the existing owner lock fence through the Folders workspace-lock HTTP response.
+  evidence: `WorkspaceLockStatusQueryHandler` populates `Lease.LockFence`, but `FoldersDomainServiceEndpoints.ToHttpResult` and `LockLeaseMetadataResponse` omit it. The generated SDK consequently observes zero. A generated-client HTTP fixture reproduces the omitted field and requires a retryable evidence-unavailable result with no upload. ChatBot does not fabricate a fence or acquire/release another task's lock.
+
+Validation update for the earlier seven-FoldersFolderStoreTests entry: the ChatBot adapter now reads and validates supported owner metadata/lock observations before building an upload and preserves owner admission. Debug source build passes with zero warnings/errors; focused Folders tests pass 66/66 and the subsequent full Server project passes 3,421/3,421, both with zero skips. Evidence: `/tmp/chatbot-folders-focused.{ctrf.json,trx,log}` and `/tmp/chatbot-folders-full-server.{ctrf.json,trx,log}`. The exception/test regression is repaired; the two native owner gaps above remain open, and Story 1.6 remains review pending accepted A6 protection and native-isolation evidence.

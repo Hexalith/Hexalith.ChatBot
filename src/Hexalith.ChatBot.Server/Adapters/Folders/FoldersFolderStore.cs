@@ -6,8 +6,11 @@ using FoldersClient = Hexalith.Folders.Client.Generated.IClient;
 
 namespace Hexalith.ChatBot.Server.Adapters.Folders;
 
+/// <summary>Submits attachments using observations supplied by the Folders owner.</summary>
+/// <param name="folders">The authorized Folders client.</param>
 internal sealed class FoldersFolderStore(FoldersClient folders) : IFolderStore
 {
+    /// <inheritdoc />
     public async ValueTask<MailboxAttachmentStorageResult> StoreMailboxAttachmentAsync(
         StoreMailboxAttachmentRequest request,
         CancellationToken cancellationToken = default)
@@ -34,29 +37,72 @@ internal sealed class FoldersFolderStore(FoldersClient folders) : IFolderStore
         string workspaceId = AttachmentStorageIdentity.WorkspaceIdFor(request.TenantId, request.ProjectId, request.AssociationId);
         string operationId = AttachmentStorageIdentity.OperationIdFor(request);
         string taskId = AttachmentStorageIdentity.TaskIdFor(operationId);
-        FileUploadDescriptor descriptor = new()
-        {
-            FolderId = folderId,
-            WorkspaceId = workspaceId,
-            OperationId = operationId,
-            PathMetadata = AttachmentStorageIdentity.PathFor(request),
-            MediaType = AttachmentStorageIdentity.SafeMediaType(request.Content.MediaType ?? request.ContentType),
-            ContentMediaType = request.ContentType,
-            FileOperationKind = FileMutationRequestFileOperationKind.Add,
-            ContentHashReference = request.Content.ContentHashReference,
-        };
-        FileMutationRequest mutation = FileUpload.BuildInlineFileMutation(
-            request.Content.Content,
-            descriptor.MediaType,
-            descriptor.PathMetadata,
-            descriptor.OperationId,
-            descriptor.FileOperationKind,
-            descriptor.ContentMediaType,
-            descriptor.ContentHashReference);
-        string idempotencyKey = FileUpload.ComputeIdempotencyKey(mutation, descriptor.WorkspaceId, taskId);
+        PathMetadata path = AttachmentStorageIdentity.PathFor(request);
+        bool uploadStarted = false;
 
         try
         {
+            FileMetadataResult metadata = await folders.GetFolderFileMetadataAsync(
+                folderId, workspaceId, request.CorrelationId, taskId, ReadConsistencyClass.Snapshot_per_task,
+                new FileMetadataRequest { RequestSchemaVersion = "v2", Paths = [path] }, cancellationToken)
+                .ConfigureAwait(false);
+
+            // Missing and forbidden paths share a safe 404. Neither that response nor an empty
+            // result proves version zero. The current metadata API only exposes visible versions.
+            if (metadata?.Items is not { Count: 1 }
+                || metadata.Freshness is not { Stale: false, ReadConsistency: ReadConsistencyClass.Snapshot_per_task }
+                || metadata.Limits is not { IsTruncated: false })
+            {
+                return EvidenceUnavailable();
+            }
+
+            FileMetadataItem file = metadata.Items.Single();
+            if (file is not { Version: > 0, Kind: FileMetadataItemKind.File, Redaction: FileMetadataItemRedaction.Not_redacted }
+                || string.IsNullOrWhiteSpace(file.FileId)
+                || file.Path?.NormalizedPath != path.NormalizedPath
+                || file.Path.PathPolicyClass is not (VisiblePathMetadataPathPolicyClass.Content_allowed or VisiblePathMetadataPathPolicyClass.Metadata_only))
+            {
+                return EvidenceUnavailable();
+            }
+
+            WorkspaceLockStatus workspaceLock = await folders.GetWorkspaceLockAsync(
+                folderId, workspaceId, request.CorrelationId, ReadConsistencyClass.Read_your_writes, cancellationToken)
+                .ConfigureAwait(false);
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            if (workspaceLock is not { LockState: LockState.Locked, Lease: { LockFence: > 0, LeaseStatus: LockLeaseStatus.Active } }
+                || workspaceLock.WorkspaceReference?.Value != workspaceId
+                || workspaceLock.WorkspaceReference.Redaction?.Visibility != RedactionMetadataVisibility.Metadata_only
+                || workspaceLock.Freshness is not { Stale: false, ReadConsistency: ReadConsistencyClass.Read_your_writes }
+                || string.IsNullOrWhiteSpace(workspaceLock.Lease.LockId)
+                || workspaceLock.Lease.HolderRef != taskId
+                || workspaceLock.Lease.EffectiveAt > now
+                || workspaceLock.Lease.ExpiresAt <= now)
+            {
+                return EvidenceUnavailable();
+            }
+
+            FileUploadDescriptor descriptor = new()
+            {
+                FolderId = folderId,
+                WorkspaceId = workspaceId,
+                OperationId = operationId,
+                PathMetadata = path,
+                MediaType = AttachmentStorageIdentity.SafeMediaType(request.Content.MediaType ?? request.ContentType),
+                ContentMediaType = request.ContentType,
+                FileOperationKind = FileMutationRequestFileOperationKind.Add,
+                ContentHashReference = request.Content.ContentHashReference,
+                ExpectedFileVersion = file.Version,
+                ExpectedLockFence = workspaceLock.Lease.LockFence,
+            };
+            // Forward the observation unchanged. Only the owner can admit Add/replay; a current
+            // version is not proof of absence or of the original replay preconditions.
+            FileMutationRequest mutation = FileUpload.BuildInlineFileMutation(
+                request.Content.Content, descriptor.MediaType, descriptor.PathMetadata, descriptor.OperationId,
+                descriptor.FileOperationKind, descriptor.ContentMediaType, descriptor.ContentHashReference,
+                descriptor.ExpectedFileVersion, descriptor.ExpectedLockFence);
+            string idempotencyKey = FileUpload.ComputeIdempotencyKey(mutation, workspaceId, taskId);
+
+            uploadStarted = true;
             AcceptedCommand accepted = await folders
                 .UploadFileAsync(descriptor, request.Content.Content, idempotencyKey, request.CorrelationId, taskId, cancellationToken)
                 .ConfigureAwait(false);
@@ -89,8 +135,31 @@ internal sealed class FoldersFolderStore(FoldersClient folders) : IFolderStore
                 "not-eligible",
                 "folders_authorization_unavailable"));
         }
+        catch (HexalithFoldersApiException ex) when (ex.StatusCode is 404 or 410)
+        {
+            return MailboxAttachmentStorageResult.Failed(new AttachmentStorageFailure(
+                ProjectConversationAttachmentStatus.Unavailable,
+                "not-evaluated",
+                "not-retryable",
+                "not-eligible",
+                "folders_resource_unavailable"));
+        }
+        catch (HexalithFoldersApiException ex) when (ex.StatusCode is 400 or 422 || (ex.StatusCode is 413 && !uploadStarted))
+        {
+            return MailboxAttachmentStorageResult.Failed(new AttachmentStorageFailure(
+                ProjectConversationAttachmentStatus.Unavailable,
+                "not-evaluated",
+                "not-retryable",
+                "not-eligible",
+                "folders_request_unavailable"));
+        }
         catch (HexalithFoldersApiException ex) when (ex.StatusCode is 409)
         {
+            if (!uploadStarted)
+            {
+                return EvidenceUnavailable();
+            }
+
             return MailboxAttachmentStorageResult.Failed(new AttachmentStorageFailure(
                 ProjectConversationAttachmentStatus.Retryable,
                 "duplicate-pending",
@@ -98,7 +167,9 @@ internal sealed class FoldersFolderStore(FoldersClient folders) : IFolderStore
                 "not-eligible",
                 "folders_duplicate_replay_pending"));
         }
-        catch (HexalithFoldersApiException ex) when (ex.StatusCode is 413 or 429 or 503)
+        // Includes owner query timeouts, dependency failures and malformed successful HTTP
+        // responses, which the generated client wraps in HexalithFoldersApiException.
+        catch (HexalithFoldersApiException)
         {
             return MailboxAttachmentStorageResult.Failed(new AttachmentStorageFailure(
                 ProjectConversationAttachmentStatus.Retryable,
@@ -106,6 +177,10 @@ internal sealed class FoldersFolderStore(FoldersClient folders) : IFolderStore
                 "retryable",
                 "not-eligible",
                 "folders_store_retryable"));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
         {
@@ -117,6 +192,14 @@ internal sealed class FoldersFolderStore(FoldersClient folders) : IFolderStore
                 "folders_store_retryable"));
         }
     }
+
+    private static MailboxAttachmentStorageResult EvidenceUnavailable()
+        => MailboxAttachmentStorageResult.Failed(new AttachmentStorageFailure(
+            ProjectConversationAttachmentStatus.Retryable,
+            "not-evaluated",
+            "retryable",
+            "not-eligible",
+            "folders_write_evidence_unavailable"));
 
     private static AttachmentStorageFailure FailureForContentKind(Adapters.Mailbox.MailboxAttachmentContentResultKind kind, string reasonCode)
         => kind switch

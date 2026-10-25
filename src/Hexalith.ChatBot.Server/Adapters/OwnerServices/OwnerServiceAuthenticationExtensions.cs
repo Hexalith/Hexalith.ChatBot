@@ -19,7 +19,7 @@ internal static class OwnerServiceAuthenticationExtensions
         {
             services.AddKeyedSingleton<OwnerServiceTokenProvider>(owner, (provider, _) => new(options, environment,
                 provider.GetRequiredService<IHttpClientFactory>(), provider.GetRequiredService<WorkloadSecurityClock>(),
-                provider.GetRequiredService<ILogger<JwtWorkloadAssertionIssuer>>()));
+                provider.GetRequiredService<ILogger<JwtWorkloadAssertionIssuer>>(), owner));
         }
         return client.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false })
             .AddHttpMessageHandler(provider => new OwnerServiceBearerHandler(options,

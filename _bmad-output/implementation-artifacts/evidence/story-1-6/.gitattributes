@@ -1,0 +1,4 @@
+# Preserve the exact historical producer and receipt bytes used by the provenance hashes.
+owner-service-provider.cs.txt -text
+owner-service-provider-2026-10-25.json -text
+owner-service-provider-final-2026-10-25.json -text

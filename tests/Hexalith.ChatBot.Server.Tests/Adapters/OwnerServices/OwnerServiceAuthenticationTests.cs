@@ -67,6 +67,12 @@ public sealed class OwnerServiceAuthenticationTests
     [InlineData("tenant")]
     [InlineData("eventstore-tenant")]
     [InlineData("identity")]
+    [InlineData("issuer")]
+    [InlineData("algorithm")]
+    [InlineData("missing-subject")]
+    [InlineData("empty-subject")]
+    [InlineData("permission")]
+    [InlineData("missing-permission")]
     [InlineData("oversized")]
     [InlineData("missing-exp")]
     [InlineData("zero-exp")]
@@ -98,6 +104,30 @@ public sealed class OwnerServiceAuthenticationTests
         denied.Message.ShouldBe("owner_token_unavailable");
         denied.ToString().ShouldNotContain(options.ClientSecret!);
         sends.ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData("issuer", "iss")]
+    [InlineData("algorithm", "alg")]
+    [InlineData("missing-subject", "sub")]
+    [InlineData("permission", "eventstore:permission")]
+    [InlineData("eventstore-tenant", "eventstore:tenant")]
+    [InlineData("out-of-range-exp", "ArgumentOutOfRangeException")]
+    public async Task RejectionDiagnosticsNameOnlyTheOwnerAndFailedCheck(string failure, string check)
+    {
+        OwnerServiceAuthenticationOptions options = Load();
+        string token = Token(DateTimeOffset.UtcNow, options, failure);
+        using OwnerAuthenticationTestTransport issuer = new((_, _) => Task.FromResult(Response(token)));
+        OwnerAuthenticationTestLogger logger = new();
+        using OwnerServiceTokenProvider tokens = new(options, new OwnerAuthenticationTestEnvironment(), issuer,
+            WorkloadSecurityClock.System, logger, "Projects");
+        (await tokens.AcquireAsync(TestContext.Current.CancellationToken)).ShouldBeNull();
+        string message = logger.Messages.Single(value => value.StartsWith("Owner Projects", StringComparison.Ordinal));
+        message.ShouldContain(check);
+        message.ShouldNotContain(options.ClientSecret!);
+        message.ShouldNotContain(token);
+        message.ShouldNotContain("foreign");
+        message.ShouldNotContain(options.TenantId!);
     }
 
     [Theory]
@@ -287,16 +317,106 @@ public sealed class OwnerServiceAuthenticationTests
         ownerRequests.ShouldBe(0);
     }
 
-    [Fact]
-    public void AStaticJwtWithOneConsistentTenantRetainsItsBinding()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("tenant-alpha")]
+    public void AStaticJwtWithOneConsistentTenantRetainsItsBinding(string? explicitTenant)
     {
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ChatBot:Projects:Endpoint"] = "https://projects.invalid",
             ["ChatBot:Projects:ApiToken"] = Token(DateTimeOffset.UtcNow, Load()),
+            ["ChatBot:Projects:TenantId"] = explicitTenant,
         }).Build();
         OwnerServiceAuthenticationOptions.Load(configuration, "Projects", "hexalith-eventstore", "projects:read", new OwnerAuthenticationTestEnvironment())
             .TenantId.ShouldBe("tenant-alpha");
+    }
+
+    [Fact]
+    public async Task AStaticJwtWithOneTenantCannotBeReboundToAForeignExplicitTenant()
+    {
+        int ownerRequests = 0;
+        using OwnerAuthenticationTestTransport owner = new((_, _) =>
+        {
+            ownerRequests++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        });
+        string token = Token(DateTimeOffset.UtcNow, Load());
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ChatBot:Projects:Endpoint"] = "https://projects.invalid",
+            ["ChatBot:Projects:ApiToken"] = token,
+            ["ChatBot:Projects:TenantId"] = "tenant-beta",
+        }).Build();
+        InvalidOperationException denied = await Should.ThrowAsync<InvalidOperationException>(async () =>
+        {
+            OwnerServiceAuthenticationOptions options = OwnerServiceAuthenticationOptions.Load(configuration,
+                "Projects", "hexalith-eventstore", "projects:read", new OwnerAuthenticationTestEnvironment());
+            using HttpMessageInvoker client = new(new OwnerServiceBearerHandler(options, null) { InnerHandler = owner });
+            using HttpRequestMessage request = new(HttpMethod.Get, new Uri(options.Endpoint, "api/probe"));
+            using HttpResponseMessage response = await client.SendAsync(request, TestContext.Current.CancellationToken).ConfigureAwait(false);
+        });
+        denied.Message.ShouldBe("ChatBot:Projects:TenantId must match the static token's single tenant.");
+        denied.ToString().ShouldNotContain(token);
+        ownerRequests.ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData("[\"tenant-alpha\"]")]
+    [InlineData(" [ \"tenant-alpha\" ] ")]
+    public void ProjectsStaticJwtNormalizesASingleEncodedTenant(string encodedTenants)
+    {
+        string token = Token(DateTimeOffset.UtcNow, Load(), mutate: claims =>
+        {
+            claims.Remove("tenant_id");
+            claims["tenants"] = encodedTenants;
+        });
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ChatBot:Projects:Endpoint"] = "https://projects.invalid",
+            ["ChatBot:Projects:ApiToken"] = token,
+        }).Build();
+        OwnerServiceAuthenticationOptions.Load(configuration, "Projects", "hexalith-eventstore", "projects:read", new OwnerAuthenticationTestEnvironment())
+            .TenantId.ShouldBe("tenant-alpha");
+    }
+
+    [Theory]
+    [InlineData("[\"tenant-alpha\",\"tenant-beta\"]")]
+    [InlineData("[\"tenant-beta\"]")]
+    [InlineData("[\"tenant-alpha\"")]
+    [InlineData("[1]")]
+    [InlineData("[null]")]
+    [InlineData("[\"tenant-alpha\",null]")]
+    [InlineData("[]")]
+    [InlineData("[\"\"]")]
+    [InlineData("[\" \"]")]
+    [InlineData("{\"tenant-alpha\":true}")]
+    public async Task ProjectsStaticJwtRejectsInvalidOrConflictingEncodedTenantListsBeforeOwnerAccess(string encodedTenants)
+    {
+        int ownerRequests = 0;
+        using OwnerAuthenticationTestTransport owner = new((_, _) =>
+        {
+            ownerRequests++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        });
+        string token = Token(DateTimeOffset.UtcNow, Load(), mutate: claims => claims["tenants"] = encodedTenants);
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ChatBot:Projects:Endpoint"] = "https://projects.invalid",
+            ["ChatBot:Projects:ApiToken"] = token,
+            ["ChatBot:Projects:TenantId"] = "tenant-alpha",
+        }).Build();
+        InvalidOperationException denied = await Should.ThrowAsync<InvalidOperationException>(async () =>
+        {
+            OwnerServiceAuthenticationOptions options = OwnerServiceAuthenticationOptions.Load(configuration,
+                "Projects", "hexalith-eventstore", "projects:read", new OwnerAuthenticationTestEnvironment());
+            using HttpMessageInvoker client = new(new OwnerServiceBearerHandler(options, null) { InnerHandler = owner });
+            using HttpRequestMessage request = new(HttpMethod.Get, new Uri(options.Endpoint, "api/probe"));
+            using HttpResponseMessage response = await client.SendAsync(request, TestContext.Current.CancellationToken).ConfigureAwait(false);
+        });
+        denied.Message.ShouldBe("ChatBot:Projects:ApiToken must carry exactly one unambiguous tenant in a static JWT.");
+        denied.ToString().ShouldNotContain(token);
+        ownerRequests.ShouldBe(0);
     }
 
     [Fact]
@@ -375,6 +495,11 @@ public sealed class OwnerServiceAuthenticationTests
         };
         switch (failure)
         {
+            case "issuer": claims["iss"] = "https://foreign.invalid"; break;
+            case "missing-subject": claims.Remove("sub"); break;
+            case "empty-subject": claims["sub"] = ""; break;
+            case "permission": claims["eventstore:permission"] = "projects:write"; break;
+            case "missing-permission": claims.Remove("eventstore:permission"); break;
             case "multi-tenant": claims["eventstore:tenant"] = new[] { "tenant-alpha", "tenant-beta" }; break;
             case "eventstore-tenant": claims["eventstore:tenant"] = options.TenantId; break;
             case "missing-exp": claims.Remove("exp"); break;
@@ -387,6 +512,7 @@ public sealed class OwnerServiceAuthenticationTests
         mutate?.Invoke(claims);
         string payload = JsonSerializer.Serialize(claims);
         static string Encode(string text) => Convert.ToBase64String(Encoding.UTF8.GetBytes(text)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        return Encode("{\"alg\":\"RS256\",\"typ\":\"JWT\"}") + "." + Encode(payload) + ".synthetic-signature";
+        string algorithm = failure == "algorithm" ? "HS256" : "RS256";
+        return Encode(JsonSerializer.Serialize(new { alg = algorithm, typ = "JWT" })) + "." + Encode(payload) + ".synthetic-signature";
     }
 }

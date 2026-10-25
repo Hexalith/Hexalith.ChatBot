@@ -19,18 +19,20 @@ internal sealed class OwnerServiceTokenProvider : IDisposable
     private readonly IHttpClientFactory _clients;
     private readonly WorkloadSecurityClock _clock;
     private readonly ILogger<JwtWorkloadAssertionIssuer> _logger;
+    private readonly string _owner;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private bool _disposed;
 
     /// <summary>Creates a separate SDK issuer without sharing workload credentials or options.</summary>
     public OwnerServiceTokenProvider(OwnerServiceAuthenticationOptions options, IHostEnvironment environment,
-        IHttpClientFactory clients, WorkloadSecurityClock clock, ILogger<JwtWorkloadAssertionIssuer> logger)
+        IHttpClientFactory clients, WorkloadSecurityClock clock, ILogger<JwtWorkloadAssertionIssuer> logger, string owner = "Owner")
     {
         _options = options;
         _environment = environment;
         _clients = clients;
         _clock = clock;
         _logger = logger;
+        _owner = owner;
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Contract:Authority"] = options.Authority,
@@ -59,14 +61,21 @@ internal sealed class OwnerServiceTokenProvider : IDisposable
             try
             {
                 string? token = await _issuer.IssueAsync(new(_options.Audience, _options.Operation), cancellationToken).ConfigureAwait(false);
-                if (token is null) return null;
+                if (token is null)
+                {
+                    OwnerServiceAuthenticationLog.TokenRejected(_logger, _owner, "sdk-acquisition");
+                    return null;
+                }
                 var parsed = new JsonWebToken(token);
-                if (IsUsable(parsed)) return token;
+                string? rejection = RejectionReason(parsed);
+                if (rejection is null) return token;
+                OwnerServiceAuthenticationLog.TokenRejected(_logger, _owner, rejection);
             }
             catch (Exception exception) when (exception is ArgumentException or SecurityTokenException or JsonException or OverflowException)
             {
                 // In particular, the SDK's lifetime conversion can reject an out-of-range numeric date.
-                // Neither invalid responses nor configured secrets become diagnostics or owner requests.
+                // Log only the exception type; token payloads and configured secrets must never become diagnostics.
+                OwnerServiceAuthenticationLog.AcquisitionFailed(_logger, _owner, exception.GetType().Name);
             }
             // REST checks follow the SDK cache admission. Reset only this isolated SDK issuer so a corrected
             // authority response can recover immediately; all acquisition/cache/refresh behavior remains SDK-owned.
@@ -80,7 +89,7 @@ internal sealed class OwnerServiceTokenProvider : IDisposable
         }
     }
 
-    private bool IsUsable(JsonWebToken parsed)
+    private string? RejectionReason(JsonWebToken parsed)
     {
         using JsonDocument payload = JsonDocument.Parse(Base64UrlEncoder.DecodeBytes(parsed.EncodedPayload));
         JsonElement root = payload.RootElement;
@@ -88,19 +97,21 @@ internal sealed class OwnerServiceTokenProvider : IDisposable
         const long maximumUnixSeconds = 253402300799;
         if (!root.TryGetProperty("exp", out JsonElement expiry) || expiry.ValueKind != JsonValueKind.Number
             || !expiry.TryGetInt64(out long expiresAt) || expiresAt <= 0 || expiresAt <= now || expiresAt > maximumUnixSeconds)
-            return false;
+            return "exp";
         if (root.TryGetProperty("nbf", out JsonElement date)
             && (date.ValueKind != JsonValueKind.Number || !date.TryGetInt64(out long value) || value < 0 || value > now))
-            return false;
+            return "nbf";
         // Projects shares EventStore's REST audience, so owner tokens must never carry the eventstore:tenant claim that
         // EventStore's tenant-scoped endpoints accept on its own; both receivers derive the tenant from tenant_id.
-        return !string.IsNullOrWhiteSpace(parsed.Subject) && parsed.Issuer == _options.Issuer
-            && parsed.Alg == "RS256"
-            && ExactClaim("azp", _options.ClientId!)
-            && ExactClaim("tenant_id", _options.TenantId!)
-            && !parsed.Claims.Any(claim => claim.Type == "eventstore:tenant")
-            && OwnerServiceAuthenticationOptions.ReadSingleTenant(parsed) == _options.TenantId
-            && ExactClaim("eventstore:permission", _options.Operation);
+        if (string.IsNullOrWhiteSpace(parsed.Subject)) return "sub";
+        if (parsed.Issuer != _options.Issuer) return "iss";
+        if (parsed.Alg != "RS256") return "alg";
+        if (!ExactClaim("azp", _options.ClientId!)) return "azp";
+        if (!ExactClaim("tenant_id", _options.TenantId!)) return "tenant_id";
+        if (parsed.Claims.Any(claim => claim.Type == "eventstore:tenant")) return "eventstore:tenant";
+        if (OwnerServiceAuthenticationOptions.ReadSingleTenant(parsed) != _options.TenantId) return "tenant-selectors";
+        if (!ExactClaim("eventstore:permission", _options.Operation)) return "eventstore:permission";
+        return null;
 
         bool ExactClaim(string name, string value)
         {

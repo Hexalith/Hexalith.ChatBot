@@ -1,0 +1,25 @@
+{
+  "kind": "final-owner-service-provider-evidence-provenance",
+  "receipt": "owner-service-provider-final-2026-10-25.json",
+  "receiptSha256": "c16bac2c883b478e3ebbb533f2ca45a8cb3d6b2adff5af7692eb03830089da21",
+  "producer": "owner-service-provider.cs.txt",
+  "producerSha256": "a2c3e9280085a05b48d104c3f01ab2e657829f6103797f9f19ac3b8c7c855f32",
+  "projectTemplate": "owner-service-provider.csproj.txt",
+  "sourceHead": "0468d19e56752bb70add6a8f885cfa8de0124260",
+  "sourceState": "uncommitted reviewed patches",
+  "serverAssemblySha256": "a4d6a0bb9b54a151d1fa3cb8b730cf5c7db62975b41b24adf563d82c068da826",
+  "actualInvocation": {
+    "executable": "dotnet",
+    "arguments": [
+      "/tmp/chatbot-owner-parent-probe-myv556uv/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests.dll",
+      "/tmp/chatbot-owner-parent-final-resources.json",
+      "20164"
+    ],
+    "stdoutRedirect": "/tmp/chatbot-owner-parent-final-live-provider.log",
+    "exitCode": 0
+  },
+  "limits": [
+    "No owner records or grants created.",
+    "No native isolation, positive native Projects authorization, or story-completion claim."
+  ]
+}

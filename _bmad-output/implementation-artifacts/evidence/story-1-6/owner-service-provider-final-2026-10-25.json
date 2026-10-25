@@ -1,0 +1,63 @@
+{
+  "kind": "real-keycloak-chatbot-owner-provider",
+  "utc": "2026-10-25T16:52:50.9736128+00:00",
+  "credentialsPrinted": false,
+  "identities": [
+    {
+      "owner": "Projects",
+      "actualChatBotProvider": true,
+      "signatureVerified": true,
+      "cacheReused": true,
+      "audience": "hexalith-eventstore",
+      "operation": "projects:read",
+      "tenant": "tenant-alpha",
+      "eventStoreTenantAbsent": true,
+      "nonemptySubject": true
+    },
+    {
+      "owner": "Memories",
+      "actualChatBotProvider": true,
+      "signatureVerified": true,
+      "cacheReused": true,
+      "audience": "hexalith-memories-server",
+      "operation": "memories:derived-store",
+      "tenant": "tenant-alpha",
+      "eventStoreTenantAbsent": true,
+      "nonemptySubject": true
+    }
+  ],
+  "deniedGrants": [
+    {
+      "owner": "Projects",
+      "kind": "foreign-owner-audience",
+      "httpStatus": 400
+    },
+    {
+      "owner": "Projects",
+      "kind": "sdk-workload",
+      "httpStatus": 400
+    },
+    {
+      "owner": "Memories",
+      "kind": "foreign-owner-audience",
+      "httpStatus": 400
+    },
+    {
+      "owner": "Memories",
+      "kind": "sdk-workload",
+      "httpStatus": 400
+    }
+  ],
+  "httpStatuses": {
+    "memoriesAnonymous": 401,
+    "memoriesWrongAudience": 401,
+    "memoriesForeignTenant": 403,
+    "memoriesMatchingUnprovisionedTenant": 404,
+    "projectsUnprovisionedPrincipal": 404
+  },
+  "limits": [
+    "No owner records or grants created.",
+    "Project 404 alone does not prove receiver authorization.",
+    "No native policy-isolation or story-completion claim."
+  ]
+}

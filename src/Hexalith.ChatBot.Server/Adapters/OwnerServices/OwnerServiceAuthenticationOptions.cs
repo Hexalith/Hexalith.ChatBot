@@ -114,13 +114,34 @@ internal sealed class OwnerServiceAuthenticationOptions
             .Where(property => new[] { "eventstore:current-tenant", "eventstore:tenant", "memories:tenant", "tenant_id", "tenantId", "tid", "tenants", "tenant" }
                 .Contains(property.Name, StringComparer.OrdinalIgnoreCase)))
         {
-            JsonElement[] values = property.Value.ValueKind == JsonValueKind.Array
-                ? [.. property.Value.EnumerateArray()] : [property.Value];
-            foreach (JsonElement value in values)
+            string? encodedTenants = property.Name.Equals("tenants", StringComparison.OrdinalIgnoreCase)
+                && property.Value.ValueKind == JsonValueKind.String ? property.Value.GetString()?.TrimStart() : null;
+            string?[] values;
+            if (encodedTenants is not null && (encodedTenants.StartsWith('[') || encodedTenants.StartsWith('{')))
             {
-                if (value.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(value.GetString())
-                    || value.GetString()!.Any(char.IsWhiteSpace)) return null;
-                tenants.Add(value.GetString()!);
+                // Projects accepts a JSON array encoded inside its tenants string claim. Malformed list evidence
+                // must remain a JWT tenant denial rather than escaping into the opaque static-token path.
+                try
+                {
+                    values = JsonSerializer.Deserialize<string?[]>(encodedTenants) ?? [];
+                }
+                catch (JsonException)
+                {
+                    return null;
+                }
+            }
+            else
+            {
+                JsonElement[] elements = property.Value.ValueKind == JsonValueKind.Array
+                    ? [.. property.Value.EnumerateArray()] : [property.Value];
+                if (elements.Any(value => value.ValueKind != JsonValueKind.String)) return null;
+                values = [.. elements.Select(value => value.GetString())];
+            }
+            if (values.Length == 0) return null;
+            foreach (string? value in values)
+            {
+                if (string.IsNullOrWhiteSpace(value) || value.Any(char.IsWhiteSpace)) return null;
+                tenants.Add(value);
             }
         }
         return tenants.Count == 1 ? tenants.Single() : null;

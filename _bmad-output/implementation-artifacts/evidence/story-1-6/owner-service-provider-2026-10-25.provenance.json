@@ -1,0 +1,25 @@
+{
+  "kind": "historical-owner-service-provider-evidence-provenance",
+  "receipt": "owner-service-provider-2026-10-25.json",
+  "receiptSha256": "6c3a7e421c613f64aff9cf7be5ecb2283e6a13313b0ebc073ed8eaaaad30c06f",
+  "producer": "owner-service-provider.cs.txt",
+  "producerSha256": "a2c3e9280085a05b48d104c3f01ab2e657829f6103797f9f19ac3b8c7c855f32",
+  "projectTemplate": "owner-service-provider.csproj.txt",
+  "actualInvocation": {
+    "executable": "dotnet",
+    "arguments": [
+      "/tmp/chatbot-owner-provider-probe/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests.dll",
+      "/tmp/chatbot-owner-round2-resources.json",
+      "33555"
+    ],
+    "stdoutRedirect": "/tmp/chatbot-owner-round2-live-provider-final.log",
+    "exitCode": 0
+  },
+  "build": {
+    "configuration": "Debug",
+    "assemblyName": "Hexalith.ChatBot.IntegrationTests",
+    "references": "Existing ChatBot Server Debug DLL output; the relocatable template accepts ChatBotServerOutput."
+  },
+  "runtimeInputs": "Aspire resource snapshot and run owner process ID; per-run client secrets read only from the owner-marked generated realm, not retained here.",
+  "note": "Provenance recorded after the live run from the preserved exact producer and actual invocation; historical receipt bytes are unchanged. A fresh run requires fresh AppHost inputs and produces a new timestamped receipt."
+}

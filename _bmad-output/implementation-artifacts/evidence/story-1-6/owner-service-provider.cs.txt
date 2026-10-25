@@ -1,0 +1,158 @@
+using System.Net.Http.Headers;
+using System.Text.Json;
+using Hexalith.ChatBot.Server.Adapters.OwnerServices;
+using Hexalith.ChatBot.Server.Projections.DerivedStores;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
+
+string phase = "configuration";
+try
+{
+    using JsonDocument snapshot = JsonDocument.Parse(await File.ReadAllTextAsync(args[0]));
+    JsonElement[] resources = [.. snapshot.RootElement.GetProperty("resources").EnumerateArray()];
+    string Endpoint(string name) => resources.Single(resource => resource.GetProperty("displayName").GetString() == name
+        && resource.GetProperty("resourceType").GetString() is "Project" or "Container")
+        .GetProperty("urls").EnumerateArray().Single(endpoint => endpoint.GetProperty("name").GetString() == "http")
+        .GetProperty("url").GetString()!.TrimEnd('/');
+    string authority = Endpoint("security") + "/realms/hexalith";
+    string directory = Directory.EnumerateDirectories(Path.GetTempPath(), "hexalith-chatbot-keycloak-*")
+        .Single(directory => File.Exists(Path.Combine(directory, "owner.marker"))
+            && File.ReadAllText(Path.Combine(directory, "owner.marker")).StartsWith(args[1] + ":", StringComparison.Ordinal));
+    using JsonDocument realm = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(directory, "hexalith-realm.json")));
+    Dictionary<string, string?> settings = new()
+    {
+        ["ChatBot:Memories:UseLiveBacking"] = "true", ["ChatBot:UseDaprWorkflowRuntime"] = "true",
+    };
+    foreach ((string owner, string audience, string operation) in new[]
+    {
+        ("Projects", "hexalith-eventstore", "projects:read"),
+        ("Memories", "hexalith-memories-server", "memories:derived-store"),
+    })
+    {
+        string prefix = "ChatBot:" + owner;
+        string id = "chatbot-" + owner.ToLowerInvariant() + "-owner";
+        JsonElement client = realm.RootElement.GetProperty("clients").EnumerateArray()
+            .Single(client => client.GetProperty("clientId").GetString() == id);
+        settings[prefix + ":Endpoint"] = Endpoint(owner.ToLowerInvariant());
+        settings[prefix + ":OwnerAuthentication:Authority"] = authority;
+        settings[prefix + ":OwnerAuthentication:Issuer"] = authority;
+        settings[prefix + ":OwnerAuthentication:TokenEndpoint"] = authority + "/protocol/openid-connect/token";
+        settings[prefix + ":OwnerAuthentication:ClientId"] = id;
+        settings[prefix + ":OwnerAuthentication:ClientSecret"] = client.GetProperty("secret").GetString();
+        settings[prefix + ":OwnerAuthentication:TenantId"] = "tenant-alpha";
+        settings[prefix + ":OwnerAuthentication:Audience"] = audience;
+        settings[prefix + ":OwnerAuthentication:Operation"] = operation;
+    }
+    var host = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { DisableDefaults = true, EnvironmentName = "Development" });
+    host.Logging.ClearProviders();
+    host.Services.AddChatBotMemoriesDerivedStores(new ConfigurationBuilder().AddInMemoryCollection(settings).Build(), host.Environment);
+    using ServiceProvider provider = host.Services.BuildServiceProvider();
+    using HttpClient http = new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(45) };
+    phase = "discovery";
+    using JsonDocument discovery = JsonDocument.Parse(await http.GetStringAsync(authority + "/.well-known/openid-configuration"));
+    Require(discovery.RootElement.GetProperty("issuer").GetString() == authority, "discovery-issuer");
+    JsonWebKeySet keys = new(await http.GetStringAsync(discovery.RootElement.GetProperty("jwks_uri").GetString()));
+    Dictionary<string, string> tokens = new();
+    List<object> identities = [];
+    foreach ((string owner, string audience, string operation) in new[]
+    {
+        ("Projects", "hexalith-eventstore", "projects:read"),
+        ("Memories", "hexalith-memories-server", "memories:derived-store"),
+    })
+    {
+        phase = owner + "-provider";
+        OwnerServiceTokenProvider actualProvider = provider.GetRequiredKeyedService<OwnerServiceTokenProvider>(owner);
+        string? token = await actualProvider.AcquireAsync(CancellationToken.None);
+        Require(token is not null, owner + "-provider-accepted-real-keycloak-token");
+        Require(await actualProvider.AcquireAsync(CancellationToken.None) == token, owner + "-provider-cache");
+        phase = owner + "-signature";
+        TokenValidationResult valid = await new JsonWebTokenHandler().ValidateTokenAsync(token, new TokenValidationParameters
+        {
+            ValidateIssuer = true, ValidIssuer = authority, ValidateAudience = true, ValidAudience = audience,
+            ValidateIssuerSigningKey = true, IssuerSigningKeys = keys.GetSigningKeys(), ValidAlgorithms = ["RS256"],
+            ValidateLifetime = true, RequireExpirationTime = true, ClockSkew = TimeSpan.Zero,
+        });
+        Require(valid.IsValid, owner + "-signature-and-lifetime");
+        JsonWebToken jwt = new(token);
+        Require(jwt.GetClaim("azp").Value == settings["ChatBot:" + owner + ":OwnerAuthentication:ClientId"], owner + "-azp");
+        Require(jwt.GetClaim("tenant_id").Value == "tenant-alpha" && !jwt.Claims.Any(claim => claim.Type == "eventstore:tenant"), owner + "-tenant");
+        Require(jwt.GetClaim("eventstore:permission").Value == operation && jwt.GetClaim("eventstore:operation").Value == operation,
+            owner + "-permission-and-operation");
+        tokens[owner] = token!;
+        identities.Add(new { owner, actualChatBotProvider = true, signatureVerified = true, cacheReused = true,
+            audience, operation, tenant = "tenant-alpha", eventStoreTenantAbsent = true, nonemptySubject = !string.IsNullOrWhiteSpace(jwt.Subject) });
+    }
+    phase = "grant-denials";
+    List<object> grants = [];
+    foreach (string owner in new[] { "Projects", "Memories" })
+    {
+        string prefix = "ChatBot:" + owner + ":OwnerAuthentication:";
+        foreach ((string kind, string scopes) in new[]
+        {
+            ("foreign-owner-audience", "platform-owner-audience." + (owner == "Projects" ? "hexalith-memories-server" : "hexalith-eventstore")
+                + " platform-owner-operation." + settings[prefix + "Operation"]!.Replace(':', '.')),
+            ("sdk-workload", "eventstore-audience.projects eventstore-operation.domain-service.query"),
+        })
+        {
+            using HttpResponseMessage denial = await http.PostAsync(authority + "/protocol/openid-connect/token", new FormUrlEncodedContent(new Dictionary<string,string>
+            {
+                ["grant_type"] = "client_credentials", ["client_id"] = settings[prefix + "ClientId"]!,
+                ["client_secret"] = settings[prefix + "ClientSecret"]!, ["scope"] = scopes,
+            }));
+            Require((int)denial.StatusCode == 400, owner + "-" + kind + "-denied");
+            grants.Add(new { owner, kind, httpStatus = (int)denial.StatusCode });
+        }
+    }
+    await File.WriteAllTextAsync("/tmp/chatbot-owner-round2-live-token-proof.json", JsonSerializer.Serialize(new
+    {
+        kind = "real-keycloak-chatbot-owner-provider-token-proof", utc = DateTimeOffset.UtcNow,
+        credentialsPrinted = false, identities, deniedGrants = grants,
+        limits = new[] { "REST probes are recorded separately.", "No owner records or grants created.",
+            "No native policy-isolation or story-completion claim." },
+    }, new JsonSerializerOptions { WriteIndented = true }) + "\n");
+    async Task<int> Status(string url, string? token = null)
+    {
+        phase = "owner-request-" + new Uri(url).Port;
+        Console.WriteLine(JsonSerializer.Serialize(new { phase, state = "starting" }));
+        using HttpRequestMessage request = new(HttpMethod.Get, url);
+        if (token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using HttpResponseMessage response = await http.SendAsync(request);
+        Console.WriteLine(JsonSerializer.Serialize(new { phase, httpStatus = (int)response.StatusCode }));
+        return (int)response.StatusCode;
+    }
+    var statuses = new
+    {
+        memoriesAnonymous = await Status(Endpoint("memories") + "/api/v1/tenants/tenant-alpha"),
+        memoriesWrongAudience = await Status(Endpoint("memories") + "/api/v1/tenants/tenant-alpha", tokens["Projects"]),
+        memoriesForeignTenant = await Status(Endpoint("memories") + "/api/v1/tenants/tenant-beta", tokens["Memories"]),
+        memoriesMatchingUnprovisionedTenant = await Status(Endpoint("memories") + "/api/v1/tenants/tenant-alpha", tokens["Memories"]),
+        projectsUnprovisionedPrincipal = await Status(Endpoint("projects") + "/api/v1/projects/01ARZ3NDEKTSV4RRFFQ69G5FAV/context", tokens["Projects"]),
+    };
+    Require(statuses.memoriesAnonymous == 401 && statuses.memoriesWrongAudience == 401, "memories-authentication-denials");
+    Require(statuses.memoriesForeignTenant == 403 && statuses.memoriesMatchingUnprovisionedTenant == 404, "memories-tenant-gates");
+    Require(statuses.projectsUnprovisionedPrincipal == 404, "projects-existing-authorization-gate");
+    string receipt = JsonSerializer.Serialize(new
+    {
+        kind = "real-keycloak-chatbot-owner-provider", utc = DateTimeOffset.UtcNow, credentialsPrinted = false,
+        identities, deniedGrants = grants, httpStatuses = statuses,
+        limits = new[] { "No owner records or grants created.", "Project 404 alone does not prove receiver authorization.",
+            "No native policy-isolation or story-completion claim." },
+    }, new JsonSerializerOptions { WriteIndented = true });
+    await File.WriteAllTextAsync("/tmp/chatbot-owner-round2-live-provider.json", receipt + "\n");
+    Console.WriteLine(receipt);
+}
+catch (Exception exception)
+{
+    Console.WriteLine(JsonSerializer.Serialize(new { kind = "owner-provider-probe-incomplete", phase, errorType = exception.GetType().Name,
+        check = exception is InvalidOperationException ? exception.Message : "", credentialsPrinted = false }));
+    Environment.ExitCode = 1;
+}
+
+static void Require(bool passed, string check)
+{
+    if (!passed) throw new InvalidOperationException(check);
+}
