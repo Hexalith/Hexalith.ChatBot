@@ -161,13 +161,21 @@ public sealed class FoldersFolderStoreTests
     }
 
     [Theory]
-    [InlineData(6, 43)]
-    [InlineData(102, 901)]
-    public async Task StoreMailboxAttachmentShouldForwardExactObservationsAndPreserveOwnerConflict(long version, long fence)
+    [InlineData(6, 43, VisiblePathMetadataPathPolicyClass.Metadata_only)]
+    [InlineData(6, 43, VisiblePathMetadataPathPolicyClass.Content_allowed)]
+    [InlineData(102, 901, VisiblePathMetadataPathPolicyClass.Metadata_only)]
+    [InlineData(102, 901, VisiblePathMetadataPathPolicyClass.Content_allowed)]
+    public async Task StoreMailboxAttachmentShouldForwardExactObservationsAndPreserveOwnerConflict(
+        long version, long fence, VisiblePathMetadataPathPolicyClass pathPolicyClass)
     {
         Hexalith.Folders.Client.Generated.IClient client = DispatchProxy.Create<Hexalith.Folders.Client.Generated.IClient, RecordingFoldersClient>();
         RecordingFoldersClient recording = (RecordingFoldersClient)client;
-        recording.ChangeMetadata = metadata => metadata.Items.Single().Version = version;
+        recording.ChangeMetadata = metadata =>
+        {
+            FileMetadataItem file = metadata.Items.Single();
+            file.Version = version;
+            file.Path.PathPolicyClass = pathPolicyClass;
+        };
         recording.ChangeLock = workspaceLock => workspaceLock.Lease.LockFence = fence;
         // Native Add rejects a visible positive version; it cannot be turned into an overwrite
         // or a replay by decrementing that version or borrowing a different task's fence.
