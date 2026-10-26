@@ -126,6 +126,19 @@ internal sealed class FoldersFolderStore(FoldersClient folders) : IFolderStore
                 "not-eligible",
                 "attachment_content_streaming_required"));
         }
+        catch (Exception ex) when (ex is ArgumentException { ParamName: "contentHashReference" }
+            or Newtonsoft.Json.JsonException
+            or System.Reflection.TargetInvocationException { InnerException: Newtonsoft.Json.JsonException })
+        {
+            // The SDK rejects mismatched bytes/hash before transport. Generated request validation
+            // also runs through JSON callbacks, which may wrap validation failures in reflection.
+            return MailboxAttachmentStorageResult.Failed(new AttachmentStorageFailure(
+                ProjectConversationAttachmentStatus.Unavailable,
+                "not-evaluated",
+                "not-retryable",
+                "not-eligible",
+                "folders_request_unavailable"));
+        }
         catch (HexalithFoldersApiException ex) when (ex.StatusCode is 401 or 403)
         {
             return MailboxAttachmentStorageResult.Failed(new AttachmentStorageFailure(
@@ -182,7 +195,7 @@ internal sealed class FoldersFolderStore(FoldersClient folders) : IFolderStore
         {
             throw;
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or InvalidOperationException)
         {
             return MailboxAttachmentStorageResult.Failed(new AttachmentStorageFailure(
                 ProjectConversationAttachmentStatus.Retryable,

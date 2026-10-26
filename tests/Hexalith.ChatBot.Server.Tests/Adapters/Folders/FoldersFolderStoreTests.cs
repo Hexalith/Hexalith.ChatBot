@@ -23,6 +23,7 @@ public sealed class FoldersFolderStoreTests
         StoreMailboxAttachmentRequest request = Request("hashref_2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824");
 
         MailboxAttachmentStorageResult result = await store.StoreMailboxAttachmentAsync(request, TestContext.Current.CancellationToken);
+        recording.IdempotentReplay = true;
         MailboxAttachmentStorageResult replay = await store.StoreMailboxAttachmentAsync(request, TestContext.Current.CancellationToken);
 
         StoredMailboxAttachmentReference stored = result.Stored.ShouldNotBeNull();
@@ -413,16 +414,180 @@ public sealed class FoldersFolderStoreTests
         });
 
     [Theory]
-    [InlineData("GetFolderFileMetadataAsync")]
-    [InlineData("GetWorkspaceLockAsync")]
-    [InlineData("AddFileAsync")]
-    public async Task StoreMailboxAttachmentShouldPropagateCallerCancellation(string operation)
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task StoreMailboxAttachmentShouldMapResponseStreamFailuresToRetryable(int failingCall)
+    {
+        StoreMailboxAttachmentRequest attachment = Request(ValidHash);
+        int calls = 0;
+        using FailingFoldersResponseStream responseStream = new();
+        using FoldersResponseTransport transport = new(_ =>
+        {
+            calls++;
+            if (calls == failingCall)
+            {
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StreamContent(responseStream),
+                };
+            }
+
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent(MetadataJson(attachment)) };
+        });
+        using HttpClient http = new(transport) { BaseAddress = new Uri("https://folders.invalid/") };
+
+        MailboxAttachmentStorageResult result = await new FoldersFolderStore(new Hexalith.Folders.Client.Generated.Client(http))
+            .StoreMailboxAttachmentAsync(attachment, TestContext.Current.CancellationToken);
+
+        AssertFailure(result, ProjectConversationAttachmentStatus.Retryable, "retryable", "folders_store_retryable");
+        responseStream.ReadAttempted.ShouldBeTrue();
+        calls.ShouldBe(failingCall);
+        JsonSerializer.Serialize(result).ShouldNotContain("/home/secret", Case.Insensitive);
+        JsonSerializer.Serialize(result).ShouldNotContain("Private provider", Case.Insensitive);
+    }
+
+    [Theory]
+    [InlineData("invoice.pdf", 2)]
+    [InlineData("sales report.pdf", 0)]
+    [InlineData("résumé.pdf", 0)]
+    public async Task StoreMailboxAttachmentShouldMapGeneratedRequestValidationToUnavailable(string fileName, int expectedCalls)
+    {
+        StoreMailboxAttachmentRequest attachment = Request(ValidHash) with { SafeDisplayName = fileName };
+        string workspaceId = AttachmentStorageIdentity.WorkspaceIdFor(attachment.TenantId, attachment.ProjectId, attachment.AssociationId);
+        string taskId = AttachmentStorageIdentity.TaskIdFor(AttachmentStorageIdentity.OperationIdFor(attachment));
+        int calls = 0;
+        using FoldersResponseTransport transport = new(_ =>
+        {
+            calls++;
+            // A fenced fixture reaches generated mutation validation; it does not emulate owner admission.
+            object freshness = new { readConsistency = "read_your_writes", observedAt = DateTimeOffset.UtcNow, stale = false };
+            string body = calls == 1 ? MetadataJson(attachment) : JsonSerializer.Serialize(new
+            {
+                workspaceReference = new { value = workspaceId, classification = "operator_sanitized", redaction = new { visibility = "metadata_only", reasonCode = "not_redacted" } },
+                lockState = "locked",
+                lease = new { lockId = "owner-lock", lockFence = 29, leaseStatus = "active", acquiredAt = DateTimeOffset.UtcNow.AddMinutes(-1), effectiveAt = DateTimeOffset.UtcNow.AddMinutes(-1), expiresAt = DateTimeOffset.UtcNow.AddMinutes(5), holderRef = taskId },
+                retryEligibility = new { retryable = false, reasonCode = "lock_active", correlationId = attachment.CorrelationId, taskId, currentState = "locked", freshness },
+                freshness,
+            });
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent(body) };
+        });
+        using HttpClient http = new(transport) { BaseAddress = new Uri("https://folders.invalid/") };
+
+        MailboxAttachmentStorageResult result = await new FoldersFolderStore(new Hexalith.Folders.Client.Generated.Client(http))
+            .StoreMailboxAttachmentAsync(attachment, TestContext.Current.CancellationToken);
+
+        AssertFailure(result, ProjectConversationAttachmentStatus.Unavailable, "not-retryable", "folders_request_unavailable");
+        calls.ShouldBe(expectedCalls);
+        JsonSerializer.Serialize(result).ShouldNotContain("noncanonical", Case.Insensitive);
+        JsonSerializer.Serialize(result).ShouldNotContain(fileName, Case.Insensitive);
+    }
+
+    [Theory]
+    [InlineData("GetFolderFileMetadataAsync", true)]
+    [InlineData("GetFolderFileMetadataAsync", false)]
+    [InlineData("GetWorkspaceLockAsync", true)]
+    [InlineData("GetWorkspaceLockAsync", false)]
+    [InlineData("AddFileAsync", true)]
+    [InlineData("AddFileAsync", false)]
+    public async Task StoreMailboxAttachmentShouldMapDependencyTimeoutToRetryable(string operation, bool taskCanceled)
     {
         using CancellationTokenSource cancellation = new();
         Hexalith.Folders.Client.Generated.IClient client = DispatchProxy.Create<Hexalith.Folders.Client.Generated.IClient, RecordingFoldersClient>();
         RecordingFoldersClient recording = (RecordingFoldersClient)client;
         recording.FailureAt = operation;
-        recording.Failure = new TaskCanceledException();
+        recording.Failure = taskCanceled
+            ? new TaskCanceledException("Private provider timeout at /home/secret.")
+            : new OperationCanceledException("Private provider timeout at /home/secret.");
+
+        MailboxAttachmentStorageResult result = await new FoldersFolderStore(client)
+            .StoreMailboxAttachmentAsync(Request(ValidHash), cancellation.Token);
+
+        cancellation.IsCancellationRequested.ShouldBeFalse();
+        AssertFailure(result, ProjectConversationAttachmentStatus.Retryable, "retryable", "folders_store_retryable");
+        recording.Calls.Last().ShouldBe(operation);
+        recording.Requests.Count.ShouldBe(operation == "AddFileAsync" ? 1 : 0);
+        recording.CancellationTokens.ShouldAllBe(token => token == cancellation.Token);
+        JsonSerializer.Serialize(result).ShouldNotContain("/home/secret", Case.Insensitive);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task StoreMailboxAttachmentShouldMapHttpDependencyCancellationToRetryable(int failingCall)
+    {
+        using CancellationTokenSource cancellation = new();
+        StoreMailboxAttachmentRequest attachment = Request(ValidHash);
+        int calls = 0;
+        using FoldersResponseTransport transport = new(_ =>
+        {
+            calls++;
+            if (calls == failingCall)
+            {
+                throw new OperationCanceledException("Private provider cancellation at /home/secret.");
+            }
+
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent(MetadataJson(attachment)) };
+        });
+        using HttpClient http = new(transport) { BaseAddress = new Uri("https://folders.invalid/") };
+
+        MailboxAttachmentStorageResult result = await new FoldersFolderStore(new Hexalith.Folders.Client.Generated.Client(http))
+            .StoreMailboxAttachmentAsync(attachment, cancellation.Token);
+
+        cancellation.IsCancellationRequested.ShouldBeFalse();
+        AssertFailure(result, ProjectConversationAttachmentStatus.Retryable, "retryable", "folders_store_retryable");
+        calls.ShouldBe(failingCall);
+        JsonSerializer.Serialize(result).ShouldNotContain("/home/secret", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task StoreMailboxAttachmentShouldRejectMismatchedContentHashWithoutUploading()
+    {
+        Hexalith.Folders.Client.Generated.IClient client = DispatchProxy.Create<Hexalith.Folders.Client.Generated.IClient, RecordingFoldersClient>();
+        RecordingFoldersClient recording = (RecordingFoldersClient)client;
+        string mismatchedHash = "hashref_" + new string('0', 64);
+
+        MailboxAttachmentStorageResult result = await new FoldersFolderStore(client).StoreMailboxAttachmentAsync(
+            Request(mismatchedHash), TestContext.Current.CancellationToken);
+
+        AssertFailure(result, ProjectConversationAttachmentStatus.Unavailable, "not-retryable", "folders_request_unavailable");
+        recording.Calls.ShouldBe(new[] { "GetFolderFileMetadataAsync", "GetWorkspaceLockAsync" });
+        recording.Requests.ShouldBeEmpty();
+        JsonSerializer.Serialize(result).ShouldNotContain(mismatchedHash, Case.Insensitive);
+        JsonSerializer.Serialize(result).ShouldNotContain("explicit content hash", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task StoreMailboxAttachmentShouldKeepDistinctAcceptedAttachmentsUnique()
+    {
+        Hexalith.Folders.Client.Generated.IClient client = DispatchProxy.Create<Hexalith.Folders.Client.Generated.IClient, RecordingFoldersClient>();
+        RecordingFoldersClient recording = (RecordingFoldersClient)client;
+        FoldersFolderStore store = new(client);
+        StoreMailboxAttachmentRequest request = Request(ValidHash);
+
+        MailboxAttachmentStorageResult first = await store.StoreMailboxAttachmentAsync(request, TestContext.Current.CancellationToken);
+        MailboxAttachmentStorageResult second = await store.StoreMailboxAttachmentAsync(
+            request with { ProviderAttachmentId = "attachment-002", Ordinal = 1 }, TestContext.Current.CancellationToken);
+
+        first.Stored.ShouldNotBeNull().DuplicateState.ShouldBe("unique");
+        second.Stored.ShouldNotBeNull().DuplicateState.ShouldBe("unique");
+        recording.Requests.Count.ShouldBe(2);
+        recording.Requests[0].IdempotencyKey.ShouldNotBe(recording.Requests[1].IdempotencyKey);
+    }
+
+    [Theory]
+    [InlineData("GetFolderFileMetadataAsync", true)]
+    [InlineData("GetFolderFileMetadataAsync", false)]
+    [InlineData("GetWorkspaceLockAsync", true)]
+    [InlineData("GetWorkspaceLockAsync", false)]
+    [InlineData("AddFileAsync", true)]
+    [InlineData("AddFileAsync", false)]
+    public async Task StoreMailboxAttachmentShouldPropagateCallerCancellation(string operation, bool taskCanceled)
+    {
+        using CancellationTokenSource cancellation = new();
+        Hexalith.Folders.Client.Generated.IClient client = DispatchProxy.Create<Hexalith.Folders.Client.Generated.IClient, RecordingFoldersClient>();
+        RecordingFoldersClient recording = (RecordingFoldersClient)client;
+        recording.FailureAt = operation;
+        recording.Failure = taskCanceled ? new TaskCanceledException() : new OperationCanceledException();
         recording.BeforeResponse = () =>
         {
             if (recording.Calls.Last() == operation)

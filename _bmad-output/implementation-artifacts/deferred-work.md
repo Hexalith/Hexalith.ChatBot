@@ -1880,3 +1880,41 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
   evidence: `WorkspaceLockStatusQueryHandler` populates `Lease.LockFence`, but `FoldersDomainServiceEndpoints.ToHttpResult` and `LockLeaseMetadataResponse` omit it. The generated SDK consequently observes zero. A generated-client HTTP fixture reproduces the omitted field and requires a retryable evidence-unavailable result with no upload. ChatBot does not fabricate a fence or acquire/release another task's lock.
 
 Validation update for the earlier seven-FoldersFolderStoreTests entry: the ChatBot adapter now reads and validates supported owner metadata/lock observations before building an upload and preserves owner admission. Debug source build passes with zero warnings/errors; focused Folders tests pass 66/66 and the subsequent full Server project passes 3,421/3,421, both with zero skips. Evidence: `/tmp/chatbot-folders-focused.{ctrf.json,trx,log}` and `/tmp/chatbot-folders-full-server.{ctrf.json,trx,log}`. The exception/test regression is repaired; the two native owner gaps above remain open, and Story 1.6 remains review pending accepted A6 protection and native-isolation evidence.
+
+
+## Deferred from: resumed Folders owner-evidence review (2026-10-25)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-fix-folders-attachment-owner-evidence.md`
+  summary: Publish and qualify the Folders SDK observation APIs through the shared package catalog before package-mode release.
+  evidence: R2-B1 (high): the catalog pins Hexalith.Folders.Client 1.3.1; a minimal compile against that package fails CS1061 for LockLeaseMetadata.LockFence and FileUploadDescriptor.ExpectedFileVersion/ExpectedLockFence. Exact command/output: /tmp/chatbot-folders-review-gsvpxxxd/package-compatibility.log. This repair explicitly validates Debug source references; coordinate the owner publication/catalog update and prove a package-only Release build separately.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-fix-folders-attachment-owner-evidence.md`
+  summary: Supply owner-issued absence and original operation preconditions for native attachment creation and accepted replay recovery.
+  evidence: R2-B2/R2-B4 (high): WorkspaceContentAuthority requires zero for fresh absent-target Add and the original fence/version preconditions for accepted replay. Current positive metadata and an active current lease establish neither; accepted replay can legitimately outlive that lease. Keep the adapter fail-closed until supported owner evidence proves both paths without inventing preconditions.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-fix-folders-attachment-owner-evidence.md`
+  summary: Include the owner lock fence in the Folders workspace-lock HTTP contract.
+  evidence: R2-B3 (high): FoldersDomainServiceEndpoints creates LockLeaseMetadataResponse without LockFence, leaving the generated client's value zero. The existing real-client HTTP fixture requires safe rejection. Closing this requires the owner response change and a successful native contract/persisted-state test.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-fix-folders-attachment-owner-evidence.md`
+  summary: Establish an owner-managed lease lifecycle for each attachment task before storage observation and submission.
+  evidence: R2-B5 (high): AttachmentCaptureCoordinator obtains content then calls IFolderStore without acquiring/renewing the deterministic attachment task's workspace lease. The adapter requires that task as the current holder and intentionally only reads evidence. Demonstrate consecutive attachments and lease expiration/recovery through supported owner APIs without borrowing another task's fence.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-fix-folders-attachment-owner-evidence.md`
+  summary: Distinguish owner concurrency conflicts from actual duplicate admission in attachment upload outcomes.
+  evidence: R2-B6 (medium): WorkspaceContentAuthority rejects invalid version/fence preconditions, FoldersDomainServiceEndpoints maps that to concurrency_conflict, and the preexisting ChatBot upload-409 branch reports duplicate-pending for every 409. Add typed safe-problem classification and regressions preserving genuine duplicate replay behavior; observation 409 already stays not-evaluated.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-fix-folders-attachment-owner-evidence.md`
+  summary: Align attachment operation IDs and filename paths with Folders canonical request validation while preserving existing replay identities.
+  evidence: R2-P1 follow-up (high native capability blocker): AttachmentStorageIdentity emits colon-bearing operation IDs and retains spaces/non-ASCII filename characters; Oq2RequestValidation accepts only opaque alphanumeric/underscore/hyphen IDs and ASCII path tokens. Real generated-client probes reject ordinary invoice.pdf at mutation serialization and sales report.pdf/résumé.pdf at metadata serialization. This repair safely maps those exceptions; an owner-compatible identity/path migration with replay evidence is still needed.
+
+
+## Deferred from: third Folders owner-evidence review (2026-10-25)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-fix-folders-attachment-owner-evidence.md`
+  summary: Bind stored attachment references to the owner-allocated file incarnation after authoritative publication.
+  evidence: R3-B9 (high, preexisting): WorkspaceFileMutationService allocates Add's OwnerFileId with UniqueIdHelper.GenerateSortableUniqueStringId, while AttachmentStorageIdentity.FileIdFor hashes the operation ID. AcceptedCommand does not establish that those identifiers match, and preflight metadata can describe a different file incarnation. Resolve through owner-confirmed publication evidence with read/scan and replay tests; do not substitute an existing path's ID or silently change stable identities in this observation-only repair.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-fix-folders-attachment-owner-evidence.md`
+  summary: Verify whether permanent protocol/capability statuses can reach the Folders adapter's generic retry mapping.
+  evidence: R3-B7 (medium if confirmed, unverified): the fallback maps otherwise unclassified HexalithFoldersApiException statuses to retryable. No current owner endpoint emits the cited 405/415/501 codes for the generated client's fixed methods and media types. A real transport/deployment response proving one of those statuses on this path would settle reachability and justify a terminal classification regression; no speculative branch was added.

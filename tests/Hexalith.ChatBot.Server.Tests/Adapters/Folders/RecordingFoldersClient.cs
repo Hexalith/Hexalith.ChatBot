@@ -28,6 +28,9 @@ public class RecordingFoldersClient : DispatchProxy
     /// <summary>Gets or sets the operation that fails.</summary>
     public string FailureAt { get; set; } = "AddFileAsync";
 
+    /// <summary>Gets or sets the replay outcome explicitly supplied by the owner fixture.</summary>
+    public bool IdempotentReplay { get; set; }
+
     /// <summary>Gets or sets a metadata response transformation.</summary>
     public Action<FileMetadataResult>? ChangeMetadata { get; set; }
 
@@ -113,7 +116,7 @@ public class RecordingFoldersClient : DispatchProxy
                     CorrelationId = (string)args[3]!,
                     TaskId = (string)args[4]!,
                     Status = AcceptedCommandStatus.Accepted,
-                    IdempotentReplay = Requests.Count > 1,
+                    IdempotentReplay = IdempotentReplay,
                 });
 
             default:
