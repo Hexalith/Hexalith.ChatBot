@@ -1918,3 +1918,10 @@ Validation update for the earlier seven-FoldersFolderStoreTests entry: the ChatB
 - source_spec: `_bmad-output/implementation-artifacts/spec-fix-folders-attachment-owner-evidence.md`
   summary: Verify whether permanent protocol/capability statuses can reach the Folders adapter's generic retry mapping.
   evidence: R3-B7 (medium if confirmed, unverified): the fallback maps otherwise unclassified HexalithFoldersApiException statuses to retryable. No current owner endpoint emits the cited 405/415/501 codes for the generated client's fixed methods and media types. A real transport/deployment response proving one of those statuses on this path would settle reachability and justify a terminal classification regression; no speculative branch was added.
+
+
+## Deferred from: fourth Folders owner-evidence review (2026-10-26)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-fix-folders-attachment-owner-evidence.md`
+  summary: Qualify attachment upload and replay with native owner persisted-state tests when the existing owner contract blockers are resolved.
+  evidence: R4-B9 (medium, preexisting acceptance gap): FoldersFolderStoreTests configures accepted/replayed results through RecordingFoldersClient, while real generated-client fixtures currently cover failure paths. Those tests deliberately prove forwarding and safe failure handling only. After owner-authorized absence/replay evidence, fence transport, lease lifecycle, identity/path compatibility and owner publication binding are available, assert the persisted file identity and bytes and response-loss replay without duplicate publication. This is the acceptance test for the existing owner follow-ups, not a claim of native success or Story 1.6 acceptance.
