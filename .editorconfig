@@ -54,3 +54,10 @@ dotnet_diagnostic.CA1062.severity = warning
 dotnet_diagnostic.CA1822.severity = warning
 dotnet_diagnostic.CA2007.severity = warning
 dotnet_diagnostic.CA1014.severity = none
+
+# Submodules keep their own analysis. This root file would otherwise promote
+# their CA1062/CA1822/CA2007 findings to errors through TreatWarningsAsErrors.
+[references/**.cs]
+dotnet_diagnostic.CA1062.severity = none
+dotnet_diagnostic.CA1822.severity = none
+dotnet_diagnostic.CA2007.severity = none

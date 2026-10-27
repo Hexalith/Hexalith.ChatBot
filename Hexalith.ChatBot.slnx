@@ -6,10 +6,6 @@
     <Project Path="references/Hexalith.Commons/src/libraries/Hexalith.Commons.Http/Hexalith.Commons.Http.csproj" />
     <Project Path="references/Hexalith.Commons/src/libraries/Hexalith.Commons.Serialization/Hexalith.Commons.Serialization.csproj" />
   </Folder>
-  <Folder Name="/references/Hexalith.Conversations/" />
-  <Folder Name="/references/Hexalith.Conversations/src/">
-    <Project Path="references/Hexalith.Conversations/src/Hexalith.Conversations.Contracts/Hexalith.Conversations.Contracts.csproj" />
-  </Folder>
   <Folder Name="/references/Hexalith.EventStore/" />
   <Folder Name="/references/Hexalith.EventStore/src/">
     <Project Path="references/Hexalith.EventStore/src/Hexalith.EventStore.Admin.Abstractions/Hexalith.EventStore.Admin.Abstractions.csproj" />
