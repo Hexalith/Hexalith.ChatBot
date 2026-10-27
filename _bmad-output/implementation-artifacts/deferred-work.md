@@ -1925,3 +1925,39 @@ Validation update for the earlier seven-FoldersFolderStoreTests entry: the ChatB
 - source_spec: `_bmad-output/implementation-artifacts/spec-fix-folders-attachment-owner-evidence.md`
   summary: Qualify attachment upload and replay with native owner persisted-state tests when the existing owner contract blockers are resolved.
   evidence: R4-B9 (medium, preexisting acceptance gap): FoldersFolderStoreTests configures accepted/replayed results through RecordingFoldersClient, while real generated-client fixtures currently cover failure paths. Those tests deliberately prove forwarding and safe failure handling only. After owner-authorized absence/replay evidence, fence transport, lease lifecycle, identity/path compatibility and owner publication binding are available, assert the persisted file identity and bytes and response-loss replay without duplicate publication. This is the acceptance test for the existing owner follow-ups, not a claim of native success or Story 1.6 acceptance.
+
+
+## Native inline Folders implementation follow-up (2026-10-26)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-native-folders-inline-attachments.md`
+  summary: The approved native implementation supplies the earlier owner absence/replay, lease lifecycle, fence transport, canonical identity/path, typed conflict and confirmed file-incarnation gaps in source mode.
+  evidence: Additive native v1 HTTP/generated client, real FolderDomainProcessor, CAS-persisted source events and real EventStore SDK bytes/ledger now prove fresh Add, consecutive attachments, retained legacy identity, response-loss/expiry replay, exact owner file identity and duplicate-admission race forwarding. The final source-mode Folders lane passes 117/117; owner evidence/lease lane passes 23/23; SDK content admission/sealing lane passes 22/22; canonical legacy-key golden passes 1/1, all with zero skips. Actual lock projection folding and both existing generated lock/transition fence decoders are covered. Evidence directory: `/tmp/chatbot-native-implementation-RB2Akn`. Historical deferred entries above retain their original evidence; these are source implementation dispositions subject to the new spec's independent review.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-native-folders-inline-attachments.md`
+  summary: Coordinate owner SDK publication/shared catalog qualification and actual native backend/isolation acceptance separately.
+  evidence: No package is published and no dependency pin is changed. The shared catalog still pins Folders.Client 1.3.1, which predates both the frozen repair observation fields and this new native companion. Persisted test-store tests and the healthy Aspire baseline do not qualify production Dapr CAS/native storage isolation. Story 1.6/sprint remain in review, and A6 protection/native-isolation acceptance remain outstanding.
+
+Validation update: full unfiltered Server passes 3,472/3,472 with zero skips using `-parallel none` after an initial parallel-only global-meter assertion failure (3,471 passed/1 failed). Both CTRF/TRX/logs are retained. Package-only Release qualification exits 1 with seven errors because unchanged Folders.Client 1.3.1 lacks the native companion types; exact command/result is `commands.json` and `package-only-release.log` in the implementation evidence root. Package publication/catalog and production backend/isolation remain open.
+
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-native-folders-inline-attachments.md`
+  summary: Qualify native SDK publication and package-only Release after the supported owner artifacts are available in the shared catalog.
+  evidence: Review B2 confirms the exact package-only Server Release command exits 1 with seven missing-native-type errors against unchanged Folders.Client 1.3.1; `commands.json` and `package-only-release.log` under `/tmp/chatbot-native-implementation-RB2Akn` retain the command/result. Package publication and dependency changes are explicitly excluded from this implementation.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-native-folders-inline-attachments.md`
+  summary: Retain full C7 revocation and expired-to-stale runtime qualification as a separate owner acceptance item.
+  evidence: Review B10 confirms approved C7 documentation leaves revocation handling, authority propagation and exact expired/stale status boundaries reference-pending. Native operations independently reauthorize and fail closed; profile validation and controlled renewal tests do not prove production upstream revocation timestamps or stale-query propagation.
+
+
+Final native follow-up qualification (2026-10-26): independent review corrections are complete in source mode. Parent checks pass SDK 28/28, owner 64/64, existing fence decoders 2/2, trusted gateway admission/catalog 8/8, decoder/canonical-key 5/5, focused ChatBot Folders 121/121 and full unfiltered Server 3,476/3,476 (`-parallel none`), all zero skips. Exact commands, CTRF/TRX, blocker output and final source/evidence checksums: `/tmp/chatbot-native-review-u5g9_rps`. The separate package-only Release attempt still exits 1 with seven missing-native-type errors against unchanged Client 1.3.1. SDK publication/catalog, full C7 propagation/stale qualification, actual backend/isolation and Story 1.6 A6 remain open; prior entries/evidence above remain historical snapshots.
+
+
+## Deferred from: code review of spec-1-6-platform-owner-service-access (2026-10-27, round 4)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-platform-owner-service-access.md`
+  summary: Run the owner-service Server and Integration tests in CI once the Folders package-mode break is fixed.
+  evidence: CI run 40277543114 at `f75d1de` fails the `build` job at Build and story-evidence-integrity at "Build Release configuration". The cause is the already-recorded R2-B1 Folders.Client 1.3.1 gap: the 36 CS errors are all in `FoldersFolderStore.cs:60-102`. So the lanes holding `OwnerServiceAuthenticationTests`, `MemoriesDerivedStoreDependencyInjectionTests` and `OwnerServiceTopologyTests` never execute; the only run of these tests is the local Debug receipt. No separate fix: it settles when the Folders observation APIs ship in the shared catalog.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-6-platform-owner-service-access.md`
+  summary: Re-verify the AppHost build and the owner topology after the Platform gitlink advance to `b117945` (maybe-false, unverified medium).
+  evidence: `25a269f` and `85e69f7` moved Platform from `5338a24` (last owner verification 2026-10-25 16:55 UTC) to `b117945`. That brings in Story 2.5 Composition sources the AppHost compiles: `AgentsHostComposition.cs`, `AgentsDeploymentProfile.cs`, `AgentsIngressDenialContext.cs` and `CoordinatedProtectionAcceptance.cs`. Settle with a clean-worktree AppHost Debug build plus the AppHost (19) and `OwnerServiceTopologyTests` lanes at `f75d1de`.

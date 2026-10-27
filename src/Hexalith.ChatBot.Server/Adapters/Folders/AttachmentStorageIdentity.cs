@@ -50,6 +50,31 @@ internal static class AttachmentStorageIdentity
         };
     }
 
+    public static string NativeOperationIdFor(StoreMailboxAttachmentRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        string[] parts = [request.TenantId, request.ProjectId, request.AssociationId, request.IntakeId, request.MailboxId,
+            request.ProviderMessageId, request.ProviderAttachmentId, request.Ordinal.ToString(CultureInfo.InvariantCulture)];
+        return "mailbox_attachment_v1_" + Hash(string.Concat(parts.Select(value => value.Length.ToString(CultureInfo.InvariantCulture) + ":" + value)));
+    }
+
+    public static string NativeTaskIdFor(string operationId) => "task_v1_" + Hash(operationId);
+
+    public static PathMetadata NativePathFor(StoreMailboxAttachmentRequest request)
+    {
+        PathMetadata legacy = PathFor(request);
+        StringBuilder display = new();
+        foreach (Rune rune in legacy.DisplayName.EnumerateRunes()) display.Append(rune.ToString());
+        string displayName = display.ToString().Normalize(NormalizationForm.FormC);
+        return new PathMetadata
+        {
+            NormalizedPath = $"mailbox-v1/{Hash(request.ProviderMessageId)}/{request.Ordinal.ToString(CultureInfo.InvariantCulture)}-{Hash(displayName)}",
+            DisplayName = displayName,
+            PathPolicyClass = PathPolicyClass,
+            UnicodeNormalization = PathMetadataUnicodeNormalization.NFC,
+        };
+    }
+
     public static string SafeMediaType(string? contentType)
         => string.IsNullOrWhiteSpace(contentType) || contentType.Any(static character => char.IsControl(character) || char.IsWhiteSpace(character))
             ? "application/octet-stream"

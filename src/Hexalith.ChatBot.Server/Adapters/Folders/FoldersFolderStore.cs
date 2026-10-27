@@ -8,7 +8,7 @@ namespace Hexalith.ChatBot.Server.Adapters.Folders;
 
 /// <summary>Submits attachments using observations supplied by the Folders owner.</summary>
 /// <param name="folders">The authorized Folders client.</param>
-internal sealed class FoldersFolderStore(FoldersClient folders) : IFolderStore
+internal sealed partial class FoldersFolderStore(FoldersClient folders) : IFolderStore
 {
     /// <inheritdoc />
     public async ValueTask<MailboxAttachmentStorageResult> StoreMailboxAttachmentAsync(
@@ -17,6 +17,7 @@ internal sealed class FoldersFolderStore(FoldersClient folders) : IFolderStore
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
+        if (_native is not null) return await StoreNativeAsync(request, cancellationToken).ConfigureAwait(false);
 
         if (request.Content.Kind is not Adapters.Mailbox.MailboxAttachmentContentResultKind.Available)
         {

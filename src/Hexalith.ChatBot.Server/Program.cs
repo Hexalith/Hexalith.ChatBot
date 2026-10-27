@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Acceptance;
+using Hexalith.ChatBot.Server.Adapters.Folders;
 using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Correlation;
@@ -67,6 +68,7 @@ _ = builder.Services
         + "EventStore compares them verbatim and refuses the whole named-projection capability on any mismatch.")
     .ValidateOnStart();
 _ = builder.Services.AddChatBotCommandGateway();
+_ = builder.Services.AddChatBotNativeFolders(builder.Configuration, builder.Environment);
 _ = builder.Services.AddChatBotMemoriesDerivedStores(builder.Configuration, builder.Environment);
 _ = builder.Services.AddStory132AcceptanceFixture(builder.Configuration, builder.Environment);
 _ = builder.Services.AddChatBotAiExecutionCoordinatorHostedService();

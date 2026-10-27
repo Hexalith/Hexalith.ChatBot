@@ -1,13 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+    <DefineConstants Condition="'$(UseHexalithProjectReferences)' == 'true'">$(DefineConstants);CHATBOT_NATIVE_FOLDERS_OWNER_ALIAS</DefineConstants>
   </PropertyGroup>
+  <!-- The real owner HTTP/processor fixture is a Debug source proof; package runtime qualification is separate. -->
+  <ItemGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
+    <Compile Remove="Adapters/Folders/FoldersNativeAttachmentTests.cs" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Server\Hexalith.ChatBot.Server.csproj" />
   </ItemGroup>
   <ItemGroup Condition="'$(UseHexalithProjectReferences)' == 'true'">
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Contracts\Hexalith.EventStore.Contracts.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.DomainService\Hexalith.EventStore.DomainService.csproj" />
+    <PackageReference Include="Hexalith.Commons.UniqueIds" ExcludeAssets="all" />
+    <ProjectReference Include="$(HexalithCommonsRoot)\src\libraries\Hexalith.Commons.UniqueIds\Hexalith.Commons.UniqueIds.csproj" />
+    <ProjectReference Include="$(HexalithFoldersRoot)\src\Hexalith.Folders.Server\Hexalith.Folders.Server.csproj" Aliases="FoldersOwner" />
+    <Compile Include="$(HexalithFoldersRoot)/tests/shared/NativeContent/*.cs" Link="NativeContent/%(Filename)%(Extension)" />
+    <Compile Include="$(HexalithEventStoreRoot)/tests/Hexalith.EventStore.Client.Tests/Projections/RecordingDaprClient.cs" Link="NativeContent/RecordingDaprClient.cs" />
     <ProjectReference Include="$(HexalithFoldersRoot)\src\Hexalith.Folders.Client\Hexalith.Folders.Client.csproj" />
     <ProjectReference Include="$(HexalithPartiesRoot)\src\Hexalith.Parties.Client\Hexalith.Parties.Client.csproj" />
     <ProjectReference Include="$(HexalithPartiesRoot)\src\Hexalith.Parties.Contracts\Hexalith.Parties.Contracts.csproj" />
