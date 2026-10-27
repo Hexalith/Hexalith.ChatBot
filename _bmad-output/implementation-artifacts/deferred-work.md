@@ -1961,3 +1961,25 @@ Final native follow-up qualification (2026-10-26): independent review correction
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-platform-owner-service-access.md`
   summary: Re-verify the AppHost build and the owner topology after the Platform gitlink advance to `b117945` (maybe-false, unverified medium).
   evidence: `25a269f` and `85e69f7` moved Platform from `5338a24` (last owner verification 2026-10-25 16:55 UTC) to `b117945`. That brings in Story 2.5 Composition sources the AppHost compiles: `AgentsHostComposition.cs`, `AgentsDeploymentProfile.cs`, `AgentsIngressDenialContext.cs` and `CoordinatedProtectionAcceptance.cs`. Settle with a clean-worktree AppHost Debug build plus the AppHost (19) and `OwnerServiceTopologyTests` lanes at `f75d1de`.
+
+## Deferred from: code review of spec-native-folders-inline-attachments (2026-10-27)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-native-folders-inline-attachments.md`
+  summary: Package-mode builds cannot compile the native path in ChatBot or Folders (carried B2, new Folders scope).
+  evidence: `dotnet build src/Hexalith.ChatBot.Server -c Release -p:UseHexalithProjectReferences=false` fails with 7 errors (CS0234/CS0246 on `Hexalith.Folders.Client.Native`). In package mode `Hexalith.Folders.Server` also uses `ContentTaskSealRequest`, `ContentUploadRequest.LeaseFence` and `TrySealTaskForCompletionAsync`/`TryQuiesceTaskLeaseAsync`, which the pinned `Hexalith.EventStore.DomainService` 3.127.0 (and cached 3.128.2) lack, so the Folders Release/`UseNuGetDeps=true` workflows should go red too (inferred from package symbols, not built). Settles when EventStore DomainService, then Folders.Client, publish and the pins advance.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-native-folders-inline-attachments.md`
+  summary: Move the native stub-handler tests to a file compiled in both build modes once the native SDK package exists.
+  evidence: `NativeRuntimeMapsSafeTypedFailures`, `MalformedConflictProblemCannotEscapeNativeFailureMapping`, `NativeMalformedResponseAndTransportLossFailSafely` and `LeaseObservationUsesEarlierRenewalAndPreservesShortExpiry` sit in the source-only `FoldersNativeAttachmentTests.cs` (`Hexalith.ChatBot.Server.Tests.csproj:7-9` removes it in package mode), so CI never compiles them. They need `Hexalith.Folders.Client.Native`, so the move only helps after the pin advance above.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-native-folders-inline-attachments.md`
+  summary: Native storage handles only inline attachments up to 256 KiB and reports larger ones as retryable `attachment_content_streaming_required`.
+  evidence: Pre-existing mapping: the legacy adapter returns the same retryable reason (`FoldersFolderStore.cs:27-34`); the spec scopes native Add to inline content (E4 rejects streamed bodies). Most real email attachments exceed 256 KiB. Settles with a native streamed Add or a coordinator retry ceiling for that reason.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-native-folders-inline-attachments.md`
+  summary: The native target path keys only on provider message, ordinal and name, while the operation id also keys on intake, mailbox and attachment.
+  evidence: Pre-existing identity semantics (legacy `PathFor`/`OperationIdFor` diverge the same way; the spec preserves path semantics). A message re-ingested under a new intake gets non-retryable `folders_target_conflict` from the absence check instead of duplicate suppression (`AttachmentStorageIdentity.cs:71`). Settle with an identity decision when re-ingestion is designed.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-native-folders-inline-attachments.md`
+  summary: Concurrent stores of one request may report a terminal idempotency conflict for a stored attachment (maybe-false, unverified medium).
+  evidence: Both stores share the live same-task lease (`WorkspaceNativeEndpoints.cs:83-94`). If one publishes between the other's accepted lookup and its legacy-path absence query, the owner matches the native operation id with a different path digest and throws `idempotency_conflict` (`WorkspaceOperationEvidence.cs:63-66`), mapped terminal by `FoldersFolderStore.Native.cs:109`. `AttachmentCaptureCoordinator` handles one intake sequentially; settle by showing whether two `CaptureAsync` runs for one intake can overlap.
