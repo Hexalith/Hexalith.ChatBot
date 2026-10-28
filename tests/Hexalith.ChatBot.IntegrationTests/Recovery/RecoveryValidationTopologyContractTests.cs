@@ -704,40 +704,71 @@ public sealed class RecoveryValidationTopologyContractTests
         exception.Message.ShouldContain("41101");
     }
 
-    /// <summary>
-    /// <c>AddEventStoreAdmin</c> must actually invoke the port guard, not merely be able to.
-    /// </summary>
-    /// <remarks>
-    /// The two theories around this one call <c>ValidateUniqueInternalGrpcPorts</c> DIRECTLY, so they prove the
-    /// validator rejects a collision -- not that <c>AddEventStoreAdmin</c> calls it. Deleting the call site leaves
-    /// both of them green, which is exactly the "silently removable" property the original finding named and which
-    /// widening the method's visibility did not close.
-    /// <para>
-    /// This assertion is deliberately scoped to the <c>AddEventStoreAdmin</c> method body rather than the whole
-    /// file, so an occurrence elsewhere cannot satisfy it. It is still source-scan evidence, which is weaker than
-    /// executing the composition: invoking the method for real needs a <c>HexalithChatBotResources</c> and two
-    /// project resource builders, i.e. a full topology. That residual is recorded in <c>deferred-work.md</c>
-    /// rather than left implied.
-    /// </para>
-    /// </remarks>
-    [Fact]
-    public void AddEventStoreAdminBodyInvokesThePortGuard()
+    /// <summary>Proves Admin composition itself refuses colliding ports without the ChatBot composition.</summary>
+    /// <param name="firstAppId">The first sidecar using the conflicting port.</param>
+    /// <param name="secondAppId">The second sidecar using the conflicting port.</param>
+    [Theory]
+    [InlineData("eventstore", "eventstore-admin")]
+    [InlineData("eventstore-admin", "eventstore-admin-ui")]
+    public async Task AddEventStoreAdminRejectsCollidingPortsWithoutTheChatBotCompositionAsync(string firstAppId, string secondAppId)
     {
-        string source = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
-            "src",
-            "Hexalith.ChatBot.AppHost",
-            "Aspire",
-            "ChatBotAspireModule.cs"));
-        int start = source.IndexOf("public static void AddEventStoreAdmin(", StringComparison.Ordinal);
-        start.ShouldBeGreaterThan(0, "AddEventStoreAdmin must exist to carry the guard.");
-        int next = source.IndexOf("\n    public static ", start + 1, StringComparison.Ordinal);
-        string body = next > start ? source[start..next] : source[start..];
+        IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder();
+        builder.Configuration.Sources.Clear();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [$"Dapr:InternalGrpcPorts:{firstAppId}"] = "41101",
+            [$"Dapr:InternalGrpcPorts:{secondAppId}"] = "41101",
+        });
+        IResourceBuilder<ProjectResource> spine = builder.AddResource(new ProjectResource("test-spine"));
+        IResourceBuilder<IDaprComponentResource> store = builder.AddDaprComponent("test-store", "state.redis");
+        HexalithChatBotResources resources = new(store, store, store, store, spine, spine, spine);
+        IResourceBuilder<ProjectResource> server = builder.AddResource(new ProjectResource(ChatBotAspireModule.EventStoreAdminAppId));
+        IResourceBuilder<ProjectResource> ui = builder.AddResource(new ProjectResource(ChatBotAspireModule.EventStoreAdminUiAppId));
+        InvalidOperationException exception = Should.Throw<InvalidOperationException>(
+            () => builder.AddEventStoreAdmin(resources, server, ui));
+        await using DistributedApplication app = builder.Build();
 
-        body.Contains("ValidateUniqueInternalGrpcPorts(builder.Configuration)", StringComparison.Ordinal)
-            .ShouldBeTrue(
-                "AddEventStoreAdmin must invoke the port guard itself; a composition root that calls it without a "
-                + "preceding AddHexalithChatBot otherwise loses port-collision protection for its two sidecars.");
+        exception.Message.ShouldContain("41101");
+        exception.Message.ShouldContain($"'{firstAppId}'");
+        exception.Message.ShouldContain($"'{secondAppId}'");
+        server.Resource.Annotations.OfType<DaprSidecarAnnotation>().ShouldBeEmpty();
+        ui.Resource.Annotations.OfType<DaprSidecarAnnotation>().ShouldBeEmpty();
+    }
+
+    /// <summary>Proves the same isolated Admin composition accepts distinct or unconfigured ports.</summary>
+    /// <param name="configurePorts">Whether to provide distinct explicit internal gRPC ports.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AddEventStoreAdminAcceptsDistinctOrUnconfiguredPortsWithoutTheChatBotCompositionAsync(bool configurePorts)
+    {
+        IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder();
+        builder.Configuration.Sources.Clear();
+        if (configurePorts)
+        {
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Dapr:InternalGrpcPorts:eventstore"] = "41101",
+                ["Dapr:InternalGrpcPorts:eventstore-admin"] = "41102",
+                ["Dapr:InternalGrpcPorts:eventstore-admin-ui"] = "41103",
+            });
+        }
+        IResourceBuilder<ProjectResource> spine = builder.AddResource(new ProjectResource("test-spine"));
+        IResourceBuilder<IDaprComponentResource> store = builder.AddDaprComponent("test-store", "state.redis");
+        HexalithChatBotResources resources = new(store, store, store, store, spine, spine, spine);
+        IResourceBuilder<ProjectResource> server = builder.AddResource(new ProjectResource(ChatBotAspireModule.EventStoreAdminAppId));
+        IResourceBuilder<ProjectResource> ui = builder.AddResource(new ProjectResource(ChatBotAspireModule.EventStoreAdminUiAppId));
+        Should.NotThrow(() => builder.AddEventStoreAdmin(resources, server, ui));
+        await using DistributedApplication app = builder.Build();
+
+        DaprSidecarOptions serverOptions = server.Resource.Annotations.OfType<DaprSidecarAnnotation>()
+            .ShouldHaveSingleItem().Sidecar.Annotations.OfType<DaprSidecarOptionsAnnotation>().ShouldHaveSingleItem().Options;
+        DaprSidecarOptions uiOptions = ui.Resource.Annotations.OfType<DaprSidecarAnnotation>()
+            .ShouldHaveSingleItem().Sidecar.Annotations.OfType<DaprSidecarOptionsAnnotation>().ShouldHaveSingleItem().Options;
+        serverOptions.AppId.ShouldBe(ChatBotAspireModule.EventStoreAdminAppId);
+        uiOptions.AppId.ShouldBe(ChatBotAspireModule.EventStoreAdminUiAppId);
+        serverOptions.DaprInternalGrpcPort.ShouldBe(configurePorts ? 41102 : null);
+        uiOptions.DaprInternalGrpcPort.ShouldBe(configurePorts ? 41103 : null);
     }
 
     /// <summary>Proves distinct ports and absent configuration both pass the same guard.</summary>

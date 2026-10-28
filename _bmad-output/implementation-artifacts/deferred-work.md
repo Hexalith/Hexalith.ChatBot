@@ -347,7 +347,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: AppHost/Keycloak fixture hygiene if credentials must rotate per run
 severity: low
 reason: **[LOW · sandbox fixture] Committed Keycloak realm includes `recovery-validator` / `recovery-validator-pass`.** Same class as other local realm test users. **Release-claim impact:** none for production (sandbox realm only). **Owner:** AppHost/Keycloak fixture hygiene if credentials must rotate per run. **Closure evidence:** generated-at-runtime password or documented fixture residual in Completion Notes.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28 using the permitted documented-fixture-residual closure: README local-development seed policy and Story 12.15 Completion Notes now explicitly identify the static recovery-validator credential, its shared token-request identity, reserved tenant and production exclusion. Original request/realm and tenant-separation tests are retained. No per-run rotation or production credential qualification is claimed. See spec-five-deferred-maintenance-evidence.md and validation/five-deferred-maintenance-evidence.json.
 
 ### DW-39: [MEDIUM · `RV-PROVIDER-SCALE`] ~~`datasetVolume: 6` still overstates materialized rebuild inputs.~~ Closed 2026-08-04.
 
@@ -709,7 +710,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 13-1-establi
 location: 10-1-frontcomposer-shell-integration.md:15
 severity: low
 reason: **[LOW] Retrospective doc conflates multi-commit "13.1 review" corrections.** `10-1-frontcomposer-shell-integration.md:15` / `test-summary.md:31` attribute EventStore-registration removal (actually in commit `7e63edc`) and the account-affordance/banner-landmark (pre-existing `RealRenderCrossSurfaceE2ETests` / shell) to "the Story 13.1 review" as if in commit `9462de3`. Imprecise attribution in a doc whose stated purpose is to retract overclaims. Doc-only.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: both historical correction paragraphs now attribute direct UI EventStore removal, account-menu suppression and the test assertion of the existing banner to 7e63edc3e841559e3d12ec21aad9248c7283aa01; the correction prose and Fluent/CSS changes belong to 9462de3395453c7c8a7f0bac20bbf9978435ec48. Checked both original Git patches; fixture versus live-render limitations remain explicit. See spec-five-deferred-maintenance-evidence.md.
 
 ### DW-79: [LOW] Unrelated `references/Hexalith.Memories` gitlink bump bundled into UI-CSS commit `9462de3`
 
@@ -788,7 +790,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 8-6-hosted-d
 location: Story 2.10 retry/exhaustion
 severity: medium
 reason: **[MEDIUM · terminal failure ownership]** Distinct correction-propagation workflow `Failed` status deferred; Story 2.9 keeps `Correction-delayed` for store/soft failures. **Release-claim impact:** do not cite Story 2.9 for terminal-failure saga evidence. **Owner:** Story 2.10 retry/exhaustion. **Closure evidence:** terminal/exhaustion path with status + tests under 2.10 (or explicit hard-fail design change).
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28 by verifying the existing separate terminal/exhaustion path at baseline 696e6dd736bd50e764ccd3a392bfbc726e82ab29: corrected-case resolution stops at five attempts, publishes Failed with its original cause, projects escalation and refuses retry. Registered workflow, coordinator and operation-status sink tests provide executable coverage. Store/soft failures still use Delayed; this does not add terminal evidence to the historical Story 2.9 claim. See spec-five-deferred-maintenance-evidence.md and validation/five-deferred-maintenance-evidence.json.
 
 ### DW-88: [LOW · pre-existing, self-disclosed] `StrictEnumContractResolver` doesn't cover an enum used as a dictionary KEY or a nested collection element (e.g. `List<List<TEnum>>`).
 
@@ -1153,7 +1156,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15 patch 
 location: ChatBot AppHost composition
 severity: medium
 reason: **[MEDIUM · test-design] `AddEventStoreAdmin`'s port-guard call site is pinned by a method-body source scan, not by execution.** `AddEventStoreAdminBodyInvokesThePortGuard` slices the `AddEventStoreAdmin` method text and asserts the guard call appears inside it, which is strictly stronger than the previous whole-file substring and strictly weaker than composing the method. **Not covered:** invoking `AddEventStoreAdmin` for real needs a `HexalithChatBotResources` plus two `IResourceBuilder<ProjectResource>` instances — a full topology — so a refactor that keeps the call text but stops reaching it would still pass. **Owner:** ChatBot AppHost composition. **Closure evidence:** a test that composes `AddEventStoreAdmin` on a builder with colliding `Dapr:InternalGrpcPorts` and no preceding `AddHexalithChatBot`, asserting it throws.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: replaced the method-body source scan with isolated executable AddEventStoreAdmin composition without AddHexalithChatBot. Both spine/Admin.Server and Admin.Server/Admin.UI collisions are refused with exact port/app diagnostics before sidecar mutation. Distinct and absent configuration controls assert actual Admin sidecar port values; configuration is isolated from ambient settings. See spec-five-deferred-maintenance-evidence.md and validation/five-deferred-maintenance-evidence.json.
 
 ### DW-129: No repository workflow lints the GitHub Actions files or the checked-in shell scripts, so workflow and script regressions are caught only when a run fails.
 origin: spec-deferred 38290798d6e7
@@ -1276,7 +1280,8 @@ location: references/Hexalith.EventStore/src/Hexalith.EventStore.Contracts/Hexal
 source_spec: `spec-shared-recovery-read-model-keys.md`
 severity: high
 reason: `dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug -m:1` fails with CS1704 ("An assembly with the same simple name 'Hexalith.Commons.UniqueIds' has already been imported") in references/Hexalith.EventStore/src/Hexalith.EventStore.Contracts. The super-repo sets UseHexalithProjectReferences=true for Debug, which turns on HexalithCommonsFromSource inside the EventStore submodule, so a source-built UniqueIds 3.97 and the transitively resolved package 2.30 land in the same compile closure. Forcing package mode with -p:UseHexalithProjectReferences=false instead fails with CS0234/CS0246 because the published Hexalith.Memories.Contracts package lacks the Hexalith.Memories.Contracts.V1.DerivedStores namespace that src/Hexalith.ChatBot.Server consumes. Only -p:HexalithCommonsFromSource=false builds clean. Neither failure is in any file this story touched.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28 for the reported absence of a clean developer build: the documented pinned source-mapping wrapper introduced by 07b8ecebe3484031a66d9aea8519bd00e7de9d29 builds the entire original Integration Debug project with zero warnings/errors. Neither duplicate guards nor dependency authority were weakened. Bare unprepared source flags are not the supported path; package-mode native Folders publication gaps remain separately tracked and are not closed by this developer verification. See spec-five-deferred-maintenance-evidence.md and validation/five-deferred-maintenance-evidence.json.
 
 ### DW-142: Follow-up review still recommended for dw-shared-recovery-read-model-keys after the damping cap was spent
 origin: review-budget-followup

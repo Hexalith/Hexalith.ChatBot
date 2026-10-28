@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "recordKind": "local-maintenance-verification",
+  "createdAtUtc": "2026-10-28T19:51:40.210366+00:00",
+  "baselineCommit": "696e6dd736bd50e764ccd3a392bfbc726e82ab29",
+  "specPath": "_bmad-output/implementation-artifacts/spec-five-deferred-maintenance-evidence.md",
+  "items": [
+    "DW-38",
+    "DW-78",
+    "DW-87",
+    "DW-128",
+    "DW-141"
+  ],
+  "changedSourceSha256": {
+    "README.md": "d8cd988cfbc64cbd2a5c7fec6088502a9efb746ba70a74f17e0d7047020d591a",
+    "_bmad-output/implementation-artifacts/10-1-frontcomposer-shell-integration.md": "0cf477e97ec60124938382c05c207d352c16b709068f8bbf8346d185329ef5b0",
+    "_bmad-output/implementation-artifacts/12-15-stand-up-live-recovery-continuity-fault-injection-drivers-and-recalibrate-a10.md": "99aa07d4c93c0fa9adafb33cb74ace6df684202ef4bafc68208e7fa7029caf22",
+    "_bmad-output/implementation-artifacts/deferred-work.md": "2621e5ab2ec9e5a4639df2f6bd984a2c6e626849c941d36f793e33dea3c98e1a",
+    "_bmad-output/implementation-artifacts/spec-five-deferred-maintenance-evidence.md": "d47fcc56e39c8ecbbcf21e641f274bd369afce1e7ca28e7228da855951a0924d",
+    "_bmad-output/implementation-artifacts/tests/test-summary.md": "553bb704cf1de1a78d9ad5ab22e640aca5102581fe1ec4a61880db667fde2745",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryValidationTopologyContractTests.cs": "46baaa4ef05d99a575887c8b4d2736c78cc432a68d31fd788dc3f0701ffd50ff"
+  },
+  "reports": {
+    "topology": {
+      "summary": {
+        "tests": 35,
+        "passed": 35,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793217004723,
+        "stop": 1793217008128,
+        "duration": 3405
+      },
+      "failedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-deferred-maintenance-evidence/topology.ctrf.json",
+          "sha256": "d8f2bd1787ff9c363f1973d21d692e4896f42dc77559355fbf68844a74202310"
+        },
+        {
+          "path": "TestResults/five-deferred-maintenance-evidence/topology.trx",
+          "sha256": "80d54382b08dadb97272e4f2de94996197594bff8c4af788b9a0ccc34ad1c389"
+        }
+      ]
+    },
+    "workflow": {
+      "summary": {
+        "tests": 63,
+        "passed": 63,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793216969415,
+        "stop": 1793216969917,
+        "duration": 502
+      },
+      "failedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-deferred-maintenance-evidence/workflow.ctrf.json",
+          "sha256": "45e0b338e02af3149170c4a6ab9dc89c745d35cd6aba47ce9965359a4e82b01e"
+        },
+        {
+          "path": "TestResults/five-deferred-maintenance-evidence/workflow.trx",
+          "sha256": "26a1b232bb91c79f9739546830ac42624d5249c1baf39bb7a9ddc78ff1f6f3f2"
+        }
+      ]
+    }
+  },
+  "commands": [
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py aspire start --no-build --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+      "exitCode": 0,
+      "result": "Task-owned baseline AppHost started"
+    },
+    {
+      "command": "aspire describe --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --non-interactive --format Json",
+      "exitCode": 0,
+      "result": "Inspected 44 resources; no topology-health qualification claimed"
+    },
+    {
+      "command": "aspire stop --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+      "exitCode": 0,
+      "result": "Exact task-owned AppHost stopped"
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug -m:1",
+      "exitCode": 0,
+      "result": "Full source-mapped Integration build succeeded, zero warnings/errors"
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --configuration Debug -m:1",
+      "exitCode": 0,
+      "result": "Server.Tests build succeeded, zero warnings/errors"
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug --no-restore -p:BuildProjectReferences=false -m:1",
+      "exitCode": 0,
+      "result": "Final Integration rebuild after review succeeded, zero warnings/errors"
+    },
+    {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests TestResults/five-deferred-maintenance-evidence/topology.ctrf.json -class Hexalith.ChatBot.IntegrationTests.Recovery.RecoveryValidationTopologyContractTests -parallel none -result-trx TestResults/five-deferred-maintenance-evidence/topology.trx",
+      "exitCode": 0,
+      "result": "35 passed, zero failed/skipped"
+    },
+    {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests TestResults/five-deferred-maintenance-evidence/workflow.ctrf.json -class Hexalith.ChatBot.Server.Tests.Lifecycle.CorrectionPropagationWorkflowBridgeTests -class Hexalith.ChatBot.Server.Tests.Lifecycle.CorrectionPropagationCoordinatorTests -class Hexalith.ChatBot.Server.Tests.Lifecycle.OperationStatusWorkflowStatusSinkTests -parallel none -result-trx TestResults/five-deferred-maintenance-evidence/workflow.trx",
+      "exitCode": 0,
+      "result": "63 passed, zero failed/skipped"
+    },
+    {
+      "command": "git -c core.whitespace=cr-at-eol diff --check",
+      "exitCode": 0,
+      "result": "Passed with repository-required CRLF treated as line endings"
+    },
+    {
+      "command": "npx --yes --package @commitlint/cli commitlint --config commitlint.config.cjs --edit /tmp/chatbot-deferred-commit-message.txt",
+      "exitCode": 0,
+      "result": "Conventional commit message validated"
+    },
+    {
+      "command": "git fetch origin main",
+      "exitCode": 0,
+      "result": "Fetched successfully; HEAD and origin/main have zero divergence"
+    }
+  ],
+  "review": {
+    "layers": [
+      "blind-hunter"
+    ],
+    "findings": 4,
+    "patched": 4,
+    "deferred": 0,
+    "correctionRecheck": "No remaining concrete findings; five ledger resolutions remain within the documented maintenance scope."
+  },
+  "testSetupCorrection": "Initial topology execution passed 32/34; two new positive controls called composition after Build and therefore hit frozen DI. Moved composition before Build. The next run passed 34/34, then review additions passed 35/35.",
+  "aspireBaseline": {
+    "resources": 44,
+    "states": [
+      {
+        "state": "Running",
+        "healthStatus": "Healthy",
+        "count": 26
+      },
+      {
+        "state": "Waiting",
+        "healthStatus": null,
+        "count": 17
+      },
+      {
+        "state": "Running",
+        "healthStatus": "Unhealthy",
+        "count": 1
+      }
+    ],
+    "exactAppHostStopped": true,
+    "unrelatedTenantsAppHostLeftRunning": true
+  },
+  "historicalSources": [
+    {
+      "commit": "7e63edc3e841559e3d12ec21aad9248c7283aa01",
+      "evidence": "Original Git patch removes direct UI EventStore registration, suppresses account menu and switches real-render assertion to the existing banner."
+    },
+    {
+      "commit": "9462de3395453c7c8a7f0bac20bbf9978435ec48",
+      "evidence": "Original Git patch adds correction prose and Fluent/CSS changes."
+    },
+    {
+      "commit": "07b8ecebe3484031a66d9aea8519bd00e7de9d29",
+      "evidence": "Introduced the documented pinned source-mapping wrapper."
+    }
+  ],
+  "limitations": [
+    "Local Debug maintenance verification only. No live Tier-3 recovery, product story/sprint completion, release or deployment qualification.",
+    "DW-38 takes the expressly permitted documented-fixture-residual closure; static local sandbox password is intentionally retained.",
+    "DW-87 verifies existing resolver-exhaustion terminal behavior. Store/soft failures still use Delayed; no historical Story 2.9 terminal claim is added.",
+    "DW-141 proves the supported developer build. Separately tracked package/native publication gaps are not closed; no dependency pins or gitlinks changed.",
+    "Pinned mapping emits existing HXW009/HXW011 advisories. Aspire baseline has 26 healthy running, 17 waiting and one unhealthy running resource; startup inspection is not a health acceptance claim."
+  ]
+}

@@ -60,5 +60,5 @@ Story: 12.9 - Cross-surface a11y / visual re-verification
 ## Historical Evidence Correction — Story 10.1 (2026-07-20)
 
 - The `FrontComposerShellIntegrationE2ETests` introduced in commit `dd0d347` used `SetContentAsync(...)` fixtures. Their reported Chromium pass was fixture-browser evidence, not a live ChatBot host/navigation E2E result, and did not prove runtime DI, scoped CSS bundle emission, or computed `.fluent-layout` composition.
-- Live-host coverage was added later through `RealRenderCrossSurfaceE2ETests`. The Story 13.1 review also corrected the remaining shell bootstrap, account-affordance, and banner-landmark gaps.
+- Live-host coverage was added later through `RealRenderCrossSurfaceE2ETests`. Commit `7e63edc3e841559e3d12ec21aad9248c7283aa01` removed direct UI EventStore registration, suppressed the account menu, and changed that test to assert the existing shell banner landmark. Commit `9462de3395453c7c8a7f0bac20bbf9978435ec48` added this historical correction and Fluent/CSS changes; it did not introduce those earlier changes or add the landmark.
 - Commit `dd0d347` included unrelated README, Epic 8, planning, test-summary, and orchestration changes that were absent from the Story 10.1 File List. This correction records the scope mismatch without rewriting history.
