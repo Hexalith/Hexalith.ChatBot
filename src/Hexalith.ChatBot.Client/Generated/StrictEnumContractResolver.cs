@@ -7,7 +7,7 @@ using Newtonsoft.Json.Serialization;
 namespace Hexalith.ChatBot.Client.Generated;
 
 /// <summary>
-/// Overrides NSwag's per-property enum converter with the strict generated-client wire contract.
+/// Enforces the strict generated-client enum wire contract on scalar and recursive collection shapes.
 /// <para>
 /// Ownership: this type is hand-maintained beside NSwag output under <c>Generated/</c>. NSwag regenerates only
 /// <c>HexalithChatBotClient.g.cs</c> (see <c>nswag.json</c>); do not delete this file in a Generated wipe.
@@ -18,6 +18,42 @@ internal sealed class StrictEnumContractResolver : DefaultContractResolver
     public StrictEnumContractResolver()
     {
         NamingStrategy = new CamelCaseNamingStrategy();
+    }
+
+    /// <inheritdoc />
+    protected override JsonConverter? ResolveContractConverter(Type objectType)
+        => IsEnumType(objectType) ? new StrictStringEnumConverter() : base.ResolveContractConverter(objectType);
+
+    /// <inheritdoc />
+    protected override JsonArrayContract CreateArrayContract(Type objectType)
+    {
+        JsonArrayContract contract = base.CreateArrayContract(objectType);
+        if (contract.CollectionItemType is Type itemType && IsEnumType(itemType))
+        {
+            contract.ItemConverter = new StrictStringEnumConverter();
+        }
+
+        return contract;
+    }
+
+    /// <inheritdoc />
+    protected override JsonDictionaryContract CreateDictionaryContract(Type objectType)
+    {
+        JsonDictionaryContract contract = base.CreateDictionaryContract(objectType);
+        if (contract.DictionaryKeyType is Type keyType && IsEnumType(keyType) &&
+            contract.DictionaryValueType is Type valueType)
+        {
+            // Json.NET parses dictionary names independently of enum converters. Own this boundary so
+            // numeric names cannot become enum ordinals, including when the dictionary is nested.
+            contract.Converter = (JsonConverter)Activator.CreateInstance(
+                typeof(StrictEnumDictionaryConverter<,>).MakeGenericType(keyType, valueType))!;
+        }
+        else if (contract.DictionaryValueType is Type itemType && IsEnumType(itemType))
+        {
+            contract.ItemConverter = new StrictStringEnumConverter();
+        }
+
+        return contract;
     }
 
     protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
@@ -42,8 +78,8 @@ internal sealed class StrictEnumContractResolver : DefaultContractResolver
         // therefore left every enum array accepting integer ordinals while its scalar siblings rejected them.
         // A dictionary's IEnumerable<> element type is KeyValuePair<,>, never the enum, so a
         // Dictionary<string, TEnum> fell through this check and kept NSwag's permissive ItemConverterType — it still
-        // accepted integer ordinals while its scalar and array siblings rejected them. Latent today (the generated
-        // client emits no such property), but nothing guarded the next regeneration.
+        // accepted integer ordinals while its scalar and array siblings rejected them. Keep these property-level
+        // overrides because generated attributes take precedence over the recursive contract converters.
         Type? dictionaryValueType = DictionaryValueType(propertyType);
         if (dictionaryValueType is not null && IsEnumType(dictionaryValueType))
         {

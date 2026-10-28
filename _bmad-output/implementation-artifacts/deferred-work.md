@@ -230,7 +230,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: architecture-test hardening
 severity: low
 reason: **[LOW · architecture methodology] `AppHostTopologyTests` StrictEnum/sidecar assertions are source-substring greps.** **Release-claim impact:** formatting-only edits can fail CI; comments can falsely pass. **Owner:** architecture-test hardening. **Closure evidence:** behaviour-level guards where feasible.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28 in spec-five-deferred-contract-guards.md: actual unstarted Aspire models now verify exact sidecar/component references, named state-store metadata, configured control-plane addresses and gRPC ports, app-id suffixes, Memories ACL, UI isolation and Admin exposure/service dependencies. Replaced the corresponding source checks; existing strict enum behavior remains executable. Recovery/topology lane 90/90 and AppHost suite 18/18, zero skips; see validation/five-deferred-contract-guards.json.
 
 ### DW-26: [LOW · ReplayTenantPolicy] Control-name hole `replay-test:tenant-alpha` → physical `tenant-alpha` remains untested in SweepVocabularyTests.
 
@@ -312,7 +313,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: architecture-test hardening (follow-on)
 severity: low
 reason: **[LOW · architecture methodology] ADR prose and substring greps remain the Task 8 methodology.** **Release-claim impact:** doc rewording can fail CI while aliased authority leaks pass. **Owner:** architecture-test hardening (follow-on). **Closure evidence:** behaviour-level guards where feasible.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28 in spec-five-deferred-contract-guards.md: Server lifecycle authority and Contracts/Client/UI recovery-type boundaries now inspect compiled dependencies with four deliberately failing real-consumer controls and the existing namespace-rule machinery. ADR states the precise enforcement scope. Recovery architecture/machinery cases 27/27; full Architecture suite 165/166 retains only the unchanged FrontComposer 3.128.2 versus Builds 3.128.3 catalog override failure. Workflow/configuration documentation checks and recovery qualification remain separate; see validation/five-deferred-contract-guards.json.
 
 ### DW-35: [LOW · live-recovery checkout] Scheduled live-recovery jobs omit exact-head / producer-head sidecars.
 
@@ -412,7 +414,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: continuity Aspire ops / remaining 1b follow-ups
 severity: low
 reason: **[LOW · Aspire continuity ops] Subscription simulator restore does not reset absolute processing counters.** Consumer must use deltas/checkpoints; not closed by sandbox Restore alone. **Release-claim impact:** absolute-counter reconciliation can still fabricate duplicates across retries if ops regress. **Owner:** continuity Aspire ops / remaining 1b follow-ups. **Closure evidence:** ops tests that assert delta-based reconciliation across restore cycles.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28 in spec-five-deferred-contract-guards.md: six concrete continuity/Graph cases exercise two restore/reconciliation/cleanup cycles with actual cumulative simulator snapshots. A prior successful aggregate cannot satisfy a missing current intake; deliberately injected current duplicate and cross-tenant commits change the verdict. Recovery phase/lane and bearer/tenant assertions preserve replay semantics; no simulator counters are reset or new successful provider run invented. Recovery/topology lane 90/90 without skips; see validation/five-deferred-contract-guards.json.
 
 ### DW-47: [MEDIUM · `RV-PROVIDER-SCALE` · decision 2] Four generic scoped deps remain sandbox-contract Contained.
 
@@ -793,7 +796,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of story-12.15 
 location: src/Hexalith.ChatBot.Client/Generated/StrictEnumContractResolver.cs:38-53
 severity: low
 reason: **[LOW · pre-existing, self-disclosed] `StrictEnumContractResolver` doesn't cover an enum used as a dictionary KEY or a nested collection element (e.g. `List<List<TEnum>>`).** Only dictionary VALUE and single-level `IEnumerable` element are handled. Already self-disclosed in the class's own comment ("Latent today... but nothing guarded the next regeneration") and confirmed inert — no property of either shape exists in the current generated client. Owner: ChatBot Client generated-serialization owner, if a future NSwag regeneration introduces such a shape. [`src/Hexalith.ChatBot.Client/Generated/StrictEnumContractResolver.cs:38-53`]
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28 in spec-five-deferred-contract-guards.md: strict contract converters cover recursive enum collections and dictionary values; enum-keyed dictionaries validate named keys on read/write, reject numeric/empty/unknown keys and undefined writes, preserve nullable values and original key diagnostics, and support common mutable/read-only/immutable shapes. Forty-six recursive policy cases cover converter attributes, direct values, population, malformed/commented JSON and concurrent reuse. Full Client suite 141/141 without skips; see validation/five-deferred-contract-guards.json.
 
 ### DW-89: [MEDIUM · test-design] Generated-client freshness fixture is a tautology.
 
@@ -801,7 +805,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs:57-64
 severity: medium
 reason: **[MEDIUM · test-design] Generated-client freshness fixture is a tautology.** `GeneratedOutputHashShouldMatchCheckedInFreshnessFixture` (`tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs:57-64`) hashes the checked-in `Generated/HexalithChatBotClient.g.cs` and compares it to `tests/fixtures/hexalith-chatbot-generated-client.sha256`, never regenerating from `hexalith.chatbot.v1.yaml`; no NSwag regeneration step exists in either workflow. It therefore detects hand-edits to the generated file but can never detect drift between the OpenAPI contract and the committed client, and updating the recorded hash is indistinguishable from laundering real drift. Pre-existing test design; the fixture bump in the 12.15 delta is already disclosed as Epic 13 / package-authority scope. Release-claim impact: "generated client matches the contract" is unproven. Closure evidence: a test that regenerates from the YAML and diffs.
-status: open
+status: done 2026-10-28
+resolution: Already implemented by 95940ff3ac7ba1f579dbd7079bd8d3e310bdebb4 and verified again 2026-10-28: ClientGenerationTests.IsolatedNswagGenerationShouldMatchCheckedInOutputByteForByte copies OpenAPI and NSwag configuration into an isolated tree, invokes the restored NSwag 14.7.1 tool and compares regenerated bytes. It passes in the full 141/141 Client suite without skips; checked-in generated output is unchanged. See spec-five-deferred-contract-guards.md and validation/five-deferred-contract-guards.json.
 
 ### DW-90: [LOW · observability] The 40-minute completion reserve refusal has no gate reason code.
 

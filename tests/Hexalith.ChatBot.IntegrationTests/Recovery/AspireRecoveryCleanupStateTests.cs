@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 
+using Hexalith.ChatBot.RecoverySandbox;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Projections;
 
@@ -582,6 +583,195 @@ public sealed class AspireRecoveryCleanupStateTests
         await blockedCancellation.CancelAsync();
         await Should.ThrowAsync<OperationCanceledException>(() => cleanup);
         AssertEventStoreEmpty(blockedWriter.ActiveEventStoreCleanupState);
+    }
+
+    /// <summary>Uses current durable identities across restores while simulator submission counters keep accumulating.</summary>
+    /// <param name="scoped">Whether to execute the scoped Graph operations instead of continuity operations.</param>
+    /// <param name="secondCycle">The durable outcome of the second reconciliation cycle.</param>
+    [Theory]
+    [InlineData(false, "duplicate")]
+    [InlineData(false, "missing")]
+    [InlineData(true, "duplicate")]
+    [InlineData(true, "missing")]
+    [InlineData(false, "cross-tenant")]
+    [InlineData(true, "cross-tenant")]
+    public async Task SubscriptionReconciliationUsesCurrentDurableIdentitiesAcrossCumulativeRestoreCycles(
+        bool scoped,
+        string secondCycle)
+    {
+        string tenant = RecoveryValidationTopology.StorageTenantRef;
+        CancellationToken token = TestContext.Current.CancellationToken;
+        InMemoryRecoveryReadModelStore store = new();
+        RecoveryDurableStateMessageHandler handler = new();
+        RecoverySubscriptionSimulatorState simulator = new();
+        simulator.RecordProcessing(submitted: true);
+        simulator.RecordProcessing(submitted: true);
+        simulator.RecordProcessing(submitted: false);
+        Queue<(string Intake, bool Persist)> responses = new();
+        List<JsonElement> restores = [];
+        List<string> processed = [];
+        string? controlLeakIntake = null;
+        using EventStoreDurableStateProbe durable = Durable(handler);
+
+        ValueTask<JsonDocument> SendControlAsync(string action, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (action == "restore")
+            {
+                JsonElement restored = JsonSerializer.SerializeToElement(simulator.Restore(DateTimeOffset.UtcNow));
+                restores.Add(restored);
+                return ValueTask.FromResult(Json(restored.GetRawText()));
+            }
+            if (action == "status")
+            {
+                return ValueTask.FromResult(Json(JsonSerializer.Serialize(simulator.Snapshot())));
+            }
+
+            action.ShouldBe("process");
+            (string intake, bool persist) = responses.Dequeue();
+            simulator.IsFaulted().ShouldBeFalse();
+            simulator.RecordProcessing(submitted: true);
+            processed.Add(intake);
+            if (persist)
+            {
+                handler.AddMailboxIntake(tenant, intake);
+                if (intake == controlLeakIntake)
+                {
+                    handler.AddMailboxIntake(RecoveryValidationTopology.ControlTenantRef, intake);
+                }
+            }
+            return ValueTask.FromResult(Json(Process(intake, intake)));
+        }
+
+        // The provider notification remains fixed across restores. A normal replay generates a fresh
+        // worker intake identity but no new durable aggregate; the second-cycle missing case must fail
+        // despite earlier successes. Duplicate and cross-tenant cases inject forbidden durable writes.
+        AspireRecoverySandboxOperations? continuity = scoped ? null : SandboxOperations(
+            SandboxSeam(response: (tenantRef, action, includeBearer, cancellationToken, phase, lane) =>
+            {
+                tenantRef.ShouldBe(RecoveryValidationTopology.LogicalTenantRef);
+                includeBearer.ShouldBe(action == "process");
+                lane.ShouldBe(RecoveryNotificationIdentity.ContinuityLane);
+                if (action == "process")
+                {
+                    phase.ShouldBe(RecoveryNotificationIdentity.RecoveryPhase);
+                }
+                return SendControlAsync(action, cancellationToken);
+            }),
+            store,
+            durable);
+        AspireScopedOutageOperations? graph = scoped ? ScopedOperations(new ScopedOutageOperationsTestSeam
+        {
+            SendSubscriptionAsync = (tenantRef, action, includeBearer, cancellationToken, _) =>
+            {
+                tenantRef.ShouldBe(RecoveryValidationTopology.LogicalTenantRef);
+                includeBearer.ShouldBe(action == "process");
+                return SendControlAsync(action, cancellationToken);
+            },
+        }, store, durable) : null;
+
+        for (int cycle = 0; cycle < 2; cycle++)
+        {
+            string recovered = cycle == 0 ? Id1 : Id3;
+            string duplicate = cycle == 0 ? Id2 : Id4;
+            bool missing = cycle == 1 && secondCycle == "missing";
+            bool duplicated = cycle == 1 && secondCycle == "duplicate";
+            bool leaked = cycle == 1 && secondCycle == "cross-tenant";
+            controlLeakIntake = leaked ? recovered : null;
+            responses.Enqueue((recovered, !missing));
+            responses.Enqueue((duplicate, duplicated));
+            if (scoped)
+            {
+                await SaveScopedGraphSentinelsAsync(store, graph!.ActiveCleanupState);
+                graph.ActiveCleanupState.GraphFaultLeftStateUnchanged = true;
+            }
+            else
+            {
+                await SaveSentinelsAsync(store, continuity!.ActiveSubscriptionCleanupState, identityBranch: false);
+                continuity.ActiveSubscriptionCleanupState.SubscriptionFaultLeftStateUnchanged = true;
+            }
+
+            simulator.Fault(DateTimeOffset.UtcNow);
+            simulator.RecordProcessing(submitted: false);
+            JsonElement beforeRestore = JsonSerializer.SerializeToElement(simulator.Snapshot());
+            if (scoped)
+            {
+                (await graph!.RestoreAsync(ScopedOutageDependencies.Graph,
+                    RecoveryValidationTopology.LogicalTenantRef, token)).ShouldBeFalse();
+            }
+            else
+            {
+                await continuity!.RestoreSubscriptionAsync(RecoveryValidationTopology.LogicalTenantRef, token);
+            }
+
+            JsonElement restoration = restores[^1];
+            restoration.GetProperty("prior").GetProperty("faulted").GetBoolean().ShouldBeTrue();
+            restoration.GetProperty("current").GetProperty("faulted").GetBoolean().ShouldBeFalse();
+            foreach (string counter in new[] { "processingAttempts", "recoverableFailures", "submitted" })
+            {
+                int cumulative = beforeRestore.GetProperty(counter).GetInt32();
+                restoration.GetProperty("prior").GetProperty(counter).GetInt32().ShouldBe(cumulative);
+                restoration.GetProperty("current").GetProperty(counter).GetInt32().ShouldBe(cumulative);
+            }
+            beforeRestore.GetProperty("submitted").GetInt32().ShouldBe(cycle == 0 ? 2 : 4);
+
+            if (missing)
+            {
+                Func<Task> reconcile = scoped
+                    ? async () => { _ = await graph!.VerifyRecoveryAsync(ScopedOutageDependencies.Graph,
+                        RecoveryValidationTopology.LogicalTenantRef, Id8, token).ConfigureAwait(false); }
+                    : async () => { _ = await continuity!.ReconcileSubscriptionAsync(
+                        RecoveryValidationTopology.LogicalTenantRef, Id8, token).ConfigureAwait(false); };
+                await Should.ThrowAsync<TimeoutException>(reconcile);
+                responses.ShouldHaveSingleItem().Intake.ShouldBe(duplicate);
+                responses.Clear();
+            }
+            else if (scoped)
+            {
+                ScopedOutageRecoveryEndState end = await graph!.VerifyRecoveryAsync(ScopedOutageDependencies.Graph,
+                    RecoveryValidationTopology.LogicalTenantRef, Id8, token);
+                end.AffectedOperationRecovered.ShouldBeTrue();
+                end.SilentDataLossDetected.ShouldBeFalse();
+                end.CrossTenantLeakageDetected.ShouldBe(leaked);
+                end.DuplicateSideEffectDetected.ShouldBe(duplicated);
+                graph.ActiveCleanupState.GraphRecoveredIntakeRef.ShouldBe(recovered);
+                graph.ActiveCleanupState.GraphDuplicateProbeIntakeRef.ShouldBe(duplicate);
+            }
+            else
+            {
+                RecoverySubscriptionEndState end = await continuity!.ReconcileSubscriptionAsync(
+                    RecoveryValidationTopology.LogicalTenantRef, Id8, token);
+                end.DeliveredCount.ShouldBe(1);
+                end.NoSilentLoss.ShouldBeTrue();
+                end.TenantIsolationPreserved.ShouldBe(!leaked);
+                end.UnauthorizedMutationAbsent.ShouldBeTrue();
+                end.NoDuplicateSideEffects.ShouldBe(!duplicated);
+                continuity.ActiveSubscriptionCleanupState.ReconciledIntakeRef.ShouldBe(recovered);
+                continuity.ActiveSubscriptionCleanupState.DuplicateProbeIntakeRef.ShouldBe(duplicate);
+            }
+
+            bool cleaned = scoped
+                ? await graph!.CleanupAsync(ScopedOutageDependencies.Graph, RecoveryValidationTopology.LogicalTenantRef, token)
+                : await continuity!.CleanupSubscriptionScenarioAsync(RecoveryValidationTopology.LogicalTenantRef, token);
+            // Cleanup erases derived projections and checks the duplicate probe's durable absence.
+            // A witnessed control-tenant commit remains append-only evidence of the reported breach.
+            cleaned.ShouldBe(!duplicated);
+            store.Keys(ChatBotReadModelStoreNames.StateStoreName).ShouldBeEmpty();
+            (await durable.IsMailboxIntakeCommittedAsync(tenant, Id1, token)).ShouldBeTrue();
+            (await durable.IsMailboxIntakeCommittedAsync(RecoveryValidationTopology.ControlTenantRef, recovered, token))
+                .ShouldBe(leaked);
+            (await durable.IsMailboxIntakeCommittedAsync(RecoveryValidationTopology.ControlTenantRef, Id1, token))
+                .ShouldBeFalse();
+            responses.ShouldBeEmpty();
+        }
+
+        JsonElement final = JsonSerializer.SerializeToElement(simulator.Snapshot());
+        final.GetProperty("submitted").GetInt32().ShouldBe(secondCycle == "missing" ? 5 : 6);
+        final.GetProperty("recoverableFailures").GetInt32().ShouldBe(3);
+        final.GetProperty("processingAttempts").GetInt32().ShouldBe(secondCycle == "missing" ? 8 : 9);
+        restores[0].GetProperty("current").GetProperty("submitted").GetInt32().ShouldBe(2);
+        processed.ShouldBe(secondCycle == "missing" ? new[] { Id1, Id2, Id3 } : new[] { Id1, Id2, Id3, Id4 });
+        handler.Requests.ShouldContain(request => request.TenantRef == tenant && request.AggregateRef == Id3);
     }
 
     [Theory]

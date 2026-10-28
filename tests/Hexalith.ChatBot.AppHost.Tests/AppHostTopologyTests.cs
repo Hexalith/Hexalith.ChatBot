@@ -41,31 +41,16 @@ public static class AppHostTopologyTests
     }
 
     [Fact]
-    public static void LocalAppHostShimShouldPreserveDedicatedDaprResourceIsolation()
+    public static void LocalAppHostShimShouldDeclareDedicatedDaprComponentConfiguration()
     {
         string module = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Aspire", "ChatBotAspireModule.cs"));
 
-        module.ShouldContain(".WithMetadata(\"actorStateStore\", \"true\")");
-        module.ShouldContain(".WithReference(workflowStateStore)");
-        module.ShouldContain(".WithReference(stateStore)");
-        module.ShouldContain(".WithReference(pubSub)");
-        module.ShouldContain("AppChannelAddress = \"127.0.0.1\"");
-        module.ShouldContain("PlacementHostAddress");
-        module.ShouldContain("SchedulerHostAddress");
         module.ShouldContain("configuration[\"Dapr:RedisHost\"] ?? DefaultRedisHost");
         module.ShouldContain("Dapr:RedisHost must be a host:port endpoint without credentials or a path.");
         module.ShouldContain("configuration[\"Dapr:SpineAppIdSuffix\"]");
-        module.ShouldContain("ResolveSpineAppId(builder.Configuration, EventStoreServiceName)");
-        module.ShouldContain("ResolveSpineAppId(builder.Configuration, AppId)");
-        module.ShouldContain("WithEnvironment(\"ChatBot__EventStoreDaprAppId\", eventStoreAppId)");
-        module.ShouldContain("EventStore__DomainServices__Registrations__wildcard_chatbot_v1__AppId\", chatBotAppId");
-        module.ShouldContain("EventStore__DomainServices__Registrations__wildcard_chatbot_v1__Domain\", AppId");
-        module.ShouldContain("endpoint.IsProxied = false");
         module.ShouldContain("EventStore__Publisher__PubSubName");
         module.ShouldContain("Authentication__DaprInternal__AllowedCallers__0");
         module.ShouldContain("return new HexalithChatBotResources(actorStateStore, stateStore, workflowStateStore, pubSub, eventStore, tenants, chatBot)");
-        (module.Split(".WithMetadata(\"keyPrefix\", \"none\")", StringSplitOptions.None).Length - 1).ShouldBe(1);
-        (module.Split(".WithMetadata(\"keyPrefix\", \"name\")", StringSplitOptions.None).Length - 1).ShouldBe(2);
     }
 
     [Fact]
@@ -96,8 +81,6 @@ public static class AppHostTopologyTests
         source.ShouldContain("AddHexalithMemoriesSearchIndexServer(");
         source.ShouldContain("daprPlacementHostAddress: builder.Configuration[\"Dapr:PlacementHostAddress\"]");
         source.ShouldContain("daprSchedulerHostAddress: builder.Configuration[\"Dapr:SchedulerHostAddress\"]");
-        source.ShouldContain("memories.Server.Resource.Annotations.OfType<DaprSidecarAnnotation>().Single()");
-        source.ShouldContain("memoriesSidecarOptions.Options with { Config = accessControlConfigPath }");
         source.ShouldNotContain("Authentication__DaprInternal__AllowedCallers__1");
         source.ShouldContain("\"memories-api-token\"");
         source.ShouldContain("ChatBot__Memories__ApiToken\", builder.AddParameter(\"memories-api-token\", () => memoriesApiToken, publishValueAsDefault: false, secret: true)");
@@ -250,7 +233,6 @@ public static class AppHostTopologyTests
         source.ShouldContain("ChatBot__UseDaprWorkflowRuntime");
         source.ShouldContain("ChatBot__Workflow__StateStoreName");
         source.ShouldContain("WorkflowStateStoreComponentName");
-        source.ShouldNotContain("chatbot-ui\".WithDaprSidecar");
     }
 
     [Fact]
@@ -282,20 +264,14 @@ public static class AppHostTopologyTests
     }
 
     [Fact]
-    public static void AppHostShouldWireTheUiSurfaceWithoutADaprSidecarOrAclChange()
+    public static void ChatBotUiShouldRemainAbsentFromTheProductionDaprAcl()
     {
-        string appHost = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
         string accessControl = File.ReadAllText(Path.Combine(
             RepositoryRoot(),
             "src",
             "Hexalith.ChatBot.AppHost",
             "DaprComponents",
             "accesscontrol.yaml"));
-
-        appHost.ShouldContain("Hexalith_ChatBot_UI");
-        appHost.ShouldContain("ChatBotUiAppId");
-        appHost.ShouldContain("WaitFor(chatBot)");
-        appHost.ShouldContain("WithExternalHttpEndpoints");
 
         accessControl.ShouldContain("defaultAction: deny");
         accessControl.ShouldNotContain("defaultAction: allow");
@@ -320,31 +296,6 @@ public static class AppHostTopologyTests
         localPolicy.ShouldContain("name: HotReload");
         localPolicy.ShouldContain("enabled: false");
         localPolicy.ShouldNotContain("appId: chatbot-ui");
-
-        string module = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
-            "src",
-            "Hexalith.ChatBot.AppHost",
-            "Aspire",
-            "ChatBotAspireModule.cs"));
-        module.ShouldContain("SidecarOptions(builder, EventStoreServiceName, daprConfigPath)");
-        module.ShouldContain("SidecarOptions(builder, TenantsAppId, daprConfigPath)");
-        module.ShouldContain("SidecarOptions(builder, EventStoreAdminAppId, daprConfigPath)");
-        module.ShouldContain("SidecarOptions(builder, EventStoreAdminUiAppId, daprConfigPath)");
-    }
-
-    [Fact]
-    public static void LocalAppHostShouldAllowEachDaprInternalGrpcPortToBeIsolated()
-    {
-        string module = File.ReadAllText(Path.Combine(
-            RepositoryRoot(),
-            "src",
-            "Hexalith.ChatBot.AppHost",
-            "Aspire",
-            "ChatBotAspireModule.cs"));
-
-        module.ShouldContain("Dapr:InternalGrpcPorts:");
-        module.ShouldContain("DaprInternalGrpcPort = internalGrpcPort");
     }
 
     [Fact]
@@ -507,9 +458,6 @@ public static class AppHostTopologyTests
         // Admin.Server references the shared actor state store + the EventStore project; Admin.UI is a
         // sidecar-backed, externally-exposed, service-invocation-only surface.
         module.ShouldContain("AddEventStoreAdmin");
-        module.ShouldContain(".WithReference(resources.EventStore)");
-        module.ShouldContain(".WithReference(resources.EventStoreService)");
-        module.ShouldContain("WithExternalHttpEndpoints");
 
         // Program.cs adds both resources, invokes the wiring helper, and surfaces the Admin.Server swagger link.
         appHost.ShouldContain("Projects.Hexalith_EventStore_Admin_Server_Host");

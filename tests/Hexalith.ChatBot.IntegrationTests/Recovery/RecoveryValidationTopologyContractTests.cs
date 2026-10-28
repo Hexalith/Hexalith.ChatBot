@@ -268,6 +268,145 @@ public sealed class RecoveryValidationTopologyContractTests
         }
     }
 
+    /// <summary>Verifies resource isolation and sidecar options on the actual, unstarted application model.</summary>
+    /// <param name="spineSuffix">An optional suffix that must affect only EventStore and ChatBot app ids.</param>
+    [Theory]
+    [InlineData("")]
+    [InlineData("contract-guard")]
+    public async Task LocalTopologyPreservesDaprSidecarComponentsOptionsAndUiIsolation(string spineSuffix)
+    {
+        ArgumentNullException.ThrowIfNull(spineSuffix);
+
+        const string Placement = "127.0.0.1:51005";
+        const string Scheduler = "127.0.0.1:51006";
+        const string RedisHost = "127.0.0.1:56379";
+        string[] args =
+        [
+            .. RenderedRealmArgs,
+            $"--Dapr:SpineAppIdSuffix={spineSuffix}",
+            $"--Dapr:PlacementHostAddress={Placement}",
+            $"--Dapr:SchedulerHostAddress={Scheduler}",
+            $"--Dapr:RedisHost={RedisHost}",
+        ];
+        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(args, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        try
+        {
+            Dictionary<string, string[]> expectedComponents = new(StringComparer.Ordinal)
+            {
+                ["eventstore"] = ["statestore", "chatbot-pubsub"],
+                ["tenants"] = ["statestore", "chatbot-pubsub"],
+                ["parties"] = ["statestore", "chatbot-pubsub"],
+                ["projects"] = ["statestore", "chatbot-pubsub"],
+                ["chatbot"] = ["chatbot-statestore", "chatbot-workflow-statestore", "chatbot-pubsub"],
+                ["eventstore-admin"] = ["statestore"],
+                ["eventstore-admin-ui"] = [],
+            };
+            foreach ((string name, string[] componentNames) in expectedComponents)
+            {
+                IResource application = builder.Resources.Single(resource => resource.Name == name);
+                IDaprSidecarResource sidecar = application.Annotations.OfType<DaprSidecarAnnotation>().Single().Sidecar;
+                DaprSidecarOptions options = sidecar.Annotations.OfType<DaprSidecarOptionsAnnotation>().Single().Options;
+                string expectedAppId = spineSuffix.Length > 0 && name is "eventstore" or "chatbot"
+                    ? $"{name}-{spineSuffix}"
+                    : name;
+                options.AppId.ShouldBe(expectedAppId, name);
+                options.AppChannelAddress.ShouldBe("127.0.0.1", name);
+                options.PlacementHostAddress.ShouldBe(Placement, name);
+                options.SchedulerHostAddress.ShouldBe(Scheduler, name);
+                options.Config.ShouldBe(Path.Combine(builder.AppHostDirectory, "DaprComponents", "accesscontrol.local.yaml"), name);
+                sidecar.Annotations.OfType<DaprComponentReferenceAnnotation>()
+                    .Select(static reference => reference.Component.Name).Order(StringComparer.Ordinal)
+                    .ShouldBe(componentNames.Order(StringComparer.Ordinal), customMessage: name);
+                foreach (DaprComponentReferenceAnnotation reference in sidecar.Annotations.OfType<DaprComponentReferenceAnnotation>())
+                {
+                    builder.Resources.OfType<IDaprComponentResource>()
+                        .Single(resource => resource.Name == reference.Component.Name)
+                        .ShouldBeSameAs(reference.Component, name);
+                }
+
+                if (name != "eventstore-admin-ui")
+                {
+                    application.Annotations.OfType<EndpointAnnotation>().Single(static endpoint => endpoint.Name == "http")
+                        .IsProxied.ShouldBeFalse(name);
+                }
+            }
+
+            Dictionary<string, (string Prefix, string? ActorStateStore)> expectedStoreMetadata = new(StringComparer.Ordinal)
+            {
+                ["statestore"] = ("none", "true"),
+                ["chatbot-statestore"] = ("name", null),
+                ["chatbot-workflow-statestore"] = ("name", "true"),
+            };
+            foreach ((string name, (string prefix, string? actorStateStore)) in expectedStoreMetadata)
+            {
+                IDaprComponentResource component = builder.Resources.OfType<IDaprComponentResource>()
+                    .Single(resource => resource.Name == name);
+                component.Type.ShouldBe("state.redis", name);
+                IReadOnlyDictionary<string, string> metadata = await ResolveComponentMetadataAsync(component).ConfigureAwait(true);
+                metadata["keyPrefix"].ShouldBe(prefix, name);
+                metadata["redisHost"].ShouldBe(RedisHost, name);
+                if (actorStateStore is null)
+                {
+                    metadata.ShouldNotContainKey("actorStateStore", name);
+                }
+                else
+                {
+                    metadata["actorStateStore"].ShouldBe(actorStateStore, name);
+                }
+            }
+
+            IDaprComponentResource pubSub = builder.Resources.OfType<IDaprComponentResource>()
+                .Single(static resource => resource.Name == "chatbot-pubsub");
+            pubSub.Type.ShouldBe("pubsub.redis");
+            IReadOnlyDictionary<string, string> pubSubMetadata = await ResolveComponentMetadataAsync(pubSub).ConfigureAwait(true);
+            pubSubMetadata["redisHost"].ShouldBe(RedisHost);
+
+            IResource ui = builder.Resources.Single(static resource => resource.Name == "chatbot-ui");
+            ui.Annotations.OfType<DaprSidecarAnnotation>().ShouldBeEmpty();
+            ui.Annotations.OfType<EndpointAnnotation>().ShouldContain(static endpoint => endpoint.IsExternal);
+            ui.Annotations.OfType<WaitAnnotation>().ShouldContain(static wait => wait.Resource.Name == "chatbot");
+
+            IResource memories = builder.Resources.Single(static resource => resource.Name == "memories");
+            IDaprSidecarResource memoriesSidecar = memories.Annotations.OfType<DaprSidecarAnnotation>().Single().Sidecar;
+            DaprSidecarOptions memoriesOptions = memoriesSidecar.Annotations.OfType<DaprSidecarOptionsAnnotation>().Single().Options;
+            memoriesOptions.Config.ShouldBe(Path.Combine(builder.AppHostDirectory, "DaprComponents", "accesscontrol.local.yaml"));
+            memoriesOptions.PlacementHostAddress.ShouldBe(Placement);
+            memoriesOptions.SchedulerHostAddress.ShouldBe(Scheduler);
+
+            IResource chatbot = builder.Resources.Single(static resource => resource.Name == "chatbot");
+            IResource eventStore = builder.Resources.Single(static resource => resource.Name == "eventstore");
+            IResource adminServer = builder.Resources.Single(static resource => resource.Name == "eventstore-admin");
+            IResource adminUi = builder.Resources.Single(static resource => resource.Name == "eventstore-admin-ui");
+            adminServer.Annotations.OfType<WaitAnnotation>()
+                .ShouldContain(wait => ReferenceEquals(wait.Resource, eventStore));
+            adminServer.Annotations.OfType<EndpointReferenceAnnotation>()
+                .Single(reference => ReferenceEquals(reference.Resource, eventStore))
+                .UseAllEndpoints.ShouldBeTrue();
+            adminUi.Annotations.OfType<EndpointAnnotation>()
+                .ShouldContain(static endpoint => endpoint.Name == "http" && endpoint.IsExternal);
+            adminUi.Annotations.OfType<WaitAnnotation>()
+                .ShouldContain(wait => ReferenceEquals(wait.Resource, adminServer));
+            adminUi.Annotations.OfType<EndpointReferenceAnnotation>()
+                .Single(reference => ReferenceEquals(reference.Resource, adminServer))
+                .UseAllEndpoints.ShouldBeTrue();
+            IReadOnlyDictionary<string, string> chatbotEnvironment = await ResolveEnvironmentAsync(chatbot).ConfigureAwait(true);
+            IReadOnlyDictionary<string, string> eventStoreEnvironment = await ResolveEnvironmentAsync(eventStore).ConfigureAwait(true);
+            string effectiveChatBotId = spineSuffix.Length > 0 ? $"chatbot-{spineSuffix}" : "chatbot";
+            string effectiveEventStoreId = spineSuffix.Length > 0 ? $"eventstore-{spineSuffix}" : "eventstore";
+            chatbotEnvironment["ChatBot__EventStoreDaprAppId"].ShouldBe(effectiveEventStoreId);
+            chatbotEnvironment["ChatBot__Workflow__StateStoreName"].ShouldBe("chatbot-workflow-statestore");
+            eventStoreEnvironment["Authentication__DaprInternal__AllowedCallers__0"].ShouldBe(effectiveChatBotId);
+            eventStoreEnvironment["EventStore__DomainServices__Registrations__wildcard_chatbot_v1__AppId"].ShouldBe(effectiveChatBotId);
+            eventStoreEnvironment["EventStore__DomainServices__Registrations__wildcard_chatbot_v1__Domain"].ShouldBe("chatbot");
+        }
+        finally
+        {
+            await builder.DisposeAsync().ConfigureAwait(true);
+        }
+    }
+
     [Fact]
     public async Task RecoveryTopologyAssignsEveryConfiguredDaprInternalGrpcPortToItsSidecar()
     {
@@ -275,6 +414,8 @@ public sealed class RecoveryValidationTopologyContractTests
         {
             ["eventstore"] = 41_001,
             ["tenants"] = 41_002,
+            ["parties"] = 41_006,
+            ["projects"] = 41_007,
             ["chatbot"] = 41_003,
             ["eventstore-admin"] = 41_004,
             ["eventstore-admin-ui"] = 41_005,
@@ -902,6 +1043,33 @@ public sealed class RecoveryValidationTopologyContractTests
         {
             await builder.DisposeAsync().ConfigureAwait(true);
         }
+    }
+
+    /// <summary>Executes the pinned toolkit's actual metadata callbacks without starting Dapr resources.</summary>
+    /// <param name="component">The component whose configured metadata must be inspected.</param>
+    /// <returns>The metadata produced by the component's configuration callbacks.</returns>
+    private static async Task<IReadOnlyDictionary<string, string>> ResolveComponentMetadataAsync(IDaprComponentResource component)
+    {
+        // The toolkit keeps its configuration annotation and schema internal. Use their pinned runtime shapes
+        // rather than duplicate WithMetadata behavior or treat source text as proof of the effective metadata.
+        Type schemaType = typeof(IDaprComponentResource).Assembly.GetType(
+            "CommunityToolkit.Aspire.Hosting.Dapr.DaprComponentSchema", throwOnError: true)!;
+        object schema = Activator.CreateInstance(schemaType, component.Name, component.Type)!;
+        foreach (IResourceAnnotation annotation in component.Annotations.Where(static annotation =>
+            annotation.GetType().FullName == "CommunityToolkit.Aspire.Hosting.Dapr.DaprComponentConfigurationAnnotation"))
+        {
+            Delegate configure = (Delegate)annotation.GetType().GetProperty("Configure")!.GetValue(annotation)!;
+            Task configuration = (Task)configure.DynamicInvoke(schema, TestContext.Current.CancellationToken)!;
+            await configuration.ConfigureAwait(true);
+        }
+
+        object spec = schemaType.GetProperty("Spec")!.GetValue(schema)!;
+        IEnumerable<DaprComponentSpecMetadata> metadata = (IEnumerable<DaprComponentSpecMetadata>)spec.GetType()
+            .GetProperty("Metadata")!.GetValue(spec)!;
+        return metadata.ToDictionary(
+            static item => item.Name,
+            static item => item.ShouldBeOfType<DaprComponentSpecMetadataValue>().Value,
+            StringComparer.Ordinal);
     }
 
     private static async Task<IReadOnlyDictionary<string, string>> ResolveEnvironmentAsync(IResource resource)

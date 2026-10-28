@@ -1,9 +1,15 @@
 using System.Globalization;
+using System.Reflection;
 using System.Text.RegularExpressions;
 
+using Hexalith.ChatBot.Architecture.Tests.Fitness;
 using Hexalith.ChatBot.Server.Audit;
 
+using NetArchTest.Rules;
+
 using Shouldly;
+
+using NetArchTestResult = NetArchTest.Rules.TestResult;
 
 namespace Hexalith.ChatBot.Architecture.Tests;
 
@@ -147,22 +153,12 @@ public static class LiveRecoveryValidationArchitectureTests
     [Fact]
     public static void ProductionServer_ShouldNotReferenceAspireResourceLifecycleAuthority()
     {
-        string root = RepositoryRoot();
-        string[] violations = Directory
-            .EnumerateFiles(Path.Combine(root, "src", "Hexalith.ChatBot.Server"), "*.cs", SearchOption.AllDirectories)
-            .Where(static path => !path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-                && !path.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-            .Where(path =>
-            {
-                string source = File.ReadAllText(path);
-                return source.Contains("ResourceCommandService", StringComparison.Ordinal)
-                    || source.Contains("KnownResourceCommands", StringComparison.Ordinal)
-                    || source.Contains("Aspire.Hosting", StringComparison.Ordinal);
-            })
-            .Select(path => Path.GetRelativePath(root, path))
-            .ToArray();
+        NetArchTestResult result = Types.InAssembly(FitnessAssemblies.Server)
+            .Should()
+            .NotHaveDependencyOnAny("Aspire.Hosting", "CommunityToolkit.Aspire.Hosting")
+            .GetResult();
 
-        violations.ShouldBeEmpty();
+        result.IsSuccessful.ShouldBeTrue(FitnessRule.Describe(result));
     }
 
     [Fact]
@@ -711,38 +707,50 @@ public static class LiveRecoveryValidationArchitectureTests
     [Fact]
     public static void FaultControlTypes_ShouldNotLeakIntoContractsDomainOrUi()
     {
-        string root = RepositoryRoot();
-        string[] guardedProjects =
-        [
-            "Hexalith.ChatBot.Contracts",
-            "Hexalith.ChatBot.UI",
-            "Hexalith.ChatBot.Client",
-        ];
+        Assembly ui = FitnessAssemblies.Adapters.Single(static assembly =>
+            assembly.GetName().Name == "Hexalith.ChatBot.UI");
+        Assembly[] guardedAssemblies = [FitnessAssemblies.Contracts, FitnessAssemblies.Client, ui];
         string[] forbidden =
         [
-            "ResourceCommandService",
-            "KnownResourceCommands",
             "Aspire.Hosting",
-            "LiveRecoveryValidationOptions",
-            "IScopedOutageInjectionDriver",
-            "IContinuityDrillScenarioRunner",
-            "IProjectionRebuildDriver",
+            "CommunityToolkit.Aspire.Hosting",
+            typeof(LiveRecoveryValidationOptions).FullName!,
+            typeof(IScopedOutageInjectionDriver).FullName!,
+            typeof(IContinuityDrillScenarioRunner).FullName!,
+            typeof(IProjectionRebuildDriver).FullName!,
         ];
-        string[] violations = guardedProjects
-            .Select(project => Path.Combine(root, "src", project))
-            .Where(Directory.Exists)
-            .SelectMany(directory => Directory.EnumerateFiles(directory, "*.cs", SearchOption.AllDirectories))
-            .Where(static path => !path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-                && !path.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-            .Where(path =>
-            {
-                string source = File.ReadAllText(path);
-                return forbidden.Any(token => source.Contains(token, StringComparison.Ordinal));
-            })
-            .Select(path => Path.GetRelativePath(root, path))
-            .ToArray();
+        foreach (Assembly assembly in guardedAssemblies)
+        {
+            assembly.GetTypes().ShouldNotBeEmpty(assembly.GetName().Name);
+            NetArchTestResult result = Types.InAssembly(assembly)
+                .Should()
+                .NotHaveDependencyOnAny(forbidden)
+                .GetResult();
 
-        violations.ShouldBeEmpty();
+            result.IsSuccessful.ShouldBeTrue($"{assembly.GetName().Name}: {FitnessRule.Describe(result)}");
+        }
+    }
+
+    /// <summary>Proves each recovery-type dependency guard detects a real compiled consumer.</summary>
+    /// <param name="forbiddenType">The type that a guarded surface must not depend on.</param>
+    /// <param name="consumer">An existing Server consumer used to prove rule detection.</param>
+    [Theory]
+    [InlineData(typeof(LiveRecoveryValidationOptions), typeof(LiveRecoveryValidationOptionsValidator))]
+    [InlineData(typeof(IScopedOutageInjectionDriver), typeof(ScopedOutageDegradationValidationCoordinator))]
+    [InlineData(typeof(IContinuityDrillScenarioRunner), typeof(ContinuityDrillCoordinator))]
+    [InlineData(typeof(IProjectionRebuildDriver), typeof(ProjectionRebuildValidationCoordinator))]
+    public static void FaultControlDependencyRuleDetectsRealCompiledReferences(Type forbiddenType, Type consumer)
+    {
+        ArgumentNullException.ThrowIfNull(forbiddenType);
+        ArgumentNullException.ThrowIfNull(consumer);
+
+        NetArchTestResult result = Types.InAssembly(FitnessAssemblies.Server)
+            .Should()
+            .NotHaveDependencyOnAny(forbiddenType.FullName!)
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeFalse("the deliberately false rule must detect the real recovery dependency");
+        FitnessRule.FailingTypeNames(result).ShouldContain(consumer.FullName);
     }
 
     [Fact]

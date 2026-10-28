@@ -1,0 +1,252 @@
+{
+  "schemaVersion": 1,
+  "recordKind": "local-maintenance-verification",
+  "createdAtUtc": "2026-10-28T19:39:53.176906+00:00",
+  "baselineCommit": "a26117d0c8cda489216f391280c406507d044170",
+  "specPath": "_bmad-output/implementation-artifacts/spec-five-deferred-contract-guards.md",
+  "items": [
+    "DW-25",
+    "DW-34",
+    "DW-46",
+    "DW-88",
+    "DW-89"
+  ],
+  "changedSourceSha256": {
+    "_bmad-output/implementation-artifacts/deferred-work.md": "19cf3b2fca5831b120f43a5b5806c557573b2428544b555fd8cc4c64ab3e267f",
+    "_bmad-output/implementation-artifacts/spec-five-deferred-contract-guards.md": "e69509837b997e0a332d30fecdefce0d8e154a9feca3f4053a482aaf3f28c4d5",
+    "docs/adrs/live-recovery-validation-drivers.md": "1d6d93a97d4adf25fc506202e013337d2c44abdecada3d4c2544874e926e9b75",
+    "src/Hexalith.ChatBot.Client/Generated/StrictEnumContractResolver.cs": "f2a243207e47a2d53bd5e9aed5f323755624f21b87047ba2e1cb06e3e9d2b667",
+    "src/Hexalith.ChatBot.Client/Generated/StrictEnumDictionaryConverter.cs": "72e6cb3e3ed38c8ae02aef8860737cc35bf0508fcb7b406a821cec8dad7b6ab4",
+    "src/Hexalith.ChatBot.Client/Generated/StrictStringEnumConverter.cs": "d2efdd970e229052865f116ee0130abbc16f79081e367b2bebe89d9bd571baa5",
+    "tests/Hexalith.ChatBot.AppHost.Tests/AppHostTopologyTests.cs": "1817fd6bccb4f7b6238e41179b5a8f7bc95b916550c779a95f0f512ad22d6c96",
+    "tests/Hexalith.ChatBot.Architecture.Tests/LiveRecoveryValidationArchitectureTests.cs": "9c68d1246b22ea013dcdc000a8ef617c5dc327d8a5e0b7f8b50ed157f05ed659",
+    "tests/Hexalith.ChatBot.Client.Tests/InitializedEnumDictionaryCarrier.cs": "9e41a35441d1969894529e5b3fb9d3ec075ea6277e7a9abf4aac4a763bb86156",
+    "tests/Hexalith.ChatBot.Client.Tests/PermissiveWireEnum.cs": "71b02bfd1e9ba0041daf06e9f00f6d9b9272813bc9cc7c45de5c31b6357a6f85",
+    "tests/Hexalith.ChatBot.Client.Tests/RecursiveEnumCarrier.cs": "5a530dbf56ab4270ef1940a5152d9e20149b584aef2757e9e1c3dea1f90da25e",
+    "tests/Hexalith.ChatBot.Client.Tests/RecursiveStrictEnumWirePolicyTests.cs": "1771b558a036072bcaf9abfbb0de3ae492a04fee1ca75ec247ea86e1e90dbca1",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/AspireRecoveryCleanupStateTests.cs": "33309de0f69d12b6151506c83fd69b4cf8c63fb7bcd85ef92b1274081f8d893d",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryValidationTopologyContractTests.cs": "14a9bc1294333de86250f8d211699324f7de71f01ce10439f9705ccff102aa9a"
+  },
+  "reports": {
+    "client": {
+      "summary": {
+        "tests": 141,
+        "passed": 141,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793216281597,
+        "stop": 1793216283026,
+        "duration": 1429
+      },
+      "failedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-deferred-contract-guards/client.ctrf.json",
+          "sha256": "65664c918d6b597bccda5b39586fa0d717519496f62ae88f2352e9422ef400d8"
+        },
+        {
+          "path": "TestResults/five-deferred-contract-guards/client.trx",
+          "sha256": "9eddbb08b28f3441a3b6a6fe02656a3d8d85849d70ce6d8a4461ebf7a762c898"
+        }
+      ],
+      "recursivePolicyCases": 46
+    },
+    "apphost": {
+      "summary": {
+        "tests": 18,
+        "passed": 18,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793216129155,
+        "stop": 1793216129272,
+        "duration": 117
+      },
+      "failedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-deferred-contract-guards/apphost.ctrf.json",
+          "sha256": "259d46dd7bf53d697597ee9d9843d66bd8f185574fef70d066d1343bc796017f"
+        },
+        {
+          "path": "TestResults/five-deferred-contract-guards/apphost.trx",
+          "sha256": "a68e806dab82e3438e65138c171942a8aa30b64044ca9419771105fa2d6e0e86"
+        }
+      ]
+    },
+    "recovery": {
+      "summary": {
+        "tests": 90,
+        "passed": 90,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793216214325,
+        "stop": 1793216218901,
+        "duration": 4576
+      },
+      "failedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-deferred-contract-guards/recovery.ctrf.json",
+          "sha256": "0928d82c226a155bf1221be0ed4609419c3cf6770a022a66c97c796943ab1834"
+        },
+        {
+          "path": "TestResults/five-deferred-contract-guards/recovery.trx",
+          "sha256": "dbc393a3ab67de3cad16a853fe9a99d30781e4dc2896ae28192b0fcd57aa4ca5"
+        }
+      ]
+    },
+    "architecture": {
+      "summary": {
+        "tests": 166,
+        "passed": 165,
+        "failed": 1,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793215600007,
+        "stop": 1793215611791,
+        "duration": 11784
+      },
+      "failedTests": [
+        {
+          "name": "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.RootDeclaredSiblingPackageWrappersShouldDelegateVersionsToSharedBuildsCatalog",
+          "message": "System.InvalidOperationException : The package wrapper '/home/administrator/projects/hexalith/chatbot/references/Hexalith.FrontComposer/Directory.Packages.props' changes 'Hexalith.EventStore.Admin.Abstractions' from catalog version '3.128.3' to '3.128.2'."
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "TestResults/five-deferred-contract-guards/architecture.ctrf.json",
+          "sha256": "2babb1d6d4ef50936943c68baf28b73edeaac5d949218e7b9ada4600ed7d6088"
+        },
+        {
+          "path": "TestResults/five-deferred-contract-guards/architecture.trx",
+          "sha256": "9880c39c65802eda93fc1542dc0f68bd419cd8c5de059cf638a2467231151ba2"
+        }
+      ],
+      "recoveryArchitectureAndMachineryPassed": 27
+    }
+  },
+  "commands": [
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --configuration Debug -m:1",
+      "exitCode": 0,
+      "result": "0 warnings, 0 errors"
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py aspire start --no-build --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+      "exitCode": 0,
+      "result": "Started task-owned AppHost"
+    },
+    {
+      "command": "aspire describe --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --non-interactive --format Json",
+      "exitCode": 0,
+      "result": "44 resources: 26 Running/Healthy, 17 Waiting, one Starting"
+    },
+    {
+      "command": "aspire stop --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+      "exitCode": 0,
+      "result": "Exact task-owned AppHost stopped successfully"
+    },
+    {
+      "command": "dotnet build tests/Hexalith.ChatBot.Client.Tests/Hexalith.ChatBot.Client.Tests.csproj --configuration Debug -m:1 -warnaserror",
+      "exitCode": 0,
+      "result": "0 warnings, 0 errors"
+    },
+    {
+      "command": "dotnet build tests/Hexalith.ChatBot.AppHost.Tests/Hexalith.ChatBot.AppHost.Tests.csproj --configuration Debug -m:1 -warnaserror",
+      "exitCode": 0,
+      "result": "0 warnings, 0 errors"
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj --configuration Debug -m:1 -warnaserror",
+      "exitCode": 0,
+      "result": "0 warnings, 0 errors"
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug -m:1 -warnaserror",
+      "exitCode": 0,
+      "result": "0 warnings, 0 errors"
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug --no-restore -m:1 -warnaserror -p:BuildProjectReferences=false",
+      "exitCode": 0,
+      "result": "Final focused test-project rebuild: 0 warnings, 0 errors"
+    },
+    {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests TestResults/five-deferred-contract-guards/client.ctrf.json -parallel none -result-trx TestResults/five-deferred-contract-guards/client.trx",
+      "exitCode": 0,
+      "result": "{'tests': 141, 'passed': 141, 'failed': 0, 'pending': 0, 'skipped': 0, 'other': 0, 'suites': 1, 'start': 1793216281597, 'stop': 1793216283026, 'duration': 1429}"
+    },
+    {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.AppHost.Tests/bin/Debug/net10.0/Hexalith.ChatBot.AppHost.Tests TestResults/five-deferred-contract-guards/apphost.ctrf.json -parallel none -result-trx TestResults/five-deferred-contract-guards/apphost.trx",
+      "exitCode": 0,
+      "result": "{'tests': 18, 'passed': 18, 'failed': 0, 'pending': 0, 'skipped': 0, 'other': 0, 'suites': 1, 'start': 1793216129155, 'stop': 1793216129272, 'duration': 117}"
+    },
+    {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests TestResults/five-deferred-contract-guards/architecture.ctrf.json -parallel none -result-trx TestResults/five-deferred-contract-guards/architecture.trx",
+      "exitCode": 1,
+      "result": "{'tests': 166, 'passed': 165, 'failed': 1, 'pending': 0, 'skipped': 0, 'other': 0, 'suites': 1, 'start': 1793215600007, 'stop': 1793215611791, 'duration': 11784}"
+    },
+    {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests TestResults/five-deferred-contract-guards/recovery.ctrf.json -class Hexalith.ChatBot.IntegrationTests.Recovery.AspireRecoveryCleanupStateTests -class Hexalith.ChatBot.IntegrationTests.Recovery.RecoveryValidationTopologyContractTests -class Hexalith.ChatBot.IntegrationTests.Recovery.RecoverySandboxContractTests -parallel none -result-trx TestResults/five-deferred-contract-guards/recovery.trx",
+      "exitCode": 0,
+      "result": "{'tests': 90, 'passed': 90, 'failed': 0, 'pending': 0, 'skipped': 0, 'other': 0, 'suites': 1, 'start': 1793216214325, 'stop': 1793216218901, 'duration': 4576}"
+    },
+    {
+      "command": "npx --yes --package @commitlint/cli commitlint --edit /tmp/chatbot-five-contracts-commit-message.txt --config commitlint.config.cjs",
+      "exitCode": 0,
+      "result": "passes"
+    }
+  ],
+  "review": {
+    "layers": [
+      "blind-hunter"
+    ],
+    "findings": 10,
+    "patched": 9,
+    "rejectedLow": 1,
+    "deferred": 0,
+    "correctionRecheck": "No remaining concrete findings from the source recheck.",
+    "testDiscoveredCorrection": "The added commented-JSON case exposed a leading-comment entry-token refusal in the new converter; corrected before final 141/141 Client run."
+  },
+  "aspireBaseline": {
+    "resources": 44,
+    "states": [
+      {
+        "state": "Running",
+        "healthStatus": "Healthy",
+        "count": 26
+      },
+      {
+        "state": "Waiting",
+        "healthStatus": null,
+        "count": 17
+      },
+      {
+        "state": "Starting",
+        "healthStatus": null,
+        "count": 1
+      }
+    ],
+    "exactAppHostStopped": true
+  },
+  "limitations": [
+    "Local Debug/source-mapped maintenance evidence; no live recovery qualification, package release acceptance, deployment, story or sprint completion claim.",
+    "The full Architecture suite retains one pre-existing FrontComposer Admin.Abstractions 3.128.2 versus Builds 3.128.3 override failure; all new architecture checks pass.",
+    "Baseline source-mapping tool emits existing HXW009/HXW011 advisories. Unmapped Aspire startup requires the documented mapping, and the initial parallel AppHost build file lock was resolved by a serialized build."
+  ],
+  "unchangedCatalogGitlinks": {
+    "references/Hexalith.FrontComposer": "5f665c4d38afb2255a7dde4620330e09824a40a1",
+    "references/Hexalith.Builds": "81ab049208678bd6616828824729c0ddac02f7d1"
+  }
+}

@@ -18,6 +18,17 @@ The sandbox is **Conditionally suitable** for Story 12.15. It is suitable only w
 
 The Tier-3 orchestration boundary owns every fault and restoration action. It builds and starts the AppHost with `DistributedApplicationTestingBuilder`, resolves exact resources from the application model, and uses Aspire 13.4.6 `ResourceCommandService.ExecuteCommandAsync` with `KnownResourceCommands.StopCommand`, `KnownResourceCommands.StartCommand`, or `KnownResourceCommands.RestartCommand` only for an allowlisted resource. The production Server never receives AppHost or DCP resource-lifecycle authority.
 
+The recovery authority boundary is enforced against compiled ChatBot assemblies by
+`LiveRecoveryValidationArchitectureTests`: Server cannot depend on Aspire hosting namespaces;
+Contracts, Client and UI cannot depend on those namespaces or the recovery options/live-driver
+interfaces. Each named recovery-type rule has a deliberately failing check against its real
+Server consumer, proving that the rule identifies a compiled forbidden edge. Aliases, comments
+and source formatting do not change those dependency checks. Builder-model tests in
+`RecoveryValidationTopologyContractTests` inspect the actual sidecar options, component
+references and UI isolation before starting any resource. Configuration, workflow and governance
+document checks retain their separate responsibilities; compiled checks do not authenticate a
+live drill, replace retained evidence, or ratify A10.
+
 The Tier-3 assembly owns separate live implementations of `IContinuityDrillScenarioRunner`, `IProjectionRebuildDriver`, and `IScopedOutageInjectionDriver`. Product dependency injection retains the three `Deferred*` implementations. Live drivers are constructed explicitly by the opted-in harness and passed through the existing coordinators; no product registration silently changes mode.
 
 Provider and component faults that cannot be represented by an Aspire resource command use a bounded sandbox control plane. It is mapped only when live recovery validation is explicitly enabled, requires a dedicated capability secret, accepts only closed scenario tokens and a tenant satisfying `ReplayTenantPolicy.IsTestTenant` with the `replay-test:` prefix, and stores metadata-only state. It cannot name an arbitrary resource, dependency, tenant, route, or command. The control plane can change only the test tenant's closed provider/component fault switches; it cannot invoke AppHost/DCP lifecycle APIs.

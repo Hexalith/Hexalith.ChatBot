@@ -10,9 +10,9 @@ namespace Hexalith.ChatBot.Client.Generated;
 /// <c>HexalithChatBotClient.g.cs</c>; do not delete this file in a Generated wipe.
 /// </para>
 /// <para>
-/// Scope: this converter governs the values it is applied to. It reaches scalar enum properties through
-/// <see cref="StrictEnumContractResolver"/>'s property converter and enum collection elements through that resolver's
-/// item converter. Name matching itself remains <see cref="Newtonsoft.Json.Converters.StringEnumConverter"/>'s — that
+/// Scope: this converter governs scalar and recursive enum contracts, generated property/item overrides, and
+/// enum dictionary names through <see cref="StrictEnumContractResolver"/>. Name matching itself remains
+/// <see cref="Newtonsoft.Json.Converters.StringEnumConverter"/>'s — that
 /// is, case-insensitive and accepting of the CLR member name as well as the declared <c>[EnumMember]</c> wire value.
 /// The strictness claimed here is about integers, not about name casing.
 /// </para>
