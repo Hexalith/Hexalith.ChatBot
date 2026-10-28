@@ -3,7 +3,7 @@
 @inject ChatBotCultureFormatter Formatter
 
 <section class="chatbot-association-comparison"
-         aria-labelledby="@(ShowHeading ? "association-comparison-title" : null)"
+         aria-labelledby="@(ShowHeading ? Id("association-comparison-title") : null)"
          aria-label="@(ShowHeading ? null : UiText[ChatBotUiTextKey.AssociationReviewComparison])"
          data-chatbot-association-comparison="true">
     @* Story 13.7: when grouped inside a FluentAccordionItem the accordion item Header is the heading, so the
@@ -11,7 +11,7 @@
        via aria-label. ShowHeading defaults to true to preserve the standalone behavior. *@
     @if (ShowHeading)
     {
-        <h2 id="association-comparison-title" class="chatbot-section-title">
+        <h2 id="@Id("association-comparison-title")" class="chatbot-section-title">
             <FluentText As="TextTag.Span">@UiText[ChatBotUiTextKey.AssociationReviewComparison]</FluentText>
         </h2>
     }
@@ -21,7 +21,7 @@
         <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
                              Message="@UiText[ChatBotUiTextKey.AssociationReviewSafeNextAction]"
                              AccessibleLabel="@UiText[ChatBotUiTextKey.AssociationReviewSafeNextAction]"
-                             StableId="association-comparison-empty"
+                             StableId="@Id("association-comparison-empty")"
                              LiveRegionPoliteness="@ChatBotLiveRegionPoliteness.None" />
     }
     else
@@ -33,19 +33,20 @@
                         <FluentText As="TextTag.Span">@Candidate.DisplayLabel</FluentText>
                     </h3>
                     <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
-                        @CodeRow(UiText[ChatBotUiTextKey.ProjectLabel], Candidate.ProjectId)
-                        @TextRow(UiText.ConfidenceBandLabel(ThresholdBand), Formatter.FormatConfidence(Candidate.ConfidenceScore))
-                        @CodeRow(UiText[ChatBotUiTextKey.ReasonCodesLabel], string.Join(", ", Candidate.ReasonCodes))
+                        @AssociationReviewRendering.CodeRow(UiText[ChatBotUiTextKey.ProjectLabel], Candidate.ProjectId)
+                        @AssociationReviewRendering.TextRow(UiText.ConfidenceBandLabel(ThresholdBand), Formatter.FormatConfidence(Candidate.ConfidenceScore))
+                        @AssociationReviewRendering.CodeRow(UiText[ChatBotUiTextKey.ReasonCodesLabel], string.Join(", ", Candidate.ReasonCodes))
                     </FluentStack>
 
                     <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" Class="chatbot-association-evidence-grid">
-                        @foreach (AssociationEvidenceModel evidence in Candidate.Evidence)
+                        @for (int index = 0; index < Candidate.Evidence.Count; index++)
                         {
-                            <ChatBotEvidenceChip Text="@EvidenceText(evidence)"
+                            AssociationEvidenceModel evidence = Candidate.Evidence[index];
+                            <ChatBotEvidenceChip Text="@AssociationReviewRendering.EvidenceText(evidence, UiText)"
                                                  State="@evidence.State"
                                                  CanOpenEvidence="@(evidence.State is ChatBotEvidenceState.Available)"
                                                  UnavailableReason="@evidence.UnavailableReason"
-                                                 StableId="@EvidenceStableId(Candidate, evidence)" />
+                                                 StableId="@EvidenceStableId(index)" />
                         }
                     </FluentStack>
                 </FluentStack>
@@ -55,6 +56,10 @@
 </section>
 
 @code {
+    private readonly string _instanceId = $"association-comparison-{Guid.NewGuid():N}";
+
+    private string Id(string suffix) => $"{_instanceId}-{suffix}";
+
     [Parameter]
     public AssociationCandidateModel? Candidate { get; set; }
 
@@ -70,40 +75,6 @@
     [Parameter]
     public string? ThresholdBand { get; set; }
 
-    private string EvidenceText(AssociationEvidenceModel evidence)
-        => evidence.State is ChatBotEvidenceState.Available
-            ? string.Concat(evidence.Kind, " ", evidence.Reference)
-            : UiText[ChatBotUiTextKey.AssociationReviewEvidenceRestricted];
+    private string EvidenceStableId(int position) => $"{_instanceId}-evidence-{position}";
 
-    /// <summary>
-    /// Derives a stable id from the project id and evidence position, never from the evidence reference -
-    /// which is free text and, for restricted evidence, the value the surface must not emit.
-    /// </summary>
-    private static string EvidenceStableId(AssociationCandidateModel candidate, AssociationEvidenceModel evidence)
-    {
-        int index = 0;
-        for (int position = 0; position < candidate.Evidence.Count; position++)
-        {
-            if (ReferenceEquals(candidate.Evidence[position], evidence))
-            {
-                index = position;
-                break;
-            }
-        }
-
-        return $"comparison-{candidate.ProjectId}-{index}";
-    }
-
-    // Story 13.4: the candidate metadata renders as a structured
-    // Fluent key-value block. Project id and reason codes are opaque tokens and keep <code class="chatbot-code">;
-    // the formatted confidence band renders as plain FluentText (AC3).
-    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
-        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <code class="chatbot-code">@value</code>
-    </FluentStack>;
-
-    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
-        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <FluentText>@value</FluentText>
-    </FluentStack>;
 }

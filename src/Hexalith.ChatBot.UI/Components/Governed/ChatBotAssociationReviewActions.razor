@@ -3,23 +3,23 @@
 @inject ChatBotCultureFormatter Formatter
 @using Hexalith.ChatBot.UI.Services
 
-<section class="chatbot-association-actions" aria-labelledby="association-actions-title">
-    <h2 id="association-actions-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</h2>
+<section class="chatbot-association-actions" aria-labelledby="@Id("association-actions-title")">
+    <h2 id="@Id("association-actions-title")" class="chatbot-section-title">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</h2>
     @* The validation summary precedes the panel it describes, per the error-recovery contract. *@
     @if (!string.IsNullOrWhiteSpace(ValidationErrorCode))
     {
         <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Warning"
                              Message="@ValidationText"
                              AccessibleLabel="@ValidationText"
-                             StableId="association-review-validation"
+                             StableId="@Id("association-review-validation")"
                              StateFamily="@ChatBotFeedbackStateFamily.ValidationError" />
     }
 
     <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-field">
-        <FluentLabel Class="chatbot-labelled-row" for="association-decision-note">
+        <FluentLabel Class="chatbot-labelled-row" for="@Id("association-decision-note")">
             @UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]
         </FluentLabel>
-        <FluentTextArea Id="association-decision-note"
+        <FluentTextArea Id="@Id("association-decision-note")"
                         Value="@DecisionNote"
                         ValueChanged="UpdateNote"
                         Immediate="true"
@@ -28,7 +28,7 @@
                         aria-describedby="@DecisionNoteDescribedBy"
                         aria-invalid="@DecisionNoteInvalidText" />
         @* The cap was previously discoverable only by exceeding it and having the submit rejected. *@
-        <FluentText Id="association-decision-note-counter" Class="chatbot-field__counter">
+        <FluentText Id="@Id("association-decision-note-counter")" Class="chatbot-field__counter">
             @UiText.Get(ChatBotUiTextKey.AssociationReviewNoteCounterTemplate,
                         (DecisionNote?.Length ?? 0).ToString(System.Globalization.CultureInfo.CurrentCulture),
                         AssociationReviewService.MaximumNoteLength.ToString(System.Globalization.CultureInfo.CurrentCulture))
@@ -41,7 +41,7 @@
             <span class="chatbot-association-action-wrap">
                 <ChatBotGovernedAction Label="@action.Label"
                                         AccessibleLabel="@action.Label"
-                                        StableId="@($"association-action-{action.Code}")"
+                                        StableId="@Id($"association-action-{action.Code}")"
                                         State="@action.State"
                                         DisabledReason="@action.DisabledReason"
                                         Appearance="ButtonAppearance.Outline"
@@ -53,40 +53,40 @@
 
     @if (CanCorrect)
     {
-        <section class="chatbot-section chatbot-association-correction" aria-labelledby="association-correction-title">
-            <h3 id="association-correction-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.AssociationReviewCorrectionTitle]</h3>
+        <section class="chatbot-section chatbot-association-correction" aria-labelledby="@Id("association-correction-title")">
+            <h3 id="@Id("association-correction-title")" class="chatbot-section-title">@UiText[ChatBotUiTextKey.AssociationReviewCorrectionTitle]</h3>
             <ChatBotStatusBanner Kind="@CorrectionStatusKind"
                                  Message="@CorrectionStatusText"
                                  AccessibleLabel="@CorrectionStatusText"
-                                 StableId="association-correction-status"
+                                 StableId="@Id("association-correction-status")"
                                  StateFamily="@CorrectionFeedbackState"
                                  LiveRegionPoliteness="@ChatBotLiveRegionPoliteness.Polite" />
             <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
-                @TextRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionAffectedContext], CorrectionAffectedContext)
-                @CodeRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionDownstreamImpact], CorrectionDownstreamImpact)
+                @AssociationReviewRendering.TextRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionAffectedContext], CorrectionAffectedContext)
+                @AssociationReviewRendering.CodeRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionDownstreamImpact], CorrectionDownstreamImpact)
                 @if (!string.IsNullOrWhiteSpace(PriorProjectId))
                 {
-                    @CodeRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionPriorProject], PriorProjectId)
+                    @AssociationReviewRendering.CodeRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionPriorProject], PriorProjectId)
                 }
                 @if (PropagationEstimatedCompletionAtUtc is { } eta)
                 {
-                    @TextRow(UiText[ChatBotUiTextKey.AssociationReviewPropagationEtaLabel], Formatter.FormatDateTime(eta))
+                    @AssociationReviewRendering.TextRow(UiText[ChatBotUiTextKey.AssociationReviewPropagationEtaLabel], Formatter.FormatDateTime(eta))
                 }
                 @if (PropagationProgressNumerator is > 0 || PropagationProgressDenominator is > 0)
                 {
-                    @TextRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionPropagationProgress], PropagationProgressText)
+                    @AssociationReviewRendering.TextRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionPropagationProgress], PropagationProgressText)
                 }
                 @if (!string.IsNullOrWhiteSpace(ResponsibleOwnerRole))
                 {
-                    @TextRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionResponsibleOwner], ResponsibleOwnerRole)
+                    @AssociationReviewRendering.TextRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionResponsibleOwner], ResponsibleOwnerRole)
                 }
-                @TextRow(UiText[ChatBotUiTextKey.NextActionLabel], CorrectionSafeNextActionText)
+                @AssociationReviewRendering.TextRow(UiText[ChatBotUiTextKey.NextActionLabel], CorrectionSafeNextActionText)
             </FluentStack>
             <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-field">
-                <FluentLabel Class="chatbot-labelled-row" for="association-correction-rationale">
+                <FluentLabel Class="chatbot-labelled-row" for="@Id("association-correction-rationale")">
                     @UiText[ChatBotUiTextKey.AssociationReviewCorrectionRationale]
                 </FluentLabel>
-                <FluentTextArea Id="association-correction-rationale"
+                <FluentTextArea Id="@Id("association-correction-rationale")"
                                 Value="@CorrectionRationale"
                                 ValueChanged="UpdateCorrectionRationale"
                                 Immediate="true"
@@ -94,7 +94,7 @@
                                 aria-describedby="@CorrectionRationaleDescribedBy"
                                 Maxlength="@AssociationReviewService.MaximumNoteLength"
                                 aria-invalid="@CorrectionRationaleInvalidText" />
-                <FluentText Id="association-correction-rationale-counter" Class="chatbot-field__counter">
+                <FluentText Id="@Id("association-correction-rationale-counter")" Class="chatbot-field__counter">
                     @UiText.Get(ChatBotUiTextKey.AssociationReviewNoteCounterTemplate,
                                 (CorrectionRationale?.Length ?? 0).ToString(System.Globalization.CultureInfo.CurrentCulture),
                                 AssociationReviewService.MaximumNoteLength.ToString(System.Globalization.CultureInfo.CurrentCulture))
@@ -102,7 +102,7 @@
             </FluentStack>
             <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.AssociationReviewCorrectionSubmit]"
                                    AccessibleLabel="@UiText[ChatBotUiTextKey.AssociationReviewCorrectionSubmit]"
-                                   StableId="association-correction-submit"
+                                   StableId="@Id("association-correction-submit")"
                                    State="@CorrectionActionState"
                                    DisabledReason="@CorrectionDisabledReason"
                                    Appearance="ButtonAppearance.Primary"
@@ -112,6 +112,10 @@
 </section>
 
 @code {
+    private readonly string _instanceId = $"association-actions-{Guid.NewGuid():N}";
+
+    private string Id(string suffix) => $"{_instanceId}-{suffix}";
+
     [Parameter]
     public bool HasSelectedCandidate { get; set; }
 
@@ -255,13 +259,13 @@
     /// </summary>
     private string DecisionNoteDescribedBy
         => string.IsNullOrWhiteSpace(ValidationErrorCode) || IsCorrectionValidationError
-            ? "association-decision-note-counter"
-            : "association-review-validation association-decision-note-counter";
+            ? Id("association-decision-note-counter")
+            : $"{Id("association-review-validation")} {Id("association-decision-note-counter")}";
 
     private string CorrectionRationaleDescribedBy
         => IsCorrectionValidationError
-            ? "association-review-validation association-correction-status association-correction-rationale-counter"
-            : "association-correction-status association-correction-rationale-counter";
+            ? $"{Id("association-review-validation")} {Id("association-correction-status")} {Id("association-correction-rationale-counter")}"
+            : $"{Id("association-correction-status")} {Id("association-correction-rationale-counter")}";
 
     private string CorrectionAffectedContext
         => string.IsNullOrWhiteSpace(CorrectedProjectId)
@@ -376,17 +380,4 @@
     private async Task SubmitCorrectionAsync()
         => await OnSubmitCorrection.InvokeAsync().ConfigureAwait(true);
 
-    // Story 13.4: the former correction-panel <dl> renders as a structured
-    // Fluent key-value block. The downstream-impact status token keeps <code class="chatbot-code">; the
-    // localized affected-context preview, propagation-progress, responsible-owner and safe-next-action
-    // values render as plain FluentText (the latter three were already non-monospace) (AC3).
-    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
-        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <code class="chatbot-code">@value</code>
-    </FluentStack>;
-
-    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
-        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <FluentText>@value</FluentText>
-    </FluentStack>;
 }

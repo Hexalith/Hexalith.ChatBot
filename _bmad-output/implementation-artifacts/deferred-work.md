@@ -942,7 +942,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of story-13.3 �
 location: ChatBotAssociationReviewActions.razor:4,7,10,47,68,71
 severity: low
 reason: **[LOW · maintainability] Reusable association components hardcode DOM ids.** `association-actions-title`, `association-decision-note`, `association-correction-title`, `association-correction-rationale` (`ChatBotAssociationReviewActions.razor:4,7,10,47,68,71`) and `association-comparison-title` (`ChatBotAssociationEvidenceComparison.razor:14`) are fixed strings on parameterised components. **Not covered:** harmless today because each renders once per page. **Owner:** ChatBot UI. **Closure evidence:** ids derived from a component-instance prefix, or a documented single-instance constraint.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: Association components derive all controls, banners, action reasons and evidence identities from per-instance prefixes; real HtmlRenderer tests cover repeated components, repeated evidence objects, local label/ARIA resolution and same-instance parameter transitions. Verification: 211 focused/static-render cases passed with zero failures/skips; see validation/five-deferred-association-review.json for exact commands, source/result hashes, unchanged baseline failures and runtime limitations. Independent recheck found no unresolved findings.
 
 ### DW-106: [LOW · maintainability] Three verbatim copies of `CodeRow`/`TextRow` and two of `EvidenceText`.
 
@@ -950,7 +951,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of story-13.3 �
 location: AssociationReview.razor:209
 severity: low
 reason: **[LOW · maintainability] Three verbatim copies of `CodeRow`/`TextRow` and two of `EvidenceText`.** `AssociationReview.razor:209`, `ChatBotAssociationEvidenceComparison.razor:77,82`, `ChatBotAssociationReviewActions.razor:360,365`, `ChatBotAssociationCandidateRow.razor:57` — each carrying its own near-identical "Story 13.4" comment. **Owner:** ChatBot UI. **Closure evidence:** one shared render-fragment helper.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: One internal AssociationReviewRendering helper supplies encoded Fluent code/text rows and restricted-evidence display. Real renders prove opaque values remain code, confidence/owner display remains ordinary text, and restricted kind/reference/fingerprint values are withheld with the localized placeholder. Verification: 211 focused/static-render cases passed with zero failures/skips; see validation/five-deferred-association-review.json for exact commands, source/result hashes, unchanged baseline failures and runtime limitations. Independent recheck found no unresolved findings.
 
 ### DW-107: [MEDIUM · test-quality] The association CSS conformance assertions are not tied to association selectors.
 
@@ -958,7 +960,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of story-13.3 �
 location: AssociationReviewComponentContractTests.cs:227-238
 severity: medium
 reason: **[MEDIUM · test-quality] The association CSS conformance assertions are not tied to association selectors.** `AssociationReviewComponentContractTests.cs:227-238` checks that `chatbot.tokens.css` contains `.chatbot-association-candidate` and, separately, that the file contains `max-width: 48rem`, `forced-colors`, and `prefers-reduced-motion` blocks — with nothing binding those blocks to any association rule. Every association class could lose its responsive and forced-colors handling with the test still green. The sibling `ProjectConversationCss...` fact repeats the identical three assertions against the identical file. **Owner:** ChatBot UI tests. **Closure evidence:** assertions scoped to the rule block containing the association selector, or replaced by a computed-style check on the live render.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: Selector-scoped exact media/property checks now cover responsive association rules and the shared forced-colors/reduced-motion rules used by actual rendered association classes. Mutations remove selectors, replace width with min-width, change transition-delay and add later overrides; every mutation is rejected. Verification: 211 focused/static-render cases passed with zero failures/skips; see validation/five-deferred-association-review.json for exact commands, source/result hashes, unchanged baseline failures and runtime limitations. Independent recheck found no unresolved findings.
 
 ### DW-108: [LOW · test-quality] `css.ShouldNotContain("#")` is both too strict and too weak.
 
@@ -966,7 +969,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of story-13.3 �
 location: AssociationReviewComponentContractTests.cs:232
 severity: low
 reason: **[LOW · test-quality] `css.ShouldNotContain("#")` is both too strict and too weak.** It bans every `#` in the file — id selectors, `url(#…)` fragments, `#` inside comments — while the raw-colour check it stands in for misses `rgba(`, `hsla(`, `oklch(`, `color-mix(`, and named colours (`ShouldNotContain("rgb(")` does not match `rgba(`). `AssociationReviewComponentContractTests.cs:232`. **Owner:** ChatBot UI tests. **Closure evidence:** a colour-literal matcher covering the modern colour functions, with `#` restricted to hex-triplet position.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: Declaration-value color checks detect valid hex forms, alpha/modern constructors and named colors, including literals nested in color-mix/light-dark. Comments, selectors, URL fragments, strings, non-color identifiers, system colors and token-only expressions are allowed by regressions. Verification: 211 focused/static-render cases passed with zero failures/skips; see validation/five-deferred-association-review.json for exact commands, source/result hashes, unchanged baseline failures and runtime limitations. Independent recheck found no unresolved findings.
 
 ### DW-109: [LOW · test-quality] `AssociationReviewComponentContractTests` covers five unrelated components.
 
@@ -974,7 +978,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of story-13.3 �
 location: Program.cs
 severity: low
 reason: **[LOW · test-quality] `AssociationReviewComponentContractTests` covers five unrelated components.** Four of its eight facts assert on `ProjectConversation`, `ChatBotEmailConversationItem`, `ChatBotApprovalConversationItem`, `ChatBotTaskIntentReviewPanel`, `ChatBotWhyProjectPanel`, `Program.cs`, and the `.csproj`, so a task-intent change fails a test class named for association review. **Owner:** ChatBot UI tests. **Closure evidence:** the unrelated facts moved to their own classes.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: Unrelated shell, hosting, project-conversation, approval, task-intent and Why-project facts moved into purpose-specific classes with a shared source utility. The focused lane executes every relocated class and association regressions. Verification: 211 focused/static-render cases passed with zero failures/skips; see validation/five-deferred-association-review.json for exact commands, source/result hashes, unchanged baseline failures and runtime limitations. Independent recheck found no unresolved findings.
 
 ### DW-110: [MEDIUM · correctness] `ResolveEvidenceState` re-derives evidence state by substring keyword sniffing.
 

@@ -111,8 +111,8 @@ public sealed class Story12CssRetirementE2ETests
         composer.ShouldNotContain("chatbot-governed-composer__input", Case.Sensitive);
 
         associationActions.ShouldContain("<FluentTextArea", Case.Sensitive);
-        associationActions.ShouldContain("Id=\"association-decision-note\"", Case.Sensitive);
-        associationActions.ShouldContain("Id=\"association-correction-rationale\"", Case.Sensitive);
+        associationActions.ShouldContain("Id=\"@Id(\"association-decision-note\")\"", Case.Sensitive);
+        associationActions.ShouldContain("Id=\"@Id(\"association-correction-rationale\")\"", Case.Sensitive);
         associationActions.ShouldContain("aria-invalid=\"@DecisionNoteInvalidText\"", Case.Sensitive);
         associationActions.ShouldContain("aria-describedby=\"@DecisionNoteDescribedBy\"", Case.Sensitive);
         associationActions.ShouldContain("aria-describedby=\"@CorrectionRationaleDescribedBy\"", Case.Sensitive);
@@ -159,8 +159,8 @@ public sealed class Story12CssRetirementE2ETests
             return component.ToHtmlString();
         }).ConfigureAwait(true);
 
-        string decision = Regex.Match(html, "<fluent-textarea[^>]*id=\"association-decision-note\"[^>]*>").Value;
-        string correction = Regex.Match(html, "<fluent-textarea[^>]*id=\"association-correction-rationale\"[^>]*>").Value;
+        string decision = Regex.Match(html, "<fluent-textarea[^>]*id=\"[^\"]*association-decision-note\"[^>]*>").Value;
+        string correction = Regex.Match(html, "<fluent-textarea[^>]*id=\"[^\"]*association-correction-rationale\"[^>]*>").Value;
         decision.ShouldNotBeEmpty(html);
         correction.ShouldNotBeEmpty();
         decision.ShouldContain($"aria-invalid=\"{decisionInvalid}\"");
@@ -169,11 +169,12 @@ public sealed class Story12CssRetirementE2ETests
         {
             string description = Regex.Match(field, "aria-describedby=\"([^\"]+)\"").Groups[1].Value;
             description.ShouldNotBeEmpty();
-            description.Split(' ').ShouldContain(invalid == "true" ? "association-review-validation"
-                : field == decision ? "association-decision-note-counter" : "association-correction-rationale-counter");
+            string suffix = invalid == "true" ? "association-review-validation"
+                : field == decision ? "association-decision-note-counter" : "association-correction-rationale-counter";
+            description.Split(' ').ShouldContain(id => id.EndsWith(suffix, StringComparison.Ordinal));
             if (invalid == "false")
             {
-                description.Split(' ').ShouldNotContain("association-review-validation");
+                description.Split(' ').ShouldNotContain(id => id.EndsWith("association-review-validation", StringComparison.Ordinal));
             }
 
             foreach (string id in description.Split(' '))

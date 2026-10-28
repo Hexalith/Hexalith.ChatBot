@@ -4608,7 +4608,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         string fixture = BuildAssociationValidationTerminalFixture();
         string actions = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor");
 
-        actions.ShouldContain("StableId=\"association-review-validation\"");
+        actions.ShouldContain("StableId=\"@Id(\"association-review-validation\")\"");
         actions.ShouldContain("StateFamily=\"@ChatBotFeedbackStateFamily.ValidationError\"");
         actions.ShouldContain("aria-describedby=\"@DecisionNoteDescribedBy\"");
         actions.ShouldContain("aria-invalid=\"@DecisionNoteInvalidText\"");

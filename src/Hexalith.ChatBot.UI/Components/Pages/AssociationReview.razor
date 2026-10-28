@@ -199,12 +199,12 @@
                     <section class="chatbot-section" aria-label="@UiText[ChatBotUiTextKey.AssociationReviewSourceMetadata]">
                         <FluentCard>
                             <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
-                                @CodeRow(UiText[ChatBotUiTextKey.OperationLabel], review.AssociationId)
-                                @CodeRow(UiText[ChatBotUiTextKey.ConversationContext], review.SourceConversationId)
-                                @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], review.LifecycleState)
-                                @CodeRow(UiText[ChatBotUiTextKey.ReasonCodesLabel], string.Join(", ", review.ReasonCodes))
-                                @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], string.Join(", ", review.NextActionReasonCodes))
-                                @CodeRow(UiText[ChatBotUiTextKey.AssociationReviewMetadata], $"{review.SourceProvenance} · {review.SchemaVersion}")
+                                @AssociationReviewRendering.CodeRow(UiText[ChatBotUiTextKey.OperationLabel], review.AssociationId)
+                                @AssociationReviewRendering.CodeRow(UiText[ChatBotUiTextKey.ConversationContext], review.SourceConversationId)
+                                @AssociationReviewRendering.CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], review.LifecycleState)
+                                @AssociationReviewRendering.CodeRow(UiText[ChatBotUiTextKey.ReasonCodesLabel], string.Join(", ", review.ReasonCodes))
+                                @AssociationReviewRendering.CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], string.Join(", ", review.NextActionReasonCodes))
+                                @AssociationReviewRendering.CodeRow(UiText[ChatBotUiTextKey.AssociationReviewMetadata], $"{review.SourceProvenance} · {review.SchemaVersion}")
                             </FluentStack>
                         </FluentCard>
                     </section>
@@ -390,11 +390,4 @@
     private static bool CanCorrect(AssociationReviewModel review)
         => AssociationReviewModelExtensions.CanCorrect(review.LifecycleState);
 
-    // Story 13.4: the former source-metadata <dl> renders as a structured
-    // Fluent key-value block. Every value (association/conversation ids, lifecycle/reason/next-action tokens,
-    // provenance · schema-version) is an opaque token and keeps <code class="chatbot-code"> (AC3).
-    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
-        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <code class="chatbot-code">@value</code>
-    </FluentStack>;
 }

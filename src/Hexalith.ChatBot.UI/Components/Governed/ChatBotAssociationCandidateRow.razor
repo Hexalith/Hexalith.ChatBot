@@ -29,17 +29,20 @@
 @* The chips sit outside the radio. Nested interactive controls are invalid HTML, and while they were inside
    the FluentButton every chip activation also selected the candidate. *@
 <span class="chatbot-association-candidate__evidence">
-    @foreach (AssociationEvidenceModel evidence in Candidate.Evidence)
+    @for (int index = 0; index < Candidate.Evidence.Count; index++)
     {
-        <ChatBotEvidenceChip Text="@EvidenceText(evidence)"
+        AssociationEvidenceModel evidence = Candidate.Evidence[index];
+        <ChatBotEvidenceChip Text="@AssociationReviewRendering.EvidenceText(evidence, UiText)"
                              State="@evidence.State"
                              CanOpenEvidence="@(evidence.State is ChatBotEvidenceState.Available)"
                              UnavailableReason="@evidence.UnavailableReason"
-                             StableId="@EvidenceStableId(evidence)" />
+                             StableId="@EvidenceStableId(index)" />
     }
 </span>
 
 @code {
+    private readonly string _instanceId = $"association-candidate-{Guid.NewGuid():N}";
+
     [Parameter, EditorRequired]
     public AssociationCandidateModel Candidate { get; set; } = default!;
 
@@ -70,31 +73,7 @@
             Formatter.FormatConfidence(Candidate.ConfidenceScore),
             Candidate.DisplayLabel);
 
-    private string EvidenceText(AssociationEvidenceModel evidence)
-        => evidence.State is ChatBotEvidenceState.Available
-            ? string.Concat(evidence.Kind, " ", evidence.Reference)
-            : UiText[ChatBotUiTextKey.AssociationReviewEvidenceRestricted];
-
-    /// <summary>
-    /// Derives a stable id from the candidate's project id and the evidence position rather than the evidence
-    /// reference. The reference is free text that can repeat or contain characters invalid in an id - and for
-    /// restricted evidence it is exactly the value this surface must not emit, yet the chip renders the id
-    /// only when the evidence is unavailable, redacted, or unauthorized.
-    /// </summary>
-    private string EvidenceStableId(AssociationEvidenceModel evidence)
-    {
-        int index = 0;
-        for (int position = 0; position < Candidate.Evidence.Count; position++)
-        {
-            if (ReferenceEquals(Candidate.Evidence[position], evidence))
-            {
-                index = position;
-                break;
-            }
-        }
-
-        return $"candidate-{Candidate.ProjectId}-{index}";
-    }
+    private string EvidenceStableId(int position) => $"{_instanceId}-evidence-{position}";
 
     private async Task SelectAsync()
         => await OnSelected.InvokeAsync(Candidate.ProjectId).ConfigureAwait(true);

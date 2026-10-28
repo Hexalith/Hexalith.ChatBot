@@ -1,0 +1,235 @@
+{
+  "schemaVersion": 1,
+  "recordKind": "local-maintenance-verification",
+  "createdAtUtc": "2026-10-28T11:52:02.179026+00:00",
+  "baselineCommit": "aa4450b21339a6d902147b91f936ed5c5150dec2",
+  "specPath": "_bmad-output/implementation-artifacts/spec-five-deferred-association-review.md",
+  "items": {
+    "DW-105": [
+      "AssociationReviewRenderingTests.RepeatedActionPanelsShouldKeepLabelsAndDescriptionsLocalAndStable",
+      "AssociationReviewRenderingTests.RepeatedComparisonsShouldIsolateHeadingEmptyStateAndEvidenceIds",
+      "AssociationReviewRenderingTests.RevealingCorrectionAndValidationShouldPreserveSurvivingIdsAndLocalReferences",
+      "AssociationReviewRenderingTests.CandidateAndEvidenceChangesShouldPreserveInstanceIdentity"
+    ],
+    "DW-106": [
+      "AssociationReviewRenderingTests.SharedEvidenceDisplayShouldExposeOnlyAvailableMetadata",
+      "AssociationReviewRenderingTests.CorrectionDisplayTextShouldStayEncodedAndOutsideCodeElements",
+      "AssociationReviewRenderingTests.RepeatedComparisonsShouldIsolateHeadingEmptyStateAndEvidenceIds"
+    ],
+    "DW-107": [
+      "AssociationReviewCssContractTests.AssociationRulesShouldRetainTheirResponsiveAndAccessibilityDeclarations",
+      "AssociationReviewCssContractTests.RemovingAnAssociationSelectorShouldFailEvenWhileMediaBlocksRemain",
+      "AssociationReviewCssContractTests.ReplacingAnExactAccessibilityDeclarationShouldFail",
+      "AssociationReviewCssContractTests.LaterOverridesOfTheSameSelectorShouldFail",
+      "AssociationReviewRenderingTests.RepeatedActionPanelsShouldKeepLabelsAndDescriptionsLocalAndStable",
+      "AssociationReviewRenderingTests.RepeatedComparisonsShouldIsolateHeadingEmptyStateAndEvidenceIds"
+    ],
+    "DW-108": [
+      "AssociationReviewCssContractTests.LiteralColorDeclarationsShouldBeDetected",
+      "AssociationReviewCssContractTests.NonColorHashesAndAdaptiveKeywordsShouldBeAllowed",
+      "AssociationReviewCssContractTests.ProductStylesShouldUseThemeColors"
+    ],
+    "DW-109": [
+      "FrontComposerBodyContractTests",
+      "ChatBotUiHostingContractTests",
+      "ProjectConversationComponentContractTests",
+      "ApprovalConversationItemContractTests",
+      "TaskIntentReviewPanelContractTests",
+      "WhyProjectPanelContractTests"
+    ]
+  },
+  "changedSourceSha256": {
+    "src/Hexalith.ChatBot.UI/Components/Governed/AssociationReviewRendering.cs": "e14ffaaeeeb775f51029c124d27bdfc1c7f42d46f9a93ff95662b2995f267da3",
+    "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationCandidateRow.razor": "de0a33d2ef9781a4ed6e06374996085cb61eb7fae9c7ea2b66a8b241f008fd42",
+    "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationEvidenceComparison.razor": "094e356a66ed83cce0b20f25c0cc6b8c8146c60b9e038b0d536c4083dc03ea85",
+    "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor": "6a0c2bf410ad14fb41e82956166e92017a44ba569f3fda9e0904ab225cd96a3d",
+    "src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor": "45c0c8a0f10ce76564eefeaaea0cfef36de086643237f3b43929b3f8c9445930",
+    "tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs": "08ed54dd087148323592413e264681e49c054fd210c6b4531339f717b2f50840",
+    "tests/Hexalith.ChatBot.UI.E2E.Tests/Story12CssRetirementE2ETests.cs": "4fbb28a92e356ea7f1581ae0dbc8ba0b36793354ea20a6d2f40fc1882d52c272",
+    "tests/Hexalith.ChatBot.UI.Tests/ApprovalConversationItemContractTests.cs": "78a77db550d7b1a13d17b245f4a641b67aa88f8c75f84d794d1d9bbf30b76458",
+    "tests/Hexalith.ChatBot.UI.Tests/AssociationRenderJsRuntime.cs": "11ad7263c15bbdf7b001d209b94715219f74a1f28909ba1f857b89eb0ef23ea0",
+    "tests/Hexalith.ChatBot.UI.Tests/AssociationReviewComponentContractTests.cs": "cc61f2aa8cda461442f865ba5aabeb47c2f03f268d9a17d210c4e01a292c2c67",
+    "tests/Hexalith.ChatBot.UI.Tests/AssociationReviewCssContractTests.cs": "5b9dec74811d9fb0a06c756a4a74f961bfc8b294500ee618411d62213f33f74f",
+    "tests/Hexalith.ChatBot.UI.Tests/AssociationReviewRenderingTests.cs": "8096ce6e959f759b754577bb4951fbff501ec3c4ce47c567d8e6572a2ccd06f2",
+    "tests/Hexalith.ChatBot.UI.Tests/ChatBotUiHostingContractTests.cs": "ef6ee24194cc8c85b7845f080231d8e02a17f52a23f2a7c4db23171d3763d7df",
+    "tests/Hexalith.ChatBot.UI.Tests/ComponentContractSource.cs": "9e0857e109bf42a936d12f2b63f7cdc437f733e527bcc4296ca5bc0804d49fca",
+    "tests/Hexalith.ChatBot.UI.Tests/CssContract.cs": "f336d62e7e0b533a1425fbb38af33c0d1724b85992ff461e448f47120f3c5ba0",
+    "tests/Hexalith.ChatBot.UI.Tests/FrontComposerBodyContractTests.cs": "5895675ef86beab36cd5351c19d0ebba779a3606007694736deb6bc99c56edf7",
+    "tests/Hexalith.ChatBot.UI.Tests/ProjectConversationComponentContractTests.cs": "da0c53de9d5092ff27f0bf3ae45b10e6e96b062ff079add131d99c0e33e5056f",
+    "tests/Hexalith.ChatBot.UI.Tests/Story13DefinitionListMigrationTests.cs": "6b04ecebeaa95d757dcdda4d6003942f17780ae7e2d280985932c8572896c8f6",
+    "tests/Hexalith.ChatBot.UI.Tests/TaskIntentReviewPanelContractTests.cs": "3b782cc455e088ecdab939bf7afff0b48e3c3e1c52ffe58766b4d9913735aaef",
+    "tests/Hexalith.ChatBot.UI.Tests/WhyProjectPanelContractTests.cs": "7413c7b5ea555ca40e5d9f5a7fa70d681cd1703f8474c1a1a244b5e7837bddd4"
+  },
+  "stylesheetInput": {
+    "path": "src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css",
+    "sha256": "43361a1f3cfc97bdfcecff9f5e112e138c7dbd1ea1d131f70cf4db3be2c75d9f"
+  },
+  "reports": {
+    "baseline": {
+      "summary": {
+        "tests": 533,
+        "passed": 529,
+        "failed": 4,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793187349283,
+        "stop": 1793187350819,
+        "duration": 1536
+      },
+      "failedTests": [
+        "Hexalith.ChatBot.UI.Tests.ChatBotAccessibilityFocusContractTests.PackagePinsShouldMatchApprovedSharedCatalogForAccessibilityFloor",
+        "Hexalith.ChatBot.UI.Tests.ChatBotLiveRegionReducedMotionContractTests.PackagePinsShouldMatchApprovedSharedCatalogForLiveRegionAndMotionFoundation",
+        "Hexalith.ChatBot.UI.Tests.ChatBotLocalizationContractTests.PackagePinsShouldMatchApprovedSharedCatalogForLocalizationFoundation",
+        "Hexalith.ChatBot.UI.Tests.ChatBotResponsiveTouchContractTests.PackagePinsShouldMatchApprovedSharedCatalog"
+      ],
+      "artifacts": [
+        {
+          "path": "TestResults/five-association-baseline.ctrf.json",
+          "sha256": "986def4f440bad1821b34850ad62a2cf9fc066adf64e33966fe624421432c46f"
+        },
+        {
+          "path": "TestResults/five-association-baseline.trx",
+          "sha256": "2947e395d26b3d0fc87e786b64d6db1d00121c057f57ccadbced85e1c12f8c59"
+        }
+      ]
+    },
+    "final": {
+      "summary": {
+        "tests": 585,
+        "passed": 581,
+        "failed": 4,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793188242552,
+        "stop": 1793188244191,
+        "duration": 1639
+      },
+      "failedTests": [
+        "Hexalith.ChatBot.UI.Tests.ChatBotAccessibilityFocusContractTests.PackagePinsShouldMatchApprovedSharedCatalogForAccessibilityFloor",
+        "Hexalith.ChatBot.UI.Tests.ChatBotLiveRegionReducedMotionContractTests.PackagePinsShouldMatchApprovedSharedCatalogForLiveRegionAndMotionFoundation",
+        "Hexalith.ChatBot.UI.Tests.ChatBotLocalizationContractTests.PackagePinsShouldMatchApprovedSharedCatalogForLocalizationFoundation",
+        "Hexalith.ChatBot.UI.Tests.ChatBotResponsiveTouchContractTests.PackagePinsShouldMatchApprovedSharedCatalog"
+      ],
+      "artifacts": [
+        {
+          "path": "TestResults/five-association-final.ctrf.json",
+          "sha256": "bde944eed7a3093120b2e07fa6e084eee63b471c38f20e3a669f60eba65351fa"
+        },
+        {
+          "path": "TestResults/five-association-final.trx",
+          "sha256": "31afd712ce974751faf686a2302adb8ec3e31db02e52d1130584e81d1749edfb"
+        }
+      ]
+    },
+    "focused": {
+      "summary": {
+        "tests": 205,
+        "passed": 205,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793188242554,
+        "stop": 1793188242908,
+        "duration": 354
+      },
+      "failedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-association-focused.ctrf.json",
+          "sha256": "e4f609f3d43ba9f5791a67c80abfc0e6a5d4592cb71bad80b0c1e155ebe1f196"
+        },
+        {
+          "path": "TestResults/five-association-focused.trx",
+          "sha256": "53d40fd5ab1f33bf956faca28990769916fe14d7747bc38aa46c55b82ad9d75e"
+        }
+      ]
+    },
+    "render": {
+      "summary": {
+        "tests": 6,
+        "passed": 6,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793188242549,
+        "stop": 1793188242767,
+        "duration": 218
+      },
+      "failedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-association-render.ctrf.json",
+          "sha256": "675a4f2a99693695e4a68ae16c780e3917259b29b689df1b5411962cb52522b1"
+        },
+        {
+          "path": "TestResults/five-association-render.trx",
+          "sha256": "533eed58d2c5def365a5f5358d83e8b6d0ae34542e02c0bbd95603970b069c9c"
+        }
+      ]
+    }
+  },
+  "commands": [
+    {
+      "command": "dotnet build tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj --configuration Debug --no-restore -m:1",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0
+    },
+    {
+      "command": "dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --configuration Debug --no-restore -m:1",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0
+    },
+    {
+      "command": "bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests TestResults/five-association-baseline.ctrf.json -result-trx TestResults/five-association-baseline.trx",
+      "exitCode": 1,
+      "report": "baseline"
+    },
+    {
+      "command": "bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests TestResults/five-association-final.ctrf.json -result-trx TestResults/five-association-final.trx",
+      "exitCode": 1,
+      "report": "final"
+    },
+    {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests TestResults/five-association-focused.ctrf.json -result-trx TestResults/five-association-focused.trx -class '*Association*' -class Hexalith.ChatBot.UI.Tests.FrontComposerBodyContractTests -class Hexalith.ChatBot.UI.Tests.ChatBotUiHostingContractTests -class Hexalith.ChatBot.UI.Tests.ProjectConversationComponentContractTests -class Hexalith.ChatBot.UI.Tests.ApprovalConversationItemContractTests -class Hexalith.ChatBot.UI.Tests.TaskIntentReviewPanelContractTests -class Hexalith.ChatBot.UI.Tests.WhyProjectPanelContractTests -class Hexalith.ChatBot.UI.Tests.Story13DefinitionListMigrationTests",
+      "exitCode": 0,
+      "report": "focused"
+    },
+    {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests TestResults/five-association-render.ctrf.json -result-trx TestResults/five-association-render.trx -class Hexalith.ChatBot.UI.E2E.Tests.Story12CssRetirementE2ETests",
+      "exitCode": 0,
+      "report": "render"
+    },
+    {
+      "command": "aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+      "exitCode": 2,
+      "result": "Conversations Contracts/Client: Conversations requires the Platform tool-selected source mapping; validation does not resolve dependency mappings."
+    },
+    {
+      "command": "aspire describe --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --non-interactive",
+      "exitCode": 0,
+      "result": "No AppHost is currently running for the selected project."
+    }
+  ],
+  "independentReview": {
+    "findingsPatched": 10,
+    "newDeferredItems": 0,
+    "recheck": "No concrete unresolved findings; reviewer independently ran 51 renderer/CSS cases."
+  },
+  "limitations": [
+    "Broad UI failure identities exactly match the pre-change baseline: four existing shared-catalog assertions expect Playwright 1.64.0 while the approved catalog supplies 1.64.1.",
+    "AppHost startup failed before launch because Conversations requires a Platform source mapping unavailable in this checkout.",
+    "HtmlRenderer and CSS source/declaration assertions are local component evidence. No live browser primary, full-topology, product-story, sprint or release-gate completion is claimed.",
+    "The CSS inspector supports the current flat rules; it does not expand shorthands or implement the entire CSS cascade.",
+    "Raw local CTRF/TRX artifacts are ignored diagnostics. This receipt is not a TE-2 completion contract or retained primary evidence."
+  ]
+}
