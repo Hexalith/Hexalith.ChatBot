@@ -240,19 +240,7 @@ public static class ScaffoldArchitectureTests
         List<string> violations = [];
         int externalSourceReferenceCount = 0;
         int packageCounterpartCount = 0;
-        // Published Hexalith.Folders.Client/Contracts 1.3.1 predate the native client, and the catalog has no
-        // Hexalith.Folders.Server package. Those pinned source references stay explicit and are not package
-        // counterparts. Every other external source dependency remains source-mode-only with an exact package twin.
-        const string UnconditionalDependency = "<unconditional>";
-        string[] pinnedNativeFoldersSources =
-        [
-            "src/Hexalith.ChatBot.Server/Hexalith.ChatBot.Server.csproj|$(HexalithFoldersRoot)\\src\\Hexalith.Folders.Client\\Hexalith.Folders.Client.csproj|" + UnconditionalDependency,
-            "src/Hexalith.ChatBot.Server/Hexalith.ChatBot.Server.csproj|$(HexalithFoldersRoot)\\src\\Hexalith.Folders.Contracts\\Hexalith.Folders.Contracts.csproj|" + UnconditionalDependency,
-            "tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj|$(HexalithFoldersRoot)\\src\\Hexalith.Folders.Client\\Hexalith.Folders.Client.csproj|" + SourceModeCondition,
-            "tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj|$(HexalithFoldersRoot)\\src\\Hexalith.Folders.Client\\Hexalith.Folders.Client.csproj|" + PackageModeCondition,
-            "tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj|$(HexalithFoldersRoot)\\src\\Hexalith.Folders.Server\\Hexalith.Folders.Server.csproj|" + SourceModeCondition,
-        ];
-        List<string> observedPinnedNativeFoldersSources = [];
+        int sourceOnlyOwnerFixtureCount = 0;
         foreach (string projectFile in projectFiles)
         {
             XDocument project = XDocument.Load(projectFile);
@@ -261,23 +249,12 @@ public static class ScaffoldArchitectureTests
                 .Where(static reference =>
                     reference.Attribute("Include")?.Value.StartsWith("$(Hexalith", StringComparison.Ordinal) == true)
                 .ToArray();
+            externalSourceReferenceCount += externalProjectReferences.Length;
 
             foreach (XElement projectReference in externalProjectReferences)
             {
                 string include = projectReference.Attribute("Include")!.Value;
-                string pinnedNativeFoldersSource = Path.GetRelativePath(root, projectFile).Replace('\\', '/')
-                    + "|"
-                    + include
-                    + "|"
-                    + (DependencyCondition(projectReference) ?? UnconditionalDependency);
-                if (pinnedNativeFoldersSources.Contains(pinnedNativeFoldersSource, StringComparer.Ordinal))
-                {
-                    observedPinnedNativeFoldersSources.Add(pinnedNativeFoldersSource);
-                    continue;
-                }
-
-                externalSourceReferenceCount++;
-                string projectReferenceCondition = DependencyCondition(projectReference) ?? UnconditionalDependency;
+                string projectReferenceCondition = DependencyCondition(projectReference) ?? "<unconditional>";
                 if (!string.Equals(projectReferenceCondition, SourceModeCondition, StringComparison.Ordinal))
                 {
                     violations.Add(
@@ -285,20 +262,39 @@ public static class ScaffoldArchitectureTests
                         + $"found {projectReferenceCondition}");
                 }
 
+                // This aliased executable hosts the real owner fixture, which is deliberately absent in package mode.
+                // Client/Contracts remain subject to the ordinary package-counterpart checks below.
+                if (string.Equals(
+                        Path.GetRelativePath(root, projectFile),
+                        Path.Combine("tests", "Hexalith.ChatBot.Server.Tests", "Hexalith.ChatBot.Server.Tests.csproj"),
+                        StringComparison.Ordinal)
+                    && string.Equals(
+                        include,
+                        @"$(HexalithFoldersRoot)\src\Hexalith.Folders.Server\Hexalith.Folders.Server.csproj",
+                        StringComparison.Ordinal))
+                {
+                    (projectReference.Attribute("Aliases")?.Value).ShouldBe("FoldersOwner");
+                    XElement fixtureExclusion = project.Descendants("Compile").Single(element =>
+                        element.Attribute("Remove")?.Value == "Adapters/Folders/FoldersNativeAttachmentTests.cs");
+                    DependencyCondition(fixtureExclusion).ShouldBe(PackageModeCondition);
+                    sourceOnlyOwnerFixtureCount++;
+                    continue;
+                }
+
                 string packageId = include
                     .Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries)
                     .Last()
                     .Replace(".csproj", string.Empty, StringComparison.Ordinal);
-                // A source-mode ExcludeAssets=all reference can suppress a duplicate assembly while the project
-                // reference supplies compilation. Only the package-mode reference is the release counterpart.
                 XElement? packageReference = project
                     .Descendants("PackageReference")
+                    // A source-mode ExcludeAssets="all" entry only suppresses transitive package assets.
+                    // It cannot supply the usable package dependency required by the Release graph.
+                    .Where(static reference => !string.Equals(
+                        (reference.Attribute("ExcludeAssets")?.Value ?? reference.Element("ExcludeAssets")?.Value)?.Trim(),
+                        "all",
+                        StringComparison.OrdinalIgnoreCase))
                     .SingleOrDefault(reference =>
-                        string.Equals(reference.Attribute("Include")?.Value, packageId, StringComparison.Ordinal)
-                        && string.Equals(
-                            DependencyCondition(reference) ?? UnconditionalDependency,
-                            PackageModeCondition,
-                            StringComparison.Ordinal));
+                        string.Equals(reference.Attribute("Include")?.Value, packageId, StringComparison.Ordinal));
                 if (packageReference is null)
                 {
                     violations.Add(
@@ -317,13 +313,13 @@ public static class ScaffoldArchitectureTests
             }
         }
 
-        observedPinnedNativeFoldersSources.ShouldBe(pinnedNativeFoldersSources, ignoreOrder: true);
         externalSourceReferenceCount.ShouldBeGreaterThan(
             10,
             "the package-mode guard must inspect the real cross-repository dependency graph");
+        sourceOnlyOwnerFixtureCount.ShouldBe(1, "only the source-only aliased Folders owner fixture is exempt");
         packageCounterpartCount.ShouldBe(
-            externalSourceReferenceCount,
-            "every external source dependency must have an exact package-mode counterpart");
+            externalSourceReferenceCount - sourceOnlyOwnerFixtureCount,
+            "every external library source dependency must have an exact package-mode counterpart");
         violations.ShouldBeEmpty();
 
         XDocument appHost = XDocument.Load(appHostProject);
@@ -837,13 +833,13 @@ public static class ScaffoldArchitectureTests
             // failed-retryable / failed-terminal) — the same compliance domain as TenantExportContracts, not the legacy
             // lifecycle enum. It legitimately owns the "succeeded" token exactly like the status enums above.
             .Where(static file => !file.EndsWith(Path.Combine("Commands", "DeletionErasureClassStatuses.cs"), StringComparison.Ordinal))
-            // Native Folders evidence owns the owner receipt token "accepted". That vocabulary is the Folders
-            // operation receipt, not the legacy command lifecycle enum.
-            .Where(static file => !file.EndsWith(Path.Combine("Adapters", "Folders", "NativeEvidenceTokens.cs"), StringComparison.Ordinal))
             .Where(static file => !file.EndsWith(Path.Combine("Localization", "ChatBotUiTextLocalizer.cs"), StringComparison.Ordinal))
             .Where(file => stringLiteral.Matches(File.ReadAllText(file))
                 .Select(static match => match.Groups["value"].Value)
-                .Any(value => legacyLifecycleStates.Contains(value, StringComparer.Ordinal)))
+                .Any(value => legacyLifecycleStates.Contains(value, StringComparer.Ordinal)
+                    // The native evidence token owner may declare accepted; other lifecycle tokens remain guarded.
+                    && !(value == "accepted"
+                        && file.EndsWith(Path.Combine("Adapters", "Folders", "NativeEvidenceTokens.cs"), StringComparison.Ordinal))))
             .Select(file => Path.GetRelativePath(root, file))
             .ToArray();
 
@@ -1077,8 +1073,8 @@ public static class ScaffoldArchitectureTests
             PackageCatalogTestHelper.AssertSiblingAuthority(wrapper);
         }
 
-        PackageCatalogTestHelper.Version("Hexalith.Folders.Client").ShouldBe("1.3.1");
-        PackageCatalogTestHelper.Version("Hexalith.Folders.Contracts").ShouldBe("1.3.1");
+        PackageCatalogTestHelper.Version("Hexalith.Folders.Client").ShouldBe("1.3.2");
+        PackageCatalogTestHelper.Version("Hexalith.Folders.Contracts").ShouldBe("1.3.2");
         PackageCatalogTestHelper.Version("Hexalith.Projects.Client").ShouldBe("1.2.0");
         PackageCatalogTestHelper.Version("Hexalith.Projects.Contracts").ShouldBe("1.2.0");
         PackageCatalogTestHelper.Version("LibGit2Sharp").ShouldBe("0.32.0");

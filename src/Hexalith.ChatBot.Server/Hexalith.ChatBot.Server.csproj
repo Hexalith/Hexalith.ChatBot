@@ -30,6 +30,8 @@
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Client\Hexalith.EventStore.Client.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Contracts\Hexalith.EventStore.Contracts.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.DomainService\Hexalith.EventStore.DomainService.csproj" />
+    <ProjectReference Include="$(HexalithFoldersRoot)\src\Hexalith.Folders.Client\Hexalith.Folders.Client.csproj" />
+    <ProjectReference Include="$(HexalithFoldersRoot)\src\Hexalith.Folders.Contracts\Hexalith.Folders.Contracts.csproj" />
     <ProjectReference Include="$(HexalithPartiesRoot)\src\Hexalith.Parties.Client\Hexalith.Parties.Client.csproj" />
     <ProjectReference Include="$(HexalithPartiesRoot)\src\Hexalith.Parties.Contracts\Hexalith.Parties.Contracts.csproj" />
     <ProjectReference Include="$(HexalithProjectsRoot)\src\Hexalith.Projects.Client\Hexalith.Projects.Client.csproj" />
@@ -48,16 +50,13 @@
     <PackageReference Include="Hexalith.EventStore.Client" />
     <PackageReference Include="Hexalith.EventStore.Contracts" />
     <PackageReference Include="Hexalith.EventStore.DomainService" />
+    <PackageReference Include="Hexalith.Folders.Client" />
+    <PackageReference Include="Hexalith.Folders.Contracts" />
     <PackageReference Include="Hexalith.Memories.Client.Rest" />
     <PackageReference Include="Hexalith.Memories.Contracts" />
     <PackageReference Include="Hexalith.Parties.Client" />
     <PackageReference Include="Hexalith.Parties.Contracts" />
     <PackageReference Include="Hexalith.Projects.Client" />
     <PackageReference Include="Hexalith.Tenants.Contracts" />
-  </ItemGroup>
-  <!-- Published Hexalith.Folders.Client 1.3.1 predates the native client. Compile the pinned source in both graph modes. -->
-  <ItemGroup>
-    <ProjectReference Include="$(HexalithFoldersRoot)\src\Hexalith.Folders.Client\Hexalith.Folders.Client.csproj" />
-    <ProjectReference Include="$(HexalithFoldersRoot)\src\Hexalith.Folders.Contracts\Hexalith.Folders.Contracts.csproj" />
   </ItemGroup>
 </Project>

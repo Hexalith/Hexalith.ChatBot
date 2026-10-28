@@ -38,7 +38,7 @@
     <PackageReference Include="Hexalith.Commons.UniqueIds" />
     <PackageReference Include="Hexalith.EventStore.Contracts" />
     <PackageReference Include="Hexalith.EventStore.DomainService" />
-    <ProjectReference Include="$(HexalithFoldersRoot)\src\Hexalith.Folders.Client\Hexalith.Folders.Client.csproj" />
+    <PackageReference Include="Hexalith.Folders.Client" />
     <PackageReference Include="Hexalith.Parties.Client" />
     <PackageReference Include="Hexalith.Parties.Contracts" />
     <PackageReference Include="Hexalith.Projects.Client" />

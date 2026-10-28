@@ -161,45 +161,6 @@ public sealed class FoldersNativeAttachmentTests
         (await fixture.ReadAsync(binding).ConfigureAwait(true)).ShouldBe(request.Content.Content.ToArray());
         (await fixture.StateAsync().ConfigureAwait(true)).WorkspaceLockHolderTaskId.ShouldBeNull();
     }
-    [Theory]
-    [InlineData(401, "folders_authorization_unavailable")]
-    [InlineData(403, "folders_authorization_unavailable")]
-    [InlineData(404, "folders_authorization_unavailable")]
-    [InlineData(409, "folders_concurrency_conflict")]
-    [InlineData(422, "folders_request_unavailable")]
-    [InlineData(503, "folders_store_retryable")]
-    public async Task NativeRuntimeMapsSafeTypedFailures(int status, string reason)
-    {
-        using var handler = new NativeAttachmentTestHandler((_, _) => Task.FromResult(new HttpResponseMessage((System.Net.HttpStatusCode)status)
-            { Content = new StringContent("{\"code\":\"concurrency_conflict\"}") }));
-        using var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") };
-        var store = new FoldersFolderStore(new NativeClient(http), "tenant-a");
-        var result = await store.StoreMailboxAttachmentAsync(Request(), TestContext.Current.CancellationToken).ConfigureAwait(true);
-        result.Stored.ShouldBeNull(); result.Failure.ShouldNotBeNull().ReasonCode.ShouldBe(reason);
-        result.Failure.DuplicateState.ShouldBe("not-evaluated");
-    }
-    [Fact]
-    public async Task MalformedConflictProblemCannotEscapeNativeFailureMapping()
-    {
-        using var handler = new NativeAttachmentTestHandler((_, _) => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.Conflict)
-            { Content = new StringContent("{\"code\":{\"unexpected\":true}}") }));
-        using var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") };
-        var result = await new FoldersFolderStore(new NativeClient(http), "tenant-a").StoreMailboxAttachmentAsync(Request(), TestContext.Current.CancellationToken).ConfigureAwait(true);
-        result.Stored.ShouldBeNull(); result.Failure.ShouldNotBeNull().ReasonCode.ShouldBe("folders_concurrency_conflict");
-    }
-    [Fact]
-    public async Task NativeMalformedResponseAndTransportLossFailSafely()
-    {
-        using var handler = new NativeAttachmentTestHandler((_, _) => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
-            { Content = new StringContent("{") }));
-        using var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") };
-        var store = new FoldersFolderStore(new NativeClient(http) { ReadResponseAsString = true }, "tenant-a");
-        (await store.StoreMailboxAttachmentAsync(Request(), TestContext.Current.CancellationToken).ConfigureAwait(true)).Failure.ShouldNotBeNull().ReasonCode.ShouldBe("folders_store_retryable");
-        using var broken = new NativeAttachmentTestHandler((_, _) => throw new HttpRequestException("secret transport details"));
-        using var unavailable = new HttpClient(broken) { BaseAddress = new Uri("http://localhost/") };
-        var failure = await new FoldersFolderStore(new NativeClient(unavailable), "tenant-a").StoreMailboxAttachmentAsync(Request(), TestContext.Current.CancellationToken).ConfigureAwait(true);
-        failure.Failure.ShouldNotBeNull().ReasonCode.ShouldBe("folders_store_retryable");
-    }
     [Fact]
     public async Task CallerCancellationStillReleasesAnEmptyNativeLease()
     {

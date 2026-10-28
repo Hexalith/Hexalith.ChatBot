@@ -26,6 +26,7 @@ internal static class PackageCatalogTestHelper
             ["Hexalith1BuildPackageProps"] = authorityPath,
             ["HexalithBuildPackageVersions1"] = authorityPath,
             ["HexalithBuildsResolvedRoot"] = Path.GetDirectoryName(Path.GetDirectoryName(authorityPath))!,
+            ["HexalithBuildsRoot"] = Path.GetDirectoryName(Path.GetDirectoryName(authorityPath))!,
         };
         using JsonDocument evaluation = EvaluateWrapper(wrapperPath, globalProperties);
         IReadOnlyDictionary<string, string> versions = ReadVersions(evaluation, authorityPath, wrapperPath);
