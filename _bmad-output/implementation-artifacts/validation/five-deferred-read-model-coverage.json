@@ -1,0 +1,279 @@
+{
+  "schemaVersion": 1,
+  "recordKind": "local-maintenance-verification",
+  "createdAtUtc": "2026-10-28T13:33:16.152076+00:00",
+  "baselineCommit": "acf8f6c219ea85f278740eb7b0ba3c38888c086f",
+  "specPath": "_bmad-output/implementation-artifacts/spec-five-deferred-read-model-coverage.md",
+  "items": {
+    "DW-104": [
+      "Narrowed historical B2 claims and helper documentation to NFR59; cleanup absence diagnostics do not prove post-erase channel liveness"
+    ],
+    "DW-138": [
+      "RecoveryIntakeInventoryTests.InventoryCoversProductionRootsAndMaterializedChildrenWithoutOwningSharedIndexes",
+      "RecoveryIntakeReadModelProbeTests.KeysPreserveCanonicalShapesAndOrder"
+    ],
+    "DW-139": [
+      "RecoveryIntakeInventoryTests",
+      "AspireRecoveryCleanupStateTests.ConcreteCleanupOwnsIndexedDescendantsAndDetectsReappearanceAfterIndexErasure",
+      "AspireRecoveryCleanupStateTests.LateInventoryFailureRestoresConcreteCleanupWithoutStartingErasure"
+    ],
+    "DW-140": [
+      "Already resolved at baseline; LiveProjectionRebuildDriverTests.RebuildUsesOnlyTheSelectedTenantImmutableSourceAndWormChain passes before and after this change"
+    ],
+    "DW-142": [
+      "Independent full shared probe/test/fake-store follow-up review completed; six verification gaps patched and rechecked",
+      "Intermediate-poll regression rejects deliberately skipped intermediate observations"
+    ]
+  },
+  "changedSourceSha256": {
+    "_bmad-output/implementation-artifacts/12-15-stand-up-live-recovery-continuity-fault-injection-drivers-and-recalibrate-a10.md": "774ad91dabdf68e8122be164130980c73702904e0abe9cab40a130d1df83c2d1",
+    "src/Hexalith.ChatBot.Server/Projections/ReadModelProjectConversationProjectionStore.cs": "05ceb2598c41f38972f24b554b9be9f83e82fb0f71c2040439aa523e243e2a66",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/AdvancingRecoveryTimeProvider.cs": "5f2e470a5ad52c69ea8a899aa6cf826d11e76619e78cf2dd1f61ec61d53bfe09",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/AspireRecoveryCleanupStateTests.cs": "0541d28e538042918091e7452e4c6b98bef72ed1733d5b44123e53b9962f1beb",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/AspireRecoverySandboxOperations.cs": "048a891474c4b06f15d6364796fae19947b9985bab0d3cbd4de1868c4c751b5b",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/AspireScopedOutageOperations.cs": "135e0581e236da0b70d73fe6e5056baaf9e17cda5add23528977e806b0f3968d",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryIntakeInventoryTests.cs": "04beb85ffbfa58f99d8d97c1df178f839918108197ee993a8458be20d44a0d79",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryIntakeReadModelProbe.cs": "8ed8641780b84925fab1d1fe75b1735ee8708d6682f6b6f5bae3407bf70aff02",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryIntakeReadModelProbeTests.cs": "11ec445ccbcfef713dcdf3595dfcd27e44feddfd277c2babee16a6ce9886da46"
+  },
+  "reports": {
+    "baseline": {
+      "summary": {
+        "tests": 27,
+        "passed": 27,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793193448659,
+        "stop": 1793193448856,
+        "duration": 197
+      },
+      "failedTests": [],
+      "skippedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-readmodels-baseline.ctrf.json",
+          "sha256": "dd5926da75bdbaa44ba420e432ef9c7cbc72ce231067bbb5030a4ea8342114cc"
+        },
+        {
+          "path": "TestResults/five-readmodels-baseline.trx",
+          "sha256": "668becc0227039849b2728e08f0ea7c5985bab64919e4a077bc660ccbbfe14d4"
+        }
+      ]
+    },
+    "focused": {
+      "summary": {
+        "tests": 74,
+        "passed": 74,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793194320697,
+        "stop": 1793194321110,
+        "duration": 413
+      },
+      "failedTests": [],
+      "skippedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-readmodels-final-focused.ctrf.json",
+          "sha256": "68c51ccfc88e5bcd0ef28473867523c0ee55d7889c3114ca9bb09b997d30da19"
+        },
+        {
+          "path": "TestResults/five-readmodels-final-focused.trx",
+          "sha256": "152025edd20026b5dea42233c251975ed963b9bcf928d8ee42c55c4ef49444b0"
+        }
+      ]
+    },
+    "integration": {
+      "summary": {
+        "tests": 482,
+        "passed": 475,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 7,
+        "other": 0,
+        "suites": 1,
+        "start": 1793194321560,
+        "stop": 1793194331592,
+        "duration": 10032
+      },
+      "failedTests": [],
+      "skippedTests": [
+        "Hexalith.ChatBot.IntegrationTests.Recovery.LiveRecoveryEvidenceGateReplayTests.RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess",
+        "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.CorrectionPropagationWorkflowRuntimeShouldBeHealthyInRealDaprTopology",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.CommittedGovernedStateShouldPassM2StopShipSweepsInRealDaprTopology",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.GovernedNoteShouldProjectIdenticalDurableEndStateRegardlessOfDeclaredOrigin",
+        "Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests.AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix"
+      ],
+      "artifacts": [
+        {
+          "path": "TestResults/five-readmodels-restored-integration.ctrf.json",
+          "sha256": "a7e60ac5f5ea323132fca78c3e4b018cbf06cd5518ce841d78581667b1af0797"
+        },
+        {
+          "path": "TestResults/five-readmodels-restored-integration.trx",
+          "sha256": "2469a32fbff7b8c5689c3586318acbd91b33e95df7d34167f5ce706b11ea1dc9"
+        }
+      ]
+    },
+    "server": {
+      "summary": {
+        "tests": 3534,
+        "passed": 3534,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793194108366,
+        "stop": 1793194224099,
+        "duration": 115733
+      },
+      "failedTests": [],
+      "skippedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-readmodels-server.ctrf.json",
+          "sha256": "1ef10211d7d32bd24d56905937b7b444ec02f2e6a137316d504cee2d9ea4cea2"
+        },
+        {
+          "path": "TestResults/five-readmodels-server.trx",
+          "sha256": "c9978e086e1878643258f0321c73399f68e2112fa810321a1436e5abd63caf7b"
+        }
+      ]
+    },
+    "intermediateObservationMutant": {
+      "summary": {
+        "tests": 1,
+        "passed": 0,
+        "failed": 1,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793194253610,
+        "stop": 1793194253760,
+        "duration": 150
+      },
+      "failedTests": [
+        "Hexalith.ChatBot.IntegrationTests.Recovery.RecoveryIntakeReadModelProbeTests.SustainedAbsenceReturnsFalseForIntermediatePresenceEvenAfterLaterRemoval"
+      ],
+      "skippedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-readmodels-intermediate-mutant.ctrf.json",
+          "sha256": "c7ab146b8d7cec849e92e82c67c69b6be78e79e6f9716f8e8a1e96ad1974fbb7"
+        },
+        {
+          "path": "TestResults/five-readmodels-intermediate-mutant.trx",
+          "sha256": "eea9fe9ac0da1f8acca588a3247254f39360a695b09526a28506a261fa370a68"
+        }
+      ]
+    }
+  },
+  "commands": [
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+      "exitCode": 0,
+      "result": "AppHost started; resource inspection found Keycloak unhealthy and dependent projects waiting; no healthy topology qualification claimed"
+    },
+    {
+      "command": "aspire describe --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --non-interactive",
+      "exitCode": 0
+    },
+    {
+      "command": "aspire stop --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+      "exitCode": 0,
+      "result": "AppHost stopped successfully before builds"
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug --no-restore -m:1",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0,
+      "artifacts": [
+        {
+          "path": "TestResults/five-readmodels-build-final.log",
+          "sha256": "a2ffb4b35cac45896005ad5281b6f39aee5bd08e0495657c5931f43fcb7e4729"
+        }
+      ]
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --configuration Debug --no-restore -m:1",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0,
+      "artifacts": [
+        {
+          "path": "TestResults/five-readmodels-server-build.log",
+          "sha256": "0c60f36c2b38c84361e04310e449ca4fc2b4333786c2be64e2a262cabb86a207"
+        }
+      ]
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug --no-restore -m:1 -p:BuildProjectReferences=false",
+      "exitCode": 0,
+      "result": "Rebuilt original Integration project after restoring mutation source byte-for-byte; dependency graph had already built successfully",
+      "warnings": 0,
+      "errors": 0,
+      "artifacts": [
+        {
+          "path": "TestResults/five-readmodels-restored-build.log",
+          "sha256": "7ff37dbcb56bde9ff70fe6e561db110e7976b3deb1ef31f0505a1787c1098a57"
+        }
+      ]
+    },
+    {
+      "command": "bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests TestResults/five-readmodels-final-focused.ctrf.json -class Hexalith.ChatBot.IntegrationTests.Recovery.RecoveryIntakeReadModelProbeTests -class Hexalith.ChatBot.IntegrationTests.Recovery.RecoveryIntakeInventoryTests -class Hexalith.ChatBot.IntegrationTests.Recovery.AspireRecoveryCleanupStateTests -class Hexalith.ChatBot.IntegrationTests.Recovery.LiveProjectionRebuildDriverTests -result-trx TestResults/five-readmodels-final-focused.trx",
+      "exitCode": 0
+    },
+    {
+      "command": "bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests TestResults/five-readmodels-restored-integration.ctrf.json -result-trx TestResults/five-readmodels-restored-integration.trx",
+      "exitCode": 0
+    },
+    {
+      "command": "bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests TestResults/five-readmodels-server.ctrf.json -parallel none -result-trx TestResults/five-readmodels-server.trx",
+      "exitCode": 0
+    },
+    {
+      "command": "bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests TestResults/five-readmodels-intermediate-mutant.ctrf.json -method Hexalith.ChatBot.IntegrationTests.Recovery.RecoveryIntakeReadModelProbeTests.SustainedAbsenceReturnsFalseForIntermediatePresenceEvenAfterLaterRemoval -result-trx TestResults/five-readmodels-intermediate-mutant.trx",
+      "exitCode": 1,
+      "expectedFailure": true,
+      "result": "Mutant skips intermediate observations while preserving the initial/closing reads and elapsed-window loop. Assertion expected false but observed true. Original source restored before final passing verification.",
+      "artifacts": [
+        {
+          "path": "TestResults/five-readmodels-intermediate-mutant.log",
+          "sha256": "02a653d4f117d4887e3e0e2e192adafed371a44ff13d10811b856519a7dde3cf"
+        }
+      ]
+    },
+    {
+      "command": "npx --yes --package @commitlint/cli commitlint --edit /tmp/chatbot-five-read-model-coverage-commit.txt",
+      "exitCode": 0,
+      "result": "Conventional Commit message validated before committing"
+    }
+  ],
+  "review": {
+    "layers": [
+      "blind-hunter"
+    ],
+    "findings": 6,
+    "patched": 6,
+    "deferred": 0,
+    "finalRecheck": "All six findings addressed; no additional concrete issue found in isolated indexed/captured fixture scope"
+  },
+  "limitations": [
+    "Local maintenance evidence only; no story, sprint, release, A10 or production recovery acceptance is advanced",
+    "Seven existing explicit live/retained-evidence/production-browser opt-in tests were skipped; no live recovery qualification claimed",
+    "Inventory covers production-indexed fixture rows and previously captured descendants; arbitrary unindexed orphans and concurrent live writers are outside this key-addressed fixture contract",
+    "Shared project/global discovery indexes remain intact; package/Release qualification was not run",
+    "Raw local artifacts under ignored TestResults are machine-local; this retained summary records their checksums"
+  ]
+}

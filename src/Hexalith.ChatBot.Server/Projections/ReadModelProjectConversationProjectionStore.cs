@@ -16,6 +16,84 @@ internal sealed class ReadModelProjectConversationProjectionStore(
     private readonly IProjectConversationChangePublisher _changePublisher =
         changePublisher ?? NoOpProjectConversationChangePublisher.Instance;
 
+    /// <summary>Gets the intake-owned root keys without including shared project or tenant indexes.</summary>
+    /// <param name="tenantId">The tenant identifier.</param>
+    /// <param name="intakeId">The intake identifier.</param>
+    /// <returns>The existing production root keys, with discovery indexes last.</returns>
+    internal static IReadOnlyList<string> IntakeReadModelKeysFor(string tenantId, string intakeId)
+        =>
+        [
+            ProjectConversationSourceEmailView.KeyFor(tenantId, intakeId),
+            ProjectConversationAttachmentSetView.KeyFor(tenantId, intakeId),
+            AttachmentIndexKeyFor(tenantId, intakeId),
+            ParticipantIndexKeyFor(tenantId, intakeId),
+            IntakeIndexKeyFor(tenantId, intakeId),
+        ];
+
+    /// <summary>Inventories indexed intake-owned rows for isolated recovery-fixture cleanup.</summary>
+    /// <remarks>
+    /// Capture before erasing discovery indexes. Shared indexes are read but never returned for erasure.
+    /// Key-addressed reads cannot discover arbitrary unindexed orphans or fence concurrent projection writers.
+    /// </remarks>
+    /// <param name="tenantId">The fixture tenant identifier.</param>
+    /// <param name="intakeId">The fixture intake identifier.</param>
+    /// <param name="cancellationToken">Cancels inventory reads.</param>
+    /// <returns>Descendant keys followed by the intake roots.</returns>
+    internal async Task<IReadOnlyList<string>> GetIntakeReadModelKeysAsync(
+        string tenantId,
+        string intakeId,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<string> roots = IntakeReadModelKeysFor(tenantId, intakeId);
+        HashSet<string> descendants = new(StringComparer.Ordinal);
+        ProjectConversationParticipantIndex participants = await GetParticipantIndexAsync(
+            tenantId, intakeId, cancellationToken).ConfigureAwait(false);
+        foreach (string key in participants.ParticipantKeys)
+        {
+            ParticipantResolutionView? participant = await GetAsync<ParticipantResolutionView>(key, cancellationToken)
+                .ConfigureAwait(false);
+            if (participant is not null)
+            {
+                if (!string.Equals(participant.TenantId, tenantId, StringComparison.Ordinal) ||
+                    !string.Equals(participant.IntakeId, intakeId, StringComparison.Ordinal) ||
+                    !string.Equals(key, ParticipantResolutionView.KeyFor(
+                        tenantId, participant.ResolutionId, participant.SourceParticipantId), StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("The intake participant index references a foreign read model.");
+                }
+
+                descendants.Add(key);
+            }
+        }
+
+        ProjectConversationIntakeIndex intake = await GetIntakeIndexAsync(tenantId, intakeId, cancellationToken)
+            .ConfigureAwait(false);
+        ProjectConversationTenantProjectIndex projects = await GetTenantProjectIndexAsync(tenantId, cancellationToken)
+            .ConfigureAwait(false);
+        foreach (string projectId in projects.ProjectIds.Concat(intake.Items.Select(static item => item.ProjectId))
+            .Distinct(StringComparer.Ordinal))
+        {
+            ProjectConversationIndex project = await GetIndexAsync(tenantId, projectId, cancellationToken)
+                .ConfigureAwait(false);
+            foreach (string itemId in project.ItemIds.Concat(intake.Items
+                .Where(item => string.Equals(item.ProjectId, projectId, StringComparison.Ordinal))
+                .Select(static item => item.ItemId)).Distinct(StringComparer.Ordinal))
+            {
+                string key = ProjectConversationItemView.KeyFor(tenantId, projectId, itemId);
+                ProjectConversationItemView? item = await GetAsync<ProjectConversationItemView>(key, cancellationToken)
+                    .ConfigureAwait(false);
+                if (item is not null &&
+                    string.Equals(item.TenantId, tenantId, StringComparison.Ordinal) &&
+                    string.Equals(item.IntakeId, intakeId, StringComparison.Ordinal))
+                {
+                    descendants.Add(key);
+                }
+            }
+        }
+
+        return [.. descendants.Order(StringComparer.Ordinal), .. roots];
+    }
+
     public async Task UpsertAsync(ProjectConversationItemView item, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(item);

@@ -22,6 +22,149 @@ public sealed class AspireRecoveryCleanupStateTests
     private static readonly TimeSpan Poll = TimeSpan.FromMilliseconds(1);
     private static readonly TimeSpan Window = TimeSpan.FromMilliseconds(3);
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task LateInventoryFailureRestoresConcreteCleanupWithoutStartingErasure(bool scoped, bool cancel)
+    {
+        string tenant = RecoveryValidationTopology.StorageTenantRef;
+        InMemoryRecoveryReadModelStore store = new();
+        await RecoveryIntakeInventoryTests.SeedAsync(store, tenant, Id1);
+        IReadOnlyList<string> before = store.Keys(ChatBotReadModelStoreNames.StateStoreName);
+        string participant = ParticipantResolutionView.KeyFor(tenant, "resolution-" + Id1, "sender");
+        using CancellationTokenSource cancellation = new();
+        if (cancel)
+        {
+            store.OnReadKey = key =>
+            {
+                if (string.Equals(key, participant, StringComparison.Ordinal))
+                {
+                    cancellation.Cancel();
+                }
+            };
+        }
+        else
+        {
+            store.FailOnReadKey = participant;
+        }
+
+        int restores = 0;
+        using EventStoreDurableStateProbe durable = Durable(new RecoveryDurableStateMessageHandler());
+        Func<Task> cleanup;
+        if (scoped)
+        {
+            ScopedOutageOperationsTestSeam seam = new()
+            {
+                RestoreAsync = (_, _, _) =>
+                {
+                    restores++;
+                    return ValueTask.FromResult(true);
+                },
+            };
+            AspireScopedOutageOperations operations = ScopedOperations(seam, store, durable);
+            operations.ActiveCleanupState.GraphIntakeRefs.Add(Id1);
+            cleanup = () => operations.CleanupAsync(
+                ScopedOutageDependencies.Graph, RecoveryValidationTopology.LogicalTenantRef, cancellation.Token).AsTask();
+        }
+        else
+        {
+            RecoverySandboxOperationsTestSeam seam = SandboxSeam(response: (_, _, _, _, _, _) =>
+            {
+                restores++;
+                return ValueTask.FromResult(Json(RestoreBody()));
+            });
+            AspireRecoverySandboxOperations operations = SandboxOperations(seam, store, durable);
+            operations.ActiveSubscriptionCleanupState.StorageIntakeRefs.Add(Id1);
+            cleanup = () => operations.CleanupSubscriptionScenarioAsync(
+                RecoveryValidationTopology.LogicalTenantRef, cancellation.Token).AsTask();
+        }
+
+        if (cancel)
+        {
+            (await Should.ThrowAsync<OperationCanceledException>(cleanup)).CancellationToken.ShouldBe(cancellation.Token);
+        }
+        else
+        {
+            await Should.ThrowAsync<InvalidOperationException>(cleanup);
+        }
+
+        restores.ShouldBe(1);
+        store.Erases.ShouldBe(0);
+        store.Keys(ChatBotReadModelStoreNames.StateStoreName).ShouldBe(before);
+    }
+
+    [Theory]
+    [InlineData("subscription", false)]
+    [InlineData("subscription", true)]
+    [InlineData("graph", false)]
+    [InlineData("graph", true)]
+    [InlineData("identity", false)]
+    [InlineData("identity", true)]
+    public async Task ConcreteCleanupOwnsIndexedDescendantsAndDetectsReappearanceAfterIndexErasure(
+        string lane,
+        bool recreateParticipant)
+    {
+        string tenant = RecoveryValidationTopology.StorageTenantRef;
+        InMemoryRecoveryReadModelStore store = new();
+        await RecoveryIntakeInventoryTests.SeedAsync(store, tenant, Id2);
+        await RecoveryIntakeInventoryTests.SeedAsync(store, tenant, Id1);
+        RecoveryIntakeReadModelProbe inventoryProbe = new(store, store);
+        IReadOnlyList<string> inventory = await inventoryProbe.CaptureKeysAsync(
+            tenant, Id1, TestContext.Current.CancellationToken);
+        string[] preserved = store.Keys(ChatBotReadModelStoreNames.StateStoreName)
+            .Except(inventory, StringComparer.Ordinal).ToArray();
+        string participantKey = inventory.Single(key => key.Contains(":participant-resolution:", StringComparison.Ordinal));
+        object participant = (await store.GetAsync<object>(ChatBotReadModelStoreNames.StateStoreName,
+            participantKey, TestContext.Current.CancellationToken)).Value!;
+        string lastIndex = RecoveryIntakeReadModelProbe.KeysFor(tenant, Id1)[^1];
+        if (recreateParticipant)
+        {
+            store.OnEraseKey = key =>
+            {
+                if (string.Equals(key, lastIndex, StringComparison.Ordinal))
+                {
+                    store.SaveAsync(ChatBotReadModelStoreNames.StateStoreName, participantKey, participant)
+                        .GetAwaiter().GetResult();
+                }
+            };
+        }
+
+        using EventStoreDurableStateProbe durable = Durable(new RecoveryDurableStateMessageHandler());
+        bool complete;
+        if (string.Equals(lane, "subscription", StringComparison.Ordinal))
+        {
+            AspireRecoverySandboxOperations operations = SandboxOperations(SandboxSeam(), store, durable);
+            operations.ActiveSubscriptionCleanupState.StorageIntakeRefs.Add(Id1);
+            complete = await operations.CleanupSubscriptionScenarioAsync(
+                RecoveryValidationTopology.LogicalTenantRef, TestContext.Current.CancellationToken);
+        }
+        else
+        {
+            AspireScopedOutageOperations operations = ScopedOperations(
+                ScopedSeam(new Queue<string>(["{\"faulted\":false}"])), store, durable);
+            string dependency;
+            if (string.Equals(lane, "identity", StringComparison.Ordinal))
+            {
+                operations.ActiveCleanupState.IdentityAffectedSentinel = Sentinel(tenant, Id1);
+                dependency = ScopedOutageDependencies.Identity;
+            }
+            else
+            {
+                operations.ActiveCleanupState.GraphIntakeRefs.Add(Id1);
+                dependency = ScopedOutageDependencies.Graph;
+            }
+
+            complete = await operations.CleanupAsync(
+                dependency, RecoveryValidationTopology.LogicalTenantRef, TestContext.Current.CancellationToken);
+        }
+
+        complete.ShouldBe(!recreateParticipant);
+        store.Keys(ChatBotReadModelStoreNames.StateStoreName).ShouldBe(preserved
+            .Concat(recreateParticipant ? [participantKey] : Array.Empty<string>()).Order(StringComparer.Ordinal));
+    }
+
     [Fact]
     public async Task EventStorePreCommitFailureIsCleanedAndRetired()
     {

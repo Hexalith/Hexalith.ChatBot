@@ -111,7 +111,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         _readModels = new ReadModelProjectConversationProjectionStore(readModelStore);
         _governedOperationProjections = new ReadModelGovernedOperationViewStore(readModelStore);
         _readModelEraser = readModelEraser;
-        _intakeReadModels = new RecoveryIntakeReadModelProbe(readModelEraser);
+        _intakeReadModels = new RecoveryIntakeReadModelProbe(readModelStore, readModelEraser);
         _durableState = durableState;
         _chatBotClient = application.CreateHttpClient("chatbot");
         _chatBotClient.Timeout = TimeSpan.FromSeconds(30);
@@ -153,7 +153,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         _readModels = new ReadModelProjectConversationProjectionStore(readModelStore);
         _governedOperationProjections = new ReadModelGovernedOperationViewStore(readModelStore);
         _readModelEraser = readModelEraser;
-        _intakeReadModels = new RecoveryIntakeReadModelProbe(readModelEraser, pollInterval);
+        _intakeReadModels = new RecoveryIntakeReadModelProbe(readModelStore, readModelEraser, pollInterval);
         _durableState = durableState;
         _pollInterval = pollInterval;
         _absenceConfirmationWindow = absenceConfirmationWindow;
@@ -1438,7 +1438,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
 
     private async Task EraseIntakeReadModelsAsync(string tenantId, string intakeId, CancellationToken cancellationToken)
     {
-        foreach (string key in RecoveryIntakeReadModelProbe.KeysFor(tenantId, intakeId))
+        foreach (string key in await _intakeReadModels.CaptureKeysAsync(tenantId, intakeId, cancellationToken).ConfigureAwait(false))
         {
             await EraseReadModelAsync(key, cancellationToken).ConfigureAwait(false);
         }
@@ -1619,14 +1619,13 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     }
 
     /// <summary>
-    /// Proves the projection channel can actually read a view the SERVER wrote, before any absence result from it
-    /// is believed.
+    /// Proves the projection channel can read a server-written view before the NFR59 absence observation.
     /// </summary>
     /// <remarks>
     /// Without this, the absence probe is vacuous by construction: point it at the wrong tenant partition or the
-    /// wrong component and every call returns "absent", so "no unauthorized mutation landed" and "erasure
-    /// succeeded" both pass while observing nothing at all. A known-present read through the same store, same
-    /// component and same key shape is what makes a subsequent null a fact rather than an artefact.
+    /// wrong component and every call returns "absent". This control backs the NFR59 unauthorized-mutation check.
+    /// Cleanup checks are separate diagnostics: the fault-probe check has no explicit liveness control, and the
+    /// post-erase sweep has no known-present checkpoint left. Neither proves post-erase channel liveness.
     /// </remarks>
     /// <param name="tenantRef">The tenant partition the absence probe will read.</param>
     /// <param name="presentNoteRef">A governed note the server is known to have projected.</param>

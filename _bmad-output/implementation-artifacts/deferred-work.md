@@ -934,7 +934,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15 chunk 
 location: AspireRecoverySandboxOperations.cs:458
 severity: medium
 reason: **[MEDIUM · claim-accuracy] Claim B2's "every absence result" holds at one of three absence call sites.** `AssertProjectionChannelReadsServerWritesAsync` precedes only the NFR59 absence probe (`AspireRecoverySandboxOperations.cs:458`). The cleanup fault-probe absence (`:605-611`) and the post-erase absence sweep including the control tenant (`:646-657`) have no positive control. **Not covered:** the post-erase check is structurally unable to have one — by then everything it could read has been erased — which is exactly the "erasure succeeded passes while observing nothing at all" case B2's rationale names. **Fix:** narrow the claim to the NFR59 absence result, or give the cleanup fault-probe site its own control. **Owner:** ChatBot Tier-3 harness. **Closure evidence:** the B2 claim states which absence results are control-backed, and the cleanup site either carries a control or records why it cannot.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: Corrected both historical B2 claims and the projection-channel helper documentation to bind the positive control specifically to the NFR59 unauthorized-mutation observation. Cleanup fault-probe absence has no explicit positive control; the post-erase sweep has no known-present checkpoint remaining and does not establish post-erase channel liveness. See spec-five-deferred-read-model-coverage.md and validation/five-deferred-read-model-coverage.json.
 
 ### DW-105: [LOW · maintainability] Reusable association components hardcode DOM ids.
 
@@ -1234,7 +1235,8 @@ location: tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryIntakeReadMod
 source_spec: `spec-shared-recovery-read-model-keys.md`
 severity: medium
 reason: RecoveryIntakeReadModelProbe.KeysFor builds the third key as the literal `{tenantId}:project-conversation:{intakeId}:attachments`, while production writes it from the private `AttachmentIndexKeyFor` in ReadModelProjectConversationProjectionStore. The first two keys are genuinely tethered (they call the public KeyFor factories); the third is compared only against a restatement of itself in KeysPreserveCanonicalShapesAndOrder. Editing the production shape breaks no test, and the harness would then erase and assert absence of a key that can never exist. This story reduced the number of harness copies from two to one but could not close the gap: the intent lists production as read-only evidence and forbids changing production read-model keys or public contracts.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: Recovery root keys now delegate to the production ReadModelProjectConversationProjectionStore.IntakeReadModelKeysFor, which uses the same private index factories as production writers. Real production projection inventory tests verify persisted roots and materialized descendants, retaining the existing key strings. Focused tests and scoped review are recorded in spec-five-deferred-read-model-coverage.md and validation/five-deferred-read-model-coverage.json.
 
 ### DW-139: The "canonical" intake read-model set covers three keys while an intake also materializes per-intake items and participants entries, so cleanup and cross-tenant isolation checks cannot observe leaks t
 origin: spec-deferred 9e2be3ea29d2
@@ -1242,7 +1244,8 @@ location: tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryIntakeReadMod
 source_spec: `spec-shared-recovery-read-model-keys.md`
 severity: medium
 reason: Both operations classes document EraseIntakeReadModelsAsync as erasing "every read model an intake materializes", but ReadModelProjectConversationProjectionStore also persists `{tenant}:project-conversation:{intake}:items` and `...:participants` plus the item and participant views they index. Those are outside the trio, so they survive cleanup and the absence probes are blind to them. This predates the change, but the change names the trio canonical and pins it with a new test.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: The production read-only inventory and shared recovery probe now cover five intake roots, indexed participant resolutions, association rows and materialized participant/attachment conversation rows across projects. Both cleanup consumers capture descendants before erasing indexes and preserve captured identities for absence checks. Concrete subscription/Graph/Identity tests detect child reappearance after index erasure and preserve another intake; other tenant rows and shared project/global indexes remain intact. Claims cover indexed fixture records and captured descendants, not arbitrary unindexed orphans or concurrent live writers. See spec-five-deferred-read-model-coverage.md and validation/five-deferred-read-model-coverage.json.
 
 ### DW-140: LiveProjectionRebuildDriverTests.RebuildUsesOnlyTheSelectedTenantImmutableSourceAndWormChain fails on a write-count assertion and already failed at this story's baseline commit.
 origin: spec-deferred 3257e0491634
@@ -1250,7 +1253,8 @@ location: tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveProjectionRebuild
 source_spec: `spec-shared-recovery-read-model-keys.md`
 severity: medium
 reason: Shouldly.ShouldAssertException: readModels.Writes should be 4 but was 6. Reproduced on the patched tree, on HEAD, and on a tree restored to baseline 53c41666742c8bf359783e24997581467f5afae7 with the two new files removed, so it is unrelated to this refactor and to its patches. The counter involved is Writes, which this story never touched.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: Already resolved at baseline acf8f6c219ea85f278740eb7b0ba3c38888c086f: the old write-count assertion has been replaced by persisted key equality, neighboring tenant value/ETag preservation and fresh-row cleanup assertions. Verified by the original baseline probe/rebuild lane (27 passed) and final focused verification. See spec-five-deferred-read-model-coverage.md and validation/five-deferred-read-model-coverage.json.
 
 ### DW-141: The integration test project has no clean build configuration in this workspace: the default Debug source-reference mode and the package mode each fail for different pre-existing dependency-drift reas
 origin: spec-deferred 77e48253b098
@@ -1266,7 +1270,8 @@ location: n/a
 source_spec: `spec-shared-recovery-read-model-keys.md`
 severity: low
 reason: The follow-up-review damping cap (limits.max_followup_reviews = 1) was spent with the story finalized (status: done, verify green) while the review pass still recommended an independent follow-up. The work was committed by bmad-loop run 20260828-185552-dcc0; this entry preserves the lingering recommendation for a deliberate later review.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: Completed deliberate independent follow-up review of the full shared probe, its tests and fake store, together with its production-key/inventory follow-up. All six verification gaps were patched, and the reviewer rechecked them with no additional concrete issue in the isolated indexed/captured fixture scope. The intermediate-poll regression also rejects a deliberately broken implementation. No new work was deferred. See spec-five-deferred-read-model-coverage.md and validation/five-deferred-read-model-coverage.json.
 
 ## Deferred from: code review of 1-1-scaffold-the-buildable-hexalith-chatbot-module (2026-09-13)
 

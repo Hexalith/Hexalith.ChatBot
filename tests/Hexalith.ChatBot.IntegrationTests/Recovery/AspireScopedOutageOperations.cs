@@ -77,7 +77,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         _controllerSecret = controllerSecret;
         _readModels = new ReadModelProjectConversationProjectionStore(readModelStore);
         _readModelEraser = readModelEraser;
-        _intakeReadModels = new RecoveryIntakeReadModelProbe(readModelEraser);
+        _intakeReadModels = new RecoveryIntakeReadModelProbe(readModelStore, readModelEraser);
         _durableState = durableState;
         _chatBotClient = application.CreateHttpClient("chatbot");
         _chatBotClient.Timeout = TimeSpan.FromSeconds(30);
@@ -118,7 +118,7 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         _controlAccessToken = controlAccessToken;
         _readModels = new ReadModelProjectConversationProjectionStore(readModelStore);
         _readModelEraser = readModelEraser;
-        _intakeReadModels = new RecoveryIntakeReadModelProbe(readModelEraser, pollInterval);
+        _intakeReadModels = new RecoveryIntakeReadModelProbe(readModelStore, readModelEraser, pollInterval);
         _durableState = durableState;
         _pollInterval = pollInterval;
         _absenceConfirmationWindow = absenceConfirmationWindow;
@@ -790,10 +790,10 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         }
     }
 
-    /// <summary>Erases every read model an intake materializes, not just its source-email view.</summary>
+    /// <summary>Erases indexed fixture descendants and intake roots, preserving shared indexes.</summary>
     private async Task EraseIntakeReadModelsAsync(string tenantId, string intakeId, CancellationToken cancellationToken)
     {
-        foreach (string key in RecoveryIntakeReadModelProbe.KeysFor(tenantId, intakeId))
+        foreach (string key in await _intakeReadModels.CaptureKeysAsync(tenantId, intakeId, cancellationToken).ConfigureAwait(false))
         {
             await EraseReadModelAsync(key, cancellationToken).ConfigureAwait(false);
         }
