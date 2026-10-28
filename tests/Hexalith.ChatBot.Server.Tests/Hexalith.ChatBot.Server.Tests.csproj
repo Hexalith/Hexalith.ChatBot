@@ -35,6 +35,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
+    <PackageReference Include="Hexalith.Commons.UniqueIds" />
     <PackageReference Include="Hexalith.EventStore.Contracts" />
     <PackageReference Include="Hexalith.EventStore.DomainService" />
     <ProjectReference Include="$(HexalithFoldersRoot)\src\Hexalith.Folders.Client\Hexalith.Folders.Client.csproj" />

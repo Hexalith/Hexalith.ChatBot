@@ -44,12 +44,12 @@ internal sealed partial class FoldersFolderStore
             string legacyTask = AttachmentStorageIdentity.TaskIdFor(legacyOperation);
             var legacyPath = AttachmentStorageIdentity.PathFor(request);
             string legacyKey = NativeFileUpload.ComputeLegacyAddIdempotencyKey(legacyOperation, legacyPath, hash, workspace, legacyTask);
-            var prior = await QueryAsync(legacyTask, legacyOperation, legacyPath, legacyKey, true, "accepted", 0, work.Token).ConfigureAwait(false);
-            if (prior.Status == "accepted") return await FinishAsync(prior, legacyTask, legacyOperation, legacyKey, work.Token, nativeCompletion: false).ConfigureAwait(false);
+            var prior = await QueryAsync(legacyTask, legacyOperation, legacyPath, legacyKey, true, NativeEvidenceTokens.Accepted, 0, work.Token).ConfigureAwait(false);
+            if (prior.Status == NativeEvidenceTokens.Accepted) return await FinishAsync(prior, legacyTask, legacyOperation, legacyKey, work.Token, nativeCompletion: false).ConfigureAwait(false);
             if (prior.Status != "missing") return EvidenceUnavailable();
             string key = FileUpload.ComputeIdempotencyKey(KeyOnly(operation, path, hash), workspace, task);
-            prior = await QueryAsync(task, operation, path, key, false, "accepted", 0, work.Token).ConfigureAwait(false);
-            if (prior.Status == "accepted") return await FinishAsync(prior, task, operation, key, work.Token).ConfigureAwait(false);
+            prior = await QueryAsync(task, operation, path, key, false, NativeEvidenceTokens.Accepted, 0, work.Token).ConfigureAwait(false);
+            if (prior.Status == NativeEvidenceTokens.Accepted) return await FinishAsync(prior, task, operation, key, work.Token).ConfigureAwait(false);
             if (prior.Status != "missing") return EvidenceUnavailable();
             lease = await _native!.ChangeNativeTaskLeaseAsync(folder, workspace, request.CorrelationId, task,
                 new NativeLeaseRequest { Operation = "acquire", RequestedLeaseSeconds = 300 }, work.Token).ConfigureAwait(false);
@@ -68,7 +68,7 @@ internal sealed partial class FoldersFolderStore
             // Reuse SDK validation and canonical construction, then select the supported native v1 wire schema.
             var body = JObject.FromObject(mutation); body["requestSchemaVersion"] = "v1";
             NativeAcceptedCommand accepted = await _native.AddNativeFileAsync(folder, workspace, request.CorrelationId, task, key, body, work.Token).ConfigureAwait(false);
-            NativeEvidence confirmed = await QueryAsync(task, operation, path, key, false, "accepted", 0, work.Token).ConfigureAwait(false);
+            NativeEvidence confirmed = await QueryAsync(task, operation, path, key, false, NativeEvidenceTokens.Accepted, 0, work.Token).ConfigureAwait(false);
             await StopMaintenanceAsync().ConfigureAwait(false);
             var result = await FinishAsync(confirmed, task, operation, key, work.Token, accepted.IdempotentReplay).ConfigureAwait(false);
             if (result.Stored is not null) lease = null;
@@ -148,7 +148,7 @@ internal sealed partial class FoldersFolderStore
         async Task<MailboxAttachmentStorageResult> FinishAsync(NativeEvidence evidence, string queryTask, string queryOperation,
             string key, CancellationToken cancellation, bool replay = true, bool nativeCompletion = true)
         {
-            if (evidence.Status != "accepted" || evidence.TaskId != queryTask || evidence.OperationId != queryOperation
+            if (evidence.Status != NativeEvidenceTokens.Accepted || evidence.TaskId != queryTask || evidence.OperationId != queryOperation
                 || evidence.AcceptedKey != key || evidence.ContentHashReference != hash || evidence.ByteLength != request.Content.Content.Length
                 || evidence.MediaType != media || evidence.ExpectedFileVersion < 0 || evidence.LockFence <= 0
                 || string.IsNullOrWhiteSpace(evidence.Fingerprint) || string.IsNullOrWhiteSpace(evidence.FileId)
