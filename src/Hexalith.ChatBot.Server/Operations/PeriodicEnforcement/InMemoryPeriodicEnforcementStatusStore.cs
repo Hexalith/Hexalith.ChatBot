@@ -131,7 +131,7 @@ internal sealed class InMemoryPeriodicEnforcementStatusStore : IPeriodicEnforcem
         }
     }
 
-    public void RecordM2SweepSucceeded(string jobName, DateTimeOffset succeededAtUtc, string correlationId, int breaches, int coverage, int population)
+    public bool RecordM2SweepSucceeded(string jobName, DateTimeOffset succeededAtUtc, string correlationId, int breaches, int coverage, int population)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
@@ -143,7 +143,7 @@ internal sealed class InMemoryPeriodicEnforcementStatusStore : IPeriodicEnforcem
                 // Preserve a coherent success snapshot, but invalidate this attempt for release: its result cannot
                 // safely refresh the baseline after a clock regression (and must never hide a newer breach).
                 _m2SweepStatuses[jobName] = previous with { LastAttemptCompletedSuccessfully = false };
-                return;
+                return false;
             }
 
             _m2SweepStatuses[jobName] = new PeriodicEnforcementM2SweepStatus(
@@ -155,6 +155,7 @@ internal sealed class InMemoryPeriodicEnforcementStatusStore : IPeriodicEnforcem
                 coverage,
                 population,
                 LastAttemptCompletedSuccessfully: true);
+            return true;
         }
     }
 }

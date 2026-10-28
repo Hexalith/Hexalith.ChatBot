@@ -72,6 +72,7 @@ jobs:
         run: |
           python3 -m unittest discover -s .github/scripts/tests -p 'test_story_evidence_guards.py' -v
           python3 -m unittest discover -s .github/scripts/tests -p 'test_recovery_result_projection.py' -v
+          python3 -m unittest discover -s .github/scripts/tests -p 'test_release_package_paths.py' -v
 
   build:
     runs-on: ubuntu-latest
@@ -118,6 +119,7 @@ jobs:
         run: |
           python3 -m unittest discover -s .github/scripts/tests -p 'test_story_evidence_guards.py' -v
           python3 -m unittest discover -s .github/scripts/tests -p 'test_recovery_result_projection.py' -v
+          python3 -m unittest discover -s .github/scripts/tests -p 'test_release_package_paths.py' -v
       - name: Record test producer head
         run: printf '%s\n' "$(git rev-parse HEAD)" > TestResults/producer-head.sha
       - name: Upload collision-safe machine results

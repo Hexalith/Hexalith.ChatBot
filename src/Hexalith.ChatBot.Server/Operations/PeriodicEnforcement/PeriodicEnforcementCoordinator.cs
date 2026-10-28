@@ -236,6 +236,15 @@ internal sealed class PeriodicEnforcementCoordinator(
             if (failures == 0)
             {
                 statusStore.RecordSucceeded(completed, duration);
+                // Backoff-only ticks are not recovery from an unresolved M2 failure. A genuinely recovered pass
+                // ends the episode even when no health check ran between passes.
+                PeriodicEnforcementRunStatus currentStatus = statusStore.Read();
+                if (!options.Value.RunM2AuditRecoverySweeps || M2SweepJobs.All.All(job =>
+                    currentStatus.M2SweepStatuses.TryGetValue(job, out PeriodicEnforcementM2SweepStatus? sweep)
+                    && sweep.LastAttemptCompletedSuccessfully))
+                {
+                    _lastSchedulerAlertByReason.TryRemove("periodic_enforcement_pass_failed", out _);
+                }
             }
             else
             {
@@ -580,6 +589,26 @@ internal sealed class PeriodicEnforcementCoordinator(
 
         (int breaches, int alerted, int coverage, int population) = project(outcome);
         DateTimeOffset succeededAt = clock.UtcNow;
+        bool accepted = statusStore.RecordM2SweepSucceeded(jobName, succeededAt, correlationId, breaches, coverage, population);
+
+        // A rejected completion still owes breach alerting, but cannot consume the partition or suppress its retry.
+        if (breaches > alerted)
+        {
+            await EmitSchedulerAlertThrottledAsync(
+                M2SweepUnalertedBreachReasonCode(jobName),
+                now,
+                correlationId,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!accepted)
+        {
+            statusStore.RecordEvaluatorFailure(jobName);
+            await EmitSchedulerAlertThrottledAsync(M2SweepFailedReasonCode(jobName), now, correlationId, cancellationToken)
+                .ConfigureAwait(false);
+            return (outcome, M2SweepExecution.Failed);
+        }
+
         _lastM2SweepPartitionByJob[jobName] = partition;
 
         // A sweep that straddled a partition boundary also covers the partition it finished in; without this the
@@ -592,17 +621,6 @@ internal sealed class PeriodicEnforcementCoordinator(
         if (!string.Equals(completionPartition, partition, StringComparison.Ordinal))
         {
             _lastM2SweepPartitionByJob[jobName] = completionPartition;
-        }
-
-        statusStore.RecordM2SweepSucceeded(jobName, succeededAt, correlationId, breaches, coverage, population);
-
-        if (breaches > alerted)
-        {
-            await EmitSchedulerAlertThrottledAsync(
-                M2SweepUnalertedBreachReasonCode(jobName),
-                now,
-                correlationId,
-                cancellationToken).ConfigureAwait(false);
         }
 
         return (outcome, M2SweepExecution.Completed);

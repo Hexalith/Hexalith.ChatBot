@@ -13,8 +13,8 @@ public static partial class SprintLedgerReader
     /// <returns>The status, or null when absent.</returns>
     public static string? StoryStatus(string path, string key)
     {
-        return StoryStatusFromText(BoundedEvidenceInput.ReadFileText(
-            path, BoundedEvidenceInput.MaximumInputBytes, GateReason.StatusMismatch, "sprint-input-limit"), key);
+        return StoryStatusesFromLines(BoundedEvidenceInput.ReadFileLines(
+            path, GateReason.StatusMismatch, "sprint-input-limit")).TryGetValue(key, out string? status) ? status : null;
     }
 
     /// <summary>Reads an exact development status from sprint-ledger text.</summary>
@@ -31,8 +31,13 @@ public static partial class SprintLedgerReader
     public static IReadOnlyDictionary<string, string> StoryStatusesFromText(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
+        return StoryStatusesFromLines(BoundedEvidenceInput.ReadTextLines(text, GateReason.StatusMismatch, "sprint-input-limit"));
+    }
+
+    private static IReadOnlyDictionary<string, string> StoryStatusesFromLines(string[] lines)
+    {
         Dictionary<string, string> result = new(StringComparer.Ordinal);
-        foreach (string line in text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+        foreach (string line in lines)
         {
             Match match = StoryEntry().Match(line);
             if (match.Success && !result.TryAdd(match.Groups[1].Value, match.Groups[2].Value))
@@ -50,8 +55,8 @@ public static partial class SprintLedgerReader
     /// <returns>The status, or null when absent.</returns>
     public static string? ActionStatus(string path, string actionText)
     {
-        return ActionStatusFromText(BoundedEvidenceInput.ReadFileText(
-            path, BoundedEvidenceInput.MaximumInputBytes, GateReason.StatusMismatch, "sprint-input-limit"), actionText);
+        return ActionStatusesFromLines(BoundedEvidenceInput.ReadFileLines(
+            path, GateReason.StatusMismatch, "sprint-input-limit")).TryGetValue(actionText, out string? status) ? status : null;
     }
 
     /// <summary>Reads an exact action status from sprint-ledger text.</summary>
@@ -70,9 +75,13 @@ public static partial class SprintLedgerReader
     public static IReadOnlyDictionary<string, string> ActionStatusesFromText(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
+        return ActionStatusesFromLines(BoundedEvidenceInput.ReadTextLines(text, GateReason.StatusMismatch, "sprint-input-limit"));
+    }
+
+    private static IReadOnlyDictionary<string, string> ActionStatusesFromLines(string[] lines)
+    {
         Dictionary<string, string> result = new(StringComparer.Ordinal);
         HashSet<string> actions = new(StringComparer.Ordinal);
-        string[] lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
         for (int index = 0; index < lines.Length; index++)
         {
             Match action = ActionEntry().Match(lines[index]);

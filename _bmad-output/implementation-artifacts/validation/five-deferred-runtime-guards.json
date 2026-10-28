@@ -1,0 +1,250 @@
+{
+  "schemaVersion": 1,
+  "recordKind": "local-maintenance-verification",
+  "createdAtUtc": "2026-10-28T17:06:45.651810+00:00",
+  "baselineCommit": "9a032f439bb7499fd458fc7894f9fc2088d74c1c",
+  "specPath": "_bmad-output/implementation-artifacts/spec-five-deferred-runtime-guards.md",
+  "items": [
+    "DW-69",
+    "M2 regressed-completion retry eligibility",
+    "scheduler failure-episode re-arm",
+    "release-package output normalization",
+    "sprint and technical-ledger line budgets"
+  ],
+  "changedSourceSha256": {
+    ".github/scripts/pack-release-packages.sh": "df64004b0cdba29be9e5c1ac3351f16933908c7f9addf3da51ad0fbd09b17a97",
+    ".github/scripts/tests/test_release_package_paths.py": "c3c2555f13fa41d7723014145df73e9f20bb8c1b2fe364caa6347b43dd5893c1",
+    ".github/workflows/ci.yml": "1945d4611c048dcedf7c1145d84d671a342cc45d9bc6007022be3a11da6bb08c",
+    "_bmad-output/implementation-artifacts/deferred-work.md": "b953c9138749ed545f834d49ec1c59f8d62bda0a6521d0426d54dc11a473b82b",
+    "_bmad-output/implementation-artifacts/spec-five-deferred-runtime-guards.md": "e64e25d89c6de731fbf3039ef071c5b47d67dee688d709484364c3aa98254625",
+    "docs/story-evidence-integrity.md": "7aad653f38db541b7130574a8799e3668d1fcd7b4dd1c1689b2fdd4cf36bc0b0",
+    "src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/IPeriodicEnforcementStatusStore.cs": "75a717438a37ecf1f01c0f79ec6a007cbf52bc54f869393d16a9e0d73d4b1290",
+    "src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/InMemoryPeriodicEnforcementStatusStore.cs": "ab8ab6b9cd51295d7e0e73aaf4e494d3bed92a5a2c36c4c05836232436a7ced5",
+    "src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/PeriodicEnforcementCoordinator.cs": "95b086cb7543b495991caf82531dfe5797372566c62a9c397ed6a486f00bd0c1",
+    "tests/Hexalith.ChatBot.Server.Tests/Governance/AiMediation/AiActionRiskClassifierTests.cs": "b462690f4b533ecbb2fb52ff97e6fd0fe4a3c758a1509ad46f229258f34d0554",
+    "tests/Hexalith.ChatBot.Server.Tests/Operations/PeriodicEnforcement/PeriodicEnforcementCoordinatorTests.cs": "3ed876953e9c02f97b9ddb720da24991beff4d9ca99693f28d2b99545678e93c",
+    "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/LedgerLineBudgetTests.cs": "a9913dc8380dbaffc87e0add0947f83100900039853a60b4bb2c5707e2a69e69",
+    "tools/Hexalith.ChatBot.StoryEvidenceGate/BoundedEvidenceInput.cs": "091c70bcab08874b98761ecf33bf7679a9a0b76f30e9cd689c3b6f141da89f98",
+    "tools/Hexalith.ChatBot.StoryEvidenceGate/MarkdownStoryReader.cs": "f15d92c9ee39701877d5d463047eed424dfecf071e726ab0df2f4eca48f60ff5",
+    "tools/Hexalith.ChatBot.StoryEvidenceGate/SprintLedgerReader.cs": "9323599def8077fed7062032301dff89ec00b4b7af6f3dd0b968ff5b3dce9d04",
+    "tools/Hexalith.ChatBot.StoryEvidenceGate/TechnicalEnablerLedgerReader.cs": "fbaa35f6c5225afb68b16394abbb7b1a35384fee61a718b296b918ec9225a391"
+  },
+  "reports": {
+    "server": {
+      "summary": {
+        "tests": 3540,
+        "passed": 3540,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793207016289,
+        "stop": 1793207126732,
+        "duration": 110443
+      },
+      "failedTests": [],
+      "skippedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-deferred-runtime-guards/server.ctrf.json",
+          "sha256": "c9c451905f03fc977cbe75ab5171dc25622c80acb446883d33f732f17052a87e"
+        },
+        {
+          "path": "TestResults/five-deferred-runtime-guards/server.trx",
+          "sha256": "fc3620f7cecd6110870ddf450ac6eb7acdef101fa5aaa168fc7b430abf4fdcee"
+        }
+      ]
+    },
+    "gate": {
+      "summary": {
+        "tests": 344,
+        "passed": 344,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793206730231,
+        "stop": 1793206770882,
+        "duration": 40651
+      },
+      "failedTests": [],
+      "skippedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-deferred-runtime-guards/gate.ctrf.json",
+          "sha256": "1307f208a6af3e3f2291839a0eda4dca9cdc8ccc5b5fe329b7d7e00c55618192"
+        },
+        {
+          "path": "TestResults/five-deferred-runtime-guards/gate.trx",
+          "sha256": "b7ae1db968905af3c071ff9ae33088f2fa1a9a20aa96ee8813da06ae83f8b0ce"
+        }
+      ]
+    },
+    "scheduler": {
+      "summary": {
+        "tests": 48,
+        "passed": 48,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793206979561,
+        "stop": 1793206980009,
+        "duration": 448
+      },
+      "failedTests": [],
+      "skippedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-deferred-runtime-guards/scheduler.ctrf.json",
+          "sha256": "76d4f7d65691f6fa57df650c259818c5aac7a4b5e269fbc88443f171a437421b"
+        },
+        {
+          "path": "TestResults/five-deferred-runtime-guards/scheduler.trx",
+          "sha256": "93e98ef9d5f7d8e235b202385a982955e50fa13e300d1b43547f477c5a2e3c27"
+        }
+      ]
+    },
+    "packaging": {
+      "tests": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "logPath": "/tmp/chatbot-five-deferred-package-paths.log",
+      "logSha256": "6f02b0de49508b6f5df03e543bc83aed38f8db4ce3efd3e31a5b10eebc8152e9"
+    },
+    "workflowGuards": {
+      "tests": 14,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "logPath": "/tmp/chatbot-five-deferred-workflow-guards.log",
+      "logSha256": "0faca162cfecc32abb3a2813670498c0ad23dd65e7783a30dc05a882b747b458"
+    },
+    "recoveryProjection": {
+      "tests": 6,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "logPath": "/tmp/chatbot-five-deferred-recovery-projection.log",
+      "logSha256": "c0189fe2588dec3b5e05041c316ade89ede33de97fa22702c1e3cf174f074fbd"
+    }
+  },
+  "commands": [
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+      "exitCode": 0,
+      "result": "Started; inspected; exact AppHost stopped"
+    },
+    {
+      "command": "aspire describe --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --non-interactive --format Json",
+      "exitCode": 0,
+      "result": "44 resources: 26 healthy, 17 waiting, one unhealthy"
+    },
+    {
+      "command": "aspire stop --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+      "exitCode": 0,
+      "result": "stopped successfully"
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --configuration Debug -m:1 -warnaserror",
+      "exitCode": 0,
+      "result": "0 warnings, 0 errors"
+    },
+    {
+      "command": "dotnet build tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj --configuration Debug -m:1 -warnaserror",
+      "exitCode": 0,
+      "result": "0 warnings, 0 errors"
+    },
+    {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests TestResults/five-deferred-runtime-guards/server.ctrf.json -parallel none -result-trx TestResults/five-deferred-runtime-guards/server.trx",
+      "exitCode": 0,
+      "result": "3540/3540, zero skips"
+    },
+    {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Debug/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests TestResults/five-deferred-runtime-guards/gate.ctrf.json -result-trx TestResults/five-deferred-runtime-guards/gate.trx",
+      "exitCode": 0,
+      "result": "344/344, zero skips"
+    },
+    {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests TestResults/five-deferred-runtime-guards/scheduler.ctrf.json -class Hexalith.ChatBot.Server.Tests.Operations.PeriodicEnforcement.PeriodicEnforcementCoordinatorTests -class Hexalith.ChatBot.Server.Tests.Operations.PeriodicEnforcement.InMemoryPeriodicEnforcementStatusStoreTests -class Hexalith.ChatBot.Server.Tests.Governance.AiMediation.AiActionRiskClassifierTests -parallel none -result-trx TestResults/five-deferred-runtime-guards/scheduler.trx",
+      "exitCode": 0,
+      "result": "48/48, zero skips"
+    },
+    {
+      "command": "python3 -m unittest discover -s .github/scripts/tests -p test_release_package_paths.py -v",
+      "exitCode": 0,
+      "result": "2 tests pass; five path subcases and empty destination preservation"
+    },
+    {
+      "command": "python3 -m unittest discover -s .github/scripts/tests -p test_story_evidence_guards.py -v",
+      "exitCode": 0,
+      "result": "14 tests pass"
+    },
+    {
+      "command": "python3 -m unittest discover -s .github/scripts/tests -p test_recovery_result_projection.py -v",
+      "exitCode": 0,
+      "result": "6 tests pass"
+    },
+    {
+      "command": "bash -n .github/scripts/pack-release-packages.sh",
+      "exitCode": 0,
+      "result": "passes"
+    },
+    {
+      "command": "actionlint -shellcheck= .github/workflows/ci.yml",
+      "exitCode": 0,
+      "result": "passes"
+    },
+    {
+      "command": "git -c core.whitespace=cr-at-eol diff --check",
+      "exitCode": 0,
+      "result": "passes"
+    },
+    {
+      "command": "npx --yes --package @commitlint/cli commitlint --edit /tmp/chatbot-five-deferred-commit-message.txt --config commitlint.config.cjs",
+      "exitCode": 0,
+      "result": "passes"
+    }
+  ],
+  "review": {
+    "layers": [
+      "blind-hunter"
+    ],
+    "findings": 7,
+    "patched": 7,
+    "deferred": 0,
+    "correctionRecheck": "No remaining concrete defect found."
+  },
+  "limitations": [
+    "Source-mapped Debug maintenance verification; no product-story/sprint completion, live recovery qualification, package-mode release acceptance or deployment claim.",
+    "Aspire baseline had one unhealthy resource and 17 waiting resources; source-mapping HXW009/HXW011 advisories retained without pin changes."
+  ],
+  "aspireBaseline": {
+    "resources": 44,
+    "states": [
+      {
+        "state": "Running",
+        "healthStatus": "Healthy",
+        "count": 26
+      },
+      {
+        "state": "Waiting",
+        "healthStatus": null,
+        "count": 17
+      },
+      {
+        "state": "Running",
+        "healthStatus": "Unhealthy",
+        "count": 1
+      }
+    ],
+    "unhealthyResources": [
+      "security-nnvucpeu"
+    ],
+    "exactAppHostStopped": true
+  }
+}

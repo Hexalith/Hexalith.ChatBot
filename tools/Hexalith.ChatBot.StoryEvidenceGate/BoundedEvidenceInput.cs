@@ -40,8 +40,12 @@ internal static class BoundedEvidenceInput
 
     /// <summary>Reads bounded text lines without changing line-ending semantics.</summary>
     internal static string[] ReadFileLines(string path, string reasonCode, string subject)
+        => ReadTextLines(ReadFileText(path, MaximumInputBytes, reasonCode, subject), reasonCode, subject);
+
+    /// <summary>Bounds decoded text lines before retaining an excess entry.</summary>
+    internal static string[] ReadTextLines(string text, string reasonCode, string subject)
     {
-        using StringReader reader = new(ReadFileText(path, MaximumInputBytes, reasonCode, subject));
+        using StringReader reader = new(text);
         List<string> lines = [];
         while (reader.ReadLine() is { } line)
         {

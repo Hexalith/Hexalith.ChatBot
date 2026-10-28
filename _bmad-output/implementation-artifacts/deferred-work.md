@@ -626,7 +626,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-14-wire-t
 location: tests/Hexalith.ChatBot.Server.Tests/Governance/AiMediation/AiActionRiskClassifierTests.cs:111
 severity: medium
 reason: **[MEDIUM · pre-existing test defect, not in this story's diff] `AiActionRiskClassifierTests.UnknownActionClassShouldFailClosedWithoutSerializingInvalidEnumValues` is flaky at ~1%.** `tests/Hexalith.ChatBot.Server.Tests/Governance/AiMediation/AiActionRiskClassifierTests.cs:111` asserts `serialized.ShouldNotContain("999")` over the entire serialized record, but `AiActionRiskClassifier.cs:74` stamps a live `ProducedAtUtc = DateTimeOffset.UtcNow` into that payload and its fractional seconds can legitimately contain `999`. The unknown enum value is already filtered correctly by `OrderKnownClasses` (`AiActionRiskClassifier.cs:102-107`) — the failing run's payload showed `"riskActionClasses":[]` — so the assertion tests the wrong thing. Measured 2 failures in 200 runs of the compiled runner; a full-suite run at `30aa887` returned 1 failed / 1,695 passed / 1,696 total, which contradicts the "all 13 projects green, 0 failed" completion claim as a *reproducible* gate. Fix by asserting against the enum-bearing fields (or a deterministic clock), not the whole payload. Owner: the AI-mediation risk-classification surface (Stories 4.3/4.8).
-status: open
+status: done 2026-10-28
+resolution: Resolved in spec-five-deferred-runtime-guards.md: assert both serialized enum-bearing arrays and risk fields, with a deterministic timestamp containing 999. Full Server suite passes 3,540/3,540 without skips; see validation/five-deferred-runtime-guards.json.
 
 ### DW-70: [MEDIUM · coupled to the distributed cadence-lease item above] The now-deterministic derived-store sentinel id makes the isolation probe fail-open under concurrent sweeps.
 
@@ -1855,10 +1856,12 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-7-admit-commands-through-the-single-commandgateway.md`
   summary: Normalize release-package output paths before cleanup so relative destinations keep the same meaning after the script changes directory.
   evidence: Cb-root-B1; pack-release-packages.sh creates and deletes packages relative to the caller, then changes to repository_root before packing and verification. An outside-directory invocation with artifacts can exit successfully with an empty caller destination and packages written under the repository. Normalize the path once, including dash-prefixed inputs, and test invocation from another directory.
+  resolution: Resolved 2026-10-28 in spec-five-deferred-runtime-guards.md: normalize literal caller-relative directories before cleanup and repository cd, neutralize CDPATH, and reject empty destinations before mutation. Real-script regressions cover relative, absolute, dash-prefixed, space-containing and single-dash directories plus empty-input preservation. Both ordinary CI paths run the tests.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-7-admit-commands-through-the-single-commandgateway.md`
   summary: Apply the 65,536-line input limit before sprint and technical-enabler ledger readers allocate line arrays.
   evidence: Cb-root-E1; SprintLedgerReader splits byte-bounded text and TechnicalEnablerLedgerReader uses VisibleLines(string), bypassing BoundedEvidenceInput.MaximumTextLines. A reviewer probe accepted one-million-line inputs of about 1 MiB, allocating approximately 23.5 MiB and 39.9 MiB. Route file readers through a bounded line reader, retain stable sprint-input-limit and ledger-input-limit refusals, and test newline-heavy inputs below the byte ceiling.
+  resolution: Resolved 2026-10-28 in spec-five-deferred-runtime-guards.md: local and Git-text readers share bounded line admission with stable sprint-input-limit/ledger-input-limit refusals and unchanged fenced-example handling. Exact/excess LF, CRLF and unterminated inputs pass; full gate suite is 344/344 without skips.
 
 ## Deferred from: code review of spec-1-7-admit-commands-through-the-single-commandgateway (2026-10-23, round 8)
 
@@ -2041,6 +2044,7 @@ Final native follow-up qualification (2026-10-26): independent review correction
 - source_spec: `spec-five-deferred-recovery-boundaries.md`
   summary: Preserve retry eligibility when an M2 completion is rejected as regressed.
   evidence: RunM2SweepAsync commits the completion cadence partition before the status store rejects the regressed snapshot.
+  resolution: Resolved 2026-10-28 in spec-five-deferred-runtime-guards.md: internal status-store acceptance controls partition commitment; refused completions preserve newer evidence, increment failure counts, retain unalerted-breach signals and retry after backoff. Same-coordinator rejection/catch-up cases pass; full Server suite is 3,540/3,540 without skips.
 - source_spec: `spec-five-deferred-recovery-boundaries.md`
   summary: Reject invalid filesystem path syntax in dormant recovery evidence directories.
   evidence: Path.IsPathFullyQualified accepts absolute strings containing NUL; the existing dormant-shape check does not validate invalid path characters.
@@ -2065,6 +2069,7 @@ Final native follow-up qualification (2026-10-26): independent review correction
 - source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-recovery-followups.md`
   summary: Re-arm the singleton scheduler pass-failure alert after a successful intervening pass.
   evidence: CheckHealthAsync now observes the latest terminal pass independently of clocks. The pre-existing reason-keyed _lastSchedulerAlertByReason stamp still suppresses fail-success-fail episodes within M2MissedCadenceAlertResuppressAfter. Qualify that sequence on one coordinator and decide when success should reset the failure-episode throttle; ordinary repeated-failure suppression must remain.
+  resolution: Resolved 2026-10-28 in spec-five-deferred-runtime-guards.md: successful recovered passes re-arm the whole-pass failure episode even without an intervening health check; unresolved M2 attempts during backoff preserve suppression. Same-instance fail-success-fail and persistent-failure/backoff/expiry cases pass. Full Server suite is 3,540/3,540 without skips.
 
 
 ## Deferred from: review of spec-five-deferred-validation-limits (2026-10-28)

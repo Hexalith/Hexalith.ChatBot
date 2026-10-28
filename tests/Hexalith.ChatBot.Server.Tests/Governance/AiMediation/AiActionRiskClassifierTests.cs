@@ -132,9 +132,14 @@ public sealed class AiActionRiskClassifierTests
         result.IndeterminateReason.ShouldBe("unknown_action_class");
         result.ReasonCode.ShouldBe("indeterminate_unknown_action_class");
 
+        // Unrelated metadata may legitimately contain the rejected ordinal's digits.
+        result = result with { ProducedAtUtc = DateTimeOffset.Parse("2026-10-28T12:00:00.999Z", System.Globalization.CultureInfo.InvariantCulture) };
         string serialized = JsonSerializer.Serialize(result, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        serialized.ShouldContain("unknown_action_class");
-        serialized.ShouldNotContain("999");
+        using JsonDocument document = JsonDocument.Parse(serialized);
+        document.RootElement.GetProperty("riskActionClasses").GetArrayLength().ShouldBe(0);
+        document.RootElement.GetProperty("inputTuple").GetProperty("actionClasses").GetArrayLength().ShouldBe(0);
+        document.RootElement.GetProperty("indeterminateReason").GetString().ShouldBe("unknown_action_class");
+        document.RootElement.GetProperty("riskClass").GetString().ShouldBe("approval-required");
     }
 
     [Fact]

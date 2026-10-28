@@ -1008,6 +1008,141 @@ public sealed class PeriodicEnforcementCoordinatorTests
         nextPartition.AuditChainVerificationExecution.ShouldBe(M2SweepExecution.Completed);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SuccessfulPassRearmsFailureAlertOnTheSameCoordinator(bool checkRecoveredHealth)
+    {
+        CancellationToken token = TestContext.Current.CancellationToken;
+        MutableClock clock = new(Now);
+        InMemoryOperatorAlertSink alerts = new();
+        RecoverableWormStore worm = new();
+        PeriodicEnforcementCoordinator coordinator = BuildCoordinator(
+            clock, new InMemoryGovernedControlStateProjectionStore(), new StaticInputSource([], EmptyInputs()), alerts,
+            new AuditChainVerificationCoordinator(worm, new InMemoryAuditWriter(), alerts, clock),
+            runtimeOptions: new PeriodicEnforcementOptions
+            {
+                RunM2AuditRecoverySweeps = true,
+                M2SweepCadence = TimeSpan.FromMinutes(5),
+                M2SweepRetryAfter = TimeSpan.FromMinutes(1),
+                M2SweepTimeout = TimeSpan.FromMinutes(1),
+                M2MissedCadenceAlertResuppressAfter = TimeSpan.FromHours(1),
+            });
+
+        (await coordinator.RunOnceAsync("first-failure", token)).EvaluatorsFailed.ShouldBe(1);
+        await coordinator.CheckHealthAsync("first-health", token);
+        await coordinator.CheckHealthAsync("repeated-health", token);
+        alerts.Alerts.Count(a => a.ReasonCode == "periodic_enforcement_pass_failed").ShouldBe(1);
+
+        clock.UtcNow = Now.AddMinutes(1);
+        worm.Recovered = true;
+        (await coordinator.RunOnceAsync("recovered", token)).EvaluatorsFailed.ShouldBe(0);
+        if (checkRecoveredHealth)
+        {
+            await coordinator.CheckHealthAsync("healthy", token);
+        }
+
+        clock.UtcNow = Now.AddMinutes(5);
+        worm.Recovered = false;
+        (await coordinator.RunOnceAsync("new-failure", token)).EvaluatorsFailed.ShouldBe(1);
+        await coordinator.CheckHealthAsync("new-failure-health", token);
+        await coordinator.CheckHealthAsync("new-failure-repeat", token);
+        alerts.Alerts.Count(a => a.ReasonCode == "periodic_enforcement_pass_failed").ShouldBe(2);
+        // Recovery only re-arms the whole-pass episode; existing job-specific throttling is preserved.
+        alerts.Alerts.Count(a => a.ReasonCode == "m2_worm_verify_sweep_failed").ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task SkippedM2BackoffDoesNotRearmPersistentFailureAlerts()
+    {
+        CancellationToken token = TestContext.Current.CancellationToken;
+        MutableClock clock = new(Now);
+        InMemoryOperatorAlertSink alerts = new();
+        PeriodicEnforcementCoordinator coordinator = BuildCoordinator(
+            clock, new InMemoryGovernedControlStateProjectionStore(), new StaticInputSource([], EmptyInputs()), alerts,
+            new AuditChainVerificationCoordinator(new ThrowingTenantEnumerationWormStore(), new InMemoryAuditWriter(), alerts, clock),
+            runtimeOptions: new PeriodicEnforcementOptions { RunM2AuditRecoverySweeps = true });
+
+        (await coordinator.RunOnceAsync("persistent-failure", token)).EvaluatorsFailed.ShouldBe(1);
+        await coordinator.CheckHealthAsync("first-health", token);
+        clock.UtcNow = Now.AddMinutes(1);
+        (await coordinator.RunOnceAsync("backoff", token)).AuditChainVerificationExecution.ShouldBe(M2SweepExecution.Skipped);
+        await coordinator.CheckHealthAsync("backoff-health", token);
+        clock.UtcNow = Now.AddMinutes(15);
+        (await coordinator.RunOnceAsync("persistent-retry", token)).EvaluatorsFailed.ShouldBe(1);
+        await coordinator.CheckHealthAsync("retry-health", token);
+        alerts.Alerts.Count(a => a.ReasonCode == "periodic_enforcement_pass_failed").ShouldBe(1);
+        clock.UtcNow = Now.AddHours(1);
+        (await coordinator.RunOnceAsync("window-expired", token)).EvaluatorsFailed.ShouldBe(1);
+        await coordinator.CheckHealthAsync("expired-health", token);
+        alerts.Alerts.Count(a => a.ReasonCode == "periodic_enforcement_pass_failed").ShouldBe(2);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RejectedRegressedCompletionRetriesAfterBackoffUntilItsEvidenceIsAccepted(bool unalertedBreach)
+    {
+        CancellationToken token = TestContext.Current.CancellationToken;
+        MutableClock clock = new(Now);
+        InMemoryPeriodicEnforcementStatusStore status = new();
+        foreach (string job in M2SweepJobs.All)
+        {
+            status.RecordM2SweepRan(job, Now.AddHours(2), "newer-evidence");
+            status.RecordM2SweepSucceeded(job, Now.AddHours(2), "newer-evidence", 2, 3, 4).ShouldBeTrue();
+        }
+
+        InMemoryOperatorAlertSink alerts = new();
+        AuditChainVerificationCoordinator? wormCoordinator = null;
+        if (unalertedBreach)
+        {
+            IReadOnlyList<WormAuditChainRecord> tampered = await WormAuditTestData.BuildTamperedChainAsync(Tenant, 3, 1);
+            wormCoordinator = new AuditChainVerificationCoordinator(
+                new WormAuditTestData.StubWormAuditStore(Tenant, tampered),
+                new WormAuditTestData.UnavailableAuditWriter(), alerts, clock);
+        }
+
+        PeriodicEnforcementCoordinator coordinator = BuildCoordinator(
+            clock, new InMemoryGovernedControlStateProjectionStore(), new StaticInputSource([], EmptyInputs()), alerts,
+            auditChainVerificationCoordinator: wormCoordinator,
+            runtimeOptions: new PeriodicEnforcementOptions { RunM2AuditRecoverySweeps = true }, statusStore: status);
+
+        PeriodicEnforcementRunOutcome rejected = await coordinator.RunOnceAsync("regressed", token);
+        rejected.EvaluatorsFailed.ShouldBe(3);
+        rejected.AuditChainVerificationExecution.ShouldBe(M2SweepExecution.Failed);
+        foreach (string job in M2SweepJobs.All)
+        {
+            PeriodicEnforcementM2SweepStatus snapshot = status.Read().M2SweepStatuses[job];
+            snapshot.LastAttemptCompletedSuccessfully.ShouldBeFalse();
+            snapshot.LastSucceededAtUtc.ShouldBe(Now.AddHours(2));
+            snapshot.LastSuccessCorrelationId.ShouldBe("newer-evidence");
+            snapshot.LastBreaches.ShouldBe(2);
+            status.Read().EvaluatorFailureCounts[job].ShouldBe(1);
+        }
+        coordinator.M2ReleaseGateStatus.IsStopShip.ShouldBeTrue();
+        alerts.Alerts.ShouldContain(a => a.ReasonCode == "m2_worm_verify_sweep_failed");
+        if (unalertedBreach)
+        {
+            rejected.AuditChainVerification.ShouldNotBeNull().Breaches.ShouldBe(1);
+            rejected.AuditChainVerification.Alerted.ShouldBe(0);
+            alerts.Alerts.ShouldContain(a => a.ReasonCode == "m2_worm_verify_breach_unalerted");
+        }
+
+        clock.UtcNow = Now.AddMinutes(1);
+        (await coordinator.RunOnceAsync("within-backoff", token)).AuditChainVerificationExecution.ShouldBe(M2SweepExecution.Skipped);
+        clock.UtcNow = Now.AddMinutes(15);
+        (await coordinator.RunOnceAsync("retry-still-regressed", token)).EvaluatorsFailed.ShouldBe(3);
+        status.Read().M2SweepStatuses[M2SweepJobs.WormAuditChain].LastRunCorrelationId.ShouldBe("retry-still-regressed");
+        status.Read().EvaluatorFailureCounts[M2SweepJobs.WormAuditChain].ShouldBe(2);
+
+        clock.UtcNow = Now.AddHours(3);
+        PeriodicEnforcementRunOutcome accepted = await coordinator.RunOnceAsync("caught-up", token);
+        accepted.EvaluatorsFailed.ShouldBe(0);
+        accepted.AuditChainVerificationExecution.ShouldBe(M2SweepExecution.Completed);
+        status.Read().M2SweepStatuses[M2SweepJobs.WormAuditChain].LastSuccessCorrelationId.ShouldBe("caught-up");
+        (await coordinator.RunOnceAsync("same-partition", token)).AuditChainVerificationExecution.ShouldBe(M2SweepExecution.Skipped);
+    }
+
     private static PeriodicEnforcementCoordinator BuildCoordinator(
         MutableClock clock,
         IGovernedControlStateProjectionStore controlStore,

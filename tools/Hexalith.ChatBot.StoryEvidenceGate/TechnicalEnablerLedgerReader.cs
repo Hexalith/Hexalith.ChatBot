@@ -11,8 +11,8 @@ public static class TechnicalEnablerLedgerReader
     /// <returns>The normalized status word, or null when absent.</returns>
     public static string? Status(string path, string recordKey)
     {
-        return StatusFromText(BoundedEvidenceInput.ReadFileText(
-            path, BoundedEvidenceInput.MaximumInputBytes, GateReason.StatusMismatch, "ledger-input-limit"), recordKey);
+        return StatusesFromLines(BoundedEvidenceInput.ReadFileLines(
+            path, GateReason.StatusMismatch, "ledger-input-limit")).TryGetValue(recordKey, out string? status) ? status : null;
     }
 
     /// <summary>Reads the leading status word from exact ledger text.</summary>
@@ -31,9 +31,14 @@ public static class TechnicalEnablerLedgerReader
     public static IReadOnlyDictionary<string, string> StatusesFromText(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
+        return StatusesFromLines(BoundedEvidenceInput.ReadTextLines(text, GateReason.StatusMismatch, "ledger-input-limit"));
+    }
+
+    private static IReadOnlyDictionary<string, string> StatusesFromLines(string[] source)
+    {
         Dictionary<string, string> result = new(StringComparer.Ordinal);
         HashSet<string> headings = new(StringComparer.Ordinal);
-        string[] lines = MarkdownStoryReader.VisibleLines(text);
+        string[] lines = MarkdownStoryReader.VisibleLines(source);
         for (int index = 0; index < lines.Length; index++)
         {
             string line = lines[index];

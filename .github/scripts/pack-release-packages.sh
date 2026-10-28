@@ -9,14 +9,22 @@ fi
 
 output_directory="$1"
 version="$2"
-repository_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+repository_root="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
     printf 'Refusing to pack unsupported version %s.\n' "$version" >&2
     exit 1
 fi
 
+if [[ -z "$output_directory" ]]; then
+    printf 'Refusing to pack into an empty output directory.\n' >&2
+    exit 64
+fi
+if [[ "$output_directory" != /* ]]; then
+    output_directory="$PWD/$output_directory"
+fi
 mkdir -p -- "$output_directory"
+output_directory="$(CDPATH= cd -- "$output_directory" && pwd -P)"
 find "$output_directory" -maxdepth 1 -type f \( -name '*.nupkg' -o -name '*.snupkg' \) -delete
 
 cd -- "$repository_root"

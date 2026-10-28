@@ -257,7 +257,8 @@ public static partial class MarkdownStoryReader
         throw new GateValidationException(GateReason.StatusMismatch, name);
     }
 
-    private static string[] VisibleLines(IEnumerable<string> source)
+    /// <summary>Removes fenced examples from already bounded lines.</summary>
+    internal static string[] VisibleLines(IEnumerable<string> source)
     {
         List<string> result = [];
         string? fence = null;

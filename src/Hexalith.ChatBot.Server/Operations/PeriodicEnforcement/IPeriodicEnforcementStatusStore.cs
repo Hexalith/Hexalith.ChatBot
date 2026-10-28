@@ -32,5 +32,5 @@ internal interface IPeriodicEnforcementStatusStore
 
     void RecordM2SweepRan(string jobName, DateTimeOffset ranAtUtc, string correlationId);
 
-    void RecordM2SweepSucceeded(string jobName, DateTimeOffset succeededAtUtc, string correlationId, int breaches, int coverage, int population);
+    bool RecordM2SweepSucceeded(string jobName, DateTimeOffset succeededAtUtc, string correlationId, int breaches, int coverage, int population);
 }
