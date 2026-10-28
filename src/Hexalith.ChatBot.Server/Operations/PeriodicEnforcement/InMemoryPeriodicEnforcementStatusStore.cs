@@ -61,7 +61,10 @@ internal sealed class InMemoryPeriodicEnforcementStatusStore : IPeriodicEnforcem
         lock (_gate)
         {
             _isRunning = false;
-            _lastSucceededAtUtc = completedAtUtc;
+            if (_lastSucceededAtUtc is null || completedAtUtc >= _lastSucceededAtUtc)
+            {
+                _lastSucceededAtUtc = completedAtUtc;
+            }
             _lastDuration = duration;
         }
     }
@@ -129,6 +132,14 @@ internal sealed class InMemoryPeriodicEnforcementStatusStore : IPeriodicEnforcem
         lock (_gate)
         {
             _m2SweepStatuses.TryGetValue(jobName, out PeriodicEnforcementM2SweepStatus? previous);
+            if (previous?.LastSucceededAtUtc > succeededAtUtc)
+            {
+                // Preserve a coherent success snapshot, but invalidate this attempt for release: its result cannot
+                // safely refresh the baseline after a clock regression (and must never hide a newer breach).
+                _m2SweepStatuses[jobName] = previous with { LastAttemptCompletedSuccessfully = false };
+                return;
+            }
+
             _m2SweepStatuses[jobName] = new PeriodicEnforcementM2SweepStatus(
                 previous?.LastRanAtUtc,
                 previous?.LastRunCorrelationId,

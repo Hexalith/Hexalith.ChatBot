@@ -379,22 +379,37 @@ internal sealed record RecoveryValidationEvidenceManifest
         return [.. reasons.Distinct(StringComparer.Ordinal)];
     }
 
-    /// <summary>Returns whether a locator is a query-free CI artifact URI containing no sensitive marker.</summary>
+    /// <summary>Returns whether a locator is a query-free CI artifact URI containing no sensitive path token.</summary>
     public static bool IsSafeArtifactLocator(string? value)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > 2_048 ||
-            value.Contains("secret", StringComparison.OrdinalIgnoreCase) ||
-            value.Contains("password", StringComparison.OrdinalIgnoreCase) ||
-            value.Contains("token", StringComparison.OrdinalIgnoreCase) ||
             !Uri.TryCreate(value, UriKind.Absolute, out Uri? locator))
         {
             return false;
         }
 
-        return string.Equals(locator.Scheme, "artifact", StringComparison.OrdinalIgnoreCase) &&
-            string.IsNullOrEmpty(locator.Query) &&
-            string.IsNullOrEmpty(locator.Fragment) &&
-            string.IsNullOrEmpty(locator.UserInfo);
+        if (!string.Equals(locator.Scheme, "artifact", StringComparison.OrdinalIgnoreCase) ||
+            !string.IsNullOrEmpty(locator.Query) ||
+            !string.IsNullOrEmpty(locator.Fragment) ||
+            !string.IsNullOrEmpty(locator.UserInfo))
+        {
+            return false;
+        }
+
+        string decoded = Uri.UnescapeDataString(value);
+        // Reject residual escapes rather than allow nested encodings to hide a sensitive token from this check.
+        if (decoded.Any(char.IsControl) || decoded.Contains('%', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        string[] tokens = new string(decoded.Select(static character =>
+            char.IsAsciiLetterOrDigit(character) ? character : '/').ToArray())
+            .Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return !tokens.Any(static token =>
+            string.Equals(token, "secret", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(token, "password", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(token, "token", StringComparison.OrdinalIgnoreCase));
     }
 
     internal static bool IsCanonicalUlid(string? value)

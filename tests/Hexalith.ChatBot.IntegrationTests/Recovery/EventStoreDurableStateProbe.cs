@@ -18,6 +18,39 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
     private readonly TimeSpan _pollInterval = DefaultPollInterval;
     private readonly TimeSpan _presenceWindow = DefaultPresenceWindow;
 
+    /// <summary>Gets the scheduling window for repeated materialization observations.</summary>
+    /// <remarks>
+    /// The strict final observation has its own request bound. The enclosing live caller's restoration cancellation
+    /// supplies the hard overall cap, including that final observation.
+    /// </remarks>
+    internal TimeSpan PresenceWindow => _presenceWindow;
+
+    /// <summary>Gets the bound for one actor-state HTTP request, including reading its response body.</summary>
+    internal TimeSpan RequestTimeout => _client.Timeout;
+
+    /// <summary>Creates a live probe whose materialization and request bounds follow the recovery lane.</summary>
+    /// <param name="daprHttpEndpoint">The owning EventStore DAPR sidecar endpoint.</param>
+    /// <param name="options">The live recovery lane's configured restoration budget.</param>
+    internal EventStoreDurableStateProbe(Uri daprHttpEndpoint, LiveRecoveryValidationOptions options)
+        : this(daprHttpEndpoint)
+    {
+        _presenceWindow = RestorationWindow(options);
+        _client.Timeout = _presenceWindow;
+    }
+
+    /// <summary>Creates an infrastructure-free probe using the live recovery lane's bounds.</summary>
+    /// <param name="daprHttpEndpoint">The owning EventStore DAPR sidecar endpoint.</param>
+    /// <param name="handler">The transport used to observe actor-state requests.</param>
+    /// <param name="options">The live recovery lane's configured restoration budget.</param>
+    internal EventStoreDurableStateProbe(
+        Uri daprHttpEndpoint,
+        HttpMessageHandler handler,
+        LiveRecoveryValidationOptions options)
+        : this(daprHttpEndpoint, handler, RestorationWindow(options), DefaultPollInterval)
+    {
+        _client.Timeout = _presenceWindow;
+    }
+
     internal EventStoreDurableStateProbe(
         Uri daprHttpEndpoint,
         HttpMessageHandler handler,
@@ -91,7 +124,13 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
                 return;
             }
 
-            await Task.Delay(_pollInterval, cancellationToken).ConfigureAwait(false);
+            TimeSpan remaining = _presenceWindow - timer.Elapsed;
+            if (remaining <= TimeSpan.Zero)
+            {
+                break;
+            }
+
+            await Task.Delay(remaining < _pollInterval ? remaining : _pollInterval, cancellationToken).ConfigureAwait(false);
         }
 
         // Close the same final-delay race RemainsAggregateAbsentAsync closes, and — unlike the tolerant mid-window
@@ -310,9 +349,14 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
         string stateKey,
         CancellationToken cancellationToken)
     {
+        // ResponseHeadersRead ends HttpClient's timeout at the headers. Keep the same independent request budget
+        // active while reading the actor-state body as well, linked to any shorter caller restoration deadline.
+        using CancellationTokenSource requestDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        requestDeadline.CancelAfter(RequestTimeout);
+        CancellationToken requestToken = requestDeadline.Token;
         string relative = $"v1.0/actors/AggregateActor/{Uri.EscapeDataString(actorId)}/state/{Uri.EscapeDataString(stateKey)}";
         using HttpResponseMessage response = await _client
-            .GetAsync(relative, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            .GetAsync(relative, HttpCompletionOption.ResponseHeadersRead, requestToken)
             .ConfigureAwait(false);
         if (response.StatusCode is HttpStatusCode.NoContent or HttpStatusCode.NotFound)
         {
@@ -325,7 +369,7 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
                 $"EventStore actor-state probe returned HTTP {(int)response.StatusCode} for aggregate '{actorId}'.");
         }
 
-        string content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        string content = await response.Content.ReadAsStringAsync(requestToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(content))
         {
             throw new InvalidOperationException(
@@ -358,6 +402,14 @@ internal sealed class EventStoreDurableStateProbe(Uri daprHttpEndpoint) : IDispo
         client.BaseAddress = new Uri(endpoint.ToString().TrimEnd('/') + '/', UriKind.Absolute);
         client.Timeout = TimeSpan.FromSeconds(10);
         return client;
+    }
+
+    /// <summary>Reads the positive restoration budget without requiring destructive-lane activation.</summary>
+    private static TimeSpan RestorationWindow(LiveRecoveryValidationOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(options.RestorationTimeout, TimeSpan.Zero);
+        return options.RestorationTimeout;
     }
 
     private static string? GetString(JsonElement element, string propertyName)

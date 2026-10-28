@@ -35,6 +35,48 @@ public sealed class LiveRecoveryValidationOptionsTests
         options.Validate().ShouldNotBeNull().ShouldContain(nameof(LiveRecoveryValidationOptions.DatasetVolume));
     }
 
+    [Theory]
+    [InlineData("Production", "", "", "", "EnvironmentName")]
+    [InlineData("Staging", "", "", "", "EnvironmentName")]
+    [InlineData(" ", "", "", "", "EnvironmentName")]
+    [InlineData("", "tenant-alpha", "", "", "TestTenantRef")]
+    [InlineData("", " ", "", "", "TestTenantRef")]
+    [InlineData("", "", "relative/evidence", "", "EvidenceDirectory")]
+    [InlineData("", "", " ", "", "EvidenceDirectory")]
+    [InlineData("", "", "", "https://example.test/evidence", "EvidenceLocator")]
+    [InlineData("", "", "", "artifact:reports?token=private", "EvidenceLocator")]
+    public void DisabledOverlaysRejectUnsafeConfiguredShape(
+        string environment, string tenant, string directory, string locator, string field)
+    {
+        LiveRecoveryValidationOptions options = new()
+        {
+            EnvironmentName = environment,
+            TestTenantRef = tenant,
+            EvidenceDirectory = directory,
+            EvidenceLocator = locator,
+        };
+
+        options.Validate().ShouldNotBeNull().ShouldContain(field);
+    }
+
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Testing")]
+    public void DisabledSafeOverlayNeedsNoActivationCredentials(string environment)
+    {
+        LiveRecoveryValidationOptions options = new()
+        {
+            EnvironmentName = environment,
+            TestTenantRef = "replay-test:recovery-validation",
+            EvidenceDirectory = Path.GetFullPath("TestResults/live-recovery"),
+            EvidenceLocator = "artifact:live-recovery-validation-evidence",
+        };
+
+        options.Validate().ShouldBeNull();
+        options.Enabled = true;
+        options.Validate().ShouldNotBeNull();
+    }
+
     [Fact]
     public void CompleteSandboxConfigurationIsValid()
     {

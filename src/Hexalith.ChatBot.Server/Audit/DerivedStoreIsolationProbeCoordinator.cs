@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Projections.DerivedStores;
 
@@ -38,8 +40,11 @@ internal sealed class DerivedStoreIsolationProbeCoordinator(
     IAuditWriter auditWriter,
     IOperatorAlertSink operatorAlertSink,
     ISystemClock clock,
-    IWormAuditStore? tenantStore = null)
+    IWormAuditStore? tenantStore = null,
+    TimeSpan? cleanupTimeout = null)
 {
+    private readonly TimeSpan _cleanupTimeout = ValidateCleanupTimeout(cleanupTimeout ?? TimeSpan.FromSeconds(5));
+
     /// <summary>The reserved resource-id prefix marking a synthetic probe sentinel — unambiguously a probe artifact.</summary>
     public const string SentinelResourceIdPrefix = "iso-probe:";
 
@@ -85,12 +90,14 @@ internal sealed class DerivedStoreIsolationProbeCoordinator(
             List<string> sentinelIds = [];
             List<string> observableThroughIntruder = [];
             List<(DerivedStoreClass Class, string ResourceId)> seeded = [];
+            bool cleanupIncomplete = false;
+            string probeNonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
 
             try
             {
                 foreach (DerivedStoreClass cls in DerivedStorePartition.AllClasses)
                 {
-                    string sentinelId = SentinelResourceId(cls, ownerTenant);
+                    string sentinelId = SentinelResourceId(cls, probeNonce);
                     sentinelIds.Add(sentinelId);
 
                     // Seed the sentinel into the OWNER's partition.
@@ -114,23 +121,40 @@ internal sealed class DerivedStoreIsolationProbeCoordinator(
             }
             finally
             {
-                // Remove what this probe seeded, including on the cancellation/throw paths that would otherwise orphan
-                // a partially-seeded set. Best-effort by design: the sentinel id is deterministic, so a failed cleanup
-                // is overwritten by the next run rather than accumulating. Cleanup must never mask the probe's own
-                // verdict, so its failures are swallowed.
+                // Cleanup survives caller cancellation, but must fit inside one independent budget so a hanging
+                // store cannot block host shutdown. Bound the wait as well as passing the token: stores may ignore it.
+                using CancellationTokenSource cleanupDeadline = new(_cleanupTimeout);
                 foreach ((DerivedStoreClass cls, string resourceId) in seeded)
                 {
                     try
                     {
+                        cleanupDeadline.Token.ThrowIfCancellationRequested();
                         _ = await derivedStore
-                            .InvalidateAsync(cls, ownerTenant, resourceId, CancellationToken.None)
+                            .InvalidateAsync(cls, ownerTenant, resourceId, cleanupDeadline.Token)
+                            .AsTask().WaitAsync(cleanupDeadline.Token)
                             .ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (cleanupDeadline.IsCancellationRequested)
+                    {
+                        cleanupIncomplete = true;
+                        break;
                     }
                     catch
                     {
-                        // Intentionally ignored — see above.
+                        // Keep attempting the remaining owned entries, while retaining fail-closed evidence.
+                        cleanupIncomplete = true;
                     }
                 }
+            }
+
+            if (cleanupIncomplete && !result.IsBreach)
+            {
+                result = new DerivedStoreIsolationVerificationResult(
+                    ownerTenant,
+                    intruderTenant,
+                    DerivedStoreIsolationStatus.Unknown,
+                    DerivedStoreIsolationVerificationResult.ProbeIncompleteReasonCode,
+                    FirstOffenderLocator: null);
             }
         }
         catch (Exception) when (cancellationToken is { IsCancellationRequested: false })
@@ -185,9 +209,8 @@ internal sealed class DerivedStoreIsolationProbeCoordinator(
     /// tenant source prevents an empty or misbound derived store from hiding active tenants and reporting vacuous
     /// coverage. For each pair it seeds the owner's partitions and attempts the cross-tenant read through the intruder.
     /// </summary>
-    /// <param name="runCorrelationId">The run correlation id applied to every pair-probe. Sentinel resource ids are
-    /// deliberately independent of it — they are deterministic per (class, owner tenant) so repeated sweeps reuse and
-    /// invalidate the same entries instead of growing live derived state without bound.</param>
+    /// <param name="runCorrelationId">The run correlation id applied to every pair-probe. Each invocation owns distinct
+    /// sentinel identities so a timed-out cleanup cannot remove another invocation's evidence.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The structured probe outcome.</returns>
     public async ValueTask<DerivedStoreIsolationProbeOutcome> SweepAllTenantPairsAsync(
@@ -238,15 +261,18 @@ internal sealed class DerivedStoreIsolationProbeCoordinator(
     }
 
     /// <summary>
-    /// The sentinel's resource id, deterministic per (class, owner tenant).
+    /// The sentinel's resource id, bounded and unique to this probe invocation and class.
     /// </summary>
     /// <remarks>
-    /// This deliberately does NOT include the run correlation id. While the probe was invoked only from a release gate,
-    /// a per-run id was harmless; once Story 12.14 put it on a nightly schedule, a per-run id meant every run wrote
-    /// four brand-new, never-overwritten entries per owner tenant into the live derived store — unbounded growth of
-    /// production state, and a violation of the "idempotent" requirement the schedule is held to. A deterministic id
-    /// overwrites in place, so the probe's footprint is bounded regardless of how many times it runs.
+    /// Cleanup deletes only identities generated for this invocation. Distinct nonces remain necessary when callers
+    /// reuse correlation ids: a store ignoring cancellation can finish an earlier cleanup after a new probe seeds.
+    /// Cleanup deadline expiry is reported as incomplete evidence rather than successful isolation.
     /// </remarks>
-    private static string SentinelResourceId(DerivedStoreClass cls, string ownerTenant)
-        => $"{SentinelResourceIdPrefix}{DerivedStorePartition.Segment(cls)}:{ownerTenant}";
+    private static string SentinelResourceId(DerivedStoreClass cls, string probeNonce)
+        => $"{SentinelResourceIdPrefix}{DerivedStorePartition.Segment(cls)}:{probeNonce}";
+
+    private static TimeSpan ValidateCleanupTimeout(TimeSpan timeout)
+        => timeout > TimeSpan.Zero && timeout.TotalMilliseconds <= uint.MaxValue - 1
+            ? timeout
+            : throw new ArgumentOutOfRangeException(nameof(timeout));
 }

@@ -199,7 +199,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: Story 12.15 options hygiene
 severity: low
 reason: **[LOW · options] `Enabled = false` skips environment/tenant/secret/path validation.** Dormant Production-shaped overlays are not rejected until enablement. **Release-claim impact:** config mistakes surface only when the lane is armed. **Owner:** Story 12.15 options hygiene. **Closure evidence:** validate sandbox shape even when disabled, or document intentional skip.
-status: open
+status: done 2026-10-28
+resolution: Validates supplied dormant environment, replay tenant and evidence directory/locator before disabled return; empty defaults and activation-only credentials remain supported. Focused options and real gateway DI regressions pass. Evidence: spec-five-deferred-recovery-boundaries.md and evidence/five-deferred-recovery-boundaries.json (101/101 focused tests, zero failures/skips; diagnostic full Server compile, zero warnings/errors).
 decision: 2026-08-27 Validate dormant shape — Validate non-secret sandbox, environment, tenant, and path shape while disabled, retain activation-only secret checks, and add disabled-overlay tests.
 decision: 2026-08-27 Validate dormant shape — Validate non-secret sandbox, environment, tenant, and path shape while disabled, retain activation-only secret checks, and add disabled-overlay tests.
 
@@ -209,7 +210,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: evidence manifest sanitization
 severity: low
 reason: **[LOW · sanitization] `IsSafeArtifactLocator` rejects substrings `token`/`secret`/`password`.** Valid artifact URIs with those substrings fail closed. **Release-claim impact:** rare false stop-ship on locator naming. **Owner:** evidence manifest sanitization. **Closure evidence:** path-segment allowlist or documented substring policy.
-status: open
+status: done 2026-10-28
+resolution: Artifact URI validation rejects decoded bounded sensitive tokens, controls and nested escapes while accepting benign substring names. All 28 manifest regressions pass. Evidence: spec-five-deferred-recovery-boundaries.md and evidence/five-deferred-recovery-boundaries.json (101/101 focused tests, zero failures/skips; diagnostic full Server compile, zero warnings/errors).
 decision: 2026-08-27 Use segment-aware policy — Parse the artifact URI, reject bounded sensitive path segments or keys, accept benign substring occurrences, and add positive and negative tests.
 decision: 2026-08-27 Use segment-aware policy — Parse the artifact URI, reject bounded sensitive path segments or keys, accept benign substring occurrences, and add positive and negative tests.
 
@@ -368,7 +370,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: Story 12.15 Aspire/E2E options wiring
 severity: low
 reason: **[LOW · Aspire/E2E options] `EventStoreDurableStateProbe` uses fixed 30s/250ms/10s bounds unbound from `LiveRecoveryValidationOptions.RestorationTimeout`.** **Release-claim impact:** harness and probe can disagree on materialization deadlines. **Owner:** Story 12.15 Aspire/E2E options wiring. **Closure evidence:** shared bound or explicit probe options from the live options object.
-status: open
+status: done 2026-10-28
+resolution: Live probe takes restoration options for presence and HTTP bounds, clamps polling delays, preserves strict final reads and bounds body reading. All 23 durable-state probe regressions pass; live topology qualification remains separately blocked. Evidence: spec-five-deferred-recovery-boundaries.md and evidence/five-deferred-recovery-boundaries.json (101/101 focused tests, zero failures/skips; diagnostic full Server compile, zero warnings/errors).
 
 ### DW-42: [LOW · continuity end-state] Actor-state probe only checks `events:1` + `MailboxMessageIntakeCaptured` suffix.
 
@@ -613,7 +616,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-14-wire-t
 location: PeriodicEnforcementRuntime.cs:285-297
 severity: low
 reason: **[LOW · pre-existing clock assumption] `LastSucceededAtUtc` is not monotonic.** `PeriodicEnforcementRuntime.cs:285-297` — `RecordM2SweepSucceeded` overwrites unconditionally with no monotonic guard. A backwards NTP correction that crosses a partition boundary re-runs the sweep and records an *earlier* success time; if the backward jump exceeds `M2SweepCadence + MissedCadenceAlertAfter`, the missed-cadence check then alerts on every tick until wall-clock catches up. The whole runtime reads wall-clock via `ISystemClock` with no monotonic source anywhere, so this belongs to the clock/scale owner rather than this story.
-status: open
+status: done 2026-10-28
+resolution: Overall and per-job success times cannot rewind; per-job evidence stays coherent and regressed attempts remain release-ineligible. Four status/gate regressions pass, including clock catch-up after breach or zero coverage. Evidence: spec-five-deferred-recovery-boundaries.md and evidence/five-deferred-recovery-boundaries.json (101/101 focused tests, zero failures/skips; diagnostic full Server compile, zero warnings/errors).
 
 ### DW-69: [MEDIUM · pre-existing test defect, not in this story's diff] `AiActionRiskClassifierTests.UnknownActionClassShouldFailClosedWithoutSerializingInvalidEnumValues` is flaky at ~1%.
 
@@ -649,7 +653,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-14-wire-t
 location: DerivedStoreIsolationProbeCoordinator.cs:122-134
 severity: low
 reason: **[LOW · deliberate design, unbounded against a hanging store] Probe cleanup has no deadline.** `DerivedStoreIsolationProbeCoordinator.cs:122-134` — the `finally` issues up to four `InvalidateAsync` round-trips per probed pair with `CancellationToken.None`. Passing `None` is correct in intent (cleanup must survive cancellation, or a cancelled sweep leaves sentinels behind), but there is no timeout either. Against a store that hangs rather than fails fast, cancellation delivered mid-sweep blocks the `finally`, which blocks `SweepAllTenantPairsAsync`, `RunOnceAsync` and `ExecuteAsync` past the host `ShutdownTimeout` (30s default) into a forced kill. Same root cause as the open per-sweep-timeout patch in Story 12.14; fix by bounding the cleanup with its own timeout rather than by restoring the shutdown token.
-status: open
+status: done 2026-10-28
+resolution: One independent cleanup deadline bounds all invalidations including cancellation-ignoring awaits; failures remain fail-closed and caller cancellation survives. Invocation-scoped sentinels fence late deletion. Ten cleanup and 16 existing isolation regressions pass; bounded orphan retention remains separately deferred. Evidence: spec-five-deferred-recovery-boundaries.md and evidence/five-deferred-recovery-boundaries.json (101/101 focused tests, zero failures/skips; diagnostic full Server compile, zero warnings/errors).
 
 ### DW-73: [LOW · pre-existing, Story 13.4 scope] Null `facet.Health` NREs in the status-summary badge mapper.
 
@@ -1988,3 +1993,10 @@ Final native follow-up qualification (2026-10-26): independent review correction
   summary: Prerequisite before configuring `ChatBot:Folders` anywhere: an abandoned native lease blocks every later attachment in its association workspace (resolved from review decision D1, option 1).
   evidence: Only the holder's own task can clear an expired native lease, and only when clean (`FolderDomainProcessor.Native.cs:80-97`); others get retryable `native_contention`. A holder whose intake is never re-driven after a failed completion/release or a crash, or one with an uploaded-but-unpublished body after expiry (`AbandonUploadAsync` rejects task-bound uploads, `DaprAuthoritativeContentStore.cs:314`), blocks the workspace indefinitely. Capture re-runs only on association events for the same intake (`AssociationProjectionHandler`, `ReadModelProjectConversationProjectionStore.cs:189`), so contention losers also stay `Retryable`. Settles with (1) the owner's C7-deferred lock takeover and staged-work release (`c7-lock-authorization-timing.md:76-80`, Architecture+Security approval; spec Task 3 and the C6 native paragraph currently forbid takeover) and (2) a ChatBot re-drive for `Retryable` attachments independent of intake events.
   reason: Takeover/staged-work release is C7-deferred owner work needing Architecture+Security approval, and ChatBot has no timed re-drive for Retryable attachments; keep ChatBot:Folders unconfigured until both exist.
+
+
+## Deferred from: review of spec-five-deferred-recovery-boundaries (2026-10-28)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-recovery-boundaries.md`
+  summary: Bound retention or quarantine of invocation-scoped isolation-probe sentinels when cleanup cannot complete.
+  evidence: Independent review verified that a timed-out or failed deletion can leave up to four synthetic entries for a pair invocation, and later runs do not revisit those nonce-scoped identities; MemoriesDerivedStore also retains its known-ID entries. Nonce fencing is required to prevent late noncooperative deletion from masking a later probe's breach. Fast cleanup failures and timeouts now fail closed, and cleanup waiting is bounded; accumulated synthetic storage is not claimed bounded. A separate lifecycle policy must provide safe bounded reaping, retention or quarantine without deleting an active probe's evidence.

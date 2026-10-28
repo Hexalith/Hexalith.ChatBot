@@ -41,6 +41,27 @@ public sealed class LiveRecoveryValidationOptionsDependencyInjectionTests
     }
 
     [Fact]
+    public void DisabledProductionOverlayFailsOptionsValidationOnResolve()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ChatBot:LiveRecoveryValidation:Enabled"] = "false",
+                ["ChatBot:LiveRecoveryValidation:EnvironmentName"] = "Production",
+            })
+            .Build();
+        ServiceCollection services = new();
+        services.AddSingleton(configuration);
+        _ = services.AddChatBotCommandGateway();
+        using ServiceProvider provider = services.BuildServiceProvider();
+
+        OptionsValidationException exception = Should.Throw<OptionsValidationException>(
+            () => provider.GetRequiredService<IOptions<LiveRecoveryValidationOptions>>().Value);
+
+        exception.Message.ShouldContain(nameof(LiveRecoveryValidationOptions.EnvironmentName));
+    }
+
+    [Fact]
     public void EnabledNonReplayTestTenantConfigurationFailsOptionsValidationOnResolve()
     {
         IConfiguration configuration = new ConfigurationBuilder()

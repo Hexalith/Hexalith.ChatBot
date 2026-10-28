@@ -32,6 +32,32 @@ public sealed class RecoveryValidationEvidenceManifestTests
         manifest.ValidateProjectionEvidence().ShouldContain("projection_unmeasurable_evidence_not_empty");
     }
 
+    [Theory]
+    [InlineData("artifact:tokenization/reports.trx")]
+    [InlineData("artifact:secretariat/reports.trx")]
+    [InlineData("artifact:passwordless/reports.trx")]
+    [InlineData("artifact://tokenization/reports.trx")]
+    [InlineData("artifact:reports/%74okenization.trx")]
+    public void ArtifactLocatorAcceptsBenignSensitiveWordSubstrings(string locator)
+        => RecoveryValidationEvidenceManifest.IsSafeArtifactLocator(locator).ShouldBeTrue();
+
+    [Theory]
+    [InlineData("artifact:reports/token.trx")]
+    [InlineData("artifact:reports/SECRET/value")]
+    [InlineData("artifact:reports/access-token/value")]
+    [InlineData("artifact:reports/password=value")]
+    [InlineData("artifact:reports/%74oken/value")]
+    [InlineData("artifact:reports/%2574oken/value")]
+    [InlineData("artifact:reports/%00/value")]
+    [InlineData("artifact://token/reports")]
+    [InlineData("artifact://user:pass@reports/results")]
+    [InlineData("artifact:reports?key=value")]
+    [InlineData("artifact:reports#fragment")]
+    [InlineData("https://example.test/reports")]
+    [InlineData("")]
+    public void ArtifactLocatorRejectsSensitiveTokensAndUnsafeUriShape(string locator)
+        => RecoveryValidationEvidenceManifest.IsSafeArtifactLocator(locator).ShouldBeFalse();
+
     [Fact]
     public void CompleteMetadataOnlyManifestIsValid()
     {

@@ -1,0 +1,105 @@
+{
+  "purpose": "Focused diagnostic source verification; not original module-graph, live-topology or release qualification",
+  "baseline_commit": "b4046c8041aad87505fbc4c0ebfc20c5cf0b9f33",
+  "deferred_items": [
+    "DW-22",
+    "DW-23",
+    "DW-41",
+    "DW-68",
+    "DW-72"
+  ],
+  "server_source_files_compiled": 893,
+  "build_configuration": "Debug",
+  "warning_suppressions": [],
+  "source_shadows": false,
+  "test_summary": {
+    "tests": 101,
+    "passed": 101,
+    "failed": 0,
+    "pending": 0,
+    "skipped": 0,
+    "other": 0,
+    "suites": 1,
+    "start": 1793174213177,
+    "stop": 1793174214952,
+    "duration": 1775
+  },
+  "commands": [
+    {
+      "command": [
+        "dotnet",
+        "build",
+        "/tmp/chatbot-five-recovery-full-server-20261028/DiagnosticServer.csproj",
+        "--configuration",
+        "Debug",
+        "-m:1",
+        "--nologo"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "log": "/tmp/chatbot-five-recovery-full-server-20261028/final-build.log"
+    },
+    {
+      "command": [
+        "dotnet",
+        "build",
+        "/tmp/chatbot-five-recovery-assembly-harness-20261028/FocusedAssemblyRecovery.csproj",
+        "--configuration",
+        "Debug",
+        "-m:1",
+        "--nologo"
+      ],
+      "environment": {},
+      "exitCode": 0,
+      "log": "/tmp/chatbot-five-recovery-assembly-harness-20261028/final-build.log"
+    },
+    {
+      "command": [
+        ".github/scripts/run-xunit-v4.sh",
+        "/tmp/chatbot-five-recovery-assembly-harness-20261028/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests",
+        "/tmp/chatbot-five-recovery-assembly-harness-20261028/final-focused.ctrf.json",
+        "-parallel",
+        "none",
+        "-result-trx",
+        "/tmp/chatbot-five-recovery-assembly-harness-20261028/final-focused.trx"
+      ],
+      "environment": {
+        "XUNIT_REQUIRE_ZERO_SKIPS": "1"
+      },
+      "exitCode": 0,
+      "log": "/tmp/chatbot-five-recovery-assembly-harness-20261028/final-test.log"
+    }
+  ],
+  "server_assembly_sha256": "af26e048924cf94a731f05a4559be1375f70554dd46a8712bf57be3be53b5b60",
+  "changed_source_sha256": {
+    "src/Hexalith.ChatBot.Server/Audit/DerivedStoreIsolationProbeCoordinator.cs": "50a9565d9ea33350cc270874f39568b96407580876a34e726e6073d6bbfea560",
+    "src/Hexalith.ChatBot.Server/Audit/LiveRecoveryValidationOptions.cs": "38d29458cd1342fc1139fff938f4ca55c01e3ddc9feebb21f5a2a6191959cf3d",
+    "src/Hexalith.ChatBot.Server/Audit/RecoveryValidationEvidenceManifest.cs": "89d93c4fa568c3fe2c223247ff725a13374d7e394fd807dfd48783c67f436213",
+    "src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/InMemoryPeriodicEnforcementStatusStore.cs": "30ea8b8cd629a663ede0a77e64307ed40c24b1e9f5e1c0045d223dfc9fc74610",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/EventStoreDurableStateProbe.cs": "3047ee01f76796e49b244d51730f56c195409d0ff5a557b9ba70e3372c050129",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/EventStoreDurableStateProbeTests.cs": "d4f2437a604c33f07883a94d25d563819e6765ff7118b57acf387fc17999e2aa",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs": "f0bac6cdfe85b3ff3d2ac183569f963ea26f46f38525d085f9d545fe37687640",
+    "tests/Hexalith.ChatBot.Server.Tests/Audit/LiveRecoveryValidationOptionsDependencyInjectionTests.cs": "00c75e1b12c516a15d54b8698c9fea18fd634b15af78726ce12091265001e3cd",
+    "tests/Hexalith.ChatBot.Server.Tests/Audit/LiveRecoveryValidationOptionsTests.cs": "26bace834c85ae2f3f1bdb5d4a205f26338b90756be6f12072f0b87b9752b0cb",
+    "tests/Hexalith.ChatBot.Server.Tests/Audit/RecoveryValidationEvidenceManifestTests.cs": "ead07720abc6aca2a18676ffa13fd16d0d4cee9d00129abc51d7167a33e729ef",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryProbeCancellationContent.cs": "0207f7aa888c7048b9f695c5bf3a599e0804ea63b7c223db671cadb49549804a",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryProbeCancellationHandler.cs": "fca16bdbbe6af7ebc26fde9d1fc417e10384bdb7c0e81bd0749edab5aa901079",
+    "tests/Hexalith.ChatBot.Server.Tests/Audit/CleanupControlledDerivedStore.cs": "24f3b21a47bcefb2ceebbc37aec1f895ca03d64fc36bd65ba36300fbc9f5efc6",
+    "tests/Hexalith.ChatBot.Server.Tests/Audit/DerivedStoreIsolationCleanupTests.cs": "f92307f5a4f9b818a3b5b1ff75654a3a4ed6c0240062bc2156f55f2a5cd63d6f",
+    "tests/Hexalith.ChatBot.Server.Tests/Operations/PeriodicEnforcement/InMemoryPeriodicEnforcementStatusStoreTests.cs": "7bf3d17466053f72ba21f61b64889d64c24195f2871862ba4394fc77d100ade0"
+  },
+  "local_evidence": "/tmp/chatbot-five-recovery-assembly-harness-20261028",
+  "artifact_sha256": {
+    "final-focused.ctrf.json": "a5c225918b52302c9130940bba763539778d0852f759434cf2d2d7a2de892cb7",
+    "final-focused.trx": "cfc50e1d1e0fec352f0b5a751a3c81e43d3ee2248c669db35693b35b7833887b",
+    "final-commands.json": "da6be8c4a79c16e684d1f2d89adcdae95dc7eb03e0695e13391cfe97e8a979e5",
+    "final-source-checksums.json": "e8690f8ca8a25ee47e2c23c738f92845b20a5ebac01a27c6f61cb20b17f21cda",
+    "final-build.log": "93cdd342176feb6a2776e6c35c721e743525462ed6160e4fc9921d5c6812ec81",
+    "final-test.log": "f22e4bb7cc17aff80b7d3dde923add5541690b877ee66cbb7cca0efbe5fb21d0"
+  },
+  "limitations": [
+    "Original source graph blocked by Conversations mapping and duplicate dependency references; actual source-mapping diagnostic also refuses package/source overlap.",
+    "Live E2E wiring was inspected but the Aspire recovery-primary lane could not execute.",
+    "Nonce-scoped synthetic orphan retention after cleanup failure remains a separate deferred lifecycle item."
+  ]
+}

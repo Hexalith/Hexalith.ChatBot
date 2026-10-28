@@ -128,21 +128,35 @@ internal sealed class LiveRecoveryValidationOptions
             return $"{nameof(WorkflowTimeout)} must be positive.";
         }
 
-        if (!Enabled)
-        {
-            return null;
-        }
-
-        if (string.Equals(EnvironmentName, "Production", StringComparison.OrdinalIgnoreCase) ||
+        if ((Enabled || !string.IsNullOrEmpty(EnvironmentName)) &&
             (string.Equals(EnvironmentName, "Testing", StringComparison.OrdinalIgnoreCase) is false &&
              string.Equals(EnvironmentName, "Development", StringComparison.OrdinalIgnoreCase) is false))
         {
             return $"{nameof(EnvironmentName)} must identify a Testing or Development sandbox.";
         }
 
-        if (!ReplayTenantPolicy.IsTestTenant(TestTenantRef))
+        if ((Enabled || !string.IsNullOrEmpty(TestTenantRef)) && !ReplayTenantPolicy.IsTestTenant(TestTenantRef))
         {
             return $"{nameof(TestTenantRef)} must use the replay-test: tenant prefix.";
+        }
+
+        if ((Enabled || !string.IsNullOrEmpty(EvidenceDirectory)) &&
+            (string.IsNullOrWhiteSpace(EvidenceDirectory) || !Path.IsPathFullyQualified(EvidenceDirectory)))
+        {
+            return $"{nameof(EvidenceDirectory)} must be an absolute path.";
+        }
+
+        if ((Enabled || !string.IsNullOrEmpty(EvidenceLocator)) &&
+            !RecoveryValidationEvidenceManifest.IsSafeArtifactLocator(EvidenceLocator))
+        {
+            return $"{nameof(EvidenceLocator)} must be a safe artifact locator.";
+        }
+
+        // Empty product defaults remain valid. Configured dormant overlays must already have safe non-secret shape;
+        // credentials and complete dataset/controller prerequisites are needed only when the lane is armed.
+        if (!Enabled)
+        {
+            return null;
         }
 
         if (RestorationTimeout >= PerScenarioTimeout)
@@ -222,13 +236,6 @@ internal sealed class LiveRecoveryValidationOptions
             return $"{nameof(ControllerSecret)} must be supplied by the Tier-3 workflow.";
         }
 
-        if (string.IsNullOrWhiteSpace(EvidenceDirectory) || !Path.IsPathFullyQualified(EvidenceDirectory))
-        {
-            return $"{nameof(EvidenceDirectory)} must be an absolute path.";
-        }
-
-        return RecoveryValidationEvidenceManifest.IsSafeArtifactLocator(EvidenceLocator)
-            ? null
-            : $"{nameof(EvidenceLocator)} must be a safe artifact locator.";
+        return null;
     }
 }

@@ -1,5 +1,7 @@
 using System.Net;
 
+using Hexalith.ChatBot.Server.Audit;
+
 using Shouldly;
 
 namespace Hexalith.ChatBot.IntegrationTests.Recovery;
@@ -8,6 +10,117 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 public sealed class EventStoreDurableStateProbeTests
 {
     private static readonly Uri Endpoint = new("http://eventstore-dapr.test");
+
+    [Fact]
+    public void LiveRestorationBudgetCanExceedTheFormerPresenceAndRequestDefaults()
+    {
+        LiveRecoveryValidationOptions options = new() { RestorationTimeout = TimeSpan.FromMinutes(3) };
+        using EventStoreDurableStateProbe liveProbe = new(Endpoint, options);
+        using SequenceHttpMessageHandler handler = new((_, _) => new HttpResponseMessage(HttpStatusCode.NotFound));
+        using EventStoreDurableStateProbe handlerProbe = new(Endpoint, handler, options);
+
+        liveProbe.PresenceWindow.ShouldBe(options.RestorationTimeout);
+        liveProbe.RequestTimeout.ShouldBe(options.RestorationTimeout);
+        handlerProbe.PresenceWindow.ShouldBe(liveProbe.PresenceWindow);
+        handlerProbe.RequestTimeout.ShouldBe(liveProbe.RequestTimeout);
+    }
+
+    [Fact]
+    public async Task ConfiguredPresenceBudgetEndsTheProbeWithoutWaitingForTheFormerDefault()
+    {
+        using SequenceHttpMessageHandler handler = new((_, _) => new HttpResponseMessage(HttpStatusCode.NotFound));
+        using EventStoreDurableStateProbe probe = new(
+            Endpoint, handler, new LiveRecoveryValidationOptions { RestorationTimeout = TimeSpan.FromMilliseconds(40) });
+
+        Task observation = probe.WaitForMailboxIntakeAsync(
+            "recovery-validation", "01ARZ3NDEKTSV4RRFFQ69G5FAW", TestContext.Current.CancellationToken);
+        _ = await Should.ThrowAsync<TimeoutException>(() => observation.WaitAsync(
+            TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+
+        observation.IsCompleted.ShouldBeTrue("the probe's own configured window must expire before the test guard");
+        handler.Requests.ShouldBeGreaterThanOrEqualTo(2);
+    }
+
+    [Fact]
+    public async Task PresencePollDelayStopsAtTheConfiguredWindowAndPreservesTheStrictFinalRead()
+    {
+        using SequenceHttpMessageHandler handler = new((requestNumber, _) => requestNumber switch
+        {
+            1 => new HttpResponseMessage(HttpStatusCode.NotFound),
+            2 => SequenceHttpMessageHandler.Json("{\"currentSequence\":1}"),
+            _ => SequenceHttpMessageHandler.Json(EventEnvelope("recovery-validation")),
+        });
+        using EventStoreDurableStateProbe probe = new(
+            Endpoint, handler, TimeSpan.FromMilliseconds(40), TimeSpan.FromSeconds(30));
+        using CancellationTokenSource testDeadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        testDeadline.CancelAfter(TimeSpan.FromSeconds(5));
+
+        await probe.WaitForMailboxIntakeAsync(
+            "recovery-validation", "01ARZ3NDEKTSV4RRFFQ69G5FAW", testDeadline.Token);
+
+        handler.Requests.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task ConfiguredRequestBudgetCancelsAnUnresponsiveTransport()
+    {
+        using RecoveryProbeCancellationHandler handler = new();
+        using EventStoreDurableStateProbe probe = new(
+            Endpoint, handler, new LiveRecoveryValidationOptions { RestorationTimeout = TimeSpan.FromMilliseconds(40) });
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(() => probe.IsMailboxIntakeCommittedAsync(
+            "recovery-validation", "01ARZ3NDEKTSV4RRFFQ69G5FAW", TestContext.Current.CancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+
+        handler.CancellationObserved.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task ConfiguredRequestBudgetRemainsActiveAfterResponseHeadersWhileReadingBody()
+    {
+        using RecoveryProbeCancellationContent content = new();
+        using SequenceHttpMessageHandler handler = new((_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = content,
+        });
+        using EventStoreDurableStateProbe probe = new(
+            Endpoint, handler, new LiveRecoveryValidationOptions { RestorationTimeout = TimeSpan.FromMilliseconds(40) });
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(() => probe.IsMailboxIntakeCommittedAsync(
+            "recovery-validation", "01ARZ3NDEKTSV4RRFFQ69G5FAW", TestContext.Current.CancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+
+        handler.Requests.ShouldBe(1);
+        content.SerializationStarted.ShouldBeTrue();
+        content.CancellationObserved.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task CallerCancellationStillStopsARequestBeforeItsConfiguredBudget()
+    {
+        using RecoveryProbeCancellationHandler handler = new();
+        using EventStoreDurableStateProbe probe = new(
+            Endpoint, handler, new LiveRecoveryValidationOptions { RestorationTimeout = TimeSpan.FromMinutes(3) });
+        using CancellationTokenSource caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        Task<bool> observation = probe.IsMailboxIntakeCommittedAsync(
+            "recovery-validation", "01ARZ3NDEKTSV4RRFFQ69G5FAW", caller.Token);
+        await handler.Started.WaitAsync(TestContext.Current.CancellationToken);
+
+        caller.Cancel();
+        _ = await Should.ThrowAsync<OperationCanceledException>(() => observation.WaitAsync(
+            TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+
+        handler.CancellationObserved.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void NonPositiveRestorationBudgetIsRejected(int seconds)
+    {
+        LiveRecoveryValidationOptions options = new() { RestorationTimeout = TimeSpan.FromSeconds(seconds) };
+        _ = Should.Throw<ArgumentOutOfRangeException>(() => new EventStoreDurableStateProbe(Endpoint, options));
+    }
 
     [Theory]
     [InlineData("")]
