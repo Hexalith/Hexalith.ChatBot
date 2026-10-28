@@ -131,17 +131,9 @@ public static class RecoveryAttemptSummarizer
                 return null;
             }
 
-            XmlReaderSettings settings = new()
-            {
-                DtdProcessing = DtdProcessing.Prohibit,
-                XmlResolver = null,
-                MaxCharactersInDocument = RecoveryTrxSanitizer.MaximumTrxCharacters,
-            };
             byte[] bytes = BoundedEvidenceInput.ReadFileBytes(
                 inputPath, BoundedEvidenceInput.MaximumInputBytes, GateReason.MachineResultsInvalid, "recovery-sanitize");
-            using MemoryStream stream = new(bytes, writable: false);
-            using XmlReader reader = XmlReader.Create(stream, settings);
-            return XDocument.Load(reader, LoadOptions.None);
+            return BoundedTrxDocument.Load(bytes);
         }
         catch (Exception exception) when (exception is XmlException
             or GateValidationException

@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -8,6 +9,12 @@ namespace Hexalith.ChatBot.StoryEvidenceGate;
 /// </summary>
 public static class TransitionDetector
 {
+    /// <summary>The maximum number of files examined by one active identity-discovery scan.</summary>
+    internal const int MaximumDiscoveryFiles = 4_096;
+
+    /// <summary>The maximum combined admitted JSON bytes in one active identity-discovery scan.</summary>
+    internal const long MaximumDiscoveryBytes = BoundedEvidenceInput.MaximumInputBytes;
+
     private const string EvidencePrefix = "_bmad-output/implementation-artifacts/evidence/";
     private const string TechnicalLedgerPath = "_bmad-output/planning-artifacts/technical-enablers.md";
     private const string SprintPath = "_bmad-output/implementation-artifacts/sprint-status.yaml";
@@ -211,9 +218,16 @@ public static class TransitionDetector
         }
 
         List<(string Path, JsonObject Identity)> candidates = [];
+        int examinedFiles = 0;
+        long admittedBytes = 0;
         foreach (string path in Directory.EnumerateFiles(evidenceRoot, "*.json", SearchOption.TopDirectoryOnly))
         {
-            JsonObject? candidate = TryParseIdentity(path);
+            if (++examinedFiles > MaximumDiscoveryFiles)
+            {
+                throw new GateValidationException(GateReason.ScopeDigestMismatch, "contract-discovery-limit");
+            }
+
+            JsonObject? candidate = TryParseIdentity(path, ref admittedBytes);
             if (candidate is not null)
             {
                 candidates.Add((path, candidate));
@@ -244,36 +258,72 @@ public static class TransitionDetector
             throw new GateValidationException(GateReason.StatusMismatch, subject);
         }
 
-        (string selectedPath, JsonObject selectedIdentity) = matches[0];
+        string selectedPath = matches[0].Path;
         return EvidenceJson.LoadContract(selectedPath);
     }
 
-    private static JsonObject? TryParseIdentity(string path)
+    private static JsonObject? TryParseIdentity(string path, ref long admittedBytes)
     {
+        byte[] bytes;
         try
         {
+            bytes = BoundedEvidenceInput.ReadFileBytes(
+                path, BoundedEvidenceInput.MaximumJsonBytes, GateReason.ScopeDigestMismatch, "json-input-limit");
+        }
+        catch (Exception exception) when (exception is GateValidationException
+            or IOException
+            or UnauthorizedAccessException)
+        {
+            // An unreadable or individually oversized inactive input has no discoverable identity.
+            return null;
+        }
+
+        if (bytes.LongLength > MaximumDiscoveryBytes - admittedBytes)
+        {
+            throw new GateValidationException(GateReason.ScopeDigestMismatch, "contract-discovery-limit");
+        }
+
+        admittedBytes += bytes.LongLength;
+        try
+        {
+            using MemoryStream stream = new(bytes, writable: false);
+            using StreamReader reader = new(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
             JsonObject? candidate = JsonNode.Parse(
-                BoundedEvidenceInput.ReadFileText(
-                    path, BoundedEvidenceInput.MaximumJsonBytes, GateReason.ScopeDigestMismatch, "json-input-limit"),
+                reader.ReadToEnd(),
                 documentOptions: new JsonDocumentOptions
                 {
                     MaxDepth = BoundedEvidenceInput.MaximumJsonDepth,
                     AllowTrailingCommas = false,
                     CommentHandling = JsonCommentHandling.Disallow,
                 }) as JsonObject;
-            return candidate is not null
-                && candidate["storyKey"] is JsonValue
-                && candidate["storyPath"] is JsonValue
-                ? candidate
-                : null;
+            return ExtractCandidateIdentity(candidate);
         }
-        catch (Exception exception) when (exception is JsonException
-            or GateValidationException
-            or IOException
-            or UnauthorizedAccessException)
+        catch (JsonException)
         {
             return null;
         }
+    }
+
+    /// <summary>Copies only discovery identity strings, detaching unrelated parsed contract content.</summary>
+    /// <param name="candidate">The inactive candidate object, or a non-object JSON root represented as null.</param>
+    /// <returns>A detached identity projection, or null when the required identity values are absent.</returns>
+    internal static JsonObject? ExtractCandidateIdentity(JsonObject? candidate)
+    {
+        if (candidate is null
+            || candidate["storyKey"] is not JsonValue
+            || candidate["storyPath"] is not JsonValue)
+        {
+            return null;
+        }
+
+        return new JsonObject
+        {
+            ["storyKey"] = CandidateField(candidate, "storyKey"),
+            ["storyPath"] = CandidateField(candidate, "storyPath"),
+            ["recordKind"] = CandidateField(candidate, "recordKind"),
+            ["recordLedgerKey"] = CandidateField(candidate, "recordLedgerKey"),
+            ["sprintStatusKey"] = CandidateField(candidate, "sprintStatusKey"),
+        };
     }
 
     private static string CandidateField(JsonObject candidate, string name)

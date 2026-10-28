@@ -151,15 +151,7 @@ public static class TrxEvidenceReader
         XDocument document;
         try
         {
-            XmlReaderSettings settings = new()
-            {
-                DtdProcessing = DtdProcessing.Prohibit,
-                XmlResolver = null,
-                MaxCharactersInDocument = BoundedEvidenceInput.MaximumInputBytes,
-            };
-            using MemoryStream stream = new(trxBytes, writable: false);
-            using XmlReader reader = XmlReader.Create(stream, settings);
-            document = XDocument.Load(reader, LoadOptions.None);
+            document = BoundedTrxDocument.Load(trxBytes);
         }
         catch (Exception exception) when (exception is XmlException or IOException or UnauthorizedAccessException)
         {

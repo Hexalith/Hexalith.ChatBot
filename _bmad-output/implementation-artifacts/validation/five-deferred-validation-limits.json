@@ -1,0 +1,150 @@
+{
+  "baselineRevision": "c4e3cbc0b8abf417fa697f991b16726c3a6d74d7",
+  "date": "2026-10-28",
+  "qualification": "Original Debug projects and focused fixture checks; no live recovery drill or terminal story transition.",
+  "budgets": {
+    "maximumXmlReaderDepth": 64,
+    "maximumXmlNodeUnitsIncludingAttributes": 1000000,
+    "maximumDiscoveryFiles": 4096,
+    "maximumDiscoveryBytes": 67108864
+  },
+  "builds": [
+    {
+      "command": "dotnet build tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj --configuration Debug -m:1 --nologo",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0,
+      "log": "TestResults/five-deferred-validation/gate-build-reviewed.log"
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj --configuration Debug -m:1 --nologo",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0,
+      "log": "TestResults/five-deferred-validation/architecture-build.log"
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug -m:1 --nologo",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0,
+      "log": "TestResults/five-deferred-validation/integration-build.log"
+    }
+  ],
+  "tests": [
+    {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Debug/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests TestResults/five-deferred-validation/gate-reviewed.ctrf.json -parallel none -result-trx TestResults/five-deferred-validation/gate-reviewed.trx",
+      "exitCode": 0,
+      "passed": 324,
+      "failed": 0,
+      "skipped": 0,
+      "ctrf": "TestResults/five-deferred-validation/gate-reviewed.ctrf.json",
+      "trx": "TestResults/five-deferred-validation/gate-reviewed.trx",
+      "trxSha256": "82f637ea36a15b542a6c986cf5dfb969a90b5f3928e36d0cf884d868cfa85f0b"
+    },
+    {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests TestResults/five-deferred-validation/architecture.ctrf.json -parallel none -result-trx TestResults/five-deferred-validation/architecture.trx",
+      "exitCode": 1,
+      "passed": 156,
+      "failed": 1,
+      "skipped": 0,
+      "ctrf": "TestResults/five-deferred-validation/architecture.ctrf.json",
+      "trx": "TestResults/five-deferred-validation/architecture.trx",
+      "trxSha256": "5ff197a2774ca4831138eacabb2635e683e3d83ec2afac00efc84600d9d68c5e"
+    },
+    {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests TestResults/five-deferred-validation/architecture-focused.ctrf.json -class Hexalith.ChatBot.Architecture.Tests.LiveRecoveryValidationArchitectureTests -parallel none -result-trx TestResults/five-deferred-validation/architecture-focused.trx",
+      "exitCode": 0,
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "ctrf": "TestResults/five-deferred-validation/architecture-focused.ctrf.json",
+      "trx": "TestResults/five-deferred-validation/architecture-focused.trx",
+      "trxSha256": "f08703fdd6ef3278aa88fd44c85e4fb64d8520e4176c7cf21db158b38b1e4c99"
+    },
+    {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 python3 .github/scripts/with-source-mapping.py bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests TestResults/five-deferred-validation/topology-fixtures.ctrf.json -class Hexalith.ChatBot.IntegrationTests.Recovery.RecoveryValidationTopologyContractTests -parallel none -result-trx TestResults/five-deferred-validation/topology-fixtures.trx",
+      "exitCode": 0,
+      "passed": 30,
+      "failed": 0,
+      "skipped": 0,
+      "ctrf": "TestResults/five-deferred-validation/topology-fixtures.ctrf.json",
+      "trx": "TestResults/five-deferred-validation/topology-fixtures.trx",
+      "trxSha256": "e3b3783258521318c26af9ba1bba9eaa2b59ee4acf7ff14f6784c5ed6def713e"
+    },
+    {
+      "command": "python3 -m unittest discover -s .github/scripts/tests -p 'test_story_evidence_guards.py' -v",
+      "exitCode": 0,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "log": "TestResults/five-deferred-validation/python-guards.log"
+    }
+  ],
+  "aspireBaseline": {
+    "startCommand": "python3 .github/scripts/with-source-mapping.py aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+    "startExitCode": 0,
+    "waitCommand": "aspire wait chatbot-cntnhnyy --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --timeout 120",
+    "waitExitCode": 0,
+    "describeCommand": "aspire describe --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --format Json",
+    "states": {
+      "Running": 41,
+      "Finished": 3
+    },
+    "stopCommand": "aspire stop --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+    "stopExitCode": 0
+  },
+  "existingFixtureRepairRevision": "d718220801f7855dc4c7b6c0d140f3785e95d6e9",
+  "broadGateBlocker": {
+    "test": "ScaffoldArchitectureTests.RootDeclaredSiblingPackageWrappersShouldDelegateVersionsToSharedBuildsCatalog",
+    "reason": "Unchanged FrontComposer wrapper overrides Hexalith.EventStore.Admin.Abstractions to 3.128.2 while shared Builds catalog selects 3.128.3.",
+    "frontComposerRevision": "5f665c4d38afb2255a7dde4620330e09824a40a1",
+    "buildsRevision": "81ab049208678bd6616828824729c0ddac02f7d1"
+  },
+  "sourceSha256": {
+    "tests/Hexalith.ChatBot.Architecture.Tests/LiveRecoveryValidationArchitectureTests.cs": "b57ad8b28d0475b184f8d54c82e8c5d54b11e6eeb5f9d63506e5a6259617fd32",
+    "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/StoryEvidenceGateTests.cs": "2aab9f436c71c1ff1696821fb8745af1234ecd0a2f44e0f3a8e15075ecd5be86",
+    "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/TrxStructuralBudgetTests.cs": "5ae38f542ab70e2e2914599c5120e3905dce26598a779951a838954c13e6e6bc",
+    "tools/Hexalith.ChatBot.StoryEvidenceGate/BoundedTrxDocument.cs": "ead10b10f49311903e18b65a7627d4290c93ca935dadecef3a169d522d3f14ea",
+    "tools/Hexalith.ChatBot.StoryEvidenceGate/RecoveryAttemptSummarizer.cs": "f93244b4c59c56c9dd72988df974d512d66b5a7c9ad9938a624b4800e536e8f0",
+    "tools/Hexalith.ChatBot.StoryEvidenceGate/RecoveryTrxSanitizer.cs": "7136245d57f9796a6b7914772785cd85ed9d8fffa26d881b837661e8425f68b5",
+    "tools/Hexalith.ChatBot.StoryEvidenceGate/TransitionDetector.cs": "7095fe33acaffe768f47009a83bb2051e7f8c4b35e4dc9847ef3013a2ecb105c",
+    "tools/Hexalith.ChatBot.StoryEvidenceGate/TrxEvidenceReader.cs": "d39a4dd723c917e84e26b36718c0c0b8830862d295b0289e3789617457b8649c"
+  },
+  "binarySha256": {
+    "tools/Hexalith.ChatBot.StoryEvidenceGate/bin/Debug/net10.0/Hexalith.ChatBot.StoryEvidenceGate.dll": "9d5f2a9b525762335cb8dcd3dd31bbef2fd601954a8181a6933c6431d43457c9",
+    "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Debug/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests.dll": "017e8bbe172b4850fc426506bf5dcece5d82ed051eef88079d49c3565359d8d8",
+    "tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests.dll": "e8feee589d54deb3a5931e5b2487e7c5439194f48ee46bd072b89abe61145331",
+    "tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests.dll": "475f0407dd6e3c5445bdcea6c34117a38e882ba8400e2c1ee727ebe250e9b032"
+  },
+  "review": {
+    "activeLayers": [
+      "blind-hunter"
+    ],
+    "scopedRecheck": "No correction defects; findings 4-7 patched, findings 1-3 pre-existing and deferred.",
+    "newDeferredItems": 3,
+    "separateExistingBroadGateBlockers": 1
+  },
+  "selectedLedgerItems": [
+    {
+      "item": "TRX document-tree structural amplification",
+      "disposition": "implemented"
+    },
+    {
+      "item": "Evidence identity-discovery allocation",
+      "disposition": "implemented"
+    },
+    {
+      "item": "Rendered-realm grant expiry and claims-only authority fixture",
+      "disposition": "verified prior repair"
+    },
+    {
+      "item": "Mailbox secret assertion scope",
+      "disposition": "verified prior repair"
+    },
+    {
+      "item": "Unused recovery runsettings and misleading probe",
+      "disposition": "implemented"
+    }
+  ]
+}

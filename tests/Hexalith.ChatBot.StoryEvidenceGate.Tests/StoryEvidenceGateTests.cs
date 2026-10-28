@@ -2191,6 +2191,122 @@ public static class StoryEvidenceGateTests
         }
     }
 
+    /// <summary>Proves the retained identity is detached from unrelated large contract objects.</summary>
+    [Fact]
+    public static void CandidateIdentityProjectionShouldDiscardUnrelatedContent()
+    {
+        JsonObject candidate = new()
+        {
+            ["storyKey"] = "active-key",
+            ["storyPath"] = "artifacts\\active.md",
+            ["recordKind"] = "story",
+            ["recordLedgerKey"] = "ledger-key",
+            ["sprintStatusKey"] = "sprint-key",
+            ["unrelated"] = new JsonObject
+            {
+                ["large"] = new JsonArray(new string('x', BoundedEvidenceInput.MaximumJsonBytes / 2)),
+            },
+        };
+
+        JsonObject identity = TransitionDetector.ExtractCandidateIdentity(candidate).ShouldNotBeNull();
+
+        identity.Count.ShouldBe(5);
+        identity.Select(pair => pair.Key).Order(StringComparer.Ordinal).ShouldBe(
+            new[] { "recordKind", "recordLedgerKey", "sprintStatusKey", "storyKey", "storyPath" });
+        identity["storyPath"]!.GetValue<string>().ShouldBe("artifacts/active.md");
+        identity["recordKind"]!.GetValue<string>().ShouldBe("story");
+        identity["recordLedgerKey"]!.GetValue<string>().ShouldBe("ledger-key");
+        identity["sprintStatusKey"]!.GetValue<string>().ShouldBe("sprint-key");
+        candidate["storyKey"] = "changed-key";
+        identity["storyKey"]!.GetValue<string>().ShouldBe("active-key");
+    }
+
+    /// <summary>Proves active discovery accepts its exact aggregate budget and refuses one excess file or byte.</summary>
+    [Theory]
+    [InlineData("files")]
+    [InlineData("oversized-files")]
+    [InlineData("bytes")]
+    [InlineData("malformed-bytes")]
+    public static void ActiveContractDiscoveryShouldEnforceAggregateBudgets(string limit)
+    {
+        ArgumentNullException.ThrowIfNull(limit);
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"discovery-budget-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            RunGit(temporaryRoot, "init", "--initial-branch=main");
+            RunGit(temporaryRoot, "config", "user.email", "gate@example.invalid");
+            RunGit(temporaryRoot, "config", "user.name", "Story Evidence Gate Tests");
+            string artifacts = Path.Combine(temporaryRoot, "_bmad-output", "implementation-artifacts");
+            string evidence = Path.Combine(artifacts, "evidence");
+            Directory.CreateDirectory(evidence);
+            string active = Path.Combine(evidence, "explicit-transition.json");
+            File.WriteAllText(active, TransitionContract());
+            string story = Path.Combine(artifacts, "unrelated-name.md");
+            File.WriteAllText(story, "---\ntitle: 'Explicit Transition'\nstatus: 'review'\n---\n");
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: create discovery budget base");
+            string baseCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+            File.WriteAllText(story, "---\ntitle: 'Explicit Transition'\nstatus: 'done'\n---\n");
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: activate bounded discovery");
+            string headCommit = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+
+            string lastPath = string.Empty;
+            if (limit.EndsWith("files", StringComparison.Ordinal))
+            {
+                for (int index = 1; index < TransitionDetector.MaximumDiscoveryFiles; index++)
+                {
+                    string inactive = Path.Combine(evidence, $"inactive-{index}.json");
+                    if (limit == "oversized-files" && index == 1)
+                    {
+                        WriteOversizedFile(inactive, BoundedEvidenceInput.MaximumJsonBytes);
+                    }
+                    else
+                    {
+                        File.WriteAllText(inactive, "{}");
+                    }
+                }
+            }
+            else
+            {
+                long remaining = TransitionDetector.MaximumDiscoveryBytes - new FileInfo(active).Length;
+                for (int index = 0; remaining > 0; index++)
+                {
+                    int length = (int)Math.Min(remaining, BoundedEvidenceInput.MaximumJsonBytes);
+                    string prefix = $"{{\"storyKey\":\"inactive-{index}\",\"storyPath\":\"inactive-{index}.md\",\"ignored\":\"";
+                    const string Suffix = "\"}";
+                    lastPath = Path.Combine(evidence, $"inactive-{index}.json");
+                    File.WriteAllText(lastPath, limit == "malformed-bytes"
+                        ? new string('x', length)
+                        : prefix + new string('x', length - prefix.Length - Suffix.Length) + Suffix);
+                    remaining -= length;
+                }
+            }
+
+            TransitionDetector.Detect(temporaryRoot, baseCommit, headCommit)
+                .ShouldHaveSingleItem().StoryKey.ShouldBe("explicit-transition");
+
+            if (limit.EndsWith("files", StringComparison.Ordinal))
+            {
+                File.WriteAllText(Path.Combine(evidence, "one-too-many.json"), "{}");
+            }
+            else
+            {
+                File.AppendAllText(lastPath, " ");
+            }
+
+            GateValidationException exception = Should.Throw<GateValidationException>(() =>
+                TransitionDetector.Detect(temporaryRoot, baseCommit, headCommit));
+            exception.ReasonCode.ShouldBe(GateReason.ScopeDigestMismatch);
+            exception.Subject.ShouldBe("contract-discovery-limit");
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
     /// <summary>Proves changed or selected malformed evidence fails candidate detection closed.</summary>
     [Theory]
     [InlineData("changed")]

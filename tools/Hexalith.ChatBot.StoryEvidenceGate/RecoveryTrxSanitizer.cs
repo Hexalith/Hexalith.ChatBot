@@ -38,17 +38,9 @@ public static class RecoveryTrxSanitizer
                 throw new GateValidationException(GateReason.MachineResultsInvalid, "recovery-sanitize");
             }
 
-            XmlReaderSettings settings = new()
-            {
-                DtdProcessing = DtdProcessing.Prohibit,
-                XmlResolver = null,
-                MaxCharactersInDocument = MaximumTrxCharacters,
-            };
             byte[] bytes = BoundedEvidenceInput.ReadFileBytes(
                 inputPath, BoundedEvidenceInput.MaximumInputBytes, GateReason.MachineResultsInvalid, "recovery-sanitize");
-            using MemoryStream stream = new(bytes, writable: false);
-            using XmlReader reader = XmlReader.Create(stream, settings);
-            source = XDocument.Load(reader, LoadOptions.None);
+            source = BoundedTrxDocument.Load(bytes);
         }
         catch (Exception exception) when (exception is XmlException
             or IOException

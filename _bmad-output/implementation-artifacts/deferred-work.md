@@ -1795,9 +1795,11 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-five-deferred-evidence-gate-fixes.md`
   summary: Add structural XML budgets or streaming projection to prevent DOM amplification inside the 64 MiB TRX byte/character limit (medium; pre-existing; BH-2).
   evidence: TrxEvidenceReader.ValidateTrx, RecoveryTrxSanitizer.Sanitize and RecoveryAttemptSummarizer.TryLoad all materialize XDocument before validating canonical structure, both at baseline fdeb341ee2b31dc54f3a5a0551de9e303544c457 and after the bounded-read fix. Millions of small elements fit inside the byte cap and retain a much larger DOM. Closure evidence: node/depth or streaming limits with adversarial TRX tests that refuse before large DOM construction.
+  resolution: Implemented 2026-10-28 in spec-five-deferred-validation-limits.md: all three TRX consumers preflight the same bounded bytes before DOM construction, enforcing depth 64 and 1,000,000 combined reader nodes/attributes. Regressions exercise every consumer, exact boundaries and sidecar/output preservation; see validation/five-deferred-validation-limits.json. Individual start-tag buffering remains a separate parser limitation.
 - source_spec: `spec-five-deferred-evidence-gate-fixes.md`
   summary: Bound aggregate discovery allocation and retain only identity metadata for inactive evidence contracts (medium; pre-existing; BH-3).
   evidence: TransitionDetector.FindSingleContract stores every full parsed candidate in its candidates list before filtering, as it did at baseline fdeb341ee2b31dc54f3a5a0551de9e303544c457. Many individually compliant contracts can exceed a reasonable aggregate memory budget. Closure evidence: identity-only candidate records plus a documented discovery budget and multi-candidate negative coverage preserving active duplicate detection.
+  resolution: Implemented 2026-10-28 in spec-five-deferred-validation-limits.md: each active scan admits at most 4,096 files and 64 MiB combined bounded input bytes, retaining only detached identity strings. Regressions cover exact limits, excess bytes/files, malformed-byte and oversized-file accounting, retained identity shape, and existing active duplicate detection. See validation/five-deferred-validation-limits.json.
 
 
 ## Deferred from: five recovery-harness diagnostics review (2026-10-22)
@@ -1812,10 +1814,12 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-five-deferred-recovery-contracts.md`
   summary: The existing realm service-grant test still expects claims-only authority after the resolver switched to owner evidence (medium, pre-existing).
   evidence: RecoveryValidationTopologyContractTests.RenderedRealmServiceClientGrantExpiryIsAcceptedByTheClaimsGrantResolver fails with service_client_grant_missing in TestResults/five-recovery-contracts.{ctrf.json,trx}. At baseline e97e7a8831768aee1ca1cb7cfc9ec5c64b7dfe68, the test already constructs ClaimsServiceClientGrantResolver without its optional authorizer, which deterministically denies; no owner RequestContext is established either. Neither resolver nor this existing test was changed by the batch. Repair the fixture with supported owner authority rather than restoring claim-derived authority.
+  resolution: Already repaired by d718220801f7855dc4c7b6c0d140f3785e95d6e9; verified 2026-10-28 in the original Debug RecoveryValidationTopologyContractTests lane, 30 passed, zero failed/skipped. The current fixture proves rendered future canonical UTC expiries and explicitly denies claims-only authorization; production owner-authority requirements are preserved. See spec-five-deferred-validation-limits.md.
 
 - source_spec: `spec-five-deferred-recovery-contracts.md`
   summary: The existing mailbox realm assertion rejects unrelated runtime-generated workload secrets (low, pre-existing).
   evidence: RecoveryValidationTopologyContractTests.RealmAddsClosedRecoveryMailboxServiceIdentityWithoutACommittedSecret rejects any RandomNumberGenerator substring in AppHost Program.cs, which already generates five non-mailbox workload secrets at baseline e97e7a8831768aee1ca1cb7cfc9ec5c64b7dfe68. This assertion and AppHost Program.cs were untouched. TestResults/five-recovery-contracts.{ctrf.json,trx} records the failure; scope a future assertion to the mailbox secret configuration boundary.
+  resolution: Already repaired by d718220801f7855dc4c7b6c0d140f3785e95d6e9; verified 2026-10-28 by the 30/30 zero-skip original topology fixture lane. The mailbox assertion permits unrelated runtime secret generation, and rendered-client checks verify the configured mailbox secret without printing it. See spec-five-deferred-validation-limits.md.
 
 
 ## Deferred from: code review of spec-1-7-admit-commands-through-the-single-commandgateway (2026-10-23, round 7)
@@ -1823,6 +1827,7 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-7-admit-commands-through-the-single-commandgateway.md`
   summary: `RunSettingsIsAcceptedByTheTestPlatform` never passes `live-recovery.runsettings`, so it proves only that the direct runner executes one probe; retire the probe and file or pass the settings (low; pre-existing since `bb64e24`; CR7-W1).
   evidence: The argument vector in `tests/Hexalith.ChatBot.Architecture.Tests/LiveRecoveryValidationArchitectureTests.cs:676` holds only `run-xunit-v4.sh`, the runner beside the test assembly, a CTRF path and `-method ...RunSettingsPlatformAcceptanceProbe`, with no `--settings`. No workflow, script or project file references `live-recovery.runsettings`, so the remarks ("runs the real runner against the real file") are stale. The Story 1.7 blocker fix (`fdeb341`) changed only the runner path to `AppContext.BaseDirectory`, which still resolves to `bin/Release/net10.0` in the Release lane. The choice depends on whether the file still has a local use.
+  resolution: Implemented 2026-10-28 in spec-five-deferred-validation-limits.md: removed the unused settings file, obsolete XML check and both misleading acceptance/probe methods after confirming no workflow/script/project consumers. All 16 remaining LiveRecoveryValidationArchitectureTests pass with zero skips; the 14-test Python evidence-guard suite includes a real native-runner zero-test refusal with no checksum.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-7-admit-commands-through-the-single-commandgateway.md`
   summary: Normalize release-package output paths before cleanup so relative destinations keep the same meaning after the script changes directory.
@@ -2037,3 +2042,22 @@ Final native follow-up qualification (2026-10-26): independent review correction
 - source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-recovery-followups.md`
   summary: Re-arm the singleton scheduler pass-failure alert after a successful intervening pass.
   evidence: CheckHealthAsync now observes the latest terminal pass independently of clocks. The pre-existing reason-keyed _lastSchedulerAlertByReason stamp still suppresses fail-success-fail episodes within M2MissedCadenceAlertResuppressAfter. Qualify that sequence on one coordinator and decide when success should reset the failure-episode throttle; ordinary repeated-failure suppression must remain.
+
+
+## Deferred from: review of spec-five-deferred-validation-limits (2026-10-28)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-validation-limits.md`
+  summary: Ignore unrelated inactive identity JSON containing duplicate object members without aborting active discovery.
+  evidence: Pre-existing lazy JsonNode dictionary construction throws ArgumentException on candidate storyKey access when an unrelated property is duplicated; the same field access exists at baseline c4e3cbc0b8abf417fa697f991b16726c3a6d74d7. A direct SDK reproduction returned ArgumentException. The current catch handles JsonException only. Settle with local duplicate-member refusal and an active-completion regression; no full-contract grammar relaxation is implied.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-validation-limits.md`
+  summary: Qualify parser allocation for a concentrated XML start tag before structural TRX preflight can observe its attributes (medium if confirmed, unverified).
+  evidence: XmlReader.Read buffers a start tag before AttributeCount becomes available, including in the previous direct DOM loaders. The new preflight bounds subsequent DOM construction and dispersed attributes, not streaming parser internals. Existing 64 MiB byte/character ceilings remain. A single-element distinct-attribute stress case with retained allocation measurements would settle whether a tighter parser or lexical admission limit is needed.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-validation-limits.md`
+  summary: Reuse one bounded identity-discovery inventory within a multi-transition Detect invocation.
+  evidence: Story, technical-ledger and sprint completion lookup paths each call FindSingleContract, both at baseline c4e3cbc0b8abf417fa697f991b16726c3a6d74d7 and now. Retained memory is bounded per scan, but a batch repeats file reads and JSON parsing. Cache lazily within one Detect invocation and qualify multi-transition read counts while preserving duplicate and inactive-input behavior; the current documentation explicitly promises per-scan budgets only.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-validation-limits.md`
+  summary: Reconcile the existing FrontComposer EventStore Admin package overrides with the current shared Builds catalog.
+  evidence: The original full Architecture Debug suite reports 156 passed, one failed, zero skipped. RootDeclaredSiblingPackageWrappersShouldDelegateVersionsToSharedBuildsCatalog rejects unchanged FrontComposer Directory.Packages.props selecting Hexalith.EventStore.Admin.Abstractions 3.128.2 against shared catalog 3.128.3. FrontComposer remains 5f665c4d38afb2255a7dde4620330e09824a40a1; Builds remains 81ab049208678bd6616828824729c0ddac02f7d1. Exact command and result are retained in validation/five-deferred-validation-limits.json; no dependency or submodule change is included.

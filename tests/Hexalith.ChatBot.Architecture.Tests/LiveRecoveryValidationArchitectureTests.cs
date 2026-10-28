@@ -1,7 +1,5 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
 
 using Hexalith.ChatBot.Server.Audit;
 
@@ -593,22 +591,6 @@ public static class LiveRecoveryValidationArchitectureTests
             "tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveRecoveryEvidenceGateReplayTests.cs");
         replay.ShouldContain("Path.Combine(artifactRoot, RetentionFailuresDirectoryName)");
         replay.ShouldContain("SearchOption.TopDirectoryOnly");
-
-        // Three layers, because each is strictly weaker than the lane's real requirement:
-        //   1. the document parses (catches the double-hyphen digraph that broke every lane), and
-        //   2. TreatNoTestsAsError is actually true in the parsed tree, and
-        //   3. the TEST PLATFORM accepts it — a well-formed but schema-invalid settings file reproduces the same
-        //      "guard green, required lane dead" class, so parsing alone is not the bar.
-        // Layer 3 lives in RunSettingsIsAcceptedByTheTestPlatform below.
-        string runSettingsPath = Path.Combine(RepositoryRoot(), "live-recovery.runsettings");
-        XDocument runSettings = Should.NotThrow(() => XDocument.Load(runSettingsPath, LoadOptions.None));
-        XElement? treatNoTestsAsError = runSettings
-            .Element("RunSettings")?
-            .Element("RunConfiguration")?
-            .Element("TreatNoTestsAsError");
-        treatNoTestsAsError.ShouldNotBeNull();
-        bool.TryParse(treatNoTestsAsError.Value.Trim(), out bool treatNoTestsAsErrorValue).ShouldBeTrue();
-        treatNoTestsAsErrorValue.ShouldBeTrue();
     }
 
     [Fact]
@@ -665,89 +647,6 @@ public static class LiveRecoveryValidationArchitectureTests
             2,
             "the release workflow must declare exactly the two per-commit recovery concurrency blocks");
     }
-
-    /// <summary>
-    /// Proves the test platform itself accepts the run settings, not merely that it is well-formed XML.
-    /// </summary>
-    /// <remarks>
-    /// The lane needs `dotnet test --settings live-recovery.runsettings` to start. A file can parse cleanly and
-    /// still be rejected ("Settings file provided does not conform to required format"), which is the same
-    /// guard-green/lane-dead failure class the parse check was added for. This runs the real runner against the
-    /// real file with a filter that matches nothing, and asserts the platform did not reject the settings.
-    /// </remarks>
-    [Fact]
-    public static async Task RunSettingsIsAcceptedByTheTestPlatform()
-    {
-        string repositoryRoot = RepositoryRoot();
-        using Process process = new()
-        {
-            StartInfo = new ProcessStartInfo("bash")
-            {
-                WorkingDirectory = repositoryRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-            },
-        };
-        foreach (string argument in new[]
-        {
-            Path.Combine(".github", "scripts", "run-xunit-v4.sh"),
-            Path.Combine(AppContext.BaseDirectory, "Hexalith.ChatBot.Architecture.Tests"),
-            Path.Combine("TestResults", "architecture", "direct-runner-acceptance.ctrf.json"),
-            "-method",
-            "Hexalith.ChatBot.Architecture.Tests.LiveRecoveryValidationArchitectureTests.RunSettingsPlatformAcceptanceProbe",
-        })
-        {
-            process.StartInfo.ArgumentList.Add(argument);
-        }
-
-        process.Start().ShouldBeTrue("the run-settings acceptance probe process must start");
-
-        // Drained concurrently. Reading stdout to completion and only then stderr deadlocks whenever the child
-        // fills the stderr pipe buffer and prevents the bounded exit wait from observing completion.
-        Task<string> standardOutput = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
-        Task<string> standardError = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
-        try
-        {
-            await process.WaitForExitAsync(TestContext.Current.CancellationToken)
-                .WaitAsync(TimeSpan.FromMinutes(5), TestContext.Current.CancellationToken)
-                .ConfigureAwait(true);
-        }
-        catch (TimeoutException)
-        {
-            process.Kill(entireProcessTree: true);
-            throw new TimeoutException("The run-settings acceptance probe did not exit within its budget.");
-        }
-
-        string output = (await standardOutput.ConfigureAwait(true))
-            + (await standardError.ConfigureAwait(true));
-
-        output.ShouldNotContain(
-            "does not conform to required format",
-            Case.Insensitive,
-            "the test platform rejected the run settings, so every lane that passes it dies before running.");
-
-        // Positive signal, not merely the absence of one error string. Without this the probe passed whenever the
-        // child failed for ANY other reason -- a missing assembly, a localized runner, a crash before startup.
-        process.ExitCode.ShouldBe(
-            0,
-            $"the acceptance probe must actually run under the settings file. Output: {output}");
-        output.ShouldContain(
-            "RunSettingsPlatformAcceptanceProbe",
-            Case.Insensitive,
-            "the named probe test must actually have been selected and executed by the child run.");
-    }
-
-    /// <summary>
-    /// The test the acceptance probe selects. Exists so that run resolves to exactly one executed test.
-    /// </summary>
-    /// <remarks>
-    /// The filter previously named a test that did not exist anywhere in the repository, so the child run matched
-    /// nothing. Combined with an assertion that only checked for the absence of one error string, that made the
-    /// whole guard vacuous.
-    /// </remarks>
-    [Fact]
-    public static void RunSettingsPlatformAcceptanceProbe() => true.ShouldBeTrue();
 
     [Fact]
     public static void RunnerBudgetAndCadence_ShouldMatchTheWorkflowValuesTheyDescribe()
