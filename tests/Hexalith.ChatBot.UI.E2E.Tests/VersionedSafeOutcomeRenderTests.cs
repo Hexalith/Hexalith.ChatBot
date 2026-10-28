@@ -593,7 +593,7 @@ public sealed class VersionedSafeOutcomeRenderTests
         blocked.ShouldContain("aria-live=\"off\"");
         key.ShouldNotBeEmpty();
         blocked.ShouldContain($"data-chatbot-announcement-key=\"{key}\"");
-        string composer = Regex.Match(html, "<[^>]+data-chatbot-stable-id=\"project-conversation-composer-status\"[^>]*>").Value;
+        string composer = Regex.Match(html, "<[^>]+data-chatbot-stable-id=\"[^\"]*project-conversation-composer-status\"[^>]*>").Value;
         composer.ShouldContain("aria-live=\"off\"");
         composer.ShouldContain("data-chatbot-live-announced=\"false\"");
         banner.ShouldContain("data-chatbot-repeat-rule=\"OncePerFailureKey\"");
@@ -670,7 +670,7 @@ public sealed class VersionedSafeOutcomeRenderTests
         {
             WebUtility.HtmlDecode(html).ShouldNotContain("The requested action is unavailable.");
             WebUtility.HtmlDecode(html).ShouldNotContain("A required dependency is temporarily degraded.");
-            string composer = Regex.Match(html, "<[^>]+data-chatbot-stable-id=\"project-conversation-composer-status\"[^>]*>").Value;
+            string composer = Regex.Match(html, "<[^>]+data-chatbot-stable-id=\"[^\"]*project-conversation-composer-status\"[^>]*>").Value;
             composer.ShouldContain("data-chatbot-feedback-state=\"BlockedAction\"");
         }
     }
@@ -1109,6 +1109,11 @@ public sealed class VersionedSafeOutcomeRenderTests
         GovernedOperationsState? governed = null, OperationalDashboardsState? dashboards = null, string culture = "en",
         SafeOutcomeRenderDispatcher? dispatcher = null) where T : IComponent
     {
+        if (typeof(T) == typeof(ChatBotProjectConversationWorkspace))
+        {
+            parameters.TryAdd(nameof(ChatBotProjectConversationWorkspace.HeadingText), "Project conversation");
+        }
+
         CultureInfo original = CultureInfo.CurrentUICulture;
         CultureInfo originalCulture = CultureInfo.CurrentCulture;
         try

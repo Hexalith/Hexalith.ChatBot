@@ -22,22 +22,22 @@
     </header>
 
     <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-why-project-panel__metadata">
-        @CodeRowIf(UiText[ChatBotUiTextKey.OperationLabel], Panel.AssociationId)
-        @TextRowIf(UiText[ChatBotUiTextKey.WhyProjectSignalClassLabel], PrimarySignalClassLabel)
-        @CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectMatchedValueLabel], PrimaryDisplayToken)
-        @TextRowIf(UiText[ChatBotUiTextKey.ConfidenceLabel], Formatter.FormatConfidence(Panel.ConfidenceScore))
-        @CodeRowIf(UiText[ChatBotUiTextKey.ThresholdBandLabel], Panel.ThresholdBand)
-        @CodeRowIf(UiText[ChatBotUiTextKey.PolicySnapshotVersionLabel], Panel.ThresholdPolicyVersion)
-        @CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectKernelVersionLabel], Panel.KernelVersion)
-        @CodeRowIf(UiText[ChatBotUiTextKey.DecisionActorLabel], Panel.DecisionActorId)
-        @CodeRowIf(UiText[ChatBotUiTextKey.DecisionActorTypeLabel], Panel.DecisionActorType)
+        @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.OperationLabel], Panel.AssociationId)
+        @ChatBotMetadataRendering.TextRowIf(UiText[ChatBotUiTextKey.WhyProjectSignalClassLabel], PrimarySignalClassLabel)
+        @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectMatchedValueLabel], PrimaryDisplayToken)
+        @ChatBotMetadataRendering.TextRowIf(UiText[ChatBotUiTextKey.ConfidenceLabel], Formatter.FormatConfidence(Panel.ConfidenceScore))
+        @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.ThresholdBandLabel], Panel.ThresholdBand)
+        @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.PolicySnapshotVersionLabel], Panel.ThresholdPolicyVersion)
+        @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectKernelVersionLabel], Panel.KernelVersion)
+        @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.DecisionActorLabel], Panel.DecisionActorId)
+        @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.DecisionActorTypeLabel], Panel.DecisionActorType)
         @TimeRowIf(UiText[ChatBotUiTextKey.DecidedAtLabel], Panel.DecisionTimestamp)
-        @CodeRowIf(UiText[ChatBotUiTextKey.SourceProvenanceLabel], Panel.SourceProvenance)
-        @CodeRowIf(UiText[ChatBotUiTextKey.SourceVersionLabel], Panel.SourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))
-        @CodeRowIf(UiText[ChatBotUiTextKey.CorrelationIdLabel], Panel.CorrelationId)
-        @CodeRowIf(UiText[ChatBotUiTextKey.RedactionStateLabel], Panel.RedactionState)
-        @CodeRowIf(UiText[ChatBotUiTextKey.SchemaVersionLabel], Panel.SchemaVersion)
-        @CodeRowIf(UiText[ChatBotUiTextKey.SafeNextActionsLabel], Panel.SafeNextAction)
+        @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.SourceProvenanceLabel], Panel.SourceProvenance)
+        @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.SourceVersionLabel], Panel.SourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))
+        @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.CorrelationIdLabel], Panel.CorrelationId)
+        @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.RedactionStateLabel], Panel.RedactionState)
+        @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.SchemaVersionLabel], Panel.SchemaVersion)
+        @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.SafeNextActionsLabel], Panel.SafeNextAction)
     </FluentStack>
 
     @if (Panel.IsCorrectedContextStale || !string.IsNullOrWhiteSpace(Panel.PropagationStatus))
@@ -78,13 +78,13 @@
                             <span class="chatbot-metadata">@evidence.FreshnessState</span>
                         </div>
                         <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-why-project-panel__evidence-metadata">
-                            @TextRowIf(UiText[ChatBotUiTextKey.WhyProjectSignalClassLabel], SignalClassText(evidence.SignalClass))
-                            @CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectMatchedValueLabel], evidence.DisplayToken)
-                            @CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectEvidenceReferenceLabel], evidence.Reference)
-                            @CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectEvidenceFingerprintLabel], evidence.Fingerprint)
-                            @CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectEvidenceFreshnessLabel], evidence.FreshnessState)
-                            @CodeRowIf(UiText[ChatBotUiTextKey.RedactionStateLabel], evidence.RedactionState)
-                            @TextRowIf(UiText[ChatBotUiTextKey.WhyProjectConfidenceContributionLabel], ContributionText(evidence))
+                            @ChatBotMetadataRendering.TextRowIf(UiText[ChatBotUiTextKey.WhyProjectSignalClassLabel], SignalClassText(evidence.SignalClass))
+                            @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectMatchedValueLabel], evidence.DisplayToken)
+                            @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectEvidenceReferenceLabel], evidence.Reference)
+                            @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectEvidenceFingerprintLabel], evidence.Fingerprint)
+                            @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectEvidenceFreshnessLabel], evidence.FreshnessState)
+                            @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.RedactionStateLabel], evidence.RedactionState)
+                            @ChatBotMetadataRendering.TextRowIf(UiText[ChatBotUiTextKey.WhyProjectConfidenceContributionLabel], ContributionText(evidence))
                         </FluentStack>
                         @if (EvidenceState(evidence) is not ChatBotEvidenceState.Available)
                         {
@@ -161,29 +161,9 @@
     // safe-next-action token) keep <code class="chatbot-code">; the localized signal-class label and the
     // formatted confidence / confidence-contribution metrics render as plain FluentText, and the decided-at
     // timestamp drops the monospace while keeping its machine datetime (AC3). Blank rows render nothing.
-    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
-        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <code class="chatbot-code">@value</code>
-    </FluentStack>;
-
-    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
-        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <FluentText>@value</FluentText>
-    </FluentStack>;
-
-    private static RenderFragment? CodeRowIf(string label, string? value)
-        => string.IsNullOrWhiteSpace(value) ? null : CodeRow(label, value);
-
-    private static RenderFragment? TextRowIf(string label, string? value)
-        => string.IsNullOrWhiteSpace(value) ? null : TextRow(label, value);
-
-    private RenderFragment TimeRow(string label, DateTimeOffset value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
-        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <time datetime="@value.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture)">@Formatter.FormatDateTime(value)</time>
-    </FluentStack>;
 
     private RenderFragment? TimeRowIf(string label, DateTimeOffset value)
-        => value == default ? null : TimeRow(label, value);
+        => value == default ? null : ChatBotMetadataRendering.TimeRow(label, value, Formatter.FormatDateTime(value));
 
     private async Task CloseAsync()
         => await OnClose.InvokeAsync().ConfigureAwait(true);

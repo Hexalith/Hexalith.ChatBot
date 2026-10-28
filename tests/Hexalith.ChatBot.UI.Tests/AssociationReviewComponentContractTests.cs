@@ -52,7 +52,7 @@ public sealed class AssociationReviewComponentContractTests
         comparison.ShouldContain("<FluentText", Case.Sensitive);
         comparison.ShouldContain("data-chatbot-association-comparison=\"true\"");
         comparison.ShouldContain("<article");
-        ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/AssociationReviewRendering.cs").ShouldContain("\"code\"");
+        ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/AssociationReviewRendering.cs").ShouldContain("ChatBotMetadataRendering.CodeRow");
 
         // The <dl> dump was replaced by a Fluent key-value block. The previous assertion here checked for
         // "<dl" and passed only because those characters appear in a code comment describing the removal -

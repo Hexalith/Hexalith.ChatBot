@@ -17,7 +17,7 @@
                   aria-live="@AriaLive"
                   aria-atomic="true"
                   aria-label="@AccessibleLabel">
-    <h2 class="chatbot-section-title">@ResolvedHeadline</h2>
+    <FluentText As="@HeadingTag" Class="chatbot-section-title">@ResolvedHeadline</FluentText>
     <p class="chatbot-body">@ResolvedReasonText</p>
     <p class="chatbot-body"><strong>@UiText[ChatBotUiTextKey.NextActionLabel]</strong> @ResolvedSafeNextAction</p>
     @if (!IsLocalEmptyState && ResolvedNextAction is not ChatBotMessageNextActions.None)
@@ -32,6 +32,10 @@
 </FluentMessageBar>
 
 @code {
+    /// <summary>Sets the heading context for this message; nested sections use H3.</summary>
+    [Parameter]
+    public TextTag HeadingTag { get; set; } = TextTag.H2;
+
     [Parameter]
     public ChatBotBlockedReason Reason { get; set; }
 

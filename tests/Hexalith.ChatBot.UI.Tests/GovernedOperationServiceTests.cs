@@ -94,25 +94,27 @@ public sealed class GovernedOperationServiceTests
         // the same operation id and rendered as a redacted, metadata-only line: stable codes and opaque
         // identifiers only — no command payload, tenant/resource names, secrets, paths, or raw exception text.
         client.LastAuditHistoryOperationId.ShouldBe(CommandId);
-        outcome.AuditHistory.ShouldNotBeEmpty();
-        outcome.AuditHistory.ShouldContain(line =>
-            line.Contains($"audit:{OperationAuditStatus.Committed}", StringComparison.Ordinal)
-            && line.Contains($"origin:{SurfaceOrigin.Ui}", StringComparison.Ordinal)
-            && line.Contains($"correlation:{CorrelationId}", StringComparison.Ordinal));
+        outcome.AuditHistory.AuditStatus.ShouldBe(OperationAuditStatus.Committed);
+        OperationAuditEntryModel entry = outcome.AuditHistory.Entries.ShouldHaveSingleItem();
+        entry.Phase.ShouldBe(AuditHistoryPhase.PostCommit);
+        entry.Decision.ShouldBe("allow");
+        entry.Outcome.ShouldBe("proposed");
+        entry.SurfaceOrigin.ShouldBe(SurfaceOrigin.Ui);
+        entry.CorrelationId.ShouldBe(CorrelationId);
+    }
 
-        foreach (string line in outcome.AuditHistory)
-        {
-            line.ShouldNotContain("noteId", Case.Insensitive);
-            line.ShouldNotContain("tenant", Case.Insensitive);
-            line.ShouldNotContain("tenant-alpha", Case.Insensitive);
-            line.ShouldNotContain("resource", Case.Insensitive);
-            line.ShouldNotContain("restricted-file.txt", Case.Insensitive);
-            line.ShouldNotContain("Secret Project", Case.Insensitive);
-            line.ShouldNotContain("payload", Case.Insensitive);
-            line.ShouldNotContain("secret", Case.Insensitive);
-            line.ShouldNotContain("/home/", Case.Insensitive);
-            line.ShouldNotContain("exception", Case.Insensitive);
-        }
+    [Fact]
+    public async Task EmptyAuditHistoryShouldPreserveReadStatusWithoutInventingAnEntry()
+    {
+        OperationAuditHistory history = new() { AuditStatus = OperationAuditStatus.Reconciling, Entries = [] };
+        FakeChatBotClient client = new(Response(), Status(), history);
+
+        OperationOutcome outcome = await new GovernedOperationService(client)
+            .SubmitGovernedNoteAsync(TestContext.Current.CancellationToken);
+
+        outcome.AuditStatus.ShouldBe(nameof(OperationAuditStatus.Committed));
+        outcome.AuditHistory.AuditStatus.ShouldBe(OperationAuditStatus.Reconciling);
+        outcome.AuditHistory.Entries.ShouldBeEmpty();
     }
 
     [Theory]
@@ -169,7 +171,7 @@ public sealed class GovernedOperationServiceTests
         };
     }
 
-    private sealed class FakeChatBotClient(CommandSubmissionResponse response, OperationStatus status) : IChatBotClient
+    private sealed class FakeChatBotClient(CommandSubmissionResponse response, OperationStatus status, OperationAuditHistory? history = null) : IChatBotClient
     {
         public ChatBotSurfaceOrigin? LastOrigin { get; private set; }
 
@@ -208,7 +210,7 @@ public sealed class GovernedOperationServiceTests
             CancellationToken cancellationToken = default)
         {
             LastAuditHistoryOperationId = operationId;
-            return Task.FromResult(new OperationAuditHistory
+            return Task.FromResult(history ?? new OperationAuditHistory
             {
                 OperationId = operationId,
                 AuditStatus = OperationAuditStatus.Committed,

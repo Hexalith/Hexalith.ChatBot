@@ -1,0 +1,37 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+@using Hexalith.ChatBot.Client.Generated
+@inject ChatBotUiTextLocalizer UiText
+
+@if (History.Entries.Count == 0)
+{
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" data-chatbot-audit-history="@(IsReconciling ? "pending" : "empty")">
+        @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.AuditStatusLabel], History.AuditStatus.ToString())
+        <FluentText>@UiText[IsReconciling ? ChatBotUiTextKey.AuditHistoryAwaitingRecord : ChatBotUiTextKey.AuditHistoryNoRecords]</FluentText>
+    </FluentStack>
+}
+else
+{
+    <ul class="chatbot-audit-list" data-chatbot-audit-history="metadata-only">
+        @foreach (OperationAuditEntryModel entry in History.Entries)
+        {
+            <li>
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
+                    @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.AuditPhaseLabel], entry.Phase.ToString())
+                    @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.ReviewHistoryDecisionLabel], entry.Decision)
+                    @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.AuditOutcomeLabel], entry.Outcome)
+                    @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.AuditStatusLabel], History.AuditStatus.ToString())
+                    @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.AuditOriginLabel], entry.SurfaceOrigin.ToString())
+                    @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.CorrelationIdLabel], entry.CorrelationId)
+                </FluentStack>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private bool IsReconciling => History.AuditStatus is OperationAuditStatus.Reconciling;
+
+    /// <summary>Gets or sets the structured metadata read from the audit-history endpoint.</summary>
+    [Parameter, EditorRequired]
+    public OperationAuditHistoryModel History { get; set; } = default!;
+}

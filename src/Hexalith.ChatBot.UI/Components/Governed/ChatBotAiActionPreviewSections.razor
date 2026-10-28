@@ -189,12 +189,7 @@
     // variable-length suppression of empty rows. All AI-action-preview values are opaque metadata-only
     // tokens (states, reason codes, references, versions), so every value keeps the monospace <code>.
     private RenderFragment? MetadataRow(string labelKey, string? value)
-        => string.IsNullOrWhiteSpace(value) ? null : CodeRow(UiText[labelKey], value!);
-
-    private static RenderFragment CodeRow(string label, string value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
-        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <code class="chatbot-code">@value</code>
-    </FluentStack>;
+        => string.IsNullOrWhiteSpace(value) ? null : ChatBotMetadataRendering.CodeRow(UiText[labelKey], value!);
 
     private sealed record AiActionPreviewSection(
         string Kind,

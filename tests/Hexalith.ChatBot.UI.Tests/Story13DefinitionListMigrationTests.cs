@@ -223,7 +223,8 @@ public sealed class Story13DefinitionListMigrationTests
             // AC3: genuine opaque tokens keep <code class="chatbot-code"> — monospace must not be blanket-removed.
             // Helper definitions excluded for the same reason as the FluentStack check above.
             string markup = StripRowHelperDefinitions(content);
-            bool usesSharedCodeRow = markup.Contains("@AssociationReviewRendering.CodeRow(", StringComparison.Ordinal);
+            bool usesSharedCodeRow = markup.Contains("@AssociationReviewRendering.CodeRow(", StringComparison.Ordinal)
+                || markup.Contains("ChatBotMetadataRendering.CodeRow", StringComparison.Ordinal);
             if (!markup.Contains("chatbot-code", StringComparison.Ordinal) && !usesSharedCodeRow)
             {
                 missingTokenMonospace.Add(surface);
@@ -231,7 +232,7 @@ public sealed class Story13DefinitionListMigrationTests
         }
 
         // Association rows now share one encoded renderer; real HtmlRenderer regressions verify its markup.
-        ReadSurface(uiRoot, "Components/Governed/AssociationReviewRendering.cs").ShouldContain("\"chatbot-code\"");
+        ReadSurface(uiRoot, "Components/Governed/ChatBotMetadataRow.razor").ShouldContain("chatbot-code");
 
         monospacedTime.ShouldBeEmpty(
             "AC3: timestamps render as plain <time> (no chatbot-code monospace). Offenders: "

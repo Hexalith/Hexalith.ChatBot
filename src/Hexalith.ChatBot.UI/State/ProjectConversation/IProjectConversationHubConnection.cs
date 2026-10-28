@@ -10,7 +10,7 @@ internal interface IProjectConversationHubConnection : IAsyncDisposable
 
     event Func<Task>? Reconnected;
 
-    void RegisterChanged(string methodName, Action<string> callback);
+    void RegisterChanged(string methodName, Func<string, Task> callback);
 
     Task StartAsync();
 

@@ -371,7 +371,10 @@ public sealed class ChatBotLocalizationContractTests
             "AcceptedProjectionPending",
             "Committed",
             ["Retry", "inspect audit metadata", "defer"],
-            ["post-commit - allow/proposed - audit:Committed - origin:Ui"]);
+            new OperationAuditHistoryModel(
+                Hexalith.ChatBot.Client.Generated.OperationAuditStatus.Committed,
+                [new OperationAuditEntryModel(Hexalith.ChatBot.Client.Generated.AuditHistoryPhase.PostCommit,
+                    "allow", "proposed", Hexalith.ChatBot.Client.Generated.SurfaceOrigin.Ui, "correlation-opaque")]));
 
         using (UseCulture("fr"))
         {
@@ -382,7 +385,8 @@ public sealed class ChatBotLocalizationContractTests
             outcome.CompletionStatus.ShouldBe("AcceptedProjectionPending");
             outcome.AuditStatus.ShouldBe("Committed");
             outcome.SafeNextActions.ShouldBe(["Retry", "inspect audit metadata", "defer"], ignoreOrder: false);
-            outcome.AuditHistory.Single().ShouldContain("origin:Ui");
+            outcome.AuditHistory.Entries.Single().SurfaceOrigin.ShouldBe(Hexalith.ChatBot.Client.Generated.SurfaceOrigin.Ui);
+            outcome.AuditHistory.Entries.Single().CorrelationId.ShouldBe("correlation-opaque");
         }
     }
 
@@ -466,7 +470,10 @@ public sealed class ChatBotLocalizationContractTests
             "AcceptedProjectionPending",
             "Committed",
             ["Retry", "inspect audit metadata", "defer"],
-            ["post-commit - allow/proposed - audit:Committed - origin:Ui"]);
+            new OperationAuditHistoryModel(
+                Hexalith.ChatBot.Client.Generated.OperationAuditStatus.Committed,
+                [new OperationAuditEntryModel(Hexalith.ChatBot.Client.Generated.AuditHistoryPhase.PostCommit,
+                    "allow", "proposed", Hexalith.ChatBot.Client.Generated.SurfaceOrigin.Ui, "correlation-opaque")]));
 
         using (UseCulture("fr"))
         {
@@ -477,7 +484,8 @@ public sealed class ChatBotLocalizationContractTests
             outcome.CompletionStatus.ShouldBe("AcceptedProjectionPending");
             outcome.AuditStatus.ShouldBe("Committed");
             outcome.SafeNextActions.ShouldBe(["Retry", "inspect audit metadata", "defer"], ignoreOrder: false);
-            outcome.AuditHistory.Single().ShouldContain("origin:Ui");
+            outcome.AuditHistory.Entries.Single().SurfaceOrigin.ShouldBe(Hexalith.ChatBot.Client.Generated.SurfaceOrigin.Ui);
+            outcome.AuditHistory.Entries.Single().CorrelationId.ShouldBe("correlation-opaque");
         }
     }
 

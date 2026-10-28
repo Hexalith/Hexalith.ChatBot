@@ -1,0 +1,43 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+
+<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+    <FluentText Weight="TextWeight.Semibold">@Label</FluentText>
+    @if (Text is not null)
+    {
+        <FluentText>@Text</FluentText>
+    }
+    @if (Timestamp is { } timestamp)
+    {
+        <time datetime="@timestamp.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture)">@Value</time>
+    }
+    else if (IsCode)
+    {
+        <code class="chatbot-code">@Value</code>
+    }
+    else
+    {
+        <FluentText>@Value</FluentText>
+    }
+</FluentStack>
+
+@code {
+    /// <summary>Gets or sets the localized field label.</summary>
+    [Parameter]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the already-authorized field value.</summary>
+    [Parameter]
+    public string? Value { get; set; }
+
+    /// <summary>Gets or sets an optional localized explanation preceding an opaque token.</summary>
+    [Parameter]
+    public string? Text { get; set; }
+
+    /// <summary>Gets or sets whether the value is an opaque code rather than display text.</summary>
+    [Parameter]
+    public bool IsCode { get; set; } = true;
+
+    /// <summary>Gets or sets the machine timestamp when the value is a formatted timestamp.</summary>
+    [Parameter]
+    public DateTimeOffset? Timestamp { get; set; }
+}

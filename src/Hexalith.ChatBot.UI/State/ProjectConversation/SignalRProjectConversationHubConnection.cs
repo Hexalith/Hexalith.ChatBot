@@ -19,7 +19,7 @@ internal sealed class SignalRProjectConversationHubConnection : IProjectConversa
 
     public event Func<Task>? Reconnected;
 
-    public void RegisterChanged(string methodName, Action<string> callback)
+    public void RegisterChanged(string methodName, Func<string, Task> callback)
         => _ = _connection.On(methodName, callback);
 
     public Task StartAsync() => _connection.StartAsync();

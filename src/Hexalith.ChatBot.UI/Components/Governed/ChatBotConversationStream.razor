@@ -10,9 +10,10 @@
         {
             <ChatBotBlockedState Reason="ChatBotBlockedReason.UnresolvedAssociation"
                                  UseLocalEmptyStateGuidance="true"
+                                 HeadingTag="TextTag.H3"
                                  ReasonText="@EmptyText"
                                  SafeNextAction="@SafeNextAction"
-                                 StableId="project-conversation-empty" />
+                                 StableId="@($"{_instanceId}-empty")" />
         }
         else
         {
@@ -106,5 +107,7 @@
         _initialized = true;
     }
 
-    private string TitleId => "project-conversation-stream-title";
+    private readonly string _instanceId = $"project-conversation-stream-{Guid.NewGuid():N}";
+
+    private string TitleId => $"{_instanceId}-title";
 }

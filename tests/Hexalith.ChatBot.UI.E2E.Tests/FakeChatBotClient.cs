@@ -20,6 +20,9 @@ internal sealed class FakeChatBotClient(string? submissionErrorCode = null) : IC
     /// <summary>Gets optional server-labelled association evidence for rendering boundary tests.</summary>
     public AssociationEvidenceReference? AssociationEvidenceOverride { get; init; }
 
+    /// <summary>Gets an optional complete audit response for metadata-boundary render tests.</summary>
+    public OperationAuditHistory? AuditHistoryOverride { get; init; }
+
     private static readonly DateTimeOffset At = new(2026, 5, 31, 9, 0, 0, TimeSpan.Zero);
     private const string CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
     private bool _messageSubmitted;
@@ -103,7 +106,7 @@ internal sealed class FakeChatBotClient(string? submissionErrorCode = null) : IC
         string? correlationId = null,
         string? taskId = null,
         CancellationToken cancellationToken = default)
-        => Task.FromResult(new OperationAuditHistory
+        => Task.FromResult(AuditHistoryOverride ?? new OperationAuditHistory
         {
             OperationId = operationId,
             AuditStatus = OperationAuditStatus.Committed,

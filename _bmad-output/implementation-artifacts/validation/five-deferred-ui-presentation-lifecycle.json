@@ -1,0 +1,307 @@
+{
+  "schemaVersion": 1,
+  "recordKind": "local-maintenance-verification",
+  "createdAtUtc": "2026-10-28T15:33:56.508388+00:00",
+  "baselineCommit": "43cd45ed7c91e9dcf3ee6c00d6d22c40e2d7daa5",
+  "specPath": "_bmad-output/implementation-artifacts/spec-five-deferred-ui-presentation-lifecycle.md",
+  "resolvedItems": {
+    "DW-74": [
+      "ConversationAccessibilityRenderingTests.RepeatedEmptyStreamsShouldUseUniqueStableHeadingsWithNestedReasonAtLevelThree",
+      "ConversationAccessibilityRenderingTests.StandaloneBlockedStateShouldKeepHeadingAtLevelTwo"
+    ],
+    "DW-113": [
+      "GovernedAuditPresentationRenderTests",
+      "GovernedOperationServiceTests"
+    ],
+    "DW-114": [
+      "GovernedAuditPresentationRenderTests",
+      "ChatBotMetadataRenderingTests",
+      "Story13DefinitionListMigrationTests"
+    ],
+    "DW-117": [
+      "ConversationAccessibilityRenderingTests",
+      "RealRenderCrossSurfaceE2ETests.ProjectConversation_StatefulRouteShouldMessageAskAndAnnounceVerifiedStopOnce",
+      "VersionedSafeOutcomeBrowserTests"
+    ],
+    "DW-120": [
+      "ProjectConversationStreamingSubscriberTests",
+      "ProjectConversationWorkspaceSubscriptionRenderingTests",
+      "ProjectConversationWorkspaceLifecycleRenderTests"
+    ]
+  },
+  "changedSourceSha256": {
+    "src/Hexalith.ChatBot.UI/Components/Governed/AssociationReviewRendering.cs": "8559e7d770b72a8b33b60a391a0a1a37825312af3f8d4e6415dedc457a9e34e6",
+    "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAiActionPreviewSections.razor": "900f7df5016ec38291e77afb5d84473204f1630e5f0a48ab937f23d047f4fa2f",
+    "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor": "ad42aead862ee099b147b68f228d6b345bdeab3182ad9a5793f4c4d74c4e1a90",
+    "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotBlockedState.razor": "dc2aabc03868c3595cb8ae57a7c24249e834e2cb2a73115d577fd60a0681cb71",
+    "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor": "f78d16b644e898013ac05cd516f84810106223d9f2c92deaee962890a7be3316",
+    "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor": "3e35b243126639457f9db1c802b57c8b413a964609e4635586498cf1a87b3d20",
+    "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotMetadataRendering.cs": "6ab31037cca35f4a8b3edd1d297e3261b0370c58672af7370db92a7a918ff9c1",
+    "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotMetadataRow.razor": "8a685aaacb379b1d765496d8e741b330e940ee00383eb432579172ffc07664cf",
+    "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotOperationAuditHistory.razor": "082a8a00b169e5edf8c4ec2e710b5db8397af2e2ae43791f48717b30ed863f0a",
+    "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor": "de3b686e68d8228a79ae893bbf96a68dd437052c65429ee18b7fe9b7f7677107",
+    "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotTaskIntentReviewPanel.razor": "01fd7583101d99214e971d4daa8c33e36906c677904c58ecfe0482924a7f5f3d",
+    "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotWhyProjectPanel.razor": "7567d83481d4d47a7862d6edc6f5c7d73bdee2db280904999715fbd6ce6acbdd",
+    "src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor": "034677ca9780363cc828b4dea2cc5652a3cec6cf04014c4f6dd88fa8e1ac06fe",
+    "src/Hexalith.ChatBot.UI/Localization/ChatBotUiTextKey.cs": "9a2c3174aa6edc7d061c6563f7ab7bc7e08587624b90cf4a020f948e8b84e40c",
+    "src/Hexalith.ChatBot.UI/Localization/SharedResource.fr.resx": "5e549972d9a179376de7afd2406f0339f3a2ed8b5b836d229314e669a58f43e0",
+    "src/Hexalith.ChatBot.UI/Localization/SharedResource.resx": "c997bc08db0f6d25daea32ee2c406917ab4a2dc118e5fc5d5a6772b48b6cbca0",
+    "src/Hexalith.ChatBot.UI/Services/GovernedOperationService.cs": "58af119c0a3cbe4a60e9c6b78e6ee7686d46c0affc08ccee04f51d8c02f21a71",
+    "src/Hexalith.ChatBot.UI/State/GovernedOperations/OperationAuditEntryModel.cs": "a8d5697991d5dca2ae181001e93fe9db286da9ee53df94ed9927f6270a86bf13",
+    "src/Hexalith.ChatBot.UI/State/GovernedOperations/OperationAuditHistoryModel.cs": "a7d4b29f4881c6805ee958633e2499cbd943581a450966297c6294489f5cd809",
+    "src/Hexalith.ChatBot.UI/State/GovernedOperations/OperationOutcome.cs": "94fa4f4ecbe20b67c163a94c20cfe963194b5ab737326e77cf76af39d263cbfb",
+    "src/Hexalith.ChatBot.UI/State/ProjectConversation/IProjectConversationHubConnection.cs": "c25bf2190401c3dced2ff2d5be5baa4ac24db35d008562b73b28bc395a20cae3",
+    "src/Hexalith.ChatBot.UI/State/ProjectConversation/ProjectConversationStreamingSubscriber.cs": "76323fe35f7347d873d999f059247f33c03fa9d638939eb3c56579513bacb871",
+    "src/Hexalith.ChatBot.UI/State/ProjectConversation/SignalRProjectConversationHubConnection.cs": "7ed97a1167e5474ce9e3564540479f54b019da755179e8660b51c435d22ba8d9",
+    "tests/Hexalith.ChatBot.IntegrationTests/Story132ProductionBrowserAspireE2ETests.cs": "56366c122d9e2c806ab9a389cbdd893d85ff3860aa7c14595898b123643e5c4b",
+    "tests/Hexalith.ChatBot.UI.E2E.Tests/AuditPresentationJsRuntime.cs": "e0f64cc4091729cf1aa814bc92fd5ef37e213b7673e04a0438ab098a0b1ea02d",
+    "tests/Hexalith.ChatBot.UI.E2E.Tests/FakeChatBotClient.cs": "13087b383aed0d677bd26ca4bd7f4ac4c2359bc9315668ccb86baffcae46e84a",
+    "tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedAuditPresentationRenderTests.cs": "adee6326327fa6e1cee229db039eb23df94a51f7cb7189ca5cb4fe3fde4d1567",
+    "tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationWorkspaceLifecycleRenderTests.cs": "dbed500807dbad2b9ef9fa21d097a61c459e9438c7e100ce454584ec32654a80",
+    "tests/Hexalith.ChatBot.UI.E2E.Tests/RealRenderCrossSurfaceE2ETests.cs": "386f48a6a9a880ddc3b3ef0fcae0a14d11105ea52cfb8120771ecb89198c2e3d",
+    "tests/Hexalith.ChatBot.UI.E2E.Tests/Story12CssRetirementE2ETests.cs": "fb259874bcb0c79b538781869192d18750b87086acae35d468a230e9ad296661",
+    "tests/Hexalith.ChatBot.UI.E2E.Tests/VersionedSafeOutcomeBrowserTests.cs": "09a82684b9172829205b4c468a1dff115a562edbb2b5f769472837fd9cc54557",
+    "tests/Hexalith.ChatBot.UI.E2E.Tests/VersionedSafeOutcomeRenderTests.cs": "3d336cc119741a280c3fa5688cad998a672d8a6b21532b3ea43301c74b54d136",
+    "tests/Hexalith.ChatBot.UI.E2E.Tests/WorkspaceLifecycleRenderHost.cs": "61fcbe5c435540608937d4144cdb73133ce0fd14e82f31f86e8cddd432eeab66",
+    "tests/Hexalith.ChatBot.UI.Tests/AssociationReviewComponentContractTests.cs": "a3d007c184e6dee976cef1fc1a84bdb63d8076df10db71dd35ef5982df6afc0c",
+    "tests/Hexalith.ChatBot.UI.Tests/ChatBotAccessibilityFocusContractTests.cs": "adeb8004260f99e3b18f3f8986845e2f63006a2fcceeac098cac13fcadf8c9cb",
+    "tests/Hexalith.ChatBot.UI.Tests/ChatBotLocalizationContractTests.cs": "12c8675f8e0853d27e56434664ed1c8f73fb9e37306bd743ae6b4e2efaa0eecb",
+    "tests/Hexalith.ChatBot.UI.Tests/ChatBotMetadataRenderingTests.cs": "a7938972308706bba3fe1c7337d89c92f9f79e36f204ae659b87b53348c599c2",
+    "tests/Hexalith.ChatBot.UI.Tests/ConversationAccessibilityRenderingTests.cs": "9fb6b1fe5d6bc64cba4aaf4d176b88b4d80d3743ff5892241b5120abe4c0da7d",
+    "tests/Hexalith.ChatBot.UI.Tests/GovernedOperationServiceTests.cs": "3f83b6617139d58feb6303e417b9e331291d566e44b4d71af17fda9060ea8a59",
+    "tests/Hexalith.ChatBot.UI.Tests/ProjectConversationStreamingSubscriberTests.cs": "588296b87bc346f4de5ea2a92e8d2a9cc19bc2779014d633852c23114b98ceda",
+    "tests/Hexalith.ChatBot.UI.Tests/ProjectConversationWorkspaceSubscriptionRenderingTests.cs": "0d3b1a50d5a23d9b1b211ac0ccb24f5019fa558d4654a62862670356ea8082b4",
+    "tests/Hexalith.ChatBot.UI.Tests/Story13DefinitionListMigrationTests.cs": "dd5315810e6fcb229770bcbfcf2c4ea58cece2a45a1964e5f3a9e4d95d69b9c0",
+    "tests/Hexalith.ChatBot.UI.Tests/WorkspaceSubscriptionHubConnection.cs": "7fdd51e90b8b3f3334756be4678148e36dce8edfe727d52e4331c203e1c6d474",
+    "tests/Hexalith.ChatBot.UI.Tests/WorkspaceSubscriptionHubConnectionFactory.cs": "6d9d7ca4fa9abf1c9ee3032848942ec8581739c7a527817678648ecfcd09b49e",
+    "tests/Hexalith.ChatBot.UI.Tests/WorkspaceSubscriptionRenderState.cs": "15293dc342b36ba0c7cefba20c22ffac686ea5483c5337c306894c7afc3f6518"
+  },
+  "builds": [
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj --configuration Debug -m:1",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0,
+      "log": "TestResults/five-ui-presentation-ui-build.log",
+      "sha256": "361d96c1d89e6dbfe818eb7994db5d30b508c65e88ea951c0b536c5d02e179ca"
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --configuration Debug -m:1",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0,
+      "log": "TestResults/five-ui-presentation-ui-e2e-build.log",
+      "sha256": "c8079f0409c68c0499c5ffe972519b3e6c469c423855ca7105be3c7f4a4ab4f8"
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj --configuration Debug -m:1",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0,
+      "log": "TestResults/five-ui-presentation-ui-architecture-build.log",
+      "sha256": "01bd3f3e952a4b6d777de6beee12c496854742a67a134d1a08c72de9e712448a"
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug -m:1",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0,
+      "log": "TestResults/five-ui-presentation-ui-integration-build.log",
+      "sha256": "a597530ab7c33fe65d1f1cfba2bee07b4b4edd72781d9d767bca1c9cff8208aa"
+    }
+  ],
+  "reports": {
+    "unit": {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests TestResults/five-ui-presentation-unit.ctrf.json -result-trx TestResults/five-ui-presentation-unit.trx",
+      "exitCode": 1,
+      "summary": {
+        "tests": 610,
+        "passed": 606,
+        "failed": 4,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793201514605,
+        "stop": 1793201516210,
+        "duration": 1605
+      },
+      "failures": [
+        {
+          "test": "Hexalith.ChatBot.UI.Tests.ChatBotResponsiveTouchContractTests.PackagePinsShouldMatchApprovedSharedCatalog",
+          "reason": "System.InvalidOperationException : The evaluated version for 'Microsoft.Playwright' is '1.64.1', expected '1.64.0'."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.Tests.ChatBotLocalizationContractTests.PackagePinsShouldMatchApprovedSharedCatalogForLocalizationFoundation",
+          "reason": "System.InvalidOperationException : The evaluated version for 'Microsoft.Playwright' is '1.64.1', expected '1.64.0'."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.Tests.ChatBotAccessibilityFocusContractTests.PackagePinsShouldMatchApprovedSharedCatalogForAccessibilityFloor",
+          "reason": "System.InvalidOperationException : The evaluated version for 'Microsoft.Playwright' is '1.64.1', expected '1.64.0'."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.Tests.ChatBotLiveRegionReducedMotionContractTests.PackagePinsShouldMatchApprovedSharedCatalogForLiveRegionAndMotionFoundation",
+          "reason": "System.InvalidOperationException : The evaluated version for 'Microsoft.Playwright' is '1.64.1', expected '1.64.0'."
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "TestResults/five-ui-presentation-unit.ctrf.json",
+          "sha256": "e6445be89a603dbef096fed2131fd478916f54ba0715dfe363d3d898a8d2932a"
+        },
+        {
+          "path": "TestResults/five-ui-presentation-unit.trx",
+          "sha256": "455b832162f2da06b05bee0d797503133a103e54f84b475eccf00d69b1b7ff94"
+        }
+      ]
+    },
+    "unit-focused": {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests TestResults/five-ui-presentation-unit-focused.ctrf.json -result-trx TestResults/five-ui-presentation-unit-focused.trx -method- '*PackagePinsShouldMatchApprovedSharedCatalog*'",
+      "exitCode": 0,
+      "summary": {
+        "tests": 606,
+        "passed": 606,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793201542146,
+        "stop": 1793201543770,
+        "duration": 1624
+      },
+      "failures": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-ui-presentation-unit-focused.ctrf.json",
+          "sha256": "cdbe81c0b4ec6769cf104ad02f31c905459a790bfe04f934e8f6c1ecd1e082bd"
+        },
+        {
+          "path": "TestResults/five-ui-presentation-unit-focused.trx",
+          "sha256": "323b4c06566a315d6a6abbf733feb956afa43ee9c66feaf6b6951b01cd6a6980"
+        }
+      ]
+    },
+    "render": {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests TestResults/five-ui-presentation-render.ctrf.json -result-trx TestResults/five-ui-presentation-render.trx -class '*GovernedAuditPresentationRenderTests' -class '*ProjectConversationWorkspaceLifecycleRenderTests' -class '*VersionedSafeOutcomeRenderTests'",
+      "exitCode": 0,
+      "summary": {
+        "tests": 111,
+        "passed": 111,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793201459573,
+        "stop": 1793201460510,
+        "duration": 937
+      },
+      "failures": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-ui-presentation-render.ctrf.json",
+          "sha256": "76733fea1754f5b84bb235b8ae2ccecb9ff9c5ffc6301cc0983fd18e62f8636d"
+        },
+        {
+          "path": "TestResults/five-ui-presentation-render.trx",
+          "sha256": "0932a3902325777d8937eabe4e13826b1d49265923dd95050e6144feb3160b05"
+        }
+      ]
+    },
+    "browser": {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests TestResults/five-ui-presentation-browser.ctrf.json -result-trx TestResults/five-ui-presentation-browser.trx -class '*RealRenderCrossSurfaceE2ETests' -class '*VersionedSafeOutcomeBrowserTests'",
+      "exitCode": 0,
+      "summary": {
+        "tests": 19,
+        "passed": 19,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793201459573,
+        "stop": 1793201480009,
+        "duration": 20436
+      },
+      "failures": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-ui-presentation-browser.ctrf.json",
+          "sha256": "4f6937eee64c94faceb811bdee92f471a807578bfd42d8595050775c0fcb7c36"
+        },
+        {
+          "path": "TestResults/five-ui-presentation-browser.trx",
+          "sha256": "02b053e8eac119c876a872baf3419b54fde2c8447eff73978e502bd2009b41fc"
+        }
+      ]
+    },
+    "architecture": {
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests TestResults/five-ui-presentation-architecture.ctrf.json -result-trx TestResults/five-ui-presentation-architecture.trx -class '*AiResponseStreamingTransportAdrTests' -class '*AdapterBoundaryFitnessTests' -class '*DependencyDirectionFitnessTests'",
+      "exitCode": 0,
+      "summary": {
+        "tests": 16,
+        "passed": 16,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793201515766,
+        "stop": 1793201516474,
+        "duration": 708
+      },
+      "failures": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-ui-presentation-architecture.ctrf.json",
+          "sha256": "6a9f9a37f6d11b8ce5d5ed7502256eeb8fdb19381b346d714806ed510381d43b"
+        },
+        {
+          "path": "TestResults/five-ui-presentation-architecture.trx",
+          "sha256": "95574429637ac0bcee19cb64aba643d2256c8e7694252136d88b6abaa6b649d4"
+        }
+      ]
+    }
+  },
+  "aspireBaseline": {
+    "startCommand": "python3 .github/scripts/with-source-mapping.py aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+    "startExitCode": 0,
+    "observedResources": {
+      "runningHealthy": 26,
+      "runningUnhealthy": 1,
+      "waiting": 17
+    },
+    "unhealthyResource": "security",
+    "stopCommand": "aspire stop --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+    "stopExitCode": 0,
+    "limitation": "Startup inspection was not a live topology acceptance run. Existing HXW009/HXW011 source-mapping advisories were preserved."
+  },
+  "review": {
+    "method": "independent blind review with correction rechecks",
+    "findings": 11,
+    "patched": 9,
+    "rejectedLow": 1,
+    "deferredPreExisting": 1,
+    "finalRecheck": "No remaining concrete defect found in queued-recovery correction."
+  },
+  "knownBroadGateFailure": {
+    "description": "Four pre-existing UI assertions expect Playwright 1.64.0 while the authoritative shared catalog evaluates 1.64.1. Pins and guards were not changed.",
+    "priorBaselineEvidence": "_bmad-output/implementation-artifacts/validation/five-deferred-association-review.json"
+  },
+  "limitations": [
+    "Scoped maintenance verification only; no formal story-completion attestation or release qualification.",
+    "Repeated populated streams sharing item identities require broader child-ID scoping, recorded separately in deferred-work.md.",
+    "Full UI run retains four disclosed pre-existing catalog failures; focused UI excludes exactly their PackagePinsShouldMatchApprovedSharedCatalog methods."
+  ],
+  "checks": [
+    {
+      "command": "git -c core.whitespace=cr-at-eol diff --check",
+      "exitCode": 0
+    },
+    {
+      "command": "npx --no-install commitlint --config commitlint.config.cjs --edit /tmp/chatbot-five-ui-commit.txt",
+      "exitCode": 0
+    }
+  ]
+}

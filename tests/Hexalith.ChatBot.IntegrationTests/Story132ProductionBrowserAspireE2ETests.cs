@@ -206,7 +206,7 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
                 {
                     await SubmitComposerAndExpectSafeRefusalAsync(page, mode, "Story 1.7 governed refusal", row.Culture).ConfigureAwait(true);
                 }
-                ILocator input = page.Locator("#project-conversation-composer-input");
+                ILocator input = page.Locator("[data-chatbot-composer-input='true']");
                 await AssertCriticalControlNotClippedAsync(input, row).ConfigureAwait(true);
                 (await page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches").ConfigureAwait(true)).ShouldBe(row.ReducedMotion);
                 (await page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches").ConfigureAwait(true)).ShouldBe(row.ForcedColors);
@@ -347,11 +347,11 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
                 TestContext.Current.CancellationToken).ConfigureAwait(true);
         }
 
-        ILocator inputHost = page.Locator("#project-conversation-composer-input");
+        ILocator inputHost = page.Locator("[data-chatbot-composer-input='true']");
         ILocator input = inputHost.Locator("textarea");
         await input.FillAsync(text).ConfigureAwait(true);
-        ILocator status = page.Locator("[data-chatbot-stable-id='project-conversation-composer-status']");
-        ILocator validation = page.Locator("#project-conversation-composer-error");
+        ILocator status = page.Locator("[data-chatbot-stable-id$='project-conversation-composer-status']");
+        ILocator validation = page.Locator("[data-chatbot-composer-validation='true']");
         await submitControl.ClickAsync().ConfigureAwait(true);
         await WaitForAsync(
             async () => await IsAcceptedReceiptAsync(input, status).ConfigureAwait(true) ||

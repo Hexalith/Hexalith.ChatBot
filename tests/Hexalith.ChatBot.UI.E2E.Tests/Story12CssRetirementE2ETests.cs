@@ -105,8 +105,8 @@ public sealed class Story12CssRetirementE2ETests
         approval.ShouldNotContain("chatbot-action-button", Case.Sensitive);
 
         composer.ShouldContain("<FluentTextArea", Case.Sensitive);
-        composer.ShouldContain("Id=\"project-conversation-composer-input\"", Case.Sensitive);
-        composer.ShouldContain("aria-describedby=\"project-conversation-composer-help project-conversation-composer-status\"", Case.Sensitive);
+        composer.ShouldContain("Id=\"@InputId\"", Case.Sensitive);
+        composer.ShouldContain("aria-describedby=\"@InputDescriptionIds\"", Case.Sensitive);
         composer.ShouldContain("<FluentButton", Case.Sensitive);
         composer.ShouldNotContain("chatbot-governed-composer__input", Case.Sensitive);
 

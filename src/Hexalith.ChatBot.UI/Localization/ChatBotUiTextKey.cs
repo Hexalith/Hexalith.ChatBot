@@ -237,6 +237,16 @@ public static class ChatBotUiTextKey
     public const string AssociationReviewValidationDecisionUnavailable = "AssociationReview_Validation_DecisionUnavailable";
     public const string AuditHistoryMetadataOnly = "AuditHistory_MetadataOnly";
     public const string AuditHistoryTitle = "AuditHistory_Title";
+    /// <summary>The localized guidance while the audit record is pending.</summary>
+    public const string AuditHistoryAwaitingRecord = "AuditHistory_AwaitingRecord";
+    /// <summary>The localized explanation when a completed audit read has no available records.</summary>
+    public const string AuditHistoryNoRecords = "AuditHistory_NoRecords";
+    /// <summary>The audit phase field label.</summary>
+    public const string AuditPhaseLabel = "AuditHistory_Phase_Label";
+    /// <summary>The audit outcome field label.</summary>
+    public const string AuditOutcomeLabel = "AuditHistory_Outcome_Label";
+    /// <summary>The audit surface origin field label.</summary>
+    public const string AuditOriginLabel = "AuditHistory_Origin_Label";
     public const string AuditStatusCommitted = "AuditStatus_Committed";
     public const string AuditStatusLabel = "AuditStatus_Label";
     public const string AuditStatusCommittedAccessible = "AuditStatus_Committed_Accessible";
@@ -1143,6 +1153,11 @@ public static class ChatBotUiTextKey
         AssociationReviewValidationDecisionUnavailable,
         AuditHistoryMetadataOnly,
         AuditHistoryTitle,
+        AuditHistoryAwaitingRecord,
+        AuditHistoryNoRecords,
+        AuditPhaseLabel,
+        AuditOutcomeLabel,
+        AuditOriginLabel,
         AuditStatusCommitted,
         AuditStatusLabel,
         AuditStatusCommittedAccessible,

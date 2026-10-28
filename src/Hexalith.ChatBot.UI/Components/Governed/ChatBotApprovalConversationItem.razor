@@ -436,13 +436,13 @@
     // drop the monospace while keeping the machine datetime (AC3). The blank/empty guards return null so
     // conditional rows still suppress empty values.
     private RenderFragment? MetadataRow(string labelKey, string? value)
-        => string.IsNullOrWhiteSpace(value) ? null : CodeRow(UiText[labelKey], value);
+        => string.IsNullOrWhiteSpace(value) ? null : ChatBotMetadataRendering.CodeRow(UiText[labelKey], value);
 
     private RenderFragment? MetadataLabelValueRow(string labelKey, string label, string? value)
-        => string.IsNullOrWhiteSpace(value) ? null : LabelTextCodeRow(UiText[labelKey], label, value);
+        => string.IsNullOrWhiteSpace(value) ? null : ChatBotMetadataRendering.LabelTextCodeRow(UiText[labelKey], label, value);
 
     private RenderFragment? MetadataListRow(string labelKey, IReadOnlyList<string> values)
-        => values.Count == 0 ? null : CodeRow(UiText[labelKey], string.Join(", ", values));
+        => values.Count == 0 ? null : ChatBotMetadataRendering.CodeRow(UiText[labelKey], string.Join(", ", values));
 
     // Labels and values are positional pairs. Joining them independently when the lengths differ renders two
     // lists of different arity side by side as though they corresponded, so fall back to the tokens alone.
@@ -450,31 +450,15 @@
         => values.Count == 0
             ? null
             : labels.Count == values.Count
-                ? LabelTextCodeRow(UiText[labelKey], string.Join(", ", labels), string.Join(", ", values))
-                : CodeRow(UiText[labelKey], string.Join(", ", values));
+                ? ChatBotMetadataRendering.LabelTextCodeRow(UiText[labelKey], string.Join(", ", labels), string.Join(", ", values))
+                : ChatBotMetadataRendering.CodeRow(UiText[labelKey], string.Join(", ", values));
 
     private RenderFragment? TimestampRow(string labelKey, DateTimeOffset? value)
-        => value is null ? null : TimeRow(UiText[labelKey], value.Value);
+        => value is null ? null : ChatBotMetadataRendering.TimeRow(UiText[labelKey], value.Value, FormatDisplayUtc(value.Value));
 
     // Display timestamps go through the injected culture formatter; the machine value in @datetime stays
     // invariant ISO-8601.
     private string FormatDisplayUtc(DateTimeOffset timestamp) => Culture.FormatDateTime(timestamp);
-
-    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
-        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <code class="chatbot-code">@value</code>
-    </FluentStack>;
-
-    private static RenderFragment LabelTextCodeRow(string label, string? text, string? token) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
-        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <FluentText>@text</FluentText>
-        <code class="chatbot-code">@token</code>
-    </FluentStack>;
-
-    private RenderFragment TimeRow(string label, DateTimeOffset value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
-        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <time datetime="@FormatUtc(value)">@FormatDisplayUtc(value)</time>
-    </FluentStack>;
 
     private static string FormatUtc(DateTimeOffset timestamp)
         => timestamp.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture);

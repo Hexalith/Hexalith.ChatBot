@@ -53,21 +53,13 @@ public sealed class GovernedOperationService(IChatBotClient client)
             status.CompletionStatus.ToString(),
             status.AuditStatus.ToString(),
             [.. status.SafeNextActions.Select(static action => action.ToString())],
-            ToAuditHistoryLines(auditHistory),
+            new OperationAuditHistoryModel(
+                auditHistory.AuditStatus,
+                [.. auditHistory.Entries.Select(static entry => new OperationAuditEntryModel(
+                    entry.Phase, entry.Decision, entry.Outcome, entry.SurfaceOrigin, entry.CorrelationId))]),
             status.RetryCount,
             status.OperationClass,
             status.OwnerRole,
             status.DuplicateSafetyNote);
     }
-
-    // Renders the server's post-commit audit envelope summary into metadata-only display lines: stable codes and
-    // opaque correlation tokens only — never the command payload, tenant/resource names, secrets, or raw text.
-    private static IReadOnlyList<string> ToAuditHistoryLines(OperationAuditHistory auditHistory)
-        => auditHistory.Entries.Count == 0
-            ? [$"audit:{auditHistory.AuditStatus} · awaiting post-commit record"]
-            :
-            [
-                .. auditHistory.Entries.Select(entry =>
-                    $"{entry.Phase} · {entry.Decision}/{entry.Outcome} · audit:{auditHistory.AuditStatus} · origin:{entry.SurfaceOrigin} · correlation:{entry.CorrelationId}"),
-            ];
 }

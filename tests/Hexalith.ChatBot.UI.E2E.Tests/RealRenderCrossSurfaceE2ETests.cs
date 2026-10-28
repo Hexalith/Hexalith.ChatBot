@@ -73,7 +73,7 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
         IPage page = await context.NewPageAsync();
         await OpenAsync(page, Surfaces[1], EnCulture, ColorModes[0], 1280, 900);
 
-        ILocator inputHost = page.Locator("#project-conversation-composer-input");
+        ILocator inputHost = page.Locator("[data-chatbot-composer-input='true']");
         ILocator input = inputHost.Locator("textarea");
         await input.FillAsync("Stateful governed message");
         await page.Locator("fluent-button").Filter(new() { HasText = "Submit" }).ClickAsync();

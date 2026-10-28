@@ -127,7 +127,7 @@ public sealed class ChatBotAccessibilityFocusContractTests
 
     private static readonly Epic10SurfaceContract[] Epic12MigratedSurfaceContracts =
     [
-        new("Story 12.2 governed composer", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor", ["<FluentButton", "<FluentLabel", "<FluentTextArea", "aria-describedby=\"project-conversation-composer-help project-conversation-composer-status\"", "aria-invalid=", "@onkeydown:stopPropagation=\"true\"", "FocusAsync"]),
+        new("Story 12.2 governed composer", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor", ["<FluentButton", "<FluentLabel", "<FluentTextArea", "aria-describedby=\"@InputDescriptionIds\"", "aria-invalid=", "@onkeydown:stopPropagation=\"true\"", "FocusAsync"]),
         new("Story 12.3 conversation stream", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor", ["<FluentCard", "<FluentStack", "<FluentText", "data-chatbot-conversation-stream=\"metadata-only\"", "aria-labelledby=\"@TitleId\"", "<ol"]),
         new("Story 12.4 association review actions", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor", ["<FluentLabel", "<FluentTextArea", "aria-label=\"@UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]\"", "aria-describedby=\"@DecisionNoteDescribedBy\"", "aria-invalid=\"@DecisionNoteInvalidText\"", "ChatBotGovernedAction"]),
         new("Story 12.4 association candidate row", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationCandidateRow.razor", ["<FluentButton", "role=\"radio\"", "aria-checked=\"@IsSelectedText\"", "aria-label=\"@AccessibleLabel\"", "data-chatbot-association-candidate=\"@Candidate.ProjectId\""]),

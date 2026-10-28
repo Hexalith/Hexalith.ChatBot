@@ -21,13 +21,14 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
     private readonly IProjectConversationHubConnectionFactory _connectionFactory;
     private readonly TimeSpan _initialRecoveryDelay;
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly SemaphoreSlim _subscriptionChanges = new(1, 1);
 
     private IProjectConversationHubConnection? _connection;
-    private Action? _onChanged;
-    private Action? _onReconnected;
+    private Func<Task>? _onChanged;
+    private Func<Task>? _onReconnected;
     private string? _subscribedTenant;
     private int _recoveryActive;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     public ProjectConversationStreamingSubscriber(
         ChatBotHubEndpoint endpoint,
@@ -49,11 +50,24 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
     /// Invoked after the connection transparently reconnects and rejoins the tenant group, so the caller can re-query
     /// authoritative server state — SignalR does not replay signals missed during the disconnect window. [AC5]
     /// </param>
-    public async Task EnsureSubscribedAsync(string? tenantId, Action onProjectConversationChanged, Action onReconnected)
+    public async Task EnsureSubscribedAsync(string? tenantId, Func<Task> onProjectConversationChanged, Func<Task> onReconnected)
+    {
+        await _subscriptionChanges.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await EnsureSubscribedCoreAsync(tenantId, onProjectConversationChanged, onReconnected).ConfigureAwait(false);
+        }
+        finally
+        {
+            _ = _subscriptionChanges.Release();
+        }
+    }
+
+    private async Task EnsureSubscribedCoreAsync(string? tenantId, Func<Task> onProjectConversationChanged, Func<Task> onReconnected)
     {
         ArgumentNullException.ThrowIfNull(onProjectConversationChanged);
         ArgumentNullException.ThrowIfNull(onReconnected);
-        if (string.IsNullOrWhiteSpace(tenantId))
+        if (_disposed || string.IsNullOrWhiteSpace(tenantId))
         {
             return;
         }
@@ -72,6 +86,11 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
         }
 
         await DisposeConnectionAsync().ConfigureAwait(false);
+
+        if (_disposed)
+        {
+            return;
+        }
 
         _onChanged = onProjectConversationChanged;
         _onReconnected = onReconnected;
@@ -92,42 +111,65 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
         _connection = connection;
         _subscribedTenant = tenantId;
 
-        connection.RegisterChanged(ProjectConversationChangedClientMethod, signalTenantId =>
+        if (_disposed)
         {
-            if (string.Equals(signalTenantId, _subscribedTenant, StringComparison.Ordinal))
-            {
-                _onChanged?.Invoke();
-            }
-        });
-
-        // On reconnect, SignalR drops group memberships AND does not replay signals missed during the disconnect
-        // window, so rejoin the tenant group and then re-query authoritative server state via the reconnect callback. [AC5]
-        connection.Reconnected += async () =>
-        {
-            if (await JoinTenantAsync().ConfigureAwait(false))
-            {
-                _onReconnected?.Invoke();
-            }
-            else
-            {
-                await DisposeConnectionAsync(clearSubscription: false).ConfigureAwait(false);
-                ScheduleRecovery();
-            }
-        };
-        connection.Closed += () =>
-        {
-            if (ReferenceEquals(_connection, connection))
-            {
-                ScheduleRecovery();
-            }
-
-            return Task.CompletedTask;
-        };
+            await DisposeConnectionAsync(expectedConnection: connection).ConfigureAwait(false);
+            return;
+        }
 
         try
         {
+            connection.RegisterChanged(ProjectConversationChangedClientMethod, async signalTenantId =>
+            {
+                if (IsCurrentConnection(connection) &&
+                    string.Equals(signalTenantId, _subscribedTenant, StringComparison.Ordinal))
+                {
+                    await NotifyAsync(_onChanged).ConfigureAwait(false);
+                }
+            });
+
+            // On reconnect, SignalR drops group memberships AND does not replay signals missed during the disconnect
+            // window, so rejoin the tenant group and then re-query authoritative server state via the reconnect callback. [AC5]
+            connection.Reconnected += async () =>
+            {
+                if (!IsCurrentConnection(connection))
+                {
+                    return;
+                }
+
+                bool joined = await JoinTenantAsync(connection).ConfigureAwait(false);
+                if (!IsCurrentConnection(connection))
+                {
+                    return;
+                }
+
+                if (joined)
+                {
+                    await NotifyAsync(_onReconnected).ConfigureAwait(false);
+                }
+                else
+                {
+                    await DisposeConnectionAsync(clearSubscription: false, expectedConnection: connection).ConfigureAwait(false);
+                    ScheduleRecovery();
+                }
+            };
+            connection.Closed += () =>
+            {
+                if (ReferenceEquals(_connection, connection))
+                {
+                    ScheduleRecovery();
+                }
+
+                return Task.CompletedTask;
+            };
+
             await connection.StartAsync().ConfigureAwait(false);
-            if (!await JoinTenantAsync().ConfigureAwait(false))
+            if (!IsCurrentConnection(connection))
+            {
+                return;
+            }
+
+            if (!await JoinTenantAsync(connection).ConfigureAwait(false))
             {
                 throw new InvalidOperationException("The project-conversation hub tenant group could not be joined.");
             }
@@ -141,7 +183,7 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
             // failed INITIAL start, so keeping _connection/_subscribedTenant set made every later call short-circuit on
             // the "already subscribed" branch above and streaming stayed off for the rest of the session after a single
             // transient blip at page load.
-            await DisposeConnectionAsync(clearSubscription: false).ConfigureAwait(false);
+            await DisposeConnectionAsync(clearSubscription: false, expectedConnection: connection).ConfigureAwait(false);
             ScheduleRecovery();
         }
     }
@@ -149,6 +191,11 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         _disposed = true;
         await _lifetime.CancelAsync().ConfigureAwait(false);
         await DisposeConnectionAsync().ConfigureAwait(false);
@@ -169,14 +216,14 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
         return new Uri(new Uri(basePath, UriKind.Absolute), RelativeHubPath);
     }
 
-    private async Task<bool> JoinTenantAsync()
+    private async Task<bool> JoinTenantAsync(IProjectConversationHubConnection connection)
     {
-        if (_connection is { } connection && !string.IsNullOrWhiteSpace(_subscribedTenant))
+        if (IsCurrentConnection(connection) && !string.IsNullOrWhiteSpace(_subscribedTenant))
         {
             try
             {
                 await connection.InvokeAsync(JoinTenantHubMethod, _subscribedTenant).ConfigureAwait(false);
-                return true;
+                return IsCurrentConnection(connection);
             }
             catch (Exception)
             {
@@ -185,6 +232,26 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
         }
 
         return false;
+    }
+
+    private bool IsCurrentConnection(IProjectConversationHubConnection connection)
+        => !_disposed && ReferenceEquals(_connection, connection);
+
+    private async Task NotifyAsync(Func<Task>? callback)
+    {
+        if (_disposed || callback is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await callback().ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Advisory notifications must not fault SignalR event delivery or the UI circuit during teardown.
+        }
     }
 
     private void ScheduleRecovery()
@@ -204,17 +271,14 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
         {
             TimeSpan delay = _initialRecoveryDelay;
             while (!_lifetime.IsCancellationRequested &&
-                _subscribedTenant is { } tenant &&
-                _onChanged is { } onChanged &&
-                _onReconnected is { } onReconnected)
+                !string.IsNullOrWhiteSpace(_subscribedTenant))
             {
                 try
                 {
                     await Task.Delay(delay, _lifetime.Token).ConfigureAwait(false);
-                    await EnsureSubscribedAsync(tenant, onChanged, onReconnected).ConfigureAwait(false);
-                    if (_connection?.State is HubConnectionState.Connected)
+                    if (await RecoverCurrentSubscriptionAsync().ConfigureAwait(false))
                     {
-                        onReconnected();
+                        await NotifyAsync(_onReconnected).ConfigureAwait(false);
                         return;
                     }
                 }
@@ -241,17 +305,45 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
         }
     }
 
-    private async Task DisposeConnectionAsync(bool clearSubscription = true)
+    private async Task<bool> RecoverCurrentSubscriptionAsync()
     {
+        await _subscriptionChanges.WaitAsync(_lifetime.Token).ConfigureAwait(false);
+        try
+        {
+            // Read only after admission: a newer render may have changed tenant/project while recovery was queued.
+            if (_disposed || _subscribedTenant is not { } tenant ||
+                _onChanged is not { } onChanged || _onReconnected is not { } onReconnected)
+            {
+                return false;
+            }
+
+            await EnsureSubscribedCoreAsync(tenant, onChanged, onReconnected).ConfigureAwait(false);
+            return _connection?.State is HubConnectionState.Connected;
+        }
+        finally
+        {
+            _ = _subscriptionChanges.Release();
+        }
+    }
+
+    private async Task DisposeConnectionAsync(bool clearSubscription = true, IProjectConversationHubConnection? expectedConnection = null)
+    {
+        IProjectConversationHubConnection? connection = expectedConnection is null
+            ? Interlocked.Exchange(ref _connection, null)
+            : Interlocked.CompareExchange(ref _connection, null, expectedConnection);
+        if (expectedConnection is not null && !ReferenceEquals(connection, expectedConnection))
+        {
+            return;
+        }
+
         if (clearSubscription)
         {
             _onChanged = null;
             _onReconnected = null;
             _subscribedTenant = null;
         }
-        if (_connection is { } connection)
+        if (connection is not null)
         {
-            _connection = null;
             try
             {
                 await connection.DisposeAsync().ConfigureAwait(false);

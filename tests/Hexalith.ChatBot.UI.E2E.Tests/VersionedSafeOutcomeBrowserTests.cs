@@ -34,12 +34,12 @@ public sealed class VersionedSafeOutcomeBrowserTests
         await page.GotoAsync($"{host.BaseUri}/projects/project-alpha/conversation").ConfigureAwait(true);
         ILocator composer = page.Locator(".chatbot-governed-composer");
         await composer.Locator("textarea").FillAsync("Repeated safe submission").ConfigureAwait(true);
-        ILocator banner = composer.Locator("#project-conversation-composer-status");
+        ILocator banner = composer.Locator("[data-chatbot-stable-id$=\"project-conversation-composer-status\"]");
         await page.EvaluateAsync("""
             () => {
                 window.safeOutcomeLiveActivations = [];
                 new MutationObserver(() => {
-                    const banner = document.querySelector('#project-conversation-composer-status');
+                    const banner = document.querySelector('[data-chatbot-stable-id$="project-conversation-composer-status"]');
                     if (!banner || banner.getAttribute('aria-live') !== 'assertive'
                         || banner.getAttribute('role') !== 'alert'
                         || banner.getAttribute('data-chatbot-live-announced') !== 'true') return;
@@ -130,7 +130,7 @@ public sealed class VersionedSafeOutcomeBrowserTests
         await input.FillAsync("Safe failure test submission").ConfigureAwait(true);
         await composer.Locator(".chatbot-governed-composer__actions fluent-button")
             .ClickAsync().ConfigureAwait(true);
-        ILocator banner = composer.Locator("#project-conversation-composer-status");
+        ILocator banner = composer.Locator("[data-chatbot-stable-id$=\"project-conversation-composer-status\"]");
         await Assertions.Expect(banner).ToHaveAttributeAsync("data-chatbot-feedback-state",
             code == "authorization_denied" ? "BlockedAction" : "TerminalPolicyFailure").ConfigureAwait(true);
         // A previously announced persistent state may have aria-live=off after a render; its semantic role stays an alert.
@@ -144,7 +144,7 @@ public sealed class VersionedSafeOutcomeBrowserTests
             : culture == "fr" ? "Fermer ce message" : "Dismiss";
         ILocator actionButton = banner.GetByRole(AriaRole.Button, new() { Name = actionLabel, Exact = false });
         await Assertions.Expect(actionButton).ToBeDisabledAsync().ConfigureAwait(true);
-        ILocator action = banner.Locator("[data-chatbot-stable-id='project-conversation-composer-status-safe-action'] fluent-button");
+        ILocator action = banner.Locator("[data-chatbot-stable-id$='project-conversation-composer-status-safe-action'] fluent-button");
         await Assertions.Expect(action).ToHaveAttributeAsync("aria-disabled", "true").ConfigureAwait(true);
         string? reasonId = await action.GetAttributeAsync("aria-describedby").ConfigureAwait(true);
         reasonId.ShouldNotBeNullOrWhiteSpace();

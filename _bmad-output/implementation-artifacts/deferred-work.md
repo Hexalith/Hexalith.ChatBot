@@ -672,7 +672,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 13-1-establi
 location: ChatBotBlockedState.razor:17
 severity: low
 reason: **[LOW · verify in Story 13.9] Blocked-state reason heading may sit as an `<h2>` peer of the conversation-stream section title.** Commit `e91503b`/`9462de3` moved `ChatBotBlockedState`'s `FluentMessageBar Title` into an in-content `<h2 class="chatbot-section-title">` (`ChatBotBlockedState.razor:17`). In the empty-conversation path the blocked state renders inside `ChatBotConversationStream`'s section, whose own title is already an `<h2>` (`ChatBotConversationStream.razor:8`), producing two peer `<h2>`s where the blocked-reason heading is logically subordinate — a soft document-outline nuance (WCAG 1.3.1 best practice, not a hard failure). The other three usages render directly under the route `<h1>` (valid `h1→h2`), and the host still carries `aria-label`, so the accessible name is preserved. Story 13.9's live cross-surface real-render heading-order sweep should confirm axe/heading-order is clean on the project-conversation empty state; if flagged, make the blocked-state heading level context-aware. Owner: Story 13.9 real-render reverification.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: Blocked reasons accept a contextual Fluent heading tag, default H2; the conversation stream supplies H3 beneath its H2. ConversationAccessibilityRenderingTests verifies actual standalone/repeated-stream headings and stable local references. Current-run scoped verification and exact counters/hashes: validation/five-deferred-ui-presentation-lifecycle.json. This closes the maintenance defect only; product-story/sprint/release qualification is unchanged.
 
 ### DW-75: [RESOLVED in this review — was: MEDIUM pre-existing test flake] Story 13.1's live-render acceptance test is flaky — NOT an app defect.
 
@@ -1016,7 +1017,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of canonical st
 location: GovernedOperations.razor:223
 severity: medium
 reason: **[MEDIUM · localization] Display formatting for audit history is built in the service layer.** `GovernedOperationService.ToAuditHistoryLines` (`:62-69`) composes `"{Phase} · {Decision}/{Outcome} · audit:… · origin:… · correlation:…"`, including the `·` separator and the English sentence `"awaiting post-commit record"`, which `GovernedOperations.razor:223` renders into `<code>`. **Not covered:** the strings cannot be localized, restructured, or tested independently of their punctuation, and they bypass `ChatBotUiTextLocalizer` entirely. **Owner:** ChatBot UI. **Closure evidence:** audit history rendered from structured fields through the localizer.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: GovernedOperationService returns immutable structured audit metadata and the audit read status; ChatBotOperationAuditHistory renders localized labels and status-appropriate empty/reconciling guidance. Actual English/French service-to-page tests cover records, both empty states and omitted-field privacy markers. Current-run scoped verification and exact counters/hashes: validation/five-deferred-ui-presentation-lifecycle.json. This closes the maintenance defect only; product-story/sprint/release qualification is unchanged.
 
 ### DW-114: [LOW · code hygiene] Five private forks of the same key-value row helpers.
 
@@ -1024,7 +1026,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of canonical st
 location: GovernedOperations.razor:314-328
 severity: low
 reason: **[LOW · code hygiene] Five private forks of the same key-value row helpers.** Near-identical `CodeRow`/`TextRow`/`TimeRow`/`CodeRowIf` `RenderFragment` templates are duplicated in `GovernedOperations.razor:314-328`, `ChatBotApprovalConversationItem.razor:323-337`, `ChatBotAiActionPreviewSections.razor:186`, `ChatBotTaskIntentReviewPanel.razor:121` and `ChatBotWhyProjectPanel.razor:153-172`, each with a subtly different signature (`string` vs `string?`, `CodeRowIf` present or absent). **Not covered:** the legacy 13.4 migration's stated goal was a shared data-presentation pattern; what shipped will drift. **Owner:** ChatBot UI. **Closure evidence:** one shared row component consumed by all five surfaces.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: ChatBotMetadataRow and ChatBotMetadataRendering replace the five private Fluent row primitives; association helpers delegate to the same renderer. Real surface tests cover encoded labels/values, opaque code styling, optional rows and English/French caller timestamps with invariant UTC machine values. Current-run scoped verification and exact counters/hashes: validation/five-deferred-ui-presentation-lifecycle.json. This closes the maintenance defect only; product-story/sprint/release qualification is unchanged.
 
 ### DW-115: [MEDIUM · user-safety] Server problem codes reach the user verbatim and mint unbounded announcement keys.
 
@@ -1048,7 +1051,8 @@ decision: 2026-08-26 Adopt FrontComposer layout — Remove or reduce inner chrom
 origin: migrated from legacy ledger ("Deferred from: code review of story-13.2 (2026-08-25)"), 2026-08-26
 location: n/a
 reason: Hard-coded element ids (`project-conversation-composer-input`, `-title`, `-error`, `project-conversation-stream-title`) make the conversation components single-instance-only; a second instance on one page yields duplicate ids and cross-wired focus targets.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: Composer title/input/help/error/status IDs and stream title/empty-state IDs are stable and unique per instance. Workspace stop focus uses the same composer field identity. Actual repeated-instance/rerender and retained-outcome remount tests pass; real browser checks verify route stop focus and visual/accessibility modes. Broader populated-feed item-ID reuse is separately deferred; this closure covers the hard-coded IDs named by DW-117. Current-run scoped verification and exact counters/hashes: validation/five-deferred-ui-presentation-lifecycle.json. This closes the maintenance defect only; product-story/sprint/release qualification is unchanged.
 
 ### DW-118: `ProjectConversationService.SafeLocale` checks `IsNullOrWhiteSpace` before filtering, so an all-punctuation locale returns an empty string instead of the `"und"` fallback. Unreachable from `CultureInfo.CurrentUICulture.Name` today.
 
@@ -1071,7 +1075,8 @@ resolution: Undefined enums fail with the fixed unsupported-wire-value token; bo
 origin: migrated from legacy ledger ("Deferred from: code review of story-13.2 (2026-08-25)"), 2026-08-26
 location: n/a
 reason: The two hub callbacks in `ChatBotProjectConversationWorkspace` use `_ = InvokeAsync(...)` with no disposal guard and no exception observation; a signal arriving during teardown throws an unobserved `ObjectDisposedException`. The subscriber's `Reconnected += async _ =>` is async-void with no try/catch around `_onReconnected`.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: Signal and reconnect callbacks are awaited through the SignalR adapter/subscriber into disposal-guarded workspace dispatch. Startup is serialized; events and atomic cleanup retain connection ownership, and queued recovery reads current callbacks after admission. Fake-hub and actual mounted-workspace regressions cover delayed startup, tenant/project/scope replacement, async failure, queued dispatch and late events after disposal. Current-run scoped verification and exact counters/hashes: validation/five-deferred-ui-presentation-lifecycle.json. This closes the maintenance defect only; product-story/sprint/release qualification is unchanged.
 
 ### DW-121: `ProjectConversationReducers.ReduceFailed` writes `SubmissionErrorCode` from a *load* error (conflating two different failures) and sets `StreamingErrorCode` in the same reducer that nulls `Conversation`, making that value unreachable because the streaming line only renders inside `@if (Conversation is { } ...)`.
 
@@ -2081,3 +2086,8 @@ Final native follow-up qualification (2026-10-26): independent review correction
 - source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-validation-limits.md`
   summary: Reconcile the existing FrontComposer EventStore Admin package overrides with the current shared Builds catalog.
   evidence: The original full Architecture Debug suite reports 156 passed, one failed, zero skipped. RootDeclaredSiblingPackageWrappersShouldDelegateVersionsToSharedBuildsCatalog rejects unchanged FrontComposer Directory.Packages.props selecting Hexalith.EventStore.Admin.Abstractions 3.128.2 against shared catalog 3.128.3. FrontComposer remains 5f665c4d38afb2255a7dde4620330e09824a40a1; Builds remains 81ab049208678bd6616828824729c0ddac02f7d1. Exact command and result are retained in validation/five-deferred-validation-limits.json; no dependency or submodule change is included.
+
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-ui-presentation-lifecycle.md`
+  summary: Repeated populated conversation streams sharing the same ItemId values still duplicate child accessibility IDs.
+  evidence: Blind review confirmed participant/attachment/approval reason IDs and failure announcements derive from ItemId in existing item components. The current product mounts one stream and separately scopes attachment copies; DW-117 fixes hard-coded composer and stream-title IDs only. Propagate stream instance scope through item status/evidence/history/action components and verify two actual populated streams with identical items before claiming repeated-feed isolation.

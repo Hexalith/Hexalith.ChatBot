@@ -100,8 +100,8 @@
                 </ChatBotStatusBanner>
 
                 <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" role="group" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel]">
-                    @CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel], $"family:{OperationalQueueFamilies.ToWireValue(SelectedQueueFamily)}")
-                    @TextRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueResultCountLabel], VisibleQueueRows.Length.ToString(System.Globalization.CultureInfo.CurrentCulture))
+                    @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel], $"family:{OperationalQueueFamilies.ToWireValue(SelectedQueueFamily)}")
+                    @ChatBotMetadataRendering.TextRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueResultCountLabel], VisibleQueueRows.Length.ToString(System.Globalization.CultureInfo.CurrentCulture))
                 </FluentStack>
 
                 <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
@@ -133,13 +133,13 @@
                                  data-chatbot-item-ref="@row.ItemRef"
                                  data-chatbot-source-version="@row.SourceVersion">
                             <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
-                                @CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueFamilyLabel], row.FamilyToken)
-                                @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], row.State)
-                                @CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueRiskLabel], row.Risk)
-                                @TextRow(UiText[ChatBotUiTextKey.ConfidenceLabel], row.Confidence)
-                                @CodeRow(UiText[ChatBotUiTextKey.OperationOwnerRoleLabel], row.OwnerRole)
-                                @TextRow(UiText[ChatBotUiTextKey.RetryCountLabel], row.RetryCount.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                                @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], row.NextAction)
+                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueFamilyLabel], row.FamilyToken)
+                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], row.State)
+                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueRiskLabel], row.Risk)
+                                @ChatBotMetadataRendering.TextRow(UiText[ChatBotUiTextKey.ConfidenceLabel], row.Confidence)
+                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.OperationOwnerRoleLabel], row.OwnerRole)
+                                @ChatBotMetadataRendering.TextRow(UiText[ChatBotUiTextKey.RetryCountLabel], row.RetryCount.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], row.NextAction)
                             </FluentStack>
 
                             <FluentStack Orientation="Orientation.Horizontal" Wrap="true">
@@ -263,26 +263,21 @@
                     </div>
 
                     <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
-                        @CodeRow(UiText[ChatBotUiTextKey.OperationLabel], outcome.OperationId)
-                        @CodeRow(UiText[ChatBotUiTextKey.OperationClassLabel], outcome.OperationClass)
-                        @CodeRow(UiText[ChatBotUiTextKey.CommandLabel], outcome.CommandId)
-                        @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], outcome.LifecycleState)
-                        @CodeRow(UiText[ChatBotUiTextKey.CompletionStatusLabel], outcome.CompletionStatus)
-                        @CodeRow(UiText[ChatBotUiTextKey.AuditStatusLabel], outcome.AuditStatus)
-                        @CodeRowIf(UiText[ChatBotUiTextKey.SafeNextActionsLabel], outcome.SafeNextActions.Count == 0 ? null : string.Join(", ", outcome.SafeNextActions))
-                        @TextRow(UiText[ChatBotUiTextKey.RetryCountLabel], outcome.RetryCount.ToString(System.Globalization.CultureInfo.CurrentCulture))
-                        @CodeRowIf(UiText[ChatBotUiTextKey.OperationOwnerRoleLabel], outcome.OwnerRole)
-                        @TextRowIf(UiText[ChatBotUiTextKey.DuplicateSafetyNoteLabel], outcome.DuplicateSafetyNote)
+                        @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.OperationLabel], outcome.OperationId)
+                        @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.OperationClassLabel], outcome.OperationClass)
+                        @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.CommandLabel], outcome.CommandId)
+                        @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], outcome.LifecycleState)
+                        @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.CompletionStatusLabel], outcome.CompletionStatus)
+                        @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.AuditStatusLabel], outcome.AuditStatus)
+                        @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.SafeNextActionsLabel], outcome.SafeNextActions.Count == 0 ? null : string.Join(", ", outcome.SafeNextActions))
+                        @ChatBotMetadataRendering.TextRow(UiText[ChatBotUiTextKey.RetryCountLabel], outcome.RetryCount.ToString(System.Globalization.CultureInfo.CurrentCulture))
+                        @ChatBotMetadataRendering.CodeRowIf(UiText[ChatBotUiTextKey.OperationOwnerRoleLabel], outcome.OwnerRole)
+                        @ChatBotMetadataRendering.TextRowIf(UiText[ChatBotUiTextKey.DuplicateSafetyNoteLabel], outcome.DuplicateSafetyNote)
                     </FluentStack>
 
                     @* h3, not h2: the enclosing FluentAccordionItem already produced the section's h2. *@
                     <h3 class="chatbot-section-title">@UiText[ChatBotUiTextKey.AuditHistoryTitle]</h3>
-                    <ul class="chatbot-audit-list">
-                        @foreach (string entry in outcome.AuditHistory)
-                        {
-                            <li><code class="chatbot-code">@entry</code></li>
-                        }
-                    </ul>
+                    <ChatBotOperationAuditHistory History="@outcome.AuditHistory" />
                         </section>
                     </FluentAccordionItem>
                 }
@@ -396,21 +391,6 @@
     // lifecycle/completion/audit/risk/owner-role/next-action tokens keep <code class="chatbot-code">; numeric
     // metrics (result count, confidence, retry count) and the duplicate-safety note render as plain
     // FluentText (AC3). Blank-guarded rows render nothing.
-    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
-        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <code class="chatbot-code">@value</code>
-    </FluentStack>;
-
-    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
-        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
-        <FluentText>@value</FluentText>
-    </FluentStack>;
-
-    private static RenderFragment? CodeRowIf(string label, string? value)
-        => string.IsNullOrWhiteSpace(value) ? null : CodeRow(label, value);
-
-    private static RenderFragment? TextRowIf(string label, string? value)
-        => string.IsNullOrWhiteSpace(value) ? null : TextRow(label, value);
 
     private sealed record OperationalQueueFixtureRow(
         OperationalQueueFamily Family,
