@@ -1,0 +1,187 @@
+{
+  "schema_version": "1.0",
+  "kind": "deferred-work-debug-verification",
+  "spec": "_bmad-output/implementation-artifacts/spec-five-deferred-recovery-followups.md",
+  "base_commit": "07b8ecebe3484031a66d9aea8519bd00e7de9d29",
+  "spec_status": "in-review",
+  "implemented_items": [
+    "caller cancellation and synchronous cleanup invocation deadline",
+    "latest scheduler terminal-pass outcome independent of clocks",
+    "NUL and platform-invalid path character rejection in dormant overlays",
+    "witnessed breach and locator retention after later seed/read failures",
+    "recovery-attempt summary CLI grammar"
+  ],
+  "configuration": "Debug; original checked-in projects; pinned source mapping for module dependencies",
+  "dependency_or_submodule_changes": false,
+  "source_preparation_advisories": [
+    "HXW009",
+    "HXW011"
+  ],
+  "aspire_baseline": {
+    "command": "python3 .github/scripts/with-source-mapping.py aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --format Json",
+    "exit_code": 0,
+    "running_resources": 44,
+    "task_apphost_stopped": true,
+    "no_running_apphost_after_live_attempt": true
+  },
+  "builds": [
+    {
+      "lane": "server",
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --configuration Debug -m:1 --nologo",
+      "exit_code": 0,
+      "warnings": 0,
+      "errors": 0,
+      "log": "TestResults/five-recovery-followups/server-build-reviewed.log"
+    },
+    {
+      "lane": "gate",
+      "command": "dotnet build tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj --configuration Debug -m:1 --nologo",
+      "exit_code": 0,
+      "warnings": 0,
+      "errors": 0,
+      "log": "TestResults/five-recovery-followups/gate-build-reviewed.log"
+    },
+    {
+      "lane": "integration",
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug -m:1 --nologo",
+      "exit_code": 0,
+      "warnings": 0,
+      "errors": 0,
+      "log": "TestResults/five-recovery-followups/integration-build-reviewed.log"
+    }
+  ],
+  "test_lanes": [
+    {
+      "lane": "server",
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests TestResults/five-recovery-followups/server-reviewed.ctrf.json -parallel none -result-trx TestResults/five-recovery-followups/server-reviewed.trx",
+      "exit_code": 0,
+      "summary": {
+        "tests": 3534,
+        "passed": 3534,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793182048557,
+        "stop": 1793182195783,
+        "duration": 147226
+      },
+      "ctrf": "TestResults/five-recovery-followups/server-reviewed.ctrf.json",
+      "ctrf_sha256": "ce969574f70d3331d3dcf0f33f9d782002de175c86c7e4391a700c37a2e14846",
+      "trx": "TestResults/five-recovery-followups/server-reviewed.trx",
+      "trx_sha256": "d76b6424b03264122b2df8d8ba0df4e1ab60d8750b899fdcb88fe01762363c29",
+      "skipped_cases": []
+    },
+    {
+      "lane": "gate",
+      "command": "XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Debug/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests TestResults/five-recovery-followups/gate-reviewed.ctrf.json -parallel none -result-trx TestResults/five-recovery-followups/gate-reviewed.trx",
+      "exit_code": 0,
+      "summary": {
+        "tests": 313,
+        "passed": 313,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793182019612,
+        "stop": 1793182064249,
+        "duration": 44637
+      },
+      "ctrf": "TestResults/five-recovery-followups/gate-reviewed.ctrf.json",
+      "ctrf_sha256": "0e6da5d31f3c0f167646984eb51f1560f5c522005373f4007039fa5f2471b7e5",
+      "trx": "TestResults/five-recovery-followups/gate-reviewed.trx",
+      "trx_sha256": "f545d94a5435969481d02cabb77b9370bae55d9bfb10751ed9f879e84be3181a",
+      "skipped_cases": []
+    },
+    {
+      "lane": "integration",
+      "command": "python3 .github/scripts/with-source-mapping.py bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests TestResults/five-recovery-followups/integration.ctrf.json -parallel none -result-trx TestResults/five-recovery-followups/integration.trx",
+      "exit_code": 0,
+      "summary": {
+        "tests": 460,
+        "passed": 453,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 7,
+        "other": 0,
+        "suites": 1,
+        "start": 1793182216394,
+        "stop": 1793182230559,
+        "duration": 14165
+      },
+      "ctrf": "TestResults/five-recovery-followups/integration.ctrf.json",
+      "ctrf_sha256": "337c3ad19eec7060e6826f90a31d73d4796fc875bb1895524f84854845809017",
+      "trx": "TestResults/five-recovery-followups/integration.trx",
+      "trx_sha256": "d0da50b9620cd937511d600cbad4c92ec636357645442d3918b8020b239afc45",
+      "skipped_cases": [
+        "Hexalith.ChatBot.IntegrationTests.Recovery.LiveRecoveryEvidenceGateReplayTests.RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.CorrectionPropagationWorkflowRuntimeShouldBeHealthyInRealDaprTopology",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.CommittedGovernedStateShouldPassM2StopShipSweepsInRealDaprTopology",
+        "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.GovernedNoteShouldProjectIdenticalDurableEndStateRegardlessOfDeclaredOrigin",
+        "Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests.AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology"
+      ]
+    }
+  ],
+  "recovery_primary_attempt": {
+    "command": "HEXALITH_CHATBOT_TIER3=1 HEXALITH_CHATBOT_TIER3_REQUIRED=1 HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT=completion-recovery-evidence HEXALITH_CHATBOT_RECOVERY_RETENTION_FAILURE_DIR=/home/administrator/projects/hexalith/chatbot/TestResults/five-recovery-followups/retention-failures HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES=250 ChatBotServiceGrants__LifetimeDays=90 XUNIT_REQUIRE_ZERO_SKIPS=1 python3 .github/scripts/with-source-mapping.py timeout --signal=INT --kill-after=15m 265m bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests TestResults/five-recovery-followups/raw-recovery-results/live-recovery-validation.ctrf.json -method Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate -result-trx TestResults/five-recovery-followups/raw-recovery-results/live-recovery-validation.trx",
+    "exit_code": 1,
+    "summary": {
+      "tests": 1,
+      "passed": 0,
+      "failed": 1,
+      "pending": 0,
+      "skipped": 0,
+      "other": 0,
+      "suites": 1,
+      "start": 1793182216567,
+      "stop": 1793182292731,
+      "duration": 76164
+    },
+    "trx": "TestResults/five-recovery-followups/raw-recovery-results/live-recovery-validation.trx",
+    "trx_sha256": "350f037048e3add6927641174e6620213ce3cbfba5410f349a4de8df1b7c9e6f",
+    "ctrf": "TestResults/five-recovery-followups/raw-recovery-results/live-recovery-validation.ctrf.json",
+    "ctrf_sha256": "163e0fbc366ed55a8c2cb37054098b7ad6336e30a3bbabb4c54ea2e038030702",
+    "blocker": "Mailbox admission HTTP 403 authorization_denied before any recovery drill; same boundary as the prior dependency-unblock attempt.",
+    "canonical_completion_trx_or_provenance_created": false
+  },
+  "summary_cli": {
+    "command": "dotnet tools/Hexalith.ChatBot.StoryEvidenceGate/bin/Debug/net10.0/Hexalith.ChatBot.StoryEvidenceGate.dll summarize-recovery-attempt --input TestResults/five-recovery-followups/raw-recovery-results/live-recovery-validation.trx --outcome failure --output TestResults/five-recovery-followups/recovery-attempt-summary.json",
+    "exit_code": 0,
+    "summary": "TestResults/five-recovery-followups/recovery-attempt-summary.json",
+    "sha256": "28942796e7b3b5b8104030aee1a0dddbbf70a8307e9f0e5f08224221e337359b"
+  },
+  "independent_review": {
+    "findings": 6,
+    "patched": 4,
+    "preexisting_followups": 2,
+    "scoped_recheck": "No remaining findings in the four corrections."
+  },
+  "preexisting_followups": [
+    "Windows component legality beyond platform invalid path characters (Windows runtime unverified)",
+    "singleton failed-episode alert resuppression after intervening success"
+  ],
+  "source_sha256": {
+    "src/Hexalith.ChatBot.Server/Audit/DerivedStoreIsolationProbeCoordinator.cs": "616088b3db77f2ea25bdf0b187fd67b1f6bf7712a07ddf60c30e9f86d47f585f",
+    "src/Hexalith.ChatBot.Server/Audit/LiveRecoveryValidationOptions.cs": "fccb676ea4ccf79873fed8ffe8c111dc538ac23ab575a5a201db7e75bc42ed53",
+    "src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/InMemoryPeriodicEnforcementStatusStore.cs": "ad60b45b93cf3b1f8fa560a166ba4bbb709a8caab019cfdca82b812df6cecaef",
+    "src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/PeriodicEnforcementCoordinator.cs": "8de8caf5fe5f7a5843002328eb81e4a8b72b4cf76dd29b96dd391c4fdc314a2e",
+    "src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/PeriodicEnforcementRunStatus.cs": "f5b40a793bb67fc171fda09b2dc7ffb0c9037f59f63ce28cf1e319571d0b1d63",
+    "tests/Hexalith.ChatBot.Server.Tests/Audit/CleanupControlledDerivedStore.cs": "09a5733951fc56c97c3d0d28ff9718a1be3470754c9094c9e8362091b2e91be2",
+    "tests/Hexalith.ChatBot.Server.Tests/Audit/DerivedStoreIsolationCleanupTests.cs": "c56b4cd6b920a9aa7785f4b5727020f31e30c25926383818b4f9e5d5edd16e3f",
+    "tests/Hexalith.ChatBot.Server.Tests/Audit/LiveRecoveryValidationOptionsTests.cs": "4ac7a9e820ad3c16327196f8cf2cd4ca0245960d8cca172da6fabd0b593d1a22",
+    "tests/Hexalith.ChatBot.Server.Tests/Operations/PeriodicEnforcement/InMemoryPeriodicEnforcementStatusStoreTests.cs": "0a1ba2cca2af8ed087bc6f3084eaf5e8e3f8cd01cbca6aec58e19b81a6ec5e48",
+    "tests/Hexalith.ChatBot.Server.Tests/Operations/PeriodicEnforcement/PeriodicEnforcementCoordinatorTests.cs": "142ba580deb12af8bd69774f58c19e97d9ee16d2f6a673453262fc9648f32797",
+    "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/StoryEvidenceGateTests.cs": "0ab22ff44bae689f0444fb9542068cee7fc612ec931689c2cb21c978dc22ad48",
+    "tools/Hexalith.ChatBot.StoryEvidenceGate/CommandArguments.cs": "6a6bc940eee6d32dcdce4536b0e9467e19969b70785fb5ff89bb212d3e32b574"
+  },
+  "matching_server_assembly_sha256": {
+    "src/Hexalith.ChatBot.Server/bin/Debug/net10.0/Hexalith.ChatBot.Server.dll": "565cae535255fe8b40932d090c4cff26ec282d97e22256ea2255a652c6d5a1d9",
+    "tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.dll": "565cae535255fe8b40932d090c4cff26ec282d97e22256ea2255a652c6d5a1d9",
+    "tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.Server.dll": "565cae535255fe8b40932d090c4cff26ec282d97e22256ea2255a652c6d5a1d9"
+  },
+  "completion_authority": "Local Debug verification only. Spec remains in-review because the required live recovery attempt failed. No A10 or package-mode Release qualification is claimed."
+}

@@ -3124,6 +3124,71 @@ public static class StoryEvidenceGateTests
         }
     }
 
+    /// <summary>Proves CI's restored summary command reaches the real writer and defaults its optional outcome.</summary>
+    [Theory]
+    [InlineData(false, "parsed")]
+    [InlineData(true, "parsed")]
+    [InlineData(true, "absent")]
+    [InlineData(true, "malformed")]
+    public static void RecoveryAttemptSummaryCliShouldWriteTheExistingMetadataContract(bool includeOutcome, string trxState)
+    {
+        using GateFixture fixture = new();
+        string output = Path.Combine(fixture.ResultsRoot, "attempt-summary.json");
+        string input = fixture.TrxPath;
+        if (trxState == "absent")
+        {
+            input = Path.Combine(fixture.ResultsRoot, "missing.trx");
+        }
+        else if (trxState == "malformed")
+        {
+            File.WriteAllText(input, "<broken>private-payload");
+        }
+        List<string> arguments =
+        [
+            "summarize-recovery-attempt", "--repository-root", fixture.RepositoryRoot,
+            "--input", input, "--output", output,
+        ];
+        if (includeOutcome)
+        {
+            arguments.AddRange(["--outcome", "failure"]);
+        }
+
+        InvokeMain(fixture, out string stdout, arguments.ToArray()).ShouldBe(0);
+
+        JsonNode.Parse(stdout)!["operation"]!.GetValue<string>().ShouldBe("summarize-recovery-attempt");
+        JsonObject summary = JsonNode.Parse(File.ReadAllText(output))!.AsObject();
+        summary["kind"]!.GetValue<string>().ShouldBe("live-recovery-attempt-summary");
+        summary["trxState"]!.GetValue<string>().ShouldBe(trxState);
+        summary["producerOutcome"]!.GetValue<string>().ShouldBe(includeOutcome ? "failure" : "unknown");
+        File.ReadAllText(output).ShouldNotContain("private-payload");
+    }
+
+    /// <summary>Proves the restored summary grammar still refuses malformed arguments with metadata-only errors.</summary>
+    [Theory]
+    [InlineData("missing", "cli-required-option")]
+    [InlineData("unknown", "cli-option")]
+    [InlineData("duplicate", "cli-duplicate-option")]
+    [InlineData("odd", "cli-arguments")]
+    public static void RecoveryAttemptSummaryCliShouldRejectMalformedOptions(string category, string subject)
+    {
+        using GateFixture fixture = new();
+        string[] arguments = category switch
+        {
+            "unknown" => ["--private-unknown", "private-value"],
+            "duplicate" => ["--input", "first", "--input", "private-value"],
+            "odd" => ["--input"],
+            _ => [],
+        };
+
+        InvokeMain(fixture, out string stdout,
+            ["summarize-recovery-attempt", "--repository-root", fixture.RepositoryRoot, .. arguments]).ShouldBe(2);
+
+        JsonObject issue = JsonNode.Parse(stdout)!["issues"]![0]!.AsObject();
+        issue["reasonCode"]!.GetValue<string>().ShouldBe(GateReason.StatusMismatch);
+        issue["subject"]!.GetValue<string>().ShouldBe(subject);
+        stdout.ShouldNotContain("private-");
+    }
+
     /// <summary>Proves an unparseable outcome token cannot reach the retained record verbatim.</summary>
     [Fact]
     public static void RecoveryAttemptSummarizerShouldNormalizeAnUnknownOutcome()

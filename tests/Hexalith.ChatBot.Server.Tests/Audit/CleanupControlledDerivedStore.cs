@@ -12,6 +12,9 @@ internal sealed class CleanupControlledDerivedStore : IDerivedStore
     /// <summary>Gets or initializes the asynchronous work performed before an actual invalidation.</summary>
     public Func<CancellationToken, Task>? BeforeCleanup { get; set; }
 
+    /// <summary>Gets or initializes work performed before seeding a class.</summary>
+    public Action<DerivedStoreClass>? BeforeSeed { get; init; }
+
     /// <summary>Gets or initializes the callback performed before the probe read.</summary>
     public Action? BeforeRead { get; init; }
 
@@ -33,6 +36,7 @@ internal sealed class CleanupControlledDerivedStore : IDerivedStore
     /// <inheritdoc />
     public ValueTask PutAsync(DerivedStoreClass cls, string tenantId, string resourceId, DerivedStoreEntry entry, CancellationToken cancellationToken)
     {
+        BeforeSeed?.Invoke(cls);
         _ownerTenant ??= tenantId;
         return _inner.PutAsync(cls, tenantId, resourceId, entry, cancellationToken);
     }

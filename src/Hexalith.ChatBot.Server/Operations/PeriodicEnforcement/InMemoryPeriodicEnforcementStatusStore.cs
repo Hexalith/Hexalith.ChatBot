@@ -20,6 +20,7 @@ internal sealed class InMemoryPeriodicEnforcementStatusStore : IPeriodicEnforcem
     private readonly Dictionary<string, int> _failures = new(StringComparer.Ordinal);
     private readonly Dictionary<string, PeriodicEnforcementM2SweepStatus> _m2SweepStatuses = new(StringComparer.Ordinal);
     private bool _isRunning;
+    private bool? _lastPassSucceeded;
     private DateTimeOffset? _lastStartedAtUtc;
     private DateTimeOffset? _lastSucceededAtUtc;
     private DateTimeOffset? _lastFailedAtUtc;
@@ -42,7 +43,10 @@ internal sealed class InMemoryPeriodicEnforcementStatusStore : IPeriodicEnforcem
                 new Dictionary<string, int>(_failures, StringComparer.Ordinal),
                 _lastCorrelationId,
                 _lastRunbookSweep,
-                new Dictionary<string, PeriodicEnforcementM2SweepStatus>(_m2SweepStatuses, StringComparer.Ordinal));
+                new Dictionary<string, PeriodicEnforcementM2SweepStatus>(_m2SweepStatuses, StringComparer.Ordinal))
+            {
+                LastPassSucceeded = _lastPassSucceeded,
+            };
         }
     }
 
@@ -61,6 +65,7 @@ internal sealed class InMemoryPeriodicEnforcementStatusStore : IPeriodicEnforcem
         lock (_gate)
         {
             _isRunning = false;
+            _lastPassSucceeded = true;
             if (_lastSucceededAtUtc is null || completedAtUtc >= _lastSucceededAtUtc)
             {
                 _lastSucceededAtUtc = completedAtUtc;
@@ -74,6 +79,7 @@ internal sealed class InMemoryPeriodicEnforcementStatusStore : IPeriodicEnforcem
         lock (_gate)
         {
             _isRunning = false;
+            _lastPassSucceeded = false;
             _lastFailedAtUtc = failedAtUtc;
             _lastDuration = duration;
         }

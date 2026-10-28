@@ -141,9 +141,10 @@ internal sealed class LiveRecoveryValidationOptions
         }
 
         if ((Enabled || !string.IsNullOrEmpty(EvidenceDirectory)) &&
-            (string.IsNullOrWhiteSpace(EvidenceDirectory) || !Path.IsPathFullyQualified(EvidenceDirectory)))
+            (string.IsNullOrWhiteSpace(EvidenceDirectory) || !Path.IsPathFullyQualified(EvidenceDirectory) ||
+             EvidenceDirectory.IndexOfAny(Path.GetInvalidPathChars()) >= 0))
         {
-            return $"{nameof(EvidenceDirectory)} must be an absolute path.";
+            return $"{nameof(EvidenceDirectory)} must be a valid absolute path.";
         }
 
         if ((Enabled || !string.IsNullOrEmpty(EvidenceLocator)) &&

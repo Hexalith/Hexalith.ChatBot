@@ -2005,19 +2005,35 @@ Final native follow-up qualification (2026-10-26): independent review correction
 - source_spec: `spec-five-deferred-recovery-boundaries.md`
   summary: Reconcile caller cancellation and synchronous blocking with isolation-probe cleanup deadlines.
   evidence: The cumulative follow-up review found no post-cleanup caller check and an InvalidateAsync call that can block before returning its ValueTask; both predate the dependency-only follow-up.
+  resolution: Implemented 2026-10-28: invalidation invocation runs independently inside the shared cleanup budget; caller cancellation is checked in cleanup finally, including pending seed/read failures, and before verdict/audit. Original Server suite: 3534 passed, zero failed/skipped. See spec-five-deferred-recovery-followups.md and evidence/five-deferred-recovery-followups.json; required live completion remains separately gated.
 - source_spec: `spec-five-deferred-recovery-boundaries.md`
   summary: Track latest scheduler pass outcome independently of monotonic wall-clock success timestamps.
   evidence: CheckHealthAsync compares LastFailedAtUtc to the preserved success maximum, which can mask a failed pass during clock catch-up.
+  resolution: Implemented 2026-10-28: a lock-protected nullable latest terminal-pass outcome drives health independently of monotonic success timestamps; starts and overlaps preserve it. Regressions cover equal/rollback timestamps, failed completion and recovery. Original Server suite: 3534 passed, zero failed/skipped. See spec-five-deferred-recovery-followups.md and its evidence summary.
 - source_spec: `spec-five-deferred-recovery-boundaries.md`
   summary: Preserve retry eligibility when an M2 completion is rejected as regressed.
   evidence: RunM2SweepAsync commits the completion cadence partition before the status store rejects the regressed snapshot.
 - source_spec: `spec-five-deferred-recovery-boundaries.md`
   summary: Reject invalid filesystem path syntax in dormant recovery evidence directories.
   evidence: Path.IsPathFullyQualified accepts absolute strings containing NUL; the existing dormant-shape check does not validate invalid path characters.
+  resolution: Implemented 2026-10-28 for the reported NUL/platform-invalid-character hole: enabled and dormant absolute paths reject Path.GetInvalidPathChars while empty disabled defaults remain valid. Original Server suite: 3534 passed, zero failed/skipped. Full Windows component legality remains a separately recorded unverified follow-up; see spec-five-deferred-recovery-followups.md and its evidence summary.
 - source_spec: `spec-five-deferred-recovery-boundaries.md`
   summary: Preserve a witnessed isolation breach and locator when a later seed or read fails.
   evidence: ProbePairInternalAsync's outer exception fallback discards earlier cross-tenant observations and reports generic Unknown; strict fail-closed status already remains intact.
+  resolution: Implemented 2026-10-28: earlier observations survive subsequent seed/read failure and cleanup failure, retaining Breach/reason/first locator in result, audit and alert. Successful cleanup asserts empty owner partitions. Original Server suite: 3534 passed, zero failed/skipped. See spec-five-deferred-recovery-followups.md and its evidence summary.
 
 - source_spec: `spec-five-deferred-recovery-boundaries.md`
   summary: Restore the recovery-attempt summary CLI grammar entry.
   evidence: Program.Main implements summarize-recovery-attempt and CI invokes it, but CommandArguments.AllowedOptions omits it; the exact supported invocation exits 2 with status_mismatch/cli-command.
+  resolution: Implemented 2026-10-28: the existing command now admits only its handler options; real Program.Main tests cover default policy, parsed/absent/malformed TRX, optional outcome and malformed/duplicate/missing/unknown options. Full gate suite: 313 passed, zero failed/skipped. See spec-five-deferred-recovery-followups.md and evidence/five-deferred-recovery-followups.json.
+
+
+## Deferred from: review of spec-five-deferred-recovery-followups (2026-10-28)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-recovery-followups.md`
+  summary: Qualify broader Windows directory-component syntax in recovery evidence configuration beyond platform invalid path characters.
+  evidence: The existing absolute-path check now rejects Path.GetInvalidPathChars, including the confirmed NUL defect. Windows wildcard/other component-invalid names need platform-native tests and root/extended-path compatibility before claiming exhaustive filesystem syntax validation; Windows runtime behavior was not executed in this Linux run. This pre-existing wider limitation does not justify rejecting legal Linux names.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-recovery-followups.md`
+  summary: Re-arm the singleton scheduler pass-failure alert after a successful intervening pass.
+  evidence: CheckHealthAsync now observes the latest terminal pass independently of clocks. The pre-existing reason-keyed _lastSchedulerAlertByReason stamp still suppresses fail-success-fail episodes within M2MissedCadenceAlertResuppressAfter. Qualify that sequence on one coordinator and decide when success should reset the failure-episode throttle; ordinary repeated-failure suppression must remain.

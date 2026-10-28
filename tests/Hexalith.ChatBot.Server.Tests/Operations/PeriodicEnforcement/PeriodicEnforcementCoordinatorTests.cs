@@ -809,6 +809,41 @@ public sealed class PeriodicEnforcementCoordinatorTests
         validationError.ShouldContain(nameof(PeriodicEnforcementOptions.Cadence));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-60)]
+    public async Task LatestFailedPassIsReportedUntilSuccessfulCompletionRegardlessOfClockOrder(int clockShiftMinutes)
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        MutableClock clock = new(Now);
+        InMemoryPeriodicEnforcementStatusStore status = new();
+        PeriodicEnforcementCoordinator successful = BuildCoordinator(
+            clock, new InMemoryGovernedControlStateProjectionStore(), new StaticInputSource([], EmptyInputs()), statusStore: status);
+        await successful.RunOnceAsync("initial-success", cancellationToken);
+        status.Read().LastPassSucceeded.ShouldBe(true);
+
+        clock.UtcNow = Now.AddMinutes(clockShiftMinutes);
+        InMemoryOperatorAlertSink failedAlerts = new();
+        PeriodicEnforcementCoordinator failing = BuildCoordinator(
+            clock, new InMemoryGovernedControlStateProjectionStore(), new ThrowingInputSource(), failedAlerts, statusStore: status);
+        await failing.RunOnceAsync("failed-after-success", cancellationToken);
+        await failing.CheckHealthAsync("failed-pass-health", cancellationToken);
+
+        status.Read().LastSucceededAtUtc.ShouldBe(Now);
+        status.Read().LastPassSucceeded.ShouldBe(false);
+        failedAlerts.Alerts.ShouldContain(alert => alert.ReasonCode == "periodic_enforcement_pass_failed");
+
+        InMemoryOperatorAlertSink recoveredAlerts = new();
+        PeriodicEnforcementCoordinator recovered = BuildCoordinator(
+            clock, new InMemoryGovernedControlStateProjectionStore(), new StaticInputSource([], EmptyInputs()), recoveredAlerts, statusStore: status);
+        await recovered.RunOnceAsync("recovered-at-regressed-time", cancellationToken);
+        await recovered.CheckHealthAsync("recovered-health", cancellationToken);
+
+        status.Read().LastSucceededAtUtc.ShouldBe(Now);
+        status.Read().LastPassSucceeded.ShouldBe(true);
+        recoveredAlerts.Alerts.ShouldNotContain(alert => alert.ReasonCode == "periodic_enforcement_pass_failed");
+    }
+
     [Fact]
     public async Task CheckHealthAsyncShouldReportASweepThatHasNeverSucceededOnceItsBudgetLapses()
     {
@@ -981,7 +1016,8 @@ public sealed class PeriodicEnforcementCoordinatorTests
         AuditChainVerificationCoordinator? auditChainVerificationCoordinator = null,
         ReplayIsolationProbeCoordinator? replayIsolationProbeCoordinator = null,
         DerivedStoreIsolationProbeCoordinator? derivedStoreIsolationProbeCoordinator = null,
-        PeriodicEnforcementOptions? runtimeOptions = null)
+        PeriodicEnforcementOptions? runtimeOptions = null,
+        IPeriodicEnforcementStatusStore? statusStore = null)
     {
         InMemoryNotificationSink notificationSink = new();
         InMemoryNotificationDeliveryHistoryStore history = new();
@@ -1036,7 +1072,7 @@ public sealed class PeriodicEnforcementCoordinatorTests
             new UnavailableAuditProjectionCheckpointSource(),
             lagSource,
             alerts,
-            new InMemoryPeriodicEnforcementStatusStore(),
+            statusStore ?? new InMemoryPeriodicEnforcementStatusStore(),
             clock,
             Options.Create(runtimeOptions));
     }

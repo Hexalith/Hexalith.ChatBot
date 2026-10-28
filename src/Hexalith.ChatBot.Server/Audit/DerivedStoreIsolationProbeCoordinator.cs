@@ -19,8 +19,8 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// <see cref="AuditEnvelopeFactory.DerivedStoreIsolationBreach"/> pre-commit envelope <b>before</b> emitting exactly one
 /// <see cref="OperatorAlertKind.DerivedStoreIsolationBreach"/> alert through the existing <see cref="IOperatorAlertSink"/>
 /// (if audit is unavailable, no alert fires — no observable side effect — but the breach still surfaces to the caller).
-/// A seed or read-back that throws maps to <see cref="DerivedStoreIsolationStatus.Unknown"/> — a breach signal — never a
-/// silent pass.
+/// A seed or read-back that throws retains any witnessed breach; otherwise it maps to
+/// <see cref="DerivedStoreIsolationStatus.Unknown"/> — a breach signal — never a silent pass.
 /// </para>
 /// <para>
 /// <b>M2 release gate.</b> <see cref="SweepAllTenantPairsAsync"/> returns a structured
@@ -85,10 +85,10 @@ internal sealed class DerivedStoreIsolationProbeCoordinator(
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
 
         DerivedStoreIsolationVerificationResult result;
+        List<string> sentinelIds = [];
+        List<string> observableThroughIntruder = [];
         try
         {
-            List<string> sentinelIds = [];
-            List<string> observableThroughIntruder = [];
             List<(DerivedStoreClass Class, string ResourceId)> seeded = [];
             bool cleanupIncomplete = false;
             string probeNonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
@@ -124,14 +124,17 @@ internal sealed class DerivedStoreIsolationProbeCoordinator(
                 // Cleanup survives caller cancellation, but must fit inside one independent budget so a hanging
                 // store cannot block host shutdown. Bound the wait as well as passing the token: stores may ignore it.
                 using CancellationTokenSource cleanupDeadline = new(_cleanupTimeout);
+                CancellationToken cleanupToken = cleanupDeadline.Token;
                 foreach ((DerivedStoreClass cls, string resourceId) in seeded)
                 {
                     try
                     {
-                        cleanupDeadline.Token.ThrowIfCancellationRequested();
-                        _ = await derivedStore
-                            .InvalidateAsync(cls, ownerTenant, resourceId, cleanupDeadline.Token)
-                            .AsTask().WaitAsync(cleanupDeadline.Token)
+                        cleanupToken.ThrowIfCancellationRequested();
+                        // Schedule the invocation too: an implementation may block before returning its ValueTask.
+                        _ = await Task.Run(
+                            () => derivedStore.InvalidateAsync(cls, ownerTenant, resourceId, cleanupToken).AsTask(),
+                            cleanupToken)
+                            .WaitAsync(cleanupToken)
                             .ConfigureAwait(false);
                     }
                     catch (OperationCanceledException) when (cleanupDeadline.IsCancellationRequested)
@@ -145,6 +148,10 @@ internal sealed class DerivedStoreIsolationProbeCoordinator(
                         cleanupIncomplete = true;
                     }
                 }
+
+                // This also covers a pending seed/read exception: cancellation during its awaited finally must
+                // retain the caller token rather than letting the earlier store error escape the outer filter.
+                cancellationToken.ThrowIfCancellationRequested();
             }
 
             if (cleanupIncomplete && !result.IsBreach)
@@ -159,14 +166,19 @@ internal sealed class DerivedStoreIsolationProbeCoordinator(
         }
         catch (Exception) when (cancellationToken is { IsCancellationRequested: false })
         {
-            // Fail-closed: a probe that cannot complete is itself a breach signal, never silent success.
-            result = new DerivedStoreIsolationVerificationResult(
-                ownerTenant,
-                intruderTenant,
-                DerivedStoreIsolationStatus.Unknown,
-                DerivedStoreIsolationVerificationResult.ProbeIncompleteReasonCode,
-                FirstOffenderLocator: null);
+            // A later store failure cannot erase an already witnessed leak or its metadata-only locator.
+            result = observableThroughIntruder.Count > 0
+                ? DerivedStoreIsolationVerifier.Verify(ownerTenant, intruderTenant, sentinelIds, observableThroughIntruder)
+                : new DerivedStoreIsolationVerificationResult(
+                    ownerTenant,
+                    intruderTenant,
+                    DerivedStoreIsolationStatus.Unknown,
+                    DerivedStoreIsolationVerificationResult.ProbeIncompleteReasonCode,
+                    FirstOffenderLocator: null);
         }
+
+        // Independent cleanup may finish successfully after the caller cancels.
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (!result.IsBreach)
         {

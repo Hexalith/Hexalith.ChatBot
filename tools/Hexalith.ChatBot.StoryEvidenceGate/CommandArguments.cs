@@ -14,6 +14,7 @@ public sealed class CommandArguments
             ["detect"] = Set("repository-root", "base", "head", "output"),
             ["plan"] = Set("repository-root", "policy", "base", "head", "results", "output"),
             ["sanitize-recovery-trx"] = Set("repository-root", "input", "output"),
+            ["summarize-recovery-attempt"] = Set("repository-root", "policy", "input", "output", "outcome"),
             ["ci"] = Set("repository-root", "policy", "base", "head", "results", "report-directory"),
         };
 

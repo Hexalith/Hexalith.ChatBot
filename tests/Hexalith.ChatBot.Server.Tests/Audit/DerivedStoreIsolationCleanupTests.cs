@@ -203,4 +203,174 @@ public sealed class DerivedStoreIsolationCleanupTests
         store.CleanupTokens.Count.ShouldBe(DerivedStorePartition.AllClasses.Count);
         alerts.Alerts.ShouldHaveSingleItem();
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CancellationDuringSuccessfulCleanupPreventsVerdictAndSideEffects(bool leakReads)
+    {
+        using CancellationTokenSource caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        CleanupControlledDerivedStore store = new()
+        {
+            LeakReads = leakReads,
+            BeforeCleanup = _ =>
+            {
+                caller.Cancel();
+                return Task.CompletedTask;
+            },
+        };
+        InMemoryAuditWriter audit = new();
+        InMemoryOperatorAlertSink alerts = new();
+        DerivedStoreIsolationProbeCoordinator coordinator = new(store, audit, alerts, new WormAuditTestData.FixedClock(Now));
+
+        OperationCanceledException exception = await Should.ThrowAsync<OperationCanceledException>(
+            () => coordinator.ProbePairAndAlertAsync("tenant-alpha", "tenant-beta", "cancel-during-cleanup", caller.Token).AsTask());
+
+        exception.CancellationToken.ShouldBe(caller.Token);
+        store.CleanupTokens.Count.ShouldBe(DerivedStorePartition.AllClasses.Count);
+        foreach (DerivedStoreClass cls in DerivedStorePartition.AllClasses)
+        {
+            store.EnumerateResourceIds(cls, "tenant-alpha").ShouldBeEmpty();
+        }
+        audit.Envelopes.ShouldBeEmpty();
+        alerts.Alerts.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task SynchronouslyBlockingInvalidationCannotBlockTheCleanupDeadline()
+    {
+        TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        CleanupControlledDerivedStore store = new()
+        {
+            IgnoreCleanupCancellation = true,
+            BeforeCleanup = _ =>
+            {
+                entered.TrySetResult();
+                release.Task.GetAwaiter().GetResult();
+                return Task.CompletedTask;
+            },
+        };
+        DerivedStoreIsolationProbeCoordinator coordinator = new(
+            store, new InMemoryAuditWriter(), new InMemoryOperatorAlertSink(), new WormAuditTestData.FixedClock(Now),
+            cleanupTimeout: TimeSpan.FromSeconds(1));
+        Task<DerivedStoreIsolationVerificationResult> probe = Task.Run(
+            () => coordinator.ProbePairAndAlertAsync("tenant-alpha", "tenant-beta", "blocking-invalidation", TestContext.Current.CancellationToken).AsTask(),
+            TestContext.Current.CancellationToken);
+
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            DerivedStoreIsolationVerificationResult result = await probe.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            result.Status.ShouldBe(DerivedStoreIsolationStatus.Unknown);
+            result.ReasonCode.ShouldBe(DerivedStoreIsolationVerificationResult.ProbeIncompleteReasonCode);
+            store.CleanupTokens.ShouldHaveSingleItem().IsCancellationRequested.ShouldBeTrue();
+            release.Task.IsCompleted.ShouldBeFalse();
+        }
+        finally
+        {
+            release.TrySetResult();
+            if (entered.Task.IsCompleted)
+            {
+                await store.FirstCleanupCompleted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            }
+            await probe.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CancellationDuringCleanupOverridesAPendingStoreFailure(bool failSeed)
+    {
+        using CancellationTokenSource caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        CleanupControlledDerivedStore store = new()
+        {
+            BeforeSeed = cls =>
+            {
+                if (failSeed && cls == DerivedStorePartition.AllClasses[1])
+                {
+                    throw new InvalidOperationException("later seed failed");
+                }
+            },
+            BeforeRead = () =>
+            {
+                if (!failSeed)
+                {
+                    throw new InvalidOperationException("read failed");
+                }
+            },
+            BeforeCleanup = _ =>
+            {
+                caller.Cancel();
+                return Task.CompletedTask;
+            },
+        };
+        InMemoryAuditWriter audit = new();
+        InMemoryOperatorAlertSink alerts = new();
+        DerivedStoreIsolationProbeCoordinator coordinator = new(store, audit, alerts, new WormAuditTestData.FixedClock(Now));
+
+        OperationCanceledException exception = await Should.ThrowAsync<OperationCanceledException>(
+            () => coordinator.ProbePairAndAlertAsync("tenant-alpha", "tenant-beta", "cancel-pending-failure", caller.Token).AsTask());
+
+        exception.CancellationToken.ShouldBe(caller.Token);
+        store.CleanupTokens.ShouldHaveSingleItem().IsCancellationRequested.ShouldBeFalse();
+        audit.Envelopes.ShouldBeEmpty();
+        alerts.Alerts.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task LaterStoreFailurePreservesAnEarlierBreachInResultAuditAndAlert(bool failSeed, bool cleanupFails)
+    {
+        int reads = 0;
+        CleanupControlledDerivedStore store = new()
+        {
+            LeakReads = true,
+            BeforeSeed = cls =>
+            {
+                if (failSeed && cls == DerivedStorePartition.AllClasses[1])
+                {
+                    throw new InvalidOperationException("later seed failed");
+                }
+            },
+            BeforeRead = () =>
+            {
+                if (++reads == 2 && !failSeed)
+                {
+                    throw new InvalidOperationException("later read failed");
+                }
+            },
+            BeforeCleanup = _ => cleanupFails
+                ? Task.FromException(new InvalidOperationException("cleanup unavailable"))
+                : Task.CompletedTask,
+        };
+        InMemoryAuditWriter audit = new();
+        InMemoryOperatorAlertSink alerts = new();
+        DerivedStoreIsolationProbeCoordinator coordinator = new(store, audit, alerts, new WormAuditTestData.FixedClock(Now));
+
+        DerivedStoreIsolationVerificationResult result = await coordinator.ProbePairAndAlertAsync(
+            "tenant-alpha", "tenant-beta", "later-store-failure", TestContext.Current.CancellationToken);
+
+        result.Status.ShouldBe(DerivedStoreIsolationStatus.Breach);
+        result.ReasonCode.ShouldBe(DerivedStoreIsolationVerificationResult.BreachReasonCode);
+        result.FirstOffenderLocator.ShouldNotBeNull().ShouldStartWith(
+            $"derived-store-sentinel:iso-probe:{DerivedStorePartition.Segment(DerivedStorePartition.AllClasses[0])}:");
+        AuditEnvelope envelope = audit.Envelopes.ShouldHaveSingleItem();
+        envelope.ReasonCode.ShouldBe(result.ReasonCode);
+        envelope.SourceEvidenceRefs.ShouldContain($"derived-store-isolation-first-offender:{result.FirstOffenderLocator}");
+        OperatorAlert alert = alerts.Alerts.ShouldHaveSingleItem();
+        alert.ReasonCode.ShouldBe(result.ReasonCode);
+        alert.FirstBreakLocator.ShouldBe(result.FirstOffenderLocator);
+        if (!cleanupFails)
+        {
+            foreach (DerivedStoreClass cls in DerivedStorePartition.AllClasses)
+            {
+                store.EnumerateResourceIds(cls, "tenant-alpha").ShouldBeEmpty();
+            }
+        }
+    }
 }

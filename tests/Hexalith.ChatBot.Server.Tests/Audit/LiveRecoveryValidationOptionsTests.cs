@@ -85,6 +85,20 @@ public sealed class LiveRecoveryValidationOptionsTests
         options.Validate().ShouldBeNull();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InvalidAbsoluteEvidenceDirectoryIsRejectedBeforeActivation(bool enabled)
+    {
+        LiveRecoveryValidationOptions options = ValidOptions();
+        options.Enabled = enabled;
+        foreach (char invalid in Path.GetInvalidPathChars())
+        {
+            options.EvidenceDirectory = Path.GetFullPath("TestResults") + Path.DirectorySeparatorChar + "evidence" + invalid;
+            options.Validate().ShouldNotBeNull().ShouldContain(nameof(LiveRecoveryValidationOptions.EvidenceDirectory));
+        }
+    }
+
     [Fact]
     public void EnabledConfigurationCrossValidatesRecoveryScheduleAndWorkflowTimeouts()
     {

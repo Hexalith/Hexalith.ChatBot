@@ -24,4 +24,8 @@ internal sealed record PeriodicEnforcementRunStatus(
     IReadOnlyDictionary<string, int> EvaluatorFailureCounts,
     string? LastCorrelationId,
     PeriodicEnforcementRunbookEvidence? LastRunbookSweep,
-    IReadOnlyDictionary<string, PeriodicEnforcementM2SweepStatus> M2SweepStatuses);
+    IReadOnlyDictionary<string, PeriodicEnforcementM2SweepStatus> M2SweepStatuses)
+{
+    /// <summary>Gets the latest completed pass outcome, independently of wall-clock ordering; null before any completion.</summary>
+    public bool? LastPassSucceeded { get; init; }
+}

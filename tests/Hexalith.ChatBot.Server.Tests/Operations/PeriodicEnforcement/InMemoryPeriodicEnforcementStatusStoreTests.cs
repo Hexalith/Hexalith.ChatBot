@@ -10,6 +10,28 @@ public sealed class InMemoryPeriodicEnforcementStatusStoreTests
     private static readonly DateTimeOffset Now = new(2026, 10, 28, 0, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void LatestPassOutcomeFollowsCompletionOrderAcrossClockRollbackAndOverlap()
+    {
+        InMemoryPeriodicEnforcementStatusStore store = new();
+        store.Read().LastPassSucceeded.ShouldBeNull();
+        store.RecordSucceeded(Now, TimeSpan.FromSeconds(1));
+        store.Read().LastPassSucceeded.ShouldBe(true);
+        store.RecordStarted(Now.AddHours(-1), "failed-pass");
+        store.RecordFailed(Now.AddHours(-1), TimeSpan.FromSeconds(1));
+        store.Read().LastPassSucceeded.ShouldBe(false);
+        store.Read().LastSucceededAtUtc.ShouldBe(Now);
+
+        store.RecordStarted(Now.AddMinutes(-30), "recovery-pass");
+        store.RecordOverlap(Now.AddMinutes(-30), "overlap");
+        store.Read().LastPassSucceeded.ShouldBe(false);
+        store.RecordSucceeded(Now.AddMinutes(-30), TimeSpan.FromSeconds(1));
+        store.Read().LastPassSucceeded.ShouldBe(true);
+        store.Read().LastSucceededAtUtc.ShouldBe(Now);
+        store.RecordOverlap(Now.AddHours(1), "later-overlap");
+        store.Read().LastPassSucceeded.ShouldBe(true);
+    }
+
+    [Fact]
     public void OverallSuccessDoesNotMoveBackwardsAndStillCompletesTheCurrentAttempt()
     {
         InMemoryPeriodicEnforcementStatusStore store = new();

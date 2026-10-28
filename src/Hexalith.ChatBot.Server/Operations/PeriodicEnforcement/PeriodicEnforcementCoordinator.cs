@@ -291,8 +291,8 @@ internal sealed class PeriodicEnforcementCoordinator(
         // false so the stall check cannot fire either; and LastFailedAtUtc was written but read nowhere. A runtime
         // whose every pass threw — an unavailable projection store at boot, say — therefore reported healthy forever,
         // where before the exception escaped and StopHost made it loud. This is what makes the failure observable.
-        if (status.LastFailedAtUtc is { } failedAt &&
-            (status.LastSucceededAtUtc is not { } succeededAt || failedAt > succeededAt))
+        // Completion order is authoritative even during clock rollback or equal timestamp resolution.
+        if (status.LastPassSucceeded is false)
         {
             await EmitSchedulerAlertThrottledAsync("periodic_enforcement_pass_failed", now, correlationId, cancellationToken)
                 .ConfigureAwait(false);
