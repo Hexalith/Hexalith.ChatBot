@@ -45,8 +45,9 @@
        Conditioned on a NON-EMPTY value: AdditionalProperties pins the property globally for the referenced build,
        and a referenced project's own Condition="'$(HexalithCommonsRoot)' == ''" fallback cannot override a global
        property. Forwarding an empty value therefore turns an undetected Commons root into a hard break instead of
-       letting each sibling fall back. When the value is empty, forward nothing and let those fallbacks run. -->
-  <ItemGroup Condition="'$(HexalithCommonsRoot)' != ''">
+       letting each sibling fall back. When the value is empty, forward nothing and let those fallbacks run.
+       A verified mapping supplies every child root directly and rejects per-edge reserved property overrides. -->
+  <ItemGroup Condition="'$(HexalithCommonsRoot)' != '' and '$(HexalithSourceMappingHash)' == ''">
     <ProjectReference Update="@(ProjectReference)"
                       AdditionalProperties="%(ProjectReference.AdditionalProperties);HexalithCommonsRoot=$(HexalithCommonsRoot)" />
   </ItemGroup>

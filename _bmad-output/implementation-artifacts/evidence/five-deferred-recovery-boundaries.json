@@ -1,5 +1,5 @@
 {
-  "purpose": "Focused diagnostic source verification; not original module-graph, live-topology or release qualification",
+  "purpose": "Historical diagnostic source verification plus supported original-project Debug validation; live recovery remains unqualified",
   "baseline_commit": "b4046c8041aad87505fbc4c0ebfc20c5cf0b9f33",
   "deferred_items": [
     "DW-22",
@@ -101,5 +101,181 @@
     "Original source graph blocked by Conversations mapping and duplicate dependency references; actual source-mapping diagnostic also refuses package/source overlap.",
     "Live E2E wiring was inspected but the Aspire recovery-primary lane could not execute.",
     "Nonce-scoped synthetic orphan retention after cleanup failure remains a separate deferred lifecycle item."
-  ]
+  ],
+  "dependency_followup": {
+    "baseline_commit": "a402e00d3b35dc8772d7dbea0a46d53fadee2ad1",
+    "module_tool_version": "4.38.1",
+    "configuration": "Debug",
+    "library_package_pins_changed": false,
+    "build_guards_preserved": true,
+    "initialized_nested_submodules": [],
+    "pushed_owner_heads": {
+      "Hexalith.Folders": "56550414c58db9b2d46a1a8b45fc77a3156cbee0",
+      "Hexalith.Projects": "dd2b871bac16fbba62703a14ab32d9ba9b579c8f",
+      "Hexalith.EventStore": "50221cf7dbe425becc333f6757ba37b93a22ab4e"
+    },
+    "builds": [
+      {
+        "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --configuration Debug -m:1 --nologo",
+        "exit_code": 0,
+        "warnings": 0,
+        "errors": 0,
+        "duration_seconds": 42.06,
+        "log": "/tmp/chatbot-recovery-unblock-server-build-final-head.log"
+      },
+      {
+        "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug -m:1 --nologo",
+        "exit_code": 0,
+        "warnings": 0,
+        "errors": 0,
+        "duration_seconds": 94.53,
+        "log": "/tmp/chatbot-recovery-unblock-integration-build-final.log"
+      }
+    ],
+    "test_lanes": [
+      {
+        "lane": "server",
+        "exit_code": 0,
+        "result_path": "TestResults/recovery-unblock/server-final.ctrf.json",
+        "summary": {
+          "tests": 3520,
+          "passed": 3520,
+          "failed": 0,
+          "pending": 0,
+          "skipped": 0,
+          "other": 0,
+          "suites": 1,
+          "start": 1793180306729,
+          "stop": 1793180420568,
+          "duration": 113839
+        },
+        "skipped_cases": [],
+        "trx_path": "TestResults/recovery-unblock/server-final.trx",
+        "trx_sha256": "de1e9d928fe872aafdd656d3efc454862fe3824fdeaa23ecb1936efa7489cc9c"
+      },
+      {
+        "lane": "integration",
+        "exit_code": 0,
+        "result_path": "TestResults/recovery-unblock/integration-final.ctrf.json",
+        "summary": {
+          "tests": 460,
+          "passed": 453,
+          "failed": 0,
+          "pending": 0,
+          "skipped": 7,
+          "other": 0,
+          "suites": 1,
+          "start": 1793180309873,
+          "stop": 1793180323510,
+          "duration": 13637
+        },
+        "skipped_cases": [
+          "Hexalith.ChatBot.IntegrationTests.Recovery.LiveRecoveryEvidenceGateReplayTests.RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess",
+          "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.CorrectionPropagationWorkflowRuntimeShouldBeHealthyInRealDaprTopology",
+          "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.CommittedGovernedStateShouldPassM2StopShipSweepsInRealDaprTopology",
+          "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate",
+          "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.GovernedNoteShouldProjectIdenticalDurableEndStateRegardlessOfDeclaredOrigin",
+          "Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests.AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix",
+          "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology"
+        ],
+        "trx_path": "TestResults/recovery-unblock/integration-final.trx",
+        "trx_sha256": "b472814fcfba460829fd945f3897190f6c0c54eaceef52c8db2edf3392dbc18b"
+      }
+    ],
+    "wrapper_regressions": {
+      "command": "python3 .github/scripts/tests/test_story_evidence_guards.py SourceMappingWrapperTests -v",
+      "exit_code": 0,
+      "tests_passed": 2,
+      "refusal_subcases": 8,
+      "independently_repeated": true
+    },
+    "dependency_checks": [
+      {
+        "repository": "Hexalith.Folders",
+        "property": "AdditionalProperties",
+        "value": "UseHexalithProjectReferences=false;UseNuGetDeps=true",
+        "standaloneFallbackPreserved": true
+      },
+      {
+        "repository": "Hexalith.Projects",
+        "property": "GlobalPropertiesToRemove",
+        "value": "Version;PackageVersion",
+        "standaloneFallbackPreserved": true
+      },
+      {
+        "repository": "Hexalith.EventStore",
+        "property": "AdditionalProperties",
+        "value": ";HexalithEventStoreVersion=3.128.3",
+        "standaloneFallbackPreserved": true
+      },
+      {
+        "guard": "source mapping refuses Release",
+        "exitCode": 1,
+        "ruleId": "HXW006"
+      }
+    ],
+    "source_preparation_advisories": [
+      "HXW011",
+      "HXW009"
+    ],
+    "terminal_spec_status": "in-review",
+    "recovery_primary": {
+      "command": "HEXALITH_CHATBOT_TIER3=1 HEXALITH_CHATBOT_TIER3_REQUIRED=1 HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT=completion-recovery-evidence HEXALITH_CHATBOT_RECOVERY_RETENTION_FAILURE_DIR=/home/administrator/projects/hexalith/chatbot/TestResults/recovery-unblock/retention-failures-final HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES=250 ChatBotServiceGrants__LifetimeDays=90 XUNIT_REQUIRE_ZERO_SKIPS=1 python3 .github/scripts/with-source-mapping.py timeout --signal=INT --kill-after=15m 265m bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests TestResults/recovery-unblock/raw-recovery-results-final/live-recovery-validation.ctrf.json -method Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate -result-trx TestResults/recovery-unblock/raw-recovery-results-final/live-recovery-validation.trx",
+      "exit_code": 1,
+      "attempts": [
+        {
+          "result_path": "TestResults/recovery-unblock/raw-recovery-results/live-recovery-validation.ctrf.json",
+          "trx_path": "TestResults/recovery-unblock/raw-recovery-results/live-recovery-validation.trx",
+          "summary": {
+            "tests": 1,
+            "passed": 0,
+            "failed": 1,
+            "pending": 0,
+            "skipped": 0,
+            "other": 0,
+            "suites": 1,
+            "start": 1793179872248,
+            "stop": 1793179945163,
+            "duration": 72915
+          },
+          "trx_sha256": "5e1327a18622331409def7ab890021f875a9e96f4244333d954a5ce68e170238"
+        },
+        {
+          "result_path": "TestResults/recovery-unblock/raw-recovery-results-final/live-recovery-validation.ctrf.json",
+          "trx_path": "TestResults/recovery-unblock/raw-recovery-results-final/live-recovery-validation.trx",
+          "summary": {
+            "tests": 1,
+            "passed": 0,
+            "failed": 1,
+            "pending": 0,
+            "skipped": 0,
+            "other": 0,
+            "suites": 1,
+            "start": 1793180431052,
+            "stop": 1793180502722,
+            "duration": 71670
+          },
+          "trx_sha256": "3ff092b5c647d84cee69a184ba51c679812f35c0369c1cf2c54b866d992c5781"
+        }
+      ],
+      "blocker": {
+        "http_status": 403,
+        "code": "authorization_denied",
+        "boundary": "mailbox-admission-before-drills"
+      },
+      "apphost_stopped_after_attempt": true,
+      "completion_evidence_minted": false,
+      "sanitizer_exit_code": 2,
+      "sanitizer_issue": {
+        "reasonCode": "machine_results_invalid",
+        "subject": "recovery-sanitize"
+      },
+      "attempt_summary_exit_code": 2,
+      "attempt_summary_issue": {
+        "reasonCode": "status_mismatch",
+        "subject": "cli-command"
+      },
+      "attempt_summary_blocker": "CommandArguments.AllowedOptions omits summarize-recovery-attempt"
+    }
+  }
 }

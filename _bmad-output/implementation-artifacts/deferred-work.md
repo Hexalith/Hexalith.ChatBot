@@ -2000,3 +2000,24 @@ Final native follow-up qualification (2026-10-26): independent review correction
 - source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-recovery-boundaries.md`
   summary: Bound retention or quarantine of invocation-scoped isolation-probe sentinels when cleanup cannot complete.
   evidence: Independent review verified that a timed-out or failed deletion can leave up to four synthetic entries for a pair invocation, and later runs do not revisit those nonce-scoped identities; MemoriesDerivedStore also retains its known-ID entries. Nonce fencing is required to prevent late noncooperative deletion from masking a later probe's breach. Fast cleanup failures and timeouts now fail closed, and cleanup waiting is bounded; accumulated synthetic storage is not claimed bounded. A separate lifecycle policy must provide safe bounded reaping, retention or quarantine without deleting an active probe's evidence.
+
+
+- source_spec: `spec-five-deferred-recovery-boundaries.md`
+  summary: Reconcile caller cancellation and synchronous blocking with isolation-probe cleanup deadlines.
+  evidence: The cumulative follow-up review found no post-cleanup caller check and an InvalidateAsync call that can block before returning its ValueTask; both predate the dependency-only follow-up.
+- source_spec: `spec-five-deferred-recovery-boundaries.md`
+  summary: Track latest scheduler pass outcome independently of monotonic wall-clock success timestamps.
+  evidence: CheckHealthAsync compares LastFailedAtUtc to the preserved success maximum, which can mask a failed pass during clock catch-up.
+- source_spec: `spec-five-deferred-recovery-boundaries.md`
+  summary: Preserve retry eligibility when an M2 completion is rejected as regressed.
+  evidence: RunM2SweepAsync commits the completion cadence partition before the status store rejects the regressed snapshot.
+- source_spec: `spec-five-deferred-recovery-boundaries.md`
+  summary: Reject invalid filesystem path syntax in dormant recovery evidence directories.
+  evidence: Path.IsPathFullyQualified accepts absolute strings containing NUL; the existing dormant-shape check does not validate invalid path characters.
+- source_spec: `spec-five-deferred-recovery-boundaries.md`
+  summary: Preserve a witnessed isolation breach and locator when a later seed or read fails.
+  evidence: ProbePairInternalAsync's outer exception fallback discards earlier cross-tenant observations and reports generic Unknown; strict fail-closed status already remains intact.
+
+- source_spec: `spec-five-deferred-recovery-boundaries.md`
+  summary: Restore the recovery-attempt summary CLI grammar entry.
+  evidence: Program.Main implements summarize-recovery-attempt and CI invokes it, but CommandArguments.AllowedOptions omits it; the exact supported invocation exits 2 with status_mismatch/cli-command.

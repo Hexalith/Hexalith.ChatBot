@@ -17,14 +17,23 @@ dotnet restore Hexalith.ChatBot.slnx -p:Configuration=Release -p:UseHexalithProj
 dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -p:UseHexalithProjectReferences=false -m:1 /nr:false
 ```
 
-Package versions come exclusively from `references/Hexalith.Builds/Props/Directory.Packages.props`; the repository
-wrapper adds no local versions. For a local Debug build against the checked-out sibling sources, pass the source mode
-to the entire solution so projects with package-mode defaults do not mix package and source assemblies:
+Package versions come exclusively from `references/Hexalith.Builds/Props/Directory.Packages.props`.
+Local Debug builds use the pinned `hexalith-module prepare-build` workflow to select one source graph,
+including Conversations. Run ordinary commands through the mapping wrapper from the repository root:
 
 ```bash
-dotnet restore Hexalith.ChatBot.slnx -p:Configuration=Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false
-dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false
+python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --configuration Debug -m:1
+python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug -m:1
+python3 .github/scripts/with-source-mapping.py dotnet build Hexalith.ChatBot.slnx --configuration Debug -m:1
 ```
+
+The wrapper restores the exact local tool pin, prepares the build-only declaration in
+`module/build.module-manifest.v2.json`, and passes the producer's imports to the command and its children.
+Machine-specific imports remain under ignored `.artifacts/source-mapping/` so detached Aspire resources
+can still use them. This declaration selects build dependencies only; it does not enroll ChatBot's runtime
+in Platform. The mapping keeps Conversations validation and package/source duplicate guards active.
+Bare source-mode flags do not prepare a mapping. Use the same wrapper when starting the local AppHost or
+running live recovery tests that may rebuild projects.
 
 Release restore/build and release automation use published package dependencies.
 

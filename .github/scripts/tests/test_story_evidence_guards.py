@@ -9,6 +9,8 @@ import json
 import os
 from pathlib import Path
 import shlex
+import shutil
+import sys
 import subprocess
 import tempfile
 import unittest
@@ -303,6 +305,91 @@ class StoryEvidenceGuardsTests(unittest.TestCase):
         self.assertIn("xUnit lane executed zero tests", result.stderr)
         self.assertEqual(json.loads((results / "Zero.Tests.ctrf.json").read_text())["results"]["summary"]["tests"], 0)
         self.assertFalse(list(results.glob("*.sha256")))
+
+
+
+class SourceMappingWrapperTests(unittest.TestCase):
+    """Exercise the producer-to-child boundary without packages or infrastructure."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="source-mapping-wrapper-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        scripts = self.root / ".github/scripts"
+        scripts.mkdir(parents=True)
+        self.wrapper = scripts / "with-source-mapping.py"
+        shutil.copyfile(SCRIPTS / "with-source-mapping.py", self.wrapper)
+        config = self.root / ".config"
+        config.mkdir()
+        shutil.copyfile(ROOT / ".config/dotnet-tools.json", config / "dotnet-tools.json")
+        self.bin = self.root / "bin"
+        self.bin.mkdir()
+        producer = self.bin / "dotnet"
+        producer.write_text("""#!/usr/bin/env python3
+import json, os, pathlib, sys
+case = os.environ.get("MAPPING_FIXTURE", "valid")
+if sys.argv[1:3] == ["tool", "restore"]:
+    sys.exit(23 if case == "restore-failure" else 0)
+if "--version" in sys.argv:
+    print("0.0.0" if case == "wrong-version" else
+          json.loads(pathlib.Path(".config/dotnet-tools.json").read_text())["tools"]["hexalith.builds.module.cli"]["version"])
+    sys.exit(0)
+if case == "prepare-failure":
+    sys.exit(24)
+workspace = pathlib.Path(sys.argv[sys.argv.index("--workspace") + 1])
+workspace.mkdir(parents=True)
+imports = {
+    "CustomBeforeDirectoryBuildProps": "SourceMapping.targets",
+    "CustomAfterMicrosoftCommonProps": "SourceMapping.props",
+    "CustomBeforeDirectoryBuildTargets": "SourceMapping.before-targets.props",
+    "CustomAfterDirectoryBuildTargets": "SourceMapping.late.props",
+    "AfterMicrosoftNETSdkTargets": "SourceMapping.final.targets",
+}
+environment = {"Configuration": "Debug", "HEXALITH_SOURCE_MAPPING_HASH": "a" * 64}
+for key, filename in imports.items():
+    path = workspace / "source-mapping" / filename
+    path.parent.mkdir(exist_ok=True)
+    path.touch()
+    environment[key] = str(path)
+if case == "missing-import":
+    pathlib.Path(environment["AfterMicrosoftNETSdkTargets"]).unlink()
+if case == "unexpected-import":
+    environment["AfterMicrosoftNETSdkTargets"] = str(workspace / "other.targets")
+if case == "wrong-hash":
+    environment["HEXALITH_SOURCE_MAPPING_HASH"] = "b" * 64
+if case == "extra-environment":
+    environment["UNEXPECTED_PROPERTY"] = "value"
+print(json.dumps({"status": "failed" if case == "failed-status" else "prepared",
+    "outcome": {"exitCode": "Success"}, "diagnostics": [],
+    "buildPreparation": {"mode": "source", "workspace": str(workspace),
+        "mappingHash": "a" * 64, "environment": environment}}))
+""", encoding="utf-8")
+        producer.chmod(0o755)
+        self.marker = self.root / "executed.json"
+
+    def execute(self, case):
+        environment = os.environ | {"PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}",
+                                   "MAPPING_FIXTURE": case}
+        return subprocess.run(
+            [sys.executable, str(self.wrapper), sys.executable, "-c",
+             "import json,os,pathlib,sys; pathlib.Path(sys.argv[1]).write_text(json.dumps({"
+             "'configuration':os.environ['Configuration'],'hash':os.environ['HEXALITH_SOURCE_MAPPING_HASH'],"
+             "'cwd':os.getcwd()})); sys.exit(7)", str(self.marker)],
+            cwd=self.root, env=environment, text=True, capture_output=True, timeout=30)
+
+    def test_refusals_never_launch_the_child(self):
+        for case in ("restore-failure", "wrong-version", "prepare-failure", "failed-status",
+                     "wrong-hash", "unexpected-import", "missing-import", "extra-environment"):
+            with self.subTest(case=case):
+                result = self.execute(case)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertFalse(self.marker.exists(), result.stdout + result.stderr)
+
+    def test_verified_mapping_reaches_child_and_preserves_its_exit_code(self):
+        result = self.execute("valid")
+        self.assertEqual(result.returncode, 7, result.stdout + result.stderr)
+        self.assertEqual(json.loads(self.marker.read_text()),
+                         {"configuration": "Debug", "hash": "a" * 64, "cwd": str(self.root)})
 
 
 if __name__ == "__main__":

@@ -253,6 +253,8 @@ public sealed class LiveContinuityAspireE2eTests
             options.Validate().ShouldBeNull();
             using EventStoreDurableStateProbe durableState = new(
                 application.GetEndpoint("eventstore-dapr-cli", "http"), options);
+            durableState.PresenceWindow.ShouldBe(options.RestorationTimeout);
+            durableState.RequestTimeout.ShouldBe(options.RestorationTimeout);
             rebuildEraseTimeout = options.RestorationTimeout;
 
             // Enforce the configured WorkflowTimeout in-process. Without it the only real bound was the GitHub

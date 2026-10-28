@@ -13,7 +13,6 @@
   <ItemGroup Condition="'$(UseHexalithProjectReferences)' == 'true'">
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Contracts\Hexalith.EventStore.Contracts.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.DomainService\Hexalith.EventStore.DomainService.csproj" />
-    <PackageReference Include="Hexalith.Commons.UniqueIds" ExcludeAssets="all" />
     <ProjectReference Include="$(HexalithCommonsRoot)\src\libraries\Hexalith.Commons.UniqueIds\Hexalith.Commons.UniqueIds.csproj" />
     <ProjectReference Include="$(HexalithFoldersRoot)\src\Hexalith.Folders.Server\Hexalith.Folders.Server.csproj" Aliases="FoldersOwner" />
     <Compile Include="$(HexalithFoldersRoot)/tests/shared/NativeContent/*.cs" Link="NativeContent/%(Filename)%(Extension)" />
