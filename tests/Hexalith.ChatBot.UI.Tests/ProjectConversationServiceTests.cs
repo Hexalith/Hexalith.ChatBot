@@ -15,6 +15,56 @@ namespace Hexalith.ChatBot.UI.Tests;
 
 public sealed class ProjectConversationServiceTests
 {
+    [Theory]
+    [InlineData("!!!", "und")]
+    [InlineData(" é!? ", "und")]
+    [InlineData(" fr-FR ", "fr-FR")]
+    [InlineData("en_US", "en_US")]
+    [InlineData("fr@FR", "frFR")]
+    public async Task BothComposerPathsShouldUseSanitizedNonemptyLocale(string locale, string expected)
+    {
+        FakeChatBotClient client = new();
+        ProjectConversationService service = new(client);
+        await service.SubmitUserMessageAsync("project-001", "Message", locale, 0, "correlation-001", TestContext.Current.CancellationToken);
+        client.LastSubmittedCommand.ShouldBeOfType<Hexalith.ChatBot.Contracts.Commands.RecordProjectConversationMessage>()
+            .Locale.ShouldBe(expected);
+
+        await service.SubmitAskAiAsync("project-001", "Message", locale, 0, "correlation-002", TestContext.Current.CancellationToken);
+        client.LastSubmittedCommand.ShouldBeOfType<Hexalith.ChatBot.Contracts.Commands.ProposeAIAction>()
+            .ProposalInputMetadata.ShouldNotBeNull()["locale"].ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("decision")]
+    [InlineData("health")]
+    [InlineData("redaction")]
+    [InlineData("lifecycle")]
+    [InlineData("provenance")]
+    [InlineData("participant")]
+    [InlineData("attachment")]
+    public async Task UndefinedWireEnumsShouldFailSafelyWithoutNumericTokens(string field)
+    {
+        FakeChatBotClient client = new()
+        {
+            ConfigureItem = item =>
+            {
+                switch (field)
+                {
+                    case "decision": item.DecisionKind = (AssociationDecisionKind)999; break;
+                    case "health": item.StatusSummary!.Facets.First().Health = (ChatBotHealthStatus)999; break;
+                    case "redaction": item.DecisionNoteRedactionState = (ProjectConversationItemDecisionNoteRedactionState)999; break;
+                    case "lifecycle": item.LifecycleState = (LifecycleState)999; break;
+                    case "provenance": item.SourceProvenance = (ProjectConversationItemSourceProvenance)999; break;
+                    case "participant": item.ParticipantStatus = (ParticipantResolutionStatus)999; break;
+                    case "attachment": item.AttachmentCaptureStatus = (ProjectConversationAttachmentStatus)999; break;
+                }
+            },
+        };
+        InvalidOperationException failure = await Should.ThrowAsync<InvalidOperationException>(() =>
+            new ProjectConversationService(client).GetProjectConversationAsync("project-001", cancellationToken: TestContext.Current.CancellationToken));
+        failure.Message.ShouldBe("unsupported-wire-value");
+    }
+
     [Fact]
     public async Task ServiceShouldReadProjectConversationThroughClientAndMapMetadataOnlyItems()
     {
@@ -460,6 +510,8 @@ public sealed class ProjectConversationServiceTests
 
         public bool ReturnParticipant { get; set; }
 
+        public Action<ProjectConversationItem>? ConfigureItem { get; init; }
+
         public bool ReturnAttachment { get; set; }
 
         public bool ReturnStoredAttachment { get; set; }
@@ -851,6 +903,11 @@ public sealed class ProjectConversationServiceTests
                             RedactionState = ProjectConversationAiSummaryProvenanceRedactionState.Metadata_only,
                         },
                     });
+            }
+
+            foreach (ProjectConversationItem item in items)
+            {
+                ConfigureItem?.Invoke(item);
             }
 
             return items;

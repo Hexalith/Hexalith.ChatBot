@@ -17,11 +17,20 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
     private readonly AssociationReviewService _service = service ?? throw new ArgumentNullException(nameof(service));
     private readonly IState<AssociationReviewState> _state = state ?? throw new ArgumentNullException(nameof(state));
 
+    private long _loadGeneration;
+
     [EffectMethod]
     public async Task HandleLoadAsync(LoadAssociationReviewAction action, IDispatcher dispatcher)
     {
         ArgumentNullException.ThrowIfNull(action);
         ArgumentNullException.ThrowIfNull(dispatcher);
+
+        long generation = Interlocked.Increment(ref _loadGeneration);
+        if (string.IsNullOrWhiteSpace(action.AssociationId))
+        {
+            dispatcher.Dispatch(new AssociationReviewFailedAction("association-id-required"));
+            return;
+        }
 
         try
         {
@@ -30,7 +39,8 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
                 .ConfigureAwait(false);
 
             // A slower earlier load must not overwrite the association the reviewer is now looking at.
-            if (!string.Equals(review.AssociationId, action.AssociationId, StringComparison.Ordinal))
+            if (generation != Volatile.Read(ref _loadGeneration)
+                || !string.Equals(review.AssociationId, action.AssociationId, StringComparison.Ordinal))
             {
                 return;
             }
@@ -43,11 +53,19 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
         }
         catch (HexalithChatBotApiException<ProblemDetails> problem)
         {
-            dispatcher.Dispatch(new AssociationReviewFailedAction(SafeFailureCode(ChatBotUiFailureCatalog.Resolve(problem))));
+            DispatchLoadFailure(generation, SafeFailureCode(ChatBotUiFailureCatalog.Resolve(problem)), dispatcher);
         }
         catch (Exception exception)
         {
-            dispatcher.Dispatch(new AssociationReviewFailedAction(ChatBotUiFailureCatalog.Resolve(exception)));
+            DispatchLoadFailure(generation, ChatBotUiFailureCatalog.Resolve(exception), dispatcher);
+        }
+    }
+
+    private void DispatchLoadFailure(long generation, string code, IDispatcher dispatcher)
+    {
+        if (generation == Volatile.Read(ref _loadGeneration))
+        {
+            dispatcher.Dispatch(new AssociationReviewFailedAction(code));
         }
     }
 

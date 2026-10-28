@@ -16,6 +16,68 @@ namespace Hexalith.ChatBot.UI.Tests;
 public sealed class AssociationReviewEffectsTests
 {
     [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("\t\r\n")]
+    public async Task BlankAssociationLoadShouldClearPriorRouteAndFailWithoutReadingClient(string associationId)
+    {
+        RecordingClient client = new();
+        AssociationReviewState previous = StateOf(client, "choose-candidate", "candidate-001", "Prior note") with
+        {
+            CorrectionRationale = "Prior rationale",
+            LastAcceptedOperation = new AssociationOperationIdentity("old-command", "old-correlation", null, "Proposed"),
+        };
+        LoadAssociationReviewAction action = new(associationId);
+        AssociationReviewState loading = AssociationReviewReducers.ReduceLoad(previous, action);
+        loading.Review.ShouldBeNull();
+        loading.SelectedCandidateId.ShouldBeNull();
+        loading.DecisionNote.ShouldBeEmpty();
+        loading.PendingDecisionCode.ShouldBeNull();
+        loading.CorrectionRationale.ShouldBeEmpty();
+        loading.LastAcceptedOperation.ShouldBeNull();
+
+        int reads = client.RoutingReadCount;
+        RecordingDispatcher dispatcher = new();
+        await EffectsFor(client, loading).HandleLoadAsync(action, dispatcher);
+        client.RoutingReadCount.ShouldBe(reads);
+        AssociationReviewFailedAction failure = dispatcher.Actions.ShouldHaveSingleItem().ShouldBeOfType<AssociationReviewFailedAction>();
+        failure.ErrorCode.ShouldBe("association-id-required");
+        AssociationReviewState failed = AssociationReviewReducers.ReduceFailed(loading, failure);
+        failed.IsLoading.ShouldBeFalse();
+        failed.Review.ShouldBeNull();
+        AssociationReviewFailureCatalog.IsRetryable(failed.ErrorCode).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EarlierLoadShouldNotReplaceBlankIdFailure(bool failEarlierLoad)
+    {
+        RecordingClient client = new();
+        AssociationRoutingStatus oldStatus = await client.GetAssociationRoutingStatusAsync("old-association", cancellationToken: TestContext.Current.CancellationToken);
+        AssociationReviewState state = StateOf(client);
+        TaskCompletionSource<AssociationRoutingStatus> pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.PendingRoutingRead = pending;
+        AssociationReviewEffects effects = EffectsFor(client, state);
+        RecordingDispatcher dispatcher = new();
+        Task earlier = effects.HandleLoadAsync(new LoadAssociationReviewAction("old-association"), dispatcher);
+        earlier.IsCompleted.ShouldBeFalse();
+        await effects.HandleLoadAsync(new LoadAssociationReviewAction(" "), dispatcher);
+        if (failEarlierLoad)
+        {
+            pending.SetException(new TimeoutException("private delayed failure"));
+        }
+        else
+        {
+            pending.SetResult(oldStatus);
+        }
+
+        await earlier.ConfigureAwait(true);
+        dispatcher.Actions.ShouldHaveSingleItem().ShouldBeOfType<AssociationReviewFailedAction>()
+            .ErrorCode.ShouldBe("association-id-required");
+    }
+
+    [Theory]
     [MemberData(nameof(UiTransportFailureCases.Cases), MemberType = typeof(UiTransportFailureCases))]
     public async Task TransportFailureShouldUseStatusCatalogWithoutRawText(string kind, int status, string expected)
     {
@@ -308,6 +370,10 @@ public sealed class AssociationReviewEffectsTests
 
         public int SubmitCount { get; private set; }
 
+        public int RoutingReadCount { get; private set; }
+
+        public TaskCompletionSource<AssociationRoutingStatus>? PendingRoutingRead { get; set; }
+
         public IChatBotCommand? SubmittedCommand { get; private set; }
 
         public void ResetCounters() => SubmitCount = 0;
@@ -351,6 +417,12 @@ public sealed class AssociationReviewEffectsTests
             string? taskId = null,
             CancellationToken cancellationToken = default)
         {
+            RoutingReadCount++;
+            if (PendingRoutingRead is not null)
+            {
+                return PendingRoutingRead.Task;
+            }
+
             Hexalith.ChatBot.Client.Generated.AssociationEvidenceReference evidence = new()
             {
                 EvidenceReference = "thread-token",

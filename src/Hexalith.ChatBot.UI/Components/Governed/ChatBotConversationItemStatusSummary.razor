@@ -150,8 +150,8 @@
             _ => 8,
         };
 
-    private static BadgeColor HealthBadgeColor(string health)
-        => health.ToUpperInvariant() switch
+    private static BadgeColor HealthBadgeColor(string? health)
+        => (string.IsNullOrWhiteSpace(health) ? "UNKNOWN" : health.ToUpperInvariant()) switch
         {
             "HEALTHY" => BadgeColor.Success,
             "DEGRADED" => BadgeColor.Warning,

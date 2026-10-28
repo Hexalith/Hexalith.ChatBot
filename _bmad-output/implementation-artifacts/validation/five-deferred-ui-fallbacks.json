@@ -1,0 +1,312 @@
+{
+  "baselineRevision": "b28991f278fa5640f49dd42d6efef9f7249b5fb0",
+  "recordedAtUtc": "2026-10-28T11:09:36.898030+00:00",
+  "resolvedItems": {
+    "DW-73": [
+      "MissingFacetHealthShouldRenderUnknownWarning"
+    ],
+    "DW-110": [
+      "AvailableEvidenceNamesShouldNotOverrideServerLabels",
+      "StructuredRestrictionShouldWithholdNeutralNamedEvidence",
+      "RestrictedComparisonShouldNotRenderEvidenceMetadata"
+    ],
+    "DW-111": [
+      "BlankAssociationLoadShouldClearPriorRouteAndFailWithoutReadingClient",
+      "EarlierLoadShouldNotReplaceBlankIdFailure",
+      "BlankAssociationIdShouldDispatchLoadAndRenderItsSafeFailure"
+    ],
+    "DW-118": [
+      "BothComposerPathsShouldUseSanitizedNonemptyLocale"
+    ],
+    "DW-119": [
+      "UndefinedWireEnumsShouldFailSafelyWithoutNumericTokens",
+      "UndefinedResponseEnumShouldProduceSafeFailureThroughRealReducers"
+    ]
+  },
+  "sourceSha256": {
+    "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemStatusSummary.razor": "7e431fe8413bb45f4182f93bb4f6acf46cad056ce04cdcbc2b3e6725cb7daaed",
+    "src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor": "0c74f66014149e1c6a7d77edb2d0165e0fd47ad69046771acb4da2307a39604e",
+    "src/Hexalith.ChatBot.UI/Services/AssociationReviewService.cs": "be350966eb19a4e7f6a920120ea1126faac6979e2e6dac8cfe55e34ce679001b",
+    "src/Hexalith.ChatBot.UI/Services/ProjectConversationService.cs": "b4f36284708a6a933f70c8fdfadea5a2a90d2d73eae4966509e582ade4eea90f",
+    "src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewEffects.cs": "a078902d34743e123c32c59e156842141d78728e069caa7cbb26c517ded17cad",
+    "tests/Hexalith.ChatBot.UI.E2E.Tests/FakeChatBotClient.cs": "41c6b5283bf11f93ef250bac2a042ec55b24403dece2bac836eed2098e9592b4",
+    "tests/Hexalith.ChatBot.UI.E2E.Tests/VersionedSafeOutcomeRenderTests.cs": "f5ef60b46eea097771745f872ff955d5c9989683d178d51569bf385fc7b0b608",
+    "tests/Hexalith.ChatBot.UI.Tests/AssociationReviewEffectsTests.cs": "1fad1ece40a5f5cf28b72fd79b93022037ceb8ce4365ba982908386b56ad7cbb",
+    "tests/Hexalith.ChatBot.UI.Tests/AssociationReviewServiceTests.cs": "5f779756ad094a74f261aaf3d8845379e4ac767936024d7f0ec98f35dbc4687b",
+    "tests/Hexalith.ChatBot.UI.Tests/ProjectConversationEffectsTests.cs": "edee34c3fc0dedbf6651a86410c5cf718b23a807cfb91113cdd039aa524da4ef",
+    "tests/Hexalith.ChatBot.UI.Tests/ProjectConversationServiceTests.cs": "c39d1408c8dd8619c4ab7a9f1ef762009a1178d645a390b8c7388e2802334ee1"
+  },
+  "builds": [
+    {
+      "command": "dotnet build tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj --configuration Debug -m:1 --nologo",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0,
+      "log": "TestResults/five-deferred-ui/reviewed-ui-build.log"
+    },
+    {
+      "command": "dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --configuration Debug -m:1 --nologo",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0,
+      "log": "TestResults/five-deferred-ui/reviewed-render-build.log"
+    }
+  ],
+  "testRuns": [
+    {
+      "name": "baseline",
+      "exitCode": 1,
+      "summary": {
+        "tests": 499,
+        "passed": 495,
+        "failed": 4,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793184979248,
+        "stop": 1793184980910,
+        "duration": 1662
+      },
+      "failures": [
+        {
+          "test": "Hexalith.ChatBot.UI.Tests.ChatBotResponsiveTouchContractTests.PackagePinsShouldMatchApprovedSharedCatalog",
+          "reason": "System.InvalidOperationException : The evaluated version for 'Microsoft.Playwright' is '1.64.1', expected '1.64.0'."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.Tests.ChatBotLocalizationContractTests.PackagePinsShouldMatchApprovedSharedCatalogForLocalizationFoundation",
+          "reason": "System.InvalidOperationException : The evaluated version for 'Microsoft.Playwright' is '1.64.1', expected '1.64.0'."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.Tests.ChatBotAccessibilityFocusContractTests.PackagePinsShouldMatchApprovedSharedCatalogForAccessibilityFloor",
+          "reason": "System.InvalidOperationException : The evaluated version for 'Microsoft.Playwright' is '1.64.1', expected '1.64.0'."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.Tests.ChatBotLiveRegionReducedMotionContractTests.PackagePinsShouldMatchApprovedSharedCatalogForLiveRegionAndMotionFoundation",
+          "reason": "System.InvalidOperationException : The evaluated version for 'Microsoft.Playwright' is '1.64.1', expected '1.64.0'."
+        }
+      ],
+      "ctrf.json": {
+        "path": "TestResults/five-deferred-ui/baseline.ctrf.json",
+        "sha256": "0c2342ed64111ab7ff525c2896632b689466b7a91d37b4766f9160344b8ae333"
+      },
+      "trx": {
+        "path": "TestResults/five-deferred-ui/baseline.trx",
+        "sha256": "2d1821703bcf4eea90302b80617f7cabe26f97c2d57619bc351b331112a009c9"
+      }
+    },
+    {
+      "name": "reviewed-ui",
+      "exitCode": 1,
+      "summary": {
+        "tests": 533,
+        "passed": 529,
+        "failed": 4,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793185621391,
+        "stop": 1793185623153,
+        "duration": 1762
+      },
+      "failures": [
+        {
+          "test": "Hexalith.ChatBot.UI.Tests.ChatBotResponsiveTouchContractTests.PackagePinsShouldMatchApprovedSharedCatalog",
+          "reason": "System.InvalidOperationException : The evaluated version for 'Microsoft.Playwright' is '1.64.1', expected '1.64.0'."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.Tests.ChatBotLocalizationContractTests.PackagePinsShouldMatchApprovedSharedCatalogForLocalizationFoundation",
+          "reason": "System.InvalidOperationException : The evaluated version for 'Microsoft.Playwright' is '1.64.1', expected '1.64.0'."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.Tests.ChatBotAccessibilityFocusContractTests.PackagePinsShouldMatchApprovedSharedCatalogForAccessibilityFloor",
+          "reason": "System.InvalidOperationException : The evaluated version for 'Microsoft.Playwright' is '1.64.1', expected '1.64.0'."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.Tests.ChatBotLiveRegionReducedMotionContractTests.PackagePinsShouldMatchApprovedSharedCatalogForLiveRegionAndMotionFoundation",
+          "reason": "System.InvalidOperationException : The evaluated version for 'Microsoft.Playwright' is '1.64.1', expected '1.64.0'."
+        }
+      ],
+      "ctrf.json": {
+        "path": "TestResults/five-deferred-ui/reviewed-ui.ctrf.json",
+        "sha256": "29eeae0eecb14e7ac7c5ebbbae8ecb58c4455143556bf1a4b5bf38dc15eaf1ae"
+      },
+      "trx": {
+        "path": "TestResults/five-deferred-ui/reviewed-ui.trx",
+        "sha256": "dca76869c1b4dd01815e21cfad1ce3f7d30f014b33b3319bcb2c9fcd573256c5"
+      },
+      "baselineFailuresUnchanged": true
+    },
+    {
+      "name": "reviewed-focused",
+      "exitCode": 0,
+      "summary": {
+        "tests": 176,
+        "passed": 176,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793185662213,
+        "stop": 1793185663868,
+        "duration": 1655
+      },
+      "failures": [],
+      "ctrf.json": {
+        "path": "TestResults/five-deferred-ui/reviewed-focused.ctrf.json",
+        "sha256": "2ef2a0d16dd86d060df5458342e01ff7c2a6d08d90028868522037ed97577a0f"
+      },
+      "trx": {
+        "path": "TestResults/five-deferred-ui/reviewed-focused.trx",
+        "sha256": "eb11c5da7e7b4e0a99e94b4dbe64e572363843da21143a27477b212aef963fa5"
+      }
+    },
+    {
+      "name": "reviewed-render",
+      "exitCode": 1,
+      "summary": {
+        "tests": 95,
+        "passed": 76,
+        "failed": 19,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793185663504,
+        "stop": 1793185665261,
+        "duration": 1757
+      },
+      "failures": [
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.WorkspaceBlockedContextShouldKeepLocalReasonAndGuardServerAction(status: \"Blocked\")",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.WorkspaceFailureShouldOnlyEnableCatalogRetry(code: \"audit_unavailable\", expectedActionState: \"Enabled\")",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.WorkspaceFailureShouldAnnounceItsCatalogExplanationOnlyOnce(code: \"authorization_denied\", authorization: True)",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.WorkspaceFailureShouldAnnounceItsCatalogExplanationOnlyOnce(code: \"private-workspace-error\", authorization: False)",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.WorkspaceFailureShouldOnlyEnableCatalogRetry(code: \"invalid_lifecycle_transition\", expectedActionState: null)",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.WorkspaceFailureShouldOnlyEnableCatalogRetry(code: \"private-workspace-error\", expectedActionState: \"DisabledWithReason\")",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.StreamingFailureShouldOnlySuggestCatalogRetry(code: \"restricted-stream-error\", retry: False)",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.WorkspaceBlockedContextShouldKeepLocalReasonAndGuardServerAction(status: \"Degraded\")",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.StreamingFailureShouldOnlySuggestCatalogRetry(code: \"dependency_degraded\", retry: True)",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.WorkspaceAuthorizationFailureShouldRenderCatalogGuidance(code: \"authentication_denied\", reason: \"Authentication is required before this operation c\"···)",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.WorkspaceFailureShouldAnnounceItsCatalogExplanationOnlyOnce(code: \"audit_unavailable\", authorization: False)",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.StreamingFailureShouldOnlySuggestCatalogRetry(code: \"generic_denial\", retry: False)",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.WhyPanelFailureShouldRenderGenericCatalogGuidanceWithoutCallerCode",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.WorkspaceFailureShouldAnnounceItsCatalogExplanationOnlyOnce(code: \"authentication_denied\", authorization: True)",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.StreamingFailureShouldOnlySuggestCatalogRetry(code: \"audit_unavailable\", retry: True)",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.WorkspaceAuthorizationFailureShouldRenderCatalogGuidance(code: \"unauthorized_participant\", reason: \"The operation is not available to this participant\"···)",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.WorkspaceBlockedContextShouldKeepLocalReasonAndGuardServerAction(status: \"Stale\")",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.WorkspaceAuthorizationFailureShouldRenderCatalogGuidance(code: \"authorization_denied\", reason: \"The operation is not available to this caller.\")",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        },
+        {
+          "test": "Hexalith.ChatBot.UI.E2E.Tests.VersionedSafeOutcomeRenderTests.StreamingFailureShouldOnlySuggestCatalogRetry(code: \"retry_queued\", retry: True)",
+          "reason": "System.InvalidOperationException : FcPageHeader requires a non-blank PageTitle or Heading so the browser document has a title."
+        }
+      ],
+      "ctrf.json": {
+        "path": "TestResults/five-deferred-ui/reviewed-render.ctrf.json",
+        "sha256": "7d3c18b4aa410119c7fe5a3c54012b18380b3140cc971c49495eee3b90a1e0c7"
+      },
+      "trx": {
+        "path": "TestResults/five-deferred-ui/reviewed-render.trx",
+        "sha256": "197bc4eb9d0439c2a8d4663f41447bebef5f9c7f1802c51af0ac2ee41ae02114"
+      },
+      "reviewPatchFailuresUnchanged": true,
+      "limitation": "19 existing workspace/streaming fixture cases report blank FcPageHeader title. An archived baseline build was blocked by 207 FrontComposer analyzer errors; a fixture-only archive attempt also could not resolve FrontComposer.Contracts. No whole-baseline renderer pass is claimed."
+    },
+    {
+      "name": "reviewed-focused-render",
+      "exitCode": 0,
+      "summary": {
+        "tests": 8,
+        "passed": 8,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793185722953,
+        "stop": 1793185723624,
+        "duration": 671
+      },
+      "failures": [],
+      "ctrf.json": {
+        "path": "TestResults/five-deferred-ui/reviewed-focused-render.ctrf.json",
+        "sha256": "14a921b0716a4fbca0b71cda8b5ecbe0654eb635a1a6804c4c47c2d0acf68b11"
+      },
+      "trx": {
+        "path": "TestResults/five-deferred-ui/reviewed-focused-render.trx",
+        "sha256": "3f3825d5f51aad07fcb56daa588093db03cd40dba34349253da662af30485d11"
+      }
+    }
+  ],
+  "runtimeBlocker": {
+    "command": "aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+    "exitCode": 2,
+    "result": "Conversations Contracts and Client require Platform tool-selected source mapping; no topology started.",
+    "log": "TestResults/five-deferred-ui/aspire-baseline.log"
+  },
+  "review": {
+    "layers": [
+      "blind-hunter"
+    ],
+    "findings": 6,
+    "patched": 6,
+    "recheck": "All six findings addressed; no concrete regression found.",
+    "deferred": 0
+  },
+  "qualification": "Local focused regressions only. Broad test failures and missing UI primary/runtime qualification keep the build record in review; no product-story, sprint, technical-enabler completion, dependency, submodule or release-gate change."
+}

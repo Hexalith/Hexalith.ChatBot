@@ -27,6 +27,23 @@ namespace Hexalith.ChatBot.UI.Tests;
 /// </summary>
 public sealed class ProjectConversationEffectsTests
 {
+    [Fact]
+    public async Task UndefinedResponseEnumShouldProduceSafeFailureThroughRealReducers()
+    {
+        LoadProjectConversationAction action = new("project-001");
+        ProjectConversationState loading = ProjectConversationReducers.ReduceLoad(new(false, null, null), action);
+        FakeState state = new(loading);
+        RecordingDispatcher dispatcher = new(state);
+        StubChatBotClient client = new() { ResponseStatus = (ProjectConversationReadStatus)999 };
+        await new ProjectConversationEffects(new ProjectConversationService(client), state).HandleLoadAsync(action, dispatcher);
+        dispatcher.Actions.OfType<ProjectConversationLoadedAction>().ShouldBeEmpty();
+        ProjectConversationFailedAction failure = dispatcher.Actions.OfType<ProjectConversationFailedAction>().ShouldHaveSingleItem();
+        failure.ErrorCode.ShouldBe("generic_denial");
+        state.Value.IsLoading.ShouldBeFalse();
+        state.Value.Conversation.ShouldBeNull();
+        state.Value.ErrorCode.ShouldBe("generic_denial");
+    }
+
     private const string ResponseId = "proposal-001";
     private const string GenerationId = "operation-001";
 
@@ -582,6 +599,8 @@ public sealed class ProjectConversationEffectsTests
 
     private sealed class StubChatBotClient : IChatBotClient
     {
+        public ProjectConversationReadStatus ResponseStatus { get; init; } = ProjectConversationReadStatus.Current;
+
         public Exception? SubmitException { get; init; }
 
         public Exception? ReadException { get; init; }
@@ -654,7 +673,7 @@ public sealed class ProjectConversationEffectsTests
             {
                 ProjectId = projectId,
                 ProjectDisplayName = "Authorized Project",
-                Status = ProjectConversationReadStatus.Current,
+                Status = ResponseStatus,
                 ConversationState = LifecycleState.Associated,
                 Items =
                 [
@@ -762,6 +781,7 @@ public sealed class ProjectConversationEffectsTests
                     ProjectConversationSubmissionAcceptedAction accepted => ProjectConversationReducers.ReduceSubmissionAccepted(state.Value, accepted),
                     ProjectConversationSubmissionFailedAction failed => ProjectConversationReducers.ReduceSubmissionFailed(state.Value, failed),
                     ProjectConversationLoadedAction loaded => ProjectConversationReducers.ReduceLoaded(state.Value, loaded),
+                    ProjectConversationFailedAction failed => ProjectConversationReducers.ReduceFailed(state.Value, failed),
                     _ => state.Value,
                 };
             }

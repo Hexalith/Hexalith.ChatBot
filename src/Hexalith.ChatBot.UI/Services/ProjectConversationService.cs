@@ -47,16 +47,16 @@ public sealed class ProjectConversationService(IChatBotClient client)
             response.ProjectId,
             string.IsNullOrWhiteSpace(response.ProjectDisplayName) ? response.ProjectId : response.ProjectDisplayName,
             response.TenantContext,
-            response.Status.ToString(),
-            response.ConversationState.ToString(),
+            EnumName(response.Status),
+            EnumName(response.ConversationState),
             response.Items.Select(MapItem).ToArray(),
             response.Page.NextCursor,
             response.Page.HasMore,
             response.Page.PageSize,
-            response.SourceProvenance.ToString(),
-            response.RedactionState.ToString(),
-            response.RetentionClass.ToString(),
-            response.SchemaVersion.ToString(),
+            EnumName(response.SourceProvenance),
+            EnumName(response.RedactionState),
+            EnumName(response.RetentionClass),
+            EnumName(response.SchemaVersion),
             response.CorrelationId,
             string.IsNullOrWhiteSpace(response.SafeNextAction) ? "none" : response.SafeNextAction)
         {
@@ -150,12 +150,12 @@ public sealed class ProjectConversationService(IChatBotClient client)
                     audit.DecidedAtUtc,
                     audit.ReasonCode,
                     audit.CorrelationId,
-                    audit.RedactionState.ToString()))
+                    EnumName(audit.RedactionState)))
                 .ToArray(),
-            review.CurrentState?.ToString(),
+            EnumName(review.CurrentState),
             review.SourceVersion,
             review.CorrelationId,
-            review.RedactionState.ToString(),
+            EnumName(review.RedactionState),
             review.SchemaVersion);
     }
 
@@ -304,12 +304,12 @@ public sealed class ProjectConversationService(IChatBotClient client)
     private static ProjectConversationItemModel MapItem(ProjectConversationItem item)
         => new(
             item.ItemId,
-            item.Kind.ToString(),
-            item.ActorKind.ToString(),
+            EnumName(item.Kind),
+            EnumName(item.ActorKind),
             item.ActorLabel,
             item.OccurredAt,
-            item.LifecycleState.ToString(),
-            item.ThresholdBand.ToString(),
+            EnumName(item.LifecycleState),
+            EnumName(item.ThresholdBand),
             item.ConfidenceScore,
             item.AssociationId,
             item.SourceMailboxId,
@@ -322,10 +322,10 @@ public sealed class ProjectConversationService(IChatBotClient client)
             item.SourceCreatedAtUtc,
             item.SourceTimezone,
             item.SourceProvenanceDisplayToken,
-            item.SourceProvenance.ToString(),
-            item.RedactionState.ToString(),
-            item.RetentionClass.ToString(),
-            item.SchemaVersion.ToString(),
+            EnumName(item.SourceProvenance),
+            EnumName(item.RedactionState),
+            EnumName(item.RetentionClass),
+            EnumName(item.SchemaVersion),
             item.SourceVersion,
             item.CorrelationId,
             item.ProjectId,
@@ -335,27 +335,27 @@ public sealed class ProjectConversationService(IChatBotClient client)
             item.ParticipantResolutionId,
             item.SourceParticipantId,
             item.PartyId,
-            item.ParticipantStatus?.ToString(),
-            item.ParticipantBlockedReason?.ToString(),
-            item.ParticipantDisplayKind?.ToString(),
+            EnumName(item.ParticipantStatus),
+            EnumName(item.ParticipantBlockedReason),
+            EnumName(item.ParticipantDisplayKind),
             item.ParticipantEvidenceReference,
             item.ParticipantEvidenceFingerprint,
-            item.ParticipantAllowedReviewActions?.Select(static action => action.ToString()).ToArray() ?? [],
-            item.ParticipantRedactionState?.ToString(),
+            item.ParticipantAllowedReviewActions?.Select(static action => EnumName(action)).ToArray() ?? [],
+            EnumName(item.ParticipantRedactionState),
             item.SourceProviderAttachmentId,
             item.AttachmentDisplayName,
             item.AttachmentContentType,
             item.AttachmentSizeInBytes,
-            item.AttachmentCaptureStatus?.ToString(),
-            item.AttachmentStorageStatus?.ToString(),
-            item.AttachmentScanStatus?.ToString(),
+            EnumName(item.AttachmentCaptureStatus),
+            EnumName(item.AttachmentStorageStatus),
+            EnumName(item.AttachmentScanStatus),
             item.AttachmentFolderId,
             item.AttachmentFileId,
             item.AttachmentDuplicateState,
             item.AttachmentRetryState,
             item.AttachmentAiContextEligibility,
             item.AttachmentAllowedActions?.ToArray() ?? [],
-            item.AttachmentRedactionState?.ToString(),
+            EnumName(item.AttachmentRedactionState),
             WireToken(item.DecisionKind),
             item.DecisionActorId,
             item.DecisionActorType,
@@ -617,15 +617,19 @@ public sealed class ProjectConversationService(IChatBotClient client)
     private static string WireToken<TEnum>(TEnum value)
         where TEnum : struct, Enum
     {
-        string? memberName = Enum.GetName(value);
-        if (memberName is null)
-        {
-            return value.ToString();
-        }
+        string memberName = EnumName(value);
 
         MemberInfo? member = typeof(TEnum).GetMember(memberName).FirstOrDefault();
-        return member?.GetCustomAttribute<EnumMemberAttribute>()?.Value ?? value.ToString();
+        return member?.GetCustomAttribute<EnumMemberAttribute>()?.Value ?? memberName;
     }
+
+    private static string? EnumName<TEnum>(TEnum? value)
+        where TEnum : struct, Enum
+        => value is null ? null : EnumName(value.Value);
+
+    private static string EnumName<TEnum>(TEnum value)
+        where TEnum : struct, Enum
+        => Enum.GetName(value) ?? throw new InvalidOperationException("unsupported-wire-value");
 
     private static string TextFingerprint(string text)
     {
@@ -645,7 +649,8 @@ public sealed class ProjectConversationService(IChatBotClient client)
     }
 
     private static string SafeLocale(string locale)
-        => string.IsNullOrWhiteSpace(locale)
-            ? "und"
-            : new string(locale.Trim().Where(static c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_').ToArray());
+    {
+        string sanitized = new(locale.Trim().Where(static c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_').ToArray());
+        return sanitized.Length == 0 ? "und" : sanitized;
+    }
 }

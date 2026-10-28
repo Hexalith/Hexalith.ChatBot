@@ -662,7 +662,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 13-1-establi
 location: ChatBotConversationItemStatusSummary.razor:154
 severity: low
 reason: **[LOW · pre-existing, Story 13.4 scope] Null `facet.Health` NREs in the status-summary badge mapper.** `ChatBotConversationItemStatusSummary.razor:154` calls `health.ToUpperInvariant()` on `facet.Health`; a null `Health` throws `NullReferenceException` before the `BadgeColor` switch is evaluated. This is on the **unchanged** line 154 — NOT introduced by the reviewed diff (which only added the `"UNKNOWN" => BadgeColor.Warning` arm). Case is already normalized and empty string falls through to `_ => Subtle`, so only a genuine null trips it. Verify whether `facet.Health` can be null on any live surface; if so, coalesce to `"UNKNOWN"`/`string.Empty` before `ToUpperInvariant()`. Owner: Story 13.4 status-summary surface.
-status: open
+status: done 2026-10-28
+resolution: Missing health now selects the existing Unknown warning badge; real HtmlRenderer cases cover null, empty and whitespace values. Evidence: spec-five-deferred-ui-fallbacks.md and validation/five-deferred-ui-fallbacks.json; 176 focused UI tests plus 8 focused render tests pass with zero failures/skips. Broad-suite and runtime blockers remain disclosed; no release qualification.
 
 ### DW-74: [LOW · verify in Story 13.9] Blocked-state reason heading may sit as an `<h2>` peer of the conversation-stream section title.
 
@@ -981,7 +982,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of story-13.3 �
 location: AssociationReviewService.cs:296-313
 severity: medium
 reason: **[MEDIUM · correctness] `ResolveEvidenceState` re-derives evidence state by substring keyword sniffing.** `AssociationReviewService.cs:296-313` matches `unauthorized|restricted|suppressed|redacted|unavailable|expired|stale` case-insensitively against `EvidenceKind + EvidenceReference`, over data the server already labels structurally. **Not covered:** produces false positives (a legitimate "restricted-access" reference is suppressed) and false negatives (a genuinely restricted item without the magic words renders); its single test uses a reference literally named `suppressed-candidate-metadata`. **Owner:** ChatBot UI. **Closure evidence:** the safety net removed in favour of the server label, or its keyword set justified against the server's actual vocabulary.
-status: open
+status: done 2026-10-28
+resolution: Evidence uses server visibility/redaction/freshness labels and rejects undefined labels; benign keyword names and omitted candidate labels retain available evidence and submit the selected fingerprint. Model, command refusal and real mapped-evidence rendering tests verify restricted metadata stays withheld. Evidence: spec-five-deferred-ui-fallbacks.md and validation/five-deferred-ui-fallbacks.json; 176 focused UI tests plus 8 focused render tests pass with zero failures/skips. Broad-suite and runtime blockers remain disclosed; no release qualification.
 
 ### DW-111: [LOW · robustness] An empty or whitespace `AssociationId` renders the header only.
 
@@ -989,7 +991,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of story-13.3 �
 location: AssociationReview.razor:152-159
 severity: low
 reason: **[LOW · robustness] An empty or whitespace `AssociationId` renders the header only.** `AssociationReview.razor:152-159` dispatches no load and produces no loading, error, or blocked state. **Owner:** ChatBot UI. **Closure evidence:** an `association-id-required` failure dispatch, or a routing constraint that makes the state unreachable.
-status: open
+status: done 2026-10-28
+resolution: Blank IDs dispatch a load that clears prior candidates, selection, notes, rationale and accepted-operation state; the effect refuses before any client read. Private request generations prevent delayed success/failure from restoring the previous route. Reducer/effect and real component dispatch/render cases pass. Evidence: spec-five-deferred-ui-fallbacks.md and validation/five-deferred-ui-fallbacks.json; 176 focused UI tests plus 8 focused render tests pass with zero failures/skips. Broad-suite and runtime blockers remain disclosed; no release qualification.
 
 ### DW-112: [HIGH · test-integrity] The E2E fixtures for the approval surfaces assert markup the components no longer produce.
 
@@ -1044,14 +1047,16 @@ status: open
 origin: migrated from legacy ledger ("Deferred from: code review of story-13.2 (2026-08-25)"), 2026-08-26
 location: n/a
 reason: `ProjectConversationService.SafeLocale` checks `IsNullOrWhiteSpace` before filtering, so an all-punctuation locale returns an empty string instead of the `"und"` fallback. Unreachable from `CultureInfo.CurrentUICulture.Name` today.
-status: open
+status: done 2026-10-28
+resolution: Locale sanitization now applies the und fallback after filtering; both message and AI proposal submission paths cover punctuation-only, Unicode-only and ordinary locale values. Evidence: spec-five-deferred-ui-fallbacks.md and validation/five-deferred-ui-fallbacks.json; 176 focused UI tests plus 8 focused render tests pass with zero failures/skips. Broad-suite and runtime blockers remain disclosed; no release qualification.
 
 ### DW-119: `ProjectConversationService.WireToken` falls back to `value.ToString()` for an enum value outside the declared members, surfacing a raw numeric ordinal as a state or provenance token.
 
 origin: migrated from legacy ledger ("Deferred from: code review of story-13.2 (2026-08-25)"), 2026-08-26
 location: n/a
 reason: `ProjectConversationService.WireToken` falls back to `value.ToString()` for an enum value outside the declared members, surfacing a raw numeric ordinal as a state or provenance token.
-status: open
+status: done 2026-10-28
+resolution: Undefined enums fail with the fixed unsupported-wire-value token; both wire-token and existing enum-name mappings validate values while preserving declared names, wire values and nullable behavior. Real effects/reducers retain a safe generic failure without loading or numeric tokens. Evidence: spec-five-deferred-ui-fallbacks.md and validation/five-deferred-ui-fallbacks.json; 176 focused UI tests plus 8 focused render tests pass with zero failures/skips. Broad-suite and runtime blockers remain disclosed; no release qualification.
 
 ### DW-120: The two hub callbacks in `ChatBotProjectConversationWorkspace` use `_ = InvokeAsync(...)` with no disposal guard and no exception observation; a signal arriving during teardown throws an unobserved `ObjectDisposedException`. The subscriber's `Reconnected += async _ =>` is async-void with no try/catch around `_onReconnected`.
 

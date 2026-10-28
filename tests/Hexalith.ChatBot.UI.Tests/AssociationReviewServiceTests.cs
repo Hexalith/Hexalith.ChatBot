@@ -93,15 +93,87 @@ public sealed class AssociationReviewServiceTests
     }
 
     [Fact]
-    public async Task ServiceShouldClassifyRestrictedEvidenceWithoutRelyingOnlyOnUnauthorizedKind()
+    public async Task ServiceShouldClassifyRestrictedEvidenceUsingServerLabels()
     {
         FakeChatBotClient client = new() { ReturnRestrictedEvidence = true };
         AssociationReviewModel review = await new AssociationReviewService(client, AssociationReviewTestText.Create())
             .GetAssociationReviewAsync("01ARZ3NDEKTSV4RRFFQ69G5FAZ", TestContext.Current.CancellationToken);
 
         AssociationEvidenceModel evidence = review.Candidates.Single().Evidence.Single();
-        evidence.State.ShouldBe(ChatBotEvidenceState.Unauthorized);
+        evidence.State.ShouldBe(ChatBotEvidenceState.Redacted);
         evidence.UnavailableReason.ShouldBe("Evidence restricted");
+    }
+
+    [Theory]
+    [InlineData("unauthorized")]
+    [InlineData("restricted")]
+    [InlineData("suppressed")]
+    [InlineData("redacted")]
+    [InlineData("unavailable")]
+    [InlineData("expired")]
+    [InlineData("stale")]
+    public async Task AvailableEvidenceNamesShouldNotOverrideServerLabels(string word)
+    {
+        foreach (bool omitLabels in new[] { false, true })
+        {
+            FakeChatBotClient client = new()
+            {
+                EvidenceOverride = new AssociationEvidenceReference
+                {
+                    EvidenceReference = $"project-{word}-reference",
+                    EvidenceKind = $"{word}-signal",
+                    EvidenceFingerprint = "fingerprint-1",
+                    VisibilityState = omitLabels ? null : AssociationEvidenceReferenceVisibilityState.Available,
+                    RedactionState = omitLabels ? null : AssociationEvidenceReferenceRedactionState.Metadata_only,
+                    FreshnessState = omitLabels ? null : AssociationEvidenceReferenceFreshnessState.Fresh,
+                },
+            };
+            AssociationReviewService service = new(client, AssociationReviewTestText.Create());
+            AssociationReviewModel review = await service.GetAssociationReviewAsync("association-001", TestContext.Current.CancellationToken);
+
+            review.Evidence.Single().State.ShouldBe(ChatBotEvidenceState.Available);
+            review.Candidates.Single().Evidence.Single().State.ShouldBe(ChatBotEvidenceState.Available);
+            await service.SubmitDecisionAsync(review, "choose-candidate", review.Candidates.Single().ProjectId, null, TestContext.Current.CancellationToken);
+            client.SubmittedCommand.ShouldBeOfType<Hexalith.ChatBot.Contracts.Commands.AssociateEmailToProject>()
+                .CandidateEvidenceFingerprint.ShouldBe("fingerprint-1");
+        }
+    }
+
+    [Theory]
+    [InlineData("visibility", 1, ChatBotEvidenceState.Redacted)]
+    [InlineData("visibility", 2, ChatBotEvidenceState.Unavailable)]
+    [InlineData("visibility", 999, ChatBotEvidenceState.Unavailable)]
+    [InlineData("redaction", 1, ChatBotEvidenceState.Redacted)]
+    [InlineData("redaction", 2, ChatBotEvidenceState.Unavailable)]
+    [InlineData("redaction", 999, ChatBotEvidenceState.Unavailable)]
+    [InlineData("freshness", 1, ChatBotEvidenceState.Unavailable)]
+    [InlineData("freshness", 2, ChatBotEvidenceState.Unavailable)]
+    [InlineData("freshness", 999, ChatBotEvidenceState.Unavailable)]
+    public async Task StructuredRestrictionShouldWithholdNeutralNamedEvidence(string label, int value, ChatBotEvidenceState expected)
+    {
+        AssociationEvidenceReference evidence = new()
+        {
+            EvidenceReference = "neutral-reference",
+            EvidenceKind = "subject-signal",
+            EvidenceFingerprint = "fingerprint-1",
+        };
+        switch (label)
+        {
+            case "visibility": evidence.VisibilityState = (AssociationEvidenceReferenceVisibilityState)value; break;
+            case "redaction": evidence.RedactionState = (AssociationEvidenceReferenceRedactionState)value; break;
+            case "freshness": evidence.FreshnessState = (AssociationEvidenceReferenceFreshnessState)value; break;
+        }
+
+        FakeChatBotClient client = new() { EvidenceOverride = evidence };
+        AssociationReviewService service = new(client, AssociationReviewTestText.Create());
+        AssociationReviewModel review = await service.GetAssociationReviewAsync("association-001", TestContext.Current.CancellationToken);
+
+        review.Evidence.Single().State.ShouldBe(expected);
+        review.Candidates.Single().Evidence.Single().State.ShouldBe(expected);
+        InvalidOperationException failure = await Should.ThrowAsync<InvalidOperationException>(() =>
+            service.SubmitDecisionAsync(review, "choose-candidate", review.Candidates.Single().ProjectId, null, TestContext.Current.CancellationToken));
+        failure.Message.ShouldBe("stale-evidence");
+        client.SubmitCount.ShouldBe(0);
     }
 
     [Fact]
@@ -204,6 +276,8 @@ public sealed class AssociationReviewServiceTests
 
         public bool ReturnRestrictedEvidence { get; init; }
 
+        public AssociationEvidenceReference? EvidenceOverride { get; init; }
+
         public bool ReturnStructurallyRedactedEvidence { get; init; }
 
         public bool ReturnCorrectedAssociation { get; set; }
@@ -252,7 +326,7 @@ public sealed class AssociationReviewServiceTests
         {
             LastAssociationId = associationId;
             RoutingReadCount++;
-            return Task.FromResult(CreateStatus(associationId, ReturnEmptyCandidates, ReturnRestrictedEvidence, ReturnStructurallyRedactedEvidence, ReturnCorrectedAssociation, OmitPriorProjectId));
+            return Task.FromResult(CreateStatus(associationId, ReturnEmptyCandidates, ReturnRestrictedEvidence, ReturnStructurallyRedactedEvidence, ReturnCorrectedAssociation, OmitPriorProjectId, EvidenceOverride));
         }
 
         public Task<ProjectConversationResponse> GetProjectConversationAsync(
@@ -265,15 +339,15 @@ public sealed class AssociationReviewServiceTests
             => throw new NotSupportedException();
 
         private static AssociationRoutingStatus CreateStatus(string associationId, bool empty, bool restrictedEvidence, bool structurallyRedacted, bool corrected,
-            bool omitPrior)
+            bool omitPrior, AssociationEvidenceReference? evidenceOverride)
         {
-            AssociationEvidenceReference evidence = new()
+            AssociationEvidenceReference evidence = evidenceOverride ?? new()
             {
-                EvidenceReference = restrictedEvidence ? "suppressed-candidate-metadata" : "evidence-ref-1",
+                EvidenceReference = "evidence-ref-1",
                 EvidenceFingerprint = "fingerprint-1",
-                EvidenceKind = restrictedEvidence ? "restricted-project-signal" : "subject-signal",
+                EvidenceKind = "subject-signal",
                 VisibilityState = structurallyRedacted ? AssociationEvidenceReferenceVisibilityState.Redacted : null,
-                RedactionState = structurallyRedacted ? AssociationEvidenceReferenceRedactionState.Redacted : null,
+                RedactionState = structurallyRedacted || restrictedEvidence ? AssociationEvidenceReferenceRedactionState.Redacted : null,
             };
 
             return new AssociationRoutingStatus

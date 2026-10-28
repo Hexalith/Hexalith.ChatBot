@@ -1024,6 +1024,81 @@ public sealed class VersionedSafeOutcomeRenderTests
         html.ShouldNotContain("The requested action is unavailable.");
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task MissingFacetHealthShouldRenderUnknownWarning(string? health)
+    {
+        ProjectConversationItemStatusFacetModel facet = new(
+            "command", health!, "unknown", "status_unknown", "none",
+            new Dictionary<string, string>(), false, null, null, null, null, null, null, null, null, null);
+        string html = await RenderParentAsync<ChatBotConversationItemStatusSummary>(new()
+        {
+            [nameof(ChatBotConversationItemStatusSummary.ItemId)] = "item-001",
+            [nameof(ChatBotConversationItemStatusSummary.Summary)] = new ProjectConversationItemStatusSummaryModel([facet]),
+        });
+        WebUtility.HtmlDecode(html).ShouldContain("Unknown");
+        html.ShouldContain("chatbot-conversation-status-summary__health");
+        html.ShouldContain("warning");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task BlankAssociationIdShouldDispatchLoadAndRenderItsSafeFailure(string associationId)
+    {
+        SafeOutcomeRenderDispatcher dispatcher = new();
+        Dictionary<string, object?> parameters = new()
+        {
+            [nameof(AssociationReview.AssociationId)] = associationId,
+        };
+        await RenderParentAsync<AssociationReview>(parameters, dispatcher: dispatcher);
+        LoadAssociationReviewAction load = dispatcher.Actions.OfType<LoadAssociationReviewAction>().ShouldHaveSingleItem();
+        load.AssociationId.ShouldBe(associationId);
+        AssociationReviewState empty = new(false, false, null, null, "", "", null, null);
+        AssociationReviewState failed = AssociationReviewReducers.ReduceFailed(
+            AssociationReviewReducers.ReduceLoad(empty, load), new AssociationReviewFailedAction("association-id-required"));
+        string html = await RenderParentAsync<AssociationReview>(parameters, association: failed);
+        html.ShouldContain("data-chatbot-stable-id=\"association-review-failed\"");
+        html.ShouldContain("data-chatbot-feedback-state=\"TerminalPolicyFailure\"");
+        html.ShouldNotContain("data-chatbot-stable-id=\"association-review-retry\"");
+        WebUtility.HtmlDecode(html).ShouldContain("The requested action is unavailable.");
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(999)]
+    public async Task RestrictedComparisonShouldNotRenderEvidenceMetadata(int redaction)
+    {
+        global::Hexalith.ChatBot.UI.E2E.Tests.FakeChatBotClient client = new()
+        {
+            AssociationEvidenceOverride = new Hexalith.ChatBot.Client.Generated.AssociationEvidenceReference
+            {
+                EvidenceReference = "private-reference-sentinel",
+                EvidenceFingerprint = "private-fingerprint-sentinel",
+                EvidenceKind = "private-kind-sentinel",
+                RedactionState = (Hexalith.ChatBot.Client.Generated.AssociationEvidenceReferenceRedactionState)redaction,
+            },
+        };
+        ServiceCollection services = new();
+        services.AddLogging();
+        services.AddLocalization();
+        services.AddSingleton<ChatBotUiTextLocalizer>();
+        await using ServiceProvider provider = services.BuildServiceProvider();
+        AssociationReviewModel review = await new AssociationReviewService(client, provider.GetRequiredService<ChatBotUiTextLocalizer>())
+            .GetAssociationReviewAsync("association-001", TestContext.Current.CancellationToken).ConfigureAwait(true);
+        string html = await RenderParentAsync<ChatBotAssociationEvidenceComparison>(new()
+        {
+            [nameof(ChatBotAssociationEvidenceComparison.Candidate)] = review.Candidates.Single(),
+        });
+        html.ShouldNotContain("private-reference-sentinel");
+        html.ShouldNotContain("private-fingerprint-sentinel");
+        html.ShouldNotContain("private-kind-sentinel");
+        html.ShouldContain("Evidence restricted");
+    }
+
     private static ProjectConversationItemModel CreateFailureItem(string code, string id)
         => JsonSerializer.Deserialize<ProjectConversationItemModel>(
             """{"itemId":"failure","kind":"FailureState","actorKind":"System","actorLabel":"Worker","occurredAt":"2026-01-01T00:00:00Z","failureStatus":"failed","messageDetailVisibility":"metadata_only"}""",
@@ -1031,7 +1106,8 @@ public sealed class VersionedSafeOutcomeRenderTests
 
     private static async Task<string> RenderParentAsync<T>(Dictionary<string, object?> parameters,
         ProjectConversationState? project = null, AssociationReviewState? association = null,
-        GovernedOperationsState? governed = null, OperationalDashboardsState? dashboards = null, string culture = "en") where T : IComponent
+        GovernedOperationsState? governed = null, OperationalDashboardsState? dashboards = null, string culture = "en",
+        SafeOutcomeRenderDispatcher? dispatcher = null) where T : IComponent
     {
         CultureInfo original = CultureInfo.CurrentUICulture;
         CultureInfo originalCulture = CultureInfo.CurrentCulture;
@@ -1048,7 +1124,7 @@ public sealed class VersionedSafeOutcomeRenderTests
             services.AddSingleton<IState<AssociationReviewState>>(new SafeOutcomeRenderState<AssociationReviewState>(association ?? new(false, false, null, null, "", "", null, null)));
             services.AddSingleton<IState<GovernedOperationsState>>(new SafeOutcomeRenderState<GovernedOperationsState>(governed ?? new(false, null, null)));
             services.AddSingleton<IState<OperationalDashboardsState>>(new SafeOutcomeRenderState<OperationalDashboardsState>(dashboards ?? new(false, null, null)));
-            services.AddSingleton<IDispatcher, SafeOutcomeRenderDispatcher>();
+            services.AddSingleton<IDispatcher>(dispatcher ?? new SafeOutcomeRenderDispatcher());
             services.AddSingleton(new ChatBotHubEndpoint(new Uri("http://127.0.0.1")));
             services.AddSingleton<IJSRuntime, StaticRenderJsRuntime>();
             services.AddSingleton<ChatBotUiTextLocalizer>();

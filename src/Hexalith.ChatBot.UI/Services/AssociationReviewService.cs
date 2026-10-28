@@ -335,6 +335,13 @@ public sealed class AssociationReviewService(IChatBotClient client, ChatBotUiTex
 
     private static ChatBotEvidenceState ResolveEvidenceState(GeneratedAssociationEvidenceReference evidence)
     {
+        if ((evidence.VisibilityState is { } visibility && !Enum.IsDefined(visibility))
+            || (evidence.RedactionState is { } redaction && !Enum.IsDefined(redaction))
+            || (evidence.FreshnessState is { } freshness && !Enum.IsDefined(freshness)))
+        {
+            return ChatBotEvidenceState.Unavailable;
+        }
+
         // Honor the server's authoritative structured states first and fail closed. The routing-status
         // contract stamps explicit visibility/redaction/freshness states (for example excluded candidates
         // are emitted as redacted); relying only on keyword sniffing would render the reference whenever the
@@ -353,30 +360,10 @@ public sealed class AssociationReviewService(IChatBotClient client, ChatBotUiTex
             return ChatBotEvidenceState.Unavailable;
         }
 
-        // Secondary keyword safety net for evidence that hints restriction even when the server omitted
-        // structured states.
-        string evidenceClassification = $"{evidence.EvidenceKind} {evidence.EvidenceReference}";
-
-        if (ContainsAny(evidenceClassification, "unauthorized", "restricted", "suppressed"))
-        {
-            return ChatBotEvidenceState.Unauthorized;
-        }
-
-        if (ContainsAny(evidenceClassification, "redacted"))
-        {
-            return ChatBotEvidenceState.Redacted;
-        }
-
-        if (ContainsAny(evidenceClassification, "unavailable", "expired", "stale"))
-        {
-            return ChatBotEvidenceState.Unavailable;
-        }
-
+        // Candidate references may omit these optional labels. Preserve that contract's default;
+        // reference names and kinds carry no visibility or freshness authority.
         return ChatBotEvidenceState.Available;
     }
-
-    private static bool ContainsAny(string value, params string[] needles)
-        => needles.Any(needle => value.Contains(needle, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Resolves an enum's wire value. A value the generated client does not define means the server is ahead

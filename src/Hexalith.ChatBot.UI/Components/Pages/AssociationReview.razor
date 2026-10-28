@@ -226,7 +226,7 @@
     protected override void OnParametersSet()
     {
         base.OnParametersSet();
-        if (!string.IsNullOrWhiteSpace(AssociationId) && Review?.AssociationId != AssociationId)
+        if (string.IsNullOrWhiteSpace(AssociationId) || Review?.AssociationId != AssociationId)
         {
             Dispatcher.Dispatch(new LoadAssociationReviewAction(AssociationId));
         }

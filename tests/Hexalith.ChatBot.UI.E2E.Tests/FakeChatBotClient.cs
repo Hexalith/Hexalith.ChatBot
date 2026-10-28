@@ -17,6 +17,9 @@ namespace Hexalith.ChatBot.UI.E2E.Tests;
 /// <param name="submissionErrorCode">Optional failure code for exercising rejected submissions.</param>
 internal sealed class FakeChatBotClient(string? submissionErrorCode = null) : IChatBotClient
 {
+    /// <summary>Gets optional server-labelled association evidence for rendering boundary tests.</summary>
+    public AssociationEvidenceReference? AssociationEvidenceOverride { get; init; }
+
     private static readonly DateTimeOffset At = new(2026, 5, 31, 9, 0, 0, TimeSpan.Zero);
     private const string CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
     private bool _messageSubmitted;
@@ -128,7 +131,7 @@ internal sealed class FakeChatBotClient(string? submissionErrorCode = null) : IC
         string? taskId = null,
         CancellationToken cancellationToken = default)
     {
-        AssociationEvidenceReference evidence = new()
+        AssociationEvidenceReference evidence = AssociationEvidenceOverride ?? new()
         {
             EvidenceReference = "evidence-ref-1",
             EvidenceFingerprint = "fingerprint-1",
