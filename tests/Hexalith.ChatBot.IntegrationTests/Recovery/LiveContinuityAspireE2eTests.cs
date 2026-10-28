@@ -285,292 +285,293 @@ public sealed class LiveContinuityAspireE2eTests
             DateTimeOffset attemptStartedAtUtc = DateTimeOffset.UtcNow;
             InMemoryAuditWriter audit = new();
             InMemoryOperatorAlertSink alerts = new();
-            ContinuityDrillCoordinator coordinator = new(
-                runner,
-                audit,
-                alerts,
-                new SystemClock(),
-                evidence,
-                retentionFailures);
-
-            ContinuityDrillOutcome outcome = await coordinator
-                .RunAllScenariosAsync(tenantRef, runId, workflowToken)
-                .ConfigureAwait(true);
-
-            if (runner.Failures.Count > 0)
+            await RunRecoveryAttemptAsync(async () =>
             {
-                throw new AggregateException("Live continuity validation produced unmeasurable scenario failures.", runner.Failures);
-            }
+                ContinuityDrillCoordinator coordinator = new(
+                    runner,
+                    audit,
+                    alerts,
+                    new SystemClock(),
+                    evidence,
+                    retentionFailures);
 
-            AspireControlledLossPathOperations controlledLossOperations = new(operations);
-            LiveControlledLossPathRunner controlledLossRunner = new(controlledLossOperations, options);
-            ControlledLossPathReport controlledLossReport = await RunControlledLossStageAsync(
-                token => controlledLossRunner.RunAsync(tenantRef, runId, token),
-                evidence.RecordAsync,
-                retentionFailures,
-                retentionFailureDirectory,
-                options.Enabled,
-                runId,
-                attemptStartedAtUtc,
-                outcome.Alerted,
-                options.RestorationTimeout,
-                workflowToken).ConfigureAwait(true);
-
-            string recoveryDatasetPath = Path.Combine(
-                RepositoryRoot(),
-                "tests",
-                "Hexalith.ChatBot.IntegrationTests",
-                "Recovery",
-                "Datasets",
-                "recovery-baseline-v1.json");
-            RecoveryValidationDataset seedDataset = RecoveryValidationDataset.Load(recoveryDatasetPath, tenantRef);
-            RecoveryValidationDataset rebuildDataset = RecoveryValidationDataset.Load(recoveryDatasetPath, tenantRef);
-            RecoveryValidationDatasetDescriptor dataset = rebuildDataset.Descriptor;
-            dataset.Validate(
-                options.DatasetRef,
-                options.DatasetVersion,
-                options.DatasetVolume,
-                options.ProjectionSchemaVersion,
-                options.ValidationPartitionRef).ShouldBeNull();
-            seedDataset.ShouldNotBeSameAs(rebuildDataset);
-            seedDataset.SourceRecords.ShouldNotBeSameAs(rebuildDataset.SourceRecords);
-            InMemoryWormAuditStore seedWorm = new();
-            foreach (AuditEnvelope envelope in seedDataset.AuditEnvelopes)
-            {
-                _ = await seedWorm.AppendAsync(envelope, workflowToken).ConfigureAwait(true);
-            }
-
-            InMemoryWormAuditStore rebuildWorm = new();
-            foreach (AuditEnvelope envelope in rebuildDataset.AuditEnvelopes)
-            {
-                _ = await rebuildWorm.AppendAsync(envelope, workflowToken).ConfigureAwait(true);
-            }
-
-            ProjectionRebuildBaselineEvidence baselineEvidence = await LiveProjectionRebuildDriver.SeedBaselineAsync(
-                recoveryReadModels,
-                tenantRef,
-                seedDataset.Descriptor,
-                seedDataset.SourceRecords,
-                seedWorm.EnumerateChain(tenantRef),
-                workflowToken).ConfigureAwait(true);
-            freshPartitionTenant = LiveProjectionRebuildDriver.FreshPartitionTenant(
-                tenantRef,
-                options.ValidationPartitionRef,
-                runId);
-            rebuildFreshKeys = LiveProjectionRebuildDriver.ProjectionKeys(
-                freshPartitionTenant,
-                rebuildDataset.SourceRecords,
-                rebuildWorm.EnumerateChain(tenantRef).ToArray());
-            LiveProjectionRebuildDriver rebuildDriver = new(
-                rebuildDataset.SourceRecords,
-                rebuildWorm,
-                baselineEvidence,
-                recoveryReadModels,
-                recoveryReadModels,
-                dataset,
-                options,
-                new SystemClock());
-            CapturingProjectionRebuildDriver capturingRebuildDriver = new(rebuildDriver);
-            ProjectionRebuildValidationCoordinator rebuildCoordinator = new(
-                capturingRebuildDriver,
-                audit,
-                alerts,
-                new SystemClock(),
-                evidence,
-                retentionFailures);
-
-            ProjectionRebuildOutcome rebuildOutcome = await rebuildCoordinator
-                .RunAllAsync(tenantRef, [options.DatasetRef], runId, workflowToken)
-                .ConfigureAwait(true);
-
-            if (capturingRebuildDriver.Failures.Count > 0)
-            {
-                throw new AggregateException(
-                    "Live projection-rebuild validation produced unmeasurable scenario failures.",
-                    capturingRebuildDriver.Failures);
-            }
-
-            AspireScopedOutageOperations scopedOperations = new(
-                application,
-                security,
-                controlAccessToken,
-                mailboxClientSecret,
-                controllerSecret,
-                recoveryReadModels,
-                recoveryReadModels,
-                durableState);
-            LiveScopedOutageInjectionDriver liveScopedDriver = new(scopedOperations, options);
-            CapturingScopedOutageInjectionDriver scopedDriver = new(liveScopedDriver);
-            ScopedOutageDegradationValidationCoordinator scopedCoordinator = new(
-                scopedDriver,
-                audit,
-                alerts,
-                new SystemClock(),
-                evidence,
-                retentionFailures);
-
-            ScopedOutageDegradationOutcome scopedOutcome = await scopedCoordinator
-                .RunAllScenariosAsync(tenantRef, runId, workflowToken)
-                .ConfigureAwait(true);
-
-            if (scopedDriver.Failures.Count > 0)
-            {
-                throw new AggregateException(
-                    "Live scoped-outage validation produced unmeasurable scenario failures.",
-                    scopedDriver.Failures.Values);
-            }
-
-            int expectedEvidence = ContinuityDrillScenarios.All.Count + 2 + ScopedOutageDependencies.All.Count;
-
-            // The sinks' failure path writes a SECOND report+manifest pair for a substituted Unmeasurable report, so an
-            // exact count turned a genuine sink/manifest error into an opaque count mismatch. Require at least one pair
-            // per scenario and let the manifest contents (asserted below and by the gate) carry the real verdict.
-            // Directory enumeration itself can be the canonical failure. Treat an unreadable/disappearing root as
-            // zero evidence so the independent attempt summary below is still retained with a failed outcome.
-            string[] reportFiles = CanonicalEvidenceFiles(evidenceDirectory, "*.report.json");
-            string[] manifestFiles = CanonicalEvidenceFiles(evidenceDirectory, "*.manifest.json");
-
-            DateTimeOffset attemptCompletedAtUtc = DateTimeOffset.UtcNow;
-
-            // Derived from what the run actually produced, not asserted. This field is the one the gate branches on
-            // first, so hand-setting it to true meant the gate was handed its own answer. Continuity Missed and
-            // rebuild equivalence are part of success — not only Unmeasurable/Contained tallies.
-            bool attemptSucceeded =
-                runner.Failures.Count == 0 &&
-                capturingRebuildDriver.Failures.Count == 0 &&
-                scopedDriver.Failures.Count == 0 &&
-                outcome.Unmeasurable == 0 &&
-                outcome.Missed == 0 &&
-                outcome.Met == ContinuityDrillScenarios.All.Count &&
-                string.Equals(controlledLossReport.Verdict, ControlledLossPathVerdicts.Met, StringComparison.Ordinal) &&
-                controlledLossReport.MeasuredRpo > TimeSpan.Zero &&
-                rebuildOutcome.Unmeasurable == 0 &&
-                rebuildOutcome.Equivalent == 1 &&
-                rebuildOutcome.Divergent == 0 &&
-                rebuildOutcome.DurationExceeded == 0 &&
-                scopedOutcome.Unmeasurable == 0 &&
-                scopedOutcome.Contained == ScopedOutageDependencies.All.Count &&
-                scopedOutcome.Breached == 0 &&
-                scopedOutcome.ScopeRecordingExceeded == 0 &&
-                scopedOutcome.Alerted == 0 &&
-                manifestFiles.Length >= expectedEvidence;
-
-            Dictionary<string, int> alertsDeliveredByJob = new(StringComparer.Ordinal)
-            {
-                [LiveRecoveryValidationJobs.Continuity] = outcome.Alerted,
-                [LiveRecoveryValidationJobs.ControlledLossPath] = 0,
-                [LiveRecoveryValidationJobs.ProjectionRebuild] = rebuildOutcome.Alerted,
-                [LiveRecoveryValidationJobs.ScopedOutage] = scopedOutcome.Alerted,
-            };
-
-            // Retain the run's own observations in the independent workflow-owned side-channel root so the release
-            // gate can still reconstruct total canonical-directory loss from a fresh process. Alert counts and sweep
-            // completion are facts only this run can see; every threshold they are judged by comes from the release
-            // path's policy, not from here. The workflow stages this root once under `retention-failures`, yielding
-            // exactly one uploaded summary without depending on the canonical evidence directory.
-            // Enabled mirrors the configured option rather than a literal, and the summary is written BEFORE the
-            // outcome assertions below: hand-setting it to true, then only reaching the write on a fully passing run,
-            // made the gate's `live_validation_disabled` and `latest_attempt_incomplete` branches unreachable from any
-            // real artifact. A breached/missed/divergent sweep must still retain a summary saying so.
-            await WriteAttemptSummaryAsync(
-                retentionFailureDirectory,
-                options.Enabled,
-                runId,
-                attemptStartedAtUtc,
-                attemptCompletedAtUtc,
-                attemptSucceeded,
-                alertsDeliveredByJob,
-                cancellationToken).ConfigureAwait(true);
-
-            // Parse normal evidence only after the independent summary is durable. A truncated, unreadable, or
-            // concurrently removed canonical file must not erase the attempt-level observations needed by replay.
-            List<RecoveryValidationEvidenceManifest> manifests = [];
-            foreach (string manifestFile in manifestFiles)
-            {
-                await using FileStream stream = File.OpenRead(manifestFile);
-                RecoveryValidationEvidenceManifest? manifest = await JsonSerializer
-                    .DeserializeAsync<RecoveryValidationEvidenceManifest>(
-                        stream,
-                        new JsonSerializerOptions(JsonSerializerDefaults.Web),
-                        cancellationToken)
-                    .ConfigureAwait(true);
-                manifests.Add(manifest.ShouldNotBeNull());
-            }
-
-            // Load through the SAME bounded loader the out-of-process gate uses. A separate ad-hoc deserialize loop
-            // here applied neither the size bound nor the closed-schema rejection, so identical retained bytes could be
-            // accepted in-process and rejected after upload — and a corrupt marker threw instead of becoming an invalid
-            // candidate the gate can classify.
-            IReadOnlyList<RecoveryValidationEvidenceRetentionFailureMarker?> retentionFailureMarkers =
-                await LiveRecoveryEvidenceGateReplayTests
-                    .LoadRetentionFailureMarkersFromDirectoryAsync(
-                        retentionFailureDirectory,
-                        new JsonSerializerOptions(JsonSerializerDefaults.Web),
-                        cancellationToken)
+                ContinuityDrillOutcome outcome = await coordinator
+                    .RunAllScenariosAsync(tenantRef, runId, workflowToken)
                     .ConfigureAwait(true);
 
-            // Asserted only after the summary is durable, so a breached/missed/divergent sweep still leaves retained
-            // evidence for the independent gate to reject rather than failing here with nothing written.
-            outcome.ScenariosRun.ShouldBe(ContinuityDrillScenarios.All.Count);
-            outcome.Unmeasurable.ShouldBe(0);
-            outcome.Missed.ShouldBe(0);
-            outcome.Met.ShouldBe(ContinuityDrillScenarios.All.Count);
-            outcome.Alerted.ShouldBe(0);
-            controlledLossReport.Verdict.ShouldBe(ControlledLossPathVerdicts.Met);
-            controlledLossReport.MeasuredRpo.ShouldBeGreaterThan(TimeSpan.Zero);
-            controlledLossReport.MeasuredRpo.ShouldBeLessThanOrEqualTo(RecoveryTargets.MaxRpo);
-            controlledLossReport.PreFaultRetained.ShouldBeTrue();
-            controlledLossReport.CandidateRejected.ShouldBeTrue();
-            controlledLossReport.CandidateAbsent.ShouldBeTrue();
-            controlledLossReport.PostRecoveryRetained.ShouldBeTrue();
-            rebuildOutcome.TenantsValidated.ShouldBe(1);
-            rebuildOutcome.Equivalent.ShouldBe(1);
-            rebuildOutcome.Divergent.ShouldBe(0);
-            rebuildOutcome.DurationExceeded.ShouldBe(0);
-            rebuildOutcome.Unmeasurable.ShouldBe(0);
-            rebuildOutcome.Alerted.ShouldBe(0);
-            scopedOutcome.ScenariosValidated.ShouldBe(ScopedOutageDependencies.All.Count);
-            scopedOutcome.Contained.ShouldBe(ScopedOutageDependencies.All.Count);
-            scopedOutcome.Breached.ShouldBe(0);
-            scopedOutcome.ScopeRecordingExceeded.ShouldBe(0);
-            scopedOutcome.Unmeasurable.ShouldBe(0);
-            scopedOutcome.Alerted.ShouldBe(0);
+                if (runner.Failures.Count > 0)
+                {
+                    throw new AggregateException("Live continuity validation produced unmeasurable scenario failures.", runner.Failures);
+                }
 
-            LiveRecoveryValidationEvidenceAttempt attempt = new(
-                Enabled: options.Enabled,
-                RunId: runId,
-                StartedAtUtc: attemptStartedAtUtc,
-                CompletedAtUtc: attemptCompletedAtUtc,
-                LatestAttemptCompletedSuccessfully: attemptSucceeded,
-                Evidence: manifests,
-                RetentionFailureMarkers: retentionFailureMarkers,
-                AlertsDeliveredByJob: alertsDeliveredByJob);
+                AspireControlledLossPathOperations controlledLossOperations = new(operations);
+                LiveControlledLossPathRunner controlledLossRunner = new(controlledLossOperations, options);
+                ControlledLossPathReport controlledLossReport = await RunControlledLossAndRetainAsync(
+                    token => controlledLossRunner.RunAsync(tenantRef, runId, token),
+                    evidence.RecordAsync,
+                    retentionFailures,
+                    runId,
+                    options.RestorationTimeout,
+                    workflowToken).ConfigureAwait(true);
 
-            // Evaluate at a real wall-clock instant rather than reusing attemptCompletedAtUtc. Passing the completion
-            // timestamp back in made evaluatedAtUtc - CompletedAtUtc identically zero, so neither the attempt-level nor
-            // the per-manifest staleness branch could ever fire.
-            //
-            // This in-process evaluation is a fast smoke check only. The authoritative, independent evaluation runs in
-            // the separate `live-recovery-evidence-gate` workflow job (LiveRecoveryEvidenceGateReplayTests) against
-            // the uploaded artifact, so the run no longer grades its own homework.
-            LiveRecoveryValidationEvidenceGateDecision gate = LiveRecoveryValidationEvidenceGate.Evaluate(
-                attempt,
-                new LiveRecoveryValidationGatePolicy(
-                    ConfiguredProjectionDatasets: [options.DatasetRef],
-                    TargetDeviationsBlockRelease: true,
-                    RequiredDriverMode: RecoveryValidationEvidenceManifest.LiveDriverMode,
-                    MaximumEvidenceAge: options.MaximumEvidenceAge,
-                    ExpectedDatasetVersion: options.DatasetVersion,
-                    MinimumDatasetVolume: options.DatasetVolume,
-                    MaximumMeasurableRecoveryCeilingSeconds: options.RestorationTimeout.TotalSeconds),
-                DateTimeOffset.UtcNow);
-            gate.IsStopShip.ShouldBeFalse(string.Join(',', gate.StopShipReasons));
-            gate.TargetDeviationReasons.ShouldBeEmpty();
+                string recoveryDatasetPath = Path.Combine(
+                    RepositoryRoot(),
+                    "tests",
+                    "Hexalith.ChatBot.IntegrationTests",
+                    "Recovery",
+                    "Datasets",
+                    "recovery-baseline-v1.json");
+                RecoveryValidationDataset seedDataset = RecoveryValidationDataset.Load(recoveryDatasetPath, tenantRef);
+                RecoveryValidationDataset rebuildDataset = RecoveryValidationDataset.Load(recoveryDatasetPath, tenantRef);
+                RecoveryValidationDatasetDescriptor dataset = rebuildDataset.Descriptor;
+                dataset.Validate(
+                    options.DatasetRef,
+                    options.DatasetVersion,
+                    options.DatasetVolume,
+                    options.ProjectionSchemaVersion,
+                    options.ValidationPartitionRef).ShouldBeNull();
+                seedDataset.ShouldNotBeSameAs(rebuildDataset);
+                seedDataset.SourceRecords.ShouldNotBeSameAs(rebuildDataset.SourceRecords);
+                InMemoryWormAuditStore seedWorm = new();
+                foreach (AuditEnvelope envelope in seedDataset.AuditEnvelopes)
+                {
+                    _ = await seedWorm.AppendAsync(envelope, workflowToken).ConfigureAwait(true);
+                }
 
-            reportFiles.Length.ShouldBeGreaterThanOrEqualTo(expectedEvidence);
-            manifestFiles.Length.ShouldBe(
-                reportFiles.Length,
-                "Every retained report must have a matching evidence manifest.");
+                InMemoryWormAuditStore rebuildWorm = new();
+                foreach (AuditEnvelope envelope in rebuildDataset.AuditEnvelopes)
+                {
+                    _ = await rebuildWorm.AppendAsync(envelope, workflowToken).ConfigureAwait(true);
+                }
+
+                ProjectionRebuildBaselineEvidence baselineEvidence = await LiveProjectionRebuildDriver.SeedBaselineAsync(
+                    recoveryReadModels,
+                    tenantRef,
+                    seedDataset.Descriptor,
+                    seedDataset.SourceRecords,
+                    seedWorm.EnumerateChain(tenantRef),
+                    workflowToken).ConfigureAwait(true);
+                freshPartitionTenant = LiveProjectionRebuildDriver.FreshPartitionTenant(
+                    tenantRef,
+                    options.ValidationPartitionRef,
+                    runId);
+                rebuildFreshKeys = LiveProjectionRebuildDriver.ProjectionKeys(
+                    freshPartitionTenant,
+                    rebuildDataset.SourceRecords,
+                    rebuildWorm.EnumerateChain(tenantRef).ToArray());
+                LiveProjectionRebuildDriver rebuildDriver = new(
+                    rebuildDataset.SourceRecords,
+                    rebuildWorm,
+                    baselineEvidence,
+                    recoveryReadModels,
+                    recoveryReadModels,
+                    dataset,
+                    options,
+                    new SystemClock());
+                CapturingProjectionRebuildDriver capturingRebuildDriver = new(rebuildDriver);
+                ProjectionRebuildValidationCoordinator rebuildCoordinator = new(
+                    capturingRebuildDriver,
+                    audit,
+                    alerts,
+                    new SystemClock(),
+                    evidence,
+                    retentionFailures);
+
+                ProjectionRebuildOutcome rebuildOutcome = await rebuildCoordinator
+                    .RunAllAsync(tenantRef, [options.DatasetRef], runId, workflowToken)
+                    .ConfigureAwait(true);
+
+                if (capturingRebuildDriver.Failures.Count > 0)
+                {
+                    throw new AggregateException(
+                        "Live projection-rebuild validation produced unmeasurable scenario failures.",
+                        capturingRebuildDriver.Failures);
+                }
+
+                AspireScopedOutageOperations scopedOperations = new(
+                    application,
+                    security,
+                    controlAccessToken,
+                    mailboxClientSecret,
+                    controllerSecret,
+                    recoveryReadModels,
+                    recoveryReadModels,
+                    durableState);
+                LiveScopedOutageInjectionDriver liveScopedDriver = new(scopedOperations, options);
+                CapturingScopedOutageInjectionDriver scopedDriver = new(liveScopedDriver);
+                ScopedOutageDegradationValidationCoordinator scopedCoordinator = new(
+                    scopedDriver,
+                    audit,
+                    alerts,
+                    new SystemClock(),
+                    evidence,
+                    retentionFailures);
+
+                ScopedOutageDegradationOutcome scopedOutcome = await scopedCoordinator
+                    .RunAllScenariosAsync(tenantRef, runId, workflowToken)
+                    .ConfigureAwait(true);
+
+                if (scopedDriver.Failures.Count > 0)
+                {
+                    throw new AggregateException(
+                        "Live scoped-outage validation produced unmeasurable scenario failures.",
+                        scopedDriver.Failures.Values);
+                }
+
+                int expectedEvidence = ContinuityDrillScenarios.All.Count + 2 + ScopedOutageDependencies.All.Count;
+
+                // The sinks' failure path writes a SECOND report+manifest pair for a substituted Unmeasurable report, so an
+                // exact count turned a genuine sink/manifest error into an opaque count mismatch. Require at least one pair
+                // per scenario and let the manifest contents (asserted below and by the gate) carry the real verdict.
+                // Directory enumeration itself can be the canonical failure. Treat an unreadable/disappearing root as
+                // zero evidence so the independent attempt summary below is still retained with a failed outcome.
+                string[] reportFiles = CanonicalEvidenceFiles(evidenceDirectory, "*.report.json");
+                string[] manifestFiles = CanonicalEvidenceFiles(evidenceDirectory, "*.manifest.json");
+
+                DateTimeOffset attemptCompletedAtUtc = DateTimeOffset.UtcNow;
+
+                // Derived from what the run actually produced, not asserted. This field is the one the gate branches on
+                // first, so hand-setting it to true meant the gate was handed its own answer. Continuity Missed and
+                // rebuild equivalence are part of success — not only Unmeasurable/Contained tallies.
+                bool attemptSucceeded =
+                    runner.Failures.Count == 0 &&
+                    capturingRebuildDriver.Failures.Count == 0 &&
+                    scopedDriver.Failures.Count == 0 &&
+                    outcome.Unmeasurable == 0 &&
+                    outcome.Missed == 0 &&
+                    outcome.Met == ContinuityDrillScenarios.All.Count &&
+                    string.Equals(controlledLossReport.Verdict, ControlledLossPathVerdicts.Met, StringComparison.Ordinal) &&
+                    controlledLossReport.MeasuredRpo > TimeSpan.Zero &&
+                    rebuildOutcome.Unmeasurable == 0 &&
+                    rebuildOutcome.Equivalent == 1 &&
+                    rebuildOutcome.Divergent == 0 &&
+                    rebuildOutcome.DurationExceeded == 0 &&
+                    scopedOutcome.Unmeasurable == 0 &&
+                    scopedOutcome.Contained == ScopedOutageDependencies.All.Count &&
+                    scopedOutcome.Breached == 0 &&
+                    scopedOutcome.ScopeRecordingExceeded == 0 &&
+                    scopedOutcome.Alerted == 0 &&
+                    manifestFiles.Length >= expectedEvidence;
+
+                Dictionary<string, int> alertsDeliveredByJob = new(StringComparer.Ordinal)
+                {
+                    [LiveRecoveryValidationJobs.Continuity] = outcome.Alerted,
+                    [LiveRecoveryValidationJobs.ControlledLossPath] = 0,
+                    [LiveRecoveryValidationJobs.ProjectionRebuild] = rebuildOutcome.Alerted,
+                    [LiveRecoveryValidationJobs.ScopedOutage] = scopedOutcome.Alerted,
+                };
+
+                // Retain the run's own observations in the independent workflow-owned side-channel root so the release
+                // gate can still reconstruct total canonical-directory loss from a fresh process. Alert counts and sweep
+                // completion are facts only this run can see; every threshold they are judged by comes from the release
+                // path's policy, not from here. The workflow stages this root once under `retention-failures`, yielding
+                // exactly one uploaded summary without depending on the canonical evidence directory.
+                // Enabled mirrors the configured option rather than a literal, and the summary is written BEFORE the
+                // outcome assertions below: hand-setting it to true, then only reaching the write on a fully passing run,
+                // made the gate's `live_validation_disabled` and `latest_attempt_incomplete` branches unreachable from any
+                // real artifact. A breached/missed/divergent sweep must still retain a summary saying so.
+                await WriteAttemptSummaryAsync(
+                    retentionFailureDirectory,
+                    options.Enabled,
+                    runId,
+                    attemptStartedAtUtc,
+                    attemptCompletedAtUtc,
+                    attemptSucceeded,
+                    alertsDeliveredByJob,
+                    cancellationToken).ConfigureAwait(true);
+
+                // Parse normal evidence only after the independent summary is durable. A truncated, unreadable, or
+                // concurrently removed canonical file must not erase the attempt-level observations needed by replay.
+                List<RecoveryValidationEvidenceManifest> manifests = [];
+                foreach (string manifestFile in manifestFiles)
+                {
+                    FileStream stream = File.OpenRead(manifestFile);
+                    await using ConfiguredAsyncDisposable streamScope = stream.ConfigureAwait(true);
+                    RecoveryValidationEvidenceManifest? manifest = await JsonSerializer
+                        .DeserializeAsync<RecoveryValidationEvidenceManifest>(
+                            stream,
+                            new JsonSerializerOptions(JsonSerializerDefaults.Web),
+                            cancellationToken)
+                        .ConfigureAwait(true);
+                    manifests.Add(manifest.ShouldNotBeNull());
+                }
+
+                // Load through the SAME bounded loader the out-of-process gate uses. A separate ad-hoc deserialize loop
+                // here applied neither the size bound nor the closed-schema rejection, so identical retained bytes could be
+                // accepted in-process and rejected after upload — and a corrupt marker threw instead of becoming an invalid
+                // candidate the gate can classify.
+                IReadOnlyList<RecoveryValidationEvidenceRetentionFailureMarker?> retentionFailureMarkers =
+                    await LiveRecoveryEvidenceGateReplayTests
+                        .LoadRetentionFailureMarkersFromDirectoryAsync(
+                            retentionFailureDirectory,
+                            new JsonSerializerOptions(JsonSerializerDefaults.Web),
+                            cancellationToken)
+                        .ConfigureAwait(true);
+
+                // Asserted only after the summary is durable, so a breached/missed/divergent sweep still leaves retained
+                // evidence for the independent gate to reject rather than failing here with nothing written.
+                outcome.ScenariosRun.ShouldBe(ContinuityDrillScenarios.All.Count);
+                outcome.Unmeasurable.ShouldBe(0);
+                outcome.Missed.ShouldBe(0);
+                outcome.Met.ShouldBe(ContinuityDrillScenarios.All.Count);
+                outcome.Alerted.ShouldBe(0);
+                controlledLossReport.Verdict.ShouldBe(ControlledLossPathVerdicts.Met);
+                controlledLossReport.MeasuredRpo.ShouldBeGreaterThan(TimeSpan.Zero);
+                controlledLossReport.MeasuredRpo.ShouldBeLessThanOrEqualTo(RecoveryTargets.MaxRpo);
+                controlledLossReport.PreFaultRetained.ShouldBeTrue();
+                controlledLossReport.CandidateRejected.ShouldBeTrue();
+                controlledLossReport.CandidateAbsent.ShouldBeTrue();
+                controlledLossReport.PostRecoveryRetained.ShouldBeTrue();
+                rebuildOutcome.TenantsValidated.ShouldBe(1);
+                rebuildOutcome.Equivalent.ShouldBe(1);
+                rebuildOutcome.Divergent.ShouldBe(0);
+                rebuildOutcome.DurationExceeded.ShouldBe(0);
+                rebuildOutcome.Unmeasurable.ShouldBe(0);
+                rebuildOutcome.Alerted.ShouldBe(0);
+                scopedOutcome.ScenariosValidated.ShouldBe(ScopedOutageDependencies.All.Count);
+                scopedOutcome.Contained.ShouldBe(ScopedOutageDependencies.All.Count);
+                scopedOutcome.Breached.ShouldBe(0);
+                scopedOutcome.ScopeRecordingExceeded.ShouldBe(0);
+                scopedOutcome.Unmeasurable.ShouldBe(0);
+                scopedOutcome.Alerted.ShouldBe(0);
+
+                LiveRecoveryValidationEvidenceAttempt attempt = new(
+                    Enabled: options.Enabled,
+                    RunId: runId,
+                    StartedAtUtc: attemptStartedAtUtc,
+                    CompletedAtUtc: attemptCompletedAtUtc,
+                    LatestAttemptCompletedSuccessfully: attemptSucceeded,
+                    Evidence: manifests,
+                    RetentionFailureMarkers: retentionFailureMarkers,
+                    AlertsDeliveredByJob: alertsDeliveredByJob);
+
+                // Evaluate at a real wall-clock instant rather than reusing attemptCompletedAtUtc. Passing the completion
+                // timestamp back in made evaluatedAtUtc - CompletedAtUtc identically zero, so neither the attempt-level nor
+                // the per-manifest staleness branch could ever fire.
+                //
+                // This in-process evaluation is a fast smoke check only. The authoritative, independent evaluation runs in
+                // the separate `live-recovery-evidence-gate` workflow job (LiveRecoveryEvidenceGateReplayTests) against
+                // the uploaded artifact, so the run no longer grades its own homework.
+                LiveRecoveryValidationEvidenceGateDecision gate = LiveRecoveryValidationEvidenceGate.Evaluate(
+                    attempt,
+                    new LiveRecoveryValidationGatePolicy(
+                        ConfiguredProjectionDatasets: [options.DatasetRef],
+                        TargetDeviationsBlockRelease: true,
+                        RequiredDriverMode: RecoveryValidationEvidenceManifest.LiveDriverMode,
+                        MaximumEvidenceAge: options.MaximumEvidenceAge,
+                        ExpectedDatasetVersion: options.DatasetVersion,
+                        MinimumDatasetVolume: options.DatasetVolume,
+                        MaximumMeasurableRecoveryCeilingSeconds: options.RestorationTimeout.TotalSeconds),
+                    DateTimeOffset.UtcNow);
+                gate.IsStopShip.ShouldBeFalse(string.Join(',', gate.StopShipReasons));
+                gate.TargetDeviationReasons.ShouldBeEmpty();
+
+                reportFiles.Length.ShouldBeGreaterThanOrEqualTo(expectedEvidence);
+                manifestFiles.Length.ShouldBe(
+                    reportFiles.Length,
+                    "Every retained report must have a matching evidence manifest.");
+            }, retentionFailureDirectory, options.Enabled, runId, attemptStartedAtUtc, alerts,
+                options.RestorationTimeout).ConfigureAwait(true);
         }
         finally
         {
@@ -599,71 +600,55 @@ public sealed class LiveContinuityAspireE2eTests
         }
     }
 
-    /// <summary>
-    /// Runs the controlled-loss stage and, when it fails, retains the incomplete attempt summary the out-of-process
-    /// gate reads for <c>latest_attempt_incomplete</c> before rethrowing. Extracted from the Tier-3 fact so the
-    /// summary's destination directory and its false completion flag are pinned by an executing test rather than by
-    /// a source-text assertion: writing it to the canonical evidence directory, or with the flag left true, would
-    /// otherwise be invisible outside a hosted run.
-    /// </summary>
-    internal static async ValueTask<ControlledLossPathReport> RunControlledLossStageAsync(
-        Func<CancellationToken, ValueTask<ControlledLossPathReport>> run,
-        Func<ControlledLossPathReport, CancellationToken, ValueTask> retain,
-        IRecoveryValidationEvidenceRetentionFailureSink retentionFailures,
-        string retentionFailureDirectory,
+    /// <summary>Retains an incomplete independent attempt summary after any coordinator-stage failure.</summary>
+    /// <param name="run">The complete coordinator sequence, including setup and final assertions.</param>
+    /// <param name="directory">The workflow-owned independent summary directory.</param>
+    /// <param name="enabled">Whether the live attempt is enabled.</param>
+    /// <param name="runId">The attempt's correlation identifier.</param>
+    /// <param name="startedAtUtc">The original attempt start.</param>
+    /// <param name="alerts">Successfully delivered alerts observed by this attempt.</param>
+    /// <param name="summaryTimeout">The independent failure-retention budget.</param>
+    /// <returns>Completion after the sequence, or the original failure after retention.</returns>
+    internal static async ValueTask RunRecoveryAttemptAsync(
+        Func<ValueTask> run,
+        string directory,
         bool enabled,
         string runId,
-        DateTimeOffset attemptStartedAtUtc,
-        int continuityAlertsDelivered,
-        TimeSpan markerTimeout,
-        CancellationToken cancellationToken)
+        DateTimeOffset startedAtUtc,
+        InMemoryOperatorAlertSink alerts,
+        TimeSpan summaryTimeout)
     {
         try
         {
-            return await RunControlledLossAndRetainAsync(
-                run,
-                retain,
-                retentionFailures,
-                runId,
-                markerTimeout,
-                cancellationToken).ConfigureAwait(false);
+            await run().ConfigureAwait(false);
         }
-        catch (Exception controlledFailure)
+        catch (Exception primaryFailure)
         {
-            // Stages after this one never constructed their coordinators, so no alert was delivered for them. The
-            // incomplete flag below is what stops the release; these counts only keep the delivery accounting honest.
-            Dictionary<string, int> failedAlertCounts = new(StringComparer.Ordinal)
+            IReadOnlyList<OperatorAlert> delivered = alerts.Alerts
+                .Where(alert => string.Equals(alert.CorrelationId, runId, StringComparison.Ordinal)).ToArray();
+            Dictionary<string, int> counts = new(StringComparer.Ordinal)
             {
-                [LiveRecoveryValidationJobs.Continuity] = continuityAlertsDelivered,
+                [LiveRecoveryValidationJobs.Continuity] = delivered.Count(alert => alert.Kind == OperatorAlertKind.ContinuityDrillTargetMissed),
                 [LiveRecoveryValidationJobs.ControlledLossPath] = 0,
-                [LiveRecoveryValidationJobs.ProjectionRebuild] = 0,
-                [LiveRecoveryValidationJobs.ScopedOutage] = 0,
+                [LiveRecoveryValidationJobs.ProjectionRebuild] = delivered.Count(alert => alert.Kind == OperatorAlertKind.ProjectionRebuildValidationFailed),
+                [LiveRecoveryValidationJobs.ScopedOutage] = delivered.Count(alert => alert.Kind == OperatorAlertKind.ScopedOutageDegradationBreach),
             };
-            Exception? summaryFailure = null;
             try
             {
-                using CancellationTokenSource summaryDeadline = new(markerTimeout);
-                await WriteAttemptSummaryAsync(
-                    retentionFailureDirectory,
-                    enabled,
-                    runId,
-                    attemptStartedAtUtc,
-                    DateTimeOffset.UtcNow,
-                    latestAttemptCompletedSuccessfully: false,
-                    failedAlertCounts,
-                    summaryDeadline.Token).ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                summaryFailure = exception;
-            }
+                using CancellationTokenSource deadline = new(summaryTimeout);
+                if (summaryTimeout == TimeSpan.Zero)
+                {
+                    await deadline.CancelAsync().ConfigureAwait(false);
+                }
 
-            if (summaryFailure is not null)
+                deadline.Token.ThrowIfCancellationRequested();
+                await WriteAttemptSummaryAsync(directory, enabled, runId, startedAtUtc, DateTimeOffset.UtcNow,
+                    latestAttemptCompletedSuccessfully: false, counts, deadline.Token).ConfigureAwait(false);
+            }
+            catch (Exception retentionFailure)
             {
-                throw new AggregateException(
-                    "The controlled-loss run failed and its attempt summary could not be retained.",
-                    controlledFailure,
-                    summaryFailure);
+                throw new AggregateException("The recovery attempt failed and its summary could not be retained.",
+                    primaryFailure, retentionFailure);
             }
 
             throw;

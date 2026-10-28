@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 1,
+  "recordKind": "local-maintenance-verification",
+  "createdAtUtc": "2026-10-28T14:36:10.698017+00:00",
+  "baselineCommit": "4697c67b6c1d72aed07a27f121c9b0be34e80bce",
+  "specPath": "_bmad-output/implementation-artifacts/spec-five-deferred-evidence-completeness.md",
+  "items": [
+    "DW-61",
+    "DW-95",
+    "DW-135",
+    "inactive identity JSON duplicate-member containment",
+    "one bounded identity inventory per Detect invocation"
+  ],
+  "changedSourceSha256": {
+    ".github/scripts/project-recovery-results.sh": "510c6be14230bd6bb69b6c5d9205e12f22ff08ba9031b934cd7659097989837d",
+    ".github/scripts/tests/test_recovery_result_projection.py": "4a162922bd4af62538956ed2fbcf84d69766bc46a582325e723f87c9fe94a86d",
+    ".github/workflows/ci.yml": "e954755ce8c5560a5e195ef6287c100ddf7847233c66dab0f7950d0b0cd7b061",
+    ".github/workflows/release.yml": "b5430e9d56bfc03a0389d30bb7ecc49e09d4ae27ee674d34c4179cd9f7fcf558",
+    "_bmad-output/implementation-artifacts/deferred-work.md": "814180ff1cfb50b5f5d35a6a36945b88c9049358206d807a9d2c3955d9b0c03c",
+    "_bmad-output/implementation-artifacts/spec-five-deferred-evidence-completeness.md": "edf8604f99ee6516414dbae2862bfb0fe8d17e1252df45a846685fe482b5058d",
+    "docs/adrs/live-recovery-validation-drivers.md": "a670433819d242f50def91b92af38e906cbab47b3f5230c83de542b6a785cd79",
+    "docs/story-evidence-integrity.md": "4207d96ab758197c2278e07b024cff02c01c31b025e755cdc205e6dffb28979f",
+    "src/Hexalith.ChatBot.Server/Audit/LiveRecoveryValidationEvidenceGate.cs": "4da7e85da9741ab74ced2df3bcd99d1b61517a3b3c0632b335365e28e9614b68",
+    "tests/Hexalith.ChatBot.Architecture.Tests/LiveRecoveryValidationArchitectureTests.cs": "6fc6499794cc9fdf44589e878f5641b49e30a72ef8ba62573489c31143ea2f5b",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/FileRecoveryValidationEvidenceSink.cs": "fcc13b16b8b7f1260ef3354a3028ef9e44a9768b2981048ee2228c8aea32eecc",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/FileRecoveryValidationEvidenceSinkTests.cs": "b7eb98ef090b33b7acb4984359e9441757d6078b63c4fbd379d06011053c0c87",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eContractTests.cs": "9334dfe6de3fc324a0e1620622c3b6117c78946f37d45b70089a3c1b75a71edc",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs": "55d4761961ea4928da0b75af20ead7b2251df1e8f032c789823cd01ca477f4b9",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveRecoveryEvidenceGateReplayTests.cs": "37e49265ae8b55f33584efe0472897a5b23689ce20b487d232e04562e7955b70",
+    "tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryAttemptFailureBoundaryTests.cs": "72cb7dcaa2520a8e900a868de95c79dc0eed509f2e8e439b8d5407217c90c2e3",
+    "tests/Hexalith.ChatBot.Server.Tests/Audit/LiveRecoveryValidationEvidenceGateTests.cs": "073c695516e3c69ecb2497e01dea20b1c7eb0aaf35163d6540450afe8546431d",
+    "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/StoryEvidenceGateTests.cs": "cdc6999cbe3af2a53007bbeb4b6430cf70021b366fd3dfaa46f19e8bc1d0b898",
+    "tools/Hexalith.ChatBot.StoryEvidenceGate/RecoveryAttemptSummarizer.cs": "64030514927840fc23b621188d08cc86303725955aba69ed04763bce5761f8a3",
+    "tools/Hexalith.ChatBot.StoryEvidenceGate/RecoveryTrxSanitizer.cs": "aedada432a98d6d68474dbfd31aca419a022f02abfff7a5ce45711478fbcaf42",
+    "tools/Hexalith.ChatBot.StoryEvidenceGate/TransitionDetector.cs": "104fa2b7903ee22e8755685c3e82a7d9f3ebc2cb3fe291274a310663bdbf30c9"
+  },
+  "reports": {
+    "gate": {
+      "summary": {
+        "tests": 331,
+        "passed": 331,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793197965086,
+        "stop": 1793197994327,
+        "duration": 29241
+      },
+      "failedTests": [],
+      "skippedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-completeness-gate.ctrf.json",
+          "sha256": "4873fc46317fd98270ed2bb7da0228aaad7fc420d95e62feb0dc3dd625ba2516"
+        },
+        {
+          "path": "TestResults/five-completeness-gate.trx",
+          "sha256": "555d12ea21fc574641506cf6f6377a4627d964b5f73599f621f42b702d4083dd"
+        }
+      ]
+    },
+    "server": {
+      "summary": {
+        "tests": 3535,
+        "passed": 3535,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793197527842,
+        "stop": 1793197626268,
+        "duration": 98426
+      },
+      "failedTests": [],
+      "skippedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-completeness-server.ctrf.json",
+          "sha256": "6c65418987d79ea67ab403dc4826fc69fb27b790384cf0a64cc9afc2da36466e"
+        },
+        {
+          "path": "TestResults/five-completeness-server.trx",
+          "sha256": "bd82baa9990002b26625f9fd4ccde20d16b1dfd742b74df34776177eab63c472"
+        }
+      ]
+    },
+    "integration": {
+      "summary": {
+        "tests": 491,
+        "passed": 484,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 7,
+        "other": 0,
+        "suites": 1,
+        "start": 1793198008264,
+        "stop": 1793198018119,
+        "duration": 9855
+      },
+      "failedTests": [],
+      "skippedTests": [
+        "Hexalith.ChatBot.IntegrationTests.Recovery.LiveRecoveryEvidenceGateReplayTests.RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess",
+        "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.CorrectionPropagationWorkflowRuntimeShouldBeHealthyInRealDaprTopology",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.CommittedGovernedStateShouldPassM2StopShipSweepsInRealDaprTopology",
+        "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.GovernedNoteShouldProjectIdenticalDurableEndStateRegardlessOfDeclaredOrigin",
+        "Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests.AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix"
+      ],
+      "artifacts": [
+        {
+          "path": "TestResults/five-completeness-integration.ctrf.json",
+          "sha256": "8e0ba2f7cae19494850494ad1ad04e390fd35fe5568c7160299d0c400ff92e86"
+        },
+        {
+          "path": "TestResults/five-completeness-integration.trx",
+          "sha256": "700524e0964872ff62f851ef4ee97f5173ba44e474c6bc747d9714d28efd7999"
+        }
+      ]
+    },
+    "architecture": {
+      "summary": {
+        "tests": 21,
+        "passed": 21,
+        "failed": 0,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793198001306,
+        "stop": 1793198001459,
+        "duration": 153
+      },
+      "failedTests": [],
+      "skippedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-completeness-architecture.ctrf.json",
+          "sha256": "46150540e3616ed580eca5c72d4ebab21be533ca3a3604f144e4701f1a1b26b3"
+        },
+        {
+          "path": "TestResults/five-completeness-architecture.trx",
+          "sha256": "d2091a3733ca839164d52534f87803be317797802a6166171adfc08ff46246c7"
+        }
+      ]
+    },
+    "architecture-all": {
+      "summary": {
+        "tests": 162,
+        "passed": 161,
+        "failed": 1,
+        "pending": 0,
+        "skipped": 0,
+        "other": 0,
+        "suites": 1,
+        "start": 1793198095520,
+        "stop": 1793198099885,
+        "duration": 4365
+      },
+      "failedTests": [
+        {
+          "name": "Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests.RootDeclaredSiblingPackageWrappersShouldDelegateVersionsToSharedBuildsCatalog",
+          "message": "System.InvalidOperationException : The package wrapper '/home/administrator/projects/hexalith/chatbot/references/Hexalith.FrontComposer/Directory.Packages.props' changes 'Hexalith.EventStore.Admin.Abstractions' from catalog version '3.128.3' to '3.128.2'."
+        }
+      ],
+      "skippedTests": [],
+      "artifacts": [
+        {
+          "path": "TestResults/five-completeness-architecture-all.ctrf.json",
+          "sha256": "fbd6c0e90151e1b7d9d64769f192f5fd4366a0ed72cb7027d567d8ed993a2cbe"
+        },
+        {
+          "path": "TestResults/five-completeness-architecture-all.trx",
+          "sha256": "f36e4e23d3716c6caf4914616e3a57dd0ec46f782c3dd48e7bcb1d468701166b"
+        }
+      ]
+    }
+  },
+  "commands": [
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj -c Debug --no-dependencies --no-restore -m:1 -p:NuGetAudit=false",
+      "exitCode": 0
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj -c Debug --no-dependencies --no-restore -m:1 -p:NuGetAudit=false",
+      "exitCode": 0
+    },
+    {
+      "command": "dotnet build tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj -c Debug -m:1 -p:NuGetAudit=false",
+      "exitCode": 0
+    },
+    {
+      "command": "python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj -c Debug --no-dependencies -m:1 -p:NuGetAudit=false",
+      "exitCode": 0
+    },
+    {
+      "command": "python3 -m unittest discover -s .github/scripts/tests -p test_story_evidence_guards.py -v",
+      "exitCode": 0,
+      "testsPassed": 14
+    },
+    {
+      "command": "python3 -m unittest discover -s .github/scripts/tests -p test_recovery_result_projection.py -v",
+      "exitCode": 0,
+      "testsPassed": 6
+    },
+    {
+      "command": "actionlint .github/workflows/ci.yml .github/workflows/release.yml",
+      "exitCode": 0
+    },
+    {
+      "command": "bash -n .github/scripts/project-recovery-results.sh",
+      "exitCode": 0
+    },
+    {
+      "command": "bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Debug/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests TestResults/five-completeness-gate.ctrf.json -result-trx TestResults/five-completeness-gate.trx",
+      "exitCode": 0
+    },
+    {
+      "command": "bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests TestResults/five-completeness-server.ctrf.json -parallel none -result-trx TestResults/five-completeness-server.trx",
+      "exitCode": 0
+    },
+    {
+      "command": "bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests TestResults/five-completeness-integration.ctrf.json -result-trx TestResults/five-completeness-integration.trx",
+      "exitCode": 0
+    },
+    {
+      "command": "bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests TestResults/five-completeness-architecture.ctrf.json -class Hexalith.ChatBot.Architecture.Tests.LiveRecoveryValidationArchitectureTests -result-trx TestResults/five-completeness-architecture.trx",
+      "exitCode": 0
+    },
+    {
+      "command": "bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests TestResults/five-completeness-architecture-all.ctrf.json -result-trx TestResults/five-completeness-architecture-all.trx",
+      "exitCode": 1
+    }
+  ],
+  "aspireBaseline": {
+    "startCommand": "python3 .github/scripts/with-source-mapping.py aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+    "inspectCommand": "aspire describe --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --format Json",
+    "resourcesRunningHealthy": 44,
+    "stopCommand": "aspire stop --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+    "allExitCodes": 0
+  },
+  "review": {
+    "layer": "blind-hunter",
+    "findings": 10,
+    "patched": 10,
+    "correctionRecheck": "No concrete remaining defects; six executable projection scenarios pass.",
+    "newDeferrals": 0
+  },
+  "limitations": [
+    "Full Architecture has one unchanged FrontComposer catalog mismatch: Hexalith.EventStore.Admin.Abstractions 3.128.2 versus Builds 3.128.3; focused affected Architecture passes.",
+    "Seven Integration opt-in live/retained/browser tests were skipped.",
+    "No current-run live recovery primary or A10/release qualification; spec remains in-review under repository evidence policy.",
+    "NuGetAudit=false is an environment validation pin, not a tracked gate or dependency change.",
+    "Source mapping retained existing HXW009/HXW011 advisories; dependencies and submodule contents are unchanged."
+  ]
+}

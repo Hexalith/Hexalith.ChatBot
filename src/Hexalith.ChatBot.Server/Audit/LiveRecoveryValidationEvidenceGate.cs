@@ -161,6 +161,12 @@ internal static class LiveRecoveryValidationEvidenceGate
                 invalidManifests.Add(manifest);
             }
 
+            if (manifest.ResidualIds is null || RequiredResidualsFor(manifest.JobId, manifest.Scenario)
+                .Except(manifest.ResidualIds, StringComparer.Ordinal).Any())
+            {
+                stopShip.Add($"{SafeJob(manifest.JobId)}:required_residual_missing");
+            }
+
             if (!string.Equals(manifest.RunId, attempt.RunId, StringComparison.Ordinal))
             {
                 stopShip.Add($"{SafeJob(manifest.JobId)}:run_mismatch");
@@ -744,4 +750,22 @@ internal static class LiveRecoveryValidationEvidenceGate
 
     private static string SafeJob(string jobId)
         => LiveRecoveryValidationJobs.All.Contains(jobId) ? jobId : "unknown_live_job";
+    /// <summary>Returns the minimum disclosed limitations for each composed recovery scenario.</summary>
+    /// <param name="reportKind">The recovery job kind.</param>
+    /// <param name="scenario">The canonical scenario.</param>
+    /// <returns>The gate-owned residual identifiers the manifest must retain.</returns>
+    internal static IReadOnlyList<string> RequiredResidualsFor(string reportKind, string scenario)
+        => (reportKind, scenario) switch
+        {
+            // The controlled-loss drill faults and restores the same composed Graph/subscription boundary as the
+            // M365 continuity scenario, so it inherits RV-EXT-M365: no live Graph resource is exercised. Omitting
+            // it here would let the one manifest that carries the RPO claim under-declare its own boundary limit.
+            ("continuity", ContinuityDrillScenarios.M365SubscriptionFailure) or
+            ("controlled-loss-path", _) or
+            ("scoped-outage", ScopedOutageDependencies.Graph) =>
+                ["RV-EXT-M365", "RV-PROD-CONTROL", "RV-PROVIDER-SCALE", "RV-EVIDENCE-KINDS"],
+            ("projection-rebuild", _) or ("scoped-outage", ScopedOutageDependencies.AuditStore) =>
+                ["RV-DURABLE-WORM", "RV-PROD-CONTROL", "RV-PROVIDER-SCALE", "RV-EVIDENCE-KINDS"],
+            _ => ["RV-PROD-CONTROL", "RV-PROVIDER-SCALE", "RV-EVIDENCE-KINDS"],
+        };
 }

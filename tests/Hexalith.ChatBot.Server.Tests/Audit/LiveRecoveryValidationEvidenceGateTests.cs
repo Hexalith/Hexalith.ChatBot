@@ -12,6 +12,47 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
     private static readonly DateTimeOffset Now = new(2026, 8, 1, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void EveryScenarioMustDiscloseAllItsRequiredResidualsAndMayDiscloseMore()
+    {
+        LiveRecoveryValidationEvidenceAttempt complete = CompleteAttempt();
+        foreach (RecoveryValidationEvidenceManifest manifest in complete.Evidence)
+        {
+            string[] expected = ["RV-PROD-CONTROL", "RV-PROVIDER-SCALE", "RV-EVIDENCE-KINDS"];
+            if ((manifest.JobId == "continuity" && manifest.Scenario == ContinuityDrillScenarios.M365SubscriptionFailure)
+                || manifest.JobId == "controlled-loss-path"
+                || (manifest.JobId == "scoped-outage" && manifest.Scenario == ScopedOutageDependencies.Graph))
+            {
+                expected = [.. expected, "RV-EXT-M365"];
+            }
+            else if (manifest.JobId == "projection-rebuild"
+                || (manifest.JobId == "scoped-outage" && manifest.Scenario == ScopedOutageDependencies.AuditStore))
+            {
+                expected = [.. expected, "RV-DURABLE-WORM"];
+            }
+
+            LiveRecoveryValidationEvidenceGate.RequiredResidualsFor(manifest.JobId, manifest.Scenario)
+                .Order(StringComparer.Ordinal).ShouldBe(expected.Order(StringComparer.Ordinal));
+            foreach (string missing in expected)
+            {
+                RecoveryValidationEvidenceManifest incomplete = manifest with
+                {
+                    ResidualIds = expected.Where(value => value != missing).ToArray(),
+                };
+                Evaluate(complete with
+                {
+                    Evidence = complete.Evidence.Select(value => ReferenceEquals(value, manifest) ? incomplete : value).ToArray(),
+                }).StopShipReasons.ShouldBe([$"{manifest.JobId}:required_residual_missing"]);
+            }
+
+            RecoveryValidationEvidenceManifest additional = manifest with { ResidualIds = [.. expected, "RV-ADDITIONAL-LIMIT"] };
+            Evaluate(complete with
+            {
+                Evidence = complete.Evidence.Select(value => ReferenceEquals(value, manifest) ? additional : value).ToArray(),
+            }).IsStopShip.ShouldBeFalse();
+        }
+    }
+
+    [Fact]
     public void CompleteFreshPositivelyCoveredFourJobAttemptPasses()
     {
         LiveRecoveryValidationEvidenceGateDecision decision = Evaluate(CompleteAttempt());
@@ -1119,7 +1160,7 @@ public sealed class LiveRecoveryValidationEvidenceGateTests
                 ["scenario"] = jobId == LiveRecoveryValidationJobs.ProjectionRebuild ? 2 : 1,
             },
             Deviations = [],
-            ResidualIds = ["RV-PROD-CONTROL"],
+            ResidualIds = ["RV-EXT-M365", "RV-DURABLE-WORM", "RV-PROD-CONTROL", "RV-PROVIDER-SCALE", "RV-EVIDENCE-KINDS"],
             MeasurableRecoveryCeilingSeconds = 180,
             ArtifactLocators = new Dictionary<string, string>
             {

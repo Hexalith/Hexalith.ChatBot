@@ -9,10 +9,10 @@ namespace Hexalith.ChatBot.StoryEvidenceGate;
 /// </summary>
 public static class TransitionDetector
 {
-    /// <summary>The maximum number of files examined by one active identity-discovery scan.</summary>
+    /// <summary>The maximum number of files examined by one Detect invocation.</summary>
     internal const int MaximumDiscoveryFiles = 4_096;
 
-    /// <summary>The maximum combined admitted JSON bytes in one active identity-discovery scan.</summary>
+    /// <summary>The maximum combined admitted JSON bytes in one Detect invocation.</summary>
     internal const long MaximumDiscoveryBytes = BoundedEvidenceInput.MaximumInputBytes;
 
     private const string EvidencePrefix = "_bmad-output/implementation-artifacts/evidence/";
@@ -28,7 +28,22 @@ public static class TransitionDetector
         string repositoryRoot,
         string baseCommit,
         string headCommit)
+        => Detect(repositoryRoot, baseCommit, headCommit, identityFileExamined: null);
+
+    /// <summary>Detects transitions while observing each file examined by the lazy identity inventory.</summary>
+    /// <param name="repositoryRoot">The root repository.</param>
+    /// <param name="baseCommit">The exact base revision.</param>
+    /// <param name="headCommit">The exact head revision.</param>
+    /// <param name="identityFileExamined">An optional observer for discovery reads.</param>
+    /// <returns>The explicit transition records.</returns>
+    internal static IReadOnlyList<TransitionRecord> Detect(
+        string repositoryRoot,
+        string baseCommit,
+        string headCommit,
+        Action<string>? identityFileExamined)
     {
+        Lazy<IReadOnlyList<(string Path, JsonObject Identity)>> inventory = new(
+            () => DiscoverIdentities(repositoryRoot, identityFileExamined));
         _ = GitReader.ResolveExactCommit(repositoryRoot, baseCommit);
         _ = GitReader.ResolveExactCommit(repositoryRoot, headCommit);
         IReadOnlyDictionary<string, string> changed = GitReader.Diff(repositoryRoot, baseCommit, headCommit);
@@ -101,7 +116,7 @@ public static class TransitionDetector
             }
 
             JsonObject contract = FindSingleContract(
-                repositoryRoot,
+                inventory,
                 candidate => CandidateField(candidate, "storyPath").Equals(path, StringComparison.Ordinal),
                 path);
             AddTransition(transitions, repositoryRoot, contract);
@@ -125,7 +140,7 @@ public static class TransitionDetector
                 }
 
                 JsonObject contract = FindSingleContract(
-                    repositoryRoot,
+                    inventory,
                     candidate => CandidateField(candidate, "recordKind").Equals("technicalEnabler", StringComparison.Ordinal)
                         && CandidateField(candidate, "recordLedgerKey").Equals(key, StringComparison.Ordinal),
                     key);
@@ -138,8 +153,8 @@ public static class TransitionDetector
         {
             string before = GitReader.Show(repositoryRoot, baseCommit, SprintPath) ?? string.Empty;
             string after = GitReader.Show(repositoryRoot, headCommit, SprintPath) ?? string.Empty;
-            AddSprintStoryCandidates(repositoryRoot, transitions, independentlyCompletedCandidates, before, after);
-            AddSprintActionCandidates(repositoryRoot, transitions, independentlyCompletedCandidates, before, after);
+            AddSprintStoryCandidates(repositoryRoot, inventory, transitions, independentlyCompletedCandidates, before, after);
+            AddSprintActionCandidates(repositoryRoot, inventory, transitions, independentlyCompletedCandidates, before, after);
         }
 
         terminalContractCandidates.ExceptWith(independentlyCompletedCandidates);
@@ -153,6 +168,7 @@ public static class TransitionDetector
 
     private static void AddSprintStoryCandidates(
         string repositoryRoot,
+        Lazy<IReadOnlyList<(string Path, JsonObject Identity)>> inventory,
         IDictionary<string, TransitionRecord> transitions,
         ISet<string> independentlyCompletedCandidates,
         string before,
@@ -170,7 +186,7 @@ public static class TransitionDetector
             }
 
             JsonObject contract = FindSingleContract(
-                repositoryRoot,
+                inventory,
                 candidate => CandidateField(candidate, "sprintStatusKey").Equals(key, StringComparison.Ordinal),
                 key);
             AddTransition(transitions, repositoryRoot, contract);
@@ -180,6 +196,7 @@ public static class TransitionDetector
 
     private static void AddSprintActionCandidates(
         string repositoryRoot,
+        Lazy<IReadOnlyList<(string Path, JsonObject Identity)>> inventory,
         IDictionary<string, TransitionRecord> transitions,
         ISet<string> independentlyCompletedCandidates,
         string before,
@@ -197,7 +214,7 @@ public static class TransitionDetector
             }
 
             JsonObject contract = FindSingleContract(
-                repositoryRoot,
+                inventory,
                 candidate => CandidateField(candidate, "recordKind").Equals("technicalEnabler", StringComparison.Ordinal)
                     && CandidateField(candidate, "sprintStatusKey").Equals(action, StringComparison.Ordinal),
                 action);
@@ -206,15 +223,14 @@ public static class TransitionDetector
         }
     }
 
-    private static JsonObject FindSingleContract(
+    private static IReadOnlyList<(string Path, JsonObject Identity)> DiscoverIdentities(
         string repositoryRoot,
-        Func<JsonObject, bool> predicate,
-        string subject)
+        Action<string>? identityFileExamined)
     {
         string evidenceRoot = Path.Combine(repositoryRoot, "_bmad-output", "implementation-artifacts", "evidence");
         if (!Directory.Exists(evidenceRoot))
         {
-            throw new GateValidationException(GateReason.StatusMismatch, subject);
+            return [];
         }
 
         List<(string Path, JsonObject Identity)> candidates = [];
@@ -227,6 +243,7 @@ public static class TransitionDetector
                 throw new GateValidationException(GateReason.ScopeDigestMismatch, "contract-discovery-limit");
             }
 
+            identityFileExamined?.Invoke(path);
             JsonObject? candidate = TryParseIdentity(path, ref admittedBytes);
             if (candidate is not null)
             {
@@ -234,6 +251,15 @@ public static class TransitionDetector
             }
         }
 
+        return candidates;
+    }
+
+    private static JsonObject FindSingleContract(
+        Lazy<IReadOnlyList<(string Path, JsonObject Identity)>> inventory,
+        Func<JsonObject, bool> predicate,
+        string subject)
+    {
+        IReadOnlyList<(string Path, JsonObject Identity)> candidates = inventory.Value;
         List<(string Path, JsonObject Identity)> matches = candidates.Where(candidate => predicate(candidate.Identity)).ToList();
 
         if (matches.Count != 0)
@@ -298,8 +324,9 @@ public static class TransitionDetector
                 }) as JsonObject;
             return ExtractCandidateIdentity(candidate);
         }
-        catch (JsonException)
+        catch (Exception exception) when (exception is JsonException or ArgumentException)
         {
+            // JsonNode materializes its dictionary lazily; duplicate members can fail during identity access.
             return null;
         }
     }

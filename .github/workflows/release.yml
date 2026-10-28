@@ -158,7 +158,7 @@ jobs:
         with:
           global-json-file: global.json
       - name: Build Release configuration
-        run: bash .github/scripts/build-release-configuration.sh tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
+        run: bash .github/scripts/build-release-configuration.sh tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Setup checksum-pinned DAPR CLI
         run: bash .github/scripts/install-dapr-cli.sh
       - name: Initialize DAPR runtime
@@ -177,9 +177,9 @@ jobs:
           XUNIT_REQUIRE_ZERO_SKIPS=1 timeout --signal=INT --kill-after=15m 16800s \
             bash .github/scripts/run-xunit-v4.sh \
             tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests \
-            TestResults/live-recovery-validation.ctrf.json \
+            "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.ctrf.json" \
             -method "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2ETests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" \
-            -result-trx TestResults/live-recovery-validation.trx
+            -result-trx "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.trx"
       - name: Finalize metadata-only live recovery attempt envelope
         if: always()
         env:
@@ -204,7 +204,13 @@ jobs:
           mv "$temporary_path" "$ATTEMPT_PATH"
           mkdir -p TestResults/workflow-attempt
           cp "$ATTEMPT_PATH" TestResults/workflow-attempt/producer-attempt.json
-      - name: Upload live recovery reports, manifests, and raw test evidence
+      - name: Project metadata-only live recovery results
+        if: always()
+        env:
+          RAW_RECOVERY_TRX: ${{ runner.temp }}/raw-recovery-results/live-recovery-validation.trx
+          PRODUCER_OUTCOME: ${{ steps.recovery.outcome }}
+        run: bash .github/scripts/project-recovery-results.sh "$RAW_RECOVERY_TRX" TestResults "${PRODUCER_OUTCOME:-skipped}"
+      - name: Upload live recovery reports, manifests, and sanitized test evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:

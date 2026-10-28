@@ -77,10 +77,11 @@ public static class RecoveryAttemptSummarizer
         }
 
         XElement? resultSummary = root.Element(TeamTestNamespace + "ResultSummary");
-        summary["runOutcome"] = SafeToken(
-            resultSummary?.Attribute("outcome")?.Value,
-            maximumStringLength,
-            forbiddenTokenFragments);
+        string? runOutcome = resultSummary?.Attribute("outcome")?.Value;
+        summary["runOutcome"] = runOutcome is "Completed" or "Passed" or "Failed" or "Aborted"
+            or "Error" or "Timeout" or "Inconclusive" or "NotExecuted"
+                ? SafeToken(runOutcome, maximumStringLength, forbiddenTokenFragments)
+                : null;
 
         JsonObject counters = [];
         XElement? counterElement = resultSummary?.Element(TeamTestNamespace + "Counters");
@@ -102,14 +103,12 @@ public static class RecoveryAttemptSummarizer
         {
             tests.Add(new JsonObject
             {
-                ["className"] = SafeToken(
-                    method.Attribute("className")?.Value,
-                    maximumStringLength,
-                    forbiddenTokenFragments),
-                ["name"] = SafeToken(
-                    method.Attribute("name")?.Value,
-                    maximumStringLength,
-                    forbiddenTokenFragments),
+                ["className"] = method.Attribute("className")?.Value is RecoveryTrxSanitizer.ExpectedClass
+                    ? SafeToken(RecoveryTrxSanitizer.ExpectedClass, maximumStringLength, forbiddenTokenFragments)
+                    : null,
+                ["name"] = method.Attribute("name")?.Value is RecoveryTrxSanitizer.ExpectedMethod
+                    ? SafeToken(RecoveryTrxSanitizer.ExpectedMethod, maximumStringLength, forbiddenTokenFragments)
+                    : null,
             });
         }
 

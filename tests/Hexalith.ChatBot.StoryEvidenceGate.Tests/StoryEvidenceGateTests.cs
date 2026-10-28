@@ -2152,9 +2152,12 @@ public static class StoryEvidenceGateTests
         }
     }
 
-    /// <summary>Proves active discovery ignores an unchanged oversized inactive contract.</summary>
-    [Fact]
-    public static void UnchangedOversizedInactiveContractShouldNotBlockActiveCompletion()
+    /// <summary>Proves malformed inactive candidates cannot abort active contract discovery.</summary>
+    [Theory]
+    [InlineData("oversized")]
+    [InlineData("duplicate-unrelated-member")]
+    [InlineData("duplicate-identity-member")]
+    public static void MalformedInactiveContractShouldNotBlockActiveCompletion(string shape)
     {
         string temporaryRoot = Path.Combine(Path.GetTempPath(), $"inactive-oversized-contract-{Guid.NewGuid():N}");
         Directory.CreateDirectory(temporaryRoot);
@@ -2166,7 +2169,17 @@ public static class StoryEvidenceGateTests
             string artifacts = Path.Combine(temporaryRoot, "_bmad-output", "implementation-artifacts");
             string evidence = Path.Combine(artifacts, "evidence");
             Directory.CreateDirectory(evidence);
-            WriteOversizedFile(Path.Combine(evidence, "inactive.json"), BoundedEvidenceInput.MaximumJsonBytes);
+            string inactive = Path.Combine(evidence, "inactive.json");
+            if (shape == "oversized")
+            {
+                WriteOversizedFile(inactive, BoundedEvidenceInput.MaximumJsonBytes);
+            }
+            else
+            {
+                File.WriteAllText(inactive, shape == "duplicate-unrelated-member"
+                    ? "{\"storyKey\":\"inactive\",\"storyPath\":\"inactive.md\",\"other\":1,\"other\":2}"
+                    : "{\"storyKey\":\"inactive\",\"storyKey\":\"other\",\"storyPath\":\"inactive.md\"}");
+            }
             File.WriteAllText(Path.Combine(evidence, "explicit-transition.json"), TransitionContract());
             string story = Path.Combine(artifacts, "unrelated-name.md");
             File.WriteAllText(story, "---\ntitle: 'Explicit Transition'\nstatus: 'review'\n---\n");
@@ -2189,6 +2202,41 @@ public static class StoryEvidenceGateTests
         {
             Directory.Delete(temporaryRoot, recursive: true);
         }
+    }
+
+    /// <summary>Duplicate-member active contracts fail both changed and selected paths.</summary>
+    /// <param name="changed">Whether the malformed contract itself is part of the exact commit diff.</param>
+    /// <param name="identityMember">Whether the duplicate is an identity member or unrelated root member.</param>
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public static void DuplicateMemberActiveContractShouldRemainRefused(bool changed, bool identityMember)
+    {
+        using GateFixture fixture = new();
+        JsonObject contract = JsonNode.Parse(File.ReadAllText(fixture.ContractPath))!.AsObject();
+        string text = contract.ToJsonString();
+        string duplicate = identityMember ? "\"storyKey\":\"gate-fixture\"," : "\"unknownMember\":1,\"unknownMember\":2,";
+        string malformed = text.Insert(1, duplicate);
+        if (!changed)
+        {
+            File.WriteAllText(fixture.ContractPath, malformed);
+            RunGit(fixture.RepositoryRoot, "add", ".");
+            RunGit(fixture.RepositoryRoot, "commit", "-m", "test: preserve malformed active base");
+        }
+
+        string baseline = RunGit(fixture.RepositoryRoot, "rev-parse", "HEAD").Trim();
+        File.WriteAllText(fixture.StoryPath, File.ReadAllText(fixture.StoryPath).Replace("in-progress", "done", StringComparison.Ordinal));
+        if (changed)
+        {
+            File.WriteAllText(fixture.ContractPath, malformed);
+        }
+
+        RunGit(fixture.RepositoryRoot, "add", ".");
+        RunGit(fixture.RepositoryRoot, "commit", "-m", "test: activate malformed contract");
+        string head = RunGit(fixture.RepositoryRoot, "rev-parse", "HEAD").Trim();
+        Should.Throw<Exception>(() => TransitionDetector.Detect(fixture.RepositoryRoot, baseline, head));
     }
 
     /// <summary>Proves the retained identity is detached from unrelated large contract objects.</summary>
@@ -2580,6 +2628,70 @@ public static class StoryEvidenceGateTests
             transitions.ShouldHaveSingleItem();
             transitions[0].StoryPath.ShouldBe("_bmad-output/implementation-artifacts/unrelated-name.md");
             transitions[0].StoryKey.ShouldBe("explicit-transition");
+        }
+        finally
+        {
+            Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    /// <summary>Proves all completed stories and sprint lookups share one bounded inventory per invocation.</summary>
+    [Fact]
+    public static void BatchTransitionsShouldReadEachIdentityOnceAndReloadOnTheNextInvocation()
+    {
+        string temporaryRoot = Path.Combine(Path.GetTempPath(), $"batch-discovery-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            RunGit(temporaryRoot, "init", "--initial-branch=main");
+            RunGit(temporaryRoot, "config", "user.email", "gate@example.invalid");
+            RunGit(temporaryRoot, "config", "user.name", "Story Evidence Gate Tests");
+            string artifacts = Path.Combine(temporaryRoot, "_bmad-output", "implementation-artifacts");
+            string evidence = Path.Combine(artifacts, "evidence");
+            Directory.CreateDirectory(evidence);
+            for (int index = 0; index < 2; index++)
+            {
+                File.WriteAllText(Path.Combine(artifacts, $"story-{index}.md"), "---\nstatus: 'review'\n---\n");
+                File.WriteAllText(Path.Combine(evidence, $"key-{index}.json"), TransitionContract()
+                    .Replace("explicit-transition", $"key-{index}", StringComparison.Ordinal)
+                    .Replace("unrelated-name.md", $"story-{index}.md", StringComparison.Ordinal)
+                    .Replace("explicit-sprint-key", $"sprint-{index}", StringComparison.Ordinal));
+            }
+
+            File.WriteAllText(Path.Combine(evidence, "te-x.json"), TechnicalEnablerTransitionContract());
+            string ledger = Path.Combine(temporaryRoot, "_bmad-output", "planning-artifacts", "technical-enablers.md");
+            Directory.CreateDirectory(Path.GetDirectoryName(ledger)!);
+            File.WriteAllText(ledger, "## TE-X — Batch\n\n- **Status:** review; pending.\n");
+            string sprint = Path.Combine(artifacts, "sprint-status.yaml");
+            File.WriteAllText(sprint, "development_status:\n  sprint-0: review\n  sprint-1: review\naction_items:\n  - epic: 13\n    action: \"TE-X action\"\n    status: open\n");
+            File.WriteAllText(Path.Combine(evidence, "inactive.json"), "{\"storyKey\":\"inactive\",\"storyPath\":\"inactive.md\",\"x\":1,\"x\":2}");
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: create batch baseline");
+            string baseline = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+            for (int index = 0; index < 2; index++)
+            {
+                File.WriteAllText(Path.Combine(artifacts, $"story-{index}.md"), "---\nstatus: 'done'\n---\n");
+            }
+
+            File.WriteAllText(ledger, "## TE-X — Batch\n\n- **Status:** complete; verified.\n");
+            File.WriteAllText(sprint, "development_status:\n  sprint-0: done\n  sprint-1: done\naction_items:\n  - epic: 13\n    action: \"TE-X action\"\n    status: done\n");
+            RunGit(temporaryRoot, "add", ".");
+            RunGit(temporaryRoot, "commit", "-m", "test: complete batch");
+            string head = RunGit(temporaryRoot, "rev-parse", "HEAD").Trim();
+            List<string> reads = [];
+            TransitionDetector.Detect(temporaryRoot, baseline, baseline, reads.Add).ShouldBeEmpty();
+            reads.ShouldBeEmpty();
+            TransitionDetector.Detect(temporaryRoot, baseline, head, reads.Add)
+                .Select(transition => transition.StoryKey).ShouldBe(["key-0", "key-1", "te-x"]);
+            reads.Count.ShouldBe(4);
+            reads.Distinct(StringComparer.Ordinal).Count().ShouldBe(4);
+
+            // A later invocation must observe newly introduced ambiguity rather than reuse stale identity data.
+            File.Copy(Path.Combine(evidence, "key-0.json"), Path.Combine(evidence, "ambiguous.json"));
+            GateValidationException failure = Should.Throw<GateValidationException>(() =>
+                TransitionDetector.Detect(temporaryRoot, baseline, head, reads.Add));
+            failure.Subject.ShouldBe("duplicate-contract-identity");
+            reads.Count.ShouldBe(9);
         }
         finally
         {

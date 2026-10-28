@@ -10,9 +10,11 @@ namespace Hexalith.ChatBot.StoryEvidenceGate;
 /// </summary>
 public static class RecoveryTrxSanitizer
 {
-    private const string ExpectedClass =
+    /// <summary>The only recovery test class eligible for published identity metadata.</summary>
+    internal const string ExpectedClass =
         "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests";
-    private const string ExpectedMethod =
+    /// <summary>The only recovery method eligible for published identity metadata.</summary>
+    internal const string ExpectedMethod =
         "LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate";
     private static readonly XNamespace TeamTestNamespace =
         "http://microsoft.com/schemas/VisualStudio/TeamTest/2010";

@@ -10,6 +10,57 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 
 public sealed class FileRecoveryValidationEvidenceSinkTests
 {
+    /// <summary>Every emitted scenario retains its complete independently specified scope limitations.</summary>
+    [Fact]
+    public async Task EveryEmittedScenarioCarriesItsCompleteResidualSet()
+    {
+        string directory = CreateEvidenceDirectory();
+        FileRecoveryValidationEvidenceSink sink = new(Options(directory),
+            "0123456789abcdef0123456789abcdef01234567", "1.18.4", "13.4.6", "1.0.0");
+        DateTimeOffset started = DateTimeOffset.UtcNow;
+        string runId = ChatBotCorrelationId.New().Value;
+        try
+        {
+            foreach (string scenario in ContinuityDrillScenarios.All)
+            {
+                await sink.RecordAsync(MetReport(runId, scenario, started), TestContext.Current.CancellationToken).ConfigureAwait(true);
+            }
+
+            await sink.RecordAsync(ControlledLossReport(runId, started), TestContext.Current.CancellationToken).ConfigureAwait(true);
+            await sink.RecordAsync(EquivalentProjectionReport(runId, started, 2), TestContext.Current.CancellationToken).ConfigureAwait(true);
+            foreach (string dependency in ScopedOutageDependencies.All)
+            {
+                await sink.RecordAsync(ContainedScopedOutageReport(runId, started) with { Dependency = dependency },
+                    TestContext.Current.CancellationToken).ConfigureAwait(true);
+            }
+
+            RecoveryValidationEvidenceManifest[] manifests = Directory.GetFiles(directory, "*.manifest.json")
+                .Select(DeserializeManifest).ToArray();
+            manifests.Length.ShouldBe(10);
+            foreach (RecoveryValidationEvidenceManifest manifest in manifests)
+            {
+                string[] expected = ["RV-PROD-CONTROL", "RV-PROVIDER-SCALE", "RV-EVIDENCE-KINDS"];
+                if ((manifest.JobId == "continuity" && manifest.Scenario == ContinuityDrillScenarios.M365SubscriptionFailure)
+                    || manifest.JobId == "controlled-loss-path"
+                    || (manifest.JobId == "scoped-outage" && manifest.Scenario == ScopedOutageDependencies.Graph))
+                {
+                    expected = [.. expected, "RV-EXT-M365"];
+                }
+                else if (manifest.JobId == "projection-rebuild"
+                    || (manifest.JobId == "scoped-outage" && manifest.Scenario == ScopedOutageDependencies.AuditStore))
+                {
+                    expected = [.. expected, "RV-DURABLE-WORM"];
+                }
+
+                manifest.ResidualIds.Order(StringComparer.Ordinal).ShouldBe(expected.Order(StringComparer.Ordinal));
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task RecordAsyncDistinguishesConfiguredCorpusVolumeFromScenarioExerciseVolume()
     {

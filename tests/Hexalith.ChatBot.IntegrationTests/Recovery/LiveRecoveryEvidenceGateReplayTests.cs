@@ -672,7 +672,7 @@ public sealed class LiveRecoveryEvidenceGateReplayTests
                 .ToDictionary(static assertion => assertion, static _ => true, StringComparer.Ordinal),
             Coverage = new Dictionary<string, int> { ["scenario"] = 1 },
             Deviations = [],
-            ResidualIds = ["RV-PROD-CONTROL"],
+            ResidualIds = ["RV-EXT-M365", "RV-DURABLE-WORM", "RV-PROD-CONTROL", "RV-PROVIDER-SCALE", "RV-EVIDENCE-KINDS"],
             ArtifactLocators = new Dictionary<string, string>
             {
                 ["test-output"] = "artifact:live-recovery-validation-evidence/results.trx",

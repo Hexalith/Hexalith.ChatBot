@@ -260,7 +260,7 @@ internal sealed class FileRecoveryValidationEvidenceSink(
             // unmeasurable, never a miss.
             MeasurableRecoveryCeilingSeconds = options.RestorationTimeout.TotalSeconds,
             Deviations = deviations,
-            ResidualIds = ResidualIds(reportKind, scenario),
+            ResidualIds = LiveRecoveryValidationEvidenceGate.RequiredResidualsFor(reportKind, scenario),
             // Advertise ONLY what the workflow actually uploads (the .trx plus this evidence directory's reports and
             // manifests). Emitting logs/traces/metrics/state-end-state locators produced links to artifacts the lane
             // never generates, which the syntax-only locator check happily accepted.
@@ -406,18 +406,5 @@ internal sealed class FileRecoveryValidationEvidenceSink(
             _ => $"restore:{scenario}",
         };
 
-    private static IReadOnlyList<string> ResidualIds(string reportKind, string scenario)
-        => (reportKind, scenario) switch
-        {
-            // The controlled-loss drill faults and restores the same composed Graph/subscription boundary as the
-            // M365 continuity scenario, so it inherits RV-EXT-M365: no live Graph resource is exercised. Omitting
-            // it here would let the one manifest that carries the RPO claim under-declare its own boundary limit.
-            ("continuity", ContinuityDrillScenarios.M365SubscriptionFailure) or
-            ("controlled-loss-path", _) or
-            ("scoped-outage", ScopedOutageDependencies.Graph) =>
-                ["RV-EXT-M365", "RV-PROD-CONTROL", "RV-PROVIDER-SCALE", "RV-EVIDENCE-KINDS"],
-            ("projection-rebuild", _) or ("scoped-outage", ScopedOutageDependencies.AuditStore) =>
-                ["RV-DURABLE-WORM", "RV-PROD-CONTROL", "RV-PROVIDER-SCALE", "RV-EVIDENCE-KINDS"],
-            _ => ["RV-PROD-CONTROL", "RV-PROVIDER-SCALE", "RV-EVIDENCE-KINDS"],
-        };
+
 }

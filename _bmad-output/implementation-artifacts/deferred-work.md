@@ -553,7 +553,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: LiveRecoveryValidationEvidenceGate.cs:86-149
 severity: medium
 reason: **[MEDIUM] The live-recovery evidence gate never asserts that a manifest's `ResidualIds` covers the scenario's required residual set.** `LiveRecoveryValidationEvidenceGate.cs:86-149` validates manifest shape, freshness, provenance, coverage and verdict dimensions, but no branch checks residual coverage, and no test ties a manifest's residual ids to the `RV-EXT-M365` / `RV-DURABLE-WORM` / `RV-PROD-CONTROL` / `RV-PROVIDER-SCALE` entries in this ledger. Release-claim impact: a residual could be silently dropped from published evidence while the ADR and PRD still assert it open, so a narrowing of scope would not surface at the gate. Closure evidence: a gate branch requiring the per-job required residual set, plus a test binding that set to the ledger entry ids. Belongs with the chunk-2 gate-anchoring work accepted in review round 3. [`src/Hexalith.ChatBot.Server/Audit/LiveRecoveryValidationEvidenceGate.cs:86-149`]
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: The gate now requires the minimum per-job/scenario residual set and the sink consumes the same gate-owned mapping. Every required-token omission across ten scenarios fails with required_residual_missing; additional truthful limits remain allowed. Persisted sink matrix and ledger-binding checks pass. See spec-five-deferred-evidence-completeness.md and validation/five-deferred-evidence-completeness.json. Focused verification does not qualify live recovery or release acceptance.
 
 ### DW-62: [MEDIUM] The `RV-*` entries' "Release-claim impact: do not claim …" constraints have no enforcement point.
 
@@ -854,7 +855,8 @@ origin: migrated from legacy ledger ("Deferred from: hosted-lane review of 12-15
 location: ChatBot DevOps
 severity: medium
 reason: **[MEDIUM · evidence-integrity] The scheduled and release recovery lanes upload `TestResults` without the metadata-only TRX projection.** The completion lane runs `sanitize-recovery-trx` before uploading; `live-recovery-validation` and its release twin upload the raw directory under `--logger "console;verbosity=detailed"`. The two content sources that carried raw material have been fixed at source (the resource-log tail is now metadata-only, and the retained response body is ChatBot's own redacted ProblemDetails), so this is defence in depth rather than a known leak — but the asymmetry means a future addition to that console output reaches an artifact unsanitised. **Owner:** ChatBot DevOps. **Closure evidence:** both lanes project through the sanitizer before upload, or the console logger is removed from the uploaded path.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: Scheduled and release recovery producers stage raw CTRF/TRX outside all artifact paths, always retain payload-free attempt metadata and require sanitized successful TRX. Executable tests cover failed/absent/malformed input, reused roots, blocked output and arbitrary safe-shaped attribute values; workflow wiring checks, actionlint and six projection scenarios pass. See spec-five-deferred-evidence-completeness.md and validation/five-deferred-evidence-completeness.json. Focused verification does not qualify live recovery or release acceptance.
 
 ### DW-96: [LOW · observability] Three projection log event ids are duplicated within the EventStore projection subsystem.
 
@@ -1206,7 +1208,8 @@ location: tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE
 source_spec: `spec-dw-52-loss-path-rpo-evidence.md`
 severity: low
 reason: LiveContinuityAspireE2eTests wraps RunControlledLossAndRetainAsync in a catch that writes `LatestAttemptCompletedSuccessfully: false`; the stages that run after it still propagate without one, so a hosted failure there leaves no attempt summary for the gate to read. Pre-existing shape — no stage had such a summary before this story added one for the new stage.
-status: open
+status: done 2026-10-28
+resolution: Resolved 2026-10-28: One outer coordinator boundary now retains incomplete independent summaries for continuity, controlled loss, dataset/rebuild setup, rebuild, scoped-outage and final validation failures. Real controlled-loss marker composition, caller cancellation, delivered-alert snapshots, exhausted independent budget, filesystem failure and superseded successful summary are covered. See spec-five-deferred-evidence-completeness.md and validation/five-deferred-evidence-completeness.json. Focused verification does not qualify live recovery or release acceptance.
 
 ### DW-136: Follow-up review still recommended for dw-loss-path-rpo-evidence after the damping cap was spent
 origin: review-budget-followup
@@ -2064,6 +2067,7 @@ Final native follow-up qualification (2026-10-26): independent review correction
 - source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-validation-limits.md`
   summary: Ignore unrelated inactive identity JSON containing duplicate object members without aborting active discovery.
   evidence: Pre-existing lazy JsonNode dictionary construction throws ArgumentException on candidate storyKey access when an unrelated property is duplicated; the same field access exists at baseline c4e3cbc0b8abf417fa697f991b16726c3a6d74d7. A direct SDK reproduction returned ArgumentException. The current catch handles JsonException only. Settle with local duplicate-member refusal and an active-completion regression; no full-contract grammar relaxation is implied.
+  resolution: Resolved 2026-10-28: Inactive duplicate-member JSON is locally contained during identity extraction; active changed/selected duplicate-member contracts remain refused in four regression cases. Full gate suite passes 331/331 without skips. See spec-five-deferred-evidence-completeness.md and validation/five-deferred-evidence-completeness.json.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-validation-limits.md`
   summary: Qualify parser allocation for a concentrated XML start tag before structural TRX preflight can observe its attributes (medium if confirmed, unverified).
@@ -2072,6 +2076,7 @@ Final native follow-up qualification (2026-10-26): independent review correction
 - source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-validation-limits.md`
   summary: Reuse one bounded identity-discovery inventory within a multi-transition Detect invocation.
   evidence: Story, technical-ledger and sprint completion lookup paths each call FindSingleContract, both at baseline c4e3cbc0b8abf417fa697f991b16726c3a6d74d7 and now. Retained memory is bounded per scan, but a batch repeats file reads and JSON parsing. Cache lazily within one Detect invocation and qualify multi-transition read counts while preserving duplicate and inactive-input behavior; the current documentation explicitly promises per-scan budgets only.
+  resolution: Resolved 2026-10-28: One lazy bounded inventory now serves every story, technical-ledger, sprint-story and sprint-action lookup in a Detect invocation. A real multi-transition Git fixture asserts one read per file, no reads for no-transition and fresh ambiguity detection on a later invocation. Existing discovery-budget and active-duplicate cases remain passing. See spec-five-deferred-evidence-completeness.md and validation/five-deferred-evidence-completeness.json.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-validation-limits.md`
   summary: Reconcile the existing FrontComposer EventStore Admin package overrides with the current shared Builds catalog.

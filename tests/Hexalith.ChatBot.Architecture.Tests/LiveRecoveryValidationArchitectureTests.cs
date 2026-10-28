@@ -9,6 +9,26 @@ namespace Hexalith.ChatBot.Architecture.Tests;
 
 public static class LiveRecoveryValidationArchitectureTests
 {
+    /// <summary>Required gate disclosures remain tied to the open production-equivalence ledger limits.</summary>
+    /// <param name="entry">The authoritative deferred entry.</param>
+    /// <param name="residual">The disclosed limitation identifier.</param>
+    [Theory]
+    [InlineData("DW-54", "RV-EXT-M365")]
+    [InlineData("DW-55", "RV-DURABLE-WORM")]
+    [InlineData("DW-56", "RV-PROD-CONTROL")]
+    [InlineData("DW-57", "RV-PROVIDER-SCALE")]
+    [InlineData("DW-59", "RV-EVIDENCE-KINDS")]
+    public static void RequiredGateResidualsRemainBoundToOpenLedgerLimits(string entry, string residual)
+    {
+        string ledger = ReadProjectFile("_bmad-output/implementation-artifacts/deferred-work.md");
+        string section = ledger.Split($"### {entry}:", StringSplitOptions.None)[1]
+            .Split("### DW-", StringSplitOptions.None)[0];
+        section.ShouldContain(residual);
+        section.ShouldContain("status: open");
+        ReadProjectFile("src/Hexalith.ChatBot.Server/Audit/LiveRecoveryValidationEvidenceGate.cs")
+            .ShouldContain($"\"{residual}\"");
+    }
+
     [Fact]
     public static void LiveRecoveryFaultVocabularies_ShouldBeClosedAndDeterministicallyOrdered()
     {
@@ -399,7 +419,7 @@ public static class LiveRecoveryValidationArchitectureTests
             producerJob.Success.ShouldBeTrue($"{workflow} must contain the live recovery producer job");
             Match uploadStep = Regex.Match(
                 producerJob.Value,
-                "(?ms)^      - name: Upload live recovery reports, manifests, and raw test evidence\\n"
+                "(?ms)^      - name: Upload live recovery reports, manifests, and sanitized test evidence\\n"
                 + ".*?(?=^      - name: |\\z)");
             uploadStep.Success.ShouldBeTrue($"{workflow} must contain the live recovery upload step");
             source.ShouldContain("live-recovery-validation:");
@@ -409,6 +429,21 @@ public static class LiveRecoveryValidationArchitectureTests
             source.ShouldContain("LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate");
             uploadStep.Value.ShouldContain("if: always()");
             uploadStep.Value.ShouldContain("path: TestResults");
+            Match projectionStep = Regex.Match(producerJob.Value,
+                "(?ms)^      - name: Project metadata-only live recovery results\\n.*?(?=^      - name: |\\z)");
+            projectionStep.Success.ShouldBeTrue();
+            projectionStep.Value.ShouldContain("if: always()");
+            projectionStep.Index.ShouldBeLessThan(uploadStep.Index);
+            Match recoveryStep = Regex.Match(producerJob.Value,
+                "(?ms)^      - name: Run all live recovery coordinators and retain evidence\\n.*?(?=^      - name: |\\z)");
+            recoveryStep.Success.ShouldBeTrue();
+            recoveryStep.Value.ShouldContain("${{ runner.temp }}/raw-recovery-results/live-recovery-validation.ctrf.json");
+            recoveryStep.Value.ShouldNotContain("TestResults/live-recovery-validation.ctrf.json");
+            producerJob.Value.ShouldContain("Project metadata-only live recovery results");
+            producerJob.Value.ShouldContain("bash .github/scripts/project-recovery-results.sh");
+            producerJob.Value.ShouldContain("${{ runner.temp }}/raw-recovery-results/live-recovery-validation.trx");
+            producerJob.Value.ShouldNotContain("-result-trx TestResults/live-recovery-validation.trx");
+            producerJob.Value.ShouldContain("tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj");
             uploadStep.Value.ShouldNotContain("path: |");
             producerJob.Value.ShouldContain(
                 "ATTEMPT_PATH: ${{ runner.temp }}/workflow-attempt/producer-attempt.json");
