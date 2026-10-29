@@ -1287,3 +1287,32 @@ Code review 2026-10-25. Reviewed the 26 Story 1.6 files from the original baseli
 - The approved Platform/ChatBot owner-service repair is complete and independently reviewed in `spec-1-6-platform-owner-service-access.md`. Its final verification passed 180 affected cases with zero skips and repeated real Keycloak acquisition through the actual ChatBot DI providers. Reproducible producer, sanitized receipt and source/assembly provenance are retained under `evidence/story-1-6/`.
 - Full Server remains 3357/3364 passing with the same seven unchanged Folders adapter failures. The broad Platform legacy-test analyzer blocker and local Tenants/EventStore Admin port conflicts remain explicit; no gate or owner provisioning requirement was weakened. The task-owned ChatBot AppHost was stopped, leaving unrelated AppHosts untouched.
 - This resolves the earlier interrupted owner-token recheck only. Story 1.6 and sprint remain `review`; accepted A6 protection and native persisted-end-state isolation remain incomplete. Current follow-up changes remain uncommitted.
+
+### Review Findings (round 30)
+
+Code review 2026-10-29. Delta-only (user-selected): `b92e509..HEAD` restricted to Story 1.6 policy/admission surfaces, which changed only in `tests/Hexalith.ChatBot.Server.Tests/Gateway/PolicyPersistenceAdmissionTests.cs` (+53/−1, 86 diff lines; the round-28/29 patches, committed in `9718ef6`). All four layers completed (BH 7, ECH 4, VG 0, AA 0). No `decision-needed`, no `patch`, no deferrals. Not executed this round; round 29 recorded the focused 62/62 pass for these tests.
+
+#### Rejected (round 30)
+
+- BH/ECH: a single truncated-JSON payload does not cover empty, null, wrong-typed or non-UTF8 payloads — low: the gate denies on the authenticated subject/tenant before any payload read (ADR), so payload shape is not an input to the decision; extra rows are added coverage, not a direct correction.
+- BH/ECH: no proof the parser was not reached / no valid-payload control — low: the denial reason and zero-effect assertions are the pinned contract; a parser spy is new test infrastructure.
+- ECH: fixture uses a user principal, not the EventStore workload principal — low: the same synthetic principal helper backs every `SyntheticSdkPolicy*` fixture; the gate is subject/tenant-keyed. Workload-principal binding is covered by the 1.3/1.7 admission tests.
+- ECH: no admission marker / actorType extensions on the envelope — false as a defect: the unmarked path is the one under test and reaches the SDK gate; round 29 confirmed the rejection reason is `policy-snapshot-unavailable` (62/62).
+- ECH/BH: rejected event payload not scanned for input fragments — low: the payload is the typed `ChatBotDomainServiceAdmissionRejected` with a reason code only; the sentinel is already absent from body and audit facts.
+- BH: other `surfaceOrigin` values, `provider.ReadCount`, counter-empty-with-audit-fact rationale, magic literals, `InlineData` list not enforced against the command set — low/false: sibling tests pin origin variants and the counter contract (`PolicyPersistenceAdmissionTests.cs:79,170`); the eight kinds match the gate union (rounds 28–29); no gate read occurs on this path.
+- BH: helper overloads not in the delta — false: `SyntheticPolicyHost`/`Gateway` `authorizationFailureCounter` parameters pre-exist (build and tests passed in round 29).
+
+### Review Findings (round 31)
+
+Code review 2026-10-29. Delta-only (user-selected): `9718ef6..HEAD` restricted to Story 1.6 policy/admission surfaces, which changed only through `tests/Hexalith.ChatBot.Server.Tests/Governance/AiMediation/AiActionRiskClassifierTests.cs` (+7/−2, 21 diff lines, `a26117d`; the AI risk-classifier path adjacent to the Story 1.6 evaluator). All four layers completed (BH 5, ECH 5, VG 0, AA 3). No `decision-needed`, no `patch`, no deferrals. Not executed this round; the verification was source reading only.
+
+#### Rejected (round 31)
+
+- BH/ECH/AA: the full-payload `ShouldNotContain("999")` became two empty-array assertions, so a 999 leak in another field would pass — low: the rejected ordinal enters the record only through `actionClasses` (`AiActionRiskClassifierTests.cs:125`); `commandDefaultRisk` is `LowRisk`, so no other enum field can carry it, and `riskClass` is pinned to `approval-required`. A JSON token walk is new test machinery, not a direct correction.
+- BH/ECH: `ProducedAtUtc` is overwritten so the no-leak check runs on a copy — false: the classification assertions (`:128-133`) run on the unmodified classifier output; only serialization runs on the `with` copy, and the `.999` timestamp is the deliberate proof that the structural checks ignore unrelated digits.
+- BH/ECH: `GetProperty` throws `KeyNotFoundException` on a rename — low: the test still fails loudly, and a `TryGetProperty` guard adds branches for no new signal.
+- ECH/BH: wire-level `reasonCode` no longer asserted — low: added coverage, not a correction; the `riskClass` string assertion already exercises the enum converter.
+- BH: other ordinals (`-1`, `int.MaxValue`) and a mixed valid/unknown list uncovered — added coverage for a separate test, not a defect in this change.
+- BH: inline `CultureInfo` and `CA2007` — false: style only, and `CA2007` concerns `ConfigureAwait`.
+- ECH: commit title "five deferred runtime and validation guards" vs one test hunk — false: this file is one of that commit's five fixes; the commit message is not code under review.
+- AA: change is outside the Story 1.6 persisted-snapshot scope — noted, no acceptance criterion is violated; test-only.
