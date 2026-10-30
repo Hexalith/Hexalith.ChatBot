@@ -1,0 +1,535 @@
+{
+    "schemaVersion": 1,
+    "kind": "policy-snapshot-a6-source-inspection",
+    "inspectedOn": "2026-10-30",
+    "acceptanceStatus": "unaccepted",
+    "evidenceClass": "source-inspection-only",
+    "runtimeObserved": false,
+    "gateApprovalConferred": false,
+    "storyCompletionConferred": false,
+    "rootRevision": "90cbaa11ae7bb05fefc44f5a4dd97c0224162920",
+    "hashAlgorithm": "SHA-256",
+    "hashInput": "exact committed Git blob bytes; worktree representation hashed separately without normalization",
+    "scope": "Inspected source candidate only; not a deployed provider, complete dependency inventory, runtime receipt or TE-2 contract.",
+    "exclusions": [
+        "this packet README and source-binding.json",
+        "mutable Story 1.6 specification and appendix",
+        "sprint tracking",
+        "generated and runtime files",
+        "secrets, credentials, personal data and protected policy values"
+    ],
+    "worktreeRepresentationDifferenceCount": 1,
+    "repositories": [
+        {
+            "path": ".",
+            "revision": "90cbaa11ae7bb05fefc44f5a4dd97c0224162920",
+            "binding": "root-head",
+            "checkoutHeadMatchesBoundRevision": true,
+            "sources": [
+                {
+                    "path": ".editorconfig",
+                    "mode": "100644",
+                    "gitBlob": "a6ffc47c7f335fceae195e0abecaff91690dba4d",
+                    "byteLength": 2490,
+                    "sha256": "3e225994a13961391d8ca4be3c76bcdfacb2c5ad695262665a8066b42cba171b",
+                    "worktreeByteLength": 2490,
+                    "worktreeSha256": "3e225994a13961391d8ca4be3c76bcdfacb2c5ad695262665a8066b42cba171b",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": ".gitmodules",
+                    "mode": "100644",
+                    "gitBlob": "bbf3cd527ee413ad6bdcf355acc272951ffeab4e",
+                    "byteLength": 2076,
+                    "sha256": "aa37a80a3309238eae41a784c2028698d9f828ef6ced9885693e8496834ba959",
+                    "worktreeByteLength": 2076,
+                    "worktreeSha256": "aa37a80a3309238eae41a784c2028698d9f828ef6ced9885693e8496834ba959",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "Directory.Build.props",
+                    "mode": "100644",
+                    "gitBlob": "1203b2e2aad43310bc0da09464fa1644443171a2",
+                    "byteLength": 4569,
+                    "sha256": "271e92cca258c7ba9bb56bbc83819ae1fcc50cc9ccc9538b18f80205f0320458",
+                    "worktreeByteLength": 4569,
+                    "worktreeSha256": "271e92cca258c7ba9bb56bbc83819ae1fcc50cc9ccc9538b18f80205f0320458",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "Directory.Build.targets",
+                    "mode": "100644",
+                    "gitBlob": "0ab1483db3daa6042d85b1154b0c23038886ec2e",
+                    "byteLength": 2033,
+                    "sha256": "dffc87bff0ce0e6acb7ee3f3dabecd38d73b778728f625f5c23215e1a60a812e",
+                    "worktreeByteLength": 2033,
+                    "worktreeSha256": "dffc87bff0ce0e6acb7ee3f3dabecd38d73b778728f625f5c23215e1a60a812e",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "Directory.Packages.props",
+                    "mode": "100644",
+                    "gitBlob": "2cbcb05ab4becc948a4707d36f1cc8821ac51f8e",
+                    "byteLength": 465,
+                    "sha256": "32fa31437915b0cabbb3df7348fde9eee0e6f3895cbd4481e411c2b230b1afd0",
+                    "worktreeByteLength": 465,
+                    "worktreeSha256": "32fa31437915b0cabbb3df7348fde9eee0e6f3895cbd4481e411c2b230b1afd0",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "_bmad-output/implementation-artifacts/epic-1-context.md",
+                    "mode": "100644",
+                    "gitBlob": "af04c11ee932905fcd61a9d15318895d97a0827a",
+                    "byteLength": 6900,
+                    "sha256": "d72b7c315376c3f6d8f758894a71dac10eb39135f89dc7982d1dffd2215d9bb7",
+                    "worktreeByteLength": 6900,
+                    "worktreeSha256": "d72b7c315376c3f6d8f758894a71dac10eb39135f89dc7982d1dffd2215d9bb7",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "_bmad-output/implementation-artifacts/evidence/story-1-6/owner-service-provider-final-2026-10-25.json",
+                    "mode": "100644",
+                    "gitBlob": "6f4c1937638b5e1bc01ec6bdefab53ad3dfae5a0",
+                    "byteLength": 1613,
+                    "sha256": "c16bac2c883b478e3ebbb533f2ca45a8cb3d6b2adff5af7692eb03830089da21",
+                    "worktreeByteLength": 1613,
+                    "worktreeSha256": "c16bac2c883b478e3ebbb533f2ca45a8cb3d6b2adff5af7692eb03830089da21",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "_bmad-output/implementation-artifacts/evidence/story-1-6/owner-service-provider-final-2026-10-25.provenance.json",
+                    "mode": "100644",
+                    "gitBlob": "ce2e5dbd2e27856c6cd727d225a2b728214f5204",
+                    "byteLength": 1117,
+                    "sha256": "1c0f97750ee1a59089858d1f73190b99cce6c706a381af184d4d40f8e5c280ab",
+                    "worktreeByteLength": 1117,
+                    "worktreeSha256": "1c0f97750ee1a59089858d1f73190b99cce6c706a381af184d4d40f8e5c280ab",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "_bmad-output/implementation-artifacts/evidence/story-1-6/owner-service-verification-final-2026-10-25.json",
+                    "mode": "100644",
+                    "gitBlob": "a424a0c2124811d417e54a3798d8070c0f5a0a4e",
+                    "byteLength": 3537,
+                    "sha256": "3872323f26e51ffeea5a574a9b033a3e2a77db98135373c423ed5bd8191df42f",
+                    "worktreeByteLength": 3537,
+                    "worktreeSha256": "3872323f26e51ffeea5a574a9b033a3e2a77db98135373c423ed5bd8191df42f",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "_bmad-output/planning-artifacts/epics.md",
+                    "mode": "100644",
+                    "gitBlob": "436b38016f85301aa6ef0301ddb490b9f4d3a123",
+                    "byteLength": 581252,
+                    "sha256": "3ea1c16886130981e0a47c848d262683f6bf2c321986fec9c34adf7982690955",
+                    "worktreeByteLength": 581252,
+                    "worktreeSha256": "3ea1c16886130981e0a47c848d262683f6bf2c321986fec9c34adf7982690955",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/addendum.md",
+                    "mode": "100644",
+                    "gitBlob": "adf9b3f1fdc96e30f80e27ad3907a26a62f1cb33",
+                    "byteLength": 67120,
+                    "sha256": "6b97504c57c4726009c47c9220d0b8dca8d39f593908edd00a855481a75c8552",
+                    "worktreeByteLength": 67120,
+                    "worktreeSha256": "6b97504c57c4726009c47c9220d0b8dca8d39f593908edd00a855481a75c8552",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md",
+                    "mode": "100644",
+                    "gitBlob": "47ba54159c0aab41854de3f2ae72ed6004cb6421",
+                    "byteLength": 240430,
+                    "sha256": "223fd2cd4359d6d7c5aba5661123fd1a1345853d63b931b7bfe782246cd9c393",
+                    "worktreeByteLength": 240430,
+                    "worktreeSha256": "223fd2cd4359d6d7c5aba5661123fd1a1345853d63b931b7bfe782246cd9c393",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "docs/adrs/data-class-inventory-and-retention-policy.md",
+                    "mode": "100644",
+                    "gitBlob": "45c04ce3764636adc4382f4c387ceb116f6447b9",
+                    "byteLength": 10387,
+                    "sha256": "08694b4fc1e3f1cac97e374193023a05962cd759c80f04a895de528ca87a3095",
+                    "worktreeByteLength": 10387,
+                    "worktreeSha256": "08694b4fc1e3f1cac97e374193023a05962cd759c80f04a895de528ca87a3095",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "docs/adrs/isolated-policy-snapshots.md",
+                    "mode": "100644",
+                    "gitBlob": "3147dd5afd0db754f7fd54f0b6cc79c37dda860a",
+                    "byteLength": 10075,
+                    "sha256": "2a90813f91c1b805073cc195aee068f55225bb5af01dbfbc7456d2ca0587a110",
+                    "worktreeByteLength": 10075,
+                    "worktreeSha256": "2a90813f91c1b805073cc195aee068f55225bb5af01dbfbc7456d2ca0587a110",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "docs/story-evidence-integrity.md",
+                    "mode": "100644",
+                    "gitBlob": "4e700430bb3178cdd0cbac54850c18a486a5190f",
+                    "byteLength": 30962,
+                    "sha256": "7aad653f38db541b7130574a8799e3668d1fcd7b4dd1c1689b2fdd4cf36bc0b0",
+                    "worktreeByteLength": 30962,
+                    "worktreeSha256": "7aad653f38db541b7130574a8799e3668d1fcd7b4dd1c1689b2fdd4cf36bc0b0",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "global.json",
+                    "mode": "100644",
+                    "gitBlob": "81732150ad356ff05f2c0af064d80d570fbcc195",
+                    "byteLength": 79,
+                    "sha256": "c9c9cae030d639a70a7f7642ee546c9a31dda4bae6492a3a8aa21d08cab83779",
+                    "worktreeByteLength": 79,
+                    "worktreeSha256": "c9c9cae030d639a70a7f7642ee546c9a31dda4bae6492a3a8aa21d08cab83779",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "release-metadata.json",
+                    "mode": "100644",
+                    "gitBlob": "3264ddbdb4d5ae35714cfa3d88fa56ae53b20bf1",
+                    "byteLength": 2131,
+                    "sha256": "af2473f1b311309dbfb8f4b8fe8fbd7eb9ce1eceed2b92ab8038c1a575d7a270",
+                    "worktreeByteLength": 2131,
+                    "worktreeSha256": "af2473f1b311309dbfb8f4b8fe8fbd7eb9ce1eceed2b92ab8038c1a575d7a270",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.ChatBot.AppHost/Aspire/ChatBotAspireModule.cs",
+                    "mode": "100644",
+                    "gitBlob": "f5c9c254a421b2731e143414a2e7bded752c32e1",
+                    "byteLength": 23997,
+                    "sha256": "9a252a786995e512f167c8ce6c67ce8dc2b18f1bd664d012db3c9c72aba84d05",
+                    "worktreeByteLength": 23997,
+                    "worktreeSha256": "9a252a786995e512f167c8ce6c67ce8dc2b18f1bd664d012db3c9c72aba84d05",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.ChatBot.AppHost/DaprComponents/accesscontrol.local.yaml",
+                    "mode": "100644",
+                    "gitBlob": "bd5f671e7095060d2ae2d47a68802837f37d273b",
+                    "byteLength": 1986,
+                    "sha256": "c9630fe965e26f7da64254747c286451e7aa4dfa7e7c10996cbdf1a64465f865",
+                    "worktreeByteLength": 1986,
+                    "worktreeSha256": "c9630fe965e26f7da64254747c286451e7aa4dfa7e7c10996cbdf1a64465f865",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.ChatBot.AppHost/DaprComponents/accesscontrol.yaml",
+                    "mode": "100644",
+                    "gitBlob": "cb9d388a0d80169ee96245ca7e4357b898663df6",
+                    "byteLength": 5364,
+                    "sha256": "34a1d99a8b763e31d996897e36e583fc3bc63494efb899eb4f513a2f1a8efce9",
+                    "worktreeByteLength": 5364,
+                    "worktreeSha256": "34a1d99a8b763e31d996897e36e583fc3bc63494efb899eb4f513a2f1a8efce9",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+                    "mode": "100644",
+                    "gitBlob": "02bd3e82e682056c9fd894fe4e480ea65f38b722",
+                    "byteLength": 4509,
+                    "sha256": "62982c078b364b2db1727381bb01c024fea96b9b4656c0ebf41aa16d482ba4e8",
+                    "worktreeByteLength": 4509,
+                    "worktreeSha256": "62982c078b364b2db1727381bb01c024fea96b9b4656c0ebf41aa16d482ba4e8",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.ChatBot.AppHost/Program.cs",
+                    "mode": "100644",
+                    "gitBlob": "cede34e427a4b3dd46528cc4ee1b2c87e28e0b40",
+                    "byteLength": 49071,
+                    "sha256": "ccb8597e9cdd1378ac97a63270517e86aff3173582fffa5204be361a51cc6fb6",
+                    "worktreeByteLength": 49071,
+                    "worktreeSha256": "ccb8597e9cdd1378ac97a63270517e86aff3173582fffa5204be361a51cc6fb6",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.ChatBot.Contracts/Commands/TenantPolicyKnobIds.cs",
+                    "mode": "100644",
+                    "gitBlob": "d441706c90432140f3c718bbac4c5f10747e7b51",
+                    "byteLength": 1155,
+                    "sha256": "f3d58998e8ff823d83d60e371debdf8ae24941997caaed5ec430ad4aa0419b01",
+                    "worktreeByteLength": 1155,
+                    "worktreeSha256": "f3d58998e8ff823d83d60e371debdf8ae24941997caaed5ec430ad4aa0419b01",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.ChatBot.Contracts/Commands/TenantPolicySchema.cs",
+                    "mode": "100644",
+                    "gitBlob": "69a318c3ce6bb063045767c96b5211fc85490045",
+                    "byteLength": 18194,
+                    "sha256": "1114685b31c8dc317e7ab7f07bf5ad1beed9eebf79bbb65fd05906e5db360875",
+                    "worktreeByteLength": 18194,
+                    "worktreeSha256": "1114685b31c8dc317e7ab7f07bf5ad1beed9eebf79bbb65fd05906e5db360875",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.ChatBot.Contracts/Commands/TenantPolicySchemaVersions.cs",
+                    "mode": "100644",
+                    "gitBlob": "6dabf0f012952fa461af255b0b3e8fbb0790f410",
+                    "byteLength": 538,
+                    "sha256": "9f44caab7e9b35a63dd61f718fcb5858621cab1246e5291cbefea8d07d3c8c83",
+                    "worktreeByteLength": 538,
+                    "worktreeSha256": "9f44caab7e9b35a63dd61f718fcb5858621cab1246e5291cbefea8d07d3c8c83",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.ChatBot.Contracts/Commands/TenantPolicyValue.cs",
+                    "mode": "100644",
+                    "gitBlob": "df0863a2a98c5549676af9569be87d6081c6bf4a",
+                    "byteLength": 645,
+                    "sha256": "9d8a4482c4092167a95ecdba1114c04d723292d71a47f9850ff95abde9305b39",
+                    "worktreeByteLength": 645,
+                    "worktreeSha256": "9d8a4482c4092167a95ecdba1114c04d723292d71a47f9850ff95abde9305b39",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.ChatBot.Server/Gateway/CommandGatewayServiceCollectionExtensions.cs",
+                    "mode": "100644",
+                    "gitBlob": "9b2f57ec89bbf834cc8be74704be9db0398c30a0",
+                    "byteLength": 33345,
+                    "sha256": "d5e895b023978ad37b8911aa9456df9728f9904ce01b39e5fb004cfc426413a9",
+                    "worktreeByteLength": 33345,
+                    "worktreeSha256": "d5e895b023978ad37b8911aa9456df9728f9904ce01b39e5fb004cfc426413a9",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.ChatBot.Server/Governance/AiMediation/UnavailableTenantAiPolicySnapshotProvider.cs",
+                    "mode": "100644",
+                    "gitBlob": "36aa7fdc8e2621b8324dcbd7652dcd2bcb989229",
+                    "byteLength": 423,
+                    "sha256": "68838b4e86a2b26176047fe4e73ad9c95c9662313fdb8d45421a31b096abc3d3",
+                    "worktreeByteLength": 423,
+                    "worktreeSha256": "68838b4e86a2b26176047fe4e73ad9c95c9662313fdb8d45421a31b096abc3d3",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.ChatBot.Server/Governance/Policy/ImmutableTenantPolicySnapshot.cs",
+                    "mode": "100644",
+                    "gitBlob": "5b7ba1e0f896d84205b4fb7081b1a2b7d050e1ed",
+                    "byteLength": 8281,
+                    "sha256": "4468594704729e62847eb05f329fdac09377424adbcd4bf2b9c0777ad3d6916b",
+                    "worktreeByteLength": 8281,
+                    "worktreeSha256": "4468594704729e62847eb05f329fdac09377424adbcd4bf2b9c0777ad3d6916b",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.ChatBot.Server/Governance/Policy/TenantPolicyPersistenceGate.cs",
+                    "mode": "100644",
+                    "gitBlob": "a21c5e78121d14128975e9cfddc313781bffc37c",
+                    "byteLength": 881,
+                    "sha256": "6d10caca171664fc5e87fa9eb5e3f21f05b6883106fcf879cbd5e412647a734f",
+                    "worktreeByteLength": 881,
+                    "worktreeSha256": "6d10caca171664fc5e87fa9eb5e3f21f05b6883106fcf879cbd5e412647a734f",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.ChatBot.Server/Program.cs",
+                    "mode": "100644",
+                    "gitBlob": "87563757b92af366684e3fba8e0260753640c0db",
+                    "byteLength": 9511,
+                    "sha256": "f653565474559f5f550f43b616fc178d1e0958b6972ee4268c5fc44b15798b09",
+                    "worktreeByteLength": 9511,
+                    "worktreeSha256": "f653565474559f5f550f43b616fc178d1e0958b6972ee4268c5fc44b15798b09",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "story-evidence-policy.json",
+                    "mode": "100644",
+                    "gitBlob": "cc01a0834e785791571d55ad4ce57f90534a6163",
+                    "byteLength": 5954,
+                    "sha256": "272395c9bc936b92c925ba3b062aae7446ec929555b8dc07c095d51e785dacfd",
+                    "worktreeByteLength": 5954,
+                    "worktreeSha256": "272395c9bc936b92c925ba3b062aae7446ec929555b8dc07c095d51e785dacfd",
+                    "worktreeBytesMatchCommittedBlob": true
+                }
+            ]
+        },
+        {
+            "path": "references/Hexalith.EventStore",
+            "revision": "50221cf7dbe425becc333f6757ba37b93a22ab4e",
+            "binding": "root-head-gitlink",
+            "checkoutHeadMatchesBoundRevision": true,
+            "sources": [
+                {
+                    "path": "src/Hexalith.EventStore.PayloadProtection/InteractionPayloadProtectionService.cs",
+                    "mode": "100644",
+                    "gitBlob": "9f78894f7ae05ef669fea010d8131ce57707657d",
+                    "byteLength": 27223,
+                    "sha256": "d34b45bedf3b9a2ef8e7e062cbdd2bc497f160bf58583f96136c99079f526873",
+                    "worktreeByteLength": 27223,
+                    "worktreeSha256": "d34b45bedf3b9a2ef8e7e062cbdd2bc497f160bf58583f96136c99079f526873",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.EventStore.Server/Configuration/InteractionPayloadProtectionServiceCollectionExtensions.cs",
+                    "mode": "100644",
+                    "gitBlob": "fa7668344c1b5696f6e971f2e9b26bce2a5b3a41",
+                    "byteLength": 2223,
+                    "sha256": "0fac45ea4d13c1b19f0d880e34d6e1293c5c4ad750a7523da0680c38dd9061d7",
+                    "worktreeByteLength": 2223,
+                    "worktreeSha256": "0fac45ea4d13c1b19f0d880e34d6e1293c5c4ad750a7523da0680c38dd9061d7",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.EventStore.Server/Configuration/InteractionProtectionBindingServiceCollectionExtensions.cs",
+                    "mode": "100644",
+                    "gitBlob": "a2d77589cdf5018a88b00f83a5f635ecc0cb4fcc",
+                    "byteLength": 1750,
+                    "sha256": "f2ebe63abf0b4d0d8cbae44d1cbe3694abe2eed648519d01fbb2a83058588377",
+                    "worktreeByteLength": 1750,
+                    "worktreeSha256": "f2ebe63abf0b4d0d8cbae44d1cbe3694abe2eed648519d01fbb2a83058588377",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.EventStore.Server/Configuration/ServiceCollectionExtensions.cs",
+                    "mode": "100644",
+                    "gitBlob": "0a85bdc8b851dff93ead4acb25b54c27cf7ce357",
+                    "byteLength": 23968,
+                    "sha256": "e41e1d289076a7539a171e90a376db55f4964cecb63ef46af70947cf41b138f6",
+                    "worktreeByteLength": 23968,
+                    "worktreeSha256": "e41e1d289076a7539a171e90a376db55f4964cecb63ef46af70947cf41b138f6",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.EventStore/Program.cs",
+                    "mode": "100644",
+                    "gitBlob": "d5bf058f4045c31e02a0f0a0528d8737066e98af",
+                    "byteLength": 3251,
+                    "sha256": "062b3467a2877dbb23cc9324b50b63608da879c2652e11274cc24446a0d4570e",
+                    "worktreeByteLength": 3251,
+                    "worktreeSha256": "062b3467a2877dbb23cc9324b50b63608da879c2652e11274cc24446a0d4570e",
+                    "worktreeBytesMatchCommittedBlob": true
+                }
+            ]
+        },
+        {
+            "path": "references/Hexalith.Parties",
+            "revision": "9239c531f3b0cbb4a998c419e537463b597ff14b",
+            "binding": "root-head-gitlink",
+            "checkoutHeadMatchesBoundRevision": true,
+            "sources": [
+                {
+                    "path": "src/Hexalith.Parties.Security/EventStorePartyPayloadProtectionAdapter.cs",
+                    "mode": "100644",
+                    "gitBlob": "f720c6a83862961300d40abf9eca3c6a12bb2e9f",
+                    "byteLength": 22503,
+                    "sha256": "0e0d890f498efa9b92c6206747ddc119eb0901642e2c644ae7e014b725ad7e49",
+                    "worktreeByteLength": 22503,
+                    "worktreeSha256": "0e0d890f498efa9b92c6206747ddc119eb0901642e2c644ae7e014b725ad7e49",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.Parties.Security/LocalDevKeyStorageBackend.cs",
+                    "mode": "100644",
+                    "gitBlob": "d3cb30d6ad5b8396944fc836dfe9d16bca89e3bb",
+                    "byteLength": 11578,
+                    "sha256": "d18ed94d1a36b380938dc021d05d52fe7b2fbe3d10e83bfeb8668ad06b87c2a8",
+                    "worktreeByteLength": 11578,
+                    "worktreeSha256": "d18ed94d1a36b380938dc021d05d52fe7b2fbe3d10e83bfeb8668ad06b87c2a8",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.Parties.Security/PartyPayloadProtectionService.cs",
+                    "mode": "100644",
+                    "gitBlob": "b19803234613b008a7a2bce9d72b18bd3ac9a94c",
+                    "byteLength": 42733,
+                    "sha256": "aff078913a6a9b4025574d3a01813f8916ad9d2e567c221ad330e8adb8e6232e",
+                    "worktreeByteLength": 42733,
+                    "worktreeSha256": "aff078913a6a9b4025574d3a01813f8916ad9d2e567c221ad330e8adb8e6232e",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.Parties/Extensions/PartiesServiceCollectionExtensions.cs",
+                    "mode": "100644",
+                    "gitBlob": "e92e496c59dc351d6f18946a18bec45b2d144f2e",
+                    "byteLength": 26753,
+                    "sha256": "dca2ac9e7b36345061f851308f1ad6affe24f6bdedc6f641e4577e159f7ec940",
+                    "worktreeByteLength": 26753,
+                    "worktreeSha256": "dca2ac9e7b36345061f851308f1ad6affe24f6bdedc6f641e4577e159f7ec940",
+                    "worktreeBytesMatchCommittedBlob": true
+                }
+            ]
+        },
+        {
+            "path": "references/Hexalith.Platform",
+            "revision": "8de90958bc41b7fd01b7ed22b8ab364447a800e4",
+            "binding": "root-head-gitlink",
+            "checkoutHeadMatchesBoundRevision": true,
+            "sources": [
+                {
+                    "path": "src/Hexalith.Platform.Custody/PlatformCustodyServiceCollectionExtensions.cs",
+                    "mode": "100644",
+                    "gitBlob": "ead4d0f3149b0ced950dea2b8314030c751dd3a8",
+                    "byteLength": 1278,
+                    "sha256": "564f7715fa04df908c1b49d0598a3eb9ca374c37338bd13d6c22d56cb0bf09f8",
+                    "worktreeByteLength": 1278,
+                    "worktreeSha256": "564f7715fa04df908c1b49d0598a3eb9ca374c37338bd13d6c22d56cb0bf09f8",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.Platform.Protection/Fr34ProductionComposition.cs",
+                    "mode": "100644",
+                    "gitBlob": "0eb08bc11156e981007ee9b1cc63c59f2ea67f12",
+                    "byteLength": 1625,
+                    "sha256": "3afdffd1607aedbb4d40bdff4a160b6dff7782948a906753c2bfa1abbd183a50",
+                    "worktreeByteLength": 1625,
+                    "worktreeSha256": "3afdffd1607aedbb4d40bdff4a160b6dff7782948a906753c2bfa1abbd183a50",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "src/Hexalith.Platform.Secrets.Runtime/SecretsRuntimeServiceCollectionExtensions.cs",
+                    "mode": "100644",
+                    "gitBlob": "9804819c24cc9f0c55c65783b60713075385b801",
+                    "byteLength": 9401,
+                    "sha256": "d63290ce465ac3bd5dbb8d088394576ab951b85b7df5bf93d741335fd29dd87d",
+                    "worktreeByteLength": 9401,
+                    "worktreeSha256": "d63290ce465ac3bd5dbb8d088394576ab951b85b7df5bf93d741335fd29dd87d",
+                    "worktreeBytesMatchCommittedBlob": true
+                }
+            ]
+        },
+        {
+            "path": "references/Hexalith.Builds",
+            "revision": "81ab049208678bd6616828824729c0ddac02f7d1",
+            "binding": "root-head-gitlink",
+            "checkoutHeadMatchesBoundRevision": true,
+            "sources": [
+                {
+                    "path": ".gitattributes",
+                    "mode": "100644",
+                    "gitBlob": "3e8528ce8f114473f7e559bad224bbd6711054fb",
+                    "byteLength": 1258,
+                    "sha256": "08319a46e2399d81f63ba1f7b24485174fef762b199c12bd0a5045ea5a14b66c",
+                    "worktreeByteLength": 1258,
+                    "worktreeSha256": "08319a46e2399d81f63ba1f7b24485174fef762b199c12bd0a5045ea5a14b66c",
+                    "worktreeBytesMatchCommittedBlob": true
+                },
+                {
+                    "path": "Props/Directory.Packages.props",
+                    "mode": "100644",
+                    "gitBlob": "21eaa13df0bbd0d87f2664002f6e39787643b0d0",
+                    "byteLength": 30713,
+                    "sha256": "76c78725f68a82642c0e26c8aab0256dea1a335b77218841451590d7070328a0",
+                    "worktreeByteLength": 31077,
+                    "worktreeSha256": "f9c97805fe540f17277f0d96f16a92b5f595f24c0f059c7a2c864abe8a6c1fb5",
+                    "worktreeBytesMatchCommittedBlob": false,
+                    "checkoutTransformation": {
+                        "kind": "tracked-gitattributes-line-ending-conversion",
+                        "attributeSource": ".gitattributes",
+                        "attributes": {
+                            "text": "set",
+                            "eol": "crlf"
+                        },
+                        "committedLineEndings": "LF",
+                        "worktreeLineEndings": "CRLF",
+                        "gitDiffHeadClean": true
+                    }
+                }
+            ]
+        }
+    ]
+}
