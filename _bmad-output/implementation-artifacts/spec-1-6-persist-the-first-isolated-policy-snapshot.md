@@ -1316,3 +1316,7 @@ Code review 2026-10-29. Delta-only (user-selected): `9718ef6..HEAD` restricted t
 - BH: inline `CultureInfo` and `CA2007` — false: style only, and `CA2007` concerns `ConfigureAwait`.
 - ECH: commit title "five deferred runtime and validation guards" vs one test hunk — false: this file is one of that commit's five fixes; the commit message is not code under review.
 - AA: change is outside the Story 1.6 persisted-snapshot scope — noted, no acceptance criterion is violated; test-only.
+
+### Review Findings (round 32)
+
+Code review 2026-10-30. Delta-only (user-selected): `a26117d..HEAD` restricted to Story 1.6 policy/admission surfaces. Nothing in scope changed: the two later code commits (`696e6dd`, `80cd66d`; 12 files under `src`/`tests`/`docs`) touch only the Client strict-enum wire converters and their tests, the AppHost and architecture topology tests, the Recovery integration tests and `docs/adrs/live-recovery-validation-drivers.md`. The only other commit, `03ed05b`, records rounds 30 and 31. No diff was built and no review layers were run. No `decision-needed`, no `patch`, no deferrals. Story 1.6 and sprint remain `review`.
