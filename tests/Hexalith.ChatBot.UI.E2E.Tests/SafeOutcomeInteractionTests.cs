@@ -30,6 +30,8 @@ public sealed class SafeOutcomeInteractionTests
             ChatBotProjectConversationWorkspace workspace = await renderer.MountAsync<ChatBotProjectConversationWorkspace>(new()
             {
                 [nameof(ChatBotProjectConversationWorkspace.ProjectId)] = "project-alpha",
+                [nameof(ChatBotProjectConversationWorkspace.HeadingText)] = "Project conversation",
+                [nameof(ChatBotProjectConversationWorkspace.PageTitle)] = "Project conversation",
             }).ConfigureAwait(true);
             await renderer.Dispatcher.InvokeAsync(async () =>
             {

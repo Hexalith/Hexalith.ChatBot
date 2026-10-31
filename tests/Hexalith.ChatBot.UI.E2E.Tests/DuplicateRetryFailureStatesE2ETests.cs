@@ -349,7 +349,7 @@ public sealed class DuplicateRetryFailureStatesE2ETests
         fixture.ShouldContain("EventStore dispatches</dt><dd data-dispatch-count>1</dd>");
         admissionPipeline.ShouldContain("RecordDuplicateReplaySideEffectsAsync");
         admissionPipeline.ShouldContain("AuditEnvelopeFactory.DuplicateMailboxIntakeSuppressed");
-        admissionPipeline.ShouldContain("PartialOutputCodes = [\"duplicate_suppressed\"]");
+        admissionPipeline.ShouldContain("PartialOutputCodes = [.. (replayStatus.PartialOutputCodes ?? []).Union([\"duplicate_suppressed\"], StringComparer.Ordinal)]");
         audit.ShouldContain("duplicate_suppressed");
         AssertMetadataOnly(fixture);
     }
