@@ -158,7 +158,7 @@
   <data name="GovernedCommand" xml:space="preserve"><value>Commande gouvernée</value></data>
   <data name="GovernedCommandPath" xml:space="preserve"><value>Chemin de commande gouvernée</value></data>
   <data name="GovernedOperationReviewContext" xml:space="preserve"><value>Contexte de revue de l'opération gouvernée</value></data>
-  <data name="GovernedOperations_Intro" xml:space="preserve"><value>Soumettre la commande gouvernée triviale de bout en bout dans la chaîne de commande. L'origine de surface</value></data>
+  <data name="GovernedOperations_Intro" xml:space="preserve"><value>Soumettre la commande gouvernée triviale de bout en bout dans la chaîne de commande. La surface d'origine</value></data>
   <data name="GovernedOperations_IntroSuffix" xml:space="preserve"><value>est déclarée à la frontière et transmise à la piste d'audit.</value></data>
   <data name="GovernedOperations_Title" xml:space="preserve"><value>Opérations gouvernées</value></data>
   <data name="GovernedOperations_OperationalQueue_Title" xml:space="preserve"><value>Gestion des files opérationnelles</value></data>
@@ -381,7 +381,7 @@
   <data name="Decision_Redacted_Value" xml:space="preserve"><value>Masqué</value></data>
   <data name="Decision_Unavailable_Value" xml:space="preserve"><value>Indisponible</value></data>
   <data name="Decision_Unavailable_Reason" xml:space="preserve"><value>Le détail de la décision est indisponible sur cette surface.</value></data>
-  <data name="SurfaceOrigin_Label" xml:space="preserve"><value>Origine de surface</value></data>
+  <data name="SurfaceOrigin_Label" xml:space="preserve"><value>Surface d'origine</value></data>
   <data name="PolicySnapshotVersion_Label" xml:space="preserve"><value>Instantané de stratégie</value></data>
   <data name="EvidenceReferenceSummary_Label" xml:space="preserve"><value>Références de preuve</value></data>
   <data name="Correction_Kind_Label" xml:space="preserve"><value>Type de correction</value></data>

@@ -41,8 +41,10 @@ internal sealed class OperationStatusWorkflowStatusSink(
         await statusStore.UpdateAsync(request.TenantId, request.OperationId, existing =>
         {
             if (existing is null) { return null; }
-            // Completion is final for this instance; failed workflows may still intentionally restart through
-            // Started. A report that lost the atomic write must not reopen a failure or rewind retry progress.
+            // Completion is final for this instance. Started after Failed still applies because it is the supported
+            // restart, so a stale Started can also reopen Failed. A same-instance Retrying or Delayed report cannot
+            // reopen Failed, and a lower Retrying count cannot rewind Retrying. Other stale reports can still reopen
+            // Failed or Delayed or rewind counts and due times; that ordering is tracked as deferred work.
             if (string.Equals(existing.WorkflowInstanceId, request.WorkflowInstanceId, StringComparison.Ordinal) &&
                 (existing.WorkflowStatus == CorrectionPropagationWorkflowStatuses.Completed ||
                     (existing.WorkflowStatus == CorrectionPropagationWorkflowStatuses.Failed && (retrying || delayed)) ||

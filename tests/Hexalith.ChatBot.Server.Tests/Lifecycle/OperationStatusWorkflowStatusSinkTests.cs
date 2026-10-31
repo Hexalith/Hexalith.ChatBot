@@ -539,6 +539,41 @@ public sealed class OperationStatusWorkflowStatusSinkTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task EqualCountRetryingReportShouldAdvanceRetryDueTime(bool sdk)
+    {
+        IOperationStatusStore store = sdk ? new ReadModelOperationStatusStore(new AtomicOperationStatusReadModelStore()) : new InMemoryOperationStatusStore();
+        DateTimeOffset now = new(2026, 8, 9, 10, 0, 0, TimeSpan.Zero);
+        OperationStatusWorkflowStatusSink firstPollSink = new(store, new FixedClock(now));
+        OperationStatusWorkflowStatusSink secondPollSink = new(store, new FixedClock(now.AddSeconds(30)));
+        CommandSubmissionResponse accepted = new()
+        {
+            CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY", CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            OperationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX", LifecycleState = LifecycleState.Correcting, AcceptedAt = now,
+        };
+        await store.UpsertAsync(OperationStatusRecord.Accepted("tenant-alpha", accepted, false, now), TestContext.Current.CancellationToken);
+        CorrectionPropagationRequest request = new("tenant-alpha", "actor", "association", "intake", "correction", "workflow",
+            "prior-project", "corrected-project", 1, accepted.CorrelationId, now, now.AddMinutes(1), OperationId: accepted.OperationId);
+
+        // Pending-store polls always report Retrying(0); when the Started publication between two polls is lost,
+        // the next poll must still replace the earlier due time.
+        await firstPollSink.ReportAsync(request, CorrectionPropagationWorkflowStatuses.Retrying, 0,
+            CorrectionPropagationWorkflowFailureCodes.None, TestContext.Current.CancellationToken, retryDueAt: now.AddSeconds(30));
+        await secondPollSink.ReportAsync(request, CorrectionPropagationWorkflowStatuses.Retrying, 0,
+            CorrectionPropagationWorkflowFailureCodes.None, TestContext.Current.CancellationToken, retryDueAt: now.AddSeconds(60));
+
+        OperationStatusRecord retrying = (await store.TryGetAsync(request.TenantId, request.OperationId, TestContext.Current.CancellationToken))!;
+        retrying.WorkflowStatus.ShouldBe(CorrectionPropagationWorkflowStatuses.Retrying);
+        retrying.WorkflowRetryCount.ShouldBe(0);
+        retrying.RetryCount.ShouldBe(0);
+        retrying.NextRetryAt.ShouldBe(now.AddSeconds(60));
+        retrying.LastUpdatedAt.ShouldBe(now.AddSeconds(30));
+        OperationStatusHttpResults.ToJsonElement(retrying, now.AddSeconds(30)).GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
+        OperationStatusHttpResults.ToJsonElement(retrying, now.AddSeconds(60)).GetProperty("retryEligible").GetBoolean().ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task WorkflowReportForAbsentOperationShouldRemainAbsent(bool sdk)
     {
         IOperationStatusStore store = sdk ? new ReadModelOperationStatusStore(new AtomicOperationStatusReadModelStore()) : new InMemoryOperationStatusStore();

@@ -91,8 +91,10 @@ public sealed class GovernedOperationServiceTests
         OperationOutcome outcome = await service.SubmitGovernedNoteAsync(TestContext.Current.CancellationToken);
 
         // Audit history is a REAL server read of the post-commit audit envelope summary (Story 1.9 M3), keyed by
-        // the same operation id and rendered as a redacted, metadata-only line: stable codes and opaque
-        // identifiers only — no command payload, tenant/resource names, secrets, paths, or raw exception text.
+        // the same operation id and mapped to structured metadata: stable codes and opaque identifiers only.
+        // GovernedAuditPresentationRenderTests.GovernedAuditShouldWithholdOmittedTransportFieldsThroughServiceAndPage
+        // proves that sentinels seeded into the history operation id, ResourceId, ReasonCode, StateTransition and
+        // RecordedAt reach neither the serialized service model nor the rendered page.
         client.LastAuditHistoryOperationId.ShouldBe(CommandId);
         outcome.AuditHistory.AuditStatus.ShouldBe(OperationAuditStatus.Committed);
         OperationAuditEntryModel entry = outcome.AuditHistory.Entries.ShouldHaveSingleItem();
