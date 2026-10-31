@@ -15,6 +15,7 @@ using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -532,7 +533,7 @@ public sealed class ProjectConversationProjectionTests
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
                     new MailboxMessageContentResult(true, "available", "authorized body for review", "text/plain", "metadata_only")));
-                services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
+                services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
             }));
 
         HttpResponseMessage response = await factory
@@ -562,7 +563,7 @@ public sealed class ProjectConversationProjectionTests
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
                     new MailboxMessageContentResult(false, "task_intent_source_unavailable")));
-                services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
+                services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
             }));
 
         HttpResponseMessage response = await factory
@@ -600,7 +601,7 @@ public sealed class ProjectConversationProjectionTests
                         "raw provider payload graph-message-001 tenant-beta restricted@example.com",
                         "text/plain",
                         "unavailable")));
-                services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
+                services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
             }));
 
         HttpResponseMessage response = await factory
@@ -637,7 +638,7 @@ public sealed class ProjectConversationProjectionTests
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
                     new MailboxMessageContentResult(true, "available", "authorized body for review", "text/plain", "metadata_only")));
-                services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
+                services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
             }));
 
         HttpResponseMessage response = await factory
@@ -672,7 +673,7 @@ public sealed class ProjectConversationProjectionTests
                 Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(source);
-                services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
+                services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
             }));
         using HttpClient client = factory.CreateClient();
         using HttpRequestMessage missing = new(HttpMethod.Get, "/api/v1/projects/project-001/task-intents/task-intent:missing");
@@ -710,7 +711,7 @@ public sealed class ProjectConversationProjectionTests
                 services.AddSingleton<IProjectConversationProjectionStore>(store);
                 services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
                     new MailboxMessageContentResult(true, "available", "raw provider payload graph-message-001 tenant-beta restricted@example.com", "text/plain", "metadata_only")));
-                services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
+                services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
             }));
 
         HttpResponseMessage response = await factory
@@ -2433,7 +2434,7 @@ public sealed class ProjectConversationProjectionTests
                 Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                 Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                 services.AddSingleton<IProjectConversationProjectionStore>(conversationStore);
-                services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(projectId));
+                services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(projectId));
             }));
     }
 

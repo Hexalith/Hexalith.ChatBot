@@ -18,6 +18,7 @@ using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Policy;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Results;
 using Hexalith.ChatBot.Server.Tests.TrustedAuthority;
@@ -532,7 +533,7 @@ public sealed partial class CommandGatewayTests
             SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
             services.AddSingleton(clock);
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticOwnerAuthorityProvider(clock));
-            services.AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(_ => principal));
+            services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(_ => principal));
             services.AddSingleton<IAuthorizationStage>(new PassThroughAuthorizationStage());
             services.AddSingleton(dispatcher);
             services.AddSingleton(audit);

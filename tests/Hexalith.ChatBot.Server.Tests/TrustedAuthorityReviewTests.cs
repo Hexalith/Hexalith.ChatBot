@@ -301,7 +301,7 @@ public sealed class TrustedAuthorityReviewTests
             RegressionAuthorityFixture.AddSyntheticAdmission(services);
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
             services.AddSingleton<IGovernedOperationProjectionStore>(store);
-            services.AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(Relay));
+            services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(Relay));
         }));
         using HttpClient client = factory.CreateClient();
         Dictionary<string, object?> queryPayload = new() { ["noteId"] = Note };
@@ -406,15 +406,20 @@ public sealed class TrustedAuthorityReviewTests
             services.AddSingleton<ISystemClock>(clock);
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(new SyntheticOwnerAuthorityProvider(clock) { Allows = static _ => false });
             services.AddSingleton(store);
-            services.AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(_ => authenticated ? TrustedAuthorityFixture.Principal() : new ClaimsPrincipal()));
+            services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(_ => authenticated ? TrustedAuthorityFixture.Principal() : new ClaimsPrincipal()));
             foreach (ServiceDescriptor descriptor in services.Where(static descriptor => descriptor.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)).ToArray()) { services.Remove(descriptor); }
         }));
         using HttpClient client = factory.CreateClient();
         using HttpResponseMessage list = await client.GetAsync("/api/v1/operations/ai-executions/exhausted", TestContext.Current.CancellationToken);
         using HttpResponseMessage recover = await client.PostAsJsonAsync("/api/v1/operations/ai-executions/exhausted/recover", new { key = "foreign-key" }, TestContext.Current.CancellationToken);
-        list.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        // The conforming host denies an anonymous caller at the boundary (401); an authenticated non-owner still gets
+        // the existence-neutral 404 from the recovery guard. Neither path reaches the store.
+        list.StatusCode.ShouldBe(authenticated ? HttpStatusCode.NotFound : HttpStatusCode.Unauthorized);
         recover.StatusCode.ShouldBe(list.StatusCode);
-        (await recover.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldBe(await list.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        if (authenticated)
+        {
+            (await recover.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldBe(await list.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        }
         ((ProtectedAccessProbe)(object)store).Calls.ShouldBe(0);
     }
 
@@ -450,7 +455,7 @@ public sealed class TrustedAuthorityReviewTests
             services.AddSingleton<IIdempotencyStore>(idempotency);
             services.AddSingleton<IAuditWriter>(audit);
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
-            services.AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(Relay));
+            services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(Relay));
         }));
         using HttpClient client = factory.CreateClient();
         CommandEnvelope command = new(Note, "tenant-alpha", "chatbot", "forbidden-aggregate",
@@ -514,7 +519,7 @@ public sealed class TrustedAuthorityReviewTests
             services.AddSingleton<ISystemClock>(clock);
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(new SyntheticOwnerAuthorityProvider(clock));
             services.AddSingleton(store);
-            services.AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(_ => TrustedAuthorityFixture.Principal()));
+            services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(_ => TrustedAuthorityFixture.Principal()));
             foreach (ServiceDescriptor descriptor in services.Where(static descriptor => descriptor.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)).ToArray()) { services.Remove(descriptor); }
         }));
         using HttpClient client = factory.CreateClient();

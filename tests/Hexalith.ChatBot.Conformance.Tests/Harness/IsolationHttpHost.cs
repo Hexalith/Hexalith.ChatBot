@@ -6,6 +6,7 @@ using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Projections;
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -66,7 +67,7 @@ internal static class IsolationHttpHost
             {
                 Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                 Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
-                services.AddSingleton<IStartupFilter>(new IsolationPrincipalStartupFilter(CrossTenantLeakageCorpus.BoundTenant));
+                services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new IsolationPrincipalStartupFilter(CrossTenantLeakageCorpus.BoundTenant));
                 services.AddSingleton<IGovernedOperationProjectionStore>(projectionStore);
                 services.AddSingleton<IOperationStatusStore>(statusStore);
                 services.AddSingleton<IProjectConversationProjectionStore>(conversationStore);

@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Projections;
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -39,7 +40,7 @@ public sealed class ChatBotProjectConversationHubE2ETests
     public async Task AiResponseProgressProjectionShouldBroadcastTenantScopedChangeSignalToHubSubscribers()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken()
             .WithWebHostBuilder(builder => builder.UseSetting("ChatBot:ProjectionChangeNotifications:Enabled", "true"));
 
         TestServer server = factory.Server;
@@ -63,7 +64,7 @@ public sealed class ChatBotProjectConversationHubE2ETests
 
         // Project a server-verified low-risk AI assistance outcome for Tenant (the producer sets AI response progress),
         // which materializes a progress-bearing row and broadcasts the advisory change signal to the tenant group.
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateAppChannelClient();
         using HttpResponseMessage response = await client.PostAsJsonAsync(
             AiOutcomeProjectionEndpoints.AiOutcomeRecordedRoute,
             LowRiskSucceededEvent(),
@@ -81,12 +82,12 @@ public sealed class ChatBotProjectConversationHubE2ETests
         // [AC3/AC5 fail-closed] An authenticated caller whose token binds tenant-alpha must NOT be able to join another
         // tenant's project-conversation change group; the hub throws tenant-forbidden before AddToGroupAsync.
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken()
             .WithWebHostBuilder(builder =>
             {
                 _ = builder.UseSetting("ChatBot:ProjectionChangeNotifications:Enabled", "true");
                 _ = builder.ConfigureServices(services =>
-                    services.AddSingleton<IStartupFilter>(new AuthenticatedTenantStartupFilter(Tenant)));
+                    services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new AuthenticatedTenantStartupFilter(Tenant)));
             });
 
         await using HubConnection connection = BuildHubConnection(factory.Server);
@@ -102,10 +103,10 @@ public sealed class ChatBotProjectConversationHubE2ETests
     [InlineData(true)]
     public async Task SupplementalIdentityCannotJoinAnotherTenant(bool authenticatedSupplement)
     {
-        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("ChatBot:ProjectionChangeNotifications:Enabled", "true");
-            builder.ConfigureServices(services => services.AddSingleton<IStartupFilter>(new AuthenticatedTenantStartupFilter(Tenant, authenticatedSupplement)));
+            builder.ConfigureServices(services => services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new AuthenticatedTenantStartupFilter(Tenant, authenticatedSupplement)));
         });
         await using HubConnection connection = BuildHubConnection(factory.Server);
         await connection.StartAsync(TestContext.Current.CancellationToken);
@@ -126,12 +127,12 @@ public sealed class ChatBotProjectConversationHubE2ETests
         // [AC5 authorized path] An authenticated caller whose token binds tenant-alpha joins its own group and receives
         // the tenant-scoped change signal — the positive complement of the cross-tenant fail-closed case.
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken()
             .WithWebHostBuilder(builder =>
             {
                 _ = builder.UseSetting("ChatBot:ProjectionChangeNotifications:Enabled", "true");
                 _ = builder.ConfigureServices(services =>
-                    services.AddSingleton<IStartupFilter>(new AuthenticatedTenantStartupFilter(Tenant)));
+                    services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new AuthenticatedTenantStartupFilter(Tenant)));
             });
 
         TestServer server = factory.Server;
@@ -144,7 +145,7 @@ public sealed class ChatBotProjectConversationHubE2ETests
         await connection.StartAsync(cancellationToken);
         await connection.InvokeAsync("JoinTenant", Tenant, cancellationToken);
 
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateAppChannelClient();
         using HttpResponseMessage response = await client.PostAsJsonAsync(
             AiOutcomeProjectionEndpoints.AiOutcomeRecordedRoute,
             LowRiskSucceededEvent(),
@@ -162,7 +163,7 @@ public sealed class ChatBotProjectConversationHubE2ETests
         // closed: UseAuthentication only populates the principal from a present token (it does not reject anonymous
         // requests), so the hub's own env-gate must reject an unauthenticated JoinTenant rather than allow any tenant.
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken()
             .WithWebHostBuilder(builder =>
             {
                 _ = builder.UseSetting("ChatBot:ProjectionChangeNotifications:Enabled", "true");

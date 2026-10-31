@@ -86,7 +86,7 @@ public sealed class TrustedAuthorityParityTests
             .ConfigureLogging(logging => logging.AddProvider(capture).SetMinimumLevel(LogLevel.Information))
             .ConfigureServices(services =>
         {
-            services.AddSingleton<IStartupFilter>(new TrustedAuthorityHttpStartupFilter(tenant, actorClass));
+            services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TrustedAuthorityHttpStartupFilter(tenant, actorClass));
             services.AddSingleton<Hexalith.ChatBot.Server.Audit.ISystemClock>(clock);
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
             services.AddSingleton<IGovernedOperationProjectionStore>(store);

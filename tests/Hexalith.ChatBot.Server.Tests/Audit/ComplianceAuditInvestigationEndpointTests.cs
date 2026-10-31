@@ -504,7 +504,7 @@ public sealed class ComplianceAuditInvestigationEndpointTests
                 {
                     Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                     Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
-                    services.AddSingleton<IStartupFilter>(new CompliancePrincipalStartupFilter(tenantId, projectOwner, role, actorType, includeTenant));
+                    services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new CompliancePrincipalStartupFilter(tenantId, projectOwner, role, actorType, includeTenant));
                 }));
 
     private sealed class CompliancePrincipalStartupFilter(

@@ -104,7 +104,7 @@ public sealed partial class AiExecutionCoordinatorTests
         {
             // Isolate the operator request from the provider worker's independent durable scans.
             services.RemoveAll<IHostedService>();
-            services.AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(_ => TrustedAuthorityFixture.Principal()));
+            services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(_ => TrustedAuthorityFixture.Principal()));
             services.AddSingleton<ISystemClock>(clock);
             services.AddSingleton<IChatBotOwnerAuthorityProvider>(owner);
             services.AddSingleton<IAiExecutionWorkStore>(store);

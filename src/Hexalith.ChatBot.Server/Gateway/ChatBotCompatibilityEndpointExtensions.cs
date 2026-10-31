@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 
 using Dapr;
@@ -34,11 +33,13 @@ internal static class ChatBotCompatibilityEndpointExtensions
     {
         ArgumentNullException.ThrowIfNull(app);
 
+        // The EventStore conforming-host inventory leaves only its exact /health, /alive and /ready probes anonymous,
+        // so these ChatBot status routes are served behind the ChatBot boundary policy to authenticated callers.
         _ = app.MapGet("/health/chatbot", () => Results.Ok(new ChatBotHealth(
             ChatBotClientDescriptor.Default.ModuleName,
             ChatBotClientDescriptor.Default.DaprAppId,
             ChatBotHealthStatuses.ToWireValue(ChatBotHealthStatus.Healthy))))
-            .AllowEventStorePublicEndpoint("/health/chatbot");
+            .RequireAuthorization(ChatBotApplicationBoundaryPolicy.Name);
         _ = app.MapGet(
             "/health/chatbot/workflows",
             async (ICorrectionPropagationWorkflowRuntime runtime, CancellationToken cancellationToken) =>
@@ -50,44 +51,36 @@ internal static class ChatBotCompatibilityEndpointExtensions
                     ? Results.Ok(status)
                     : Results.Json(status, statusCode: StatusCodes.Status503ServiceUnavailable);
             })
-            .AllowEventStorePublicEndpoint("/health/chatbot/workflows");
-        // Anonymous liveness only. This endpoint deliberately carries no M2 state: the Aspire topology publishes
-        // the service with WithExternalHttpEndpoints(), so anything here is world-readable. An earlier revision
-        // returned a per-job HasBreaches plus a 503, which told
-        // any unauthenticated caller whether cross-tenant isolation or the WORM chain was currently broken — the exact
-        // confirmation someone probing those boundaries wants. The stop-ship signal moved to the gated endpoint below.
+            .RequireAuthorization(ChatBotApplicationBoundaryPolicy.Name);
+        // Liveness only. This endpoint deliberately carries no M2 state: the Aspire topology publishes the service
+        // with WithExternalHttpEndpoints(), so any authenticated caller can read it. An earlier revision returned a
+        // per-job HasBreaches plus a 503, which told any caller whether cross-tenant isolation or the WORM chain was
+        // currently broken — the exact confirmation someone probing those boundaries wants. The stop-ship signal
+        // moved to the gated endpoint below.
         _ = app.MapGet(
             "/health/chatbot/periodic-enforcement",
             (PeriodicEnforcementCoordinator coordinator)
                 => Results.Ok(PeriodicEnforcementHealthResponse.From(coordinator.Status)))
-            .AllowEventStorePublicEndpoint("/health/chatbot/periodic-enforcement");
+            .RequireAuthorization(ChatBotApplicationBoundaryPolicy.Name);
 
         // AC3: the M2 breach state must be a real stop-ship signal, not merely provable. This endpoint returns 503
-        // whenever any sweep is not demonstrably clean, so a release job gates on the status code alone. It is
-        // protected by a shared secret because JWT authentication is registered only conditionally
-        // (ChatBotJwtAuthentication.IsConfigured). When no token is configured the
-        // endpoint is not mapped at all, so it can never be reached anonymously.
-        string? releaseGateToken = app.Configuration["ChatBot:PeriodicEnforcement:M2ReleaseGateToken"];
+        // whenever any sweep is not demonstrably clean, so a release job gates on the status code alone. The release
+        // job holds no user token, so the endpoint is protected by a shared secret, checked by its own scheme-bound
+        // policy (ChatBotM2ReleaseGateAuthentication); a missing or wrong secret is a 401 challenge. When no secret is
+        // configured the endpoint is not mapped at all, so it can never be reached.
+        string? releaseGateToken = app.Configuration[ChatBotM2ReleaseGateAuthentication.TokenConfigurationKey];
         if (!string.IsNullOrWhiteSpace(releaseGateToken))
         {
             _ = app.MapGet(
                 "/health/chatbot/periodic-enforcement/m2",
-                (PeriodicEnforcementCoordinator coordinator, HttpContext httpContext) =>
+                (PeriodicEnforcementCoordinator coordinator) =>
                 {
-                    string? presented = httpContext.Request.Headers[M2ReleaseGateTokenHeader].ToString();
-                    if (!CryptographicOperations.FixedTimeEquals(
-                        System.Text.Encoding.UTF8.GetBytes(presented ?? string.Empty),
-                        System.Text.Encoding.UTF8.GetBytes(releaseGateToken)))
-                    {
-                        return Results.StatusCode(StatusCodes.Status401Unauthorized);
-                    }
-
                     PeriodicEnforcementM2ReleaseGateResponse gate = coordinator.M2ReleaseGateStatus;
                     return gate.IsStopShip
                         ? Results.Json(gate, statusCode: StatusCodes.Status503ServiceUnavailable)
                         : Results.Ok(gate);
                 })
-                .AllowEventStorePublicEndpoint("/health/chatbot/periodic-enforcement/m2");
+                .RequireAuthorization(ChatBotM2ReleaseGateAuthentication.PolicyName);
         }
 
         // These routes bind and authorize through ChatBot's own admission pipeline. An explicit endpoint policy

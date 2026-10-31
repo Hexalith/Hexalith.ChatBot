@@ -32,10 +32,10 @@ public sealed class ChatBotDeadLetterProjectionEndpointsTests
     public async Task DeadLetteredMessageShouldBeDrainedWithMetadataOnlyErrorLog()
     {
         RecordingLoggerProvider recorder = new();
-        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
                 services.AddSingleton<ILoggerProvider>(recorder)));
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateAppChannelClient();
 
         using HttpResponseMessage response = await client
             .PostAsJsonAsync(
@@ -64,10 +64,10 @@ public sealed class ChatBotDeadLetterProjectionEndpointsTests
     public async Task DeadLetterDrainMustNeverLogTheMessageBody()
     {
         RecordingLoggerProvider recorder = new();
-        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
                 services.AddSingleton<ILoggerProvider>(recorder)));
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateAppChannelClient();
 
         using HttpResponseMessage response = await client
             .PostAsJsonAsync(
@@ -104,10 +104,10 @@ public sealed class ChatBotDeadLetterProjectionEndpointsTests
         // A dead-lettered message is by definition one the projection path rejected, so its own fields cannot be
         // assumed well-formed. An unsafe identity must be reduced, never forwarded verbatim into a log sink.
         RecordingLoggerProvider recorder = new();
-        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
                 services.AddSingleton<ILoggerProvider>(recorder)));
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateAppChannelClient();
 
         using HttpResponseMessage response = await client
             .PostAsJsonAsync(
