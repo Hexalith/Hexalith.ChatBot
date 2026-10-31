@@ -680,6 +680,33 @@ public static class LiveRecoveryValidationArchitectureTests
     }
 
     [Fact]
+    public static void ReleasePublication_ShouldBypassStopShipGatesOnlyThroughAnExplicitManualDispatch()
+    {
+        string release = ReadProjectFile(".github/workflows/release.yml");
+
+        // The bypass is a dispatch input, never a push-time setting, and it must default to the gated behaviour.
+        release.ShouldContain(
+            "  workflow_dispatch:\n"
+            + "    inputs:\n"
+            + "      bypass_stop_ship_gates:\n");
+        Match input = Regex.Match(release, "(?ms)^      bypass_stop_ship_gates:\n.*?(?=^  \\S)");
+        input.Success.ShouldBeTrue("the release workflow must declare the bypass input");
+        input.Value.ShouldContain("        type: boolean\n");
+        input.Value.ShouldContain("        default: false\n");
+
+        // Only semantic-release reads the input: every gate still runs and uploads its evidence on a bypassed run.
+        Match semanticReleaseJob = Regex.Match(release, "(?ms)^  semantic-release:.*?(?=^  \\S|\\z)");
+        semanticReleaseJob.Success.ShouldBeTrue("release workflow must contain the semantic-release job");
+        CountOccurrences(release, "inputs.bypass_stop_ship_gates").ShouldBe(1);
+        CountOccurrences(semanticReleaseJob.Value, "inputs.bypass_stop_ship_gates").ShouldBe(1);
+        semanticReleaseJob.Value.ShouldContain(
+            "    if: >-\n"
+            + "      !cancelled()\n"
+            + "      && ((needs.topology-acceptance.result == 'success' && needs.live-recovery-evidence-gate.result == 'success')\n"
+            + "      || (github.event_name == 'workflow_dispatch' && inputs.bypass_stop_ship_gates))\n");
+    }
+
+    [Fact]
     public static void RunnerBudgetAndCadence_ShouldMatchTheWorkflowValuesTheyDescribe()
     {
         // Both options existed only inside their own validator: nothing tied RunnerBudget to the workflow's

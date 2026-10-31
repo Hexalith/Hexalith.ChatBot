@@ -2,6 +2,13 @@ name: release
 
 on:
   workflow_dispatch:
+    inputs:
+      bypass_stop_ship_gates:
+        # Owner-authorized one-off publication. Every gate still runs and uploads its evidence; only a manual
+        # dispatch can set this, so a push to a release branch always publishes through green gates.
+        description: Publish even when the topology or live recovery stop-ship gates fail
+        type: boolean
+        default: false
   push:
     branches:
       - main
@@ -284,6 +291,12 @@ jobs:
     needs:
       - topology-acceptance
       - live-recovery-evidence-gate
+    # Without the bypass both gates must pass. The dispatch-only bypass waits for them to finish, never for them to
+    # pass; the publication guard below still refuses a stale or diverged commit.
+    if: >-
+      !cancelled()
+      && ((needs.topology-acceptance.result == 'success' && needs.live-recovery-evidence-gate.result == 'success')
+      || (github.event_name == 'workflow_dispatch' && inputs.bypass_stop_ship_gates))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
