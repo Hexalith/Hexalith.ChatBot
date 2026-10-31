@@ -25,6 +25,9 @@ env:
   HexalithEventStoreRoot: ${{ github.workspace }}/references/Hexalith.EventStore
   HexalithEventStoreFromSource: "false"
   UseHexalithProjectReferences: "false"
+  # A solution build otherwise unsets Configuration on references outside the solution, so root-declared
+  # submodule projects such as Platform built in Debug and failed Platform's CI guard (Release assets only).
+  ShouldUnsetParentConfigurationAndPlatform: "false"
 
 jobs:
   pull-request-merge-ref:
@@ -54,6 +57,10 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - name: Bind the published Builds tooling for Platform CI
+        run: |
+          tool_root="$(bash .github/scripts/resolve-published-builds-tooling.sh)"
+          printf 'HexalithBuildsPublishedToolRoot=%s\n' "$tool_root" >> "$GITHUB_ENV"
       - name: Restore synthetic merge
         run: dotnet restore Hexalith.ChatBot.slnx -p:Configuration=Release -p:UseHexalithProjectReferences=false -m:1 /nr:false
       - name: Build synthetic merge
@@ -95,6 +102,10 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - name: Bind the published Builds tooling for Platform CI
+        run: |
+          tool_root="$(bash .github/scripts/resolve-published-builds-tooling.sh)"
+          printf 'HexalithBuildsPublishedToolRoot=%s\n' "$tool_root" >> "$GITHUB_ENV"
       - name: Restore
         run: dotnet restore Hexalith.ChatBot.slnx -p:Configuration=Release -p:UseHexalithProjectReferences=false -m:1 /nr:false
       - name: Build

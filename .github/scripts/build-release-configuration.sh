@@ -12,6 +12,11 @@ cd -- "$repository_root"
 export HexalithBuildsRoot="${HexalithBuildsRoot:-${repository_root}/references/Hexalith.Builds}"
 export HexalithEventStoreRoot="${HexalithEventStoreRoot:-${repository_root}/references/Hexalith.EventStore}"
 export HexalithEventStoreFromSource=false
+# Platform's CI guard requires the published Builds tooling instead of its source project reference.
+if [[ -z "${HexalithBuildsPublishedToolRoot:-}" ]]; then
+    HexalithBuildsPublishedToolRoot="$(bash "${repository_root}/.github/scripts/resolve-published-builds-tooling.sh")"
+fi
+export HexalithBuildsPublishedToolRoot
 
 for project in "$@"; do
     if [[ ! -f "$project" ]]; then
