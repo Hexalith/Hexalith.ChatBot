@@ -299,6 +299,13 @@ jobs:
       || (github.event_name == 'workflow_dispatch' && inputs.bypass_stop_ship_gates))
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Job-level permissions replace the workflow defaults, so the semantic-release scopes are restated here.
+    # id-token lets NuGet trusted publishing exchange this run's OIDC token for a temporary key.
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -315,6 +322,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+      # Minted before the guard because no step may separate the guard from the release. The key expires within
+      # an hour and is used only by the guarded release step; a failed exchange stops the job before any tag exists.
+      - name: Exchange GitHub OIDC for a temporary NuGet key
+        id: nuget_login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: ${{ vars.NUGET_TRUSTED_PUBLISHING_USER }}
       - name: Guard main publication against a stale validated commit
         id: publication_guard
         env:
@@ -325,9 +339,9 @@ jobs:
         if: steps.publication_guard.outputs.should_publish == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Organization publishing key. This job does not use a protected environment, so publication
-          # does not wait for a human reviewer.
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          # Trusted-publishing key, as in the sibling modules; nuget.org refused the static organization key.
+          # This job does not use a protected environment, so publication does not wait for a human reviewer.
+          NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
         run: npx --yes -p semantic-release -p @semantic-release/exec semantic-release
       - name: Verify published NuGet packages
         if: success() && steps.publication_guard.outputs.should_publish == 'true'
