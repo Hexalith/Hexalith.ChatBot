@@ -177,8 +177,9 @@ public sealed class LiveContinuityAspireE2eContractTests
 
     /// <summary>
     /// The live mailbox-bearer probes are only meaningful when their body passes the OpenAPI request contract, which is
-    /// validated BEFORE authentication: a contract-invalid body answers the validation 400 whatever the bearer and so
-    /// proves nothing about admission. Drives the PRODUCTION request adapter over the exact probe body.
+    /// validated after authentication and before admission: an authenticated contract-invalid body answers the
+    /// validation 400, which proves authentication but nothing about admission. Drives the PRODUCTION request adapter
+    /// over the exact probe body.
     /// </summary>
     [Fact]
     public async Task MailboxAdmissionProbeBodyShouldPassTheProductionRequestContract()

@@ -966,9 +966,10 @@ public sealed class ServerBootstrapApiTests
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
         body.ShouldNotContain("project-alpha", Case.Insensitive);
 
-        // This endpoint requires authentication and the topology publishes it externally, so it must disclose nothing
-        // about the governance controls' verdicts — no per-sweep breach bit, no sweep-keyed evaluator failure counts
-        // (which name the WORM/isolation jobs), and no stop-ship flag. Those moved to the token-gated M2 release-gate endpoint.
+        // The topology publishes this endpoint externally and any authenticated caller can read it, so it must disclose
+        // nothing about the governance controls' verdicts — no per-sweep breach bit, no sweep-keyed evaluator failure
+        // counts (which name the WORM/isolation jobs), and no stop-ship flag. Those moved to the M2 release-gate
+        // endpoint, which its own shared-secret scheme protects.
         root.TryGetProperty("m2SweepStatuses", out _).ShouldBeFalse();
         root.TryGetProperty("isStopShip", out _).ShouldBeFalse();
         root.TryGetProperty("evaluatorFailureCounts", out _).ShouldBeFalse();

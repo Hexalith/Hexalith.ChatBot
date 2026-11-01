@@ -946,9 +946,9 @@ public sealed class LiveContinuityAspireE2eTests
     /// </para>
     /// <para>
     /// A <c>400</c>/<c>422</c> is never admission proof. Authentication precedes OpenAPI request validation, so a
-    /// contract-invalid body answers the versioned <c>400</c> only after authentication. The former incomplete mailbox
-    /// source could not establish admission. The probe therefore sends <see cref="MailboxAdmissionProbeBody"/>,
-    /// which satisfies the published contract and is invalid only after
+    /// contract-invalid body answers the versioned <c>400</c> after authentication but before admission. The former
+    /// probe body (an incomplete mailbox source) therefore proved only authentication. The probe now sends
+    /// <see cref="MailboxAdmissionProbeBody"/>, which satisfies the published contract and is invalid only after
     /// admission. <c>ServerBootstrapApiTests</c> pins this authentication/validation/admission order in-process.
     /// </para>
     /// </remarks>
@@ -1093,8 +1093,9 @@ public sealed class LiveContinuityAspireE2eTests
 
     /// <summary>
     /// The contract-valid mailbox admission probe body: every published <c>CaptureMailboxMessageIntake</c> member is
-    /// present with its declared type, so the request passes the OpenAPI boundary and reaches authentication, while the
-    /// intake identity is deliberately not a ULID so an admitted request fails in dispatch planning before any write.
+    /// present with its declared type, so an authenticated request passes OpenAPI validation and reaches admission,
+    /// while the intake identity is deliberately not a ULID so an admitted request fails in dispatch planning before
+    /// any write.
     /// The provider message identity embeds the command ID so a probe never shares its mailbox-intake deduplication
     /// key with an earlier run against the same persistent state store.
     /// </summary>

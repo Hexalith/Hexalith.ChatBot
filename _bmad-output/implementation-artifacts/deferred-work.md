@@ -2153,3 +2153,11 @@ Final native follow-up qualification (2026-10-26): independent review correction
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
   summary: U1-V1 — Assert every prepared MSBuild import variable in the source-wrapper child process test (medium; build tooling verification owner).
   evidence: .github/scripts/tests/test_story_evidence_guards.py:370-392 observes only Configuration, mapping hash, cwd and exit status. The reviewer ran both SourceMappingWrapperTests successfully against a temporary wrapper that removed all five IMPORTS variables before launching the child, proving the current tests miss loss of the prepared source graph. The production wrapper correctly forwards those imports and the current mapped Debug build passes. Extend the existing child-observation assertion; do not weaken producer validation or source/package duplicate guards.
+
+## Deferred from: code review of spec-1-5-establish-stable-operation-identity-and-concurrency-contracts (2026-11-01, round 13)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: R13-W1 — Update Story 1.2's completion evidence after the R12-P2 bootstrap-test rename (low; evidence-contract owner).
+  evidence: `_bmad-output/implementation-artifacts/evidence/1-2-publish-the-openapi-contract-spine-and-typed-client.json:656` (task-43) still lists `ServerBootstrapApiTests.CommandEndpointShouldValidateContractBeforeAuthenticationAndAuthenticateBeforeAdmission`; `86f658f` renamed it to `CommandEndpointShouldAuthenticateBeforeContractValidationAndValidateBeforeAdmission`. No other reference remains. `TransitionDetector` re-validates mappings only on a transition to done and Story 1.2 is already done, so CI is unaffected; a later re-validation of Story 1.2 would report the missing assertion.
+  reason: The correction edits another completed story's evidence contract, outside Story 1.5's boundary.
+  closure: Task-43 names the current test whenever Story 1.2 evidence is next regenerated or re-validated, with that assertion passing.
