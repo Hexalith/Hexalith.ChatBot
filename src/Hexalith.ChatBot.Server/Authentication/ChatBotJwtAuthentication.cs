@@ -8,10 +8,12 @@ using Microsoft.IdentityModel.Tokens;
 namespace Hexalith.ChatBot.Server.Authentication;
 
 /// <summary>
-/// JWT bearer authentication for the ChatBot adapter surface. It is wired ONLY when the hosting topology
+/// JWT bearer authentication for the ChatBot adapter surface. Tokens validate only when the hosting topology
 /// supplies <c>Authentication:JwtBearer:Authority</c> (OIDC discovery, e.g. the Aspire Keycloak realm) or a
-/// symmetric <c>SigningKey</c> (dev). When neither is configured — the in-process <c>WebApplicationFactory</c>
-/// tests, which inject a test principal directly — no JWT middleware is added, so the test principal survives.
+/// symmetric <c>SigningKey</c> (dev). The bearer scheme is registered either way, because the EventStore
+/// conforming-host inventory refuses to start a host whose ChatBot boundary policy names an unregistered scheme;
+/// without configuration it has no issuer or signing key, so it authenticates nothing and every ChatBot route
+/// returns the typed authentication denial.
 /// </summary>
 /// <remarks>
 /// Tenant authority comes ONLY from the authenticated token: the gateway binds <c>tenantId</c> from the
@@ -35,6 +37,17 @@ internal static class ChatBotJwtAuthentication
 
         if (!IsConfigured(configuration))
         {
+            _ = services
+                .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(static options =>
+                {
+                    options.MapInboundClaims = false;
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuerSigningKey = true,
+                        ValidateLifetime = true,
+                    };
+                });
             return services;
         }
 

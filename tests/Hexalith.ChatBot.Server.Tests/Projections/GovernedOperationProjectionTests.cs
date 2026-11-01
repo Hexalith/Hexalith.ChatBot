@@ -114,8 +114,8 @@ public sealed class GovernedOperationProjectionTests
     [Fact]
     public async Task ProjectionEndpointShouldApplyPublishedEventAndStayIdempotentOnReplay()
     {
-        using WebApplicationFactory<Program> factory = new();
-        using HttpClient client = factory.CreateClient();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken();
+        using HttpClient client = factory.CreateAppChannelClient();
 
         using HttpResponseMessage first = await client
             .PostAsJsonAsync(
@@ -142,8 +142,8 @@ public sealed class GovernedOperationProjectionTests
     [Fact]
     public async Task ProjectionEndpointShouldApplyControlEventAndStayIdempotentOnReplay()
     {
-        using WebApplicationFactory<Program> factory = new();
-        using HttpClient client = factory.CreateClient();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken();
+        using HttpClient client = factory.CreateAppChannelClient();
 
         PublishedGovernedOperationEvent published = PublishedControlEvent(
             new ServiceClientDisabled(

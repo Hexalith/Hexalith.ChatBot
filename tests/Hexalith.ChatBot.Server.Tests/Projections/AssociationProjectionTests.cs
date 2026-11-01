@@ -10,6 +10,7 @@ using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Projections;
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -516,7 +517,7 @@ public sealed class AssociationProjectionTests
                 services.AddSingleton<IAssociationProjectionStore>(store);
                 if (authenticated)
                 {
-                    services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter());
+                    services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter());
                 }
             }));
 

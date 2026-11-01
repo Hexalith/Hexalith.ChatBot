@@ -329,8 +329,8 @@ public sealed class AiOutcomeProjectionTests
     [Fact]
     public async Task ProjectionEndpointShouldApplyLowRiskAiAssistanceSuccessDomainEvent()
     {
-        using WebApplicationFactory<Program> factory = new();
-        using HttpClient client = factory.CreateClient();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken();
+        using HttpClient client = factory.CreateAppChannelClient();
 
         LowRiskAiAssistanceExecutionRecord record = new(
             "ai-execution-001",
@@ -398,8 +398,8 @@ public sealed class AiOutcomeProjectionTests
     [Fact]
     public async Task ProjectionEndpointShouldApplyLowRiskAiAssistanceRoutedToApprovalDomainEvent()
     {
-        using WebApplicationFactory<Program> factory = new();
-        using HttpClient client = factory.CreateClient();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken();
+        using HttpClient client = factory.CreateAppChannelClient();
 
         LowRiskAiAssistanceExecutionRecord record = new(
             "ai-execution-002",
@@ -669,8 +669,8 @@ public sealed class AiOutcomeProjectionTests
     [Fact]
     public async Task ProjectionEndpointShouldApplyPublishedAiOutcomeAndStayIdempotentOnReplay()
     {
-        using WebApplicationFactory<Program> factory = new();
-        using HttpClient client = factory.CreateClient();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken();
+        using HttpClient client = factory.CreateAppChannelClient();
 
         using HttpResponseMessage first = await client
             .PostAsJsonAsync(
@@ -698,8 +698,8 @@ public sealed class AiOutcomeProjectionTests
     [Fact]
     public async Task ProjectionEndpointShouldApplyApprovedAiActionExecutionDomainEvent()
     {
-        using WebApplicationFactory<Program> factory = new();
-        using HttpClient client = factory.CreateClient();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken();
+        using HttpClient client = factory.CreateAppChannelClient();
 
         ApprovedAiActionExecutionRecord record = new(
             "ai-approved-execution-001",
@@ -756,8 +756,8 @@ public sealed class AiOutcomeProjectionTests
     [Fact]
     public async Task ProjectionEndpointShouldApplyApprovedAiActionExecutionRejectionDomainEvent()
     {
-        using WebApplicationFactory<Program> factory = new();
-        using HttpClient client = factory.CreateClient();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken();
+        using HttpClient client = factory.CreateAppChannelClient();
 
         PublishedAiActionExecutionEvent published = new(
             Tenant,
@@ -809,8 +809,8 @@ public sealed class AiOutcomeProjectionTests
         // AC6: a proactive correction invalidation must project an append-only corrected-context row through the
         // published-event wire envelope, not just via the translator. This exercises the AiOutcome subscriber endpoint
         // and the TryCreatePublishedEvents Invalidated branch end-to-end, matching the Rejected/Started wire coverage.
-        using WebApplicationFactory<Program> factory = new();
-        using HttpClient client = factory.CreateClient();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken();
+        using HttpClient client = factory.CreateAppChannelClient();
 
         PublishedAiActionExecutionEvent published = new(
             Tenant,

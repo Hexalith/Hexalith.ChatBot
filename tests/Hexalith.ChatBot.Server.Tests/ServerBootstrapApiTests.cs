@@ -868,7 +868,20 @@ public sealed class ServerBootstrapApiTests
     [Fact]
     public async Task ChatBotCompatibilityHealthEndpointShouldReturnHealthyStatus()
     {
-        using WebApplicationFactory<Program> factory = new();
+        // The EventStore conforming host leaves only /health, /alive and /ready anonymous, so the ChatBot status route
+        // answers an anonymous caller with the typed authentication denial and reports health to an authenticated one.
+        using WebApplicationFactory<Program> anonymousFactory = new();
+        using HttpClient anonymous = anonymousFactory.CreateClient();
+        using HttpResponseMessage denied = await anonymous
+            .GetAsync("/health/chatbot", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        denied.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        using (JsonDocument problem = JsonDocument.Parse(await denied.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true)))
+        {
+            problem.RootElement.GetProperty("code").GetString().ShouldBe("authentication_denied");
+        }
+
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
         using HttpClient client = factory.CreateClient();
 
         using HttpResponseMessage response = await client
@@ -902,7 +915,7 @@ public sealed class ServerBootstrapApiTests
     [Fact]
     public async Task ChatBotHealthEndpointShouldExposeModuleIdentity()
     {
-        using WebApplicationFactory<Program> factory = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
         using HttpClient client = factory.CreateClient();
 
         using HttpResponseMessage response = await client
@@ -929,9 +942,9 @@ public sealed class ServerBootstrapApiTests
         statusStore.RecordEvaluatorFailure("audit-projection-lag");
         statusStore.RecordSucceeded(startedAt.AddSeconds(30), TimeSpan.FromSeconds(30));
 
-        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder => builder.ConfigureServices(
-                services => services.AddSingleton<IPeriodicEnforcementStatusStore>(statusStore)));
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<IPeriodicEnforcementStatusStore>(statusStore));
         using HttpClient client = factory.CreateClient();
 
         using HttpResponseMessage response = await client
@@ -1025,11 +1038,12 @@ public sealed class ServerBootstrapApiTests
     }
 
     /// <summary>
-    /// Pins the boundary order the live Tier-3 mailbox-bearer probes rely on: the published request contract is
-    /// validated before authentication (so a contract-invalid body answers the versioned 400 whatever the bearer), a
-    /// contract-valid body is rejected at the authentication boundary (401) without credentials, and the same body with
-    /// an admitted principal reaches dispatch, whose deliberately invalid intake identity yields dispatch-unavailable —
-    /// the only response that proves admission. A 400 therefore never proves a bearer was admitted.
+    /// Pins the boundary order the live Tier-3 mailbox-bearer probes rely on. The EventStore conforming host
+    /// authenticates the ChatBot boundary before any handler runs, so without credentials every body, contract-valid
+    /// or not, answers the typed authentication denial (401). With an admitted principal the published request
+    /// contract is validated next (a contract-invalid body answers the versioned 400), and a contract-valid body reaches
+    /// dispatch, whose deliberately invalid intake identity yields dispatch-unavailable — the only response that proves
+    /// admission. A 400 therefore proves authentication, never admission.
     /// </summary>
     [Fact]
     public async Task CommandEndpointShouldValidateContractBeforeAuthenticationAndAuthenticateBeforeAdmission()
@@ -1038,7 +1052,20 @@ public sealed class ServerBootstrapApiTests
 
         using WebApplicationFactory<Program> anonymousFactory = new();
         using HttpClient anonymous = anonymousFactory.CreateClient();
-        using HttpResponseMessage incomplete = await anonymous
+        foreach (string body in new[] { IncompleteMailboxAdmissionProbeBody(commandId), MailboxAdmissionProbeBody(commandId) })
+        {
+            using HttpResponseMessage unauthenticated = await anonymous
+                .SendAsync(MailboxAdmissionProbeRequest(body), TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
+            unauthenticated.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+            using JsonDocument problem = JsonDocument.Parse(await unauthenticated.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true));
+            problem.RootElement.GetProperty("type").GetString().ShouldBe(ChatBotProblemTypes.AuthorizationDenied);
+            problem.RootElement.GetProperty("code").GetString().ShouldBe("authentication_denied");
+        }
+
+        using WebApplicationFactory<Program> admittedFactory = AuthenticatedFactory("tenant-alpha");
+        using HttpClient admitted = admittedFactory.CreateClient();
+        using HttpResponseMessage incomplete = await admitted
             .SendAsync(MailboxAdmissionProbeRequest(IncompleteMailboxAdmissionProbeBody(commandId)), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         incomplete.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -1048,18 +1075,6 @@ public sealed class ServerBootstrapApiTests
             problem.RootElement.GetProperty("code").GetString().ShouldBe("command_contract_invalid");
         }
 
-        using HttpResponseMessage unauthenticated = await anonymous
-            .SendAsync(MailboxAdmissionProbeRequest(MailboxAdmissionProbeBody(commandId)), TestContext.Current.CancellationToken)
-            .ConfigureAwait(true);
-        unauthenticated.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
-        using (JsonDocument problem = JsonDocument.Parse(await unauthenticated.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true)))
-        {
-            problem.RootElement.GetProperty("type").GetString().ShouldBe(ChatBotProblemTypes.AuthorizationDenied);
-            problem.RootElement.GetProperty("code").GetString().ShouldBe("authentication_denied");
-        }
-
-        using WebApplicationFactory<Program> admittedFactory = AuthenticatedFactory("tenant-alpha");
-        using HttpClient admitted = admittedFactory.CreateClient();
         using HttpResponseMessage dispatchUnavailable = await admitted
             .SendAsync(MailboxAdmissionProbeRequest(MailboxAdmissionProbeBody(commandId)), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
@@ -1616,9 +1631,14 @@ public sealed class ServerBootstrapApiTests
             .ConfigureAwait(true);
         using JsonDocument problem = JsonDocument.Parse(body);
         JsonElement root = problem.RootElement;
-        root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
+
+        // The conforming host denies the unauthenticated submission before its body is read, so the denial carries a
+        // freshly generated correlation identifier rather than the invalid header value or anything from the payload.
+        string correlationId = root.GetProperty("correlationId").GetString().ShouldNotBeNull();
+        Hexalith.ChatBot.Contracts.Identities.ChatBotCorrelationId.TryParse(correlationId, out _).ShouldBeTrue();
+        correlationId.ShouldNotBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
         root.TryGetProperty("taskId", out _).ShouldBeFalse();
-        response.Headers.GetValues("X-Correlation-Id").Single().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        response.Headers.GetValues("X-Correlation-Id").Single().ShouldBe(correlationId);
         response.Headers.Contains("X-Hexalith-Task-Id").ShouldBeFalse();
         body.ShouldNotContain("/tmp/sensitive-correlation", Case.Insensitive);
         body.ShouldNotContain("payload-sentinel-task", Case.Insensitive);
@@ -3178,7 +3198,7 @@ public sealed class ServerBootstrapApiTests
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
-                        services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
+                        services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
                         services.AddSingleton<IIdempotencyStore>(_ => new InMemoryCoarseIdempotencyStore(new SystemClock()));
 
                         // The real AcceptedCommandDispatcher submits to EventStore over HTTP; there is no
@@ -3224,7 +3244,7 @@ public sealed class ServerBootstrapApiTests
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
                         services.AddSingleton<IProjectConversationProjectionStore>(conversationStore);
-                        services.AddSingleton<IStartupFilter>(new ProjectConversationPrincipalStartupFilter());
+                        services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new ProjectConversationPrincipalStartupFilter());
                     }));
 
     private static ProjectConversationItemView ProjectConversationProjectionPendingItem()

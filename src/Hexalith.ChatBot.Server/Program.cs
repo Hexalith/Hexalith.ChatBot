@@ -86,6 +86,7 @@ _ = builder.Services.Configure<PeriodicEnforcementOptions>(builder.Configuration
 
 bool jwtAuthentication = ChatBotJwtAuthentication.IsConfigured(builder.Configuration);
 _ = builder.Services.AddChatBotJwtAuthentication(builder.Configuration);
+_ = builder.Services.AddChatBotM2ReleaseGateAuthentication(builder.Configuration);
 
 if (string.Equals(builder.Configuration["ChatBot:UseDaprWorkflowRuntime"], "true", StringComparison.OrdinalIgnoreCase))
 {

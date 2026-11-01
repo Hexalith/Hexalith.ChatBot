@@ -21,6 +21,7 @@ using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Queries;
@@ -2822,7 +2823,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                         if (admissionEvidence is not null) { services.AddSingleton(admissionEvidence); }
                         if (tenantId is not null)
                         {
-                            services.AddSingleton<IStartupFilter>(
+                            services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(
                                 new TestPrincipalStartupFilter(
                                     tenantId,
                                     participantAuthority,
@@ -2911,7 +2912,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
-                        services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
+                        services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
                         services.AddSingleton<IEventStoreGatewayClient>(eventStore);
                         services.AddSingleton<IAuditWriter>(auditWriter);
                         services.AddSingleton<IParticipantDirectory>(directory);
@@ -2932,7 +2933,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
-                        services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
+                        services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
                         services.AddSingleton<IEventStoreGatewayClient>(eventStore);
                         services.AddSingleton<IAuditWriter>(auditWriter);
                         services.AddSingleton<IProjectDirectory>(directory);
@@ -2954,7 +2955,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
-                        services.AddSingleton<IStartupFilter>(
+                        services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(
                             new TestPrincipalStartupFilter(tenantId, projectOwners: ["project-alpha", "project-beta"]));
                         services.AddSingleton<IEventStoreGatewayClient>(eventStore);
                         services.AddSingleton<IAuditWriter>(auditWriter);
@@ -2977,7 +2978,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
-                        services.AddSingleton<IStartupFilter>(
+                        services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(
                             new TestPrincipalStartupFilter(tenantId, projectOwners: ["project-001"]));
                         services.AddSingleton<IEventStoreGatewayClient>(eventStore);
                         services.AddSingleton<IAuditWriter>(auditWriter);
@@ -2999,7 +3000,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
-                        services.AddSingleton<IStartupFilter>(
+                        services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(
                             new TestPrincipalStartupFilter(tenantId, projectOwners: ["project-001"]));
                         services.AddSingleton<IEventStoreGatewayClient>(eventStore);
                         services.AddSingleton<IAuditWriter>(auditWriter);
@@ -3023,7 +3024,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
-                        services.AddSingleton<IStartupFilter>(
+                        services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(
                             new TestPrincipalStartupFilter(tenantId, projectOwners: ["project-001"]));
                         services.AddSingleton<IEventStoreGatewayClient>(eventStore);
                         services.AddSingleton<IAuditWriter>(auditWriter);
@@ -3046,7 +3047,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     {
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddOwners(services);
                         Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.AddSyntheticAdmission(services);
-                        services.AddSingleton<IStartupFilter>(
+                        services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(
                             new TestPrincipalStartupFilter(
                                 tenantId,
                                 projectOwners: ["project-alpha"],

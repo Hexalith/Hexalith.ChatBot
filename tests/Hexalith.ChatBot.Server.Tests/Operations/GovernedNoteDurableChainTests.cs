@@ -64,8 +64,8 @@ public sealed class GovernedNoteDurableChainTests
             MessageId,
             new DateTimeOffset(2026, 5, 31, 8, 0, 0, TimeSpan.Zero));
 
-        using WebApplicationFactory<Program> factory = new();
-        using HttpClient client = factory.CreateClient();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken();
+        using HttpClient client = factory.CreateAppChannelClient();
 
         using HttpResponseMessage delivered = await client
             .PostAsJsonAsync(GovernedOperationProjectionEndpoints.GovernedNoteRecordedRoute, published, TestContext.Current.CancellationToken)

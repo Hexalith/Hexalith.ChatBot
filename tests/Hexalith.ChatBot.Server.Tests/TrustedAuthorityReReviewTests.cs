@@ -138,7 +138,7 @@ public sealed class TrustedAuthorityReReviewTests
             if (sdkAbort)
             {
                 SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
-                services.AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(Relay));
+                services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(Relay));
             }
         }));
         if (sdkAbort)

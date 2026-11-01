@@ -13,6 +13,7 @@ using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Conversations;
 using Hexalith.ChatBot.Server.Lifecycle.AiExecution;
 using Hexalith.ChatBot.Server.Operations;
+using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Client.Projections;
 using Hexalith.EventStore.Contracts.Commands;
@@ -649,7 +650,7 @@ public sealed partial class AiExecutionCoordinatorTests
             .WithWebHostBuilder(builder => builder.ConfigureServices(
                 services =>
                 {
-                    services.AddSingleton<IStartupFilter, OperatorPrincipalStartupFilter>();
+                    services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter, OperatorPrincipalStartupFilter>();
                     Hexalith.ChatBot.Tests.TrustedAuthority.TrustedAuthorityClock clock = new();
                     services.AddSingleton<ISystemClock>(clock);
                     services.AddSingleton<Hexalith.ChatBot.Server.Authorization.IChatBotOwnerAuthorityProvider>(new Hexalith.ChatBot.Tests.TrustedAuthority.SyntheticOwnerAuthorityProvider(clock));
