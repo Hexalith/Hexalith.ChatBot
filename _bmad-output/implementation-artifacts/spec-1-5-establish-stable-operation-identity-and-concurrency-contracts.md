@@ -2,7 +2,7 @@
 title: 'Establish Stable Operation Identity and Concurrency Contracts'
 type: 'feature'
 created: '2026-10-14'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: 5bb56567499c6df1c621184d3c3d35aa45521166
 route: 'dispatch'
 review_loop_iteration: 0
@@ -415,6 +415,30 @@ Rejected:
 - **R12-B3 (`low`)** — The boundary-order helper does send an invalid bearer rather than omitting the header. Both cases lack an authenticated principal; the production authorization boundary is unconditional and runs before body parsing. Headerless anonymous command denial is already covered by `CommandEndpointShouldRejectUnauthenticatedSubmissionsWithSafeProblemDetails`. No differing body-dependent behavior was demonstrated; adding another malformed-body credential matrix would add test branches for a negligible, undemonstrated distinction.
 - **R12-B5a (`false`)** — The claim that restoring anonymous access to periodic-enforcement health would pass the revised test is disproved by `EventStoreDomainServiceEndpointInventory.Validate`: non-probe anonymous routes or routes without an explicit named policy are startup violations. `EventStoreDomainServiceSecurityStartupValidator.StartingAsync` throws on those violations before `CreateClient` can succeed. Its incorrect anonymous comment is handled separately as R12-P3.
 
+### Source-recovery build review (2026-11-01)
+
+Resumed the build workflow against preserved baseline `5bb56567499c6df1c621184d3c3d35aa45521166` and unchanged implementation HEAD `2ac8c4b5bc87cc253c92ca60e806a86ab0948e99`. All three context-free review layers completed against `/tmp/story-1-5-unblock-baseline-i__dbizt.diff` (536 files, 6,829,185 bytes). That original-baseline diff includes separately committed UI, native Folders, contract and release work; this continuation changed no production or test source. Every finding is classified separately below. Carried dispositions retain their existing owner and are not duplicated in the ledger.
+
+| ID | Verdict | Route | Evidence and disposition |
+| --- | --- | --- | --- |
+| U1-B1 | medium | defer | Carried R12-W1: the HTTP authentication boundary returns before gateway denial auditing. The current full Server lane reproduces the expected-one/observed-zero audit failure. Retain its existing host-integration follow-up without reading an unauthenticated body or weakening the audit assertion. |
+| U1-B2 | medium | defer | Carried R10-W1/R11-W1: stale same-instance Started reports can still reopen Failed or replace later retry progress. The supported restart and ordering decision remain unchanged; do not reopen the accepted narrow guard or duplicate its ledger entry. |
+| U1-B3 | medium | defer | Carried R8B1: the original final receipt can overwrite workflow completion on a replay-created record. Its existing receipt-initialization/field-merge lifecycle decision remains open. |
+| U1-B4 | low | rejected | Carried BH1/EC2/R4B1/R8B4: constructor slot bounds remain intentionally looser than the live adapter. The adapter enforces the published grammar and the pure reducer is unregistered; no new consumer justifies reopening that decision. |
+| U1-B5 | maybe-false | defer | Acquisition validates lease metadata, but MaintainAsync replaces renewed/validated metadata directly. A malformed response could create an immediate observation loop; no current owner response producing those malformed values was demonstrated. Record unverified medium under native Folders qualification: settle with owner response invariants and a controlled malformed-renewal transport case. This native adapter is separately committed work, not an operation-contract or source-recovery change. |
+| U1-B6 | low | rejected | Release is already bounded to five seconds, failure retains owner state for supported recovery, and the storage attempt has a safe failure outcome. Adding a cleanup diagnostic protocol, logger plumbing and new cases is optional observability expansion; the finding shows no additional everyday effect beyond the already recorded owner lease-recovery problem. |
+| U1-B7 | medium | defer | The workspace loads before subscribing, while the successful initial JoinTenant path does not trigger a fresh typed read. A projection change in that window can remain unseen until another signal/action. This same initial-join behavior exists at the original baseline; record a separate UI subscription follow-up, preserving typed reads as authority. |
+| U1-B8 | low | rejected | A blank tenant intentionally leaves the subscriber unchanged until component teardown or a replacement subscription. Workspace disposal closes it; unloaded, cross-project and stale-scope callbacks are rejected by ProjectConversationEffects. The demonstrated residual is retaining an advisory connection, not exposing stale tenant data; adding a new clear-subscription contract is more than a direct correction for the shown impact. |
+| U1-B9 | low | rejected | Dictionary replacement matches the existing Json.NET dictionary behavior; no current producer of duplicate response members or promised duplicate-key policy was identified. A new key-alias/duplicate rejection policy and converter branches are not justified by this hypothetical response alone. |
+| U1-B10 | medium | defer | Carried R7B3/R8B7 and Story 1.6 R22Build-BH-7/EH-4: curl has no request timeout within the publication verifier's outer deadline. Existing release-maintenance ownership and ledger entry stand. |
+| U1-B11 | low | rejected | Metadata rows retain label-before-value DOM order within the same FluentStack, including code/time values. No broken reading-order or assistive-technology interaction was demonstrated. Introducing new IDs/roles and relationship machinery for these noninteractive text pairs is optional semantic enhancement, not a direct correction to the operation contract. |
+| U1-E1 | false | rejected | Carried R4E1/R5E1/R6E1: SafeNextActions has always been a required positional persisted field and every identified writer supplies it. No historical producer of the fabricated omitted/null record was identified; retain the existing rejection. |
+| U1-E2 | low | rejected | Carried BH1/EC2/R8E3, the same constructor/reducer slot-grammar claim as U1-B4. Current malformed-concurrency acceptance is exercised at the guarded live adapter; the inactive reusable-boundary decision remains unchanged. |
+| U1-E3 | medium | defer | StrictStringEnumConverter delegates nonempty names to Json.NET, whose comma-separated parsing can map Admitted, Committed to Rejected. The reviewer reproduced this through the actual helper. The same delegation exists in the original baseline; retain a separate client-contract follow-up for non-flags compound names, without changing accepted aliases or generated-client bytes here. |
+| U1-V1 | medium | defer | Pre-verified test gap: SourceMappingWrapperTests observes Debug, hash, cwd and exit code, but none of the five child MSBuild import variables. The reviewer removed all import keys in a temporary wrapper copy and both existing tests still passed. The real wrapper correctly forwards the full environment and current mapped builds pass; extend the existing child-observation test in the separately committed build-tooling follow-up. |
+
+Disposition: **15 findings, 0 patches, 0 intent/spec loopbacks**. Seven findings carry earlier dispositions; four new follow-ups are recorded separately in deferred-work (native lease-response qualification, initial subscription refresh, compound enum names, and child import-variable assertions). The other four new findings are rejected above. No production or test source was changed after verification, so no broader test repetition was needed. Existing owner/workflow deferrals, frozen intent, original baseline and completion gates are preserved.
+
 ## Design Notes
 
 GetWorkflowOperationStatus uses the existing typed GetOperationStatus boundary. RetryCommandExecution is distinct from legacy RequestFailedWorkflowRetry; this story supplies its prerequisites. No migrations, deployments or external effects. Preserve historical OperationId values exactly.
@@ -812,6 +836,99 @@ R8B2/R8E1 are resolved by a same-instance completion guard inside the atomic wor
 The pre-review full run (3906 passed, 3 failed, zero skips) and its original logs are retained under `TestResults/story-1-5-deferrals-pre-review/`; the final paths above contain the post-review rerun. The fifteen review findings are individually triaged above. There are no open review patches or spec loopbacks. The new, pre-existing original-receipt/workflow merge race R8B1 is recorded separately in deferred-work; it is not covered by the three resolved deferrals. No other carried ledger entry was duplicated.
 
 The build workflow remains at step-04 because required broader verification still fails and native owner evidence is unavailable. Both stories remain at their review stage; neither has a done/evidence-gate attestation. The completed initial carried-finding commit remains the only new commit/push in this task; resumed source, tests and records are left uncommitted for review.
+
+### Current implementation verification (2026-11-01)
+
+Verified canonical HEAD `2ac8c4b5bc87cc253c92ca60e806a86ab0948e99` on `main` from a clean working tree. Loaded this complete spec and both frontmatter context files before inspection. All execution tasks and accepted patches through R12-P3 are already present; no production or test-source changes were needed. This pass adds only this verification record and ignored local results. Original baseline `5bb56567499c6df1c621184d3c3d35aa45521166`, frozen intent, explicit deferrals, spec/sprint `in-progress` and Story 1.6's literal `review` are preserved.
+
+Required build/runtime commands:
+
+```bash
+python3 .github/scripts/with-source-mapping.py aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj
+python3 .github/scripts/with-source-mapping.py dotnet build Hexalith.ChatBot.slnx --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false
+python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --configuration Debug -m:1
+```
+
+All three exited **2** during source preparation with `HXW009`: the pinned Builds file `Props/Directory.Packages.props` at `74c1bc5ca68bc9856a5fa7d06323f60a0b48b604` cannot be read from the local `references/Hexalith.Builds` checkout. Logs, in command order: `/tmp/story-1-5-implementation-runtime.log`, `/tmp/story-1-5-implementation-solution-build.log`, `/tmp/story-1-5-implementation-server-build.log`. Aspire did not start. `aspire ps --format Json --non-interactive` returned `[]`; subsequent `aspire describe --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --format Json --non-interactive` reported no running ChatBot host. The historical mailbox-secret startup failure was not reached this run.
+
+The focused fallback ladder retained the source-mapping guard:
+
+```bash
+dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --configuration Debug --no-restore -p:UseHexalithProjectReferences=true -m:1 /nr:false
+dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --configuration Debug --no-restore -p:UseHexalithProjectReferences=true -p:HexalithBuildsRoot=/home/administrator/projects/hexalith/chatbot/references/Hexalith.Builds -m:1 /nr:false
+```
+
+Both exited **1**, each with one error and zero warnings. The first reports `MSB4019` for the absent nested Conversations Builds import; the second reaches Conversations' explicit refusal, `Conversations requires the Platform tool-selected source mapping; validation does not resolve dependency mappings.` Logs: `/tmp/story-1-5-implementation-server-fallback.log` and `/tmp/story-1-5-implementation-server-root-builds-fallback.log`. No nested submodule was initialized, no dependency or mapping guard was changed, and stale Server binaries were not executed as current evidence.
+
+Independent Contracts and Client fallbacks built and ran current source:
+
+```bash
+dotnet build tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj --configuration Debug --no-restore -p:UseHexalithProjectReferences=true -m:1 /nr:false
+dotnet build tests/Hexalith.ChatBot.Client.Tests/Hexalith.ChatBot.Client.Tests.csproj --configuration Debug --no-restore -p:UseHexalithProjectReferences=true -m:1 /nr:false
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests TestResults/story-1-5-implementation/contracts.ctrf.json -result-trx TestResults/story-1-5-implementation/contracts.trx
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests TestResults/story-1-5-implementation/client.ctrf.json -result-trx TestResults/story-1-5-implementation/client.trx
+```
+
+Both builds exited **0**, zero warnings/errors. Full lanes exited **0**: Contracts **531 passed**, Client **141 passed**, **672 total**, zero failures/skips. Build/test logs: `/tmp/story-1-5-implementation-contracts-build.log`, `/tmp/story-1-5-implementation-client-build.log`, `/tmp/story-1-5-implementation-contracts-tests.log`, `/tmp/story-1-5-implementation-client-tests.log`. Current CTRF/TRX results are at the exact paths above. These independent fallback results do not establish the verified full source graph.
+
+Current Server, full matrix/acceptance, Architecture/Conformance and native persisted-end-state evidence could not be produced. Earlier results and failures remain historical disclosures, not current passes. Source preparation is the immediate verification blocker; A6/A13 owner/protection acceptance, retry-profile approval, existing explicit deferrals and the completion evidence contract remain separate open gates. The story stays `in-progress`; no done transition, attestation, runtime activation, commit or push is proposed.
+
+### Resumed implementation verification after source preparation recovery (2026-11-01)
+
+Rechecked the complete spec and its two frontmatter context files against unchanged implementation HEAD `2ac8c4b5bc87cc253c92ca60e806a86ab0948e99`. All execution tasks and accepted patches through R12-P3 are present; no production or test-source correction was necessary. This continuation appends verification evidence only. Earlier failed preparation/fallback attempts above remain historical; the recovered source preparation now permits the required mapped build and current test execution. The original baseline, frozen intent, explicit deferrals and Story 1.6 are preserved. Story status is left for the parent workflow to reconcile; no done transition or runtime approval is inferred.
+
+Required solution command:
+
+```bash
+python3 .github/scripts/with-source-mapping.py dotnet build Hexalith.ChatBot.slnx --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false
+```
+
+Exit **0**, **0 warnings/errors**, elapsed **2m17s**; log `/tmp/story-1-5-resumed-solution-build.log`. Each full lane then ran separately with `XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.<Lane>.Tests/bin/Debug/net10.0/Hexalith.ChatBot.<Lane>.Tests TestResults/story-1-5-resumed-implementation/<lane>.ctrf.json -result-trx TestResults/story-1-5-resumed-implementation/<lane>.trx`, using lowercase result names. Exact argument arrays, environment, exit codes, counts, failure names/messages and log/result paths are retained in `TestResults/story-1-5-resumed-implementation/lane-results.json`.
+
+| Current full lane | Passed | Failed | Skipped | Exit |
+| --- | ---: | ---: | ---: | ---: |
+| Contracts | 531 | 0 | 0 | 0 |
+| Client | 141 | 0 | 0 | 0 |
+| Server | 3477 | 65 | 0 | 1 |
+| Cli | 61 | 0 | 0 | 0 |
+| Architecture | 167 | 0 | 0 | 0 |
+| Conformance | 151 | 0 | 0 | 0 |
+
+Total **4528 passed, 65 failed, 0 skipped**. The earlier Architecture/Conformance failures did not recur in this current run. The complete failed Server lane remains required failing evidence; focused success does not replace it. `server-failure-groups.json` in the same results directory retains every exact failed case name, file/line, message and trace, grouped as follows:
+
+- **62 SDK HTTP-host integration failures:** `ServerBootstrapApiTests` (17), `CommandGatewayTests` (39), `TrustedAuthorityReReviewTests` (1) and `TrustedAuthorityReviewTests` (5). Current `/process` and `/project` responses are HTTP 503 where the fixtures require HTTP 200 result envelopes (or 404 for the unknown projection); the malformed-command-payload fixture receives an empty non-JSON error body. Representative exact failures are `ServerBootstrapApiTests.ProcessEndpointShouldRejectUnauthenticatedTransportWithValidEnvelope` (through `ReadDomainServiceResultAsync`, line 3499), `ProjectEndpointShouldReturnNotFoundForUnknownDomain`, `ProcessEndpointShouldRejectMalformedCommandPayloadWithoutEchoingPayload`, and `CommandGatewayTests.SyntheticSdkPolicyWritesMustDenyEvenAnAuthenticSignedMarker`. These observations require HTTP-host/fixture reconciliation; no expectation or runtime gate was changed.
+- **2 hub authentication failures:** `ChatBotProjectConversationHubE2ETests.AiResponseProgressProjectionShouldBroadcastTenantScopedChangeSignalToHubSubscribers` and `UnauthenticatedJoinShouldFailClosedWhenJwtAuthenticationIsConfigured` receive HTTP 401 during their configured connection setup.
+- **1 existing R12-W1 failure:** `CommandGatewayAdmissionApiE2ETests.CommandGatewayApi_ShouldRejectUnauthenticatedSubmissionBeforeDispatch` expects one authorization-failure audit fact and observes zero. This is current execution evidence for the already recorded HTTP-boundary denial-audit deferral; it is not silently resolved or duplicated.
+
+The documented direct-runner fallback separately passed **181/181**, zero skips, exit **0**:
+
+```bash
+XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests TestResults/story-1-5-resumed-implementation/server-core.ctrf.json -result-trx TestResults/story-1-5-resumed-implementation/server-core.trx -class '*CommandOperationContractTests' -class '*CommandOperationConcurrencyAdapterTests' -class '*OperationStatusMonotonicityTests' -class '*OperationStatusWorkflowStatusSinkTests'
+```
+
+The focused result and exact command are retained in `focused-results.json`; log `/tmp/story-1-5-resumed-server-core-tests.log`. Both changed R12 bootstrap regression methods pass in the full Server result. The parent's independent `parent-matrix-audit.json` resolves all **16** methods named by the Matrix evidence/acceptance section to **38 passing current TRX cases**, including immutable replay, competing revisions, terminal retry, historical identities, missing/forbidden parity and fail-closed canonical requests. This is a local audit, not completion provenance or native-store evidence.
+
+Runtime baseline command `python3 .github/scripts/with-source-mapping.py aspire start --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj` exited **0** after a successful mapped Debug build. `aspire wait chatbot-bhvxwdeb --timeout 45 --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --non-interactive` exited **0**, reporting healthy after 16 seconds; ChatBot and its UI were healthy in the subsequent exact-target describe. The same snapshot records `eventstore-pjwuuxpb`, `eventstore-admin-yntkgsqd` and `tenants-hvcjafmf` as **Finished**, each with exit **134**. Their causes are absent from the retained CLI diagnostics, so full-topology health is not claimed. Sanitized state is retained at `/tmp/story-1-5-resumed-runtime-resource-summary.json`; startup/wait logs are `/tmp/story-1-5-resumed-runtime.log` and `/tmp/story-1-5-resumed-runtime-wait.log`, with CLI diagnostics `/home/administrator/.aspire/logs/cli_20261101T170757722_detach-child_ea88738e83394fcf94e036eaf9d466a9.log`. No secret was fabricated, and the earlier mailbox-secret startup failure did not recur.
+
+Exact-target `aspire stop --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --non-interactive` exited **0** before the solution build; final exact-target describe confirmed no running ChatBot host. Stop log: `/tmp/story-1-5-resumed-runtime-stop.log`. No topology was restarted during verification. Native persisted-end-state/owner execution evidence, A6/A13 acceptance, retry-profile approval and the existing explicit owner/workflow deferrals remain open, separately from the 65 current Server failures.
+
+`git diff --exit-code HEAD -- src tests .github Directory.Build.props Directory.Build.targets Directory.Packages.props global.json references` returned **0**; generated client bytes still match the existing SHA-256 fixture. CRLF-aware `git diff --check` passed. No dependency, submodule checkout, nested initialization, branch, index, commit or push changed in this implementation continuation.
+
+### Source-object recovery and parent closeout (2026-11-01)
+
+HXW009 was caused by an absent local Git object, not a missing working-tree file. `git cat-file -e 74c1bc5ca68bc9856a5fa7d06323f60a0b48b604^{commit}` in the root-declared Builds submodule initially exited 128. Fetching that exact revision from origin also exited 128 (`upload-pack: not our ref`); `git fetch --no-recurse-submodules --tags origin` succeeded but still did not provide it. An existing local Builds object store contained the exact commit and catalog, so this command recovered its reachable objects without moving any checkout:
+
+```bash
+git -C references/Hexalith.Builds fetch --no-recurse-submodules /home/administrator/projects/hexalith/platform/references/Hexalith.Builds 74c1bc5ca68bc9856a5fa7d06323f60a0b48b604
+```
+
+Exit **0**. The recovered catalog blob is `5a8b113853766e1deda3f4112bc1924001133a0d`. No nested submodule was initialized, updated or used as a new workspace dependency. The source store was read only. `python3 .github/scripts/with-source-mapping.py python3 -c 'print("Source preparation succeeded")'` then exited **0**, selecting mapping hash `278da9e99e3150d7181a4972f5a729fd1220d5fca564b0fb4f5602c9ef627bb8`. The producer still reports advisory HXW011 (no local Platform release tag) and HXW009 (the root Builds checkout differs from Platform's catalog pin); these do not prevent preparation. No guard, tool pin or dependency pin was changed. Exact operations and preservation checks are retained in `TestResults/story-1-5-resumed-implementation/dependency-object-recovery.json` and `/tmp/story-1-5-unblock-source-preparation-after-builds.log`.
+
+A bounded second runtime inspection used the current built outputs and the same verified mapping: `python3 .github/scripts/with-source-mapping.py aspire start --no-build --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj` exited **0** and the exact ChatBot health wait exited **0**. Console logs identify the three exit-134 causes omitted from the first CLI diagnostics: EventStore cannot bind `http://127.0.0.1:8080`, EventStore admin cannot bind `http://127.0.0.1:8090`, and Tenants cannot bind `http://127.0.0.1:61448`, each reporting address already in use. The same host was stopped successfully; final exact-target describe confirms none running. Other port owners were not stopped. Sanitized exact commands, exits and causes are retained in `TestResults/story-1-5-resumed-implementation/runtime-blockers.json`; detailed local console logs are under `/tmp/story-1-5-unblock-runtime-diagnosis-*.logs.json`. This supplies diagnostics, not native owner/persisted-end-state evidence.
+
+Parent verification confirms the full solution build and five passing lanes, all 65 disclosed Server failures, the 181-case focused pass and the independent 16-method/38-case matrix pass above. No failed test was suppressed or relabeled. Root HEAD, index gitlinks, every root-declared submodule HEAD/branch/working-tree status and every nested-submodule initialization state match the initial snapshot. The incoming user's verification section and the frozen block are preserved byte for byte. Only this story record, the append-only deferred ledger and Story 1.5's sprint stage were updated; local machine results remain ignored.
+
+Story 1.5 is spec `in-review` / sprint `review` following the completed review. Story 1.6 remains literal `review` in both artifacts. Completion remains blocked by the **65 current Server failures** (62 SDK HTTP/result-body cases, two hub authentication cases and R12-W1), the **three runtime port conflicts**, missing accepted **A6/A13 owner/protection evidence**, **retry-profile approval**, existing explicit owner/workflow decisions, and the **Story 1.5 completion contract/current bound primary evidence** (no Story 1.5 evidence contract or new attestation is present). The earlier Architecture/Conformance and missing-mailbox-secret failures did not recur. The generic build workflow's done/commit instructions are superseded by the user's explicit no-commit/no-push request and preserved completion gates: no done transition, completion attestation, runtime activation, commit or push is made.
 
 ## File List
 
