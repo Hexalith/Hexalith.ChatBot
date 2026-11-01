@@ -966,9 +966,9 @@ public sealed class ServerBootstrapApiTests
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
         body.ShouldNotContain("project-alpha", Case.Insensitive);
 
-        // This endpoint is anonymous and the topology publishes it externally, so it must disclose nothing about the
-        // governance controls' verdicts — no per-sweep breach bit, no sweep-keyed evaluator failure counts (which name
-        // the WORM/isolation jobs), and no stop-ship flag. Those moved to the token-gated M2 release-gate endpoint.
+        // This endpoint requires authentication and the topology publishes it externally, so it must disclose nothing
+        // about the governance controls' verdicts — no per-sweep breach bit, no sweep-keyed evaluator failure counts
+        // (which name the WORM/isolation jobs), and no stop-ship flag. Those moved to the token-gated M2 release-gate endpoint.
         root.TryGetProperty("m2SweepStatuses", out _).ShouldBeFalse();
         root.TryGetProperty("isStopShip", out _).ShouldBeFalse();
         root.TryGetProperty("evaluatorFailureCounts", out _).ShouldBeFalse();
@@ -1046,7 +1046,7 @@ public sealed class ServerBootstrapApiTests
     /// admission. A 400 therefore proves authentication, never admission.
     /// </summary>
     [Fact]
-    public async Task CommandEndpointShouldValidateContractBeforeAuthenticationAndAuthenticateBeforeAdmission()
+    public async Task CommandEndpointShouldAuthenticateBeforeContractValidationAndValidateBeforeAdmission()
     {
         const string commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
 
@@ -1471,7 +1471,7 @@ public sealed class ServerBootstrapApiTests
     [Fact]
     public async Task TypedFacadeShouldPreserveCaseDistinctProposalMetadataKeysAtValidationBoundary()
     {
-        using WebApplicationFactory<Program> factory = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
         using HttpClient http = factory.CreateClient();
         Hexalith.ChatBot.Client.ChatBotClient facade = new(new Hexalith.ChatBot.Client.Generated.Client(http));
         const string correlationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
@@ -1495,12 +1495,14 @@ public sealed class ServerBootstrapApiTests
                 ["Source"] = "two",
             });
 
-        // A valid envelope reaches authentication; malformed typed member aliases still fail before that boundary.
+        // The authenticated payload must pass validation before admission refuses its unsupported intended command.
+        // Malformed typed member aliases would return the contract-invalid 400 instead.
         HexalithChatBotApiException<ProblemDetails> problem = await Should.ThrowAsync<HexalithChatBotApiException<ProblemDetails>>(
             () => facade.SubmitWithCommandIdAsync(command, "01ARZ3NDEKTSV4RRFFQ69G5FAY", correlationId,
                 cancellationToken: TestContext.Current.CancellationToken));
-        problem.StatusCode.ShouldBe((int)HttpStatusCode.Unauthorized);
-        problem.Result.Code.ShouldBe("authentication_denied");
+        problem.StatusCode.ShouldBe((int)HttpStatusCode.Forbidden);
+        problem.Result.Type.ShouldBe(ChatBotProblemTypes.CommandNotAllowlisted);
+        problem.Result.Code.ShouldBe(ChatBotMessageCodes.RefusalBlockedAction);
         problem.Result.SchemaVersion.ShouldBe("chatbot.message-catalog.v1");
     }
 

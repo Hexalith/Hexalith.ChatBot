@@ -945,11 +945,11 @@ public sealed class LiveContinuityAspireE2eTests
     /// Neither response proves accepted mutation or owner execution.
     /// </para>
     /// <para>
-    /// A <c>400</c>/<c>422</c> is never admission proof. The OpenAPI request contract is validated BEFORE
-    /// authentication, so a contract-invalid body answers the versioned <c>400</c> whatever the bearer — the former
-    /// probe body (an incomplete mailbox source) passed with any token for exactly that reason. The probe therefore
-    /// sends <see cref="MailboxAdmissionProbeBody"/>, which satisfies the published contract and is invalid only after
-    /// admission. <c>ServerBootstrapApiTests</c> pins this validation/authentication/admission order in-process.
+    /// A <c>400</c>/<c>422</c> is never admission proof. Authentication precedes OpenAPI request validation, so a
+    /// contract-invalid body answers the versioned <c>400</c> only after authentication. The former incomplete mailbox
+    /// source could not establish admission. The probe therefore sends <see cref="MailboxAdmissionProbeBody"/>,
+    /// which satisfies the published contract and is invalid only after
+    /// admission. <c>ServerBootstrapApiTests</c> pins this authentication/validation/admission order in-process.
     /// </para>
     /// </remarks>
     private static async Task AssertMailboxTokenAdmissionAsync(
@@ -1108,8 +1108,8 @@ public sealed class LiveContinuityAspireE2eTests
     /// <summary>
     /// Companion to <see cref="AssertMailboxTokenAdmissionAsync"/>: proves an invalid bearer is rejected at the
     /// authentication boundary, before admission, by sending the identical contract-valid probe body with a forged
-    /// bearer and requiring <c>401</c>. A contract-invalid body would answer the validation <c>400</c> first and prove
-    /// nothing about authentication.
+    /// bearer and requiring <c>401</c>. Authentication precedes contract validation; using the same body holds the
+    /// request contract constant between the valid- and invalid-bearer probes.
     /// </summary>
     private static async Task AssertInvalidMailboxBearerIsRejectedBeforeAdmissionAsync(
         DistributedApplication application,
