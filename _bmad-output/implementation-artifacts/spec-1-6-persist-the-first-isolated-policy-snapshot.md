@@ -1352,3 +1352,256 @@ Acceptance for this documentation slice: the reviewable packet is explicitly una
 - All 39 local Markdown destinations and four heading fragments resolve; packet files preserve CRLF, final newlines and clean whitespace. The metadata labels remain unaccepted/source-inspection-only with no runtime observation, gate approval or story completion. Self/spec/sprint exclusions hold. `git -c core.whitespace=cr-at-eol diff --check` passes.
 - All three independent review layers completed on the new packet delta: Blind Hunter eight findings, Edge Case Hunter zero, Verification Gap zero. Each finding has a Packet-BH row in the Review Triage Log. Seven direct corrections were applied and parent-verified; the strict current-HEAD check is retained with its documented successor-binding requirement. No new deferrals, intent decision or runtime patch remains.
 - Original frontmatter (including baseline and literal `review`) and frozen intent are byte-identical to the starting candidate. Sprint and release metadata, tracked runtime/test/configuration files, owner sources, dependencies and Git index remain unchanged. No build, xUnit, live topology, new native receipt, TE-2 completion proposal, stage, commit or push was performed. Accepted protection, installed policy-specific provider/target/custody binding, independently witnessed native isolation/end-state evidence and named Compliance/Data Protection plus Architecture acceptance remain outstanding. Packet preparation is complete; A6 and Story 1.6 are not complete.
+
+### Native refusal preflight (2026-10-31; user-approved bounded continuation)
+
+The user approved this continuation with `go` after reviewing the source audit and
+the test-only proposal. This appendix is the implementation scope for this run;
+earlier implementation and review tasks above remain historical context. Preserve
+the original frontmatter, baseline, frozen intent, sprint and release metadata.
+Keep spec and sprint at literal `review`, overriding generic workflow status
+transitions. No stage, commit, push, remote operation, sibling edit, dependency
+change or live tenant-material policy persistence is authorized.
+
+**Goal:** make the current-candidate, two-tenant missing-proof refusal preflight
+executable with independently observed native persisted state. It covers only a
+bounded missing-proof branch of epic AC6. AC5 physical isolation, stale-proof and
+outage transitions, all-copy protection and actual A6/TE-2 acceptance remain open.
+An always-denying gate does not discriminate those other branches.
+
+**Current source binding:** root `166eef972516721e0de1fb437915a96c2ee9a982`;
+EventStore `61e6fa853d81cf822d67d6abfd6a130bdbb14ce2`;
+Platform `e243a680a54ff9a05275a6868ddd38c6d32cab96`;
+Parties `05aeee0d647a34eab112b6f8282a0810d35b7bf6`;
+Builds `585ffbce4452d995ef09b9f65d21b4ba343d4993`.
+All 16 root gitlinks matched clean checkouts at approval. The historical packet
+binds an older root and four older owner gitlinks; its strict verifier currently
+fails at HEAD equality. All 46 historical blobs remain intact: 39 bound source
+files are unchanged and seven changed (root global.json; four EventStore sources;
+Builds .gitattributes and package catalog). Preserve that packet and every retained
+owner-service receipt byte-for-byte. They are not current-run evidence.
+
+**Code map:** reuse the existing local AppHost through
+`DistributedApplicationTestingBuilder.CreateAsync<Projects.Hexalith_ChatBot_AppHost>`;
+do not create another AppHost or modify production sources. Current EventStore
+`AddEventStoreServer` installs committed route-catalog authority, superseding the
+old static DomainServices registrations. Its public
+`DevelopmentRouteCatalogAspireExtensions.AddEventStoreDevelopmentRouteCatalog`
+supports exact real compiled owner/receiver enrollment in Development. Use
+explicit finite invocation declarations; the convenience Capture method rejects
+the existing default-allow local ACL. The supported helper renders the closed
+receiver configurations and installs its real authority protocol; never replace
+the authority with a mock or bypass its readiness/security gates.
+
+`TrivialGovernedCommandAspireE2eTests` contains supported owner-command completion,
+tenant creation/membership and current-owner readback precedents; reuse rather
+than fake these protocols. `PlatformNativeTestPreparation` is internal,
+source-catalog-only and grants only one positive tenant; its ungranted foreign
+sentinel must remain ungranted. EventStore's native fixture observes Redis hashes
+and runtime identity but is not an independent ChatBot witness. Existing root
+`Recovery/EventStoreDurableStateProbe.cs` observes Dapr actor state for mailbox/note
+events, not native policy isolation. Keep generic provider/custody capabilities in
+their technical owners; the new verifier is a domain-specific evidence consumer.
+
+**Execution tasks:** paths abbreviated with `PolicyIsolation/` resolve under
+`tests/Hexalith.ChatBot.IntegrationTests/`; `preflight/` resolves under
+`evidence/story-1-6/native-refusal-preflight/` relative to this spec.
+
+- [ ] `PolicyIsolation/PolicyRefusalPreflightTopology.cs`: compose disposable,
+  run-owned provider resources around the existing AppHost; enroll the actual
+  owner/receiver catalog through its supported helper; provision two positive
+  fixture tenants and distinct scoped principals through real owner commands and
+  authoritative readback. No shared ambient Redis, fabricated credential success,
+  authorization substitution, test-only admission provider or policy gate change.
+- [ ] `PolicyIsolation/PolicyRefusalPreflightTests.cs`: execute
+  `SubmitTenantPolicyChange` through the canonical gateway for both principals;
+  require the policy-gate HTTP 503 dependency_degraded response with retryable
+  retry-later semantics. Fail/blocked is mandatory on missing prerequisites;
+  an opt-in switch may select execution but cannot constitute evidence or approval.
+- [x] `PolicyIsolation/PolicyRefusalNativeObservationVerifier.cs` and
+  `PolicyIsolation/PolicyRefusalNativeObservationVerifierTests.cs`: consume
+  independently collected native before/after observations with exact backing,
+  source/run/configuration binding, positive presence controls and complete scoped
+  inventory. Reject wrong backing, missing controls, incomplete observations,
+  mismatched candidate/run and any policy mutation. No prefix-filtered absence
+  claim or producer-produced observation can stand in for independent evidence.
+- [x] `preflight/README.md` and `preflight/contract-proposal.json`: specify exact
+  producer/independently operated read-only observer procedure and evidence wire
+  contract, cleanup, sanitization and scope limits. The proposal is unaccepted,
+  not a story-completion contract. If independent credentials/authority are absent,
+  retain an executable handoff and exact blocker; never fabricate a witness.
+- [x] `preflight/source-binding.json`: create a separate successor inspection
+  manifest with full revisions and exact source hashes; exclude mutable spec,
+  sprint, itself, generated artifacts and secrets. Bind later test results to the
+  actual implementation bytes separately; source binding is not runtime evidence.
+- [x] Append verification/review results here. Preserve historical packet hashes,
+  frozen intent, literal review status, all gates, dependencies and Git index.
+
+**Acceptance criteria:**
+
+- Given the exact current candidate, when real provisioning executes, then both
+  supported tenant commands commit and authoritative owner readback confirms their
+  distinct memberships. Authentication/HTTP acceptance alone is insufficient.
+- Given separately scoped principals, when each submits the selected policy
+  command, then the canonical gateway returns HTTP 503 dependency_degraded with
+  retryable=true and clientAction=retry-later from the unchanged policy gate.
+- Given independently collected native observations, when evaluated, then positive
+  controls identify the actual backing and complete before/after scope shows no
+  policy mutation. Missing/mismatched/incomplete evidence stays blocked/unknown.
+- Given any producer results or source tests, when reported, then independently
+  witnessed acceptance, AC5, stale-proof/outage qualification and A6 remain open.
+  Receipts carry no protected policy values, credentials, tokens or raw secrets.
+
+**Verification:** first record the required Aspire startup baseline using only
+run-owned disposable storage; preserve unrelated running AppHosts. Debug builds
+are serialized and bounded with timeout. If ordinary Debug hits CS1704, use both
+`-p:HexalithBuildsRoot="$PWD/references/Hexalith.Builds"` and
+`-p:HexalithCommonsFromSource=false`. Build/run the narrowest relevant project;
+every xUnit invocation uses timeout and `< /dev/null`. No weakened build gate,
+synthetic qualification or invented independent approval. Record exact commands,
+exit results and durable log locations, distinguishing historical failures from
+fresh blockers. Independently review the implementation diff per bmad-build;
+additional supporting one-type files are allowed only when required for this
+approved slice, and must be listed in the final evidence inventory.
+
+#### Pre-implementation baseline and concurrent drift
+
+- Ordinary `timeout 300s dotnet build src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --configuration Debug -m:1 --nologo`
+  exited 1: Conversations requires the Platform tool-selected source mapping.
+  Exact log: `/tmp/story-1-6-preflight-baseline-build.log`. This is a fresh
+  observation, not historical CS1704.
+- The documented wrapper command
+  `timeout 300s python3 .github/scripts/with-source-mapping.py dotnet build src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --configuration Debug -m:1 --nologo`
+  passed, zero warnings/errors, 86.61 seconds. Log:
+  `/tmp/story-1-6-preflight-mapped-baseline-build.log`. Tool diagnostics HXW009,
+  HXW010 and HXW011 disclose the pinned tool/Platform/Builds release relationships;
+  no validation or dependency was changed to suppress them.
+- The mapped command `timeout 180s python3 .github/scripts/with-source-mapping.py aspire start --no-build --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj`
+  exited 0. Its child environment selected the run-owned Redis endpoint recorded
+  privately in `/tmp/story-1-6-preflight-baseline-resource.json`; placement and
+  scheduler were deliberately set to `127.0.0.1:1` so this baseline could not use
+  unrelated ambient actor control planes. No command or fixture data was sent.
+  This is a startup attempt, not a ready/native acceptance baseline.
+  Private log: `/tmp/story-1-6-preflight-aspire-baseline.log`.
+- `timeout 30s aspire describe --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj --format Json --non-interactive`
+  observed ChatBot/EventStore/Tenants/Admin processes Finished, not ready; the
+  CLI AppHost log also records a Memories Dapr gRPC port 50002 conflict. Preserve
+  that failure separately from intentional withheld ambient control-plane access.
+  `timeout 60s aspire stop --non-interactive --apphost src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj`
+  exited 0. The owned Redis was removed after checking its ownership label;
+  a subsequent inspect confirmed absence. Other running AppHosts were preserved.
+- During baseline observation an external Git operation moved ten sibling HEADs
+  by `merge origin/main: Fast-forward` (reflogs 2026-10-31 18:31:54–56 +0100).
+  This task issued no merge, fetch, checkout or submodule update. Preserve those
+  concurrent changes. Until root gitlinks and checkouts agree again, qualification
+  is blocked; bind actual inspected sources separately and do not claim that the
+  earlier build qualifies the advanced graph. Continue only the approved root
+  test/evidence work. Use the root's documented source-mapping wrapper for builds;
+  do not fake selection hashes or initialize any nested submodule.
+
+
+#### Native refusal preflight implementation and focused verification (2026-10-31)
+
+- Added the four approved `PolicyIsolation/` C# files: the run-owned existing-AppHost composition, canonical two-principal producer, independently signed complete-native-inventory consumer, and synthetic adversarial verifier tests. Added only the three proposed `native-refusal-preflight/` packet files (`README.md`, `contract-proposal.json`, `source-binding.json`). No additional supporting C# types or generic provider/custody capability was introduced. The producer uses actual compiled owner enrollment, supported signed bound bootstrap/readback, real completion checks and exact ChatBot authority-grant attempts. Private Dapr SQLite name resolution prevents ambient mDNS owner routing; domain state remains on disposable EventStore Redis. Production sources, all admission/protection gates and dependencies remain unchanged.
+- Source availability and executable handoff are implemented; real two-tenant owner provisioning, real canonical policy-gate responses and independently witnessed native before/after acceptance have **not** been established. The execution checkboxes above are not blanket completion claims. Independent observer enrollment/native read-only authority is absent. Accepted A13 owner-dispatched atomic participation for the required exact `admin:policy` grants, real catalog/ACL readiness and current-owner authority remain fail-closed runtime prerequisites, never substituted by a fixture provider.
+- A concurrent external operation advanced root HEAD from `166eef972516721e0de1fb437915a96c2ee9a982` to `5f0831b86f5bf9a2978febe4830f8ba4bfd817d4` and reconciled the earlier sibling drift. This task issued no Git mutation. The separate successor manifest binds that actual inspected candidate, all 17 repository revisions (root plus 16 agreeing root gitlinks), 49 exact committed/worktree source representations, including six new non-manifest implementation/proposal sources without inventing committed blobs for untracked files; the manifest excludes itself. The original story baseline, frontmatter, frozen intent, sprint/release metadata and historical packet/receipts remain unchanged. Historical evidence is not relabeled as current runtime evidence.
+- The first mapped Integration build on the drifted graph returned HXW004 before compilation: Conversations checkout `8a26cb03ee1d5413c034eb60aee71618f3ebd31a` differed from staged gitlink `bc8ea08fdb06719a29931e1d3fd53d2338ee6bbf`; Platform/Builds drift diagnostics were retained. Command: `timeout 300s python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug -m:1 --nologo`. Log: `TestResults/story-1-6/native-refusal-preflight/story-1-6-native-preflight-build.log`. This is an earlier observation within this run, superseded for compilation by the aligned-candidate builds below. No staged pointer, selection hash, nested submodule or gate was changed to bypass it.
+- A temporary isolated compile/runner harness using retained Debug dependencies caught local API/style issues and passed the initial verifier cases 23/23, zero skips. It is fallback synthetic evidence only. The first aligned real-project build exposed xUnit1030 on test-method `ConfigureAwait(false)`; changing those test awaits to `ConfigureAwait(true)` resolved it. Final exact mapped Debug command above exited 0, zero warnings/errors, 99.58 seconds, including the final private-discovery fix. Final log: `TestResults/story-1-6/native-refusal-preflight/story-1-6-native-preflight-reviewed-build.log`. No CS1704 fallback or weakened build gate was used.
+- Final focused native-runner commands used `XUNIT_REQUIRE_ZERO_SKIPS=1 timeout 180s bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests /tmp/story-1-6-native-preflight-final-verifier.ctrf.json -class '*PolicyRefusalNativeObservationVerifierTests' -result-trx /tmp/story-1-6-native-preflight-final-verifier.trx < /dev/null` (30/30 passed, zero failures/skips) and the same runner with selector `-method '*NativeVerifierMustRequireExternalEvidenceInsteadOfAnOptInFlag'` and `final-external-evidence` output stems (1/1 passed, zero failures/skips). The negative matrix rejects wrong backing/source/run/configuration, incomplete/filtered inventories, missing/uncommitted/absent controls, new/deleted/changed native entries, invalid signatures, self-witnessing, malformed schema, wrong chronology and broken envelope chaining. These are synthetic consumer checks, not native-store observations.
+- Explicit live-prerequisite check: `HEXALITH_POLICY_REFUSAL_PREFLIGHT=1 HEXALITH_POLICY_REFUSAL_OBSERVER_TRUST=/tmp/story-1-6-independent-observer-not-enrolled.json XUNIT_REQUIRE_ZERO_SKIPS=1 timeout 180s bash .github/scripts/run-xunit-v4.sh tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests /tmp/story-1-6-native-preflight-missing-witness.ctrf.json -method '*MissingProofMustRefuseBothRealPrincipalsWithoutNativeMutation' -result-trx /tmp/story-1-6-native-preflight-missing-witness.trx < /dev/null` exited 1: one failed, zero passed/skipped, with `Preflight blocked: independently enrolled observer trust file is required; no witness was fabricated.` It failed before any topology/provider allocation. This is a demonstrated prerequisite refusal, not a passing live lane, independent witness or ready Aspire baseline.
+- Current logs, CTRF/TRX and separate result/assembly/source hashes are retained under `TestResults/story-1-6/native-refusal-preflight/`; `verification.json` binds the actual candidate, exact successor-manifest hash, implementation bytes, built assemblies and reconciled native result counters. The documented isolated source verifier passed; local Markdown destinations and whitespace checks passed. No source changed after the final build/test execution. Independent workflow review remains for the parent step; this paragraph does not claim it has occurred.
+- AC5 physical isolation, stale-proof/outage transitions, all-copy protection, A6, TE-2 and story completion remain open. Story and sprint retain literal `review`. The producer cannot manufacture its own observation, legal basis, accepted protection profile or witness approval. The Git index is untouched; no stage, commit, push, dependency or sibling edit was performed.
+
+
+#### Native refusal preflight independent review triage (2026-10-31)
+
+Three context-free workflow reviewers inspected the approved continuation diff
+`/tmp/story-1-6-native-refusal-review-rhy3hxqk.diff` (155,681 bytes). All layers
+completed before triage: Blind Hunter 10 findings, Edge Case Hunter 5, Verification
+Gap 1 pre-verified gap and 1 other finding. Every finding is recorded below before
+root-cause grouping. These are implementation corrections within the already
+approved evidence and resource-ownership requirements; no product API, owner gate,
+original frozen intent, literal status or original baseline is changed.
+
+| Finding | Verdict | Evidence and route |
+| --- | --- | --- |
+| Native-BH-1: producer command loses mapping environment | medium | README's unwrapped producer command starts a new shell after its wrapped build; owner preparation performs child source builds. Wrap producer execution with the documented mapping wrapper. Patch. |
+| Native-BH-2: ChatBot bearer used for EventStore completion | medium | The grant loop passes the `hexalith-chatbot` token to EventStore status although it acquired a distinct `hexalith-eventstore` bearer earlier. Retain/use the proper scoped owner bearer. Patch. |
+| Native-BH-3: generic dependency response counted as policy gate | high | CommandGateway admission exceptions use the same dependency response as policy-snapshot-unavailable; unchanged native state cannot distinguish them. Require independent, correlation-bound specific refusal evidence; absent cause observation stays blocked/unknown. Patch. |
+| Native-BH-4: unbound dirty runtime sources escape inspection | high | HEAD and the selected 49 hashes leave changed unlisted admission/realm sources untested. Refuse dirty/untracked consumed inputs outside explicitly bound implementation/evidence and the permitted mutable spec. Patch. |
+| Native-BH-5: runtime binary identity absent | high | Source/configuration hashes do not identify selected or loaded producer/child artifacts. Bind artifact identities/hashes and require independent loaded-artifact verification before native claims. Patch. |
+| Native-BH-6: requests constructed after immutable request hash | high | Per-call command/correlation/task IDs and actual serialized body are generated after observer binding. Prepare both submissions first, bind exact metadata/body hashes, and reuse those bytes with correlated response/cause evidence. Patch. |
+| Native-BH-7: cleanup stops after earlier failure | medium | Startup diagnostic write precedes disposal; catalog/owner disposal can abort the container loop. Guarantee all cleanup stages and aggregate failures, including diagnostic-write failure. Patch. |
+| Native-BH-8: prerequisite diagnostics discarded | medium | RunAsync discards stderr then refers to nonexistent private diagnostics. Retain bounded exact-command/exit diagnostics under private access and expose only a safe locator. Patch. |
+| Native-BH-9: inherited external/persistent configuration | high | AppHost explicitly selects external owners from configuration and can reuse Keycloak. Refuse external owner overrides and select disposable security before any owner request. Patch. |
+| Native-BH-10: preliminary witness gate has no success test | medium | Every VerifyBefore test expects an exception; a permanently refusing gate stays green. Add a valid signed-before case in the existing fixture; full live execution still requires real prerequisites. Patch. |
+| Native-ECH-1: admission exception falsely satisfies refusal | high | Same verified CommandGateway catch path as Native-BH-3; retain separate finding and group its correlation-bound cause correction. Patch. |
+| Native-ECH-2: blocked.json write prevents startup cleanup | medium | WriteAsync is outside disposal protection in StartAsync's catch; a filesystem error skips all cleanup. Same guaranteed-cleanup group as Native-BH-7. Patch. |
+| Native-ECH-3: catalog/owner disposal prevents remaining cleanup | medium | Unprotected awaits precede container disposal; one delete error skips remaining preparations/providers. Same guaranteed-cleanup group as Native-BH-7. Patch. |
+| Native-ECH-4: Redis anonymous volume survives container removal | medium | Redis declares /data and appendonly is enabled; docker rm --force does not remove anonymous volumes. Use run-owned ephemeral storage and remove/verify only exact owned anonymous volumes. Patch. |
+| Native-ECH-5: candidate drifts after initial validation | high | Initial-only checks do not cover real owner builds or the observer handoff interval; this session demonstrated concurrent source movement. Revalidate the identical source binding before submissions and final acceptance, with runtime artifact binding. Patch. |
+| Native-VG-1: VerifyBefore positive path untested | medium | Pre-verified gap: inverting the preliminary chronology guard leaves all rejection cases green; successful pair calls only Verify. Group with Native-BH-10 and pin valid before acceptance. Patch. |
+| Native-VG-Other-1: indistinguishable generic 503 | high | Verified the cited admission catch and shared factory. Group with Native-BH-3/Native-ECH-1; never promote generic refusal into gate-origin evidence. Patch. |
+| Native-Parent-1: closed receivers retain mTLS-off topology | medium | Existing local ACL comments and supported helper's closed receiver configuration require authenticated Dapr identities. Reuse the technical owner's run-owned self-hosted mTLS support if supported; otherwise explicitly stop before native qualification rather than weaken ACLs. Patch. |
+
+The corrections preserve the successful strict signature/inventory tests,
+run-owned discovery, historical packet/receipt bytes, real owner protocols and
+all default-deny product gates. No independent runtime result or approval is
+created by this review.
+
+
+#### Native refusal preflight parent verification and review closure (2026-10-31)
+
+- Applied all 17 independently reported corrections and the parent mTLS correction.
+  The two original reviewers rechecked the corrected source independently: all
+  original defects closed, with no concrete remaining false-success, ambient
+  contact or cleanup defect found. Those are code reviews, not Security/Test
+  Architect native acceptance. Every original triage row above remains intact.
+- Exact requests are prepared before the immutable observer handoff and reused
+  byte-for-byte. Generic dependency HTTP observations carry no policy-gate claim.
+  The signed after contract requires exact ChatBot-owned cause correlation and
+  actual loaded-artifact verification. Current producer execution explicitly
+  blocks on the missing supported reader of
+  `InMemoryAuditWriter.AuthorizationFailures`; no new production endpoint or
+  synthetic cause provider was introduced. The README identifies the ChatBot
+  observation prerequisite and the separate A13/grant/catalog prerequisite.
+- Source/configuration/artifact and unbound dirty-state checks repeat around
+  handoff and submission. The fixture uses the proper scoped EventStore bearer,
+  the supported run-owned Platform mTLS composition, private discovery, disposable
+  security and ephemeral Redis storage. Cleanup aggregates earlier failures,
+  verifies only owned container/anonymous-volume removal and retains a sanitized
+  receipt. Exact prerequisite diagnostics stay bounded/private, with safe locators.
+- Parent full mapped Debug build passed with zero warnings/errors in 92.76 seconds:
+  `timeout 300s python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug -m:1 --nologo`.
+  No BuildProjectReferences=false restriction, CS1704 fallback, altered dependency
+  or disabled gate was used by this final parent build.
+- Parent actual-project verifier lane passed **45/45** and the two external
+  evidence/cause-reader guards passed **2/2**, all zero skips. Both used
+  `XUNIT_REQUIRE_ZERO_SKIPS=1 timeout 180s bash .github/scripts/run-xunit-v4.sh`
+  with `< /dev/null`. Full exact commands, CTRF/TRX reconciliation, implementation
+  and assembly hashes are in
+  `TestResults/story-1-6/native-refusal-preflight/parent-verification.json`.
+  These remain synthetic consumer/guard checks, not native isolation evidence.
+- Fresh selected native check used a unique absent observer-trust path and failed
+  **1/1**, zero passes/skips, exit 1, before topology allocation:
+  `Preflight blocked: independently enrolled observer trust file is required; no witness was fabricated.`
+  Exact argv/environment, stdin and result are retained in
+  `TestResults/story-1-6/native-refusal-preflight/parent-missing-witness-command.json`;
+  the CTRF, TRX and log use the same `parent-missing-witness` stem. No failed or
+  earlier attempt was overwritten or relabeled as a pass. Real provisioning,
+  specific policy-gate responses and native persisted-end-state remain unobserved.
+- The successor source verifier independently passed **17 repositories / 59
+  sources** on root `5f0831b86f5bf9a2978febe4830f8ba4bfd817d4`, including newly
+  consumed mTLS/security/runtime inputs. All 16 root gitlinks agree with checkouts.
+  The earlier concurrent source-mapping failure remains historical-to-this-run;
+  it is not a current compilation blocker. New Markdown links, CRLF/final-newline
+  and whitespace checks pass. The entire original spec remains a byte-identical
+  prefix; sprint, release metadata and preserved historical packet/receipt hashes
+  match the original source candidate. The Git index remains unstaged.
+- Source implementation/proposal/verification tasks are recorded complete where
+  proven. The topology and policy-response execution tasks remain unchecked because
+  their required real execution/independent evidence is missing. AC5, complete
+  AC6, policy-specific protection/custody, A6, TE-2 and Story 1.6 acceptance remain
+  open. Spec and sprint remain literal `review`. No staging, commit, push, sibling
+  edit, dependency change or live tenant-material policy persistence was performed
+  by this continuation.

@@ -1,0 +1,546 @@
+{
+  "proposalSchema": "hexalith.chatbot.policy-refusal-preflight.contract-proposal.v1",
+  "status": "unaccepted",
+  "purpose": "Bounded missing-proof AC6 preflight; not AC5, A6 or TE-2 acceptance",
+  "runtimeEvidencePresent": false,
+  "storyComplete": false,
+  "sourceBinding": "source-binding.json",
+  "authority": {
+    "producer": "chatbot-policy-refusal-producer",
+    "observer": "Separately enrolled independent operator; identity and public key supplied out of band",
+    "requiredCapabilities": [
+      "independent provider/runtime inspection",
+      "separately issued native read-only Redis credential",
+      "independent real owner completion and current-membership readback",
+      "observer-held RSA private key unknown to producer",
+      "ChatBot-owned independently observable admission cause bound to exact command/type/correlation/task/tenant/principal/body hash"
+    ],
+    "missingCapabilitiesAre": "blocked; never create a producer witness or promote an execution flag into approval"
+  },
+  "signature": {
+    "algorithm": "RSA-PSS-SHA256",
+    "minimumRsaBits": 3072,
+    "saltLengthBytes": 32,
+    "signedBytes": "Exact decoded payloadBase64 bytes; UTF-8 JSON; no reserialization",
+    "trust": "External operational enrollment, independent of producer; not accepted custody/protection profile"
+  },
+  "envelopeSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "payloadBase64": {
+        "type": "string",
+        "contentEncoding": "base64"
+      },
+      "signatureBase64": {
+        "type": "string",
+        "contentEncoding": "base64"
+      }
+    },
+    "required": [
+      "payloadBase64",
+      "signatureBase64"
+    ]
+  },
+  "observationSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema": {
+        "const": "hexalith.chatbot.policy-refusal-native.v1"
+      },
+      "rootRevision": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "sourceSha256": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "runId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "producerId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "configurationSha256": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "requestSha256": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "backing": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "containerId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "redisRunId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "imageDigest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "database": {
+            "const": 0
+          }
+        },
+        "required": [
+          "containerId",
+          "redisRunId",
+          "imageDigest",
+          "database"
+        ]
+      },
+      "phase": {
+        "enum": [
+          "before",
+          "after"
+        ]
+      },
+      "observerId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "captureStartedUtc": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "captureEndedUtc": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "scope": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "entire-disposable-redis-database"
+          },
+          "algorithm": {
+            "const": "atomic-keys-dump-v1"
+          },
+          "complete": {
+            "const": true
+          },
+          "database": {
+            "const": 0
+          },
+          "dbSize": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "keys": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "keySha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "valueSha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              },
+              "required": [
+                "keySha256",
+                "valueSha256"
+              ]
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "algorithm",
+          "complete",
+          "database",
+          "dbSize",
+          "keys"
+        ]
+      },
+      "positiveControls": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tenantId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "principalId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "keySha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "ownerReadbackVerified": {
+              "const": true
+            },
+            "committedEventSequence": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "membershipRole": {
+              "const": "TenantOwner"
+            }
+          },
+          "required": [
+            "tenantId",
+            "principalId",
+            "keySha256",
+            "ownerReadbackVerified",
+            "committedEventSequence",
+            "membershipRole"
+          ]
+        }
+      },
+      "beforeEnvelopeSha256": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "submissions": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tenantId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "principalId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "commandId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "commandType": {
+              "const": "SubmitTenantPolicyChange"
+            },
+            "correlationId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "taskId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "requestBodySha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "method": {
+              "const": "POST"
+            },
+            "path": {
+              "const": "/api/v1/commands"
+            },
+            "contentType": {
+              "const": "application/json; charset=utf-8"
+            },
+            "origin": {
+              "const": "ui"
+            },
+            "requestSchemaVersion": {
+              "const": "v1"
+            }
+          },
+          "required": [
+            "tenantId",
+            "principalId",
+            "commandId",
+            "commandType",
+            "correlationId",
+            "taskId",
+            "requestBodySha256",
+            "method",
+            "path",
+            "contentType",
+            "origin",
+            "requestSchemaVersion"
+          ]
+        }
+      },
+      "runtimeArtifacts": {
+        "type": "array",
+        "minItems": 3,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "resourceId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "resourceId",
+            "path",
+            "sha256",
+            "bytes"
+          ]
+        }
+      },
+      "actualLoadedArtifactsVerified": {
+        "const": true
+      },
+      "policyGateCauses": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 2,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tenantId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "principalId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "commandId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "commandType": {
+              "const": "SubmitTenantPolicyChange"
+            },
+            "correlationId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "taskId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "requestBodySha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "reasonCode": {
+              "const": "policy-snapshot-unavailable"
+            },
+            "owner": {
+              "const": "ChatBot"
+            },
+            "sourceKind": {
+              "const": "chatbot-owned-correlated-admission-observation"
+            },
+            "evidenceSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "observedAtUtc": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "required": [
+            "tenantId",
+            "principalId",
+            "commandId",
+            "commandType",
+            "correlationId",
+            "taskId",
+            "requestBodySha256",
+            "reasonCode",
+            "owner",
+            "sourceKind",
+            "evidenceSha256",
+            "observedAtUtc"
+          ]
+        }
+      }
+    },
+    "required": [
+      "schema",
+      "rootRevision",
+      "sourceSha256",
+      "runId",
+      "producerId",
+      "configurationSha256",
+      "requestSha256",
+      "backing",
+      "phase",
+      "observerId",
+      "captureStartedUtc",
+      "captureEndedUtc",
+      "scope",
+      "positiveControls",
+      "submissions",
+      "runtimeArtifacts",
+      "actualLoadedArtifactsVerified"
+    ],
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "phase": {
+              "const": "after"
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "beforeEnvelopeSha256",
+            "policyGateCauses"
+          ]
+        },
+        "else": {
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "beforeEnvelopeSha256"
+                ]
+              },
+              {
+                "required": [
+                  "policyGateCauses"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "nativeDigest": {
+    "keySha256": "SHA256(raw key bytes)",
+    "valueSha256": "SHA256(frame(ASCII Redis TYPE) || frame(raw Redis DUMP) || frame(ASCII PEXPIRETIME))",
+    "frame": "Unsigned 64-bit big-endian byte length followed by exact bytes",
+    "expiry": "Absolute Unix milliseconds, including Redis -1 sentinel; no relative TTL normalization",
+    "collection": "One EVAL_RO over KEYS * and DBSIZE on the complete run-owned DB 0. No prefix filtering/sampling, producer observation, API simulation or omission."
+  },
+  "validationBeyondJsonSchema": [
+    "All object properties unique, closed payload/envelope/control/inventory schema",
+    "Exact expected candidate, source, run, configuration, immutable request and native backing bindings",
+    "RSA signature verified using independently enrolled public key; observer differs from producer",
+    "Every timestamp UTC; run start <= before start <= before end <= submission start <= submission end <= after start <= after end <= run end",
+    "after.beforeEnvelopeSha256 equals SHA256(exact before envelope bytes)",
+    "Complete unique inventory count equals DBSIZE and both inventories match every key and value digest",
+    "Two distinct tenant/principal memberships, committed positive sequence, different present native control keys",
+    "Independent operator verifies native control semantics and actual runtime/configuration; producer receipts do not establish them",
+    "All immutable submission IDs/body/HTTP metadata match both signed observations and exact per-request causes",
+    "Policy cause source is ChatBot-owned independent correlated observation, exact policy-snapshot-unavailable; generic HTTP/producer claims are refused",
+    "Actual producer/AppHost/selected child/native-sidecar loaded artifacts independently verified against complete runtimeArtifacts inventory in both observations",
+    "Cause readback UTC timestamp lies within the after capture; missing cause reader leaves live execution blocked/unknown"
+  ],
+  "handoff": {
+    "producerFiles": [
+      "request.json",
+      "configuration.json",
+      "before-request.json",
+      "after-request.json"
+    ],
+    "observerFiles": [
+      "before.observer.json",
+      "after.observer.json"
+    ],
+    "success": "producer-result.json, explicitly unaccepted and bounded",
+    "failure": "blocked.json or failed xUnit result; retain exact prerequisite safely"
+  },
+  "scopeLimits": [
+    "No accepted native physical tenant isolation",
+    "No stale-proof or provider-outage transition qualification",
+    "No live policy persistence or protection acceptance",
+    "No all-copy, backup, custody, retention or deletion qualification",
+    "No story completion, TE-2 or release gate approval"
+  ],
+  "sanitization": {
+    "allowed": "Run/candidate hashes, synthetic fixture identities, native key/value hashes, committed sequence, safe refusal metadata",
+    "prohibited": [
+      "policy values",
+      "raw native records or keys",
+      "tokens",
+      "passwords",
+      "private keys",
+      "raw secret-bearing runtime logs"
+    ]
+  },
+  "cleanup": "Every cleanup step continues after failures and errors aggregate; session application/security and supported run-owned mTLS infrastructure; Redis /data tmpfs; exact run-labeled Redis container and exclusively attached image-declared anonymous volumes only, verified absent afterwards; sanitized cleanup.json. No shared/named volume, global stop or prune.",
+  "causeObservationPrerequisite": {
+    "status": "unavailable-in-current-candidate; live producer remains blocked/unknown",
+    "requiredOwner": "ChatBot",
+    "existingSource": "InMemoryAuditWriter.AuthorizationFailures (process-local only)",
+    "existingFactFields": [
+      "TenantId",
+      "ActorId",
+      "CommandType",
+      "ReasonCode",
+      "CorrelationId",
+      "TaskId",
+      "SurfaceOrigin"
+    ],
+    "missing": [
+      "supported independent cross-process reader",
+      "owner-established exact command ID and request-body-hash correlation"
+    ],
+    "notAuthorized": [
+      "new production cause API",
+      "admission provider replacement",
+      "producer-generated cause facts"
+    ],
+    "genericHttpEvidence": "503/dependency_degraded/retryable/retry-later can precede the gate; generic HTTP receipts do not prove policy-snapshot-unavailable",
+    "consumer": "After payload requires two exact independent ChatBot-owned causes; neither an execution flag nor an unchanged native inventory replaces them"
+  },
+  "immutableRequestBinding": {
+    "constructedBeforeHandoff": [
+      "both exact UTF-8 request bodies",
+      "all command/correlation/task IDs",
+      "tenant/principal/command type",
+      "method/path/content type/origin/schema",
+      "request body hashes",
+      "producer/AppHost/selected child dependency/native-sidecar artifact identities and content hashes"
+    ],
+    "exports": "Only metadata and hashes; policy values/request body bytes remain in memory",
+    "reused": "Exact prepared body bytes and matching HTTP/cause correlations",
+    "rechecks": "Identical candidate/manifest/source/dirty inventory/runtime bytes before allocation, after builds/preparation, immediately before submissions, and final acceptance; sealed request fields/file cannot change"
+  },
+  "privateDiagnostics": {
+    "classification": "private raw diagnostics, never export as sanitized evidence",
+    "contents": [
+      "exact command/arguments/working-directory",
+      "exit/failure/timeout",
+      "exact bounded stdout/stderr bytes"
+    ],
+    "maximumBytesPerStream": 1048576,
+    "permissions": "0700 directory, 0600 files",
+    "publicFailure": "Safe locator only; private command/stdout/stderr/exit files exist even when process start fails"
+  }
+}

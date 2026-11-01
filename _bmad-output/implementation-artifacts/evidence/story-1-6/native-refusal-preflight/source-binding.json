@@ -1,0 +1,794 @@
+{
+  "schema": "hexalith.chatbot.policy-refusal-preflight.source-inspection.v1",
+  "status": "unaccepted-source-inspection-only",
+  "rootRevision": "5f0831b86f5bf9a2978febe4830f8ba4bfd817d4",
+  "originalStoryBaselineUnchanged": "38ca946f1dca9978f0eed5c5948d69421d6dac17",
+  "inspectedAtUtc": "2026-10-31T17:50:59.264318+00:00",
+  "runtimeEvidence": false,
+  "a6Accepted": false,
+  "te2Accepted": false,
+  "storyComplete": false,
+  "rootGitlinksAllMatch": true,
+  "repositories": [
+    {
+      "path": ".",
+      "worktreeRevision": "5f0831b86f5bf9a2978febe4830f8ba4bfd817d4",
+      "rootGitlinkRevision": null,
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.EventStore",
+      "worktreeRevision": "61e6fa853d81cf822d67d6abfd6a130bdbb14ce2",
+      "rootGitlinkRevision": "61e6fa853d81cf822d67d6abfd6a130bdbb14ce2",
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.Tenants",
+      "worktreeRevision": "9e5a991d0ba304bac7b1a5809cd71797b47d78ed",
+      "rootGitlinkRevision": "9e5a991d0ba304bac7b1a5809cd71797b47d78ed",
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.FrontComposer",
+      "worktreeRevision": "86e07babdf88329dffc60f0c4fb5b566a35063c4",
+      "rootGitlinkRevision": "86e07babdf88329dffc60f0c4fb5b566a35063c4",
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.Folders",
+      "worktreeRevision": "765544efc5c8aa395895f3a3d5911d4364658639",
+      "rootGitlinkRevision": "765544efc5c8aa395895f3a3d5911d4364658639",
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.Conversations",
+      "worktreeRevision": "8a26cb03ee1d5413c034eb60aee71618f3ebd31a",
+      "rootGitlinkRevision": "8a26cb03ee1d5413c034eb60aee71618f3ebd31a",
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.Projects",
+      "worktreeRevision": "32385f0bb067f4c9795f37ed0949105dffd918a6",
+      "rootGitlinkRevision": "32385f0bb067f4c9795f37ed0949105dffd918a6",
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.Parties",
+      "worktreeRevision": "166fd757cd512779c8df8d9c1060eae8c63cfe20",
+      "rootGitlinkRevision": "166fd757cd512779c8df8d9c1060eae8c63cfe20",
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.AI.Tools",
+      "worktreeRevision": "9b78aa008cfc62cd88ad0ea4b39b1f07311956ce",
+      "rootGitlinkRevision": "9b78aa008cfc62cd88ad0ea4b39b1f07311956ce",
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.Memories",
+      "worktreeRevision": "2649a946aa55cdd570c9beb15f9c91bc01703a26",
+      "rootGitlinkRevision": "2649a946aa55cdd570c9beb15f9c91bc01703a26",
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.Commons",
+      "worktreeRevision": "0604bcf5304fc09a569f7abbd8e5d1b9049c02b7",
+      "rootGitlinkRevision": "0604bcf5304fc09a569f7abbd8e5d1b9049c02b7",
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.Builds",
+      "worktreeRevision": "2132fe0e276059dcd9fc35a7115fd2a1795ce538",
+      "rootGitlinkRevision": "2132fe0e276059dcd9fc35a7115fd2a1795ce538",
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.Timesheets",
+      "worktreeRevision": "cfbf34c2bedefff30cef9dc5691ffa48085554da",
+      "rootGitlinkRevision": "cfbf34c2bedefff30cef9dc5691ffa48085554da",
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.PolymorphicSerializations",
+      "worktreeRevision": "92ede24cc11129379efe52cfe7fd2c820c567f7f",
+      "rootGitlinkRevision": "92ede24cc11129379efe52cfe7fd2c820c567f7f",
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.Works",
+      "worktreeRevision": "038f49080a86d312b30d12567f521c3954593569",
+      "rootGitlinkRevision": "038f49080a86d312b30d12567f521c3954593569",
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.McpCli",
+      "worktreeRevision": "4cdc47c468a01b8065b2746f7f25c8e478f84fb3",
+      "rootGitlinkRevision": "4cdc47c468a01b8065b2746f7f25c8e478f84fb3",
+      "rootGitlinkMatches": true
+    },
+    {
+      "path": "references/Hexalith.Platform",
+      "worktreeRevision": "68b785b6a929050771e70d78f83ff10fea3daabc",
+      "rootGitlinkRevision": "68b785b6a929050771e70d78f83ff10fea3daabc",
+      "rootGitlinkMatches": true
+    }
+  ],
+  "sources": [
+    {
+      "path": ".editorconfig",
+      "repository": ".",
+      "repositoryRelativePath": ".editorconfig",
+      "kind": "committed-source-inspection",
+      "committedSha256": "3e225994a13961391d8ca4be3c76bcdfacb2c5ad695262665a8066b42cba171b",
+      "committedBytes": 2490,
+      "worktreeSha256": "3e225994a13961391d8ca4be3c76bcdfacb2c5ad695262665a8066b42cba171b",
+      "worktreeBytes": 2490,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "global.json",
+      "repository": ".",
+      "repositoryRelativePath": "global.json",
+      "kind": "committed-source-inspection",
+      "committedSha256": "1b33cc591138f2d00721e6779af509d66e1c4a21048c75d080c0c200b11cfca3",
+      "committedBytes": 79,
+      "worktreeSha256": "1b33cc591138f2d00721e6779af509d66e1c4a21048c75d080c0c200b11cfca3",
+      "worktreeBytes": 79,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "Directory.Build.props",
+      "repository": ".",
+      "repositoryRelativePath": "Directory.Build.props",
+      "kind": "committed-source-inspection",
+      "committedSha256": "271e92cca258c7ba9bb56bbc83819ae1fcc50cc9ccc9538b18f80205f0320458",
+      "committedBytes": 4569,
+      "worktreeSha256": "271e92cca258c7ba9bb56bbc83819ae1fcc50cc9ccc9538b18f80205f0320458",
+      "worktreeBytes": 4569,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "Directory.Build.targets",
+      "repository": ".",
+      "repositoryRelativePath": "Directory.Build.targets",
+      "kind": "committed-source-inspection",
+      "committedSha256": "dffc87bff0ce0e6acb7ee3f3dabecd38d73b778728f625f5c23215e1a60a812e",
+      "committedBytes": 2033,
+      "worktreeSha256": "dffc87bff0ce0e6acb7ee3f3dabecd38d73b778728f625f5c23215e1a60a812e",
+      "worktreeBytes": 2033,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "Directory.Packages.props",
+      "repository": ".",
+      "repositoryRelativePath": "Directory.Packages.props",
+      "kind": "committed-source-inspection",
+      "committedSha256": "32fa31437915b0cabbb3df7348fde9eee0e6f3895cbd4481e411c2b230b1afd0",
+      "committedBytes": 465,
+      "worktreeSha256": "32fa31437915b0cabbb3df7348fde9eee0e6f3895cbd4481e411c2b230b1afd0",
+      "worktreeBytes": 465,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "tests/Directory.Build.props",
+      "repository": ".",
+      "repositoryRelativePath": "tests/Directory.Build.props",
+      "kind": "committed-source-inspection",
+      "committedSha256": "fb17cf670eddfd8c32e12a2e9c44ff594b2b51e18c4a1950c2fcc51616ee4b75",
+      "committedBytes": 128,
+      "worktreeSha256": "fb17cf670eddfd8c32e12a2e9c44ff594b2b51e18c4a1950c2fcc51616ee4b75",
+      "worktreeBytes": 128,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj",
+      "repository": ".",
+      "repositoryRelativePath": "tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj",
+      "kind": "committed-source-inspection",
+      "committedSha256": "bd1f5c018f80f9447695cf7b60c8e64e9f1d487f526469808b7c760ab17b5a54",
+      "committedBytes": 2750,
+      "worktreeSha256": "bd1f5c018f80f9447695cf7b60c8e64e9f1d487f526469808b7c760ab17b5a54",
+      "worktreeBytes": 2750,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": ".config/dotnet-tools.json",
+      "repository": ".",
+      "repositoryRelativePath": ".config/dotnet-tools.json",
+      "kind": "committed-source-inspection",
+      "committedSha256": "289e8a4a93f8b8a795db430415ed8edfb10224e5bbb4e26d445602dd05a62bed",
+      "committedBytes": 206,
+      "worktreeSha256": "289e8a4a93f8b8a795db430415ed8edfb10224e5bbb4e26d445602dd05a62bed",
+      "worktreeBytes": 206,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": ".github/scripts/with-source-mapping.py",
+      "repository": ".",
+      "repositoryRelativePath": ".github/scripts/with-source-mapping.py",
+      "kind": "committed-source-inspection",
+      "committedSha256": "98f2f69e5ccf5307698be1c277d98ea6727451c2963113ba33d287cb6032dd1d",
+      "committedBytes": 3588,
+      "worktreeSha256": "98f2f69e5ccf5307698be1c277d98ea6727451c2963113ba33d287cb6032dd1d",
+      "worktreeBytes": 3588,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "src/Hexalith.ChatBot.AppHost/Program.cs",
+      "repository": ".",
+      "repositoryRelativePath": "src/Hexalith.ChatBot.AppHost/Program.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "ccb8597e9cdd1378ac97a63270517e86aff3173582fffa5204be361a51cc6fb6",
+      "committedBytes": 49071,
+      "worktreeSha256": "ccb8597e9cdd1378ac97a63270517e86aff3173582fffa5204be361a51cc6fb6",
+      "worktreeBytes": 49071,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+      "repository": ".",
+      "repositoryRelativePath": "src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
+      "kind": "committed-source-inspection",
+      "committedSha256": "62982c078b364b2db1727381bb01c024fea96b9b4656c0ebf41aa16d482ba4e8",
+      "committedBytes": 4509,
+      "worktreeSha256": "62982c078b364b2db1727381bb01c024fea96b9b4656c0ebf41aa16d482ba4e8",
+      "worktreeBytes": 4509,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "src/Hexalith.ChatBot.AppHost/Aspire/ChatBotAspireModule.cs",
+      "repository": ".",
+      "repositoryRelativePath": "src/Hexalith.ChatBot.AppHost/Aspire/ChatBotAspireModule.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "9a252a786995e512f167c8ce6c67ce8dc2b18f1bd664d012db3c9c72aba84d05",
+      "committedBytes": 23997,
+      "worktreeSha256": "9a252a786995e512f167c8ce6c67ce8dc2b18f1bd664d012db3c9c72aba84d05",
+      "worktreeBytes": 23997,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "src/Hexalith.ChatBot.AppHost/DaprComponents/accesscontrol.local.yaml",
+      "repository": ".",
+      "repositoryRelativePath": "src/Hexalith.ChatBot.AppHost/DaprComponents/accesscontrol.local.yaml",
+      "kind": "committed-source-inspection",
+      "committedSha256": "c9630fe965e26f7da64254747c286451e7aa4dfa7e7c10996cbdf1a64465f865",
+      "committedBytes": 1986,
+      "worktreeSha256": "c9630fe965e26f7da64254747c286451e7aa4dfa7e7c10996cbdf1a64465f865",
+      "worktreeBytes": 1986,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "src/Hexalith.ChatBot.Server/Program.cs",
+      "repository": ".",
+      "repositoryRelativePath": "src/Hexalith.ChatBot.Server/Program.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "f653565474559f5f550f43b616fc178d1e0958b6972ee4268c5fc44b15798b09",
+      "committedBytes": 9511,
+      "worktreeSha256": "f653565474559f5f550f43b616fc178d1e0958b6972ee4268c5fc44b15798b09",
+      "worktreeBytes": 9511,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "src/Hexalith.ChatBot.Server/Gateway/CommandGatewayServiceCollectionExtensions.cs",
+      "repository": ".",
+      "repositoryRelativePath": "src/Hexalith.ChatBot.Server/Gateway/CommandGatewayServiceCollectionExtensions.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "d5e895b023978ad37b8911aa9456df9728f9904ce01b39e5fb004cfc426413a9",
+      "committedBytes": 33345,
+      "worktreeSha256": "d5e895b023978ad37b8911aa9456df9728f9904ce01b39e5fb004cfc426413a9",
+      "worktreeBytes": 33345,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "src/Hexalith.ChatBot.Server/Authorization/ChatBotAuthorityCatalog.cs",
+      "repository": ".",
+      "repositoryRelativePath": "src/Hexalith.ChatBot.Server/Authorization/ChatBotAuthorityCatalog.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "3bc48f1c515d9c40d4ddbc764c6039c5511c086e8f90a22999ef209185517b54",
+      "committedBytes": 9303,
+      "worktreeSha256": "3bc48f1c515d9c40d4ddbc764c6039c5511c086e8f90a22999ef209185517b54",
+      "worktreeBytes": 9303,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "src/Hexalith.ChatBot.Server/Authorization/ChatBotRequestAuthorizer.cs",
+      "repository": ".",
+      "repositoryRelativePath": "src/Hexalith.ChatBot.Server/Authorization/ChatBotRequestAuthorizer.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "2b5ea0fd776c21d567747a4b68863f115812126f4905994ff0c2c4f2e17c346d",
+      "committedBytes": 30632,
+      "worktreeSha256": "2b5ea0fd776c21d567747a4b68863f115812126f4905994ff0c2c4f2e17c346d",
+      "worktreeBytes": 30632,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "src/Hexalith.ChatBot.Server/Authorization/CurrentChatBotOwnerAuthorityProvider.cs",
+      "repository": ".",
+      "repositoryRelativePath": "src/Hexalith.ChatBot.Server/Authorization/CurrentChatBotOwnerAuthorityProvider.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "0c7be00aed304866e045ffa6d96a34c34e32e24a3b878d885cb6ae86b6a5fa40",
+      "committedBytes": 11231,
+      "worktreeSha256": "0c7be00aed304866e045ffa6d96a34c34e32e24a3b878d885cb6ae86b6a5fa40",
+      "worktreeBytes": 11231,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "src/Hexalith.ChatBot.Server/Governance/Policy/TenantPolicyPersistenceGate.cs",
+      "repository": ".",
+      "repositoryRelativePath": "src/Hexalith.ChatBot.Server/Governance/Policy/TenantPolicyPersistenceGate.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "6d10caca171664fc5e87fa9eb5e3f21f05b6883106fcf879cbd5e412647a734f",
+      "committedBytes": 881,
+      "worktreeSha256": "6d10caca171664fc5e87fa9eb5e3f21f05b6883106fcf879cbd5e412647a734f",
+      "worktreeBytes": 881,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "src/Hexalith.ChatBot.Server/Governance/AiMediation/UnavailableTenantAiPolicySnapshotProvider.cs",
+      "repository": ".",
+      "repositoryRelativePath": "src/Hexalith.ChatBot.Server/Governance/AiMediation/UnavailableTenantAiPolicySnapshotProvider.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "68838b4e86a2b26176047fe4e73ad9c95c9662313fdb8d45421a31b096abc3d3",
+      "committedBytes": 423,
+      "worktreeSha256": "68838b4e86a2b26176047fe4e73ad9c95c9662313fdb8d45421a31b096abc3d3",
+      "worktreeBytes": 423,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "src/Hexalith.ChatBot.Contracts/Commands/SubmitTenantPolicyChange.cs",
+      "repository": ".",
+      "repositoryRelativePath": "src/Hexalith.ChatBot.Contracts/Commands/SubmitTenantPolicyChange.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "261e257b2e39b54bb4f004898cef2b576a096d5ff9c7d240e96d63cfffe238bd",
+      "committedBytes": 611,
+      "worktreeSha256": "261e257b2e39b54bb4f004898cef2b576a096d5ff9c7d240e96d63cfffe238bd",
+      "worktreeBytes": 611,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "src/Hexalith.ChatBot.Contracts/Commands/TenantPolicySchema.cs",
+      "repository": ".",
+      "repositoryRelativePath": "src/Hexalith.ChatBot.Contracts/Commands/TenantPolicySchema.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "1114685b31c8dc317e7ab7f07bf5ad1beed9eebf79bbb65fd05906e5db360875",
+      "committedBytes": 18194,
+      "worktreeSha256": "1114685b31c8dc317e7ab7f07bf5ad1beed9eebf79bbb65fd05906e5db360875",
+      "worktreeBytes": 18194,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "docs/adrs/isolated-policy-snapshots.md",
+      "repository": ".",
+      "repositoryRelativePath": "docs/adrs/isolated-policy-snapshots.md",
+      "kind": "committed-source-inspection",
+      "committedSha256": "2a90813f91c1b805073cc195aee068f55225bb5af01dbfbc7456d2ca0587a110",
+      "committedBytes": 10075,
+      "worktreeSha256": "2a90813f91c1b805073cc195aee068f55225bb5af01dbfbc7456d2ca0587a110",
+      "worktreeBytes": 10075,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "release-metadata.json",
+      "repository": ".",
+      "repositoryRelativePath": "release-metadata.json",
+      "kind": "committed-source-inspection",
+      "committedSha256": "af2473f1b311309dbfb8f4b8fe8fbd7eb9ce1eceed2b92ab8038c1a575d7a270",
+      "committedBytes": 2131,
+      "worktreeSha256": "af2473f1b311309dbfb8f4b8fe8fbd7eb9ce1eceed2b92ab8038c1a575d7a270",
+      "worktreeBytes": 2131,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs",
+      "repository": ".",
+      "repositoryRelativePath": "tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "57c92d2c13b9292613c19ffbdddd2b479521250e74bc199ec42027630dad9732",
+      "committedBytes": 183947,
+      "worktreeSha256": "57c92d2c13b9292613c19ffbdddd2b479521250e74bc199ec42027630dad9732",
+      "worktreeBytes": 183947,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.EventStore/src/Hexalith.EventStore.Aspire/DevelopmentRouteCatalogAspireExtensions.cs",
+      "repository": "references/Hexalith.EventStore",
+      "repositoryRelativePath": "src/Hexalith.EventStore.Aspire/DevelopmentRouteCatalogAspireExtensions.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "5ec83f438285616378b5adb5e0c35bfeb684d87f758e6d11af718c561b505dd0",
+      "committedBytes": 19547,
+      "worktreeSha256": "5ec83f438285616378b5adb5e0c35bfeb684d87f758e6d11af718c561b505dd0",
+      "worktreeBytes": 19547,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.EventStore/src/Hexalith.EventStore.Aspire/DevelopmentRouteCatalogOwnerPreparationExtensions.cs",
+      "repository": "references/Hexalith.EventStore",
+      "repositoryRelativePath": "src/Hexalith.EventStore.Aspire/DevelopmentRouteCatalogOwnerPreparationExtensions.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "8d4e288b9212811cd1911eec3fdb2abf62b53cf5d3e6b966c2ede965b6b7dfed",
+      "committedBytes": 13083,
+      "worktreeSha256": "8d4e288b9212811cd1911eec3fdb2abf62b53cf5d3e6b966c2ede965b6b7dfed",
+      "worktreeBytes": 13083,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.EventStore/src/Hexalith.EventStore.Aspire/DevelopmentRouteCatalogComponentObserver.cs",
+      "repository": "references/Hexalith.EventStore",
+      "repositoryRelativePath": "src/Hexalith.EventStore.Aspire/DevelopmentRouteCatalogComponentObserver.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "75b3b43d64bac646c3203d87ceb465eaad87281b39d7652b27895918acd59e6b",
+      "committedBytes": 5415,
+      "worktreeSha256": "75b3b43d64bac646c3203d87ceb465eaad87281b39d7652b27895918acd59e6b",
+      "worktreeBytes": 5415,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.EventStore/src/Hexalith.EventStore.Aspire/DevelopmentRouteCatalogComposition.cs",
+      "repository": "references/Hexalith.EventStore",
+      "repositoryRelativePath": "src/Hexalith.EventStore.Aspire/DevelopmentRouteCatalogComposition.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "c224657a907b4d37d94ec66a01ed757243605c34d550a9a40ec08b59d52a6d21",
+      "committedBytes": 1016,
+      "worktreeSha256": "c224657a907b4d37d94ec66a01ed757243605c34d550a9a40ec08b59d52a6d21",
+      "worktreeBytes": 1016,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.EventStore/src/Hexalith.EventStore.Aspire/HexalithEventStoreTrustedEffectExtensions.cs",
+      "repository": "references/Hexalith.EventStore",
+      "repositoryRelativePath": "src/Hexalith.EventStore.Aspire/HexalithEventStoreTrustedEffectExtensions.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "0f63bf9806bd57d2be766784e6beca98f43a25d01ba2c9d26c80e39c8fbdc43a",
+      "committedBytes": 6334,
+      "worktreeSha256": "0f63bf9806bd57d2be766784e6beca98f43a25d01ba2c9d26c80e39c8fbdc43a",
+      "worktreeBytes": 6334,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.EventStore/src/Hexalith.EventStore.Client/Gateway/BoundWorkloadCommandProof.cs",
+      "repository": "references/Hexalith.EventStore",
+      "repositoryRelativePath": "src/Hexalith.EventStore.Client/Gateway/BoundWorkloadCommandProof.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "272bc7f4890071452c8f8c284c7a5c100df2853ae2d028c6cb677757e861a507",
+      "committedBytes": 2377,
+      "worktreeSha256": "272bc7f4890071452c8f8c284c7a5c100df2853ae2d028c6cb677757e861a507",
+      "worktreeBytes": 2377,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.EventStore/src/Hexalith.EventStore.Client/Gateway/BoundOwnerQueryProof.cs",
+      "repository": "references/Hexalith.EventStore",
+      "repositoryRelativePath": "src/Hexalith.EventStore.Client/Gateway/BoundOwnerQueryProof.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "6964294cca11da3847ddee133ef5c94678ff6f543b08aab12e845f0aef138ce2",
+      "committedBytes": 2236,
+      "worktreeSha256": "6964294cca11da3847ddee133ef5c94678ff6f543b08aab12e845f0aef138ce2",
+      "worktreeBytes": 2236,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.EventStore/src/Hexalith.EventStore/Controllers/CommandsController.cs",
+      "repository": "references/Hexalith.EventStore",
+      "repositoryRelativePath": "src/Hexalith.EventStore/Controllers/CommandsController.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "76dfb2702e6c92a3be8721de007973f83b7b62ca8f408ff3d1272defc8a98ca7",
+      "committedBytes": 21647,
+      "worktreeSha256": "76dfb2702e6c92a3be8721de007973f83b7b62ca8f408ff3d1272defc8a98ca7",
+      "worktreeBytes": 21647,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.EventStore/src/Hexalith.EventStore.Server/Configuration/ServiceCollectionExtensions.cs",
+      "repository": "references/Hexalith.EventStore",
+      "repositoryRelativePath": "src/Hexalith.EventStore.Server/Configuration/ServiceCollectionExtensions.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "dfec1162e5a9dd4da3b9745cc8c701b40a3c33c868cf4a08b11d11d017218ffb",
+      "committedBytes": 24481,
+      "worktreeSha256": "dfec1162e5a9dd4da3b9745cc8c701b40a3c33c868cf4a08b11d11d017218ffb",
+      "worktreeBytes": 24481,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.Tenants/src/Hexalith.Tenants/Program.cs",
+      "repository": "references/Hexalith.Tenants",
+      "repositoryRelativePath": "src/Hexalith.Tenants/Program.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "e1101f24259391e2f2d6bf3683a432659300931315fe09ae45c4388e5bfdc4e6",
+      "committedBytes": 14747,
+      "worktreeSha256": "e1101f24259391e2f2d6bf3683a432659300931315fe09ae45c4388e5bfdc4e6",
+      "worktreeBytes": 14747,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.Tenants/src/Hexalith.Tenants.Contracts/Routing/TenantCatalogDeclarations.cs",
+      "repository": "references/Hexalith.Tenants",
+      "repositoryRelativePath": "src/Hexalith.Tenants.Contracts/Routing/TenantCatalogDeclarations.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "a0c20d20f1c255a48ef44a3f82b056c685f3959b23e28d1bcaf50ae713d5602b",
+      "committedBytes": 8685,
+      "worktreeSha256": "a0c20d20f1c255a48ef44a3f82b056c685f3959b23e28d1bcaf50ae713d5602b",
+      "worktreeBytes": 8685,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.Tenants/src/Hexalith.Tenants.Server/Routing/TenantIntentAdapters.cs",
+      "repository": "references/Hexalith.Tenants",
+      "repositoryRelativePath": "src/Hexalith.Tenants.Server/Routing/TenantIntentAdapters.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "144f0ec0b48161edda522d8ea3877ff7d2d59faf33713ac42074f877179753f6",
+      "committedBytes": 2487,
+      "worktreeSha256": "144f0ec0b48161edda522d8ea3877ff7d2d59faf33713ac42074f877179753f6",
+      "worktreeBytes": 2487,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.Tenants/src/Hexalith.Tenants.Server/Aggregates/GlobalAdministratorsAggregate.cs",
+      "repository": "references/Hexalith.Tenants",
+      "repositoryRelativePath": "src/Hexalith.Tenants.Server/Aggregates/GlobalAdministratorsAggregate.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "4dcd291c31a2cc137dca2a972f4bb191d49c7b0da4e099fea16148141f5dc873",
+      "committedBytes": 3916,
+      "worktreeSha256": "4dcd291c31a2cc137dca2a972f4bb191d49c7b0da4e099fea16148141f5dc873",
+      "worktreeBytes": 3916,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.Tenants/src/Hexalith.Tenants.Contracts/Queries/ResolveTenantOwnerAuthority.cs",
+      "repository": "references/Hexalith.Tenants",
+      "repositoryRelativePath": "src/Hexalith.Tenants.Contracts/Queries/ResolveTenantOwnerAuthority.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "c420399feb3fac05aa8a8ad7a8fffcbdc89dfde9bff2d196add4f76b491c48e4",
+      "committedBytes": 710,
+      "worktreeSha256": "c420399feb3fac05aa8a8ad7a8fffcbdc89dfde9bff2d196add4f76b491c48e4",
+      "worktreeBytes": 710,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.Platform/src/Hexalith.Platform.Composition/PlatformNativeTestPreparation.cs",
+      "repository": "references/Hexalith.Platform",
+      "repositoryRelativePath": "src/Hexalith.Platform.Composition/PlatformNativeTestPreparation.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "5674d71a8403c6d2806fea37369f3145bfb03d5215633a80f1274628fe1e44cc",
+      "committedBytes": 27113,
+      "worktreeSha256": "5674d71a8403c6d2806fea37369f3145bfb03d5215633a80f1274628fe1e44cc",
+      "worktreeBytes": 27113,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.Builds/Directory.Packages.props",
+      "repository": "references/Hexalith.Builds",
+      "repositoryRelativePath": "Directory.Packages.props",
+      "kind": "committed-source-inspection",
+      "committedSha256": "c3d41f4a1a5d0f9fbc0e40ba0997ace2f8c22b996864f864d6cd1bff2b4e9515",
+      "committedBytes": 152,
+      "worktreeSha256": "c3d41f4a1a5d0f9fbc0e40ba0997ace2f8c22b996864f864d6cd1bff2b4e9515",
+      "worktreeBytes": 152,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.Builds/.gitattributes",
+      "repository": "references/Hexalith.Builds",
+      "repositoryRelativePath": ".gitattributes",
+      "kind": "committed-source-inspection",
+      "committedSha256": "b60fb9d0bc573e1a044f8258fa168825c00e563fc94d975f89d2f51b444cd6e4",
+      "committedBytes": 1600,
+      "worktreeSha256": "b60fb9d0bc573e1a044f8258fa168825c00e563fc94d975f89d2f51b444cd6e4",
+      "worktreeBytes": 1600,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.Parties/src/Hexalith.Parties/Extensions/PartiesServiceCollectionExtensions.cs",
+      "repository": "references/Hexalith.Parties",
+      "repositoryRelativePath": "src/Hexalith.Parties/Extensions/PartiesServiceCollectionExtensions.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "dca2ac9e7b36345061f851308f1ad6affe24f6bdedc6f641e4577e159f7ec940",
+      "committedBytes": 26753,
+      "worktreeSha256": "dca2ac9e7b36345061f851308f1ad6affe24f6bdedc6f641e4577e159f7ec940",
+      "worktreeBytes": 26753,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "tests/Hexalith.ChatBot.IntegrationTests/PolicyIsolation/PolicyRefusalNativeObservationVerifier.cs",
+      "repository": ".",
+      "repositoryRelativePath": "tests/Hexalith.ChatBot.IntegrationTests/PolicyIsolation/PolicyRefusalNativeObservationVerifier.cs",
+      "kind": "uncommitted-implementation-bytes",
+      "committedSha256": null,
+      "committedBytes": null,
+      "worktreeSha256": "95f65650120545114fdadd7b2179133da7d59b91eb1fd1824d8bd315bdea5be0",
+      "worktreeBytes": 20627,
+      "byteIdenticalToCommitted": null
+    },
+    {
+      "path": "tests/Hexalith.ChatBot.IntegrationTests/PolicyIsolation/PolicyRefusalNativeObservationVerifierTests.cs",
+      "repository": ".",
+      "repositoryRelativePath": "tests/Hexalith.ChatBot.IntegrationTests/PolicyIsolation/PolicyRefusalNativeObservationVerifierTests.cs",
+      "kind": "uncommitted-implementation-bytes",
+      "committedSha256": null,
+      "committedBytes": null,
+      "worktreeSha256": "5c522dff72960d7a87ae5488eb9cb8e63e5ec9e26ed5ce24311f4cf1e448b8b6",
+      "worktreeBytes": 14422,
+      "byteIdenticalToCommitted": null
+    },
+    {
+      "path": "tests/Hexalith.ChatBot.IntegrationTests/PolicyIsolation/PolicyRefusalPreflightTests.cs",
+      "repository": ".",
+      "repositoryRelativePath": "tests/Hexalith.ChatBot.IntegrationTests/PolicyIsolation/PolicyRefusalPreflightTests.cs",
+      "kind": "uncommitted-implementation-bytes",
+      "committedSha256": null,
+      "committedBytes": null,
+      "worktreeSha256": "1c396e7b29224131a5b66ae80e3914473af23f78babe67e5151e7358a40ef3d5",
+      "worktreeBytes": 6659,
+      "byteIdenticalToCommitted": null
+    },
+    {
+      "path": "tests/Hexalith.ChatBot.IntegrationTests/PolicyIsolation/PolicyRefusalPreflightTopology.cs",
+      "repository": ".",
+      "repositoryRelativePath": "tests/Hexalith.ChatBot.IntegrationTests/PolicyIsolation/PolicyRefusalPreflightTopology.cs",
+      "kind": "uncommitted-implementation-bytes",
+      "committedSha256": null,
+      "committedBytes": null,
+      "worktreeSha256": "8cbd2345953c9596c2a4d28776fab8d537628777065f800551437026d55496fd",
+      "worktreeBytes": 63633,
+      "byteIdenticalToCommitted": null
+    },
+    {
+      "path": "_bmad-output/implementation-artifacts/evidence/story-1-6/native-refusal-preflight/README.md",
+      "repository": ".",
+      "repositoryRelativePath": "_bmad-output/implementation-artifacts/evidence/story-1-6/native-refusal-preflight/README.md",
+      "kind": "uncommitted-implementation-bytes",
+      "committedSha256": null,
+      "committedBytes": null,
+      "worktreeSha256": "c2ec0ab07981a55cc0b2441054fd7abbad612e5fed867ff998cefb7d3a77513b",
+      "worktreeBytes": 21275,
+      "byteIdenticalToCommitted": null
+    },
+    {
+      "path": "_bmad-output/implementation-artifacts/evidence/story-1-6/native-refusal-preflight/contract-proposal.json",
+      "repository": ".",
+      "repositoryRelativePath": "_bmad-output/implementation-artifacts/evidence/story-1-6/native-refusal-preflight/contract-proposal.json",
+      "kind": "uncommitted-implementation-bytes",
+      "committedSha256": null,
+      "committedBytes": null,
+      "worktreeSha256": "4b749b73e5dab220d1cca2b6b82cd3fa6af87d1f5107a307f47af3f357e48e98",
+      "worktreeBytes": 17626,
+      "byteIdenticalToCommitted": null
+    },
+    {
+      "path": "references/Hexalith.Platform/DaprSelfHostedMtls.cs",
+      "repository": "references/Hexalith.Platform",
+      "repositoryRelativePath": "DaprSelfHostedMtls.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "703072feb8b609c2661a1c7eaa955fbd2c9d838402520b4fc425bda2000ba1a8",
+      "committedBytes": 27766,
+      "worktreeSha256": "703072feb8b609c2661a1c7eaa955fbd2c9d838402520b4fc425bda2000ba1a8",
+      "worktreeBytes": 27766,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.Platform/DaprSelfHostedMtlsSubscriber.cs",
+      "repository": "references/Hexalith.Platform",
+      "repositoryRelativePath": "DaprSelfHostedMtlsSubscriber.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "55c280284d0a305b1d6b6667f31362b7c4e4a3cf39890b6175d913cd762bb9c6",
+      "committedBytes": 1277,
+      "worktreeSha256": "55c280284d0a305b1d6b6667f31362b7c4e4a3cf39890b6175d913cd762bb9c6",
+      "worktreeBytes": 1277,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.Platform/src/Hexalith.Platform.Composition/Hexalith.Platform.Composition.csproj",
+      "repository": "references/Hexalith.Platform",
+      "repositoryRelativePath": "src/Hexalith.Platform.Composition/Hexalith.Platform.Composition.csproj",
+      "kind": "committed-source-inspection",
+      "committedSha256": "54c9cb55e8ea041b9df720509dc36711584a2482610fe5677869afc72689dfb4",
+      "committedBytes": 3997,
+      "worktreeSha256": "54c9cb55e8ea041b9df720509dc36711584a2482610fe5677869afc72689dfb4",
+      "worktreeBytes": 3997,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.EventStore/src/Hexalith.EventStore.Aspire/HexalithEventStoreSecurityExtensions.cs",
+      "repository": "references/Hexalith.EventStore",
+      "repositoryRelativePath": "src/Hexalith.EventStore.Aspire/HexalithEventStoreSecurityExtensions.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "0403211ed596e43377dd98ab9ed8ce8acade8cfb0f56928918f82810cd1f4d26",
+      "committedBytes": 36341,
+      "worktreeSha256": "0403211ed596e43377dd98ab9ed8ce8acade8cfb0f56928918f82810cd1f4d26",
+      "worktreeBytes": 36341,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.EventStore/src/Hexalith.EventStore.Aspire/HexalithEventStoreSecurityOptions.cs",
+      "repository": "references/Hexalith.EventStore",
+      "repositoryRelativePath": "src/Hexalith.EventStore.Aspire/HexalithEventStoreSecurityOptions.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "22ef28c3e03e8a5c9734fa3b539386d61e1258906e4606df6b508f675061a47d",
+      "committedBytes": 4147,
+      "worktreeSha256": "22ef28c3e03e8a5c9734fa3b539386d61e1258906e4606df6b508f675061a47d",
+      "worktreeBytes": 4147,
+      "byteIdenticalToCommitted": true
+    },
+    {
+      "path": "references/Hexalith.Builds/src/libraries/Hexalith.Builds.Tooling/Runtime/CompositionWorkspace.cs",
+      "repository": "references/Hexalith.Builds",
+      "repositoryRelativePath": "src/libraries/Hexalith.Builds.Tooling/Runtime/CompositionWorkspace.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "1d0e483c5d593c67b5deb9b42fdad3af91ac06fac77836e63db1b5b8c0ee85b7",
+      "committedBytes": 3164,
+      "worktreeSha256": "54ca263b46b8b6b07b7924b6551fe5b22c55fdb6de96de44b5e70c29ffa7f627",
+      "worktreeBytes": 3249,
+      "byteIdenticalToCommitted": false
+    },
+    {
+      "path": "references/Hexalith.Builds/src/libraries/Hexalith.Builds.Tooling/Runtime/CompositionToolchainPins.cs",
+      "repository": "references/Hexalith.Builds",
+      "repositoryRelativePath": "src/libraries/Hexalith.Builds.Tooling/Runtime/CompositionToolchainPins.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "4adc0208ef28d71bc39265028190bce03933dda14c50949e748c848b1b9fa89f",
+      "committedBytes": 1850,
+      "worktreeSha256": "efafe7b2c020109614e276a8ecff1d02d724c6c72acb3ac6799e177e9560133e",
+      "worktreeBytes": 1884,
+      "byteIdenticalToCommitted": false
+    },
+    {
+      "path": "references/Hexalith.Builds/src/libraries/Hexalith.Builds.Tooling/Runtime/CompositionRunPorts.cs",
+      "repository": "references/Hexalith.Builds",
+      "repositoryRelativePath": "src/libraries/Hexalith.Builds.Tooling/Runtime/CompositionRunPorts.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "787fe532ec6b3c5306ad3a22e46a644df9dacbc3a147998107508f1e4033ebf0",
+      "committedBytes": 3767,
+      "worktreeSha256": "cd4fe0394f5b32fa61ced25668a1ef031b56a959ede1ce54769f8cf3d3a2447e",
+      "worktreeBytes": 3859,
+      "byteIdenticalToCommitted": false
+    },
+    {
+      "path": "references/Hexalith.Builds/src/libraries/Hexalith.Builds.Tooling/Runtime/CompositionPortAllocator.cs",
+      "repository": "references/Hexalith.Builds",
+      "repositoryRelativePath": "src/libraries/Hexalith.Builds.Tooling/Runtime/CompositionPortAllocator.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "694bfa8d60d4a2f1f73585cc3cc502d047a69c492163e545d21d0704de950227",
+      "committedBytes": 9764,
+      "worktreeSha256": "e2d46d37fcebd110df89859be916f269529098834d92763a6e111ea9080fe373",
+      "worktreeBytes": 9978,
+      "byteIdenticalToCommitted": false
+    },
+    {
+      "path": "references/Hexalith.Builds/src/libraries/Hexalith.Builds.Tooling/Runtime/CompositionDaprSidecarPorts.cs",
+      "repository": "references/Hexalith.Builds",
+      "repositoryRelativePath": "src/libraries/Hexalith.Builds.Tooling/Runtime/CompositionDaprSidecarPorts.cs",
+      "kind": "committed-source-inspection",
+      "committedSha256": "ce43c8c1d8380c6905ad552ebe52e18e5e637ac411b5eca8348b4f4adea54c77",
+      "committedBytes": 729,
+      "worktreeSha256": "de34dbd648d68a60ff3e6aade34f70f6368d2cbd948dfed8150e52df7ba9697b",
+      "worktreeBytes": 744,
+      "byteIdenticalToCommitted": false
+    }
+  ],
+  "preservedHistoricalArtifacts": [
+    {
+      "path": "_bmad-output/implementation-artifacts/evidence/story-1-6/policy-snapshot-a6/README.md",
+      "sha256": "bb81c179a6cbc80f04f1efbcf9d197ae962f6b6729532e16b0cefa099b257852",
+      "bytes": 31819,
+      "unchangedFromCurrentCommittedBlob": true,
+      "classification": "historical-not-current-runtime-evidence"
+    },
+    {
+      "path": "_bmad-output/implementation-artifacts/evidence/story-1-6/policy-snapshot-a6/source-binding.json",
+      "sha256": "e48e068e621c1a7cd4faa18e692254c6a52ead661749b2b1787475b6e347751b",
+      "bytes": 30667,
+      "unchangedFromCurrentCommittedBlob": true,
+      "classification": "historical-not-current-runtime-evidence"
+    }
+  ],
+  "exclusions": [
+    "mutable Story 1.6 spec",
+    "sprint status",
+    "this source manifest",
+    "generated artifacts and build outputs",
+    "secrets and credentials"
+  ],
+  "implementationBinding": "Uncommitted implementation files bind exact current worktree bytes with no invented committed blob. Runtime results must additionally bind actual built assembly hashes and this exact manifest hash.",
+  "runtimeBinding": "The producer seals exact submission metadata/body hashes and selected producer/AppHost/child dependency/native-executable artifacts before observer handoff. Signed observations must independently verify actual loaded artifacts. Static generated Sentry/sidecar/component inputs and configuration.json are also rehashed before submissions and final acceptance. Generated per-run configurations/artifacts remain excluded from this source inspection.",
+  "unsupportedOwnerPrerequisite": "ChatBot-owned exact correlated policy-snapshot-unavailable cross-process admission cause observation is unavailable. Generic HTTP dependency responses cannot complete the preflight.",
+  "postReviewInspectedAtUtc": "2026-10-31T18:20:18.671028+00:00"
+}
