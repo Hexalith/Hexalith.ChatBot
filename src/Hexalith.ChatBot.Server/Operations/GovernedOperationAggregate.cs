@@ -136,6 +136,42 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    /// <summary>Refuses unsupported policy persistence without emitting a success event or changing state.</summary>
+    public static DomainResult Handle(SubmitEscalationPolicyChange command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+        return RejectTenantPolicyChange(command.EscalationPolicyChangeId, ChatBotRefusalReasonCodes.PolicySnapshotUnavailable,
+            command.SourceVersion, command.CorrelationId);
+    }
+
+    /// <summary>Refuses unsupported policy persistence without emitting a success event or changing state.</summary>
+    public static DomainResult Handle(SubmitMailboxConfigurationChange command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+        return RejectTenantPolicyChange(command.ConfigurationChangeId, ChatBotRefusalReasonCodes.PolicySnapshotUnavailable,
+            command.SourceVersion, command.CorrelationId);
+    }
+
+    /// <summary>Refuses unsupported policy persistence without emitting a success event or changing state.</summary>
+    public static DomainResult Handle(SubmitRetentionConfigurationChange command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+        return RejectTenantPolicyChange(command.RetentionChangeId, ChatBotRefusalReasonCodes.PolicySnapshotUnavailable,
+            command.SourceVersion, command.CorrelationId);
+    }
+
+    /// <summary>Refuses unsupported policy persistence without emitting a success event or changing state.</summary>
+    public static DomainResult Handle(SubmitDataClassInventoryChange command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+        return RejectTenantPolicyChange(command.InventoryChangeId, ChatBotRefusalReasonCodes.PolicySnapshotUnavailable,
+            command.SourceVersion, command.CorrelationId);
+    }
+
     public static DomainResult Handle(SubmitTenantPolicyChange command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);

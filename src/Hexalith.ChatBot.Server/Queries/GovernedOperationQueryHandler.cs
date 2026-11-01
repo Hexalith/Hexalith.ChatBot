@@ -24,6 +24,10 @@ internal sealed class GovernedOperationQueryHandler(
     IGovernedOperationProjectionStore projectionStore)
     : ChatBotReadQueryHandler<GovernedOperationQuery>(requestContextResolver, requestAuthorizer)
 {
+    /// <summary>Declares this actual protected query handler and its existing output.</summary>
+    public static Hexalith.EventStore.Contracts.Routing.RouteContractDeclaration CatalogDeclaration { get; } =
+        Hexalith.ChatBot.Server.Routing.ChatBotCatalogDeclarations.Query(ChatBotReadQueryTypes.GovernedOperation, typeof(GovernedOperationQueryHandler));
+
     public override string QueryType => ChatBotReadQueryTypes.GovernedOperation;
 
     protected override async Task<QueryResult> ExecuteAsync(QueryEnvelope query, GovernedOperationQuery request, ChatBotAuthorityPrincipal principal, CancellationToken cancellationToken)

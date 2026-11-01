@@ -27,6 +27,10 @@ internal sealed class OperationStatusQueryHandler(
     ICorrectionPropagationWorkflowRuntime? workflowRuntime = null)
     : ChatBotReadQueryHandler<OperationStatusQuery>(requestContextResolver, requestAuthorizer)
 {
+    /// <summary>Declares this actual protected query handler and its existing output.</summary>
+    public static Hexalith.EventStore.Contracts.Routing.RouteContractDeclaration CatalogDeclaration { get; } =
+        Hexalith.ChatBot.Server.Routing.ChatBotCatalogDeclarations.Query(ChatBotReadQueryTypes.OperationStatus, typeof(OperationStatusQueryHandler));
+
     public override string QueryType => ChatBotReadQueryTypes.OperationStatus;
 
     protected override async Task<QueryResult> ExecuteAsync(QueryEnvelope query, OperationStatusQuery request, ChatBotAuthorityPrincipal principal, CancellationToken cancellationToken)

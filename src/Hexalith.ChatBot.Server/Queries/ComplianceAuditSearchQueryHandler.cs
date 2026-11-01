@@ -24,6 +24,10 @@ internal sealed class ComplianceAuditSearchQueryHandler(
     IWormAuditStore wormAuditStore)
     : ChatBotReadQueryHandler<ComplianceAuditSearchQuery>(requestContextResolver, requestAuthorizer)
 {
+    /// <summary>Declares this actual protected query handler and its existing output.</summary>
+    public static Hexalith.EventStore.Contracts.Routing.RouteContractDeclaration CatalogDeclaration { get; } =
+        Hexalith.ChatBot.Server.Routing.ChatBotCatalogDeclarations.Query(ChatBotReadQueryTypes.ComplianceAuditSearch, typeof(ComplianceAuditSearchQueryHandler));
+
     public override string QueryType => ChatBotReadQueryTypes.ComplianceAuditSearch;
 
     protected override Task<QueryResult> ExecuteAsync(QueryEnvelope query, ComplianceAuditSearchQuery request, ChatBotAuthorityPrincipal principal, CancellationToken cancellationToken)

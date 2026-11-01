@@ -13,6 +13,7 @@ using Hexalith.ChatBot.Server.Observability;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
 using Hexalith.ChatBot.Server.Projections;
+using Hexalith.ChatBot.Server.Routing;
 using Hexalith.ChatBot.Server.Projections.DerivedStores;
 using Hexalith.EventStore.Client.Registration;
 using Hexalith.EventStore.DomainService;
@@ -25,6 +26,8 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 _ = builder.AddEventStoreDomainService(typeof(GovernedOperationAggregate).Assembly);
 _ = builder.Services.AddChatBotApplicationBoundaryPolicy();
+_ = builder.Services.AddSingleton(new LegacyProjectionCatalogRegistration(ChatBotCatalogDeclarations.Projections));
+_ = builder.Services.AddEventStoreDevelopmentDomainCatalog(builder.Configuration, typeof(ChatBotCatalogDeclarations).Assembly);
 
 // Resolve the identity EventStore negotiates named projections against. The SDK derives an unconfigured AppId
 // from DAPR_APP_ID, falling back to the .NET application name ("Hexalith.ChatBot.Server"), which is never the DAPR

@@ -20,6 +20,7 @@ internal static class SdkRouteFixtureAuthorization
     public static void AllowCanonicalRouteHandlers(IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+        HttpRouteCatalogFixture.Configure(services);
         if (!services.Any(static service => service.ServiceType == typeof(SdkRouteFixtureAuthenticationHandler)))
         {
             _ = services

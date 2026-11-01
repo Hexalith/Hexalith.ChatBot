@@ -26,6 +26,10 @@ internal sealed class ProjectConversationQueryHandler(
     IQueryCursorCodec cursorCodec)
     : ChatBotReadQueryHandler<ProjectConversationQuery>(requestContextResolver, requestAuthorizer)
 {
+    /// <summary>Declares this actual protected query handler and its existing output.</summary>
+    public static Hexalith.EventStore.Contracts.Routing.RouteContractDeclaration CatalogDeclaration { get; } =
+        Hexalith.ChatBot.Server.Routing.ChatBotCatalogDeclarations.Query(ChatBotReadQueryTypes.ProjectConversation, typeof(ProjectConversationQueryHandler));
+
     public override string QueryType => ChatBotReadQueryTypes.ProjectConversation;
 
     protected override async Task<QueryResult> ExecuteAsync(QueryEnvelope query, ProjectConversationQuery request, ChatBotAuthorityPrincipal principal, CancellationToken cancellationToken)
