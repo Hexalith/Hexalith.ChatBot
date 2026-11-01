@@ -1,5 +1,10 @@
+using System.Text.Json;
+
+using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Correlation;
+using Hexalith.ChatBot.Server.Gateway.Stages;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
@@ -13,6 +18,11 @@ namespace Hexalith.ChatBot.Server.Authentication;
 /// </summary>
 internal sealed class ChatBotApplicationBoundaryResultHandler : IAuthorizationMiddlewareResultHandler
 {
+    // Denial auditing never needs an entire command payload. Larger or malformed submissions retain the denial
+    // with unknown command metadata, rather than spending unbounded resources to describe an unauthenticated call.
+    private const int DeniedCommandMetadataLimit = 16 * 1024;
+    private static readonly TimeSpan DeniedCommandMetadataReadDeadline = TimeSpan.FromMilliseconds(250);
+    private static readonly ChatBotSpineCommandAllowlist CanonicalCommandNames = new();
     private readonly AuthorizationMiddlewareResultHandler _frameworkHandler = new();
 
     /// <inheritdoc />
@@ -46,6 +56,31 @@ internal sealed class ChatBotApplicationBoundaryResultHandler : IAuthorizationMi
             context.Response.Headers["X-Hexalith-Task-Id"] = correlation.TaskId;
         }
 
+        if (context.GetEndpoint() is RouteEndpoint endpoint &&
+            string.Equals(endpoint.RoutePattern.RawText, "/api/v1/commands", StringComparison.OrdinalIgnoreCase) &&
+            HttpMethods.IsPost(context.Request.Method))
+        {
+            // Only validated transport identity can name the caller. Body identity, resource and origin fields are
+            // never authority, and a challenge must stay anonymous even if another identity was attached upstream.
+            ChatBotRequestContext? actor = null;
+            if (!authorizeResult.Challenged)
+            {
+                _ = ChatBotRequestContextResolver.TryResolve(context.User, ChatBotSurfaceOrigin.Api, out actor, out _);
+            }
+
+            string commandName = await ReadDeniedCommandNameAsync(context.Request, context.RequestAborted).ConfigureAwait(false);
+            await context.RequestServices.GetRequiredService<IAuditWriter>()
+                .RecordAuthorizationFailureAsync(new ChatBotAuthorizationFailureAuditFact(
+                    actor?.TenantId ?? "unavailable",
+                    actor?.SubjectId ?? "anonymous",
+                    commandName,
+                    reasonCode,
+                    correlation.CorrelationId,
+                    correlation.TaskId,
+                    "api"), context.RequestAborted)
+                .ConfigureAwait(false);
+        }
+
         IChatBotProblemDetailsFactory problemDetailsFactory = context.RequestServices.GetRequiredService<IChatBotProblemDetailsFactory>();
         await CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
                 problemDetailsFactory.CreateAuthorizationProblem(reasonCode, correlation.CorrelationId, correlation.TaskId)))
@@ -56,4 +91,70 @@ internal sealed class ChatBotApplicationBoundaryResultHandler : IAuthorizationMi
     private static bool RequiresChatBotBoundary(Endpoint? endpoint)
         => endpoint?.Metadata.GetOrderedMetadata<IAuthorizeData>()
             .Any(static data => string.Equals(data.Policy, ChatBotApplicationBoundaryPolicy.Name, StringComparison.Ordinal)) == true;
+
+    private static async Task<string> ReadDeniedCommandNameAsync(HttpRequest request, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (request.ContentLength > DeniedCommandMetadataLimit ||
+            !string.Equals(request.ContentType?.Split(';', 2)[0].Trim(), "application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            return AuditMetadata.UnknownCommandName;
+        }
+
+        using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        // One deadline covers the whole best-effort read. WaitAsync also bounds a transport that ignores its token;
+        // the private buffer is never reused or parsed after expiry. Audit always uses the original request token.
+        deadline.CancelAfter(DeniedCommandMetadataReadDeadline);
+        byte[] metadata = new byte[DeniedCommandMetadataLimit + 1];
+        int length = 0;
+        try
+        {
+            while (length < metadata.Length)
+            {
+                int read = await request.Body.ReadAsync(metadata.AsMemory(length), deadline.Token).AsTask()
+                    .WaitAsync(deadline.Token).ConfigureAwait(false);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                length += read;
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return AuditMetadata.UnknownCommandName;
+        }
+        catch (Exception exception) when (exception is IOException or BadHttpRequestException or InvalidDataException)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return AuditMetadata.UnknownCommandName;
+        }
+
+        if (length > DeniedCommandMetadataLimit)
+        {
+            return AuditMetadata.UnknownCommandName;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(metadata.AsMemory(0, length));
+            if (document.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                JsonProperty[] names = document.RootElement.EnumerateObject()
+                    .Where(static property => string.Equals(property.Name, "commandType", StringComparison.OrdinalIgnoreCase)).ToArray();
+                if (names.Length == 1 && names[0].NameEquals("commandType") && names[0].Value.ValueKind == JsonValueKind.String)
+                {
+                    string name = AuditMetadata.SafeCommandName(names[0].Value.GetString());
+                    return CanonicalCommandNames.IsAllowed(name) ? name : AuditMetadata.UnknownCommandName;
+                }
+            }
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
+        {
+            // Authentication denial takes precedence over request validation. No payload detail enters the fact.
+        }
+
+        return AuditMetadata.UnknownCommandName;
+    }
 }

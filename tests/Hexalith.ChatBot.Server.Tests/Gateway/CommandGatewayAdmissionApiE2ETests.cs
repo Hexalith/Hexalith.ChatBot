@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -21,6 +22,7 @@ using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
+using Hexalith.ChatBot.Server.Tests.Authentication;
 using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Contracts.Commands;
@@ -2560,10 +2562,12 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotency = new(new SystemClock());
         using WebApplicationFactory<Program> factory = GatewayFactory(
             tenantId: null,
             dispatcher,
-            auditWriter);
+            auditWriter,
+            idempotencyStore: idempotency);
         using HttpClient client = factory.CreateClient();
 
         using HttpResponseMessage response = await client
@@ -2572,6 +2576,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         dispatcher.DispatchCount.ShouldBe(0);
+        idempotency.RecordCount.ShouldBe(0);
         auditWriter.Envelopes.ShouldBeEmpty();
         auditWriter.AuthorizationFailures.Count.ShouldBe(1);
         ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures.Single();
@@ -2581,6 +2586,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthenticationDenied);
         fact.CorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         fact.TaskId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        fact.SurfaceOrigin.ShouldBe("api");
 
         string body = await response.Content
             .ReadAsStringAsync(TestContext.Current.CancellationToken)
@@ -2590,8 +2596,121 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         root.GetProperty("category").GetString().ShouldBe("authentication_failure");
         root.GetProperty("code").GetString().ShouldBe(ChatBotAuthorizationReasonCodes.AuthenticationDenied);
         root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe("metadata_only");
+        response.Headers.GetValues("X-Correlation-Id").Single().ShouldBe(fact.CorrelationId);
+        response.Headers.GetValues("X-Hexalith-Task-Id").Single().ShouldBe(fact.TaskId);
+        root.GetProperty("correlationId").GetString().ShouldBe(fact.CorrelationId);
+        root.GetProperty("taskId").GetString().ShouldBe(fact.TaskId);
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
         body.ShouldNotContain("restricted-project-sentinel", Case.Insensitive);
+    }
+
+    [Theory]
+    [InlineData("malformed", null)]
+    [InlineData("missing", "invalid")]
+    [InlineData("unsafe", "invalid")]
+    [InlineData("duplicate", null)]
+    [InlineData("large", null)]
+    [InlineData("normal", "invalid-signature")]
+    [InlineData("normal", "workload")]
+    public async Task CommandGatewayApi_ShouldAuditBoundaryDenialWithoutPayloadAuthorityOrValidationDisclosure(string metadata, string? credential)
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotency = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = GatewayFactory(null, dispatcher, auditWriter, idempotencyStore: idempotency)
+            .WithWebHostBuilder(ChatBotSignedBearerFixture.Configure);
+        using HttpClient client = factory.CreateClient();
+        string json = metadata switch
+        {
+            "malformed" => "{\"commandType\":\"RecordGovernedNote\",\"command\":",
+            "missing" => "{\"command\":{\"tenantId\":\"payload-tenant\",\"actorId\":\"payload-actor\"}}",
+            "unsafe" => "{\"commandType\":\"/tmp/raw-secret.txt\",\"actorType\":\"system\",\"origin\":\"worker\"}",
+            "duplicate" => "{\"commandType\":\"RecordGovernedNote\",\"CommandType\":\"payload-secret\"}",
+            "large" => "{\"commandType\":\"RecordGovernedNote\",\"command\":\"" + new string('x', 20 * 1024) + "\"}",
+            _ => "{\"commandType\":\"RecordGovernedNote\",\"command\":{\"tenantId\":\"payload-tenant\",\"actorId\":\"payload-actor\",\"resourceId\":\"restricted-project-sentinel\"}}",
+        };
+        using HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands")
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Add("X-Correlation-Id", "unsafe-secret-header");
+        request.Headers.Add("X-Hexalith-Task-Id", "unsafe-secret-task");
+        if (credential is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credential switch
+            {
+                "invalid-signature" => ChatBotSignedBearerFixture.CreateToken("credential-tenant", invalidSignature: true),
+                "workload" => ChatBotSignedBearerFixture.CreateToken("credential-tenant", workload: true),
+                _ => "invalid-bearer-token",
+            });
+        }
+
+        using HttpResponseMessage response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        bool forbidden = credential == "workload";
+        response.StatusCode.ShouldBe(forbidden ? HttpStatusCode.Forbidden : HttpStatusCode.Unauthorized);
+        ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures.ShouldHaveSingleItem();
+        fact.ReasonCode.ShouldBe(forbidden ? ChatBotAuthorizationReasonCodes.AuthorizationDenied : ChatBotAuthorizationReasonCodes.AuthenticationDenied);
+        fact.TenantId.ShouldBe(forbidden ? "credential-tenant" : "unavailable");
+        fact.ActorId.ShouldBe(forbidden ? "actor-credential-tenant" : "anonymous");
+        fact.CommandType.ShouldBe(metadata == "normal" ? "RecordGovernedNote" : AuditMetadata.UnknownCommandName);
+        fact.TaskId.ShouldBeNull();
+        fact.SurfaceOrigin.ShouldBe("api");
+        response.Headers.Contains("X-Hexalith-Task-Id").ShouldBeFalse();
+        response.Headers.GetValues("X-Correlation-Id").Single().ShouldBe(fact.CorrelationId);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(fact.ReasonCode);
+        problem.RootElement.GetProperty("correlationId").GetString().ShouldBe(fact.CorrelationId);
+        problem.RootElement.GetProperty("details").GetProperty("visibility").GetString().ShouldBe("metadata_only");
+        string safeOutput = body + JsonSerializer.Serialize(fact);
+        foreach (string sentinel in new[] { "payload-tenant", "payload-actor", "restricted-project-sentinel", "raw-secret", "unsafe-secret", "invalid-bearer-token", "payload-secret" })
+        {
+            safeOutput.ShouldNotContain(sentinel);
+        }
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotency.RecordCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldBindSignedHumanBeforeOrdinaryDomainAuthorityDenial()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotency = new(new SystemClock());
+        IAuthenticationStage authentication = TrustedAuthorityBoundaryProxy.Create<IAuthenticationStage>(new ClaimsAuthenticationStage(), static _ => { });
+        using WebApplicationFactory<Program> factory = GatewayFactory(null, dispatcher, auditWriter,
+            idempotencyStore: idempotency, commandAllowlist: new ChatBotSpineCommandAllowlist())
+            .WithWebHostBuilder(builder =>
+            {
+                ChatBotSignedBearerFixture.Configure(builder);
+                builder.ConfigureServices(services => services.AddSingleton(authentication));
+            });
+        using HttpClient client = factory.CreateClient();
+        using HttpRequestMessage request = CommandSubmissionRequest("signed-control-tenant", "restricted-project-sentinel");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ChatBotSignedBearerFixture.CreateToken("signed-control-tenant"));
+
+        using HttpResponseMessage response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        // The actual bearer handler and human policy admit this credential to the real domain authentication stage.
+        // No owner persona or successful authority grant is supplied, so ordinary domain admission remains closed.
+        ((TrustedAuthorityBoundaryProxy)(object)authentication).Calls.ShouldBe([nameof(IAuthenticationStage.AuthenticateAsync)]);
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures.ShouldHaveSingleItem();
+        fact.TenantId.ShouldBe("signed-control-tenant");
+        fact.ActorId.ShouldBe("actor-signed-control-tenant");
+        fact.CommandType.ShouldBe(nameof(RecordGovernedNote));
+        fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        fact.CorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        fact.TaskId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        body.ShouldNotContain("signed-control-tenant");
+        body.ShouldNotContain("restricted-project-sentinel");
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotency.RecordCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
     }
 
     [Fact]

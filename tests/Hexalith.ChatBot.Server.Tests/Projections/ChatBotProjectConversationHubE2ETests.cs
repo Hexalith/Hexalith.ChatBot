@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 
@@ -5,18 +7,16 @@ using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Projections;
+using Hexalith.ChatBot.Server.Tests.Authentication;
 using Hexalith.ChatBot.Tests.TrustedAuthority;
 
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Http.Connections.Client;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration;
 
 using Shouldly;
 
@@ -41,12 +41,16 @@ public sealed class ChatBotProjectConversationHubE2ETests
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken()
-            .WithWebHostBuilder(builder => builder.UseSetting("ChatBot:ProjectionChangeNotifications:Enabled", "true"));
+            .WithWebHostBuilder(builder =>
+            {
+                ChatBotSignedBearerFixture.Configure(builder);
+                _ = builder.UseSetting("ChatBot:ProjectionChangeNotifications:Enabled", "true");
+            });
 
         TestServer server = factory.Server;
 
-        await using HubConnection tenantConnection = BuildHubConnection(server);
-        await using HubConnection otherTenantConnection = BuildHubConnection(server);
+        await using HubConnection tenantConnection = BuildHubConnection(server, ChatBotSignedBearerFixture.CreateToken(Tenant));
+        await using HubConnection otherTenantConnection = BuildHubConnection(server, ChatBotSignedBearerFixture.CreateToken(OtherTenant));
 
         TaskCompletionSource<string> tenantSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
         bool otherTenantSignalled = false;
@@ -86,11 +90,10 @@ public sealed class ChatBotProjectConversationHubE2ETests
             .WithWebHostBuilder(builder =>
             {
                 _ = builder.UseSetting("ChatBot:ProjectionChangeNotifications:Enabled", "true");
-                _ = builder.ConfigureServices(services =>
-                    services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new AuthenticatedTenantStartupFilter(Tenant)));
+                ChatBotSignedBearerFixture.Configure(builder);
             });
 
-        await using HubConnection connection = BuildHubConnection(factory.Server);
+        await using HubConnection connection = BuildHubConnection(factory.Server, ChatBotSignedBearerFixture.CreateToken(Tenant));
         await connection.StartAsync(cancellationToken);
 
         HubException error = await Should.ThrowAsync<HubException>(
@@ -103,21 +106,26 @@ public sealed class ChatBotProjectConversationHubE2ETests
     [InlineData(true)]
     public async Task SupplementalIdentityCannotJoinAnotherTenant(bool authenticatedSupplement)
     {
-        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken().WithWebHostBuilder(builder =>
+        ClaimsPrincipal principal = RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim("sub", "actor-001"), new Claim("eventstore:tenant", Tenant)], "test")));
+        principal.AddIdentity(new ClaimsIdentity([new Claim("tenant", OtherTenant)], authenticatedSupplement ? "authenticated-supplement" : null));
+        RecordingProjectionHubGroups groups = new();
+        using ChatBotProjectConversationHub hub = new(new ConfigurationBuilder().Build())
         {
-            builder.UseSetting("ChatBot:ProjectionChangeNotifications:Enabled", "true");
-            builder.ConfigureServices(services => services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new AuthenticatedTenantStartupFilter(Tenant, authenticatedSupplement)));
-        });
-        await using HubConnection connection = BuildHubConnection(factory.Server);
-        await connection.StartAsync(TestContext.Current.CancellationToken);
-        (await Should.ThrowAsync<HubException>(() => connection.InvokeAsync("JoinTenant", OtherTenant, TestContext.Current.CancellationToken))).Message.ShouldContain("tenant-forbidden");
+            Context = new ProjectionHubCallerContext(principal),
+            Groups = groups,
+        };
+        (await Should.ThrowAsync<HubException>(() => hub.JoinTenant(OtherTenant))).Message.ShouldContain("tenant-forbidden");
+        groups.Joined.ShouldBeEmpty();
         if (authenticatedSupplement)
         {
-            (await Should.ThrowAsync<HubException>(() => connection.InvokeAsync("JoinTenant", Tenant, TestContext.Current.CancellationToken))).Message.ShouldContain("tenant-forbidden");
+            (await Should.ThrowAsync<HubException>(() => hub.JoinTenant(Tenant))).Message.ShouldContain("tenant-forbidden");
+            groups.Joined.ShouldBeEmpty();
         }
         else
         {
-            await connection.InvokeAsync("JoinTenant", Tenant, TestContext.Current.CancellationToken);
+            await hub.JoinTenant(Tenant);
+            groups.Joined.ShouldBe([ChatBotProjectConversationHub.GroupFor(Tenant)]);
         }
     }
 
@@ -131,12 +139,11 @@ public sealed class ChatBotProjectConversationHubE2ETests
             .WithWebHostBuilder(builder =>
             {
                 _ = builder.UseSetting("ChatBot:ProjectionChangeNotifications:Enabled", "true");
-                _ = builder.ConfigureServices(services =>
-                    services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new AuthenticatedTenantStartupFilter(Tenant)));
+                ChatBotSignedBearerFixture.Configure(builder);
             });
 
         TestServer server = factory.Server;
-        await using HubConnection connection = BuildHubConnection(server);
+        await using HubConnection connection = BuildHubConnection(server, ChatBotSignedBearerFixture.CreateToken(Tenant));
         TaskCompletionSource<string> tenantSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
         _ = connection.On<string>(
             ChatBotProjectConversationHub.ProjectConversationChangedClientMethod,
@@ -156,29 +163,60 @@ public sealed class ChatBotProjectConversationHubE2ETests
         received.ShouldBe(Tenant);
     }
 
-    [Fact]
-    public async Task UnauthenticatedJoinShouldFailClosedWhenJwtAuthenticationIsConfigured()
+    [Theory]
+    [InlineData("anonymous", HttpStatusCode.Unauthorized)]
+    [InlineData("invalid", HttpStatusCode.Unauthorized)]
+    [InlineData("tampered", HttpStatusCode.Unauthorized)]
+    [InlineData("workload", HttpStatusCode.Forbidden)]
+    public async Task HubNegotiationShouldRejectMissingInvalidAndNonHumanBearer(string credential, HttpStatusCode expectedStatus)
     {
-        // [F1 fail-open fix] When the deployment configures JWT bearer auth, an anonymous hub connection must fail
-        // closed: UseAuthentication only populates the principal from a present token (it does not reject anonymous
-        // requests), so the hub's own env-gate must reject an unauthenticated JoinTenant rather than allow any tenant.
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken()
             .WithWebHostBuilder(builder =>
             {
                 _ = builder.UseSetting("ChatBot:ProjectionChangeNotifications:Enabled", "true");
-                _ = builder.UseSetting("Authentication:JwtBearer:SigningKey", "test-signing-key-0123456789-abcdef-ghijkl");
+                ChatBotSignedBearerFixture.Configure(builder);
             });
 
-        await using HubConnection connection = BuildHubConnection(factory.Server);
-        await connection.StartAsync(cancellationToken);
+        using HttpClient client = factory.CreateClient();
+        using HttpRequestMessage request = new(HttpMethod.Post, ChatBotProjectConversationHub.HubPath + "/negotiate?negotiateVersion=1");
+        string? token = credential switch
+        {
+            "invalid" => "invalid-bearer",
+            "tampered" => ChatBotSignedBearerFixture.CreateToken(Tenant, invalidSignature: true),
+            "workload" => ChatBotSignedBearerFixture.CreateToken(Tenant, workload: true),
+            _ => null,
+        };
+        if (token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
 
-        HubException error = await Should.ThrowAsync<HubException>(
-            () => connection.InvokeAsync("JoinTenant", Tenant, cancellationToken));
-        error.Message.ShouldContain("tenant-forbidden");
+        using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
+        response.StatusCode.ShouldBe(expectedStatus);
+        (await response.Content.ReadAsStringAsync(cancellationToken)).ShouldNotContain("connectionToken");
     }
 
-    private static HubConnection BuildHubConnection(TestServer server)
+    [Fact]
+    public async Task UnauthenticatedJoinShouldFailClosedWhenJwtAuthenticationIsConfigured()
+    {
+        // Preserve the original JoinTenant guard assertion at its actual method boundary. HTTP never admits this
+        // anonymous connection: the SDK human policy rejects it during negotiation first.
+        IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Authentication:JwtBearer:SigningKey"] = "test-signing-key-0123456789-abcdef-ghijkl",
+        }).Build();
+        RecordingProjectionHubGroups groups = new();
+        using ChatBotProjectConversationHub hub = new(configuration)
+        {
+            Context = new ProjectionHubCallerContext(new ClaimsPrincipal(new ClaimsIdentity())),
+            Groups = groups,
+        };
+        (await Should.ThrowAsync<HubException>(() => hub.JoinTenant(Tenant))).Message.ShouldContain("tenant-forbidden");
+        groups.Joined.ShouldBeEmpty();
+    }
+
+    private static HubConnection BuildHubConnection(TestServer server, string token)
         => new HubConnectionBuilder()
             .WithUrl(
                 new Uri(server.BaseAddress, ChatBotProjectConversationHub.HubPath),
@@ -186,6 +224,7 @@ public sealed class ChatBotProjectConversationHubE2ETests
                 {
                     options.HttpMessageHandlerFactory = _ => server.CreateHandler();
                     options.Transports = HttpTransportType.LongPolling;
+                    options.AccessTokenProvider = () => Task.FromResult<string?>(token);
                 })
             .Build();
 
@@ -230,29 +269,4 @@ public sealed class ChatBotProjectConversationHubE2ETests
                 ["redacted", "policy-denied"]));
     }
 
-    // Injects an authenticated principal carrying the eventstore:tenant claim into every request (mirrors the
-    // TestPrincipalStartupFilter used by ProjectConversationProjectionTests) so the hub's authenticated authorization
-    // branch is exercised without configuring a real JWT issuer. SignalR populates HubCallerContext.User from it.
-    private sealed class AuthenticatedTenantStartupFilter(string tenantId, bool? authenticatedSupplement = null) : IStartupFilter
-    {
-        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
-            => app =>
-            {
-                _ = app.Use(async (context, continuation) =>
-                {
-                    context.User = Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Principal(new ClaimsPrincipal(new ClaimsIdentity(
-                        [
-                            new Claim("sub", "actor-001"),
-                            new Claim("eventstore:tenant", tenantId),
-                        ],
-                        "test")));
-                    if (authenticatedSupplement is not null)
-                    {
-                        context.User.AddIdentity(new ClaimsIdentity([new Claim("tenant", OtherTenant)], authenticatedSupplement.Value ? "authenticated-supplement" : null));
-                    }
-                    await continuation().ConfigureAwait(false);
-                });
-                next(app);
-            };
-    }
 }
