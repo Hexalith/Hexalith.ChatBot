@@ -255,8 +255,13 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
             await AssertOwnerScopeDeniedAsync(eventStore, "tenant-outside-probe", "memories-tenants", cancellationToken).ConfigureAwait(false);
             await AssertOwnerScopeDeniedAsync(eventStore, "tenant-alpha", "chatbot", cancellationToken).ConfigureAwait(false);
             _eventStore = eventStore;
-            _workloadEventStore = application.CreateHttpClient("eventstore", "http");
-            _workloadEventStore.Timeout = TimeSpan.FromSeconds(30);
+            // The EventStore workload boundary also requires its Dapr app-channel token. Invoke through
+            // Memories' real sidecar so the verified caller and channel are the production ones.
+            _workloadEventStore = new HttpClient
+            {
+                BaseAddress = application.GetEndpoint("memories-dapr-cli", "http"),
+                Timeout = TimeSpan.FromSeconds(30),
+            };
         }
         catch
         {
@@ -382,7 +387,7 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
         }
 
         using HttpRequestMessage upstream = new(HttpMethod.Post,
-            bound ? "/api/v1/commands/bound/workload" : "/api/v1/commands")
+            bound ? "/v1.0/invoke/eventstore/method/api/v1/commands/bound/workload" : "/api/v1/commands")
         {
             Content = new StringContent((bound ? body.RootElement : command).GetRawText(), Encoding.UTF8, "application/json"),
         };
