@@ -56,6 +56,7 @@ internal sealed class ChatBotApplicationBoundaryResultHandler : IAuthorizationMi
             context.Response.Headers["X-Hexalith-Task-Id"] = correlation.TaskId;
         }
 
+        IChatBotProblemDetailsFactory problemDetailsFactory = context.RequestServices.GetRequiredService<IChatBotProblemDetailsFactory>();
         if (context.GetEndpoint() is RouteEndpoint endpoint &&
             string.Equals(endpoint.RoutePattern.RawText, "/api/v1/commands", StringComparison.OrdinalIgnoreCase) &&
             HttpMethods.IsPost(context.Request.Method))
@@ -69,19 +70,38 @@ internal sealed class ChatBotApplicationBoundaryResultHandler : IAuthorizationMi
             }
 
             string commandName = await ReadDeniedCommandNameAsync(context.Request, context.RequestAborted).ConfigureAwait(false);
-            await context.RequestServices.GetRequiredService<IAuditWriter>()
-                .RecordAuthorizationFailureAsync(new ChatBotAuthorizationFailureAuditFact(
-                    actor?.TenantId ?? "unavailable",
-                    actor?.SubjectId ?? "anonymous",
-                    commandName,
-                    reasonCode,
-                    correlation.CorrelationId,
-                    correlation.TaskId,
-                    "api"), context.RequestAborted)
-                .ConfigureAwait(false);
+            string tenantId = actor?.TenantId ?? "unavailable";
+            try
+            {
+                await context.RequestServices.GetRequiredService<IAuditWriter>()
+                    .RecordAuthorizationFailureAsync(new ChatBotAuthorizationFailureAuditFact(
+                        tenantId,
+                        actor?.SubjectId ?? "anonymous",
+                        commandName,
+                        reasonCode,
+                        correlation.CorrelationId,
+                        correlation.TaskId,
+                        "api"), context.RequestAborted)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // An unavailable audit path must not become an untyped host failure. Like the gateway's admission
+                // path, answer the typed, retryable dependency-unavailable outcome; the denied request has no effect.
+                await CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                        problemDetailsFactory.CreateDependencyUnavailable(correlation.CorrelationId, correlation.TaskId)))
+                    .ExecuteAsync(context)
+                    .ConfigureAwait(false);
+                return;
+            }
+
+            // The NFR43 spike counter is fed from the same path as the denial fact, with the same tenant value.
+            if (context.RequestServices.GetService<IAuthorizationFailureCounter>() is { } failureCounter)
+            {
+                failureCounter.Record(tenantId, context.RequestServices.GetRequiredService<ISystemClock>().UtcNow);
+            }
         }
 
-        IChatBotProblemDetailsFactory problemDetailsFactory = context.RequestServices.GetRequiredService<IChatBotProblemDetailsFactory>();
         await CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
                 problemDetailsFactory.CreateAuthorizationProblem(reasonCode, correlation.CorrelationId, correlation.TaskId)))
             .ExecuteAsync(context)

@@ -2563,11 +2563,14 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new();
         InMemoryCoarseIdempotencyStore idempotency = new(new SystemClock());
+        BoundaryAuthorizationFailureCounter failureCounter = new();
         using WebApplicationFactory<Program> factory = GatewayFactory(
             tenantId: null,
             dispatcher,
             auditWriter,
-            idempotencyStore: idempotency);
+            idempotencyStore: idempotency)
+            .WithWebHostBuilder(builder => builder.ConfigureServices(
+                services => services.AddSingleton<IAuthorizationFailureCounter>(failureCounter)));
         using HttpClient client = factory.CreateClient();
 
         using HttpResponseMessage response = await client
@@ -2579,6 +2582,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         idempotency.RecordCount.ShouldBe(0);
         auditWriter.Envelopes.ShouldBeEmpty();
         auditWriter.AuthorizationFailures.Count.ShouldBe(1);
+        failureCounter.Tenants.ShouldBe(["unavailable"]);
         ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures.Single();
         fact.TenantId.ShouldBe("unavailable");
         fact.ActorId.ShouldBe("anonymous");
@@ -2617,8 +2621,13 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new();
         InMemoryCoarseIdempotencyStore idempotency = new(new SystemClock());
+        BoundaryAuthorizationFailureCounter failureCounter = new();
         using WebApplicationFactory<Program> factory = GatewayFactory(null, dispatcher, auditWriter, idempotencyStore: idempotency)
-            .WithWebHostBuilder(ChatBotSignedBearerFixture.Configure);
+            .WithWebHostBuilder(builder =>
+            {
+                ChatBotSignedBearerFixture.Configure(builder);
+                builder.ConfigureServices(services => services.AddSingleton<IAuthorizationFailureCounter>(failureCounter));
+            });
         using HttpClient client = factory.CreateClient();
         string json = metadata switch
         {
@@ -2667,6 +2676,43 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         {
             safeOutput.ShouldNotContain(sentinel);
         }
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotency.RecordCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        failureCounter.Tenants.ShouldBe([fact.TenantId]);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldAnswerTypedDependencyUnavailableWhenBoundaryDenialAuditFails()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { AuthorizationFailureException = new InvalidOperationException("restricted-audit-backend") };
+        InMemoryCoarseIdempotencyStore idempotency = new(new SystemClock());
+        BoundaryAuthorizationFailureCounter failureCounter = new();
+        using WebApplicationFactory<Program> factory = GatewayFactory(null, dispatcher, auditWriter, idempotencyStore: idempotency)
+            .WithWebHostBuilder(builder => builder.ConfigureServices(
+                services => services.AddSingleton<IAuthorizationFailureCounter>(failureCounter)));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(CommandSubmissionRequest("tenant-alpha", "restricted-project-sentinel"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        // An audit outage keeps the denial fail-closed but answers the gateway's typed, retryable outcome, never an
+        // untyped host failure. The fact was attempted once; nothing is counted, reserved or dispatched.
+        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures.ShouldHaveSingleItem();
+        fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthenticationDenied);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.DependencyDegraded);
+        problem.RootElement.GetProperty("category").GetString().ShouldBe("internal_error");
+        problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeTrue();
+        problem.RootElement.GetProperty("correlationId").GetString().ShouldBe(fact.CorrelationId);
+        response.Headers.GetValues("X-Correlation-Id").Single().ShouldBe(fact.CorrelationId);
+        body.ShouldNotContain("restricted-audit-backend");
+        body.ShouldNotContain("restricted-project-sentinel");
+        failureCounter.Tenants.ShouldBeEmpty();
         dispatcher.DispatchCount.ShouldBe(0);
         idempotency.RecordCount.ShouldBe(0);
         auditWriter.Envelopes.ShouldBeEmpty();
@@ -4338,11 +4384,15 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
         public AuditWriteResult PostCommitResult { get; init; } = AuditWriteResult.Success;
 
+        public Exception? AuthorizationFailureException { get; init; }
+
         public ValueTask RecordAuthorizationFailureAsync(ChatBotAuthorizationFailureAuditFact fact, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             _authorizationFailures.Add(fact);
-            return ValueTask.CompletedTask;
+            return AuthorizationFailureException is null
+                ? ValueTask.CompletedTask
+                : ValueTask.FromException(AuthorizationFailureException);
         }
 
         public ValueTask<AuditWriteResult> RecordPreCommitAsync(AuditEnvelope envelope, CancellationToken cancellationToken)

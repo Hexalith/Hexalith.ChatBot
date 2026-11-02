@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
@@ -155,15 +156,39 @@ public sealed class ChatBotApplicationBoundaryResultHandlerTests
     }
 
     [Fact]
-    public async Task AuditBackendFailureMustPropagateWithoutRetryOrEndpointEffects()
+    public async Task AuditBackendFailureMustAnswerTypedDependencyUnavailableWithoutRetryOrEndpointEffects()
     {
-        InvalidOperationException failure = new("audit-backend-failure");
-        BoundaryAuditWriter audit = new(failure);
-        using ServiceProvider services = Services(audit);
+        BoundaryAuditWriter audit = new(new InvalidOperationException("restricted-audit-backend"));
+        BoundaryAuthorizationFailureCounter failureCounter = new();
+        using ServiceProvider services = Services(audit, failureCounter);
         DefaultHttpContext context = Context(services);
 
-        (await Should.ThrowAsync<InvalidOperationException>(() => DenyAsync(context))).ShouldBeSameAs(failure);
-        audit.Facts.ShouldHaveSingleItem();
+        await DenyAsync(context);
+
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status503ServiceUnavailable);
+        ChatBotAuthorizationFailureAuditFact fact = audit.Facts.ShouldHaveSingleItem();
+        string response = Encoding.UTF8.GetString(((MemoryStream)context.Response.Body).ToArray());
+        using JsonDocument problem = JsonDocument.Parse(response);
+        problem.RootElement.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.DependencyDegraded);
+        problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeTrue();
+        problem.RootElement.GetProperty("correlationId").GetString().ShouldBe(fact.CorrelationId);
+        context.Response.Headers["X-Correlation-Id"].ToString().ShouldBe(fact.CorrelationId);
+        response.ShouldNotContain("restricted-audit-backend");
+        failureCounter.Tenants.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task RecordedDenialMustFeedTheFailureCounterWithTheFactTenant()
+    {
+        BoundaryAuditWriter audit = new();
+        BoundaryAuthorizationFailureCounter failureCounter = new();
+        using ServiceProvider services = Services(audit, failureCounter);
+        DefaultHttpContext context = Context(services);
+
+        await DenyAsync(context);
+
+        AssertSafeMetadataDenial(context, audit, AuditMetadata.UnknownCommandName);
+        failureCounter.Tenants.ShouldBe([audit.Facts.ShouldHaveSingleItem().TenantId]);
     }
 
     [Fact]
@@ -180,11 +205,18 @@ public sealed class ChatBotApplicationBoundaryResultHandlerTests
         audit.Facts.ShouldBeEmpty();
     }
 
-    private static ServiceProvider Services(BoundaryAuditWriter audit)
-        => new ServiceCollection().AddLogging()
+    private static ServiceProvider Services(BoundaryAuditWriter audit, BoundaryAuthorizationFailureCounter? failureCounter = null)
+    {
+        IServiceCollection services = new ServiceCollection().AddLogging()
             .AddSingleton<IAuditWriter>(audit)
-            .AddSingleton<IChatBotProblemDetailsFactory>(new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry()))
-            .BuildServiceProvider();
+            .AddSingleton<IChatBotProblemDetailsFactory>(new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry()));
+        if (failureCounter is not null)
+        {
+            _ = services.AddSingleton<IAuthorizationFailureCounter>(failureCounter).AddSingleton<ISystemClock>(new SystemClock());
+        }
+
+        return services.BuildServiceProvider();
+    }
 
     private static void AssertSafeMetadataDenial(DefaultHttpContext context, BoundaryAuditWriter audit, string expectedName)
     {
