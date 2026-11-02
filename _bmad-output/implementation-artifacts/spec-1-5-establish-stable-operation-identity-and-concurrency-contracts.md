@@ -619,6 +619,79 @@ Rejected:
 - **R15-E10 (`false`)** — Claim: the commit's "Use actual ordinary SDK authority" misleads readers of the factories. The factory comment (`ServerBootstrapApiTests.cs:3220-3222`) states that the named route policies are bypassed, and the commit's phrase describes `ChatBotTerminalRefusalTests` (`:35`).
 - **R15-A5 (`false`)** — Claim: the test violates the shared-file preservation rule. That rule governs Story 1.5's own resumed edits. `e48e87e` is an independent `fix(authentication)` commit that this File List delta only brings into view. The part of the claim about telling denial branches apart is R15-E8.
 
+### Review Findings — round 16 (2026-11-02, R15-patch review)
+
+Code review round 16 (bmad-code-review, full mode). The user chose the recommended scope: only the round-15 patch commit `9152a9e` ("fix(authentication): count boundary denials and type audit outages"), as `git diff --ignore-cr-at-eol 18f8301 HEAD` restricted to this story's 77 File List code paths. That range equals `9152a9e`. It covers 4 files, +160/−24 and 287 diff lines:
+
+- `ChatBotApplicationBoundaryResultHandler.cs`
+- `BoundaryAuthorizationFailureCounter.cs` (new)
+- `ChatBotApplicationBoundaryResultHandlerTests.cs`
+- `CommandGatewayAdmissionApiE2ETests.cs`
+
+Nothing else on the File List changed after `3eee82f`. The later commits touch only submodule pins, `.config/dotnet-tools.json` and `MemoriesProbeCommandGateway.cs`. R14-P1 through R14-P6 are still unapplied, and their files are unchanged. This round does not re-review the original-baseline implementation. Baseline `5bb56567499c6df1c621184d3c3d35aa45521166` and the frozen intent are unchanged. Loaded context: this spec, `epic-1-context.md` and `references/Hexalith.AI.Tools/hexalith-state-instructions.md`.
+
+All four independent layers completed, and none failed:
+
+| Layer | Findings |
+| --- | --- |
+| Blind Hunter | 9 (B1–B9) |
+| Edge Case Hunter | 9 (E1–E9) |
+| Verification Gap | 2 gaps (V1–V2) |
+| Acceptance Auditor | no acceptance violations, plus 5 low findings (A1–A5) |
+
+Parent triage of the 25 raw findings: **0 decision-needed, 4 patch, 0 defer, 13 rejected**. Twelve raw findings fold into the four patches; B7's rejected part is listed separately.
+
+Every patch is low severity. In the shipped composition, denial facts go through `ChainedAuditWriter` to `InMemoryAuditWriter.RecordAuthorizationFailureAsync` (`InMemoryAuditWriter.cs:55-60`). That writer cannot fail for a non-null fact and ignores cancellation, so the R15-P4 503 branch is latent in production until a durable denial-fact writer exists.
+
+Verified fact: `OperationalAlertWiringCoordinator.CollectAlerts` (`:121-123`) evaluates only readings whose tenant equals a tenant enumerated by `PeriodicEnforcementCoordinator.EnumerateTenantsAsync`. Unauthenticated boundary denials feed the literal `unavailable` bucket, which never raises an NFR43 alert. R15-P1's rationale ("floods of unauthenticated or forbidden-workload requests never reach spike alerting") is therefore restored only for forbidden credentials that carry a tenant. This matches NFR43's "authorization spikes over tenant baseline" wording and the counter contract. It is recorded here only (see R16-B1).
+
+- [ ] [Review][Patch] **R16-P1 (low): the new audit catch misclassifies failures** [src/Hexalith.ChatBot.Server/Authentication/ChatBotApplicationBoundaryResultHandler.cs:87]. Findings B2, B4, E1, E5, E9, A2.
+  - The filter `when (exception is not OperationCanceledException)` lets an `OperationCanceledException` raised by the audit store itself escape as the untyped 500 that R15-D2 removed. An example is a client timeout while `RequestAborted` is live.
+  - A caller abort that surfaces as an `IOException` gets a 503 written to an aborted response.
+  - `GetRequiredService<IAuditWriter>()` sits inside the `try`. A resolution failure is a host misconfiguration, but it is reported as a retryable `dependency_degraded` 503.
+  - **Fix:** resolve the writer before the `try`. Use this story's own pipeline pattern (`ChatBotCommandAdmissionPipeline.cs:210-213`, `:279-283`): `catch (Exception exception) when (exception is not OperationCanceledException || !context.RequestAborted.IsCancellationRequested)`, starting with `context.RequestAborted.ThrowIfCancellationRequested()`.
+  - Request cancellation still propagates, as R15-P4 requires.
+- [ ] [Review][Patch] **R16-P2 (low): no test throws cancellation from inside the audit write** [tests/Hexalith.ChatBot.Server.Tests/Authentication/ChatBotApplicationBoundaryResultHandlerTests.cs:145]. Findings V2, A1.
+  - `CancelledDenialMustPropagateCancellationWithoutAuditOrEndpointEffects` and `RequestAbortedDuringMetadataReadMustPropagateWithoutAudit` both stop in `ReadDeniedCommandNameAsync` before the audit call. Both assert `audit.Facts.ShouldBeEmpty()`.
+  - Dropping the `when` filter, so that a request abort during the audit write answers 503, would therefore pass every test.
+  - **Fix:** add unit rows where the audit write runs and then throws `OperationCanceledException`.
+    - With `RequestAborted` cancelled during the write: the call must throw, the status must not be 503, the response body must be empty and the counter must stay empty.
+    - With a live request (this pins R16-P1): the call must answer the typed 503.
+- [ ] [Review][Patch] **R16-P3 (low): the counter feed is proven only through a double that discards the timestamp** [tests/Hexalith.ChatBot.Server.Tests/Authentication/ChatBotApplicationBoundaryResultHandlerTests.cs:181]. Findings V1, B6.
+  - `BoundaryAuthorizationFailureCounter.Record` keeps only the tenant.
+  - Passing `default` or a stale instant instead of the server clock would pass every test. In production, `InMemoryAuthorizationFailureCounter` would then prune the entry at read time, or throw from `MinValue.AddSeconds(-window)` after the fact was written.
+  - The double's summary says a hosted alert reader could otherwise "hide one", and R15-P1 used a recording counter "because the hosted alert coordinator drains the production counter". The production counter is a sliding window, though: `ReadAndReset` keeps in-window events (`InMemoryAuthorizationFailureCounter.cs:50-69`).
+  - **Fix:** make `RecordedDenialMustFeedTheFailureCounterWithTheFactTenant` use the real `InMemoryAuthorizationFailureCounter` with a fixed `ISystemClock`. Assert one reading: `unavailable`, `FailureCount` 1, and `WindowStartUtc` equal to the fixed instant.
+  - Correct the double's summary to describe what it does: it records each fed tenant in order and reports no readings. Test-only.
+- [ ] [Review][Patch] **R16-P4 (low): the HTTP 503 case never checks the task id** [tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs:2711]. Findings A3 and B7 (task-id part).
+  - `CommandSubmissionRequest` sends `X-Hexalith-Task-Id: 01ARZ3NDEKTSV4RRFFQ69G5FAX`, but the 503 case asserts only the correlation id.
+  - The sibling 401 test asserts both the task-id header and the body `taskId` (`:2604`, `:2606`).
+  - The 503 body `taskId` comes only from `CreateDependencyUnavailable(correlation.CorrelationId, correlation.TaskId)`. Dropping that argument would therefore pass, and the unit context sends no task id at all.
+  - **Fix:** assert the `X-Hexalith-Task-Id` header and the body `taskId` against `fact.TaskId`. Test-only.
+
+On 2026-11-02 the user chose option 2, "Leave as action items". R16-P1 through R16-P4 stay unchecked above; no source or test file was edited. Code-review actions: **0 decision-needed, 4 patches left as action items, 0 deferred, 13 rejected**. Story 1.5 stays spec `in-review` / sprint `review`, not the generic workflow's `in-progress` or `done`. Completion remains gated by:
+
+- the explicit owner/workflow deferrals;
+- R14-P1 through R14-P6 and R16-P1 through R16-P4;
+- A6/A13 owner/protection evidence;
+- retry-profile approval;
+- the completion evidence contract.
+
+Rejected:
+
+- **R16-B1 (`low`), first part** — Claim: unauthenticated denials still never reach the spike alert. This is true, as recorded above, but it is pre-existing and consistent with NFR43's tenant-baseline scope: the counter contract explicitly feeds `unavailable`, and the Story 8.4 coordinator evaluates only enumerated tenants. A platform-scope anonymous-spike alert would be a new design, outside this delta.
+- **R16-B1 (`low`), second part** — Claim: `unavailable` floods drive an O(n) `RemoveAll` under the counter's shared lock. This is real (`InMemoryAuthorizationFailureCounter.cs:71-75`), but it is the pre-existing Story 8.4 counter, which every gateway denial also feeds. The cost per request is bounded by the 600 s window, and it matters only under a sustained high-rate anonymous flood. A fix (prefix pruning or a capped bucket) is more than a direct correction.
+- **R16-B3/E7/A4 (`low`)** — Claim: a boundary audit outage is now silent, with no log, metric or alert, where propagation used to reach the host's unhandled-exception log. This is real, but the branch is unreachable in the shipped composition (`InMemoryAuditWriter` cannot fail). `CommandGateway.SubmitAsync:83-86` swallows the same outage just as silently. Adding a logger dependency and a `LoggerMessage` is more than a direct correction. Revisit when a durable denial-fact writer lands.
+- **R16-E4 (`low`)** — Claim: the counter is skipped while audit is down. This is deliberate in R15-P4 ("Nothing is counted in that case"). It matches `ChatBotCommandAdmissionPipeline.DenyAsync`, where an audit throw precedes `authorizationFailureCounter?.Record`, and the contract feeds the counter from the path that emits the fact. The branch is latent in production.
+- **R16-B5/E2 (`false`)** — Claim: an exception from the counter or clock resolution after a successful audit becomes a bare 500. `InMemoryAuthorizationFailureCounter.Record` has no throwing path: it returns early on a blank tenant, and the tenant is never null. The shipped composition registers `ISystemClock` and the counter together (`CommandGatewayServiceCollectionExtensions.cs:297`, `:315`). `DenyAsync` uses the same optional-counter, required-clock shape.
+- **R16-B7 (`false`), all but the task id** — Claim: the 503 tests omit `type`, `status`, `clientAction`, visibility, content type, the unit `category` and the absence of `tenant-alpha`. Both paths build the 503 with the same `CreateDependencyUnavailable` and `CoarseUserFacingRedactionStage`. The gateway tests pin its type, status and `RetryLater` client action (`CommandGatewayTests.cs:1400`, `:5140`), the HTTP case asserts status and `category`, and the factory takes no tenant parameter, so `tenant-alpha` cannot enter the body. The task-id part is R16-P4.
+- **R16-B8 (`false`)** — Claim: the forbid path is untested for audit failure and counter feeding. The catch and the counter feed do not branch on challenge versus forbid. The HTTP theory's `workload` forbid row already asserts `failureCounter.Tenants.ShouldBe([fact.TenantId])` with `credential-tenant` (`:2682`), and the 503 factory has no tenant parameter, so it cannot echo `credential-tenant`.
+- **R16-B9 (`false`)** — Claim: a retryable 503 tells unauthenticated callers to retry an invalid credential, and the CLI or MCP may loop. The typed, retryable 503 is the user's R15-D2 option 1, which also matches the gateway path before `e89a3ac`. No ChatBot client retries automatically: the CLI and MCP formatters only render `Retryable` (`ChatBotCliOutputFormatter.cs:315`, `ChatBotMcpResultFormatter.cs:104`).
+- **R16-E3 (`low`)** — Claim: a send-and-abort burst never reaches the counter. This is true, but an aborted caller receives no 401 or 403, so an aborted probe learns nothing that a counted probe would. No fact is written by design (`RequestAbortedDuringMetadataReadMustPropagateWithoutAudit`), and the counter follows the fact. The gateway before `e89a3ac` also recorded neither when a request was aborted during model binding.
+- **R16-E6 (`low`)** — Claim: boundary denials on GET, health, hub and recovery routes do not feed the counter. Only the admission pipeline and this handler have ever fed it, as a source search confirms. Read routes never emitted a `ChatBotAuthorizationFailureAuditFact` or fed the counter, so this is pre-existing scope, not a regression. Extending fact emission to other routes is more than a direct correction.
+- **R16-E8 (`false`)** — Claim: resolving the problem-details factory before the audit means a factory failure leaves the denial unaudited. The factory is a registered singleton that both outcomes need, and its resolution had to move above the `try` so that the catch can use it. No reachable failure has been shown.
+- **R16-A5 (`false`)** — Claim: the handler summary and the `IAuthorizationFailureCounter` summary are stale. The handler still turns a refused boundary policy into typed, metadata-only problem details, and its summary never listed the audit side effect either. The counter's "fed … from the same code path that emits `ChatBotAuthorizationFailureAuditFact`" stays true, because the boundary emits that fact, and the file still lives beside the gateway authorization seam. No harm has been named.
+
 ## Design Notes
 
 GetWorkflowOperationStatus uses the existing typed GetOperationStatus boundary. RetryCommandExecution is distinct from legacy RequestFailedWorkflowRetry; this story supplies its prerequisites. No migrations, deployments or external effects. Preserve historical OperationId values exactly.
