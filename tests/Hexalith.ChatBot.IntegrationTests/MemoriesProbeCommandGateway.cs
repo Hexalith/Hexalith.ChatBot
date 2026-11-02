@@ -135,7 +135,11 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
         }));
         IResource memories = builder.Resources.Single(resource => resource.Name == "memories");
         memories.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
-            context.EnvironmentVariables["EventStoreIntegration__CommandGateway__BaseAddress"] = BaseAddress));
+        {
+            // Platform sets the current key; Memories resolves it before the legacy fallback.
+            context.EnvironmentVariables["EventStore__CommandGateway__BaseAddress"] = BaseAddress;
+            context.EnvironmentVariables["EventStoreIntegration__CommandGateway__BaseAddress"] = BaseAddress;
+        }));
         IResource eventStore = builder.Resources.Single(resource => resource.Name == "eventstore");
         eventStore.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
         {
