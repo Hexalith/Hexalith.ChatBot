@@ -1073,10 +1073,10 @@ public static class ScaffoldArchitectureTests
             PackageCatalogTestHelper.AssertSiblingAuthority(wrapper);
         }
 
-        PackageCatalogTestHelper.Version("Hexalith.Folders.Client").ShouldBe("1.3.2");
-        PackageCatalogTestHelper.Version("Hexalith.Folders.Contracts").ShouldBe("1.3.2");
-        PackageCatalogTestHelper.Version("Hexalith.Projects.Client").ShouldBe("1.2.1");
-        PackageCatalogTestHelper.Version("Hexalith.Projects.Contracts").ShouldBe("1.2.1");
+        PackageCatalogTestHelper.Version("Hexalith.Folders.Client").ShouldBe("1.3.3");
+        PackageCatalogTestHelper.Version("Hexalith.Folders.Contracts").ShouldBe("1.3.3");
+        PackageCatalogTestHelper.Version("Hexalith.Projects.Client").ShouldBe("1.2.3");
+        PackageCatalogTestHelper.Version("Hexalith.Projects.Contracts").ShouldBe("1.2.3");
         PackageCatalogTestHelper.Version("LibGit2Sharp").ShouldBe("0.32.0");
         PackageCatalogTestHelper.AssertExclusiveAuthority();
     }
