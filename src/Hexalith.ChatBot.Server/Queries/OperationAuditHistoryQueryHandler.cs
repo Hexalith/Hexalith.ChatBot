@@ -25,6 +25,10 @@ internal sealed class OperationAuditHistoryQueryHandler(
     IAuditHistoryReader auditHistoryReader)
     : ChatBotReadQueryHandler<OperationAuditHistoryQuery>(requestContextResolver, requestAuthorizer)
 {
+    /// <summary>Declares this actual protected query handler and its existing output.</summary>
+    public static Hexalith.EventStore.Contracts.Routing.RouteContractDeclaration CatalogDeclaration { get; } =
+        Hexalith.ChatBot.Server.Routing.ChatBotCatalogDeclarations.Query(ChatBotReadQueryTypes.OperationAuditHistory, typeof(OperationAuditHistoryQueryHandler));
+
     public override string QueryType => ChatBotReadQueryTypes.OperationAuditHistory;
 
     protected override async Task<QueryResult> ExecuteAsync(QueryEnvelope query, OperationAuditHistoryQuery request, ChatBotAuthorityPrincipal principal, CancellationToken cancellationToken)

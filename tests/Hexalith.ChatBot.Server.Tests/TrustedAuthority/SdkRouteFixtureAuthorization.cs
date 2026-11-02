@@ -2,6 +2,7 @@ using Hexalith.EventStore.DomainService;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Hexalith.ChatBot.Server.Tests.TrustedAuthority;
@@ -17,9 +18,20 @@ internal static class SdkRouteFixtureAuthorization
     /// <summary>The test-only transport scheme behind the replaced SDK route policies.</summary>
     public const string SchemeName = "ChatBotSdkRouteFixture";
 
+    /// <summary>Supplies actual loaded finite receiver inputs before the production SDK maps its receiver.</summary>
+    public static IWebHostBuilder ConfigureFiniteReceiver(this IWebHostBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        HttpRouteCatalogFixtureFiles files = new();
+        files.Configure(builder);
+        builder.ConfigureServices(services => services.AddSingleton(_ => files));
+        return builder;
+    }
+
     public static void AllowCanonicalRouteHandlers(IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+        HttpRouteCatalogFixture.Configure(services);
         if (!services.Any(static service => service.ServiceType == typeof(SdkRouteFixtureAuthenticationHandler)))
         {
             _ = services

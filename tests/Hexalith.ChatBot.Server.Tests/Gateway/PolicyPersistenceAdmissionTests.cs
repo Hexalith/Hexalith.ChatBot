@@ -121,7 +121,7 @@ public sealed partial class CommandGatewayTests
             Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock), authorizationFailureCounter: counter);
         ClaimsPrincipal principal = workload
             ? new(new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "workload:eventstore"), new("eventstore:workload", "eventstore"),
-                new("eventstore:operation", "domain-service:process")], "EventStoreWorkload"))
+                new("eventstore:operation", "domain-service:process"), new("eventstore:surface", "service")], "EventStoreWorkload"))
             : SyntheticPolicyPrincipal(commandKind);
         HttpContextAccessor accessor = new() { HttpContext = new DefaultHttpContext { User = principal } };
         ChatBotRequestContextResolver resolver = new(accessor);
@@ -449,7 +449,7 @@ public sealed partial class CommandGatewayTests
         RecordingDispatcher dispatcher = new();
         InMemoryCoarseIdempotencyStore reservations = new(clock);
         ClaimsPrincipal principal = new(new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "workload:eventstore"),
-            new("eventstore:workload", "eventstore"), new("eventstore:operation", "domain-service:process")], "EventStoreWorkload"));
+            new("eventstore:workload", "eventstore"), new("eventstore:operation", "domain-service:process"), new("eventstore:surface", "service")], "EventStoreWorkload"));
         object command = SyntheticPolicyCommand("approval");
         JsonElement payload = JsonSerializer.SerializeToElement(command);
         DataProtectionChatBotAdmissionMarker marker = new(new EphemeralDataProtectionProvider());
@@ -528,7 +528,7 @@ public sealed partial class CommandGatewayTests
     private static WebApplicationFactory<Program> SyntheticPolicyHost(ClaimsPrincipal principal, ISystemClock clock, IAuditWriter audit,
         IIdempotencyStore reservations, ICommandDispatcher dispatcher, IChatBotAdmissionMarker? marker = null,
         IAuthorizationFailureCounter? authorizationFailureCounter = null)
-        => new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        => new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureFiniteReceiver().ConfigureServices(services =>
         {
             SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
             services.AddSingleton(clock);

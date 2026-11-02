@@ -8,11 +8,9 @@ using Microsoft.Extensions.Options;
 namespace Hexalith.ChatBot.Server.Tests.TrustedAuthority;
 
 /// <summary>
-/// Test-only transport for in-process SDK route fixtures. A fixture principal placed on the request by a startup
-/// filter passes through unchanged. Otherwise the request keeps its anonymous primary identity and gains one
-/// claimless transport identity after it: that satisfies the conforming host's authenticated, scheme-bound policy
-/// requirement while ChatBot admission still sees no subject, tenant or workload, exactly as the earlier allow-all
-/// fixture policy delivered the request.
+/// Test-only authenticated service transport for in-process SDK route fixtures. It preserves every existing
+/// workload claim exactly. Other fixture principals retain their subject and tenant evidence and gain only the
+/// transport's signed service surface. A claimless caller still has no ChatBot subject or tenant authority.
 /// </summary>
 /// <param name="options">The scheme options.</param>
 /// <param name="logger">The logger factory.</param>
@@ -25,9 +23,12 @@ internal sealed class SdkRouteFixtureAuthenticationHandler(
     /// <inheritdoc />
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        ClaimsPrincipal principal = Context.User.Identities.Any(static identity => identity.IsAuthenticated)
+        // The authenticated test transport asserts only its service surface. Existing workload evidence passes
+        // through exactly, including absent or conflicting surfaces used by the SDK denial controls.
+        ClaimsPrincipal principal = Context.User.Identities.Any(static identity => identity.IsAuthenticated && identity.AuthenticationType == "EventStoreWorkload")
             ? Context.User
-            : new ClaimsPrincipal([.. Context.User.Identities, new ClaimsIdentity(Scheme.Name)]);
+            : new ClaimsPrincipal([.. Context.User.Identities,
+                new ClaimsIdentity([new Claim("eventstore:surface", "service")], Scheme.Name)]);
         return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme.Name)));
     }
 }

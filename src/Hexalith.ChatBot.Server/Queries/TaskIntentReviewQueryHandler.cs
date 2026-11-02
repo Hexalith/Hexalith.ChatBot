@@ -25,6 +25,10 @@ internal sealed class TaskIntentReviewQueryHandler(
     IMailboxMessageContentSource messageContentSource)
     : ChatBotReadQueryHandler<TaskIntentReviewQuery>(requestContextResolver, requestAuthorizer)
 {
+    /// <summary>Declares this actual protected query handler and its existing output.</summary>
+    public static Hexalith.EventStore.Contracts.Routing.RouteContractDeclaration CatalogDeclaration { get; } =
+        Hexalith.ChatBot.Server.Routing.ChatBotCatalogDeclarations.Query(ChatBotReadQueryTypes.TaskIntentReview, typeof(TaskIntentReviewQueryHandler));
+
     public override string QueryType => ChatBotReadQueryTypes.TaskIntentReview;
 
     protected override async Task<QueryResult> ExecuteAsync(QueryEnvelope query, TaskIntentReviewQuery request, ChatBotAuthorityPrincipal principal, CancellationToken cancellationToken)

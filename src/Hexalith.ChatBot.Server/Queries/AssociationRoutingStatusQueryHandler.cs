@@ -24,6 +24,10 @@ internal sealed class AssociationRoutingStatusQueryHandler(
     IAssociationProjectionStore projectionStore)
     : ChatBotReadQueryHandler<AssociationRoutingStatusQuery>(requestContextResolver, requestAuthorizer)
 {
+    /// <summary>Declares this actual protected query handler and its existing output.</summary>
+    public static Hexalith.EventStore.Contracts.Routing.RouteContractDeclaration CatalogDeclaration { get; } =
+        Hexalith.ChatBot.Server.Routing.ChatBotCatalogDeclarations.Query(ChatBotReadQueryTypes.AssociationRoutingStatus, typeof(AssociationRoutingStatusQueryHandler));
+
     public override string QueryType => ChatBotReadQueryTypes.AssociationRoutingStatus;
 
     protected override async Task<QueryResult> ExecuteAsync(QueryEnvelope query, AssociationRoutingStatusQuery request, ChatBotAuthorityPrincipal principal, CancellationToken cancellationToken)
