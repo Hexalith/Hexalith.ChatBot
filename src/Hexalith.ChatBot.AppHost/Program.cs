@@ -280,6 +280,7 @@ if (security is not null)
     _ = eventStore.WithEnvironment("Authentication__BoundStreamRead__PublicKeys__chatbot", authorityReadPublicKeyParameter);
     _ = eventStore.WithEnvironment("Authentication__BoundStreamRead__AllowedDomains__chatbot", "chatbot")
         .WithEnvironment("Authentication__BoundCommand__AllowedDomains__chatbot", "chatbot")
+        .WithEnvironment("Authentication__DaprInternal__AllowedCallers__4", "memories")
         .WithEnvironment("Authentication__BoundStreamRead__PublicKeys__memories", memoriesCommandPublicKeyParameter)
         .WithEnvironment("Authentication__BoundCommand__AllowedDomains__memories", "memories-tenants,memories-cases,memories-memory-units")
         .WithEnvironment("Authentication__BoundStreamRead__PublicKeys__tenants", tenantsAuthorityReadPublicKeyParameter)
