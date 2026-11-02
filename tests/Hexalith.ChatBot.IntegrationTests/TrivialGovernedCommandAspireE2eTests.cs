@@ -2551,6 +2551,16 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         IResource memories = builder.Resources.Single(resource => resource.Name == MemoriesResourceName);
         memories.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
         {
+            // The public probe JWT is symmetric, while Memories' outbound EventStore workload
+            // assertion must use the AppHost's Keycloak authority and registered client scopes.
+            context.EnvironmentVariables["Authentication__WorkloadJwtBearer__Authority"] =
+                context.EnvironmentVariables["Authentication__JwtBearer__Authority"];
+            context.EnvironmentVariables["Authentication__WorkloadJwtBearer__Issuer"] =
+                context.EnvironmentVariables["Authentication__JwtBearer__Issuer"];
+            context.EnvironmentVariables["Authentication__WorkloadJwtBearer__Audience"] = "memories";
+            context.EnvironmentVariables["Authentication__WorkloadJwtBearer__AllowedAlgorithms__0"] = "RS256";
+            context.EnvironmentVariables["Authentication__WorkloadJwtBearer__RequireHttpsMetadata"] = "false";
+            context.EnvironmentVariables["Authentication__WorkloadJwtBearer__SigningKey"] = string.Empty;
             context.EnvironmentVariables["Authentication__JwtBearer__Authority"] = string.Empty;
             context.EnvironmentVariables["Authentication__JwtBearer__Issuer"] = MemoriesProbeIssuer;
             context.EnvironmentVariables["Authentication__JwtBearer__Audience"] = MemoriesProbeAudience;
