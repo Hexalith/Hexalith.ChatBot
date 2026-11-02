@@ -293,7 +293,9 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
         {
             while (true)
             {
-                using HttpResponseMessage response = await eventStore.GetAsync($"/api/v1/commands/status/{messageId}", deadline.Token).ConfigureAwait(false);
+                using HttpRequestMessage request = new(HttpMethod.Get, $"/api/v1/commands/status/{messageId}");
+                request.Headers.Add("X-Hexalith-Tenant", tenant);
+                using HttpResponseMessage response = await eventStore.SendAsync(request, deadline.Token).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
                     CommandStatusQueryResponse? status = await response.Content.ReadFromJsonAsync<CommandStatusQueryResponse>(deadline.Token).ConfigureAwait(false);
