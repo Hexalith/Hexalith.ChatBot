@@ -2665,6 +2665,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 catch (OperationCanceledException) when (deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
                 {
                     await RecordMemoriesProvisioningTimeoutAsync(app, workflowInstanceId).ConfigureAwait(true);
+                    await RecordEventStoreWorkloadDenialsAsync(app).ConfigureAwait(true);
                     throw;
                 }
             }
@@ -2718,6 +2719,47 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                     JsonSerializer.Serialize(new { candidate, error = exception.Message }));
             }
         }
+    }
+
+    private async Task RecordEventStoreWorkloadDenialsAsync(DistributedApplication app)
+    {
+        List<string> reasons = [];
+        try
+        {
+            using CancellationTokenSource deadline = new(TimeSpan.FromSeconds(3));
+            ResourceLoggerService logger = app.Services.GetRequiredService<ResourceLoggerService>();
+            DistributedApplicationModel model = app.Services.GetRequiredService<DistributedApplicationModel>();
+            IResource resource = model.Resources.Single(item => item.Name == EventStoreResourceName);
+            await foreach (IReadOnlyList<LogLine> batch in logger.GetAllAsync(resource).WithCancellation(deadline.Token))
+            {
+                foreach (LogLine line in batch)
+                {
+                    if (!line.Content.Contains("SecurityEvent=InternalAuthenticationDenied", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    Match reason = Regex.Match(line.Content, @"Reason=(?<value>[a-z0-9-]+)", RegexOptions.CultureInvariant);
+                    if (reason.Success)
+                    {
+                        reasons.Add(reason.Groups["value"].Value);
+                    }
+                }
+
+                if (reasons.Count >= 30)
+                {
+                    break;
+                }
+            }
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+        {
+            _output.WriteLine("MEMORIES_EVENTSTORE_AUTH_DIAGNOSTIC_ERROR {0}", exception.GetType().Name);
+        }
+
+        _output.WriteLine("MEMORIES_EVENTSTORE_AUTH_DENIAL_EVIDENCE {0}", JsonSerializer.Serialize(
+            reasons.GroupBy(static reason => reason, StringComparer.Ordinal)
+                .Select(static group => new { reason = group.Key, count = group.Count() })));
     }
 
     private static void ConfigureReservedDaprHttpEndpoints(
