@@ -2607,6 +2607,9 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 new { tenantId = tenant, displayName = tenant, vectorDimensions = 3 },
                 cancellationToken).ConfigureAwait(true);
             submitted.StatusCode.ShouldBe(HttpStatusCode.Accepted, "The Memories owner must accept the fixture provisioning workflow.");
+            using JsonDocument submittedBody = JsonDocument.Parse(
+                await submitted.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(true));
+            string workflowInstanceId = submittedBody.RootElement.GetProperty("workflowInstanceId").GetString()!;
             using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             deadline.CancelAfter(StartupTimeout);
             int lastGatewayStatus = -1;
@@ -2649,7 +2652,15 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                     response.StatusCode.ShouldBe(HttpStatusCode.NotFound, "Only owner registration in progress may be retried.");
                 }
 
-                await Task.Delay(PollInterval, deadline.Token).ConfigureAwait(true);
+                try
+                {
+                    await Task.Delay(PollInterval, deadline.Token).ConfigureAwait(true);
+                }
+                catch (OperationCanceledException) when (deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                {
+                    await RecordMemoriesProvisioningTimeoutAsync(app, workflowInstanceId).ConfigureAwait(true);
+                    throw;
+                }
             }
         }
 
@@ -2671,6 +2682,36 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             ownerLibraryVersion = gateway.OwnerLibraryVersion,
             serverAssemblyPath = gateway.ServerAssemblyPath,
         }));
+    }
+
+    private async Task RecordMemoriesProvisioningTimeoutAsync(DistributedApplication app, string workflowInstanceId)
+    {
+        foreach (string candidate in new[] { "memories-dapr-cli", "memories-dapr" })
+        {
+            try
+            {
+                using HttpClient daprClient = new()
+                {
+                    BaseAddress = app.GetEndpoint(candidate, "http"),
+                    Timeout = TimeSpan.FromSeconds(5),
+                };
+                using HttpResponseMessage response = await daprClient.GetAsync(
+                    $"/v1.0-beta1/workflows/dapr/{Uri.EscapeDataString(workflowInstanceId)}").ConfigureAwait(true);
+                string payload = await response.Content.ReadAsStringAsync().ConfigureAwait(true);
+                _output.WriteLine("MEMORIES_PROVISIONING_TIMEOUT_WORKFLOW_EVIDENCE {0}", JsonSerializer.Serialize(new
+                {
+                    workflowInstanceId,
+                    statusCode = (int)response.StatusCode,
+                    payload = payload.Length <= 4096 ? payload : payload[..4096],
+                }));
+                return;
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+            {
+                _output.WriteLine("MEMORIES_PROVISIONING_TIMEOUT_WORKFLOW_PROBE_ERROR {0}",
+                    JsonSerializer.Serialize(new { candidate, error = exception.Message }));
+            }
+        }
     }
 
     private static void ConfigureReservedDaprHttpEndpoints(
