@@ -13,6 +13,7 @@ using Aspire.Hosting.Testing;
 using CommunityToolkit.Aspire.Hosting.Dapr;
 
 using Hexalith.EventStore.Contracts.Commands;
+using Hexalith.EventStore.Client.Gateway;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -50,6 +51,7 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
     private readonly ConcurrentDictionary<string, string> _acceptedTenants = new(StringComparer.Ordinal);
     private string? _serviceSubject;
     private HttpClient? _eventStore;
+    private HttpClient? _workloadEventStore;
     private int _acceptedCommands;
     private int _lastStatusCode;
     private string? _lastRequestDomain;
@@ -93,6 +95,7 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
         WebApplication host = builder.Build();
         MemoriesProbeCommandGateway gateway = new(host);
         host.MapPost("/api/v1/commands", gateway.ForwardAsync);
+        host.MapPost("/api/v1/commands/bound/workload", gateway.ForwardBoundAsync);
         host.MapPost("/owner-process", (DomainServiceRequest request, HttpContext context) =>
             context.Connection.RemoteIpAddress is not null && IPAddress.IsLoopback(context.Connection.RemoteIpAddress)
                 && gateway._serviceSubject is string subject && gateway._domain is MemoriesProbeDomainTransport domain
@@ -252,6 +255,8 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
             await AssertOwnerScopeDeniedAsync(eventStore, "tenant-outside-probe", "memories-tenants", cancellationToken).ConfigureAwait(false);
             await AssertOwnerScopeDeniedAsync(eventStore, "tenant-alpha", "chatbot", cancellationToken).ConfigureAwait(false);
             _eventStore = eventStore;
+            _workloadEventStore = application.CreateHttpClient("eventstore", "http");
+            _workloadEventStore.Timeout = TimeSpan.FromSeconds(30);
         }
         catch
         {
@@ -263,6 +268,7 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _eventStore?.Dispose();
+        _workloadEventStore?.Dispose();
         try
         {
             await _host.StopAsync().ConfigureAwait(false);
@@ -334,9 +340,22 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
     }
 
     private async Task<IResult> ForwardAsync(HttpRequest request, CancellationToken cancellationToken)
+        => await ForwardCommandAsync(request, bound: false, cancellationToken).ConfigureAwait(false);
+
+    private async Task<IResult> ForwardBoundAsync(HttpRequest request, CancellationToken cancellationToken)
+        => await ForwardCommandAsync(request, bound: true, cancellationToken).ConfigureAwait(false);
+
+    private async Task<IResult> ForwardCommandAsync(HttpRequest request, bool bound, CancellationToken cancellationToken)
     {
         using JsonDocument body = await JsonDocument.ParseAsync(request.Body, cancellationToken: cancellationToken).ConfigureAwait(false);
-        JsonElement command = body.RootElement;
+        JsonElement command = bound ? body.RootElement.GetProperty("command") : body.RootElement;
+        if (bound && (string.IsNullOrWhiteSpace(body.RootElement.GetProperty("principalId").GetString())
+            || !request.Headers.TryGetValue(BoundWorkloadCommandProof.HeaderName, out var proof) || proof.Count != 1
+            || !request.Headers.TryGetValue("X-Hexalith-Workload-Assertion", out var assertion) || assertion.Count != 1))
+        {
+            Volatile.Write(ref _lastStatusCode, StatusCodes.Status403Forbidden);
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
         string? tenant = command.GetProperty("tenant").GetString();
         string? domain = command.GetProperty("domain").GetString();
         string? type = command.GetProperty("commandType").GetString();
@@ -356,14 +375,23 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
             return Results.StatusCode(StatusCodes.Status403Forbidden);
         }
 
-        HttpClient? eventStore = _eventStore;
+        HttpClient? eventStore = bound ? _workloadEventStore : _eventStore;
         if (eventStore is null)
         {
             return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
         }
 
-        using StringContent payload = new(command.GetRawText(), Encoding.UTF8, "application/json");
-        using HttpResponseMessage response = await eventStore.PostAsync("/api/v1/commands", payload, cancellationToken).ConfigureAwait(false);
+        using HttpRequestMessage upstream = new(HttpMethod.Post,
+            bound ? "/api/v1/commands/bound/workload" : "/api/v1/commands")
+        {
+            Content = new StringContent((bound ? body.RootElement : command).GetRawText(), Encoding.UTF8, "application/json"),
+        };
+        if (bound)
+        {
+            upstream.Headers.TryAddWithoutValidation("X-Hexalith-Workload-Assertion", request.Headers["X-Hexalith-Workload-Assertion"].ToString());
+            upstream.Headers.TryAddWithoutValidation(BoundWorkloadCommandProof.HeaderName, request.Headers[BoundWorkloadCommandProof.HeaderName].ToString());
+        }
+        using HttpResponseMessage response = await eventStore.SendAsync(upstream, cancellationToken).ConfigureAwait(false);
         Volatile.Write(ref _lastStatusCode, (int)response.StatusCode);
         string content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.Accepted)

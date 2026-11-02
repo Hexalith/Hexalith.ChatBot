@@ -1893,6 +1893,25 @@
         "eventstore-operation.eventstore.stream-read",
         "eventstore-operation.eventstore.owner-authority-query"
       ]
+    },
+    {
+      "clientId": "memories",
+      "name": "Memories bounded EventStore command workload",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "__HEXALITH_MEMORIES_WORKLOAD_CLIENT_SECRET__",
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": { "access.token.lifespan": "300" },
+      "defaultClientScopes": [],
+      "optionalClientScopes": [
+        "eventstore-audience.eventstore",
+        "eventstore-operation.eventstore.command-submit"
+      ]
     }
   ],
   "users": [

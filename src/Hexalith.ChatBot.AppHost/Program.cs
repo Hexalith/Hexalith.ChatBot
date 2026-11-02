@@ -27,6 +27,7 @@ IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(ar
 string accessControlConfigPath = ResolveDaprConfigPath(builder.AppHostDirectory, "accesscontrol.local.yaml");
 
 string eventStoreWorkloadClientSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+string memoriesWorkloadClientSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
 string chatBotAuthorityReaderSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
 string tenantsAuthorityReaderSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
 string partiesAuthorityReaderSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
@@ -47,10 +48,14 @@ string partiesAuthorityReadPublicKey = Convert.ToBase64String(partiesAuthorityRe
 using RSA projectsAuthorityReadKey = RSA.Create(2048);
 string projectsAuthorityReadPrivateKey = Convert.ToBase64String(projectsAuthorityReadKey.ExportPkcs8PrivateKey());
 string projectsAuthorityReadPublicKey = Convert.ToBase64String(projectsAuthorityReadKey.ExportSubjectPublicKeyInfo());
+using RSA memoriesCommandKey = RSA.Create(2048);
+string memoriesCommandPrivateKey = Convert.ToBase64String(memoriesCommandKey.ExportPkcs8PrivateKey());
+string memoriesCommandPublicKey = Convert.ToBase64String(memoriesCommandKey.ExportSubjectPublicKeyInfo());
 string realmImportPath = PrepareKeycloakRealmImport(
     builder.AppHostDirectory,
     builder.Configuration,
     eventStoreWorkloadClientSecret,
+    memoriesWorkloadClientSecret,
     chatBotAuthorityReaderSecret,
     tenantsAuthorityReaderSecret,
     partiesAuthorityReaderSecret,
@@ -62,6 +67,12 @@ IResourceBuilder<ParameterResource> eventStoreWorkloadClientSecretParameter = bu
     "eventstore-workload-client-secret",
     () => eventStoreWorkloadClientSecret,
     secret: true);
+IResourceBuilder<ParameterResource> memoriesWorkloadClientSecretParameter = builder.AddParameter(
+    "memories-workload-client-secret", () => memoriesWorkloadClientSecret, secret: true);
+IResourceBuilder<ParameterResource> memoriesCommandPrivateKeyParameter = builder.AddParameter(
+    "memories-command-private-key", () => memoriesCommandPrivateKey, secret: true);
+IResourceBuilder<ParameterResource> memoriesCommandPublicKeyParameter = builder.AddParameter(
+    "memories-command-public-key", () => memoriesCommandPublicKey, secret: true);
 IResourceBuilder<ParameterResource> chatBotAuthorityReaderSecretParameter = builder.AddParameter(
     "chatbot-authority-reader-secret",
     () => chatBotAuthorityReaderSecret,
@@ -269,6 +280,8 @@ if (security is not null)
     _ = eventStore.WithEnvironment("Authentication__BoundStreamRead__PublicKeys__chatbot", authorityReadPublicKeyParameter);
     _ = eventStore.WithEnvironment("Authentication__BoundStreamRead__AllowedDomains__chatbot", "chatbot")
         .WithEnvironment("Authentication__BoundCommand__AllowedDomains__chatbot", "chatbot")
+        .WithEnvironment("Authentication__BoundStreamRead__PublicKeys__memories", memoriesCommandPublicKeyParameter)
+        .WithEnvironment("Authentication__BoundCommand__AllowedDomains__memories", "memories-tenants,memories-cases,memories-memory-units")
         .WithEnvironment("Authentication__BoundStreamRead__PublicKeys__tenants", tenantsAuthorityReadPublicKeyParameter)
         .WithEnvironment("Authentication__BoundStreamRead__AllowedDomains__tenants", "tenants")
         .WithEnvironment("Authentication__BoundStreamRead__PublicKeys__parties", partiesAuthorityReadPublicKeyParameter)
@@ -307,6 +320,8 @@ if (security is not null)
         .WithEnvironment("Authentication__Workload__AllowedCallers__0", "eventstore");
     _ = chatBot.WithEventStoreWorkloadClientCredentials("chatbot", chatBotAuthorityReaderSecretParameter)
         .WithEnvironment("Authentication__BoundStreamRead__PrivateKey", authorityReadPrivateKeyParameter);
+    _ = memories.Server.WithEventStoreWorkloadClientCredentials("memories", memoriesWorkloadClientSecretParameter)
+        .WithEnvironment("EventStore__CommandGateway__BoundCommand__PrivateKeyPkcs8Base64", memoriesCommandPrivateKeyParameter);
     _ = chatBotUi
         .WithSecurityDependency(security)
         .WithEnvironment("Authentication__OpenIdConnect__Authority", security.RealmUrl)
@@ -371,6 +386,7 @@ static string PrepareKeycloakRealmImport(
     string appHostDirectory,
     IConfiguration configuration,
     string eventStoreWorkloadClientSecret,
+    string memoriesWorkloadClientSecret,
     string chatBotAuthorityReaderSecret,
     string tenantsAuthorityReaderSecret,
     string partiesAuthorityReaderSecret,
@@ -381,6 +397,7 @@ static string PrepareKeycloakRealmImport(
     const string grantExpiryMapperName = "chatbot-service-client-grant-expiry";
     const string recoveryClientSecretPlaceholder = "__HEXALITH_CHATBOT_RECOVERY_CLIENT_SECRET__";
     const string workloadClientSecretPlaceholder = "__HEXALITH_WORKLOAD_CLIENT_SECRET__";
+    const string memoriesWorkloadClientSecretPlaceholder = "__HEXALITH_MEMORIES_WORKLOAD_CLIENT_SECRET__";
     const string authorityReaderSecretPlaceholder = "__HEXALITH_CHATBOT_AUTHORITY_READER_SECRET__";
     const string tenantsAuthorityReaderSecretPlaceholder = "__HEXALITH_TENANTS_AUTHORITY_READER_SECRET__";
     const string partiesAuthorityReaderSecretPlaceholder = "__HEXALITH_PARTIES_AUTHORITY_READER_SECRET__";
@@ -530,6 +547,11 @@ static string PrepareKeycloakRealmImport(
     }
 
     realm = realm.Replace(workloadClientSecretPlaceholder, eventStoreWorkloadClientSecret, StringComparison.Ordinal);
+    if (realm.Split(memoriesWorkloadClientSecretPlaceholder, StringSplitOptions.None).Length - 1 != 1)
+    {
+        throw new InvalidOperationException("The Memories workload client must have exactly one secret placeholder.");
+    }
+    realm = realm.Replace(memoriesWorkloadClientSecretPlaceholder, memoriesWorkloadClientSecret, StringComparison.Ordinal);
     if (realm.Split(authorityReaderSecretPlaceholder, StringSplitOptions.None).Length - 1 != 1)
     {
         throw new InvalidOperationException("The ChatBot authority reader must have exactly one secret placeholder.");
