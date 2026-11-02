@@ -139,6 +139,32 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
         return Rejected(context.Command, decision.ReasonCode ?? ChatBotAuthorizationReasonCodes.AuthorizationDenied);
     }
 
+    /// <summary>Preserves transport denial ordering for the intentionally unsupported command without admitting work.</summary>
+    public async Task<DomainServiceTerminalRefusal> RefuseUnsupportedAsync(
+        DomainServiceTerminalRefusalContext context,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        // Keep the detached SDK snapshot ordinal and lossless: spelling, ambiguity, null and empty are evidence.
+        CommandEnvelope command = new(context.MessageId, context.TenantId, context.Domain, context.AggregateId,
+            context.CommandType, context.Payload.ToArray(), context.CorrelationId, context.CausationId, context.UserId,
+            context.Extensions?.ToDictionary(static pair => pair.Key, static pair => pair.Value!, StringComparer.Ordinal));
+        ChatBotRequestContext? issuer = requestContextResolver.ResolveCommand(command);
+        string reason = issuer is null || !string.Equals(command.UserId, issuer.SubjectId, StringComparison.Ordinal)
+            ? ChatBotAuthorizationReasonCodes.AuthenticationDenied
+            : !string.Equals(command.TenantId, issuer.TenantId, StringComparison.Ordinal)
+                ? ChatBotAuthorizationReasonCodes.TenantMismatch
+                : !TryReadPayload(command.Payload, out _)
+                    ? ChatBotAuthorizationReasonCodes.InvalidCommandPayload
+                    : ChatBotAuthorizationReasonCodes.AuthorizationDenied;
+        // ExecuteAdminQueueOperation has no canonical dispatch target. It can only produce a rejection.
+        if (reason != ChatBotAuthorizationReasonCodes.InvalidCommandPayload)
+        {
+            await admission.RejectTransportAsync(command, issuer, reason, cancellationToken).ConfigureAwait(false);
+        }
+        return DomainServiceTerminalRefusal.Reject(CreateRejection(command, reason));
+    }
+
     private async Task<DomainServiceAdmissionResult> RejectTransportAsync(CommandEnvelope command, ChatBotRequestContext? context, string reasonCode, CancellationToken cancellationToken)
     {
         await admission.RejectTransportAsync(command, context, reasonCode, cancellationToken).ConfigureAwait(false);
@@ -205,12 +231,12 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
     }
 
     private static DomainServiceAdmissionResult Rejected(CommandEnvelope command, string reasonCode)
-        => DomainServiceAdmissionResult.Rejected(
-            [
-                new ChatBotDomainServiceAdmissionRejected(
-                    AuditMetadata.SafeOptionalToken(command.MessageId),
-                    AuditMetadata.SafeCommandName(command.CommandType),
-                    AuditMetadata.SafeOptionalToken(reasonCode) ?? ChatBotAuthorizationReasonCodes.AuthorizationDenied,
-                    AuditMetadata.SafeOptionalToken(command.CorrelationId)),
-            ]);
+        => DomainServiceAdmissionResult.Rejected([CreateRejection(command, reasonCode)]);
+
+    private static ChatBotDomainServiceAdmissionRejected CreateRejection(CommandEnvelope command, string reasonCode)
+        => new(
+            AuditMetadata.SafeOptionalToken(command.MessageId),
+            AuditMetadata.SafeCommandName(command.CommandType),
+            AuditMetadata.SafeOptionalToken(reasonCode) ?? ChatBotAuthorizationReasonCodes.AuthorizationDenied,
+            AuditMetadata.SafeOptionalToken(command.CorrelationId));
 }

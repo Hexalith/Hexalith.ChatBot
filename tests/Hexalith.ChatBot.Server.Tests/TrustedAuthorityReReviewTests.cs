@@ -132,15 +132,19 @@ public sealed class TrustedAuthorityReReviewTests
         TrustedAuthorityAdvancingIdempotencyStore store = new(real, step => { if (step == (sdkAbort ? "abort" : "admission")) { clock.UtcNow += TimeSpan.FromSeconds(2); } });
         InMemoryAuditWriter audit = new();
         InMemoryAuthorizationFailureCounter counter = new(clock);
-        using WebApplicationFactory<Program> factory = Factory(clock, owner, store, audit).WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        using WebApplicationFactory<Program> factory = Factory(clock, owner, store, audit).WithWebHostBuilder(builder =>
         {
-            services.AddSingleton<IAuthorizationFailureCounter>(counter);
-            if (sdkAbort)
+            if (sdkAbort) { builder.ConfigureFiniteReceiver(); }
+            builder.ConfigureServices(services =>
             {
-                SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
-                services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(Relay));
-            }
-        }));
+                services.AddSingleton<IAuthorizationFailureCounter>(counter);
+                if (sdkAbort)
+                {
+                    SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
+                    services.AddFixturePrincipalAuthentication().AddSingleton<IStartupFilter>(new TrustedAuthorityPrincipalStartupFilter(Relay));
+                }
+            });
+        });
         if (sdkAbort)
         {
             using HttpClient client = factory.CreateClient();
@@ -231,5 +235,5 @@ public sealed class TrustedAuthorityReReviewTests
 
     private static ClaimsPrincipal Relay(string operation) => new(new ClaimsIdentity([
         new(ClaimTypes.NameIdentifier, "workload:eventstore"), new("eventstore:workload", "eventstore"),
-        new("eventstore:operation", operation)], "EventStoreWorkload"));
+        new("eventstore:operation", operation), new("eventstore:surface", "service")], "EventStoreWorkload"));
 }

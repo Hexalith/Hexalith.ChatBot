@@ -66,7 +66,7 @@ public sealed class ChatBotRouteCatalogBoundaryTests
         InMemoryAuditWriter audit = new();
         SyntheticOwnerAuthorityProvider owner = new(clock) { Allows = static _ => false };
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services =>
+            builder.ConfigureFiniteReceiver().ConfigureServices(services =>
             {
                 SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
                 services.AddSingleton<IIdempotencyStore>(reservations);
@@ -148,7 +148,7 @@ public sealed class ChatBotRouteCatalogBoundaryTests
     {
         InMemoryCoarseIdempotencyStore reservations = new(new SystemClock());
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services =>
+            builder.ConfigureFiniteReceiver().ConfigureServices(services =>
             {
                 SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
                 services.AddSingleton<IIdempotencyStore>(reservations);
@@ -211,7 +211,7 @@ public sealed class ChatBotRouteCatalogBoundaryTests
     public async Task ActualOwnerObservationMustRejectMismatchedTarget()
     {
         using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.ConfigureServices(SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers));
+            builder.ConfigureFiniteReceiver().ConfigureServices(SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers));
         using HttpClient client = factory.CreateClient();
         HttpRouteCatalogFixture fixture = factory.Services.GetRequiredService<HttpRouteCatalogFixture>();
         fixture.AutomaticActivation = false;

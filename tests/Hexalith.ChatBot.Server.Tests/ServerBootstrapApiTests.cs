@@ -3228,11 +3228,11 @@ public sealed class ServerBootstrapApiTests
         {
             SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
             configureServices?.Invoke(services);
-        });
+        }).WithWebHostBuilder(builder => { builder.ConfigureFiniteReceiver(); });
 
     private static WebApplicationFactory<Program> DomainServiceEndpointFactory(
         Action<IServiceCollection>? configureServices = null)
-        => new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        => new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureFiniteReceiver().ConfigureServices(services =>
         {
             SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
             configureServices?.Invoke(services);

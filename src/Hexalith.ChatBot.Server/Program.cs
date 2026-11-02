@@ -71,6 +71,13 @@ _ = builder.Services
         + "EventStore compares them verbatim and refuses the whole named-projection capability on any mismatch.")
     .ValidateOnStart();
 _ = builder.Services.AddChatBotCommandGateway();
+_ = builder.Services.AddScoped<ChatBotDomainServiceAdmissionStage>();
+_ = builder.Services.AddEventStoreDomainServiceTerminalRefusal<ChatBotDomainServiceAdmissionStage>(
+    "chatbot", nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteAdminQueueOperation),
+    static (stage, context, token) => stage.RefuseUnsupportedAsync(context, token),
+    static profile => profile.Add<ChatBotDomainServiceAdmissionRejected>(
+        typeof(ChatBotDomainServiceAdmissionRejected).FullName!, "json", 1024,
+        static (value, stream, token) => JsonSerializer.SerializeAsync(stream, value, cancellationToken: token)));
 _ = builder.Services.AddChatBotNativeFolders(builder.Configuration, builder.Environment);
 _ = builder.Services.AddChatBotMemoriesDerivedStores(builder.Configuration, builder.Environment);
 _ = builder.Services.AddStory132AcceptanceFixture(builder.Configuration, builder.Environment);

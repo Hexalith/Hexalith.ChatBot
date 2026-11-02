@@ -1,4 +1,9 @@
 using System.Security.Cryptography;
+using System.Reflection;
+
+using Hexalith.EventStore.Client.Routing;
+using Hexalith.EventStore.Client.Discovery;
+using Hexalith.EventStore.Client.Handlers;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Server.Routing;
@@ -31,12 +36,24 @@ internal sealed class HttpRouteCatalogFixture : IDisposable
     /// <summary>Allows boundary controls to send missing or stale authority without automatic fixture headers.</summary>
     public bool AutomaticActivation { get; set; } = true;
 
+    /// <summary>Allows negative controls to corrupt an actual SDK invocation after sender proof generation.</summary>
+    public Action<HttpRequestMessage>? TransformInvocation { get; set; }
+
     /// <summary>Retains the existing SDK authority, trust validator and receiver guard.</summary>
     public static void Configure(IServiceCollection services)
     {
+        // This fixture drives prepare/readiness/commit itself. Do not let the independent file coordinator
+        // overwrite its observed host identity while an in-process activation is being prepared.
+        foreach (ServiceDescriptor descriptor in services.Where(static descriptor =>
+            descriptor.ServiceType == typeof(IHostedService)
+            && descriptor.ImplementationFactory?.Method.DeclaringType?.DeclaringType == typeof(DevelopmentRouteCatalogBootstrap)).ToArray())
+        {
+            services.Remove(descriptor);
+        }
         services.RemoveAll<IRouteCatalogStateStore>();
         services.AddSingleton<IRouteCatalogStateStore, HttpRouteCatalogStateStore>();
         services.AddSingleton<HttpRouteCatalogFixture>();
+        services.AddSingleton<FiniteRouteCatalogReceiver>();
         services.AddSingleton<IStartupFilter, HttpRouteCatalogStartupFilter>();
         services.AddSingleton<IOptions<RouteCatalogHostOptions>>(Options.Create(new RouteCatalogHostOptions
         {
@@ -63,8 +80,11 @@ internal sealed class HttpRouteCatalogFixture : IDisposable
             RouteCatalogHostIdentity[] hosts = [ObservedRouteCatalogHost.Identity(owner), ObservedRouteCatalogHost.Identity(consumer)];
             IOptions<RouteCatalogHostOptions> ownerOptions = provider.GetRequiredService<IOptions<RouteCatalogHostOptions>>();
             ownerOptions.Value.Identity = hosts[0];
-            RouteCatalogEnvelope envelope = RouteCatalogCodec.Seal(new(2, 1, "Development", false,
-                owner.Declarations, owner.Targets, consumer.AdmissionPolicies!, "", ""));
+            RouteCatalogEnvelope envelope = VersionedRouteCatalogBuilder.Build(new RouteCatalogGenerationInput(
+                1, "Development", owner.Declarations, owner.Operations!,
+                owner.Targets.Select(target => new RouteCompositionBinding(target.RouteId, target.AppId,
+                    target.Method, target.ContractVersion, target.IsRuntimeOverride, target.ResolverTenantPattern)).ToArray(),
+                consumer.AdmissionPolicies!));
             RouteCatalogActivation candidate = new("chatbot-http-fixture", RouteCatalogCodec.Encode(envelope),
                 RouteCatalogCodec.ComputeRootDigest(envelope), null, hosts, "Development-fixture", "",
                 owner.AuxiliaryOperations, owner.ProjectionCapabilities);
@@ -98,15 +118,21 @@ internal sealed class HttpRouteCatalogFixture : IDisposable
         _activation.Dispose();
     }
 
-    private static Task<RouteCatalogHostObservation> ObserveOwnerAsync(IServiceProvider services, CancellationToken token)
+    private static async Task<RouteCatalogHostObservation> ObserveOwnerAsync(IServiceProvider services, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        FiniteRouteCatalogReceiver finite = services.GetRequiredService<FiniteRouteCatalogReceiver>();
+        await finite.WaitForCaptureAsync(token).ConfigureAwait(false);
         IReadOnlyList<RouteContractDeclaration> declarations = CompiledRouteCatalogDeclarations.Read([typeof(ChatBotCatalogDeclarations).Assembly]);
         var endpoints = services.GetRequiredService<EndpointDataSource>().Endpoints;
         string appId = services.GetRequiredService<IOptions<DomainProjectionIdentityOptions>>().Value.AppId;
-        return Task.FromResult(Observation(services, appId, declarations,
+        return Observation(services, appId, declarations,
             DevelopmentDomainRouteCatalog.Targets(services, endpoints, declarations), [],
-            RouteCatalogDomainObservation.Capabilities(services), RouteCatalogDomainObservation.Auxiliary(services, endpoints)));
+            RouteCatalogDomainObservation.Capabilities(services), RouteCatalogDomainObservation.Auxiliary(services, endpoints)) with
+        {
+            ReceiverSurface = finite.Observe(),
+            Operations = CompiledRouteCatalogDeclarations.ReadOperations([typeof(ChatBotCatalogDeclarations).Assembly]),
+        };
     }
 
     private async Task<RouteCatalogHostObservation> ObserveConsumerAsync(IServiceProvider services, CancellationToken token)
@@ -121,11 +147,8 @@ internal sealed class HttpRouteCatalogFixture : IDisposable
         string[] hosts = [owner, ConsumerAppId];
         RouteCatalogStateCoordinates coordinates = services.GetRequiredService<IRouteCatalogStateStore>().Coordinates!;
         // These documents describe this in-process authority cell only; no deployed Dapr component is claimed.
-        byte[][] topology = [JsonSerializer.SerializeToUtf8Bytes(new
-        {
-            kind = "Component", metadata = new { name = coordinates.StateStore },
-            spec = new { type = "state.redis", metadata = new[] { new { name = "keyPrefix", value = "none" } } }, scopes = hosts,
-        }), JsonSerializer.SerializeToUtf8Bytes(new
+        HttpRouteCatalogFixtureFiles files = services.GetRequiredService<HttpRouteCatalogFixtureFiles>();
+        byte[][] topology = [files.Component, appId == owner ? files.AccessControl : JsonSerializer.SerializeToUtf8Bytes(new
         {
             spec = new { accessControl = new { defaultAction = "deny", trustDomain = "public" } },
         })];
@@ -136,7 +159,35 @@ internal sealed class HttpRouteCatalogFixture : IDisposable
                 environment = services.GetRequiredService<IHostEnvironment>().EnvironmentName,
                 transport = SdkRouteFixtureAuthorization.SchemeName, scheme.ClaimsIssuer,
                 consumer = nameof(ConfigurationIdempotencyDigestKeyProvider),
-            }), admission, capabilities, auxiliary, coordinates);
+            }), admission, capabilities, auxiliary, coordinates, Operations: [])
+        {
+            ExecutableOwners = ExecutableOwners(services, appId == owner),
+        };
+    }
+
+    private static IReadOnlyDictionary<string, string> ExecutableOwners(IServiceProvider services, bool owner)
+    {
+        Assembly[] assemblies;
+        if (owner)
+        {
+            DiscoveryResult discovery = services.GetRequiredService<DiscoveryResult>();
+            assemblies = [typeof(ChatBotCatalogDeclarations).Assembly, typeof(DevelopmentDomainRouteCatalog).Assembly,
+                typeof(RouteCatalogInvocationHandler).Assembly, typeof(HttpRouteCatalogFixture).Assembly,
+                .. discovery.Aggregates.Select(aggregate => aggregate.Type.Assembly),
+                .. discovery.Aggregates.Select(aggregate => services.GetRequiredKeyedService<IDomainProcessor>(aggregate.DomainName).GetType().Assembly),
+                .. ChatBotCatalogDeclarations.CommandTypes.Select(type => type.Assembly),
+                .. services.GetServices<IDomainQueryHandler>().Select(handler => handler.GetType().Assembly),
+                .. services.GetServices<IDomainProjectionHandler>().Select(handler => handler.GetType().Assembly)];
+        }
+        else
+        {
+            assemblies = [typeof(ConfigurationIdempotencyDigestKeyProvider).Assembly,
+                typeof(RouteCatalogAdmissionObservation).Assembly, typeof(RouteCatalogInvocationHandler).Assembly,
+                .. ChatBotCatalogAdapters.Create().Select(adapter => adapter.GetType().Assembly)];
+        }
+        return assemblies.Distinct().OrderBy(assembly => assembly.FullName, StringComparer.Ordinal)
+            .ToDictionary(assembly => assembly.FullName!, assembly =>
+                Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(assembly.Location))), StringComparer.Ordinal);
     }
 
     private ServiceProvider Consumer(IServiceProvider owner)

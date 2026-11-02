@@ -293,7 +293,7 @@ public sealed class TrustedAuthorityReviewTests
         TrustedAuthorityClock clock = new();
         SyntheticOwnerAuthorityProvider owner = new(clock);
         CountingGovernedOperationStore store = new() { View = new("tenant-alpha", Note, GovernedOperationView.CurrentSchemaVersion, "synthetic", "v1", "metadata_only", "test", 1, clock.UtcNow, clock.UtcNow) };
-        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureFiniteReceiver().ConfigureServices(services =>
         {
             SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
             services.AddSingleton<ISystemClock>(clock);
@@ -448,7 +448,7 @@ public sealed class TrustedAuthorityReviewTests
         SyntheticOwnerAuthorityProvider owner = new(clock);
         InMemoryCoarseIdempotencyStore idempotency = new(clock);
         InMemoryAuditWriter audit = new();
-        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.ConfigureFiniteReceiver().ConfigureServices(services =>
         {
             SdkRouteFixtureAuthorization.AllowCanonicalRouteHandlers(services);
             services.AddSingleton<ISystemClock>(clock);
@@ -533,5 +533,5 @@ public sealed class TrustedAuthorityReviewTests
     private static QueryEnvelope Query() => new("tenant-alpha", "chatbot", Note, ChatBotReadQueryTypes.GovernedOperation, JsonSerializer.SerializeToUtf8Bytes(new { noteId = Note }), "correlation-alpha", "actor-alpha");
 
     private static ClaimsPrincipal Relay(string operation) => new(new ClaimsIdentity([
-        new(ClaimTypes.NameIdentifier, "workload:eventstore"), new("eventstore:workload", "eventstore"), new("eventstore:operation", operation)], "EventStoreWorkload"));
+        new(ClaimTypes.NameIdentifier, "workload:eventstore"), new("eventstore:workload", "eventstore"), new("eventstore:operation", operation), new("eventstore:surface", "service")], "EventStoreWorkload"));
 }
