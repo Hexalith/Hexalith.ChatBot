@@ -35,14 +35,14 @@ internal static class RecoveryMailboxOwnerProvisioner
         string actorEventStoreToken = await RecoveryAccessTokenProvider.AcquireEventStoreValidatorAsync(application, cancellationToken).ConfigureAwait(false);
         string actorChatBotToken = await RecoveryAccessTokenProvider.AcquireAsync(application, cancellationToken).ConfigureAwait(false);
 
-        await SubmitOwnerAsync(eventStore, adminToken, "system", "global-administrators", "global-administrators",
+        await SubmitOwnerAsync(eventStore, adminToken, "platform:global-administrators", "global-administrators", "global-administrators",
             "BootstrapGlobalAdmin", new { userId = "admin-user" }, cancellationToken,
             "global-admin-already-bootstrapped-rejection").ConfigureAwait(false);
         await WaitForGlobalAdministratorAsync(eventStore, adminToken, cancellationToken).ConfigureAwait(false);
-        await SubmitOwnerAsync(eventStore, adminToken, "system", "tenants", Tenant,
+        await SubmitOwnerAsync(eventStore, adminToken, "platform:tenants", "tenants", Tenant,
             "CreateTenant", new { tenantId = Tenant, name = "Recovery validation", description = "Live recovery owner authority" },
             cancellationToken, "tenant-already-exists-rejection").ConfigureAwait(false);
-        await SubmitOwnerAsync(eventStore, adminToken, "system", "tenants", Tenant,
+        await SubmitOwnerAsync(eventStore, adminToken, "platform:tenants", "tenants", Tenant,
             "AddUserToTenant", new { tenantId = Tenant, userId = Actor, role = "TenantOwner" },
             cancellationToken, "user-already-in-tenant-rejection").ConfigureAwait(false);
         await SubmitOwnerAsync(eventStore, actorEventStoreToken, Tenant, "party", Actor,
@@ -127,6 +127,7 @@ internal static class RecoveryMailboxOwnerProvisioner
             using HttpRequestMessage request = new(HttpMethod.Get,
                 $"/api/v1/commands/status/{Uri.EscapeDataString(messageId)}");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            request.Headers.Add("X-Hexalith-Tenant", Tenant);
             using HttpResponseMessage response = await eventStore.SendAsync(request, cancellationToken).ConfigureAwait(false);
             if (response.StatusCode == HttpStatusCode.OK)
             {
@@ -163,6 +164,8 @@ internal static class RecoveryMailboxOwnerProvisioner
                     commandType = type, payload = JsonSerializer.SerializeToElement(payload) }),
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            request.Headers.Add(tenant.StartsWith("platform:", StringComparison.Ordinal)
+                ? "X-Hexalith-Scope" : "X-Hexalith-Tenant", tenant);
             using HttpResponseMessage response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
             submissionStatus = response.StatusCode;
             result = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -189,6 +192,8 @@ internal static class RecoveryMailboxOwnerProvisioner
             using HttpRequestMessage statusRequest = new(HttpMethod.Get,
                 $"/api/v1/commands/status/{Uri.EscapeDataString(correlationId)}");
             statusRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            statusRequest.Headers.Add(tenant.StartsWith("platform:", StringComparison.Ordinal)
+                ? "X-Hexalith-Scope" : "X-Hexalith-Tenant", tenant);
             using HttpResponseMessage statusResponse = await client.SendAsync(statusRequest, cancellationToken).ConfigureAwait(false);
             statusResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
             using JsonDocument status = JsonDocument.Parse(await statusResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
@@ -210,11 +215,12 @@ internal static class RecoveryMailboxOwnerProvisioner
         {
             using HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/queries")
             {
-                Content = JsonContent.Create(new { tenant = "system", domain = "global-administrators",
+                Content = JsonContent.Create(new { tenant = "platform:global-administrators", domain = "global-administrators",
                     aggregateId = "global-administrators", queryType = "get-global-administrators",
                     projectionType = "global-administrators", payload = new { pageSize = 10 } }),
             };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            request.Headers.Add("X-Hexalith-Scope", "platform:global-administrators");
             using HttpResponseMessage response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
             if (response.StatusCode == HttpStatusCode.OK) { return; }
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);

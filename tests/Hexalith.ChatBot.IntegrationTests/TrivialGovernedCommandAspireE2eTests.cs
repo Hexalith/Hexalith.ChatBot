@@ -213,7 +213,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                     {
                         if (response.StatusCode == HttpStatusCode.ServiceUnavailable &&
                             await WasOwnerCommandDefinitivelyRejectedAsync(eventStore, eventStoreActorToken,
-                                commandId, cancellationToken).ConfigureAwait(false))
+                                tenantId, commandId, cancellationToken).ConfigureAwait(false))
                         {
                             // EventStore has definitively rejected this command before storing an event.
                             // A new message ID can retry the same exact grant; an uncertain or committed
@@ -250,15 +250,15 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             "hexalith-eventstore", cancellationToken).ConfigureAwait(false);
         if (bootstrapGlobalAdmin)
         {
-            await SubmitOwnerCommandAndWaitAsync(eventStore, adminToken, "system", "global-administrators",
+            await SubmitOwnerCommandAndWaitAsync(eventStore, adminToken, "platform:global-administrators", "global-administrators",
                 "global-administrators", "BootstrapGlobalAdmin", new { userId = "admin-user" }, cancellationToken,
                 alreadySatisfiedReasonCode: "global-admin-already-bootstrapped-rejection").ConfigureAwait(false);
         }
         await WaitForCurrentGlobalAdministratorAsync(eventStore, adminToken, cancellationToken).ConfigureAwait(false);
-        await SubmitOwnerCommandAndWaitAsync(eventStore, adminToken, "system", "tenants", tenantId,
+        await SubmitOwnerCommandAndWaitAsync(eventStore, adminToken, "platform:tenants", "tenants", tenantId,
             "CreateTenant", new { tenantId, name = $"Authority {tenantId}", description = "Live owner authority evidence" },
             cancellationToken, alreadySatisfiedReasonCode: "tenant-already-exists-rejection").ConfigureAwait(false);
-        await SubmitOwnerCommandAndWaitAsync(eventStore, adminToken, "system", "tenants", tenantId,
+        await SubmitOwnerCommandAndWaitAsync(eventStore, adminToken, "platform:tenants", "tenants", tenantId,
             "AddUserToTenant", new { tenantId, userId = principalId, role = "TenantOwner" },
             cancellationToken, alreadySatisfiedReasonCode: "user-already-in-tenant-rejection").ConfigureAwait(false);
 
@@ -273,12 +273,13 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     }
 
     private static async Task<bool> WasOwnerCommandDefinitivelyRejectedAsync(
-        HttpClient eventStore, string accessToken, string commandId, CancellationToken cancellationToken)
+        HttpClient eventStore, string accessToken, string tenantId, string commandId, CancellationToken cancellationToken)
     {
         try
         {
             using HttpRequestMessage request = new(HttpMethod.Get, $"/api/v1/commands/status/{commandId}");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            request.Headers.Add("X-Hexalith-Tenant", tenantId);
             using HttpResponseMessage response = await eventStore.SendAsync(request, cancellationToken).ConfigureAwait(false);
             if (response.StatusCode != HttpStatusCode.OK)
             {
@@ -382,7 +383,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             {
                 Content = JsonContent.Create(new
                 {
-                    tenant = "system",
+                    tenant = "platform:global-administrators",
                     domain = "global-administrators",
                     aggregateId = "global-administrators",
                     queryType = "get-global-administrators",
@@ -391,6 +392,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 }),
             };
             query.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+            query.Headers.Add("X-Hexalith-Scope", "platform:global-administrators");
             using HttpResponseMessage response = await eventStore.SendAsync(query, cancellationToken).ConfigureAwait(false);
             if (response.StatusCode == HttpStatusCode.OK) { return; }
             lastStatus = response.StatusCode;
@@ -429,6 +431,8 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 }),
             };
             submit.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            submit.Headers.Add(tenant.StartsWith("platform:", StringComparison.Ordinal)
+                ? "X-Hexalith-Scope" : "X-Hexalith-Tenant", tenant);
             try
             {
                 using HttpResponseMessage response = await eventStore.SendAsync(submit, cancellationToken).ConfigureAwait(false);
@@ -470,6 +474,8 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         {
             using HttpRequestMessage statusRequest = new(HttpMethod.Get, $"/api/v1/commands/status/{correlationId}");
             statusRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            statusRequest.Headers.Add(tenant.StartsWith("platform:", StringComparison.Ordinal)
+                ? "X-Hexalith-Scope" : "X-Hexalith-Tenant", tenant);
             using HttpResponseMessage statusResponse = await eventStore.SendAsync(statusRequest, cancellationToken).ConfigureAwait(false);
             string statusBody = await statusResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             statusResponse.StatusCode.ShouldBe(HttpStatusCode.OK,

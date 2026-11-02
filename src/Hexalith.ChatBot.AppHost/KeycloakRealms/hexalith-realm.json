@@ -2002,13 +2002,17 @@
       ],
       "attributes": {
         "tenants": [
-          "tenant-alpha",
-          "system"
+          "tenant-alpha"
         ],
         "permissions": [
           "command:submit",
           "command:replay",
-          "command:query"
+          "command:query",
+          "global-administrators:bootstrap",
+          "global-administrators:read",
+          "tenants:create",
+          "tenants:add-user",
+          "tenants:read"
         ],
         "global_admin": [
           "true"
