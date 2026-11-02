@@ -390,7 +390,7 @@ All four independent layers completed: Blind Hunter returned five findings; Edge
 - [x] [Review][Patch] **R12-P1 (medium): authenticate the case-distinct proposal-metadata regression so validation is exercised** [tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs:1472]. Finding: blind-hunter B2. `TypedFacadeShouldPreserveCaseDistinctProposalMetadataKeysAtValidationBoundary` still creates an anonymous factory and expects `401 authentication_denied`. The host now rejects before reading the body, as this delta explicitly establishes. A malformed serialized proposal therefore satisfies the existing assertion without reaching the validation it claims to test. Use the existing authenticated factory and assert the typed outcome after successful contract validation; an authentication denial must fail this regression. Retain the case-distinct dictionary input and the malformed-member validation controls. The test's source predates this delta, but its loss of validation coverage accompanies the host-boundary migration this fixture change is adapting.
 - [x] [Review][Patch] **R12-P2 (low): reconcile the boundary-order test name and its live-probe explanations** [tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs:1049]. Finding: blind-hunter B4. The test still says `ShouldValidateContractBeforeAuthentication` while its new assertions and XML summary require authentication first. `tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs:948` and `:1111` also explicitly claim that contract-invalid requests return 400 before bearer authentication and cite this bootstrap test as their evidence. Rename the test and directly correct those explanations to authentication → contract validation → admission. Preserve the live probes' existing rule that 400/422 do not prove admission and neither 503 proves owner execution. No runtime behavior or new test branch is needed.
 - [x] [Review][Patch] **R12-P3 (low): describe periodic-enforcement health as authenticated** [tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs:969]. Finding: blind-hunter B5, comment claim. The newly authenticated health test retains the statement `This endpoint is anonymous`. The production route requires `ChatBotApplicationBoundaryPolicy`; change only that description while preserving every metadata-redaction assertion. The separate claim that restoring anonymous access would escape this test is rejected below.
-- [x] [Review][Defer] **R12-W1 (medium): retain the disclosed unauthenticated-command audit regression for the HTTP-host integration follow-up** [tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs:2559] — deferred: blind-hunter B1 identifies a wider host-boundary regression already acknowledged in `e89a3ac`'s commit message. With `tenantId: null`, the gateway fixture installs no synthetic principal; `ChatBotApplicationBoundaryResultHandler` returns 401 before the endpoint and never calls `IAuditWriter`. The existing test nevertheless requires one authorization-failure audit fact, including the body-derived command type, at lines 2576–2580. Those expectations cannot pass through the current handler. The root cause is the production authentication/result-handler change outside the approved two-file diff, rather than the added authenticated fixture wiring. The host follow-up must reconcile metadata-only denial auditing and its tests without reading an unauthenticated command body or merely deleting the audit requirement. Closure requires a current passing denial-audit regression and verification of the intended audit-failure behavior. No native or completion evidence is claimed.
+- [x] [Review][Defer] **R12-W1 (medium): retain the disclosed unauthenticated-command audit regression for the HTTP-host integration follow-up** [tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs:2559] — deferred: blind-hunter B1 identifies a wider host-boundary regression already acknowledged in `e89a3ac`'s commit message. With `tenantId: null`, the gateway fixture installs no synthetic principal; `ChatBotApplicationBoundaryResultHandler` returns 401 before the endpoint and never calls `IAuditWriter`. The existing test nevertheless requires one authorization-failure audit fact, including the body-derived command type, at lines 2576–2580. Those expectations cannot pass through the current handler. The root cause is the production authentication/result-handler change outside the approved two-file diff, rather than the added authenticated fixture wiring. The host follow-up must reconcile metadata-only denial auditing and its tests without reading an unauthenticated command body or merely deleting the audit requirement. Closure requires a current passing denial-audit regression and verification of the intended audit-failure behavior. No native or completion evidence is claimed. **Amended and resolved 2026-11-02 (round 15, R15-D1/R15-P3):** the user ratified a bounded denial-metadata read in place of the "without reading an unauthenticated command body" condition. The boundary reads at most 16 KiB of an `application/json` body within 250 ms and records only a canonical allowlisted `commandType`, otherwise `unknown_command`; body identity, resource and origin fields are never used. `e48e87e` restored the metadata-only boundary denial audit, R15-P1 restored the authorization-failure counter feed, and R15-P4 answers the typed dependency-unavailable 503 when the audit path fails. Evidence is in the round-15 section.
 
 Validation attempted:
 
@@ -421,7 +421,7 @@ Resumed the build workflow against preserved baseline `5bb56567499c6df1c621184d3
 
 | ID | Verdict | Route | Evidence and disposition |
 | --- | --- | --- | --- |
-| U1-B1 | medium | defer | Carried R12-W1: the HTTP authentication boundary returns before gateway denial auditing. The current full Server lane reproduces the expected-one/observed-zero audit failure. Retain its existing host-integration follow-up without reading an unauthenticated body or weakening the audit assertion. |
+| U1-B1 | medium | defer | Carried R12-W1: the HTTP authentication boundary returns before gateway denial auditing. The current full Server lane reproduces the expected-one/observed-zero audit failure. Retain its existing host-integration follow-up without reading an unauthenticated body or weakening the audit assertion. Resolved 2026-11-02 by `e48e87e` and round 15 (R15-P1, R15-P3, R15-P4); the bounded read was ratified as R15-D1. |
 | U1-B2 | medium | defer | Carried R10-W1/R11-W1: stale same-instance Started reports can still reopen Failed or replace later retry progress. The supported restart and ordering decision remain unchanged; do not reopen the accepted narrow guard or duplicate its ledger entry. |
 | U1-B3 | medium | defer | Carried R8B1: the original final receipt can overwrite workflow completion on a replay-created record. Its existing receipt-initialization/field-merge lifecycle decision remains open. |
 | U1-B4 | low | rejected | Carried BH1/EC2/R4B1/R8B4: constructor slot bounds remain intentionally looser than the live adapter. The adapter enforces the published grammar and the pure reducer is unregistered; no new consumer justifies reopening that decision. |
@@ -491,6 +491,133 @@ Rejected:
 - **R14-B5 (`false`)** — The stated order skips the boundary authorization stage. "After authentication and before admission" is still a true partial order: authentication → `ChatBotApplicationBoundaryPolicy` (EventStore's human policy) → contract validation → admission. Neither comment claims that nothing runs in between. The live remarks (`:940-942`) already list authorization among what the problem type proves.
 - **R14-B6 (`false`)** — "'Any authenticated caller' is imprecise." The wording matches the production rationale (`ChatBotCompatibilityEndpointExtensions.cs:55-59`). Limiting readers to human bearers does not change the redaction requirement, because the endpoint is externally published and not scoped to a tenant. The comment explains the assertions. It does not claim the test reads the endpoint as every possible caller.
 - **R14-B7 (`false`)** — "The redaction assertions under the rewritten comment cannot fail." The endpoint returns `PeriodicEnforcementHealthResponse.From(coordinator.Status)` (`ChatBotCompatibilityEndpointExtensions.cs:63`), an eight-member liveness record with no M2 sweep, stop-ship or evaluator-failure member. `PeriodicEnforcementCoordinatorTests.cs:752-760` seeds a WORM sweep with seven breaches plus a WORM evaluator failure count. It then asserts that the serialized liveness response carries no breach, stop-ship or coverage data, no job name and no count. The API test's assertions are also outside this comment-only delta.
+
+### Review Findings — round 15 (2026-11-02, delta code review)
+
+Code review round 15 (bmad-code-review, full mode). The user chose the recommended scope: `git diff --ignore-cr-at-eol bd14dfe 18f8301` restricted to this story's 74 File List code paths. Two test files changed: `CommandGatewayAdmissionApiE2ETests.cs` (from `e48e87e`, "fix(authentication): preserve denial audits and authenticated hub access") and `ServerBootstrapApiTests.cs` (from `18e9fce`, "fix(gateway): retain typed terminal refusals under SDK catalog guards"). The delta is +122/−3, 190 diff lines, all test code. The round-14 action items R14-P1 through R14-P6 are still unapplied, and their files have not changed. This round does not re-review the original-baseline implementation. Baseline `5bb56567499c6df1c621184d3c3d35aa45521166` and the frozen intent are unchanged. Loaded context: this spec, `epic-1-context.md` and `references/Hexalith.AI.Tools/hexalith-state-instructions.md`.
+
+All four independent layers completed, and none failed:
+
+| Layer | Findings |
+| --- | --- |
+| Blind Hunter | 13 (B1–B13) |
+| Edge Case Hunter | 10 (E1–E10) |
+| Verification Gap | none |
+| Acceptance Auditor | 5 (A1–A5) |
+
+Parent triage of the 28 raw findings: **2 decision-needed, 2 patch, 0 defer, 24 rejected**. Both decisions resolved to patches, giving **4 patches** in total.
+
+The Verification Gap layer ran current evidence at `18f8301` after `python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --configuration Debug -m:1` (0 warnings, 0 errors):
+
+- The full Server lane passed **3643/3643**: 0 failed, 0 skipped, 0 not run.
+- The three changed gateway tests passed 9/9, including all seven theory rows, twice. Four concurrent copies of the two new tests also passed 8/8 each.
+- `ServerBootstrapApiTests` passed 106/106, three times. This includes all 17 cases that use the two changed factories.
+
+Decision items:
+
+- [x] [Review][Decision] **R15-D1 (medium): the boundary denial audit reads the unauthenticated command body, which R12-W1's closure forbids** — Finding A1.
+  - R12-W1 (round 12 in this spec, plus its `deferred-work.md` reason) and U1-B1 require the follow-up to reconcile denial auditing "without reading an unauthenticated command body".
+  - `e48e87e` does read it. `ChatBotApplicationBoundaryResultHandler.ReadDeniedCommandNameAsync` (`:95-158`) reads at most 16 KiB of an `application/json` body within 250 ms. It records `commandType` only when that is a canonical allowlisted name; otherwise it records `unknown_command`.
+  - Two tests pin the body-derived `RecordGovernedNote`: the anonymous test (`CommandGatewayAdmissionApiE2ETests.cs:2585`) and the theory's challenged `normal` rows (`:2655`).
+  - Before `e89a3ac`, the gateway model-bound the whole unauthenticated body and recorded `SafeCommandName` with no allowlist. The bounded read is therefore tighter than the behaviour R12-W1 lost.
+  - **Option 1:** ratify the bounded, allowlist-only read. Amend R12-W1's closure wording and record its resolution with this round's evidence.
+  - **Option 2:** enforce the original wording. Challenged denials record `unknown_command` without touching the body. `:2585`, `:2655` and the handler unit rows that expect `RecordGovernedNote` under a challenge change to match.
+  - **Resolved 2026-11-02:** the user chose option 1, ratifying the bounded, allowlist-only read. This becomes R15-P3.
+- [x] [Review][Decision] **R15-D2 (medium): an audit outage at the boundary turns a typed 401/403 into an untyped 500** — Finding A3.
+  - `ChatBotApplicationBoundaryResultHandler.cs:72-81` lets a `RecordAuthorizationFailureAsync` exception propagate. `ChatBotApplicationBoundaryResultHandlerTests.AuditBackendFailureMustPropagateWithoutRetryOrEndpointEffects` pins that behaviour.
+  - ChatBot.Server registers no exception handler (`Program.cs:143-152`), and neither do EventStore's DomainService or ServiceDefaults. The host therefore answers an empty 500 in Production and the developer exception page in Development.
+  - Before `e89a3ac`, the same audit failure inside `ChatBotCommandAdmissionPipeline.DenyAsync` was caught by `CommandGateway.SubmitAsync` (`CommandGateway.cs:79-86`), which returned the typed dependency-unavailable 503 (catalog code `dependency_degraded`, retryable).
+  - R12-W1's closure asks for the "expected behavior when its audit path is unavailable" through the host-boundary lane. No HTTP case covers it.
+  - **Option 1:** map the boundary audit failure to the gateway's typed dependency-unavailable 503 (`dependency_degraded`) with correlation headers. Invert the unit test and add an HTTP case.
+  - **Option 2:** keep propagation as the intended fail-closed behaviour and record it in R12-W1's closure.
+  - **Option 3:** defer to a host-boundary follow-up.
+  - **Resolved 2026-11-02:** the user chose option 1, the typed dependency-unavailable 503. This becomes R15-P4.
+
+Patch items:
+
+- [x] [Review][Patch] **R15-P1 (medium): boundary denials no longer feed the authorization-failure spike counter** [src/Hexalith.ChatBot.Server/Authentication/ChatBotApplicationBoundaryResultHandler.cs:72]. Finding A2.
+  - `IAuthorizationFailureCounter` feeds the NFR43 authorization-failure spike alert. Its contract (`IAuthorizationFailureCounter.cs:3-11`) requires it to be fed "from the same code path that emits `ChatBotAuthorizationFailureAuditFact`", including the literal `unavailable` tenant.
+  - Before `e89a3ac`, anonymous submissions reached `ChatBotCommandAdmissionPipeline.DenyAsync` (`:577-603`), which records the audit fact and then calls `authorizationFailureCounter?.Record`.
+  - `e48e87e` restored the boundary audit fact but not the counter. As a result, floods of unauthenticated or forbidden-workload requests never reach spike alerting.
+  - **Fix:** after the audit write, record the tenant value the fact carries. Assert one counter reading in the anonymous test and the theory, using a recording counter registered by the test, because the hosted alert coordinator drains the production counter.
+  - The handler is outside the File List; it joins the File List if the patch is applied.
+- [x] [Review][Patch] **R15-P2 (medium): the story's completion blockers still cite 65 Server failures that no longer reproduce** [_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md:1065]. Finding A4.
+  - The failure groups under "Resumed implementation verification after source preparation recovery (2026-11-01)" (`:1031-1037`), the closeout status note under "Source-object recovery and parent closeout (2026-11-01)" (`:1065`) and R12-W1 list "65 current Server failures (62 SDK HTTP/result-body cases, two hub authentication cases and R12-W1)" as a completion blocker.
+  - At `18f8301` the full Server lane passes 3643/3643. `18e9fce` adopted the finite route-catalog receiver, and `e48e87e` restored the boundary audit and hub authentication.
+  - **Fix:** record this round's evidence against that blocker, and keep the earlier failing run as historical evidence. Record R12-W1's resolution status according to R15-D1 and R15-D2.
+  - Records only; the intent does not change.
+- [x] [Review][Patch] **R15-P3 (medium, from R15-D1): ratify the bounded denial-metadata read in R12-W1's closure and record its resolution** [_bmad-output/implementation-artifacts/deferred-work.md:2136].
+  - Amend R12-W1's "without reading an unauthenticated command body" condition, both in this spec's round-12 entry and in the ledger reason, to the ratified rule: the boundary may read at most 16 KiB of an `application/json` body within 250 ms, and it records only a canonical allowlisted `commandType`. Anything else records `unknown_command`, and no body identity, resource or origin field is ever used.
+  - Record the resolution in `e48e87e`, with evidence: the passing anonymous test, all seven theory rows, the handler unit class and the full Server lane (3643/3643).
+  - R12-W1's audit-unavailable condition closes with R15-P4.
+  - Records only.
+- [x] [Review][Patch] **R15-P4 (medium, from R15-D2): return the typed dependency-unavailable 503 when the boundary denial audit fails** [src/Hexalith.ChatBot.Server/Authentication/ChatBotApplicationBoundaryResultHandler.cs:72].
+  - Catch a non-cancellation exception from `RecordAuthorizationFailureAsync` and answer `problemDetailsFactory.CreateDependencyUnavailable(correlation.CorrelationId, correlation.TaskId)` with the correlation headers already set. This matches `CommandGateway.SubmitAsync` (`CommandGateway.cs:79-86`).
+  - Cancellation still propagates.
+  - Invert `AuditBackendFailureMustPropagateWithoutRetryOrEndpointEffects` so it expects the 503 and exactly one attempted fact, and add an HTTP case through the real host.
+  - The handler joins the File List.
+
+Applied 2026-11-02 by the user's option 1, "Apply every patch", after both decisions resolved to option 1:
+
+- **R15-P1 and R15-P4** (`ChatBotApplicationBoundaryResultHandler.cs`): a denied `POST /api/v1/commands` records the denial fact, then feeds `IAuthorizationFailureCounter` with the fact's tenant value when a counter is registered. A non-cancellation audit failure answers `CreateDependencyUnavailable`, the gateway's typed and retryable 503 (catalog code `dependency_degraded`), with the correlation headers already set. Nothing is counted in that case, and cancellation still propagates.
+- **Tests:**
+  - New test double `BoundaryAuthorizationFailureCounter`, which never drains.
+  - The anonymous test and the theory each assert one counter entry carrying the fact's tenant.
+  - The new `CommandGatewayApi_ShouldAnswerTypedDependencyUnavailableWhenBoundaryDenialAuditFails` drives an audit failure through the real host; the gateway's private audit double gains `AuthorizationFailureException`.
+  - The unit test is inverted to `AuditBackendFailureMustAnswerTypedDependencyUnavailableWithoutRetryOrEndpointEffects`, and `RecordedDenialMustFeedTheFailureCounterWithTheFactTenant` is added.
+- **R15-P2 and R15-P3** (records only):
+  - The source-recovery closeout note now carries a superseded marker with current evidence.
+  - The round-12 R12-W1 entry, the U1-B1 row and the ledger `resolution:` record the ratified bounded read and the resolution.
+  - The handler, its unit class and the new test double join the File List.
+
+Post-patch validation (evidence under `TestResults/story-1-5-r15/`, which is gitignored):
+
+- `python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --configuration Debug -m:1` exited **0** with 0 warnings and 0 errors.
+- The handler unit class (`-class Hexalith.ChatBot.Server.Tests.Authentication.ChatBotApplicationBoundaryResultHandlerTests`) passed **19/19**.
+- The four gateway boundary tests (`-method` filters) passed **10/10**, including all seven theory rows.
+- The first run failed both new tests on a wrong expectation of mine: I expected `audit_unavailable`, but the concrete factory's dependency-unavailable code is `dependency_degraded`. I corrected the tests; the production call did not change.
+- The full Server lane passed **3645/3645**, with 0 failed and 0 skipped: the 3643 tests from before the patches plus the two new tests.
+- The Conformance lane passed **151/151**.
+- The Architecture lane passed **166/167**. The one failure, `ScaffoldArchitectureTests.RootDeclaredSiblingPackageWrappersShouldDelegateVersionsToSharedBuildsCatalog`, is shared-catalog drift: `references/Hexalith.Projects/Directory.Packages.props` pins `Hexalith.EventStore.Admin.Abstractions` at 3.132.0 while the catalog says 3.132.2. This round touches neither file, and both submodules are at their recorded commits.
+- Line endings are unchanged. The handler, its unit class, the new double, this spec and `deferred-work.md` are all-CRLF; `CommandGatewayAdmissionApiE2ETests.cs` stays LF.
+
+Code-review actions: **2 decisions resolved (both option 1), 4 patches applied, 0 deferred, 24 rejected**.
+
+Story 1.5 stays spec `in-review` / sprint `review`, not the generic workflow's `done`. Completion remains gated by:
+
+- the explicit owner/workflow deferrals;
+- the unapplied R14-P1 through R14-P6 comment items;
+- A6/A13 owner/protection evidence;
+- retry-profile approval;
+- the completion evidence contract.
+
+Rejected:
+
+- **R15-B1 (`false`)** — Claim: the signed-human test overclaims owner authority. Its comment names the actual cause, the fixture's missing owner persona ("No owner persona or successful authority grant is supplied"). It claims only that the real bearer handler and human policy pass the credential to the real authentication stage, and the proxy's single `AuthenticateAsync` call pins that. It never claims that `CurrentChatBotOwnerAuthorityProvider` ran.
+- **R15-B2 (`false`)** — Claim: the test cannot prove the tenant came from the credential. Payload-derived tenant binding is pinned by the neighbouring `CommandGatewayApi_ShouldRejectCrossTenantTargetBeforeDispatchAndRecordMetadataOnlyAuditFact`. Giving this test a different body tenant would turn it into that test.
+- **R15-B3/E9 (`false`)** — Claim: the signed-human test lacks origin, correlation, category and visibility assertions. It denies through `DenyAsync`, whose response shape the same class already pins: `SurfaceOrigin` at `:1076`, `:1466`, `:1646` and the request-origin theory at `:2290`, and category and visibility in the cross-tenant test.
+- **R15-B4 (`false`)** — Claim: the 403 boundary category is never asserted. `CreateAuthorizationProblem` derives the category from the status alone (`ChatBotProblemDetailsFactory.cs:82-84`). The theory asserts the 403 status and the code, and 17 `authorization_denied` category assertions in the class pin that ternary.
+- **R15-B5/E5 (`false`)** — Claim: the 403 body is never checked for the credential tenant. That tenant is the caller's own, and `CreateAuthorizationProblem(reason, correlation, task)` has no tenant parameter, so the tenant has no way into the body.
+- **R15-B6 (`false`)** — Claim: the minted JWTs are not leak sentinels. Neither the positional `ChatBotAuthorizationFailureAuditFact` nor the authorization problem has a member that could carry a bearer token.
+- **R15-B7 (`false`)** — Claim: the replacement correlation id is never validated. The boundary's fallback is `ChatBotCorrelationId.New()` (`ChatBotCorrelationHttpContextExtensions.cs:79-82`), which `ServerBootstrapApiTests` pins. The task id is `null` by construction when the header does not parse, and the sentinel scan already rejects the unsafe header value.
+- **R15-B8 (`false`)** — Claim: channel, non-human, issuer, audience and expiry rows are missing. The audit branch depends only on challenge versus forbid (`ChatBotApplicationBoundaryResultHandler.cs:46-48`, `:66`), and the theory covers both. Per-credential outcomes belong to EventStore's human policy and to `ChatBotSignedBearerFixtureTests`, which covers signature, issuer and audience.
+- **R15-B9/E3 (`low`)** — Claim: the content-type, lone `CommandType` and non-string-value branches are untested. Every recordable name must pass the canonical allowlist, which the handler's unit rows pin (`AliceSmith`, `recordGovernedNote`). Losing any of those guards could therefore record only a canonical command name. The cases belong in the unit class, outside this delta.
+- **R15-B10 (`false`)** — Claim: the theory compares the wire code with the reason-code constant. A divergent catalog mapping would make it fail loudly, not pass silently. The handler's reason choice is pinned by `fact.ReasonCode`, and the anonymous test and the handler's unit tests use the same constant.
+- **R15-B11 (`low`)** — Claim: the 401 responses carry no `WWW-Authenticate` header. ChatBot's typed 401 has never sent it, including the gateway path before `e89a3ac`, and no ChatBot surface reads it. Adding it would change production code and the published contract, outside this test-only delta.
+- **R15-B12 (`false`)** — Claim: the factory comment is stale. "Bypass only its named route policies" is still accurate: the finite receiver bypasses nothing, and `ConfigureFiniteReceiver` documents its own purpose (`SdkRouteFixtureAuthorization.cs:21`).
+- **R15-B13 (`false`)** — Claim: the two helpers call `ConfigureFiniteReceiver` in a different order.
+  - Callers pass only `IServiceCollection` callbacks.
+  - Only `ConfigureFiniteReceiver` registers `HttpRouteCatalogFixtureFiles` or the route-catalog settings.
+
+  The order therefore has no observable effect. The parent factory that is never disposed also never builds a host.
+- **R15-E1 (`false`)** — Claim: the duplicate row cannot show which key wins. A caller can name any canonical command with a single key, so winning a duplicate gains nothing, and both values pass the same allowlist.
+- **R15-E2 (`false`)** — Claim: chunked bodies, the size boundary and the read deadline are untested. `OversizedDeniedBodyMustStayBoundedWithOrWithoutContentLength(false)` streams a body with no length and stops at 16 KiB + 1, and `StalledMetadataReadMustExpireWithOneSafeFactAndTypedDenial` pins the deadline.
+- **R15-E4 (`false`)** — Claim: the forbid branch is tested only with `normal` metadata. That branch takes identity only from `context.User`, with a constant API origin (`:66-69`). The body read returns only an allowlisted name, so no metadata variant can affect identity.
+- **R15-E6 (`low`)** — Claim: a boundary denial issues a new correlation id where the endpoint would fall back to the body's `commandId`. Only callers that omit `X-Correlation-Id` see this. Aligning the two would mean deriving correlation from the unauthenticated body, which extends R15-D1.
+- **R15-E7 (`low`)** — Claim: `RecordCount` cannot detect a reserve-then-abort sequence. The theory's rows never reach the endpoint. The final-state idiom already appears at 22 sites in this class before the delta, and a call-recording proxy would be new test infrastructure.
+- **R15-E8 (`low`)** — Claim: the signed-human 403 cannot tell which pipeline branch denied. The test's subject is that the request passes the boundary into the real authentication stage, which the proxy call pins. Telling the branches apart would need a positive-control grant or an authorizer probe.
+- **R15-E10 (`false`)** — Claim: the commit's "Use actual ordinary SDK authority" misleads readers of the factories. The factory comment (`ServerBootstrapApiTests.cs:3220-3222`) states that the named route policies are bypassed, and the commit's phrase describes `ChatBotTerminalRefusalTests` (`:35`).
+- **R15-A5 (`false`)** — Claim: the test violates the shared-file preservation rule. That rule governs Story 1.5's own resumed edits. `e48e87e` is an independent `fix(authentication)` commit that this File List delta only brings into view. The part of the claim about telling denial branches apart is R15-E8.
 
 ## Design Notes
 
@@ -981,7 +1108,7 @@ A bounded second runtime inspection used the current built outputs and the same 
 
 Parent verification confirms the full solution build and five passing lanes, all 65 disclosed Server failures, the 181-case focused pass and the independent 16-method/38-case matrix pass above. No failed test was suppressed or relabeled. Root HEAD, index gitlinks, every root-declared submodule HEAD/branch/working-tree status and every nested-submodule initialization state match the initial snapshot. The incoming user's verification section and the frozen block are preserved byte for byte. Only this story record, the append-only deferred ledger and Story 1.5's sprint stage were updated; local machine results remain ignored.
 
-Story 1.5 is spec `in-review` / sprint `review` following the completed review. Story 1.6 remains literal `review` in both artifacts. Completion remains blocked by the **65 current Server failures** (62 SDK HTTP/result-body cases, two hub authentication cases and R12-W1), the **three runtime port conflicts**, missing accepted **A6/A13 owner/protection evidence**, **retry-profile approval**, existing explicit owner/workflow decisions, and the **Story 1.5 completion contract/current bound primary evidence** (no Story 1.5 evidence contract or new attestation is present). The earlier Architecture/Conformance and missing-mailbox-secret failures did not recur. The generic build workflow's done/commit instructions are superseded by the user's explicit no-commit/no-push request and preserved completion gates: no done transition, completion attestation, runtime activation, commit or push is made.
+Story 1.5 is spec `in-review` / sprint `review` following the completed review. Story 1.6 remains literal `review` in both artifacts. Completion remains blocked by the **65 current Server failures** (62 SDK HTTP/result-body cases, two hub authentication cases and R12-W1), the **three runtime port conflicts**, missing accepted **A6/A13 owner/protection evidence**, **retry-profile approval**, existing explicit owner/workflow decisions, and the **Story 1.5 completion contract/current bound primary evidence** (no Story 1.5 evidence contract or new attestation is present). The earlier Architecture/Conformance and missing-mailbox-secret failures did not recur. The generic build workflow's done/commit instructions are superseded by the user's explicit no-commit/no-push request and preserved completion gates: no done transition, completion attestation, runtime activation, commit or push is made. **Superseded 2026-11-02 (round 15, R15-P2):** the 65-failure blocker no longer reproduces. The full Server lane passed 3643/3643 at `18f8301` and 3645/3645 after the round-15 patches; the failing run above remains historical evidence. The other completion gates listed here stand; the three runtime port conflicts were not re-verified this round.
 
 ## File List
 
@@ -1062,3 +1189,6 @@ Story 1.5 is spec `in-review` / sprint `review` following the completed review. 
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/ConditionalDaprStateClient.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/Status/RacingOperationStatusStore.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Lifecycle/OperationStatusWorkflowStatusSinkTests.cs`
+- `src/Hexalith.ChatBot.Server/Authentication/ChatBotApplicationBoundaryResultHandler.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Authentication/BoundaryAuthorizationFailureCounter.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Authentication/ChatBotApplicationBoundaryResultHandlerTests.cs`
