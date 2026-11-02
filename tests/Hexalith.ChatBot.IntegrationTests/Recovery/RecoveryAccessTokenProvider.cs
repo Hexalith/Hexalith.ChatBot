@@ -56,6 +56,22 @@ internal static class RecoveryAccessTokenProvider
         return await AcquireTokenAsync(application, fields, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Mints the recovery validator's EventStore bearer for current Party ownership.</summary>
+    public static async Task<string> AcquireEventStoreValidatorAsync(
+        DistributedApplication application,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<string, string> fields = new()
+        {
+            ["grant_type"] = "password",
+            ["client_id"] = "hexalith-eventstore",
+            ["username"] = "recovery-validator",
+            ["password"] = "recovery-validator-pass",
+            ["scope"] = "openid",
+        };
+        return await AcquireTokenAsync(application, fields, cancellationToken).ConfigureAwait(false);
+    }
+
     public static async Task<string> AcquireControlAsync(
         DistributedApplication application,
         CancellationToken cancellationToken)

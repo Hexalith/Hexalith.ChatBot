@@ -212,6 +212,8 @@ public sealed class LiveContinuityAspireE2eTests
             string controlAccessToken = await RecoveryAccessTokenProvider
                 .AcquireControlAsync(application, startup.Token)
                 .ConfigureAwait(true);
+            await RecoveryMailboxOwnerProvisioner.SeedAsync(application, mailboxAccessToken, startup.Token)
+                .ConfigureAwait(true);
             await AssertMailboxTokenAdmissionAsync(application, mailboxAccessToken, ServerDiagnostics, startup.Token)
                 .ConfigureAwait(true);
             await AssertInvalidMailboxBearerIsRejectedBeforeAdmissionAsync(application, startup.Token).ConfigureAwait(true);
