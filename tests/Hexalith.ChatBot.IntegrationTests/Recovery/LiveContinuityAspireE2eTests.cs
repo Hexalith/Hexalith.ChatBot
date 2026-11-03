@@ -1106,9 +1106,11 @@ public sealed class LiveContinuityAspireE2eTests
     /// <summary>
     /// The contract-valid mailbox admission probe body: every published <c>CaptureMailboxMessageIntake</c> member is
     /// present with its declared type, so an authenticated request passes OpenAPI validation and reaches admission.
-    /// Live admission currently refuses it with the canonical-execution <c>503</c> before dispatch. As a backstop, the
-    /// intake identity is deliberately not a ULID, so a request admitted past that refusal fails in dispatch planning
-    /// before any external write. The provider message identity embeds the command ID so a probe never shares its
+    /// Once its owner grants are seeded, live admission refuses it with the canonical-execution <c>503</c> before
+    /// dispatch. While A6/A13 stay open the gateway refuses those grants too, so the seed fails fast and the probe is
+    /// not sent (see <see cref="RecoveryMailboxOwnerProvisioner"/>). As a backstop, the intake identity is
+    /// deliberately not a ULID, so a request admitted past that refusal fails in dispatch planning before any
+    /// external write. The provider message identity embeds the command ID so a probe never shares its
     /// mailbox-intake deduplication key with an earlier run against the same persistent state store.
     /// </summary>
     /// <param name="commandId">The caller-stable command identifier.</param>

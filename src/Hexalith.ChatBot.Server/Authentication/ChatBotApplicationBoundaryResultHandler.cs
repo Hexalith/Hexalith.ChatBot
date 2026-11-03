@@ -90,11 +90,11 @@ internal sealed class ChatBotApplicationBoundaryResultHandler : IAuthorizationMi
             }
             catch (Exception exception) when (exception is not OperationCanceledException || !context.RequestAborted.IsCancellationRequested)
             {
-                // A request abort propagates whatever the audit store raised for it (cancellation or a transport
-                // failure), so nothing is written to the aborted response. Any other failure, including the store's
-                // own cancellation, is an unavailable audit path that must not become an untyped host failure. Like
-                // the gateway's admission path, answer the typed, retryable dependency-unavailable outcome; the
-                // denied request has no effect.
+                // A request abort propagates as the request's cancellation, whatever the audit store raised for it
+                // (cancellation or a transport failure), so nothing is written to the aborted response. Any other
+                // failure, including the store's own cancellation, is an unavailable audit path that must not become
+                // an untyped host failure: answer the typed, retryable dependency-unavailable outcome, as the gateway's
+                // admission path does for a non-cancellation audit failure. The denied request has no effect.
                 context.RequestAborted.ThrowIfCancellationRequested();
                 await CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
                         problemDetailsFactory.CreateDependencyUnavailable(correlation.CorrelationId, correlation.TaskId)))

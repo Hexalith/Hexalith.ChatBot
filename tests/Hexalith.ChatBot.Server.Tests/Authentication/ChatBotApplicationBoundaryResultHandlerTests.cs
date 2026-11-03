@@ -199,16 +199,19 @@ public sealed class ChatBotApplicationBoundaryResultHandlerTests
     public async Task AuditBackendFailureMustAnswerTypedDependencyUnavailableWithoutRetryOrEndpointEffects(string failureKind)
     {
         // A store that raises its own cancellation (for example a client timeout) while the request is still live is
-        // an audit outage, not a request abort.
+        // an audit outage, not a request abort. Like Kestrel's, the request token can be cancelled but never is here.
+        using CancellationTokenSource live = new();
         BoundaryAuditWriter audit = new(failureKind == "store-cancellation"
             ? new OperationCanceledException("restricted-audit-backend")
             : new InvalidOperationException("restricted-audit-backend"));
         BoundaryAuthorizationFailureCounter failureCounter = new();
         using ServiceProvider services = Services(audit, failureCounter);
         DefaultHttpContext context = Context(services);
+        context.RequestAborted = live.Token;
 
         await DenyAsync(context);
 
+        context.RequestAborted.CanBeCanceled.ShouldBeTrue();
         context.RequestAborted.IsCancellationRequested.ShouldBeFalse();
         context.Response.StatusCode.ShouldBe(StatusCodes.Status503ServiceUnavailable);
         ChatBotAuthorizationFailureAuditFact fact = audit.Facts.ShouldHaveSingleItem();
