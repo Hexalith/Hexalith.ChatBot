@@ -26,9 +26,12 @@ public sealed class ChatBotApplicationBoundaryResultHandlerTests
     [Fact]
     public async Task StalledMetadataReadMustExpireWithOneSafeFactAndTypedDenial()
     {
+        // Like Kestrel's, the request token can be cancelled but never is here, so only the read deadline expires.
+        using CancellationTokenSource live = new();
         BoundaryAuditWriter audit = new();
         using ServiceProvider services = Services(audit);
         DefaultHttpContext context = Context(services);
+        context.RequestAborted = live.Token;
         TaskCompletionSource<int> pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
         CancellationToken readToken = default;
         using BoundaryRequestBodyStream body = new(token =>
@@ -42,6 +45,7 @@ public sealed class ChatBotApplicationBoundaryResultHandlerTests
             await DenyAsync(context).WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
 
             readToken.IsCancellationRequested.ShouldBeTrue();
+            context.RequestAborted.CanBeCanceled.ShouldBeTrue();
             context.RequestAborted.IsCancellationRequested.ShouldBeFalse();
             AssertSafeMetadataDenial(context, audit, AuditMetadata.UnknownCommandName);
         }
@@ -198,11 +202,12 @@ public sealed class ChatBotApplicationBoundaryResultHandlerTests
     [InlineData("store-cancellation")]
     public async Task AuditBackendFailureMustAnswerTypedDependencyUnavailableWithoutRetryOrEndpointEffects(string failureKind)
     {
-        // A store that raises its own cancellation (for example a client timeout) while the request is still live is
-        // an audit outage, not a request abort. Like Kestrel's, the request token can be cancelled but never is here.
+        // A store that raises its own cancellation (here a client timeout on the store's own, already cancelled token)
+        // while the request is still live is an audit outage, not a request abort. Like Kestrel's, the request token
+        // can be cancelled but never is here.
         using CancellationTokenSource live = new();
         BoundaryAuditWriter audit = new(failureKind == "store-cancellation"
-            ? new OperationCanceledException("restricted-audit-backend")
+            ? new TaskCanceledException("restricted-audit-backend", new TimeoutException(), new CancellationToken(canceled: true))
             : new InvalidOperationException("restricted-audit-backend"));
         BoundaryAuthorizationFailureCounter failureCounter = new();
         using ServiceProvider services = Services(audit, failureCounter);

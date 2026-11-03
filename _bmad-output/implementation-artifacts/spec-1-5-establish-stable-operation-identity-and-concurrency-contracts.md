@@ -902,6 +902,86 @@ Rejected:
 - **R18-A2 (procedural)** — Claim: the round-14 and round-16 closing paragraphs still say the items "stay unchecked" and list them as completion gates. Fixing them would edit the spec's history. This round's record restates the current gates instead.
 - **R18-A4 (`low`)** — Claim: R16-P2's recorded mutant ("without the `when` filter") does not fail against the shipped catch. This is true: because the catch starts with `ThrowIfCancellationRequested()`, the filter's abort clause only preserves the original exception instance. The recorded mutant ran against the pre-patch catch. The R16-P2 behaviour, no 503 for an abort during the write, is still pinned, because the pre-patch catch fails the `transport` row. Correcting the record would edit the spec's history.
 
+### Review Findings — round 19 (2026-11-03, R18-patch review)
+
+Code review round 19 (bmad-code-review, full mode). The user confirmed the recommended scope: only the round-18 patch commit `3d8293a` ("test(authentication): apply story 1.5 review round 18 patches"). The range is `git diff --ignore-cr-at-eol 8ea98fb 3d8293a -- src tests`: 3 files, +14/−9, 65 diff lines. Nothing on `src` or `tests` changed after `3d8293a`; `HEAD` (`9b2d3ab`) only moves 13 submodule pointers. The commit's spec and ledger records were not reviewed as code:
+
+- `ChatBotApplicationBoundaryResultHandler.cs` (R18-P1, R18-P2)
+- `LiveContinuityAspireE2eTests.cs` (R18-P3)
+- `ChatBotApplicationBoundaryResultHandlerTests.cs` (R18-P4)
+
+Baseline `5bb56567499c6df1c621184d3c3d35aa45521166` and the frozen intent are unchanged. Loaded context: this spec, `epic-1-context.md` and `references/Hexalith.AI.Tools/hexalith-state-instructions.md`.
+
+All four independent layers completed, and none failed:
+
+| Layer | Findings |
+| --- | --- |
+| Blind Hunter | 8 (B1–B8) |
+| Edge Case Hunter | 3 (E1–E3) |
+| Verification Gap | none |
+| Acceptance Auditor | no acceptance violations; 2 nits (A1, A2) |
+
+Parent triage of the 13 raw findings: **0 decision-needed, 3 patch, 0 defer, 10 rejected**. Every surviving entry is low. The Acceptance Auditor confirmed that R18-P1 through R18-P4 are applied as recorded, that the only `src` change is a comment, and that line endings, the File List and the status are intact.
+
+Verified facts:
+
+- The gateway's admission path does not answer every non-cancellation audit failure the same way. The outcome depends on which write fails and where:
+  - Denial audits raised before the outcome block (`ChatBotCommandAdmissionPipeline.cs:86-318`, outside the classifier and status-lookup `try` blocks) escape to `CommandGateway.SubmitAsync:83` and answer `CreateDependencyUnavailable` (`dependency_degraded`).
+  - A precommit audit failure (`:350`, `:380`) or the lapsed-authority denial audit at `:404` is caught at `:409` as `Rejected(AuditUnavailable)`, which `CommandGateway.Denied` (`:326-328`) answers with `CreateAuditUnavailable` (`audit_unavailable`).
+  - The lapsed-authority denial audit at `:343` is caught at `:409` as `idempotency_outcome_unavailable`.
+- Two rows pin the metadata-read deadline filter (`ChatBotApplicationBoundaryResultHandler.cs:152`, `catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)`):
+  - `StalledMetadataReadMustExpireWithOneSafeFactAndTypedDenial` runs on `CancellationToken.None`.
+  - `RequestAbortedDuringMetadataReadMustPropagateWithoutAudit` runs on a cancelled token.
+  - A `!cancellationToken.CanBeCanceled` mutant passes both.
+- `ValidateAtomicParticipationAsync` (`ChatBotAdmissionEvidenceValidator.cs:372-379`) still refuses every profile from a single method body.
+- No `src` code compares the token of an `OperationCanceledException` by identity, and no `src` comment cites a review-ledger ID.
+
+- [x] [Review][Patch] **R19-P1 (low): the narrowed gateway-parity clause still claims a parity the gateway does not have** [src/Hexalith.ChatBot.Server/Authentication/ChatBotApplicationBoundaryResultHandler.cs:96]. Finding E3.
+  - The comment says the handler answers dependency-unavailable "as the gateway's admission path does for a non-cancellation audit failure".
+  - Only the gateway's early denial audits answer dependency-unavailable. A precommit audit failure, or the lapsed-authority denial audit inside the outcome block, answers `audit_unavailable` or `idempotency_outcome_unavailable` (see the verified facts).
+  - A reader closing R18-W1 would take the clause as gateway-wide parity.
+  - **Fix:** delete the comparison, so the sentence ends at "answer the typed, retryable dependency-unavailable outcome". The gateway side stays tracked as R18-W1. Comment-only.
+  - Applied 2026-11-03: the comparison is deleted, and the paragraph now ends "answer the typed, retryable dependency-unavailable outcome. The denied request has no effect." Comment-only.
+- [x] [Review][Patch] **R19-P2 (low): the store-cancellation row does not model the client timeout its comment names** [tests/Hexalith.ChatBot.Server.Tests/Authentication/ChatBotApplicationBoundaryResultHandlerTests.cs:205]. Finding B6.
+  - The row throws `new OperationCanceledException("restricted-audit-backend")`, whose token is `CancellationToken.None`. An `HttpClient` timeout instead raises a `TaskCanceledException` with an inner `TimeoutException`, carrying its own cancelled token.
+  - A filter mutant that classifies by the exception's own token (`oce.CancellationToken.IsCancellationRequested`) passes every current row. In production that mutant would turn a store timeout on a live request into an untyped 500, which breaks the R16-P1 rule.
+  - **Fix:** in that row, throw `new TaskCanceledException("restricted-audit-backend", new TimeoutException(), new CancellationToken(canceled: true))`. Test-only. The row still models a store-raised cancellation on a live request.
+  - Applied 2026-11-03: the row throws that `TaskCanceledException`, and its comment now names the store's own, already cancelled token. A throwaway mutant whose audit filter classifies by the exception's own token (`exception is not OperationCanceledException oce || !oce.CancellationToken.IsCancellationRequested`) passes all 23 rows at `3d8293a` and fails this row.
+- [x] [Review][Patch] **R19-P3 (low): the stalled-read row still runs on a token that can never be cancelled** [tests/Hexalith.ChatBot.Server.Tests/Authentication/ChatBotApplicationBoundaryResultHandlerTests.cs:45]. Finding B4.
+  - R18-P4 bound a live token only for the audit-outage rows. `StalledMetadataReadMustExpireWithOneSafeFactAndTypedDenial` still runs on `CancellationToken.None`, so its `IsCancellationRequested.ShouldBeFalse()` is vacuous.
+  - A `!cancellationToken.CanBeCanceled` deadline-filter mutant survives every row (see the verified facts). Kestrel's token is always cancellable, so in production that mutant would turn every stalled read into an untyped failure instead of the ratified bounded deadline (R15-D1).
+  - **Fix:** as R18-P4 did, bind `context.RequestAborted` in that row to a live `CancellationTokenSource` that is never cancelled, and assert `CanBeCanceled`. Test-only.
+  - Applied 2026-11-03: the row binds `RequestAborted` to a live, never-cancelled token and asserts `CanBeCanceled` before `IsCancellationRequested`. A throwaway `!cancellationToken.CanBeCanceled` deadline-filter mutant passes all 23 rows at `3d8293a` and fails this row.
+
+On 2026-11-03 the user chose option 1, "Apply every patch". Code-review actions: **0 decision-needed, 3 patches applied (R19-P1 through R19-P3), 0 deferred, 10 rejected**. Story 1.5 stays spec `in-review` / sprint `review`, not the generic workflow's `done`. The completion gates restated in round 18 are unchanged:
+
+- the explicit owner/workflow deferrals;
+- A6/A13 owner/protection evidence;
+- retry-profile approval;
+- the completion evidence contract.
+
+Patch validation (2026-11-03):
+
+- `python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --configuration Debug -m:1` succeeded with 0 warnings and 0 errors.
+- `-class …Authentication.ChatBotApplicationBoundaryResultHandlerTests`: 23/23 passed.
+- Sensitivity check: both throwaway mutants were applied to the handler together.
+  - The patched class failed exactly the two target rows: the `store-cancellation` row and `StalledMetadataReadMustExpireWithOneSafeFactAndTypedDenial`.
+  - The `3d8293a` class passed 23/23 against the same mutants.
+  - The patched handler and tests were then restored byte for byte and rebuilt, and the class passed 23/23 again.
+- The full Server lane was not rerun: the production change is comment-only, and only the handler test class changed. IntegrationTests were not rebuilt, because no file in that project changed.
+
+Changed files: `ChatBotApplicationBoundaryResultHandler.cs` (R19-P1) and `ChatBotApplicationBoundaryResultHandlerTests.cs` (R19-P2, R19-P3). Both are already on the File List, and both are still fully CRLF (188 and 323 lines).
+
+Rejected:
+
+- **R19-B1/E2 (`false`)** — Claim: "a request abort propagates as the request's cancellation" is wrong when the store raises a cancellation on an aborted request, because the store's own exception then propagates with its own token. What propagates is still a cancellation caused by the request abort, which is what the sentence says. The claimed harm needs a caller that compares token identity. No `src` code does that, and ASP.NET Core classifies aborts by the request's state.
+- **R19-B2/A1 (`maybe-false`, would be `low`)** — Claim: "Once its owner grants are seeded, live admission refuses it with the canonical-execution `503`" names a precondition that rules out its own outcome, because the gate that refuses the grants is the same one that would produce the 503. Whether that holds depends on how A6/A13 open: the gate could be lifted for every profile at once or one profile at a time, or a seeding route outside the gateway could appear (R17-W1). The live predicate accepts both outcomes, and the summary's backstop sentence covers admission past the refusal. Revisit with R17-W5.
+- **R19-B3/A2 (`false`)** — Claim: the `AssertMailboxTokenAdmissionAsync` remarks (`LiveContinuityAspireE2eTests.cs:946`) still state the outcome that R18-P3 made conditional. The remarks describe the response that a probe reaching admission gets, which matches production today: `ValidateAtomicParticipationAsync` refuses every profile. They do not claim that the lane sends the probe.
+- **R19-B5 (`false`)** — Claim: the new `CanBeCanceled` assertion checks the arrange step, not the handler. That is its purpose: it fails if a later edit drops the live-token binding the row depends on. It has no other effect.
+- **R19-B7 (`low`)** — Claim: the parity sentence should point to deferred R18-W1. No `src` comment cites a review-ledger ID; the ledger entry is where it is tracked. R19-P1 deletes the sentence anyway.
+- **R19-B8 (`low`)** — Claim: R18-P3 adds LF lines to a file that `.editorconfig` requires to be CRLF. The mixed endings predate the change (316 CRLF lines out of 1,161), and R18-P3 kept the edited block's existing endings. No build or format gate enforces line endings. Normalising the whole file would rewrite about 845 lines, which is not a direct correction to this delta.
+- **R19-E1 (`low`)** — Claim: an audit outage on the 503 path leaves no log or alert. Same as R16-B3/E7/A4 and R18-B6/E2: latent, because `InMemoryAuditWriter` cannot fail, and adding a logger dependency is more than a direct correction. Revisit with R18-W1's durable-writer trigger.
+
 ## Design Notes
 
 GetWorkflowOperationStatus uses the existing typed GetOperationStatus boundary. RetryCommandExecution is distinct from legacy RequestFailedWorkflowRetry; this story supplies its prerequisites. No migrations, deployments or external effects. Preserve historical OperationId values exactly.
