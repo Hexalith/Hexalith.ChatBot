@@ -6,7 +6,8 @@ namespace Hexalith.ChatBot.Server.Tests.Authentication;
 
 /// <summary>Records denial facts and refuses every precommit or postcommit effect.</summary>
 /// <param name="failure">An optional real audit-backend failure to propagate.</param>
-internal sealed class BoundaryAuditWriter(Exception? failure = null) : IAuditWriter
+/// <param name="duringWrite">An optional effect that runs inside the write, after the fact is attempted.</param>
+internal sealed class BoundaryAuditWriter(Exception? failure = null, Action? duringWrite = null) : IAuditWriter
 {
     /// <summary>The denial facts attempted by the handler.</summary>
     public List<ChatBotAuthorizationFailureAuditFact> Facts { get; } = [];
@@ -16,6 +17,7 @@ internal sealed class BoundaryAuditWriter(Exception? failure = null) : IAuditWri
     {
         cancellationToken.ThrowIfCancellationRequested();
         Facts.Add(fact);
+        duringWrite?.Invoke();
         return failure is null ? ValueTask.CompletedTask : ValueTask.FromException(failure);
     }
 

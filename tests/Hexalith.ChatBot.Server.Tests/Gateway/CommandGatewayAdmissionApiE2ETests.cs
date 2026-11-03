@@ -2710,6 +2710,9 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeTrue();
         problem.RootElement.GetProperty("correlationId").GetString().ShouldBe(fact.CorrelationId);
         response.Headers.GetValues("X-Correlation-Id").Single().ShouldBe(fact.CorrelationId);
+        fact.TaskId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        response.Headers.GetValues("X-Hexalith-Task-Id").Single().ShouldBe(fact.TaskId);
+        problem.RootElement.GetProperty("taskId").GetString().ShouldBe(fact.TaskId);
         body.ShouldNotContain("restricted-audit-backend");
         body.ShouldNotContain("restricted-project-sentinel");
         failureCounter.Tenants.ShouldBeEmpty();

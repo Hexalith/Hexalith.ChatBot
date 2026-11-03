@@ -176,10 +176,11 @@ public sealed class LiveContinuityAspireE2eContractTests
         => LiveContinuityAspireE2eTests.IsPostAuthorizationUnavailableProblem(problemDetails).ShouldBe(expected);
 
     /// <summary>
-    /// The live mailbox-bearer probes are only meaningful when their body passes the OpenAPI request contract, which is
-    /// validated after authentication and before admission: an authenticated contract-invalid body answers the
-    /// validation 400, which proves authentication but nothing about admission. Drives the PRODUCTION request adapter
-    /// over the exact probe body.
+    /// The live authenticated admission probe is only meaningful when its body passes the OpenAPI request contract,
+    /// which is validated after authentication and before admission: an authenticated contract-invalid body answers
+    /// the validation 400, which proves authentication but nothing about admission. The forged-bearer probe's 401
+    /// precedes validation and does not depend on the body. Drives the PRODUCTION request adapter over the exact
+    /// probe body.
     /// </summary>
     [Fact]
     public async Task MailboxAdmissionProbeBodyShouldPassTheProductionRequestContract()

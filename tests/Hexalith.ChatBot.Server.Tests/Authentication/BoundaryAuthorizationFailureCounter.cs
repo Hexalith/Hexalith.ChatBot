@@ -2,7 +2,7 @@ using Hexalith.ChatBot.Server.Gateway;
 
 namespace Hexalith.ChatBot.Server.Tests.Authentication;
 
-/// <summary>Records every failure-counter feed and never drains, so a hosted alert reader cannot hide one.</summary>
+/// <summary>Records each fed tenant in feed order and reports no readings; the fed timestamp is not kept.</summary>
 internal sealed class BoundaryAuthorizationFailureCounter : IAuthorizationFailureCounter
 {
     private readonly Lock _gate = new();

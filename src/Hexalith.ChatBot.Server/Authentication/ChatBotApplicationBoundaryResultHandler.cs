@@ -61,6 +61,10 @@ internal sealed class ChatBotApplicationBoundaryResultHandler : IAuthorizationMi
             string.Equals(endpoint.RoutePattern.RawText, "/api/v1/commands", StringComparison.OrdinalIgnoreCase) &&
             HttpMethods.IsPost(context.Request.Method))
         {
+            // A missing audit writer is a host misconfiguration, not an audit outage, so it is resolved before the
+            // catch below can answer it as a retryable dependency-unavailable outcome.
+            IAuditWriter auditWriter = context.RequestServices.GetRequiredService<IAuditWriter>();
+
             // Only validated transport identity can name the caller. Body identity, resource and origin fields are
             // never authority, and a challenge must stay anonymous even if another identity was attached upstream.
             ChatBotRequestContext? actor = null;
@@ -73,7 +77,7 @@ internal sealed class ChatBotApplicationBoundaryResultHandler : IAuthorizationMi
             string tenantId = actor?.TenantId ?? "unavailable";
             try
             {
-                await context.RequestServices.GetRequiredService<IAuditWriter>()
+                await auditWriter
                     .RecordAuthorizationFailureAsync(new ChatBotAuthorizationFailureAuditFact(
                         tenantId,
                         actor?.SubjectId ?? "anonymous",
@@ -84,10 +88,14 @@ internal sealed class ChatBotApplicationBoundaryResultHandler : IAuthorizationMi
                         "api"), context.RequestAborted)
                     .ConfigureAwait(false);
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (Exception exception) when (exception is not OperationCanceledException || !context.RequestAborted.IsCancellationRequested)
             {
-                // An unavailable audit path must not become an untyped host failure. Like the gateway's admission
-                // path, answer the typed, retryable dependency-unavailable outcome; the denied request has no effect.
+                // A request abort propagates whatever the audit store raised for it (cancellation or a transport
+                // failure), so nothing is written to the aborted response. Any other failure, including the store's
+                // own cancellation, is an unavailable audit path that must not become an untyped host failure. Like
+                // the gateway's admission path, answer the typed, retryable dependency-unavailable outcome; the
+                // denied request has no effect.
+                context.RequestAborted.ThrowIfCancellationRequested();
                 await CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
                         problemDetailsFactory.CreateDependencyUnavailable(correlation.CorrelationId, correlation.TaskId)))
                     .ExecuteAsync(context)

@@ -7,6 +7,7 @@ using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Tests.Audit;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Policy;
@@ -155,16 +156,60 @@ public sealed class ChatBotApplicationBoundaryResultHandlerTests
         audit.Facts.ShouldBeEmpty();
     }
 
-    [Fact]
-    public async Task AuditBackendFailureMustAnswerTypedDependencyUnavailableWithoutRetryOrEndpointEffects()
+    [Theory]
+    [InlineData("cancellation")]
+    [InlineData("transport")]
+    public async Task RequestAbortedDuringAuditWriteMustPropagateWithoutResponseOrCounter(string failureKind)
     {
-        BoundaryAuditWriter audit = new(new InvalidOperationException("restricted-audit-backend"));
+        using CancellationTokenSource aborted = new();
+        Exception failure = failureKind == "transport"
+            ? new IOException("restricted-audit-transport")
+            : new OperationCanceledException(aborted.Token);
+        BoundaryAuditWriter audit = new(failure, aborted.Cancel);
+        BoundaryAuthorizationFailureCounter failureCounter = new();
+        using ServiceProvider services = Services(audit, failureCounter);
+        DefaultHttpContext context = Context(services);
+        context.RequestAborted = aborted.Token;
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(() => DenyAsync(context));
+
+        // The write ran and the caller aborted inside it, so nothing may be written to the aborted response.
+        _ = audit.Facts.ShouldHaveSingleItem();
+        context.Response.StatusCode.ShouldNotBe(StatusCodes.Status503ServiceUnavailable);
+        context.Response.Body.Length.ShouldBe(0);
+        failureCounter.Tenants.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task MissingAuditWriterMustFailAsHostMisconfigurationRatherThanTypedOutage()
+    {
+        using ServiceProvider services = Services(audit: null);
+        DefaultHttpContext context = Context(services);
+
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(() => DenyAsync(context));
+
+        exception.Message.ShouldContain(nameof(IAuditWriter));
+        context.Response.StatusCode.ShouldNotBe(StatusCodes.Status503ServiceUnavailable);
+        context.Response.Body.Length.ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData("backend")]
+    [InlineData("store-cancellation")]
+    public async Task AuditBackendFailureMustAnswerTypedDependencyUnavailableWithoutRetryOrEndpointEffects(string failureKind)
+    {
+        // A store that raises its own cancellation (for example a client timeout) while the request is still live is
+        // an audit outage, not a request abort.
+        BoundaryAuditWriter audit = new(failureKind == "store-cancellation"
+            ? new OperationCanceledException("restricted-audit-backend")
+            : new InvalidOperationException("restricted-audit-backend"));
         BoundaryAuthorizationFailureCounter failureCounter = new();
         using ServiceProvider services = Services(audit, failureCounter);
         DefaultHttpContext context = Context(services);
 
         await DenyAsync(context);
 
+        context.RequestAborted.IsCancellationRequested.ShouldBeFalse();
         context.Response.StatusCode.ShouldBe(StatusCodes.Status503ServiceUnavailable);
         ChatBotAuthorizationFailureAuditFact fact = audit.Facts.ShouldHaveSingleItem();
         string response = Encoding.UTF8.GetString(((MemoryStream)context.Response.Body).ToArray());
@@ -180,15 +225,20 @@ public sealed class ChatBotApplicationBoundaryResultHandlerTests
     [Fact]
     public async Task RecordedDenialMustFeedTheFailureCounterWithTheFactTenant()
     {
+        // The production sliding-window counter prunes against the server clock, so a default or stale feed
+        // timestamp would yield no reading (or throw) instead of this one.
+        DateTimeOffset now = new(2026, 3, 14, 9, 26, 53, TimeSpan.Zero);
+        WormAuditTestData.FixedClock clock = new(now);
         BoundaryAuditWriter audit = new();
-        BoundaryAuthorizationFailureCounter failureCounter = new();
-        using ServiceProvider services = Services(audit, failureCounter);
+        InMemoryAuthorizationFailureCounter failureCounter = new(clock);
+        using ServiceProvider services = Services(audit, failureCounter, clock);
         DefaultHttpContext context = Context(services);
 
         await DenyAsync(context);
 
         AssertSafeMetadataDenial(context, audit, AuditMetadata.UnknownCommandName);
-        failureCounter.Tenants.ShouldBe([audit.Facts.ShouldHaveSingleItem().TenantId]);
+        failureCounter.ReadAndReset().ShouldHaveSingleItem()
+            .ShouldBe(new AuthorizationFailureReading(audit.Facts.ShouldHaveSingleItem().TenantId, 1, now));
     }
 
     [Fact]
@@ -205,14 +255,21 @@ public sealed class ChatBotApplicationBoundaryResultHandlerTests
         audit.Facts.ShouldBeEmpty();
     }
 
-    private static ServiceProvider Services(BoundaryAuditWriter audit, BoundaryAuthorizationFailureCounter? failureCounter = null)
+    private static ServiceProvider Services(
+        BoundaryAuditWriter? audit,
+        IAuthorizationFailureCounter? failureCounter = null,
+        ISystemClock? clock = null)
     {
         IServiceCollection services = new ServiceCollection().AddLogging()
-            .AddSingleton<IAuditWriter>(audit)
             .AddSingleton<IChatBotProblemDetailsFactory>(new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry()));
+        if (audit is not null)
+        {
+            _ = services.AddSingleton<IAuditWriter>(audit);
+        }
+
         if (failureCounter is not null)
         {
-            _ = services.AddSingleton<IAuthorizationFailureCounter>(failureCounter).AddSingleton<ISystemClock>(new SystemClock());
+            _ = services.AddSingleton<IAuthorizationFailureCounter>(failureCounter).AddSingleton<ISystemClock>(clock ?? new SystemClock());
         }
 
         return services.BuildServiceProvider();
