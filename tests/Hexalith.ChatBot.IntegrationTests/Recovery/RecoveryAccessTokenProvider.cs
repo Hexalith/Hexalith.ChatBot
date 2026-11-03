@@ -57,18 +57,16 @@ internal static class RecoveryAccessTokenProvider
     }
 
     /// <summary>Mints the recovery validator's EventStore bearer for current Party ownership.</summary>
+    /// <param name="application">The composed topology.</param>
+    /// <param name="cancellationToken">Cancels acquisition.</param>
+    /// <returns>The validator's bearer issued for the EventStore client.</returns>
     public static async Task<string> AcquireEventStoreValidatorAsync(
         DistributedApplication application,
         CancellationToken cancellationToken)
     {
-        Dictionary<string, string> fields = new()
-        {
-            ["grant_type"] = "password",
-            ["client_id"] = "hexalith-eventstore",
-            ["username"] = "recovery-validator",
-            ["password"] = "recovery-validator-pass",
-            ["scope"] = "openid",
-        };
+        // Same fixture identity as the ChatBot validator token; the EventStore API validates its own client's tokens.
+        Dictionary<string, string> fields = RecoveryValidatorIdentity.CreateTokenRequestFields();
+        fields["client_id"] = "hexalith-eventstore";
         return await AcquireTokenAsync(application, fields, cancellationToken).ConfigureAwait(false);
     }
 

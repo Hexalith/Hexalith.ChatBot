@@ -172,7 +172,9 @@ public sealed class LiveContinuityAspireE2eTests
             // token loop and the writer-protocol activation are each budgeted at 3 minutes, and four resource-health
             // waits plus two further token loops follow. A 5-minute deadline was already exceeded by the first two
             // steps alone, so the lane could expire mid-provisioning and surface a bare OperationCanceledException.
-            startup.CancelAfter(TimeSpan.FromMinutes(15));
+            // The mailbox owner seed runs under the same deadline with its own bounded budget, reserved on top so it
+            // cannot consume the provisioning steps' share and reports its own timeout with the step it reached.
+            startup.CancelAfter(TimeSpan.FromMinutes(15) + RecoveryMailboxOwnerProvisioner.SeedBudget);
             internalGrpcReservations.Release();
             httpReservations.Release();
             await application.StartAsync(startup.Token).ConfigureAwait(true);
@@ -1094,6 +1096,12 @@ public sealed class LiveContinuityAspireE2eTests
             or HttpStatusCode.InsufficientStorage;
 
     /// <summary>
+    /// The probe's fixed intake identity: deliberately not a ULID so an admitted probe fails in dispatch planning, and
+    /// the exact resource <see cref="RecoveryMailboxOwnerProvisioner"/> seeds the mailbox operation grant for.
+    /// </summary>
+    internal const string MailboxAdmissionProbeIntakeId = "not-a-ulid";
+
+    /// <summary>
     /// The contract-valid mailbox admission probe body: every published <c>CaptureMailboxMessageIntake</c> member is
     /// present with its declared type, so an authenticated request passes OpenAPI validation and reaches admission,
     /// while the intake identity is deliberately not a ULID so an admitted request fails in dispatch planning before
@@ -1105,7 +1113,7 @@ public sealed class LiveContinuityAspireE2eTests
     /// <returns>The JSON request body.</returns>
     internal static string MailboxAdmissionProbeBody(string commandId)
         => $$"""
-            {"commandId":"{{commandId}}","commandType":"CaptureMailboxMessageIntake","command":{"intakeId":"not-a-ulid","source":{"providerMessageId":"recovery-admission-probe-{{commandId}}","internetMessageId":"<recovery-admission-probe-{{commandId}}@example.test>","conversationId":"recovery-admission-probe-{{commandId}}","threadId":null,"mailboxId":"recovery-admission-probe","sender":{"address":"probe@example.test","displayName":null},"receivedAt":"2026-08-01T00:00:00Z","sentAt":null,"createdAt":null,"sourceTimezone":null,"sourceContext":"mailbox:metadata","sourceSchemaVersion":1},"recipients":[],"attachments":[]},"origin":"mailbox","requestSchemaVersion":"v1"}
+            {"commandId":"{{commandId}}","commandType":"CaptureMailboxMessageIntake","command":{"intakeId":"{{MailboxAdmissionProbeIntakeId}}","source":{"providerMessageId":"recovery-admission-probe-{{commandId}}","internetMessageId":"<recovery-admission-probe-{{commandId}}@example.test>","conversationId":"recovery-admission-probe-{{commandId}}","threadId":null,"mailboxId":"recovery-admission-probe","sender":{"address":"probe@example.test","displayName":null},"receivedAt":"2026-08-01T00:00:00Z","sentAt":null,"createdAt":null,"sourceTimezone":null,"sourceContext":"mailbox:metadata","sourceSchemaVersion":1},"recipients":[],"attachments":[]},"origin":"mailbox","requestSchemaVersion":"v1"}
             """;
 
     /// <summary>

@@ -692,6 +692,111 @@ Rejected:
 - **R16-E8 (`false`)** — Claim: resolving the problem-details factory before the audit means a factory failure leaves the denial unaudited. The factory is a registered singleton that both outcomes need, and its resolution had to move above the `try` so that the catch can use it. No reachable failure has been shown.
 - **R16-A5 (`false`)** — Claim: the handler summary and the `IAuthorizationFailureCounter` summary are stale. The handler still turns a refused boundary policy into typed, metadata-only problem details, and its summary never listed the audit side effect either. The counter's "fed … from the same code path that emits `ChatBotAuthorizationFailureAuditFact`" stays true, because the boundary emits that fact, and the file still lives beside the gateway authorization seam. No harm has been named.
 
+### Review Findings — round 17 (2026-11-03, delta + callee code review)
+
+Code review round 17 (bmad-code-review, full mode). The user chose "Delta + callee": `git diff --ignore-cr-at-eol 9152a9e..HEAD` restricted to this story's 77 File List code paths, plus the two Recovery helpers that the new call runs. Only `19ae0ce` ("test(recovery): seed current mailbox owner grants") touched the File List: two lines at `LiveContinuityAspireE2eTests.cs:215-216` add a `RecoveryMailboxOwnerProvisioner.SeedAsync` call before the mailbox admission probe. `94a91b5` ("fix(test): use EventStore 4 platform scopes for owner setup") amended the new helper. The diff covers 3 files, +248 lines and 276 diff lines:
+
+- `LiveContinuityAspireE2eTests.cs` (File List)
+- `RecoveryMailboxOwnerProvisioner.cs` (new, not on the File List)
+- `RecoveryAccessTokenProvider.cs` (adds `AcquireEventStoreValidatorAsync`, not on the File List)
+
+R14-P1 through R14-P6 and R16-P1 through R16-P4 are still unapplied; the working tree was clean. Baseline `5bb56567499c6df1c621184d3c3d35aa45521166` and the frozen intent are unchanged. Loaded context: this spec, `epic-1-context.md` and `references/Hexalith.AI.Tools/hexalith-state-instructions.md`.
+
+All four independent layers completed, and none failed:
+
+| Layer | Findings |
+| --- | --- |
+| Blind Hunter | 10 (B1–B10) |
+| Edge Case Hunter | 11 (E1–E11) |
+| Verification Gap | 2 gaps (V1–V2), plus 2 other findings (V3–V4) |
+| Acceptance Auditor | 8 (A1–A8) |
+
+Parent triage of the 33 raw findings: **1 decision-needed, 8 patch, 4 defer, 9 rejected**. The remaining raw findings fold into those entries.
+
+Verified facts:
+
+- Production `ChatBotAdmissionEvidenceValidator.ValidateAtomicParticipationAsync` (`:372-378`) returns `CanonicalExecutionUnavailable` for every command. Its only registration is `CommandGatewayServiceCollectionExtensions.cs:79`, and `ChatBotCommandAdmissionPipeline.cs:262-265` applies it after authorization.
+- The required topology lane pins a real-topology `GrantChatBotAuthority` refusal as 503 `canonical-execution-unavailable` with `retryable: false` (`TrivialGovernedCommandAspireE2eTests.cs:597-598`). While A6/A13 stay open, no ChatBot authority grant can be issued through the gateway.
+- Release run `41540260256` (`e5f1664`, 2026-11-02): "required live recovery validation sweep" failed inside `SeedAsync` (`RecoveryMailboxOwnerProvisioner.cs:38`) at its first owner command. `BootstrapGlobalAdmin` answered 503 "Catalog authority cannot safely admit this operation." That is EventStore's `RouteCatalogUnavailableExceptionHandler`, whose exceptions come from route-catalog configuration mismatches, not warm-up. The seed has never completed in a hosted lane.
+- `ChatBotServiceGrants:LifetimeDays` defaults to 90 (`Program.cs:406`), and CI sets 90 (`ci.yml:262`, `:402`, `:488`; `release.yml:47`, `:139`). `GovernedOperationAggregate.Handle(GrantChatBotAuthority)` rejects `ExpiresAt > now + 30 days` (`:54`), and rejects any reused grant id as `authority_issuance_reused` (`:63-66`) whatever its expiry.
+- No server code reads `chatbot:service-client-grant-id` or `chatbot:service-client-grant-expiry`. Only the `ClaimsServiceClientGrantResolver` constants and test fixtures reference them.
+- Local runs use the persistent `dapr init` Redis (`ChatBotAspireModule.cs:208-232`). The realm hardcodes the recovery mailbox client's grant id `01ARZ3NDEKTSV4RRFFQ69G5FB2`.
+- `PartyAggregate.Handle(CreateParty)` returns `NoOp` for an existing party (`PartyAggregate.cs:722-723`), so repeating `CreateParty` is harmless.
+- EventStore status is keyed by message id, with bounded correlation compatibility (`CommandStatusController.cs:62-152`). ChatBot forwards `CommandId` as the EventStore `MessageId` (`AcceptedCommandDispatcher.cs:96`), so both polling styles in the new helper resolve.
+- `CommandStatus` has `TimedOut` (7) and no `Failed` value.
+
+- [x] [Review][Decision] **R17-D1 (high): the owner seed cannot succeed in the production composition, so the live recovery lane cannot pass** — Findings V3 and B3 (retry part).
+  - `SeedAsync` needs 202 for two `GrantChatBotAuthority` submissions through ChatBot's `/api/v1/commands`. The gateway refuses every authorized command with a non-retryable 503 `canonical-execution-unavailable` (see the facts above).
+  - `SubmitChatBotGrantAsync` treats that 503 as retryable. It retries every 500 ms for the 2-minute budget (about 240 POSTs), then throws "grant was not accepted: status 503".
+  - The probe this feeds, `AssertMailboxTokenAdmissionAsync`, proves authorization only by observing that post-authorization 503. Authorization needs a current ChatBot operation grant on the probe's intake, and that grant can only be issued through the same fail-closed gateway. Without the seed, the probe gets a non-transient 403. While A6/A13 stay open, the live mailbox proof is circular.
+  - Second blocker: in the hosted release lane the seed fails even earlier, at `BootstrapGlobalAdmin`, with EventStore's route-catalog 503. That is an environment problem outside this diff.
+  - Blast radius: the `release.yml` jobs "required live recovery validation sweep" and "required independent live recovery evidence gate", the scheduled CI sweep, and the story-evidence recovery step.
+  - Options:
+    1. Keep the seed. On the non-retryable grant 503, fail fast with a message that names the A6/A13 blocker. Apply R17-P1 through R17-P8, and defer the live-lane prerequisite.
+    2. Revert `19ae0ce` and `94a91b5`, and defer the same prerequisite. The probe keeps failing at its 403.
+    3. Re-scope the probe's proof to accept the typed 403 `authorization-denied` while A6/A13 are open. This weakens the proof and is not recommended.
+  - **Resolved 2026-11-03:** the user chose option 1. The fail-fast became R17-P9 (applied with R17-P1 through R17-P8), and the live-lane prerequisite became R17-W5 (deferred).
+- [x] [Review][Patch] **R17-P1 (medium): the service grant copies the mailbox token's grant claims** [tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryMailboxOwnerProvisioner.cs:61] — B1, B2 (grant-id part), E1, E10 (grant-id part), E11, A1, A4 (grant-id part), A5 (root-cause part).
+  - Copying the token's expiry of about 90 days hits the aggregate's 30-day cap: `invalid_authority_grant`.
+  - Copying the realm's static grant id makes every rerun against the same state store fail permanently with `authority_issuance_reused`.
+  - **Fix:**
+    - Mint the grant id (`ChatBotCommandId.New()`) and an expiry of at most 30 days that outlives the 250-minute lane, for example `UtcNow.AddDays(1)`. Use them for both `ServiceClientGrant` and `GrantChatBotAuthority`.
+    - Keep `ReadMailboxGrantMetadata`'s client, tenant and command claim checks, but stop building owner state from the grant claims.
+- [x] [Review][Patch] **R17-P2 (low): the seeded grant target repeats the probe body's literals** [tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryMailboxOwnerProvisioner.cs:24] — B7, V2, A6.
+  - **Fix:** expose the probe's intake id once as an internal constant that both `MailboxAdmissionProbeBody` and the provisioner use. Add a `LiveContinuityAspireE2eContractTests` row asserting that the seeded resource and operation equal the probe body's `intakeId` and `commandType`.
+- [x] [Review][Patch] **R17-P3 (low): the recovery-validator credentials are hardcoded a second time** [tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryAccessTokenProvider.cs:60] — B8, A7.
+  - **Fix:** build on `RecoveryValidatorIdentity.CreateTokenRequestFields()` and override only `client_id`. Add the missing `<param>` and `<returns>` docs.
+- [x] [Review][Patch] **R17-P4 (low): failures dropped the reference helper's diagnostics** [tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryMailboxOwnerProvisioner.cs:140] — B4.
+  - **Fix:** include the status body in the terminal-state exceptions and in the status `ShouldBe(OK)` message. Name the last status and reason in `WaitForGlobalAdministratorAsync` and in the timeout exceptions.
+- [x] [Review][Patch] **R17-P5 (low): the terminal-state checks look for `Failed`, which does not exist, instead of `TimedOut`** [tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryMailboxOwnerProvisioner.cs:138] — E4, E5.
+  - A `TimedOut` command is polled for the full 2-minute budget and then reported as a misleading `TimeoutException`.
+  - **Fix:** replace `Failed` with `TimedOut` in both loops.
+- [x] [Review][Patch] **R17-P6 (low): the 15-minute startup deadline and its comment ignore the seed** [tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs:171] — B5, E9, A3.
+  - The comment says the deadline is "sized to the bounded work that actually runs under it". The seed adds token loops of 3 minutes each and owner-command and grant loops of 2 minutes each.
+  - **Fix:** resize the deadline or give the seed its own linked budget, and update the comment.
+- [x] [Review][Patch] **R17-P7 (low): the submit loops abort on warm-up transport failures** [tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryMailboxOwnerProvisioner.cs:107] — B3 (transient part), E8.
+  - After the health waits, the seed is now the first caller of the command path. The probe and the reference helper tolerate `HttpRequestException` and per-request timeouts during that window; the seed does not.
+  - **Fix:** catch both with `when (!cancellationToken.IsCancellationRequested)`, within the existing budgets.
+- [x] [Review][Patch] **R17-P8 (low): the class summary overstates what is seeded** [tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryMailboxOwnerProvisioner.cs:19] — B6 (summary part), V4 (summary part).
+  - The class seeds evidence only for the admission probe's fixed intake, not for the drill's own mailbox intakes. **Fix:** say so in the summary.
+- [x] [Review][Patch] **R17-P9 (from R17-D1): fail fast on the canonical-execution refusal** [tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryMailboxOwnerProvisioner.cs:187]
+  - `SubmitChatBotGrantAsync` now stops on a 503 whose problem type is `canonical-execution-unavailable` and throws a message that names the A6/A13 gate, instead of retrying for 2 minutes.
+  - The predicate `IsCanonicalExecutionRefusal` (`:125`) is pinned in the normal lane: other 503s, other statuses and non-problem bodies keep the bounded retry.
+  - The class remarks name the blocker.
+- [x] [Review][Defer] R17-W1: no normal-lane check exercises the provisioner [tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryMailboxOwnerProvisioner.cs:29] — deferred. Sources V1 (filed as defer), B9 and A2. A check only means something once a seeding route exists; then add a contract test that the built grants pass `GovernedOperationAggregate` validation.
+- [x] [Review][Defer] R17-W2: the drill's own mailbox intakes still have no per-intake ChatBot operation authority [src/Hexalith.ChatBot.Workers/Mailbox/GraphMailboxIntakeWorker.cs:176] — deferred: pre-existing, since no grants existed before this diff. Sources B6 and V4. Those intakes would also hit `canonical-execution-unavailable`, so they are blocked on A6/A13.
+- [x] [Review][Defer] R17-W3: this is the third near-copy of the owner-seeding helpers [tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryMailboxOwnerProvisioner.cs:154] — deferred. Source B10. Fixing it means a refactor across `TrivialGovernedCommandAspireE2eTests`, `PolicyRefusalPreflightTopology` and the provisioner. The drift is real: `94a91b5` had to fix the copied `system` tenant, and `PolicyRefusalPreflightTopology.cs:515` still uses that pre-`94a91b5` form.
+- [x] [Review][Defer] R17-W4 (`maybe-false`, unverified medium): both seeded grants' principal may not match the token subject [tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryMailboxOwnerProvisioner.cs:53] — deferred. Source E2. `ChatBotRequestAuthorizer.Request` keys both the operation and the service-grant requests by `context.SubjectId`, which is the token `sub` (the service grant at `ResolveServiceGrantResolutionCoreAsync`), while the seed uses the client id for both. The realm defines no fixed service-account user for `recovery-validation-mailbox-client`. To settle it, decode a live recovery mailbox token and check its `sub`.
+- [x] [Review][Defer] R17-W5: the live recovery lane cannot pass until canonical execution opens [tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs:215] — deferred from R17-D1 option 1. The mailbox admission proof needs a ChatBot grant, and ChatBot issues grants only through the gateway that stays fail-closed while A6/A13 are open. A second, separate environment blocker: hosted release run `41540260256` fails earlier, at `BootstrapGlobalAdmin`, with EventStore's route-catalog 503.
+
+Code-review actions: **1 decision-needed resolved (option 1), 9 patches applied (R17-P1 through R17-P9), 5 deferred, 9 rejected**. Story 1.5 stays spec `in-review` / sprint `review`, not the generic workflow's `in-progress` or `done`.
+
+Patch validation (2026-11-03):
+
+- `python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug -m:1` succeeded with 0 warnings and 0 errors.
+- `-class …LiveContinuityAspireE2eContractTests`: 58/58 passed. That includes the 6 new rows, `MailboxOwnerSeedShouldTargetTheExactAdmissionProbeIntake` and `MailboxOwnerSeedFailsFastOnlyOnTheCanonicalExecutionRefusal` (5 rows).
+- `-namespace Hexalith.ChatBot.IntegrationTests.Recovery`: 421 total, 0 failed, 2 skipped. The skips are the live Tier-3 tests, which need `HEXALITH_CHATBOT_TIER3=1`.
+- The live lane itself was not run. Per R17-W5 it cannot pass yet, and the fail-fast is proven only by the normal-lane predicate.
+
+Changed files:
+
+- `RecoveryMailboxOwnerProvisioner.cs`: R17-P1, P2, P4, P5, P7, P8 and P9, plus the `SeedBudget` timeout that names the step it reached.
+- `RecoveryAccessTokenProvider.cs`: R17-P3.
+- `LiveContinuityAspireE2eTests.cs`: the shared `MailboxAdmissionProbeIntakeId` for R17-P2, and the startup deadline of 15 minutes plus `SeedBudget`, with its comment, for R17-P6. Byte-level edits keep the file's mixed line endings.
+- `LiveContinuityAspireE2eContractTests.cs`: R17-P2 and R17-P9 rows.
+
+Rejected:
+
+- **R17-B3/E3 (`false`)** — Claim: a 503 retry reuses the command id after EventStore has definitively refused it. The 503 comes from ChatBot's admission pipeline before dispatch, so EventStore never receives the message and has no cached rejection to replay. The real defect, retrying a non-retryable 503, is R17-D1.
+- **R17-A1, the 202 part (`false`)** — Claim: ChatBot answers 202 and EventStore ends the command `Rejected`. ChatBot answers 503 before dispatch, as the facts above show. The 30-day cap itself is real and is covered by R17-P1.
+- **R17-B2/E10/A4, the `CreateParty` part (`false`)** — Claim: a repeated `CreateParty` fails a rerun. The Party aggregate returns `NoOp` for an existing party.
+- **R17-B2/E10/A4, the `authority_grant_active` part (`low`)** — True, but it occurs only on a rerun within the 1-hour lease against the same Redis, and only after the A6/A13 gate opens. A fix would need to parse the rejection reason, which is more than a direct correction.
+- **R17-B2, the cleanup part (`low`)** — Claim: seeded grants, membership and the Party are never cleaned up. With R17-P1's fresh ids, reruns no longer collide on the service grant, and the state that accumulates in the dev store is harmless. Adding cleanup would be new machinery.
+- **R17-E6 (`low`)** — Claim: `WaitForCommandAsync` does not retry a transient 5xx status read. These reads follow a 202 on a warm command path, and the reference helper is just as strict. Fixing it would add branches.
+- **R17-E7 (`low`)** — Claim: `SubmitOwnerAsync` fails on its first non-OK status read. EventStore writes the status record before it answers 202, and the required topology helper relies on that too. Fixing it would add branches.
+- **R17-A8 (procedural)** — Claim: the callee files are missing from the File List. The fix would edit the spec under review. The callee files also come from non-story commits, the same rationale as R15-A5.
+- **R17-A5, the security framing (`false`)** — Claim: owner evidence built from an unverified JWT contradicts the probe's remark. The server still validates the bearer; the test only reads its own Keycloak-issued token. The old probe was criticised for building a principal locally. The root-cause part of A5 is folded into R17-P1.
+
 ## Design Notes
 
 GetWorkflowOperationStatus uses the existing typed GetOperationStatus boundary. RetryCommandExecution is distinct from legacy RequestFailedWorkflowRetry; this story supplies its prerequisites. No migrations, deployments or external effects. Preserve historical OperationId values exactly.

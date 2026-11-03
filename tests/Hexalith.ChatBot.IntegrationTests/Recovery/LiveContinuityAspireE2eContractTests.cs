@@ -231,6 +231,47 @@ public sealed class LiveContinuityAspireE2eContractTests
             .ShouldBe(expectedAdmissionProof);
     }
 
+    /// <summary>
+    /// The owner seed authorizes exactly the resource and command the admission probe submits. A drifted literal on
+    /// either side would key the grant elsewhere and surface only as a non-transient 403 hours into the live lane.
+    /// </summary>
+    [Fact]
+    public void MailboxOwnerSeedShouldTargetTheExactAdmissionProbeIntake()
+    {
+        using JsonDocument body = JsonDocument.Parse(
+            LiveContinuityAspireE2eTests.MailboxAdmissionProbeBody("01ARZ3NDEKTSV4RRFFQ69G5FAY"));
+        JsonElement root = body.RootElement;
+
+        root.GetProperty("command").GetProperty("intakeId").GetString().ShouldBe(RecoveryMailboxOwnerProvisioner.ProbeIntakeId);
+        root.GetProperty("commandType").GetString().ShouldBe(RecoveryMailboxOwnerProvisioner.ProbeOperation);
+        root.GetProperty("origin").GetString().ShouldBe("mailbox");
+    }
+
+    /// <summary>
+    /// The seed stops on ChatBot's fail-closed canonical-execution refusal instead of retrying it for its whole
+    /// budget; any other 503, status or body keeps the bounded retry.
+    /// </summary>
+    /// <param name="statusCode">The observed status.</param>
+    /// <param name="problemType">The problem type, or <see langword="null"/> for a non-problem body.</param>
+    /// <param name="expected">Whether the pair is the non-retryable canonical-execution refusal.</param>
+    [Theory]
+    [InlineData(HttpStatusCode.ServiceUnavailable, ChatBotProblemTypes.CanonicalExecutionUnavailable, true)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, ChatBotProblemTypes.DispatchUnavailable, false)]
+    [InlineData(HttpStatusCode.Forbidden, ChatBotProblemTypes.CanonicalExecutionUnavailable, false)]
+    [InlineData(HttpStatusCode.InternalServerError, ChatBotProblemTypes.CanonicalExecutionUnavailable, false)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, null, false)]
+    public void MailboxOwnerSeedFailsFastOnlyOnTheCanonicalExecutionRefusal(
+        HttpStatusCode statusCode,
+        string? problemType,
+        bool expected)
+    {
+        string body = problemType is null
+            ? "Service Unavailable"
+            : JsonSerializer.Serialize(new { type = problemType, status = (int)statusCode, retryable = false });
+
+        RecoveryMailboxOwnerProvisioner.IsCanonicalExecutionRefusal(statusCode, body).ShouldBe(expected);
+    }
+
     private sealed class CapturingRetentionFailureSink : IRecoveryValidationEvidenceRetentionFailureSink
     {
         public List<RecoveryValidationEvidenceRetentionFailureMarker> Markers { get; } = [];

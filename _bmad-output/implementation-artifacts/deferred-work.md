@@ -2162,3 +2162,31 @@ Final native follow-up qualification (2026-10-26): independent review correction
   evidence: `_bmad-output/implementation-artifacts/evidence/1-2-publish-the-openapi-contract-spine-and-typed-client.json:656` (task-43) still lists `ServerBootstrapApiTests.CommandEndpointShouldValidateContractBeforeAuthenticationAndAuthenticateBeforeAdmission`; `86f658f` renamed it to `CommandEndpointShouldAuthenticateBeforeContractValidationAndValidateBeforeAdmission`. No other reference remains. `TransitionDetector` re-validates mappings only on a transition to done and Story 1.2 is already done, so CI is unaffected; a later re-validation of Story 1.2 would report the missing assertion.
   reason: The correction edits another completed story's evidence contract, outside Story 1.5's boundary.
   closure: Task-43 names the current test whenever Story 1.2 evidence is next regenerated or re-validated, with that assertion passing.
+
+## Deferred from: code review of spec-1-5-establish-stable-operation-identity-and-concurrency-contracts (2026-11-03, round 17)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: R17-W1 — No normal-lane check exercises `RecoveryMailboxOwnerProvisioner` (low).
+  evidence: `tests/Hexalith.ChatBot.IntegrationTests/Recovery/RecoveryMailboxOwnerProvisioner.cs` is referenced only by `LiveContinuityAspireE2eTests.cs:215`, which runs only in the gated live recovery lanes.
+  reason: The test only means something once a seeding route exists. The production gateway refuses every grant while A6/A13 are open (R17-D1).
+  closure: A contract test proves that the built grants pass `GovernedOperationAggregate.Handle(GrantChatBotAuthority)` validation.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: R17-W2 — The drill's own mailbox intakes have no per-intake ChatBot operation authority (pre-existing).
+  evidence: `src/Hexalith.ChatBot.Workers/Mailbox/GraphMailboxIntakeWorker.cs:176` mints `MailboxMessageIntakeId.New()`. The authorizer requires ChatBot `operation` evidence on each `IntakeId` (`ChatBotAuthorityCatalog.cs:26`). The seed covers only the probe intake.
+  reason: Pre-existing. These intakes would also hit `canonical-execution-unavailable`, so they are blocked on A6/A13.
+  closure: Live drill intakes are authorized through an accepted owner path once canonical execution opens.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: R17-W3 — There are three near-copies of the live owner-seeding helpers, and the copies have drifted (low).
+  evidence: `RecoveryMailboxOwnerProvisioner.SubmitOwnerAsync` and `WaitForGlobalAdministratorAsync` mirror `TrivialGovernedCommandAspireE2eTests.SubmitOwnerCommandAndWaitAsync` and `WaitForCurrentGlobalAdministratorAsync`. `94a91b5` had to fix the copied `system` tenant, and `PolicyRefusalPreflightTopology.cs:515` still uses it.
+  reason: Fixing it means a refactor across three live harnesses, outside this delta.
+  closure: One shared internal test helper owns owner-command submission and waiting.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: R17-W4 (`maybe-false`, unverified medium) — Both seeded grants' principal may not match the mailbox token subject.
+  evidence: `ChatBotRequestAuthorizer.Request` keys the operation and service-grant owner requests by `context.SubjectId` (the token `sub`). The seed uses `RecoveryValidationTopology.MailboxClientId` for both. The realm defines no fixed service-account user for `recovery-validation-mailbox-client`.
+  reason: This cannot be settled without a live token.
+  closure: Decode a live recovery mailbox token. If `sub` differs from the client id, key both grants by `sub`.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: R17-W5 — The live recovery lane cannot pass until canonical execution opens (from R17-D1 option 1).
+  evidence: `LiveContinuityAspireE2eTests.AssertMailboxTokenAdmissionAsync` proves authorization only through the post-authorization 503. That needs a current ChatBot grant, and `ChatBotAdmissionEvidenceValidator.ValidateAtomicParticipationAsync` (`:372-378`) refuses every command, grants included. The seed now fails fast and names this (R17-P9). Separately, hosted release run `41540260256` fails earlier, at `BootstrapGlobalAdmin`, with EventStore's route-catalog 503.
+  reason: A6/A13 owner-atomic acceptance and the retry-profile approvals are open release gates outside Story 1.5.
+  closure: Once canonical execution is accepted, the live sweep seeds both grants, the probe observes its admission proof, and the route-catalog 503 is resolved in the hosted topology.
