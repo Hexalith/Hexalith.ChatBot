@@ -13,9 +13,9 @@ internal sealed class BoundaryAuditWriter(Exception? failure = null, Action? dur
     public List<ChatBotAuthorizationFailureAuditFact> Facts { get; } = [];
 
     /// <inheritdoc />
+    /// <remarks>Like the production in-memory writer, the write ignores the token, so an abort row observes only the handler.</remarks>
     public ValueTask RecordAuthorizationFailureAsync(ChatBotAuthorizationFailureAuditFact fact, CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
         Facts.Add(fact);
         duringWrite?.Invoke();
         return failure is null ? ValueTask.CompletedTask : ValueTask.FromException(failure);

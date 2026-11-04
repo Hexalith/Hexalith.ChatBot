@@ -61,9 +61,12 @@ public sealed class ChatBotApplicationBoundaryResultHandlerTests
     [InlineData("invalid-data")]
     public async Task BodyTransportAndFramingFailureMustRetainOneSafeFactAndTypedDenial(string failureKind)
     {
+        // Like Kestrel's, the request token can be cancelled but never is here, so the failure is not a request abort.
+        using CancellationTokenSource live = new();
         BoundaryAuditWriter audit = new();
         using ServiceProvider services = Services(audit);
         DefaultHttpContext context = Context(services);
+        context.RequestAborted = live.Token;
         Exception failure = failureKind switch
         {
             "framing" => new BadHttpRequestException("restricted-body-framing", StatusCodes.Status400BadRequest),
@@ -75,6 +78,8 @@ public sealed class ChatBotApplicationBoundaryResultHandlerTests
 
         await DenyAsync(context).WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
 
+        context.RequestAborted.CanBeCanceled.ShouldBeTrue();
+        context.RequestAborted.IsCancellationRequested.ShouldBeFalse();
         AssertSafeMetadataDenial(context, audit, AuditMetadata.UnknownCommandName);
     }
 
@@ -200,15 +205,19 @@ public sealed class ChatBotApplicationBoundaryResultHandlerTests
     [Theory]
     [InlineData("backend")]
     [InlineData("store-cancellation")]
+    [InlineData("store-timeout")]
     public async Task AuditBackendFailureMustAnswerTypedDependencyUnavailableWithoutRetryOrEndpointEffects(string failureKind)
     {
-        // A store that raises its own cancellation (here a client timeout on the store's own, already cancelled token)
-        // while the request is still live is an audit outage, not a request abort. Like Kestrel's, the request token
-        // can be cancelled but never is here.
+        // A store that raises its own cancellation while the request is still live is an audit outage, not a request
+        // abort, whether the cancellation is bare or a client timeout on the store's own, already cancelled token. Like
+        // Kestrel's, the request token can be cancelled but never is here.
         using CancellationTokenSource live = new();
-        BoundaryAuditWriter audit = new(failureKind == "store-cancellation"
-            ? new TaskCanceledException("restricted-audit-backend", new TimeoutException(), new CancellationToken(canceled: true))
-            : new InvalidOperationException("restricted-audit-backend"));
+        BoundaryAuditWriter audit = new(failureKind switch
+        {
+            "store-cancellation" => new OperationCanceledException("restricted-audit-backend"),
+            "store-timeout" => new TaskCanceledException("restricted-audit-backend", new TimeoutException(), new CancellationToken(canceled: true)),
+            _ => new InvalidOperationException("restricted-audit-backend"),
+        });
         BoundaryAuthorizationFailureCounter failureCounter = new();
         using ServiceProvider services = Services(audit, failureCounter);
         DefaultHttpContext context = Context(services);
