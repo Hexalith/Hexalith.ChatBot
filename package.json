@@ -1,0 +1,13 @@
+{
+  "name": "hexalith-chatbot",
+  "private": true,
+  "engines": {
+    "node": ">=24.10.0"
+  },
+  "scripts": {
+    "commitlint": "commitlint --config commitlint.config.cjs"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "21.2.4"
+  }
+}

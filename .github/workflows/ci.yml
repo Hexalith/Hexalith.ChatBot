@@ -57,6 +57,7 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+          dotnet-version: '10.0.404'
       - name: Bind the published Builds tooling for Platform CI
         run: |
           tool_root="$(bash .github/scripts/resolve-published-builds-tooling.sh)"
@@ -102,6 +103,7 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+          dotnet-version: '10.0.404'
       - name: Bind the published Builds tooling for Platform CI
         run: |
           tool_root="$(bash .github/scripts/resolve-published-builds-tooling.sh)"
@@ -168,6 +170,7 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+          dotnet-version: '10.0.404'
       - name: Build Release configuration
         run: >-
           bash .github/scripts/build-release-configuration.sh
@@ -417,6 +420,7 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+          dotnet-version: '10.0.404'
       - name: Build Release configuration
         run: bash .github/scripts/build-release-configuration.sh tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Setup checksum-pinned DAPR CLI
@@ -513,6 +517,7 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+          dotnet-version: '10.0.404'
       - name: Build Release configuration
         run: bash .github/scripts/build-release-configuration.sh tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Setup checksum-pinned DAPR CLI
@@ -613,6 +618,7 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+          dotnet-version: '10.0.404'
       - name: Build Release configuration
         run: bash .github/scripts/build-release-configuration.sh tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Download retained live recovery evidence
