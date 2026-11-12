@@ -22,6 +22,7 @@ public sealed class ChatBotContributorTokenRelayTests
     {
         MutableTimeProvider time = new(new DateTimeOffset(2026, 8, 26, 12, 0, 0, TimeSpan.Zero));
         FrontComposerUserTokenStore store = new(time);
+        FrontComposerTokenSession session = new("chatbot-relay-session", "actor-alpha", "tenant-alpha");
         CircuitServicesAccessor circuit = new()
         {
             Services = new ServiceCollection()
@@ -30,6 +31,7 @@ public sealed class ChatBotContributorTokenRelayTests
         };
         FrontComposerAuthenticationOptions authentication = new();
         authentication.OpenIdConnect.Enabled = true;
+        authentication.TenantClaimTypes.Add("eventstore:current-tenant");
         authentication.UserClaimTypes.Add("sub");
         FrontComposerAccessTokenProvider tokenProvider = new(
             new HttpContextAccessor(),
@@ -39,12 +41,12 @@ public sealed class ChatBotContributorTokenRelayTests
             NullLogger<FrontComposerAccessTokenProvider>.Instance);
         ChatBotHubEndpoint hub = new(new Uri("https://chatbot.example"), () => tokenProvider.GetAccessTokenAsync().AsTask());
         RecordingHandler terminal = new();
-        using HttpClient http = new(new FrontComposerGatewayAuthorizationHandler(new HttpContextAccessor(), circuit, store)
+        using HttpClient http = new(new FrontComposerGatewayAuthorizationHandler(new HttpContextAccessor(), circuit, store, Options.Create(authentication))
         {
             InnerHandler = terminal,
         });
 
-        store.Set("actor-alpha", "token-v1", time.GetUtcNow().AddMinutes(1));
+        store.Set(session, "token-v1", time.GetUtcNow().AddMinutes(1));
         (await hub.AccessTokenProvider!()).ShouldBe("token-v1");
         _ = await http.GetAsync("https://chatbot.example/current", TestContext.Current.CancellationToken);
         terminal.AuthorizationParameters[^1].ShouldBe("token-v1");
@@ -54,19 +56,57 @@ public sealed class ChatBotContributorTokenRelayTests
         _ = await http.GetAsync("https://chatbot.example/expired", TestContext.Current.CancellationToken);
         terminal.AuthorizationParameters[^1].ShouldBeNull();
 
-        store.Set("actor-alpha", "token-v2", time.GetUtcNow().AddMinutes(5));
+        store.Set(session, "token-v2", time.GetUtcNow().AddMinutes(5));
         (await hub.AccessTokenProvider!()).ShouldBe("token-v2");
         _ = await http.GetAsync("https://chatbot.example/reconnected", TestContext.Current.CancellationToken);
         terminal.AuthorizationParameters[^1].ShouldBe("token-v2");
 
-        store.Remove("actor-alpha");
+        store.Remove(session);
         await Should.ThrowAsync<FrontComposerAuthenticationException>(() => hub.AccessTokenProvider!());
         _ = await http.GetAsync("https://chatbot.example/signed-out", TestContext.Current.CancellationToken);
         terminal.AuthorizationParameters[^1].ShouldBeNull();
     }
 
+    [Theory]
+    [InlineData("other-session", "actor-alpha", "tenant-alpha")]
+    [InlineData("chatbot-relay-session", "actor-other", "tenant-alpha")]
+    [InlineData("chatbot-relay-session", "actor-alpha", "tenant-other")]
+    public async Task HttpAndHubRelayShouldRejectAnotherSessionUserOrTenant(string sessionId, string userId, string tenantId)
+    {
+        FrontComposerUserTokenStore store = new(TimeProvider.System);
+        store.Set(new FrontComposerTokenSession("chatbot-relay-session", "actor-alpha", "tenant-alpha"),
+            "bound-token", DateTimeOffset.UtcNow.AddMinutes(5));
+        ClaimsPrincipal principal = new(new ClaimsIdentity(
+            [new Claim("sub", userId),
+             new Claim("eventstore:current-tenant", tenantId),
+             new Claim(FrontComposerTokenSession.ClaimType, sessionId)], "oidc"));
+        CircuitServicesAccessor circuit = new()
+        {
+            Services = new ServiceCollection()
+                .AddSingleton<AuthenticationStateProvider>(new StaticAuthenticationStateProvider(principal))
+                .BuildServiceProvider(),
+        };
+        FrontComposerAuthenticationOptions authentication = new();
+        authentication.OpenIdConnect.Enabled = true;
+        authentication.TenantClaimTypes.Add("eventstore:current-tenant");
+        authentication.UserClaimTypes.Add("sub");
+        FrontComposerAccessTokenProvider tokenProvider = new(new HttpContextAccessor(), circuit, store,
+            Options.Create(authentication), NullLogger<FrontComposerAccessTokenProvider>.Instance);
+        ChatBotHubEndpoint hub = new(new Uri("https://chatbot.example"), () => tokenProvider.GetAccessTokenAsync().AsTask());
+        RecordingHandler terminal = new();
+        using HttpClient http = new(new FrontComposerGatewayAuthorizationHandler(
+            new HttpContextAccessor(), circuit, store, Options.Create(authentication)) { InnerHandler = terminal });
+
+        await Should.ThrowAsync<FrontComposerAuthenticationException>(() => hub.AccessTokenProvider!());
+        _ = await http.GetAsync("https://chatbot.example/wrong-binding", TestContext.Current.CancellationToken);
+        terminal.AuthorizationParameters.ShouldHaveSingleItem().ShouldBeNull();
+    }
+
     private static ClaimsPrincipal ActorAlpha()
-        => new(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "oidc"));
+        => new(new ClaimsIdentity(
+            [new Claim("sub", "actor-alpha"),
+             new Claim("eventstore:current-tenant", "tenant-alpha"),
+             new Claim(FrontComposerTokenSession.ClaimType, "chatbot-relay-session")], "oidc"));
 
     private sealed class StaticAuthenticationStateProvider(ClaimsPrincipal principal) : AuthenticationStateProvider
     {
