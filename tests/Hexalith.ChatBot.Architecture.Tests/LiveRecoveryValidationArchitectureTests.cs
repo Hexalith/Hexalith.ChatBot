@@ -454,7 +454,7 @@ public static class LiveRecoveryValidationArchitectureTests
             source.ShouldContain("actions/upload-artifact@v7");
             source.ShouldContain("actions/download-artifact@v8");
             source.ShouldContain("bash .github/scripts/install-dapr-cli.sh");
-            source.ShouldContain("dapr init --runtime-version 1.18.0");
+            source.ShouldContain("dapr init --runtime-version 1.19.1");
             source.ShouldNotContain("dapr/setup-dapr@v2");
         }
 

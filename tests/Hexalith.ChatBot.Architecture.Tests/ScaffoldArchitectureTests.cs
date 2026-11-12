@@ -506,7 +506,7 @@ public static class ScaffoldArchitectureTests
             .Select(static element => element.Attribute("Include")?.Value)
             .ShouldBe(["Microsoft.Extensions.Hosting", "ModelContextProtocol"], ignoreOrder: true);
 
-        PackageCatalogTestHelper.Version("ModelContextProtocol").ShouldBe("2.3.0");
+        PackageCatalogTestHelper.Version("ModelContextProtocol").ShouldBe("2.4.0");
 
         string[] forbidden =
         [
@@ -1073,8 +1073,8 @@ public static class ScaffoldArchitectureTests
             PackageCatalogTestHelper.AssertSiblingAuthority(wrapper);
         }
 
-        PackageCatalogTestHelper.Version("Hexalith.Folders.Client").ShouldBe("1.3.3");
-        PackageCatalogTestHelper.Version("Hexalith.Folders.Contracts").ShouldBe("1.3.3");
+        PackageCatalogTestHelper.Version("Hexalith.Folders.Client").ShouldBe("1.4.0");
+        PackageCatalogTestHelper.Version("Hexalith.Folders.Contracts").ShouldBe("1.4.0");
         PackageCatalogTestHelper.Version("Hexalith.Projects.Client").ShouldBe("1.2.3");
         PackageCatalogTestHelper.Version("Hexalith.Projects.Contracts").ShouldBe("1.2.3");
         PackageCatalogTestHelper.Version("LibGit2Sharp").ShouldBe("0.32.0");
@@ -1089,9 +1089,9 @@ public static class ScaffoldArchitectureTests
         using JsonDocument global = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "global.json")));
         JsonElement sdk = global.RootElement.GetProperty("sdk");
         Version sdkVersion = Version.Parse(sdk.GetProperty("version").GetString()!);
-        sdkVersion.Major.ShouldBe(10);
+        sdkVersion.Major.ShouldBe(11);
         sdkVersion.Minor.ShouldBe(0);
-        (sdkVersion.Build / 100).ShouldBe(4, "the repository pins the .NET 10.0.4xx SDK feature band");
+        (sdkVersion.Build / 100).ShouldBe(1, "the repository pins the .NET 11.0.1xx SDK feature band");
         sdk.GetProperty("rollForward").GetString().ShouldBe("latestPatch");
 
         foreach (string workflowName in new[] { "ci.yml", "release.yml" })
@@ -1100,7 +1100,10 @@ public static class ScaffoldArchitectureTests
             int setupSteps = Regex.Matches(workflow, @"uses: actions/setup-dotnet@").Count;
             setupSteps.ShouldBeGreaterThan(0, "every build workflow must install the repository SDK");
             Regex.Matches(workflow, @"global-json-file: global\.json").Count.ShouldBe(setupSteps);
-            workflow.ShouldNotContain("dotnet-version:", Case.Sensitive, "SDK versions come from global.json");
+            Regex.Matches(workflow, @"dotnet-version:").Count.ShouldBe(setupSteps,
+                "each setup selects the global SDK and exactly one supporting net10 SDK");
+            Regex.Matches(workflow, @"dotnet-version:\s*'10\.0\.404'").Count.ShouldBe(setupSteps,
+                "the supporting SDK is bounded to the source-resource feature band");
         }
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<TargetFramework>net10.0</TargetFramework>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<Nullable>enable</Nullable>");
@@ -1489,14 +1492,14 @@ public static class ScaffoldArchitectureTests
         reserveScript.ShouldContain("completion_reserve_exhausted");
         workflow.ShouldContain("remaining_seconds - 900");
         workflow.ShouldContain("timeout --signal=INT --kill-after=15m");
-        workflow.ShouldContain("dapr init --runtime-version 1.18.0");
+        workflow.ShouldContain("dapr init --runtime-version 1.19.1");
         workflow.ShouldContain("actions/upload-artifact@v7");
         workflow.ShouldContain("actions/download-artifact@v8");
         workflow.ShouldContain(
             "- name: Setup checksum-pinned DAPR CLI\n"
             + "        run: bash .github/scripts/install-dapr-cli.sh");
-        daprInstaller.ShouldContain("dapr_version=\"1.18.0\"");
-        daprInstaller.ShouldContain("2a94739e0aa101289d88418225319562bc6800db273b3d9cf819a0efd1ea1bfe");
+        daprInstaller.ShouldContain("dapr_version=\"1.19.1\"");
+        daprInstaller.ShouldContain("6e9a339d261e430e5914909cc4443572573c197c174c3e14504c34116831de3b");
         daprInstaller.ShouldContain("sha256sum --check --strict");
         workflow.ShouldContain("sanitize-recovery-trx");
         workflow.ShouldContain(

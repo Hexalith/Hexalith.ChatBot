@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-readonly dapr_version="1.18.0"
-readonly dapr_sha256="2a94739e0aa101289d88418225319562bc6800db273b3d9cf819a0efd1ea1bfe"
+readonly dapr_version="1.19.1"
+readonly dapr_sha256="6e9a339d261e430e5914909cc4443572573c197c174c3e14504c34116831de3b"
 readonly archive="${RUNNER_TEMP:?RUNNER_TEMP is required}/dapr_linux_amd64-${dapr_version}.tar.gz"
 readonly install_directory="${RUNNER_TEMP}/dapr-cli-${dapr_version}"
 

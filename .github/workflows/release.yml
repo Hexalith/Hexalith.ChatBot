@@ -62,7 +62,7 @@ jobs:
       - name: Setup checksum-pinned DAPR CLI
         run: bash .github/scripts/install-dapr-cli.sh
       - name: Initialize DAPR runtime
-        run: dapr init --runtime-version 1.18.0
+        run: dapr init --runtime-version 1.19.1
       - name: Record DAPR runtime state
         run: docker ps --format '{{.Names}}\t{{.Status}}\t{{.Ports}}' --filter name=dapr_
       - name: Run required fail-closed tenant-bound topology smoke
@@ -171,7 +171,7 @@ jobs:
       - name: Setup checksum-pinned DAPR CLI
         run: bash .github/scripts/install-dapr-cli.sh
       - name: Initialize DAPR runtime
-        run: dapr init --runtime-version 1.18.0
+        run: dapr init --runtime-version 1.19.1
       - name: Run all live recovery coordinators and retain evidence
         id: recovery
         # Bounded ladder, innermost first, so the in-process `finally` always wins the race to unwind a
@@ -325,7 +325,15 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: '>=24.10.0 <25.0.0'
+      - name: Verify release Node compatibility
+        run: >-
+          node -e 'const [major, minor] = process.versions.node.split(".").map(Number);
+          if (major < 24 || (major === 24 && minor < 10)) process.exit(1);'
+      - name: Install locked release tooling
+        run: npm ci --ignore-scripts
+      - name: Verify release dependency provenance and signatures
+        run: npm audit signatures
       # Minted before the guard because no step may separate the guard from the release. The key expires within
       # an hour and is used only by the guarded release step; a failed exchange stops the job before any tag exists.
       - name: Exchange GitHub OIDC for a temporary NuGet key
@@ -346,7 +354,7 @@ jobs:
           # Trusted-publishing key, as in the sibling modules; nuget.org refused the static organization key.
           # This job does not use a protected environment, so publication does not wait for a human reviewer.
           NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
-        run: npx --yes -p semantic-release -p @semantic-release/exec semantic-release
+        run: npm exec --no -- semantic-release
       - name: Verify published NuGet packages
         if: success() && steps.publication_guard.outputs.should_publish == 'true'
         run: |
