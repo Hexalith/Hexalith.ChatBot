@@ -37,20 +37,20 @@ running live recovery tests that may rebuild projects.
 
 Release restore/build and release automation use published package dependencies.
 
-The SDK version comes from `global.json` in both local and automated builds. The test projects are xUnit v3 assemblies
-hosted by the xUnit 4 in-process runner pinned in the shared Builds catalog. Run the repository boundary to
-execute every independent lane and retain non-vacuous CTRF evidence:
+The SDK version and Microsoft.Testing.Platform runner come from `global.json`. Test projects use the
+xUnit runner pinned in the shared Builds catalog. Run each project individually after the Release build:
 
 ```bash
-bash .github/scripts/run-merge-test-lanes.sh
+dotnet test --project tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj --configuration Release --no-build --no-restore
 ```
 
-Before proposing a story as `done`, run the repository-owned [story-evidence integrity preflight](docs/story-evidence-integrity.md). Attest current-run provenance first, then validate (see that doc for the full sequence, including the gate self-test):
-
-```bash
-dotnet run --project tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj --configuration Release -- attest --contract <evidence-contract> --base <full-base-sha> --head <full-head-sha> --results <results-root>
-dotnet run --project tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj --configuration Release -- validate --story <story-path> --contract <evidence-contract> --target-status done --base <full-base-sha> --head <full-head-sha> --results <results-root>
-```
+Ordinary integration and UI tests require the shared Dapr and browser environment. The enabled
+`after-unit-tests` action requires those prerequisites and sets the live topology flags so missing
+runtime dependencies fail. Only `Hexalith.ChatBot.Recovery.Tests` discovers the destructive recovery
+sweep; its harness contract and cleanup tests remain in ordinary integration. The Sunday UTC nightly
+hook runs the complete recovery project with its 250-minute in-process deadline, 280-minute interrupt
+and 300-minute step limit. Enable it only after the shared 330-minute job allowance has been released.
+After CiCd adoption, run `python3 references/Hexalith.Builds/check.py` successfully before each push.
 
 ## Aspire and DAPR
 

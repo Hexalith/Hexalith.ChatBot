@@ -29,7 +29,7 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 internal static class RecoveryMailboxOwnerProvisioner
 {
     /// <summary>The resource the operation grant targets: the admission probe's fixed intake identity.</summary>
-    internal const string ProbeIntakeId = LiveContinuityAspireE2eTests.MailboxAdmissionProbeIntakeId;
+    internal const string ProbeIntakeId = LiveRecoverySweep.MailboxAdmissionProbeIntakeId;
 
     /// <summary>The command the admission probe submits and the operation grant authorizes.</summary>
     internal const string ProbeOperation = nameof(CaptureMailboxMessageIntake);

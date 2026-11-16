@@ -60,7 +60,7 @@ public sealed class LiveContinuityAspireE2eContractTests
     [InlineData("300", 300)]
     public void RecoveryWorkflowTimeoutHonorsTheBoundedCompletionOverride(string? configured, int expectedMinutes)
     {
-        LiveContinuityAspireE2eTests.RecoveryWorkflowTimeout(configured)
+        LiveRecoverySweep.RecoveryWorkflowTimeout(configured)
             .ShouldBe(TimeSpan.FromMinutes(expectedMinutes));
     }
 
@@ -71,7 +71,7 @@ public sealed class LiveContinuityAspireE2eContractTests
     public void RecoveryWorkflowTimeoutRejectsValuesOutsideTheRunnerBudget(string configured)
     {
         Should.Throw<InvalidOperationException>(() =>
-            LiveContinuityAspireE2eTests.RecoveryWorkflowTimeout(configured));
+            LiveRecoverySweep.RecoveryWorkflowTimeout(configured));
     }
 
     [Fact]
@@ -109,7 +109,7 @@ public sealed class LiveContinuityAspireE2eContractTests
         CapturingRetentionFailureSink markerSink = new();
 
         InvalidOperationException observed = await Should.ThrowAsync<InvalidOperationException>(() =>
-            LiveContinuityAspireE2eTests.RunControlledLossAndRetainAsync(
+            LiveRecoverySweep.RunControlledLossAndRetainAsync(
                 sinkFails
                     ? _ => ValueTask.FromResult<ControlledLossPathReport>(null!)
                     : _ => ValueTask.FromException<ControlledLossPathReport>(primary),
@@ -145,7 +145,7 @@ public sealed class LiveContinuityAspireE2eContractTests
         HttpStatusCode statusCode,
         bool expectedTransient)
     {
-        LiveContinuityAspireE2eTests.IsTransientMailboxAdmissionStatus(statusCode).ShouldBe(expectedTransient);
+        LiveRecoverySweep.IsTransientMailboxAdmissionStatus(statusCode).ShouldBe(expectedTransient);
     }
 
     /// <summary>
@@ -173,7 +173,7 @@ public sealed class LiveContinuityAspireE2eContractTests
     [InlineData("{\"type\":\"https://hexalith.dev/errors/chatbot/canonical-execution-unavailable\",\"status\":503}", true)]
     [InlineData("{\"type\":\"https://hexalith.dev/errors/chatbot/canonical-execution-unavailable-x\"}", false)]
     public void MailboxAdmissionProofRequiresAPostAuthorizationUnavailableProblemType(string problemDetails, bool expected)
-        => LiveContinuityAspireE2eTests.IsPostAuthorizationUnavailableProblem(problemDetails).ShouldBe(expected);
+        => LiveRecoverySweep.IsPostAuthorizationUnavailableProblem(problemDetails).ShouldBe(expected);
 
     /// <summary>
     /// The live authenticated admission probe is only meaningful when its body passes the OpenAPI request contract,
@@ -188,7 +188,7 @@ public sealed class LiveContinuityAspireE2eContractTests
         const string commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
         DefaultHttpContext context = new();
         context.Request.ContentType = "application/json";
-        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(LiveContinuityAspireE2eTests.MailboxAdmissionProbeBody(commandId)));
+        context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(LiveRecoverySweep.MailboxAdmissionProbeBody(commandId)));
 
         (CommandSubmissionRequest? request, string? origin) = await CommandSubmissionContractAdapter
             .ReadAsync(context, TestContext.Current.CancellationToken)
@@ -240,7 +240,7 @@ public sealed class LiveContinuityAspireE2eContractTests
     public void MailboxOwnerSeedShouldTargetTheExactAdmissionProbeIntake()
     {
         using JsonDocument body = JsonDocument.Parse(
-            LiveContinuityAspireE2eTests.MailboxAdmissionProbeBody("01ARZ3NDEKTSV4RRFFQ69G5FAY"));
+            LiveRecoverySweep.MailboxAdmissionProbeBody("01ARZ3NDEKTSV4RRFFQ69G5FAY"));
         JsonElement root = body.RootElement;
 
         root.GetProperty("command").GetProperty("intakeId").GetString().ShouldBe(RecoveryMailboxOwnerProvisioner.ProbeIntakeId);

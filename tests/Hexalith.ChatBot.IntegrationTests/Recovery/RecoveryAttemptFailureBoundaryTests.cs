@@ -31,7 +31,7 @@ public sealed class RecoveryAttemptFailureBoundaryTests
         try
         {
             Exception observed = await Should.ThrowAsync<Exception>(async () =>
-                await LiveContinuityAspireE2eTests.RunRecoveryAttemptAsync(async () =>
+                await LiveRecoverySweep.RunRecoveryAttemptAsync(async () =>
                 {
                     for (int stage = 0; stage < 4; stage++)
                     {
@@ -100,7 +100,7 @@ public sealed class RecoveryAttemptFailureBoundaryTests
         try
         {
             AggregateException failure = await Should.ThrowAsync<AggregateException>(async () =>
-                await LiveContinuityAspireE2eTests.RunRecoveryAttemptAsync(
+                await LiveRecoverySweep.RunRecoveryAttemptAsync(
                     () => ValueTask.FromException(primary), path, true, RunId, DateTimeOffset.UtcNow,
                     new InMemoryOperatorAlertSink(), TimeSpan.FromSeconds(5)).ConfigureAwait(true)).ConfigureAwait(true);
             failure.InnerExceptions.Count.ShouldBe(2);
@@ -125,9 +125,9 @@ public sealed class RecoveryAttemptFailureBoundaryTests
         try
         {
             Exception observed = await Should.ThrowAsync<IOException>(async () =>
-                await LiveContinuityAspireE2eTests.RunRecoveryAttemptAsync(async () =>
+                await LiveRecoverySweep.RunRecoveryAttemptAsync(async () =>
                 {
-                    _ = await LiveContinuityAspireE2eTests.RunControlledLossAndRetainAsync(
+                    _ = await LiveRecoverySweep.RunControlledLossAndRetainAsync(
                         _ => ValueTask.FromException<ControlledLossPathReport>(primary),
                         (_, _) => ValueTask.CompletedTask, sink, RunId, TimeSpan.FromSeconds(5),
                         TestContext.Current.CancellationToken).ConfigureAwait(true);
@@ -161,7 +161,7 @@ public sealed class RecoveryAttemptFailureBoundaryTests
         string directory = Path.Combine(Path.GetTempPath(), $"recovery-attempt-{Guid.NewGuid():N}");
         IOException primary = new("stage failure");
         AggregateException failure = await Should.ThrowAsync<AggregateException>(async () =>
-            await LiveContinuityAspireE2eTests.RunRecoveryAttemptAsync(() => ValueTask.FromException(primary),
+            await LiveRecoverySweep.RunRecoveryAttemptAsync(() => ValueTask.FromException(primary),
                 directory, true, RunId, DateTimeOffset.UtcNow, new InMemoryOperatorAlertSink(),
                 TimeSpan.Zero).ConfigureAwait(true)).ConfigureAwait(true);
         failure.InnerExceptions.Count.ShouldBe(2);
@@ -182,7 +182,7 @@ public sealed class RecoveryAttemptFailureBoundaryTests
         try
         {
             _ = await Should.ThrowAsync<IOException>(async () =>
-                await LiveContinuityAspireE2eTests.RunRecoveryAttemptAsync(async () =>
+                await LiveRecoverySweep.RunRecoveryAttemptAsync(async () =>
                 {
                     Directory.CreateDirectory(directory);
                     await File.WriteAllTextAsync(path, "{\"latestAttemptCompletedSuccessfully\":true}", TestContext.Current.CancellationToken).ConfigureAwait(true);
@@ -211,7 +211,7 @@ public sealed class RecoveryAttemptFailureBoundaryTests
         string summary = Path.Combine(directory, LiveRecoveryValidationAttemptSummary.FileName);
         try
         {
-            await LiveContinuityAspireE2eTests.RunRecoveryAttemptAsync(() =>
+            await LiveRecoverySweep.RunRecoveryAttemptAsync(() =>
             {
                 Directory.CreateDirectory(directory);
                 File.WriteAllText(summary, "completed-summary");

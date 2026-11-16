@@ -14,6 +14,8 @@
   </PropertyGroup>
 
   <PropertyGroup>
+    <!-- Keep the explicitly retained AppHost resources in the solution's Release configuration. -->
+    <ShouldUnsetParentConfigurationAndPlatform>false</ShouldUnsetParentConfigurationAndPlatform>
     <!-- Directory.Build.props is imported before the SDK defaults an unset Configuration to Debug. -->
     <UseHexalithProjectReferences Condition="'$(UseHexalithProjectReferences)' == '' and '$(CI)' != 'true' and ('$(Configuration)' == '' or '$(Configuration)' == 'Debug')">true</UseHexalithProjectReferences>
     <UseHexalithProjectReferences Condition="'$(UseHexalithProjectReferences)' == ''">false</UseHexalithProjectReferences>

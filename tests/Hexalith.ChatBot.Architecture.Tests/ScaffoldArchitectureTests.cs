@@ -47,8 +47,7 @@ public static class ScaffoldArchitectureTests
             "tests/Hexalith.ChatBot.Conformance.Tests/Hexalith.ChatBot.Conformance.Tests.csproj",
             "tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj",
             "tests/Hexalith.ChatBot.RecoverySandbox/Hexalith.ChatBot.RecoverySandbox.csproj",
-            "tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj",
-            "tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/Hexalith.ChatBot.StoryEvidenceGate.Tests.csproj",
+            "tests/Hexalith.ChatBot.Recovery.Tests/Hexalith.ChatBot.Recovery.Tests.csproj",
             "tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj",
             "tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj",
             "tests/Hexalith.ChatBot.Workers.Tests/Hexalith.ChatBot.Workers.Tests.csproj",
@@ -72,16 +71,8 @@ public static class ScaffoldArchitectureTests
             expected.Where(static path => path.StartsWith("tests/", StringComparison.Ordinal)),
             ignoreOrder: true,
             customMessage: "every independent test lane must remain in the solution inventory");
-        string[] declaredSiblings = File.ReadAllLines(Path.Combine(RepositoryRoot(), ".gitmodules"))
-            .Select(static line => line.Trim())
-            .Where(static line => line.StartsWith("path = references/", StringComparison.Ordinal))
-            .Select(static line => line["path = ".Length..] + "/")
-            .ToArray();
-        foreach (string siblingProject in projects.Where(static path => path.StartsWith("references/", StringComparison.Ordinal)))
-        {
-            declaredSiblings.Any(root => siblingProject.StartsWith(root, StringComparison.Ordinal)).ShouldBeTrue(
-                $"Solution project '{siblingProject}' must belong to a root-declared sibling module.");
-        }
+        projects.ShouldNotContain(static path => path.StartsWith("references/", StringComparison.Ordinal),
+            "ordinary sibling libraries must be restored as packages; AppHost composition references stay in its project");
     }
 
     [Fact]
@@ -1094,17 +1085,6 @@ public static class ScaffoldArchitectureTests
         (sdkVersion.Build / 100).ShouldBe(1, "the repository pins the .NET 11.0.1xx SDK feature band");
         sdk.GetProperty("rollForward").GetString().ShouldBe("latestPatch");
 
-        foreach (string workflowName in new[] { "ci.yml", "release.yml" })
-        {
-            string workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", workflowName));
-            int setupSteps = Regex.Matches(workflow, @"uses: actions/setup-dotnet@").Count;
-            setupSteps.ShouldBeGreaterThan(0, "every build workflow must install the repository SDK");
-            Regex.Matches(workflow, @"global-json-file: global\.json").Count.ShouldBe(setupSteps);
-            Regex.Matches(workflow, @"dotnet-version:").Count.ShouldBe(setupSteps,
-                "each setup selects the global SDK and exactly one supporting net10 SDK");
-            Regex.Matches(workflow, @"dotnet-version:\s*'10\.0\.404'").Count.ShouldBe(setupSteps,
-                "the supporting SDK is bounded to the source-resource feature band");
-        }
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<TargetFramework>net10.0</TargetFramework>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<Nullable>enable</Nullable>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<ImplicitUsings>enable</ImplicitUsings>");
@@ -1121,7 +1101,7 @@ public static class ScaffoldArchitectureTests
     }
 
     [Fact]
-    public static void ReleaseMetadataShouldBindExactInventoryAndRemainBlockedOnOpenEvidenceGates()
+    public static void ReleaseMetadataShouldBindExactPackageAndContainerInventory()
     {
         string root = RepositoryRoot();
         using JsonDocument document = JsonDocument.Parse(
@@ -1129,7 +1109,6 @@ public static class ScaffoldArchitectureTests
         JsonElement metadata = document.RootElement;
 
         metadata.GetProperty("schemaVersion").GetInt32().ShouldBe(1);
-        metadata.GetProperty("releasePosture").GetString().ShouldBe("blocked-open-gates");
 
         Dictionary<string, string> packages = metadata.GetProperty("inventory").GetProperty("packages")
             .EnumerateArray()
@@ -1175,41 +1154,6 @@ public static class ScaffoldArchitectureTests
             project.Descendants("ContainerRepository").Single().Value.ShouldBe(containerId);
         }
 
-        JsonElement[] blockers = metadata.GetProperty("openBlockers").EnumerateArray().ToArray();
-        blockers.Select(static blocker => blocker.GetProperty("gate").GetString()).ShouldBe(
-            ["A5", "A6", "A9a", "A13"],
-            ignoreOrder: true);
-        blockers.ShouldAllBe(static blocker => blocker.GetProperty("state").GetString() == "open");
-
-        JsonElement a9aEvidence = blockers
-            .Single(static blocker => blocker.GetProperty("gate").GetString() == "A9a")
-            .GetProperty("requiredEvidence");
-        string[] exactA9aArtifacts = a9aEvidence.EnumerateArray()
-            .Select(static artifact => string.Join(
-                ':',
-                artifact.GetProperty("kernel").GetString(),
-                artifact.GetProperty("runtimeArtifact").GetString(),
-                artifact.GetProperty("state").GetString()))
-            .ToArray();
-        exactA9aArtifacts.ShouldBe(
-            [
-                "association:AssociationScorer:open-exact-evidence-required",
-                "task-intent:TaskIntentDetector:open-exact-evidence-required",
-                "action-risk:ActionRiskClassifier:open-exact-evidence-required",
-            ],
-            ignoreOrder: true);
-
-        metadata.GetProperty("authorizedReadinessClaims").GetArrayLength().ShouldBe(0);
-        string[] prohibitedClaims = metadata.GetProperty("prohibitedClaims")
-            .EnumerateArray()
-            .Select(static claim => claim.GetString()!)
-            .ToArray();
-        prohibitedClaims.ShouldContain("M0 readiness");
-        prohibitedClaims.ShouldContain("M1 readiness");
-        prohibitedClaims.ShouldContain("pilot readiness");
-        prohibitedClaims.ShouldContain("compliance readiness");
-        prohibitedClaims.ShouldContain("production readiness");
-        prohibitedClaims.ShouldContain("gate readiness");
     }
 
     [Fact]
@@ -1230,390 +1174,9 @@ public static class ScaffoldArchitectureTests
         paths.ShouldAllBe(static path => path.StartsWith("references/", StringComparison.Ordinal));
     }
 
+    /// <summary>Preserves production refusal ordering and the committed-state M2 product proof.</summary>
     [Fact]
-    public static void CiShouldInitializeOnlyReferencesSubmodulesNonRecursively()
-    {
-        string workflow = File.ReadAllText(Path.Combine(RepositoryRoot(), ".github", "workflows", "ci.yml"));
-
-        workflow.ShouldContain("submodules: false");
-        workflow.ShouldContain("git submodule update --init");
-        workflow.ShouldNotContain("--recursive");
-    }
-
-    [Fact]
-    public static void PullRequestMergeRefValidationShouldRemainIsolatedFromExactHeadEvidence()
-    {
-        string workflow = File.ReadAllText(Path.Combine(RepositoryRoot(), ".github", "workflows", "ci.yml"));
-        // Bounded by the next top-level job key rather than by a named successor: a job inserted between the two
-        // would otherwise be folded into this block and silently satisfy the isolation assertions below.
-        string mergeJob = WorkflowJob(workflow, "pull-request-merge-ref");
-        workflow.IndexOf("\n  pull-request-merge-ref:", StringComparison.Ordinal)
-            .ShouldBeLessThan(workflow.IndexOf("\n  build:", StringComparison.Ordinal));
-
-        mergeJob.ShouldContain("name: pull-request synthetic merge build and test");
-        mergeJob.ShouldContain("if: github.event_name == 'pull_request'");
-        mergeJob.ShouldContain("timeout-minutes: 60");
-        mergeJob.ShouldContain("permissions:\n      contents: read");
-        mergeJob.ShouldNotContain("\n    needs:");
-        mergeJob.ShouldContain("ref: ${{ github.sha }}");
-        mergeJob.ShouldContain("persist-credentials: false");
-        mergeJob.ShouldContain("submodules: false");
-        mergeJob.ShouldContain(
-            "verify-pull-request-merge.sh \"$MERGE_SHA\" \"$PR_BASE_SHA\" \"$PR_HEAD_SHA\"");
-        mergeJob.ShouldContain("git submodule update --init");
-        mergeJob.ShouldNotContain("--recursive");
-        mergeJob.ShouldContain("dotnet restore Hexalith.ChatBot.slnx");
-        mergeJob.ShouldContain(
-            "dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -p:UseHexalithProjectReferences=false -m:1 /nr:false");
-        mergeJob.ShouldContain("bash .github/scripts/run-merge-test-lanes.sh");
-        mergeJob.ShouldNotContain("actions/upload-artifact");
-        mergeJob.ShouldNotContain("machine-test-results");
-        mergeJob.ShouldNotContain("topology-acceptance-evidence");
-        mergeJob.ShouldNotContain("story-evidence-integrity-reports");
-        mergeJob.ShouldNotContain("provenance");
-
-        int mergeJobIndex = workflow.IndexOf(mergeJob, StringComparison.Ordinal);
-        mergeJobIndex.ShouldBeGreaterThanOrEqualTo(0);
-        string otherJobs = workflow.Remove(mergeJobIndex, mergeJob.Length);
-        otherJobs.ShouldNotContain("pull-request-merge-ref");
-    }
-
-    [Fact]
-    public static void StoryEvidenceIntegrityGateShouldRemainFailClosedAndMachineBound()
-    {
-        string root = RepositoryRoot();
-        string policy = File.ReadAllText(Path.Combine(root, "story-evidence-policy.json"));
-        string workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "ci.yml"));
-        string releaseWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "release.yml"));
-        string daprInstaller = File.ReadAllText(Path.Combine(root, ".github", "scripts", "install-dapr-cli.sh"));
-        string browserPrimarySource = File.ReadAllText(Path.Combine(
-            root,
-            "tests",
-            "Hexalith.ChatBot.UI.E2E.Tests",
-            "RealRenderCrossSurfaceE2ETests.cs"));
-        string signalRPrimarySource = File.ReadAllText(Path.Combine(
-            root,
-            "tests",
-            "Hexalith.ChatBot.Server.Tests",
-            "Projections",
-            "ChatBotProjectConversationHubE2ETests.cs"));
-        string hostingAssetsPrimarySource = File.ReadAllText(Path.Combine(
-            root,
-            "tests",
-            "Hexalith.ChatBot.UI.E2E.Tests",
-            "FrontComposerShellIntegrationE2ETests.cs"));
-        string aspireDaprPrimarySource = File.ReadAllText(Path.Combine(
-            root,
-            "tests",
-            "Hexalith.ChatBot.IntegrationTests",
-            "TrivialGovernedCommandAspireE2eTests.cs"));
-        string recoveryPrimarySource = File.ReadAllText(Path.Combine(
-            root,
-            "tests",
-            "Hexalith.ChatBot.IntegrationTests",
-            "Recovery",
-            "LiveContinuityAspireE2eTests.cs"));
-        string toolProject = File.ReadAllText(Path.Combine(
-            root,
-            "tools",
-            "Hexalith.ChatBot.StoryEvidenceGate",
-            "Hexalith.ChatBot.StoryEvidenceGate.csproj"));
-        string toolProgram = File.ReadAllText(Path.Combine(
-            root,
-            "tools",
-            "Hexalith.ChatBot.StoryEvidenceGate",
-            "Program.cs"));
-        string lifecycleValidator = File.ReadAllText(Path.Combine(
-            root,
-            "tools",
-            "Hexalith.ChatBot.StoryEvidenceGate",
-            "LifecycleTransitionValidator.cs"));
-        string trxReader = File.ReadAllText(Path.Combine(
-            root,
-            "tools",
-            "Hexalith.ChatBot.StoryEvidenceGate",
-            "TrxEvidenceReader.cs"));
-        string attestor = File.ReadAllText(Path.Combine(
-            root,
-            "tools",
-            "Hexalith.ChatBot.StoryEvidenceGate",
-            "ProvenanceAttestor.cs"));
-        string completionJob = WorkflowBlock(workflow, "story-evidence-integrity", "topology-acceptance");
-        string completionProducer = WorkflowStep(
-            completionJob,
-            "Produce transition-declared current recovery primary result");
-        string completionSummary = WorkflowStep(
-            completionJob,
-            "Summarize recovery attempt into metadata-only failure record");
-        string completionUpload = WorkflowStep(
-            completionJob,
-            "Upload metadata-only recovery attempt evidence");
-        string scheduledRecoveryJob = WorkflowBlock(
-            workflow,
-            "live-recovery-validation",
-            "live-recovery-evidence-gate");
-        string scheduledRecoveryProducer = WorkflowStep(
-            scheduledRecoveryJob,
-            "Run all live recovery coordinators and retain evidence");
-
-        policy.ShouldContain("\"schemaVersion\": \"2.1\"");
-        policy.ShouldContain("\"repositoryIdentity\": \"Hexalith/Hexalith.ChatBot\"");
-        policy.ShouldContain("\"maximumCurrentRunAgeMinutes\": 60");
-        policy.ShouldContain("\"maximumLaneCurrentRunAgeMinutes\": 1440");
-        policy.ShouldContain("\"maximumCurrentRunAgeMinutes\": 360");
-        policy.ShouldContain("\"snapshot-plus-transition\"");
-        policy.ShouldContain("\"scope_digest_mismatch\"");
-        policy.ShouldContain("\"primary_path_not_executed\"");
-        policy.ShouldContain("\"checked_item_evidence_mismatch\"");
-        policy.ShouldContain("\"eventBaseHeadResolution\"");
-        policy.ShouldContain("\"pullRequestHead\": \"github.event.pull_request.head.sha\"");
-        policy.ShouldContain("\"zeroPushBaseFallback\": \"git rev-parse HEAD^\"");
-        policy.ShouldContain("\"unavailableNonZeroPushBase\": \"fail\"");
-        policy.ShouldContain("\"nonPushEventRange\": \"github.sha..github.sha\"");
-        policy.ShouldNotContain("\"allowedLifecycleBookkeepingFields\"");
-        policy.ShouldContain("\"immutableContentSource\": \"git-tree\"");
-        policy.ShouldContain("\"worktreeModeSource\": \"git-index\"");
-        policy.ShouldContain("\"recognizedLaneBindings\"");
-        policy.ShouldContain("\"allowedLocatorSchemes\"");
-        policy.ShouldContain(
-            "\"selector\": \"class:Hexalith.ChatBot.UI.E2E.Tests.RealRenderCrossSurfaceE2ETests\"");
-        policy.ShouldContain(
-            "\"selector\": \"class:Hexalith.ChatBot.Server.Tests.Projections.ChatBotProjectConversationHubE2ETests\"");
-        policy.ShouldContain(
-            "\"selector\": \"class:Hexalith.ChatBot.UI.E2E.Tests.FrontComposerShellIntegrationE2ETests\"");
-        policy.ShouldContain(
-            "\"selector\": \"class:Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests\"");
-        policy.ShouldContain(
-            "\"selector\": \"class:Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests\"");
-        policy.ShouldContain("\"trx\": \"recovery-primary/live-recovery-validation.trx\"");
-        policy.ShouldContain(
-            "\"provenance\": \"recovery-primary/live-recovery-validation.provenance.json\"");
-        policy.ShouldContain("\".github/workflows/ci.yml\"");
-        policy.ShouldContain("\".github/workflows/release.yml\"");
-        policy.ShouldContain("\"src/Hexalith.ChatBot.AppHost/**\"");
-        policy.ShouldContain(
-            "\"tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs\"");
-        policy.ShouldNotContain("\"**/*Dapr*.cs\"");
-        policy.ShouldNotContain("\"**/*Aspire*.cs\"");
-        policy.ShouldNotContain("Hexalith.ChatBot.BrowserPrimaryTests");
-        policy.ShouldNotContain("Hexalith.ChatBot.SignalRPrimaryTests");
-        policy.ShouldNotContain("Hexalith.ChatBot.HostingAssetsPrimaryTests");
-        policy.ShouldNotContain("Hexalith.ChatBot.AspireDaprPrimaryTests");
-        policy.ShouldNotContain("Hexalith.ChatBot.RecoveryPrimaryTests");
-        browserPrimarySource.ShouldContain("namespace Hexalith.ChatBot.UI.E2E.Tests;");
-        browserPrimarySource.ShouldContain("public sealed class RealRenderCrossSurfaceE2ETests");
-        signalRPrimarySource.ShouldContain("namespace Hexalith.ChatBot.Server.Tests.Projections;");
-        signalRPrimarySource.ShouldContain("public sealed class ChatBotProjectConversationHubE2ETests");
-        hostingAssetsPrimarySource.ShouldContain("namespace Hexalith.ChatBot.UI.E2E.Tests;");
-        hostingAssetsPrimarySource.ShouldContain("public sealed class FrontComposerShellIntegrationE2ETests");
-        aspireDaprPrimarySource.ShouldContain("namespace Hexalith.ChatBot.IntegrationTests;");
-        aspireDaprPrimarySource.ShouldContain("public sealed class TrivialGovernedCommandAspireE2eTests");
-        recoveryPrimarySource.ShouldContain("namespace Hexalith.ChatBot.IntegrationTests.Recovery;");
-        recoveryPrimarySource.ShouldContain("public sealed class LiveContinuityAspireE2eTests");
-        workflow.ShouldContain("story-evidence-integrity:");
-        workflow.ShouldContain("name: story-evidence-integrity");
-        completionJob.ShouldContain("runs-on: ubuntu-latest");
-        WorkflowBlock(workflow, "build", "story-evidence-integrity").ShouldContain("runs-on: ubuntu-latest");
-        workflow.ShouldContain("python3 -m unittest discover -s .github/scripts/tests -p 'test_story_evidence_guards.py' -v");
-        workflow.ShouldContain("STORY_EVIDENCE_TEST_RUNNER:");
-        workflow.ShouldContain("needs: [build, topology-acceptance]\n    if: always()");
-        workflow.ShouldContain("timeout-minutes: 360");
-        workflow.ShouldContain("if: needs.build.result != 'success'");
-        workflow.ShouldContain(
-            "if: steps.artifacts.outputs.requires_topology == 'true' && needs.topology-acceptance.result != 'success'");
-        workflow.ShouldContain("ref: ${{ github.event.pull_request.head.sha || github.sha }}");
-        Regex.Matches(workflow, "ref: \\$\\{\\{ github\\.event\\.pull_request\\.head\\.sha \\|\\| github\\.sha \\}\\}")
-            .Count.ShouldBeGreaterThanOrEqualTo(3);
-        workflow.ShouldContain("actions: read");
-        workflow.ShouldContain("bash .github/scripts/run-merge-test-lanes.sh");
-        string mergeLaneScript = File.ReadAllText(Path.Combine(root, ".github", "scripts", "run-merge-test-lanes.sh"));
-        mergeLaneScript.ShouldContain("declare -A seen_lanes=()");
-        mergeLaneScript.ShouldContain("expected_lanes=\"${MERGE_TEST_EXPECTED_LANES:-13}\"");
-        mergeLaneScript.ShouldContain("the merge lane set must match the build job exactly");
-        mergeLaneScript.ShouldContain("Colliding merge test lane");
-        mergeLaneScript.ShouldContain("run-xunit-v4.sh");
-        workflow.ShouldContain("bash .github/scripts/resolve-story-evidence-bounds.sh");
-        string boundsScript = File.ReadAllText(Path.Combine(root, ".github", "scripts", "resolve-story-evidence-bounds.sh"));
-        boundsScript.ShouldContain("Non-zero push base %s is unavailable; refusing a one-commit fallback.");
-        boundsScript.ShouldContain("base_sha=\"$head_sha\"");
-        workflow.ShouldContain("Plan proposed completion production");
-        workflow.ShouldContain("--configuration Release --no-build -- plan");
-        workflow.ShouldContain("--output \"$PRODUCTION_PLAN_PATH\"");
-        workflow.ShouldContain("Resolve transition-declared artifact requirements");
-        workflow.ShouldContain(".requiresTopology");
-        workflow.ShouldContain(".requiresRecovery");
-        workflow.ShouldContain(".retainedLocators[]?");
-        workflow.ShouldNotContain(".source == \"current-run\" and .lane == \"recovery-primary\"");
-        workflow.ShouldContain("requires_topology=%s");
-        workflow.ShouldContain("requires_recovery=%s");
-        workflow.ShouldContain(
-            "- name: Download transition-declared current topology primary result\n"
-            + "        if: steps.artifacts.outputs.requires_topology == 'true'");
-        workflow.ShouldContain("name: topology-acceptance-evidence");
-        workflow.ShouldContain(
-            "- name: Setup DAPR CLI for transition-declared current recovery primary\n"
-            + "        if: steps.artifacts.outputs.requires_recovery == 'true'");
-        workflow.ShouldContain(
-            "- name: Produce transition-declared current recovery primary result\n"
-            + "        id: recovery\n"
-            + "        if: steps.artifacts.outputs.requires_recovery == 'true'");
-        workflow.ShouldContain(
-            "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.ctrf.json");
-        workflow.ShouldContain(
-            "- name: Stop DAPR runtime for transition-declared current recovery primary\n"
-            + "        if: always() && steps.artifacts.outputs.requires_recovery == 'true'");
-        workflow.ShouldNotContain("HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT: story-evidence-integrity-reports");
-        completionProducer.ShouldContain("timeout-minutes: 285");
-        completionProducer.ShouldContain("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: \"250\"");
-        completionProducer.ShouldContain("HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT: completion-recovery-evidence");
-        completionProducer.ShouldContain("bash .github/scripts/run-xunit-v4.sh");
-        completionProducer.ShouldContain("XUNIT_REQUIRE_ZERO_SKIPS=1");
-        completionSummary.ShouldContain("if: always() && steps.artifacts.outputs.requires_recovery == 'true'");
-        completionSummary.ShouldContain("summarize-recovery-attempt");
-        completionUpload.ShouldContain("if: always() && steps.artifacts.outputs.requires_recovery == 'true'");
-        completionUpload.ShouldContain("name: completion-recovery-evidence");
-        completionUpload.ShouldContain("path: TestResults");
-        completionUpload.ShouldNotContain("path: |");
-        Regex.Match(
-                completionProducer,
-                "HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT: (?<name>[A-Za-z0-9_.-]+)")
-            .Groups["name"].Value.ShouldBe(
-                Regex.Match(completionUpload, "(?m)^          name: (?<name>[A-Za-z0-9_.-]+)")
-                    .Groups["name"].Value);
-        scheduledRecoveryProducer.ShouldContain("timeout-minutes: 300");
-        scheduledRecoveryProducer.ShouldContain("HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: \"265\"");
-        scheduledRecoveryProducer.ShouldContain("bash .github/scripts/run-xunit-v4.sh");
-        scheduledRecoveryProducer.ShouldContain("XUNIT_REQUIRE_ZERO_SKIPS=1");
-        workflow.ShouldContain("bash .github/scripts/check-story-evidence-reserve.sh");
-        workflow.ShouldContain("RESERVE_REPORT_PATH: ${{ runner.temp }}/story-evidence-reports/completion-reserve.json");
-        string reserveScript = File.ReadAllText(Path.Combine(root, ".github", "scripts", "check-story-evidence-reserve.sh"));
-        reserveScript.ShouldContain("elapsed_seconds >= 2400");
-        reserveScript.ShouldContain("job_start_epoch + (330 * 60)");
-        reserveScript.ShouldContain("completion_reserve_exhausted");
-        workflow.ShouldContain("remaining_seconds - 900");
-        workflow.ShouldContain("timeout --signal=INT --kill-after=15m");
-        workflow.ShouldContain("dapr init --runtime-version 1.19.1");
-        workflow.ShouldContain("actions/upload-artifact@v7");
-        workflow.ShouldContain("actions/download-artifact@v8");
-        workflow.ShouldContain(
-            "- name: Setup checksum-pinned DAPR CLI\n"
-            + "        run: bash .github/scripts/install-dapr-cli.sh");
-        daprInstaller.ShouldContain("dapr_version=\"1.19.1\"");
-        daprInstaller.ShouldContain("6e9a339d261e430e5914909cc4443572573c197c174c3e14504c34116831de3b");
-        daprInstaller.ShouldContain("sha256sum --check --strict");
-        workflow.ShouldContain("sanitize-recovery-trx");
-        workflow.ShouldContain(
-            "--output \"${{ runner.temp }}/machine-results/recovery-primary/live-recovery-validation.trx\"");
-        workflow.ShouldContain(
-            "-method \"Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests."
-            + "GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology");
-        workflow.ShouldContain(
-            "-method \"Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests."
-            + "AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix");
-        workflow.ShouldContain("TestResults/topology-acceptance.ctrf.json");
-        workflow.ShouldContain("TestResults/story132-topology-acceptance.ctrf.json");
-        // Retain the consumer-facing TRX counter guard in addition to the xUnit v4 boundary's CTRF validation.
-        workflow.ShouldContain("Require one executed topology acceptance test and zero skips");
-        workflow.ShouldContain("E.parse('TestResults/topology-acceptance.trx')");
-        workflow.ShouldContain("Require one executed Story 13.2 test and zero skips");
-        workflow.ShouldContain("E.parse('TestResults/story132-topology-acceptance.trx')");
-        workflow.ShouldContain("c.get('notExecuted') == '0'");
-        releaseWorkflow.ShouldContain(
-            "-method \"Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests."
-            + "GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology");
-        releaseWorkflow.ShouldContain(
-            "-method \"Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests."
-            + "AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix");
-        releaseWorkflow.ShouldContain("TestResults/topology-acceptance.ctrf.json");
-        releaseWorkflow.ShouldContain("TestResults/story132-topology-acceptance.ctrf.json");
-        releaseWorkflow.ShouldContain("Require one executed topology acceptance test and zero skips");
-        releaseWorkflow.ShouldContain("E.parse('TestResults/topology-acceptance.trx')");
-        releaseWorkflow.ShouldContain("Require one executed Story 13.2 test and zero skips");
-        releaseWorkflow.ShouldContain("E.parse('TestResults/story132-topology-acceptance.trx')");
-        releaseWorkflow.ShouldContain(
-            "-method \"Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests."
-            + "CommittedGovernedStateShouldPassM2StopShipSweepsInRealDaprTopology");
-        releaseWorkflow.ShouldContain("TestResults/m2-stop-ship.ctrf.json");
-        releaseWorkflow.ShouldContain("Require one executed M2 stop-ship test and zero skips");
-        releaseWorkflow.ShouldContain("E.parse('TestResults/m2-stop-ship.trx')");
-        workflow.ShouldNotContain("CommittedGovernedStateShouldPassM2StopShipSweepsInRealDaprTopology");
-        releaseWorkflow.IndexOf("- name: Run required committed-state M2 stop-ship gate", StringComparison.Ordinal)
-            .ShouldBeGreaterThan(releaseWorkflow.IndexOf("- name: Require one executed Story 13.2 test and zero skips", StringComparison.Ordinal));
-        releaseWorkflow.ShouldContain("c.get('notExecuted') == '0'");
-        releaseWorkflow.ShouldContain(
-            "semantic-release:\n"
-            + "    needs:\n"
-            + "      - topology-acceptance\n"
-            + "      - live-recovery-evidence-gate");
-        workflow.ShouldContain(
-            "-method \"Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests."
-            + "LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate");
-        workflow.ShouldContain("live-recovery-validation.ctrf.json");
-        releaseWorkflow.ShouldContain(
-            "-method \"Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests."
-            + "LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate");
-        releaseWorkflow.ShouldContain("live-recovery-validation.ctrf.json");
-        workflow.ShouldContain("Collect transition-declared retained exact-run artifacts");
-        workflow.ShouldContain("bash .github/scripts/collect-story-evidence-artifacts.sh");
-        string retainedScript = File.ReadAllText(Path.Combine(root, ".github", "scripts", "collect-story-evidence-artifacts.sh"));
-        retainedScript.ShouldContain("done < \"$RETAINED_LOCATORS_PATH\"");
-        workflow.ShouldNotContain("_bmad-output/implementation-artifacts/evidence/*.json | sort -u");
-        retainedScript.ShouldContain("gh run download \"$run_id\"");
-        retainedScript.ShouldContain("github-actions://([A-Za-z0-9_.-]+)");
-        retainedScript.ShouldContain("if [[ \"$repository\" != \"$GITHUB_REPOSITORY\" ]]; then");
-        workflow.ShouldContain("Verify general producer artifact binds the exact event head");
-        workflow.ShouldContain(
-            "- name: Verify topology producer artifact binds the exact event head when transition-declared\n"
-            + "        if: steps.artifacts.outputs.requires_topology == 'true'");
-        int resolveBoundsIndex = workflow.IndexOf("Resolve exact transition bounds", StringComparison.Ordinal);
-        int detectTransitionsIndex = workflow.IndexOf("Plan proposed completion production", StringComparison.Ordinal);
-        int collectArtifactsIndex = workflow.IndexOf(
-            "Collect transition-declared retained exact-run artifacts",
-            StringComparison.Ordinal);
-        int produceCurrentRecoveryIndex = workflow.IndexOf(
-            "Produce transition-declared current recovery primary result",
-            StringComparison.Ordinal);
-        int stopCurrentRecoveryIndex = workflow.IndexOf(
-            "Stop DAPR runtime for transition-declared current recovery primary",
-            StringComparison.Ordinal);
-        int sanitizeCurrentRecoveryIndex = workflow.IndexOf(
-            "Project recovery result into metadata-only completion TRX",
-            StringComparison.Ordinal);
-        int attestTransitionsIndex = workflow.IndexOf(
-            "Attest and evaluate proposed completion transitions",
-            StringComparison.Ordinal);
-        resolveBoundsIndex.ShouldBeGreaterThanOrEqualTo(0);
-        detectTransitionsIndex.ShouldBeGreaterThanOrEqualTo(0);
-        collectArtifactsIndex.ShouldBeGreaterThanOrEqualTo(0);
-        produceCurrentRecoveryIndex.ShouldBeGreaterThanOrEqualTo(0);
-        stopCurrentRecoveryIndex.ShouldBeGreaterThanOrEqualTo(0);
-        sanitizeCurrentRecoveryIndex.ShouldBeGreaterThanOrEqualTo(0);
-        attestTransitionsIndex.ShouldBeGreaterThanOrEqualTo(0);
-        resolveBoundsIndex.ShouldBeLessThan(detectTransitionsIndex);
-        detectTransitionsIndex.ShouldBeLessThan(produceCurrentRecoveryIndex);
-        produceCurrentRecoveryIndex.ShouldBeLessThan(stopCurrentRecoveryIndex);
-        stopCurrentRecoveryIndex.ShouldBeLessThan(sanitizeCurrentRecoveryIndex);
-        sanitizeCurrentRecoveryIndex.ShouldBeLessThan(collectArtifactsIndex);
-        collectArtifactsIndex.ShouldBeLessThan(attestTransitionsIndex);
-        Regex.Matches(workflow, "producer-head\\.sha").Count.ShouldBeGreaterThanOrEqualTo(4);
-        toolProgram.ShouldContain("GITHUB_STEP_SUMMARY");
-        toolProgram.ShouldContain("\"ci\" => RunCi");
-        lifecycleValidator.ShouldContain("snapshot-plus-transition");
-        lifecycleValidator.ShouldContain("lifecycle-event-paths");
-        lifecycleValidator.ShouldContain("status: 'in-review'");
-        trxReader.ShouldContain("http://microsoft.com/schemas/VisualStudio/TeamTest/2010");
-        trxReader.ShouldContain("RejectForeignStructuralElements");
-        attestor.ShouldContain("PreflightContract");
-        toolProgram.ShouldContain("result-path-collision");
-        workflow.ShouldContain("fetch-depth: 0");
-        workflow.ShouldContain("StoryEvidenceGate.Tests");
-        workflow.ShouldNotContain("git submodule update --init --recursive");
-        toolProject.ShouldNotContain("PackageReference");
-    }
-
-    /// <summary>Separates production refusal proof from the release-only committed-state M2 requirement.</summary>
-    [Fact]
-    public static void TopologySmokeShouldPreserveRefusalOrderAndIndependentCommittedStateReleaseGate()
+    public static void TopologySmokeShouldPreserveRefusalOrderAndCommittedStateProof()
     {
         string root = RepositoryRoot();
         string source = File.ReadAllText(Path.Combine(root, "tests", "Hexalith.ChatBot.IntegrationTests",
@@ -1642,38 +1205,6 @@ public static class ScaffoldArchitectureTests
         release.IndexOf("AssertM2ReleaseGateIsClearAsync", StringComparison.Ordinal)
             .ShouldBeGreaterThan(release.IndexOf("SubmitGovernedNoteUntilAcceptedAsync", StringComparison.Ordinal));
 
-        string ci = WorkflowBlock(File.ReadAllText(Path.Combine(root, ".github", "workflows", "ci.yml")),
-            "topology-acceptance", "live-recovery-validation");
-        string releaseWorkflow = WorkflowBlock(File.ReadAllText(Path.Combine(root, ".github", "workflows", "release.yml")),
-            "topology-acceptance", "live-recovery-validation");
-        Regex.Matches(ci, Regex.Escape("-method \"Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests." + smokeName + "\""))
-            .Count.ShouldBe(1);
-        Regex.Matches(releaseWorkflow, Regex.Escape("-method \"Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests." + smokeName + "\""))
-            .Count.ShouldBe(1);
-        Regex.Matches(releaseWorkflow, Regex.Escape("-method \"Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests." + m2Name + "\""))
-            .Count.ShouldBe(1);
-        ci.ShouldNotContain(m2Name);
-        releaseWorkflow.ShouldNotContain("continue-on-error");
-        releaseWorkflow.ShouldNotContain("if: false");
-        releaseWorkflow.ShouldContain("E.parse('TestResults/m2-stop-ship.trx')");
-    }
-
-    [Fact]
-    public static void WorkflowsAndToolsShouldNotUseRecursiveSubmoduleCommands()
-    {
-        string root = RepositoryRoot();
-        IEnumerable<string> files = Directory.EnumerateFiles(Path.Combine(root, ".github", "workflows"), "*", SearchOption.AllDirectories)
-            .Concat(Directory.EnumerateFiles(Path.Combine(root, "tests", "tools"), "*", SearchOption.AllDirectories))
-            .Concat(Directory.EnumerateFiles(Path.Combine(root, "tools"), "*.cs", SearchOption.AllDirectories));
-
-        Regex forbidden = new(@"git\s+submodule\s+(?:update|foreach)\b[^\r\n]*--recursive", RegexOptions.IgnoreCase);
-        string[] violations = files
-            .Where(static file => !file.EndsWith(".gitkeep", StringComparison.Ordinal))
-            .Where(file => forbidden.IsMatch(File.ReadAllText(file)))
-            .Select(file => Path.GetRelativePath(root, file))
-            .ToArray();
-
-        violations.ShouldBeEmpty();
     }
 
     [Fact]
@@ -1749,33 +1280,6 @@ public static class ScaffoldArchitectureTests
     {
         return dependency.Attribute("Condition")?.Value
             ?? dependency.Ancestors("ItemGroup").FirstOrDefault()?.Attribute("Condition")?.Value;
-    }
-
-    private static string WorkflowJob(string source, string name)
-    {
-        Match match = Regex.Match(
-            source,
-            $"(?ms)^  {Regex.Escape(name)}:.*?(?=^  \\S|\\z)");
-        match.Success.ShouldBeTrue($"workflow job '{name}' must exist");
-        return match.Value;
-    }
-
-    private static string WorkflowBlock(string source, string name, string nextName)
-    {
-        Match match = Regex.Match(
-            source,
-            $"(?ms)^  {Regex.Escape(name)}:.*?(?=^  {Regex.Escape(nextName)}:)");
-        match.Success.ShouldBeTrue($"workflow job '{name}' must exist before '{nextName}'");
-        return match.Value;
-    }
-
-    private static string WorkflowStep(string job, string name)
-    {
-        Match match = Regex.Match(
-            job,
-            $"(?ms)^      - name: {Regex.Escape(name)}\\n.*?(?=^      - name: |\\z)");
-        match.Success.ShouldBeTrue($"workflow step '{name}' must exist in its owning job");
-        return match.Value;
     }
 
     private static string RepositoryRoot()

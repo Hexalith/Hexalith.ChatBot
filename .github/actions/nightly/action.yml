@@ -1,0 +1,13 @@
+name: Weekly ChatBot recovery validation
+description: Preserve the Sunday destructive recovery sweep in the centrally prepared nightly workspace.
+runs:
+  using: composite
+  steps:
+    - name: Require live topology and browser prerequisites
+      shell: bash
+      run: python3 .github/actions/after-unit-tests/require-runtime.py
+    - name: Run the complete recovery project when the weekly sweep is due
+      shell: bash
+      env:
+        HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: '250'
+      run: bash .github/actions/nightly/run-recovery.sh

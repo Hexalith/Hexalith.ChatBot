@@ -32,9 +32,7 @@ namespace Hexalith.ChatBot.IntegrationTests.Recovery;
 /// Tier-3 proof that continuity, projection-rebuild, and scoped-outage coordinators run live fault injection and pass
 /// the evidence gate.
 /// </summary>
-[Trait("Category", "E2E")]
-[Collection(LiveRecoveryValidationCollection.Name)]
-public sealed class LiveContinuityAspireE2eTests
+internal sealed class LiveRecoverySweep
 {
     private const string RetentionFailureDirectoryVariable =
         "HEXALITH_CHATBOT_RECOVERY_RETENTION_FAILURE_DIR";
@@ -56,8 +54,7 @@ public sealed class LiveContinuityAspireE2eTests
         "eventstore-admin",
     ];
 
-    [Fact]
-    public async Task LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate()
+    internal async Task RunAsync()
     {
         RequireTier3Runtime();
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;

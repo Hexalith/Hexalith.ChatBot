@@ -1,0 +1,8 @@
+name: Require ChatBot live product prerequisites
+description: Require the shared Docker, Dapr and browser environment before ordinary integration and UI tests.
+runs:
+  using: composite
+  steps:
+    - name: Require live topology and browser prerequisites
+      shell: bash
+      run: python3 .github/actions/after-unit-tests/require-runtime.py

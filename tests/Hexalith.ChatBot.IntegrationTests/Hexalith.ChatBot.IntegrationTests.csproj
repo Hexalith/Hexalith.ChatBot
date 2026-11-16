@@ -25,6 +25,9 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Hexalith.ChatBot.Recovery.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Aspire.Hosting.Testing" />
     <PackageReference Include="Microsoft.Playwright" />
