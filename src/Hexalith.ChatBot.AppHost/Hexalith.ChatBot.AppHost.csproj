@@ -12,20 +12,6 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Hexalith.ChatBot.IntegrationTests" />
   </ItemGroup>
-  <PropertyGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
-    <!-- Platform composition consumes the published Tooling assembly shipped by our existing pinned tool.
-         Download it during normal NuGet restore so shared preparation needs no extra bootstrap action. -->
-    <_ChatBotModuleToolManifest>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)../../.config/dotnet-tools.json'))</_ChatBotModuleToolManifest>
-    <_ChatBotModuleToolVersion>$([System.Text.RegularExpressions.Regex]::Match('$(_ChatBotModuleToolManifest)', '(?s)&quot;hexalith\.builds\.module\.cli&quot;\s*:\s*\{\s*&quot;version&quot;\s*:\s*&quot;([^&quot;]+)&quot;').Groups.get_Item(1).Value)</_ChatBotModuleToolVersion>
-    <!-- NuGetPackageRoot is absent on the first evaluation before obj/*.nuget.g.props exists. -->
-    <_ChatBotNuGetPackageRoot>$(NuGetPackageRoot)</_ChatBotNuGetPackageRoot>
-    <_ChatBotNuGetPackageRoot Condition="'$(_ChatBotNuGetPackageRoot)' == ''">$(RestorePackagesPath)</_ChatBotNuGetPackageRoot>
-    <_ChatBotNuGetPackageRoot Condition="'$(_ChatBotNuGetPackageRoot)' == ''">$(NUGET_PACKAGES)</_ChatBotNuGetPackageRoot>
-    <_ChatBotUserProfile>$(USERPROFILE)</_ChatBotUserProfile>
-    <_ChatBotUserProfile Condition="'$(_ChatBotUserProfile)' == ''">$(HOME)</_ChatBotUserProfile>
-    <_ChatBotNuGetPackageRoot Condition="'$(_ChatBotNuGetPackageRoot)' == ''">$(_ChatBotUserProfile)/.nuget/packages</_ChatBotNuGetPackageRoot>
-    <_ChatBotPublishedToolRoot>$([System.IO.Path]::GetFullPath('$(_ChatBotNuGetPackageRoot)/hexalith.builds.module.cli/$(_ChatBotModuleToolVersion)/tools/net10.0/any', '$(MSBuildThisFileDirectory)'))</_ChatBotPublishedToolRoot>
-  </PropertyGroup>
   <ItemGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
     <PackageDownload Include="Hexalith.Builds.Module.Cli" Version="[$(_ChatBotModuleToolVersion)]" />
   </ItemGroup>
@@ -34,6 +20,9 @@
     <PackageReference Include="Aspire.Hosting.Keycloak" />
     <PackageReference Include="Aspire.Hosting.Redis" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Dapr" />
+    <!-- Keep the catalog helper on the same published SDK identity as the selected owners.
+         Its required custody/observation APIs are present in the centrally pinned package. -->
+    <PackageReference Include="Hexalith.EventStore.Aspire" Condition="'$(UseHexalithProjectReferences)' != 'true'" />
   </ItemGroup>
   <!-- Typed Aspire project resources. The generated Projects.* metadata keeps the dapr sidecar's auto-detected
        app port aligned with the app's Kestrel listener under the Aspire testing builder; the path-based
@@ -43,7 +32,8 @@
     <ProjectReference Include="..\Hexalith.ChatBot.Server\Hexalith.ChatBot.Server.csproj" />
     <ProjectReference Include="..\Hexalith.ChatBot.UI\Hexalith.ChatBot.UI.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore\Hexalith.EventStore.csproj" />
-    <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Aspire\Hexalith.EventStore.Aspire.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Aspire\Hexalith.EventStore.Aspire.csproj"
+                      IsAspireProjectResource="false" Condition="'$(UseHexalithProjectReferences)' == 'true'" />
     <ProjectReference Include="$(HexalithPlatformRoot)\src\Hexalith.Platform.Composition\Hexalith.Platform.Composition.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Admin.Server.Host\Hexalith.EventStore.Admin.Server.Host.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Admin.UI\Hexalith.EventStore.Admin.UI.csproj" />
@@ -56,11 +46,6 @@
     <ProjectReference Include="$(HexalithMemoriesRoot)\src\Hexalith.Memories.Server\Hexalith.Memories.Server.csproj"
                       IsAspireProjectResource="false"
                       ReferenceOutputAssembly="false" />
-  </ItemGroup>
-  <ItemGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
-    <!-- Composition resources must inherit the same published artifact and solution configuration. -->
-    <ProjectReference Update="@(ProjectReference)"
-                      AdditionalProperties="%(ProjectReference.AdditionalProperties);HexalithBuildsPublishedToolRoot=$(_ChatBotPublishedToolRoot);ShouldUnsetParentConfigurationAndPlatform=false" />
   </ItemGroup>
   <!-- Project resources can transitively consume Conversations. Pass the root-declared Commons location as a
        global MSBuild property so no sibling falls back to its forbidden nested submodule.

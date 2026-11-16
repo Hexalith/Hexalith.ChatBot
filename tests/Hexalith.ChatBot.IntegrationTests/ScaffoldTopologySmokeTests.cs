@@ -59,7 +59,7 @@ public static class ScaffoldTopologySmokeTests
         appHostReference.Element("IsAspireProjectResource")?.Value.ShouldBe("false");
         e2eTests.ShouldContain("CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>");
         e2eTests.ShouldContain("WaitForChatBotDaprSidecarAsync");
-        e2eTests.ShouldContain("CorrectionPropagationWorkflowRuntimeShouldBeHealthyInRealDaprTopology");
+        e2eTests.ShouldContain("RunCorrectionPropagationRuntimeHealthAsync");
 
         appHostProject.ShouldContain("$(HexalithEventStoreRoot)\\src\\Hexalith.EventStore\\Hexalith.EventStore.csproj");
         appHostProject.ShouldContain("$(HexalithTenantsRoot)\\src\\Hexalith.Tenants\\Hexalith.Tenants.csproj");

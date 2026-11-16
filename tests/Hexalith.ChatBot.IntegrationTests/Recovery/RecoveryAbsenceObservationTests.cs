@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 
 using Hexalith.ChatBot.Server.Projections;
@@ -103,9 +102,9 @@ public sealed class RecoveryAbsenceObservationTests
         };
         using EventStoreDurableStateProbe durable = Durable();
         TimeSpan window = TimeSpan.FromMilliseconds(30);
+        AdvancingRecoveryTimeProvider clock = new(TimeSpan.FromMilliseconds(10));
         AspireRecoverySandboxOperations operations = new(new RecoverySandboxOperationsTestSeam(), store, store, durable,
-            TimeSpan.FromMilliseconds(1), window, TimeSpan.FromMilliseconds(10));
-        Stopwatch timer = Stopwatch.StartNew();
+            TimeSpan.FromMilliseconds(1), window, TimeSpan.FromMilliseconds(10), clock);
 
         bool absent = await operations.RemainsGovernedOperationProjectionAbsentAsync(
             tenant, Note, TestContext.Current.CancellationToken);
@@ -118,7 +117,7 @@ public sealed class RecoveryAbsenceObservationTests
         else
         {
             reads.ShouldBeGreaterThan(2);
-            timer.Elapsed.ShouldBeGreaterThanOrEqualTo(window);
+            clock.ObservedElapsed.ShouldBeGreaterThanOrEqualTo(window);
         }
     }
 

@@ -2,4 +2,5 @@
   <PropertyGroup>
     <BuildInParallel>false</BuildInParallel>
   </PropertyGroup>
+  <Import Project="$(MSBuildThisFileDirectory)eng/ChatBot.Composition.props" />
 </Project>

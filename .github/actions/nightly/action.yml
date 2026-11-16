@@ -1,12 +1,17 @@
-name: Weekly ChatBot recovery validation
-description: Preserve the Sunday destructive recovery sweep in the centrally prepared nightly workspace.
+name: ChatBot release and weekly recovery validation
+description: Run daily positive-state release gates and independently preserve the Sunday destructive recovery sweep.
 runs:
   using: composite
   steps:
     - name: Require live topology and browser prerequisites
+      id: runtime
       shell: bash
       run: python3 .github/actions/after-unit-tests/require-runtime.py
+    - name: Run the complete positive-state release project
+      shell: bash
+      run: bash .github/actions/nightly/run-release.sh
     - name: Run the complete recovery project when the weekly sweep is due
+      if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
       shell: bash
       env:
         HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES: '250'

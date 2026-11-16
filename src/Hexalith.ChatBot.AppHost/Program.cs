@@ -106,12 +106,19 @@ IResourceBuilder<ParameterResource> projectsAuthorityReadPublicKeyParameter = bu
 
 IResourceBuilder<ProjectResource> eventStore = builder.AddProject<Projects.Hexalith_EventStore>(
     ChatBotAspireModule.EventStoreServiceName);
-IResourceBuilder<ProjectResource> tenants = builder.AddProject<Projects.Hexalith_Tenants>(
-    ChatBotAspireModule.TenantsAppId);
-IResourceBuilder<ProjectResource> parties = builder.AddProject<Projects.Hexalith_Parties>(
-    ChatBotAspireModule.PartiesAppId);
-IResourceBuilder<ProjectResource> projects = builder.AddProject<Projects.Hexalith_Projects_Server>(
-    ChatBotAspireModule.ProjectsAppId);
+// The public catalog preparation API performs a real build of each selected owner. Path-based
+// project metadata permits that build; generated ProjectReference metadata suppresses it.
+bool prepareDevelopmentCatalogOwners = builder.Environment.IsDevelopment()
+    && builder.Configuration.GetValue<bool>("DevelopmentRouteCatalog:PrepareOwners");
+IResourceBuilder<ProjectResource> tenants = prepareDevelopmentCatalogOwners
+    ? builder.AddProject(ChatBotAspireModule.TenantsAppId, new Projects.Hexalith_Tenants().ProjectPath)
+    : builder.AddProject<Projects.Hexalith_Tenants>(ChatBotAspireModule.TenantsAppId);
+IResourceBuilder<ProjectResource> parties = prepareDevelopmentCatalogOwners
+    ? builder.AddProject(ChatBotAspireModule.PartiesAppId, new Projects.Hexalith_Parties().ProjectPath)
+    : builder.AddProject<Projects.Hexalith_Parties>(ChatBotAspireModule.PartiesAppId);
+IResourceBuilder<ProjectResource> projects = prepareDevelopmentCatalogOwners
+    ? builder.AddProject(ChatBotAspireModule.ProjectsAppId, new Projects.Hexalith_Projects_Server().ProjectPath)
+    : builder.AddProject<Projects.Hexalith_Projects_Server>(ChatBotAspireModule.ProjectsAppId);
 IResourceBuilder<ProjectResource> chatBot = builder.AddProject<Projects.Hexalith_ChatBot_Server>(
     ChatBotAspireModule.AppId);
 

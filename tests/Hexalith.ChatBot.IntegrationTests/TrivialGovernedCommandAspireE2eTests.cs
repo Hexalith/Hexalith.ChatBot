@@ -45,11 +45,12 @@ namespace Hexalith.ChatBot.IntegrationTests;
 /// claim), so no out-of-band token is needed (an <c>HEXALITH_CHATBOT_TIER3_TOKEN</c> override is still honoured).
 /// Two host-specific knobs cover a non-standard <c>dapr init</c>: <c>Dapr:PlacementHostAddress</c> /
 /// <c>Dapr:SchedulerHostAddress</c> point daprd at the placement/scheduler control-plane when it was mapped to
-/// non-default host ports (unset → daprd defaults). The chatbot sidecar loads the default-allow
-/// <c>accesscontrol.local.yaml</c>: the deployed deny-by-default <c>accesscontrol.yaml</c> can only match callers
-/// under mTLS (verified SPIFFE identity), which this self-hosted/mTLS-off topology does not provide.
+/// non-default host ports (unset → daprd defaults). Each attempt owns a new Redis backend with private
+/// catalog custody and uses the public SDK's real compiled-owner observations, closed traffic policies
+/// and native self-hosted mTLS identities.
 /// </remarks>
 [Trait("Category", "E2E")]
+[Collection(RealmTemplateMutationCollection.Name)]
 public sealed class TrivialGovernedCommandAspireE2eTests
 {
     private const string ChatBotResourceName = "chatbot";
@@ -501,8 +502,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     }
 
     /// <summary>Proves fresh-state grant and note refusal through production admission without durable effects.</summary>
-    [Fact]
-    public async Task GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology()
+    internal async Task RunGovernedCommandRefusalAsync()
     {
         RequireTier3Runtime("The production refusal smoke requires HEXALITH_CHATBOT_TIER3=1, Docker and DAPR.");
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
@@ -709,11 +709,9 @@ public sealed class TrivialGovernedCommandAspireE2eTests
 
     /// <summary>
     /// Requires committed two-tenant governed state before testing the M2 stop-ship sweeps. Release selects this
-    /// independently of the refusal smoke; it must remain failing until Story 1.8 supplies atomic participation.
+    /// independently of the refusal smoke; accepted production atomic participation remains required.
     /// </summary>
-    [Fact]
-    [Trait("ReleaseGate", "M2")]
-    public async Task CommittedGovernedStateShouldPassM2StopShipSweepsInRealDaprTopology()
+    internal async Task RunCommittedGovernedStateM2GateAsync()
     {
         RequireTier3Runtime(
             "Tier-3 Aspire E2E requires a Docker runtime and the DAPR CLI/runtime (dapr init). Set "
@@ -1006,8 +1004,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             $"The M2 release gate never cleared within its deadline. Last status: {lastStatus}. Last body: {lastBody}");
     }
 
-    [Fact]
-    public async Task GovernedNoteShouldProjectIdenticalDurableEndStateRegardlessOfDeclaredOrigin()
+    internal async Task RunGovernedNoteOriginParityAsync()
     {
         // Stretch leg (AC7): the live cross-origin differential. The same semantic intent submitted with
         // origin=ui then origin=cli then origin=mcp against the REAL DAPR topology must materialise an identical
@@ -1080,8 +1077,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         }
     }
 
-    [Fact]
-    public async Task CorrectionPropagationWorkflowRuntimeShouldBeHealthyInRealDaprTopology()
+    internal async Task RunCorrectionPropagationRuntimeHealthAsync()
     {
         RequireTier3Runtime(
             "Tier-3 workflow smoke requires a Docker runtime and the DAPR CLI/runtime (dapr init). Set "
@@ -2150,40 +2146,55 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         Action<IDistributedApplicationTestingBuilder>? configureBuilder,
         CancellationToken cancellationToken)
     {
-        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(AppHostConfigurationArgs, cancellationToken)
-            .ConfigureAwait(false);
-        IReadOnlyList<ReservedEndpoint> selected = GetIsolatedDaprHttpEndpoints(builder);
-        IReadOnlySet<int> unselectedConcretePorts = GetUnselectedConcreteEndpointPorts(builder, selected);
-        PortReservationSet reservations = PortReservationSet.Reserve(
-            IsolatedDaprHttpResourceNames.Length,
-            unselectedConcretePorts);
+        LiveCatalogFixture catalogFixture = await LiveCatalogFixture.CreateAsync(cancellationToken).ConfigureAwait(false);
+        IDistributedApplicationTestingBuilder? builder = null;
+        PortReservationSet? reservations = null;
         MemoriesProbeCommandGateway? memoriesGateway = null;
+        DistributedApplication? application = null;
         try
         {
+            string[] arguments = [.. AppHostConfigurationArgs, "--environment=Development",
+                "--Dapr:RedisHost=" + catalogFixture.RedisHost, "--EnableKeycloak=true", "--KeycloakPersistent=false",
+                "--DevelopmentRouteCatalog:PrepareOwners=true"];
+            builder = await DistributedApplicationTestingBuilder
+                .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(arguments, cancellationToken)
+                .ConfigureAwait(false);
+            IReadOnlyList<ReservedEndpoint> selected = GetIsolatedDaprHttpEndpoints(builder);
+            IReadOnlySet<int> unselectedConcretePorts = GetUnselectedConcreteEndpointPorts(builder, selected);
+            reservations = PortReservationSet.Reserve(IsolatedDaprHttpResourceNames.Length, unselectedConcretePorts);
             memoriesGateway = await MemoriesProbeCommandGateway.StartAsync(cancellationToken).ConfigureAwait(false);
             memoriesGateway.Configure(builder);
             builder.Services.AddSingleton<MemoriesProbeCommandGateway>(_ => memoriesGateway);
             ConfigureReservedDaprHttpEndpoints(builder, reservations.Ports);
             ConfigureAcceptanceM2SweepCadence(builder);
             ConfigureAcceptanceMemoriesProbeIdentity(builder);
+            await catalogFixture.ConfigureAsync(builder, cancellationToken).ConfigureAwait(false);
             ValidateCanonicalDaprResourceModel(builder);
             configureBuilder?.Invoke(builder);
             IReadOnlyDictionary<string, int> selectedPorts = selected
                 .Select((endpoint, index) => new KeyValuePair<string, int>(endpoint.Resource.Name, reservations.Ports[index]))
                 .ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal);
-            DistributedApplication application = await builder.BuildAsync(cancellationToken).ConfigureAwait(false);
+            application = await builder.BuildAsync(cancellationToken).ConfigureAwait(false);
+            // Resolve owned fixtures before Start creates native controllers, so host disposal stops those
+            // controllers before retaining catalog custody and removing the backend.
+            _ = application.Services.GetRequiredService<LiveCatalogFixture>();
             _ = application.Services.GetRequiredService<MemoriesProbeCommandGateway>();
             return new TopologyStartupAttempt(application, reservations, selectedPorts);
         }
-        catch
+        catch (Exception startupFailure)
         {
-            reservations.Dispose();
-            if (memoriesGateway is not null)
+            List<Exception> failures = [startupFailure];
+            async Task CleanupAsync(Func<Task> cleanup)
             {
-                await memoriesGateway.DisposeAsync().ConfigureAwait(false);
+                try { await cleanup().ConfigureAwait(false); }
+                catch (Exception cleanupFailure) { failures.Add(cleanupFailure); }
             }
-
+            if (application is not null) await CleanupAsync(() => application.DisposeAsync().AsTask()).ConfigureAwait(false);
+            else if (builder is not null) await CleanupAsync(() => builder.DisposeAsync().AsTask()).ConfigureAwait(false);
+            reservations?.Dispose();
+            if (memoriesGateway is not null) await CleanupAsync(() => memoriesGateway.DisposeAsync().AsTask()).ConfigureAwait(false);
+            await CleanupAsync(() => catalogFixture.DisposeAsync().AsTask()).ConfigureAwait(false);
+            if (failures.Count > 1) throw new AggregateException("Owned topology preparation and cleanup failed.", failures);
             throw;
         }
     }

@@ -46,8 +46,10 @@ public static class ScaffoldArchitectureTests
             "tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj",
             "tests/Hexalith.ChatBot.Conformance.Tests/Hexalith.ChatBot.Conformance.Tests.csproj",
             "tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj",
+            "tests/Hexalith.ChatBot.Live.IntegrationTests/Hexalith.ChatBot.Live.IntegrationTests.csproj",
             "tests/Hexalith.ChatBot.RecoverySandbox/Hexalith.ChatBot.RecoverySandbox.csproj",
             "tests/Hexalith.ChatBot.Recovery.Tests/Hexalith.ChatBot.Recovery.Tests.csproj",
+            "tests/Hexalith.ChatBot.Release.Tests/Hexalith.ChatBot.Release.Tests.csproj",
             "tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj",
             "tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj",
             "tests/Hexalith.ChatBot.Workers.Tests/Hexalith.ChatBot.Workers.Tests.csproj",
@@ -322,7 +324,16 @@ public static class ScaffoldArchitectureTests
         localCompositionResources.Length.ShouldBeGreaterThan(
             5,
             "the sole exception must remain the real typed local-composition topology, not an empty AppHost");
-        localCompositionResources.ShouldAllBe(
+        const string CatalogHelperProject = "$(HexalithEventStoreRoot)\\src\\Hexalith.EventStore.Aspire\\Hexalith.EventStore.Aspire.csproj";
+        XElement catalogHelper = localCompositionResources.Single(reference =>
+            string.Equals(reference.Attribute("Include")?.Value, CatalogHelperProject, StringComparison.Ordinal));
+        (catalogHelper.Attribute("IsAspireProjectResource")?.Value).ShouldBe("false");
+        DependencyCondition(catalogHelper).ShouldBe(SourceModeCondition);
+        XElement catalogHelperPackage = appHost.Descendants("PackageReference").Single(reference =>
+            string.Equals(reference.Attribute("Include")?.Value, "Hexalith.EventStore.Aspire", StringComparison.Ordinal));
+        DependencyCondition(catalogHelperPackage).ShouldBe(PackageModeCondition);
+
+        localCompositionResources.Where(reference => !ReferenceEquals(reference, catalogHelper)).ShouldAllBe(
             static reference => DependencyCondition(reference) == null,
             "AppHost executable references are unconditional local composition resources, not library dependency authority");
     }
@@ -1093,7 +1104,7 @@ public static class ScaffoldArchitectureTests
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<Deterministic>true</Deterministic>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<NuGetAudit>true</NuGetAudit>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<NuGetAuditMode>all</NuGetAuditMode>");
-        File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain(
+        File.ReadAllText(Path.Combine(root, "eng", "ChatBot.Composition.props")).ShouldContain(
             "<UseHexalithProjectReferences Condition=\"'$(UseHexalithProjectReferences)' == ''\">false</UseHexalithProjectReferences>");
         File.ReadAllText(Path.Combine(root, "src", "Hexalith.ChatBot.AppHost", "Hexalith.ChatBot.AppHost.csproj"))
             .ShouldContain("<IsPublishable>false</IsPublishable>");
@@ -1184,8 +1195,8 @@ public static class ScaffoldArchitectureTests
         MethodDeclarationSyntax[] methods = CSharpSyntaxTree.ParseText(source,
                 cancellationToken: TestContext.Current.CancellationToken).GetRoot(TestContext.Current.CancellationToken)
             .DescendantNodes().OfType<MethodDeclarationSyntax>().ToArray();
-        const string smokeName = "GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology";
-        const string m2Name = "CommittedGovernedStateShouldPassM2StopShipSweepsInRealDaprTopology";
+        const string smokeName = "RunGovernedCommandRefusalAsync";
+        const string m2Name = "RunCommittedGovernedStateM2GateAsync";
         string smoke = methods.Single(method => method.Identifier.ValueText == smokeName).Body!.ToString();
         string release = methods.Single(method => method.Identifier.ValueText == m2Name).Body!.ToString();
         smoke.ShouldContain("EnsureCurrentRequesterOwnersAsync");

@@ -1,4 +1,21 @@
 <Project>
+  <Import Project="$(MSBuildThisFileDirectory)eng/ChatBot.Composition.Restore.targets" />
+  <!-- NuGet adds transitive project edges without the AppHost edge metadata. Bind both
+       explicit and generated edges so every composition build uses Release and the same
+       manifest-pinned published Tooling assembly, including integration/recovery consumers. -->
+  <ItemGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
+    <ProjectReference Update="@(ProjectReference)"
+                      AdditionalProperties="%(ProjectReference.AdditionalProperties);HexalithBuildsPublishedToolRoot=$(_ChatBotPublishedToolRoot);ShouldUnsetParentConfigurationAndPlatform=false" />
+  </ItemGroup>
+  <Target Name="PreserveChatBotCompositionInputs"
+          AfterTargets="IncludeTransitiveProjectReferences"
+          Condition="'$(UseHexalithProjectReferences)' != 'true'">
+    <ItemGroup>
+      <ProjectReference Update="@(ProjectReference)"
+                        AdditionalProperties="%(ProjectReference.AdditionalProperties);HexalithBuildsPublishedToolRoot=$(_ChatBotPublishedToolRoot);ShouldUnsetParentConfigurationAndPlatform=false" />
+    </ItemGroup>
+  </Target>
+
   <PropertyGroup Condition="'$(EnableContainer)' == 'true'">
     <IsPackable>false</IsPackable>
     <IsPublishable>true</IsPublishable>

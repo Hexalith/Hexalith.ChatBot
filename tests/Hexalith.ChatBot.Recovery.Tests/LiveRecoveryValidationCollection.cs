@@ -1,4 +1,4 @@
-namespace Hexalith.ChatBot.IntegrationTests.Recovery;
+namespace Hexalith.ChatBot.Recovery.Tests;
 
 /// <summary>Serializes the destructive recovery topology so resource commands and fixed DAPR ports never overlap.</summary>
 [CollectionDefinition(Name, DisableParallelization = true)]

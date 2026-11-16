@@ -1,0 +1,12 @@
+<Project>
+  <!-- NuGet's project walk strips ProjectReference metadata. Supply the same published
+       composition inputs globally to its walk and final graph evaluations. This keeps
+       restore from inventing a Builds.Tooling source edge which the build never uses. -->
+  <Target Name="BindChatBotRestoreCompositionInputs"
+          BeforeTargets="_GetAllRestoreProjectPathItems;_GenerateRestoreProjectPathWalk"
+          Condition="'$(UseHexalithProjectReferences)' != 'true'">
+    <PropertyGroup>
+      <_GenerateRestoreGraphProjectEntryInputProperties>$(_GenerateRestoreGraphProjectEntryInputProperties);HexalithBuildsPublishedToolRoot=$(_ChatBotPublishedToolRoot);ShouldUnsetParentConfigurationAndPlatform=false</_GenerateRestoreGraphProjectEntryInputProperties>
+    </PropertyGroup>
+  </Target>
+</Project>

@@ -35,6 +35,7 @@ using Xunit;
 namespace Hexalith.ChatBot.IntegrationTests;
 
 [Trait("Category", "E2E")]
+[Collection(RealmTemplateMutationCollection.Name)]
 public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper output)
 {
     private const string ChatBotResourceName = "chatbot";
@@ -88,8 +89,7 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
         bool expected)
         => IsSubmissionFailureMarker(submissionError).ShouldBe(expected);
 
-    [Fact]
-    public async Task AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix()
+    internal async Task RunAuthenticatedProductionClientMatrixAsync()
     {
         TrivialGovernedCommandAspireE2eTests.RequireTier3Runtime(
             "Story 13.2 production-browser acceptance requires HEXALITH_CHATBOT_TIER3=1, Docker, DAPR, and Chrome.");

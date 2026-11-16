@@ -1,0 +1,21 @@
+<Project>
+  <PropertyGroup>
+    <!-- Directory.Build.props is imported before the SDK defaults an unset Configuration to Debug. -->
+    <UseHexalithProjectReferences Condition="'$(UseHexalithProjectReferences)' == '' and '$(CI)' != 'true' and ('$(Configuration)' == '' or '$(Configuration)' == 'Debug')">true</UseHexalithProjectReferences>
+    <UseHexalithProjectReferences Condition="'$(UseHexalithProjectReferences)' == ''">false</UseHexalithProjectReferences>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(UseHexalithProjectReferences)' != 'true'">
+    <!-- Platform composition consumes the published Tooling assembly shipped by our existing pinned tool.
+         AppHost downloads it during normal NuGet restore; all consumers share its path. -->
+    <_ChatBotModuleToolManifest>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)../.config/dotnet-tools.json'))</_ChatBotModuleToolManifest>
+    <_ChatBotModuleToolVersion>$([System.Text.RegularExpressions.Regex]::Match('$(_ChatBotModuleToolManifest)', '(?s)&quot;hexalith\.builds\.module\.cli&quot;\s*:\s*\{\s*&quot;version&quot;\s*:\s*&quot;([^&quot;]+)&quot;').Groups.get_Item(1).Value)</_ChatBotModuleToolVersion>
+    <!-- NuGetPackageRoot is absent on the first evaluation before obj/*.nuget.g.props exists. -->
+    <_ChatBotNuGetPackageRoot>$(NuGetPackageRoot)</_ChatBotNuGetPackageRoot>
+    <_ChatBotNuGetPackageRoot Condition="'$(_ChatBotNuGetPackageRoot)' == ''">$(RestorePackagesPath)</_ChatBotNuGetPackageRoot>
+    <_ChatBotNuGetPackageRoot Condition="'$(_ChatBotNuGetPackageRoot)' == ''">$(NUGET_PACKAGES)</_ChatBotNuGetPackageRoot>
+    <_ChatBotUserProfile>$(USERPROFILE)</_ChatBotUserProfile>
+    <_ChatBotUserProfile Condition="'$(_ChatBotUserProfile)' == ''">$(HOME)</_ChatBotUserProfile>
+    <_ChatBotNuGetPackageRoot Condition="'$(_ChatBotNuGetPackageRoot)' == ''">$(_ChatBotUserProfile)/.nuget/packages</_ChatBotNuGetPackageRoot>
+    <_ChatBotPublishedToolRoot>$([System.IO.Path]::GetFullPath('$(_ChatBotNuGetPackageRoot)/hexalith.builds.module.cli/$(_ChatBotModuleToolVersion)/tools/net10.0/any', '$(MSBuildThisFileDirectory)..'))</_ChatBotPublishedToolRoot>
+  </PropertyGroup>
+</Project>

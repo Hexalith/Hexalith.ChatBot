@@ -7,6 +7,9 @@
     <File Path="Directory.Build.targets" />
     <File Path="Directory.Packages.props" />
     <File Path="Directory.Solution.props" />
+    <File Path="Directory.Solution.targets" />
+    <File Path="eng/ChatBot.Composition.props" />
+    <File Path="eng/ChatBot.Composition.Restore.targets" />
     <File Path="global.json" />
     <File Path="LICENSE" />
     <File Path="nuget.config" />
@@ -31,7 +34,9 @@
     <Project Path="tests/Hexalith.ChatBot.Conformance.Tests/Hexalith.ChatBot.Conformance.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj" />
+    <Project Path="tests/Hexalith.ChatBot.Live.IntegrationTests/Hexalith.ChatBot.Live.IntegrationTests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Recovery.Tests/Hexalith.ChatBot.Recovery.Tests.csproj" />
+    <Project Path="tests/Hexalith.ChatBot.Release.Tests/Hexalith.ChatBot.Release.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Mcp.Tests/Hexalith.ChatBot.Mcp.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.RecoverySandbox/Hexalith.ChatBot.RecoverySandbox.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj" />

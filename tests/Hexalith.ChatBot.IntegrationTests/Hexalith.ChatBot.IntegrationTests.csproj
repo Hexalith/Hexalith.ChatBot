@@ -26,6 +26,8 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Hexalith.ChatBot.Recovery.Tests" />
+    <InternalsVisibleTo Include="Hexalith.ChatBot.Release.Tests" />
+    <InternalsVisibleTo Include="Hexalith.ChatBot.Live.IntegrationTests" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

@@ -77,6 +77,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     private readonly RecoverySandboxOperationsTestSeam? _testSeam;
     private readonly TimeSpan _pollInterval;
     private readonly TimeSpan _absenceConfirmationWindow;
+    private readonly TimeProvider _absenceTimeProvider = TimeProvider.System;
     private readonly TimeSpan _presenceConfirmationWindow;
     /// <summary>
     /// The number of independently committed governed notes seeded per continuity checkpoint. A single-record
@@ -132,6 +133,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     /// <param name="pollInterval">The polling cadence used by test observations.</param>
     /// <param name="absenceConfirmationWindow">The sustained-absence observation window.</param>
     /// <param name="presenceConfirmationWindow">The projection-presence observation window.</param>
+    /// <param name="absenceTimeProvider">An optional monotonic test clock; real recovery uses the system clock.</param>
     internal AspireRecoverySandboxOperations(
         RecoverySandboxOperationsTestSeam testSeam,
         IReadModelStore readModelStore,
@@ -139,7 +141,8 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         EventStoreDurableStateProbe durableState,
         TimeSpan pollInterval,
         TimeSpan absenceConfirmationWindow,
-        TimeSpan presenceConfirmationWindow)
+        TimeSpan presenceConfirmationWindow,
+        TimeProvider? absenceTimeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(testSeam);
         ArgumentNullException.ThrowIfNull(readModelStore);
@@ -157,6 +160,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         _durableState = durableState;
         _pollInterval = pollInterval;
         _absenceConfirmationWindow = absenceConfirmationWindow;
+        _absenceTimeProvider = absenceTimeProvider ?? TimeProvider.System;
         _presenceConfirmationWindow = presenceConfirmationWindow;
     }
 
@@ -1697,7 +1701,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
         string noteRef,
         CancellationToken cancellationToken)
     {
-        Stopwatch timer = Stopwatch.StartNew();
+        long started = _absenceTimeProvider.GetTimestamp();
         do
         {
             GovernedOperationView? view = await _governedOperationProjections
@@ -1710,7 +1714,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
 
             await Task.Delay(_pollInterval, cancellationToken).ConfigureAwait(false);
         }
-        while (timer.Elapsed < _absenceConfirmationWindow);
+        while (_absenceTimeProvider.GetElapsedTime(started) < _absenceConfirmationWindow);
 
         // Close the final-delay race; the initial read above also runs for a tiny positive window.
         GovernedOperationView? finalView = await _governedOperationProjections

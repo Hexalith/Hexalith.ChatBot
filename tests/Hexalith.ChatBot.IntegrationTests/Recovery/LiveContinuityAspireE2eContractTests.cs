@@ -227,7 +227,7 @@ public sealed class LiveContinuityAspireE2eContractTests
 
         // Drives the PRODUCTION predicate. Recomputing the conjunction inline here asserted the test against its
         // own re-implementation: deleting the ServiceUnavailable half of the production check left this green.
-        LiveContinuityAspireE2eTests
+        LiveRecoverySweep
             .ProvesMailboxAdmission(statusCode, body)
             .ShouldBe(expectedAdmissionProof);
     }
