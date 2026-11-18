@@ -7,7 +7,7 @@
     <IsPublishable>false</IsPublishable>
     <AspireUseCliBundle>true</AspireUseCliBundle>
     <!-- This host is non-publishable; keep the leftover CLI-bundle advisory suppressed. -->
-    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+    <NoWarn>$(NoWarn);ASPIRE010;ASPIRE012</NoWarn>
     <UserSecretsId>hexalith-chatbot</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
