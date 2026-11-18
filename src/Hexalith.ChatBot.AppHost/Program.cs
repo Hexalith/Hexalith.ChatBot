@@ -1,3 +1,5 @@
+#pragma warning disable CS0618 // Aspire 17 deprecates AddProject<T>; keep IProjectMetadata helpers.
+
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
