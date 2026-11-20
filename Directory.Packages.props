@@ -1,8 +1,11 @@
 <Project>
   <PropertyGroup>
+    <HexalithBuildsRoot Condition="'$(HexalithBuildsRoot)' == '' and Exists('$(MSBuildThisFileDirectory)references/Hexalith.Builds/Props/Directory.Packages.props')">$(MSBuildThisFileDirectory)references/Hexalith.Builds</HexalithBuildsRoot>
+    <HexalithBuildsRoot Condition="'$(HexalithBuildsRoot)' == '' and Exists('$(MSBuildThisFileDirectory)../Hexalith.Builds/Props/Directory.Packages.props')">$(MSBuildThisFileDirectory)../Hexalith.Builds</HexalithBuildsRoot>
+    <HexalithBuildsRoot Condition="'$(HexalithBuildsRoot)' == ''">$(MSBuildThisFileDirectory)references/Hexalith.Builds</HexalithBuildsRoot>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <!-- GHSA-334f-vvp4-7g6p is patched in the shared catalog at 10.0.13. The pin applies only when transitive pinning is enabled. -->
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
-  <Import Project="$(MSBuildThisFileDirectory)references/Hexalith.Builds/Props/Directory.Packages.props" />
+  <Import Project="$(HexalithBuildsRoot)/Props/Directory.Packages.props" />
 </Project>
