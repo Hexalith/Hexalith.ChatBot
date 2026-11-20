@@ -19,7 +19,7 @@
   <PropertyGroup Condition="'$(EnableContainer)' == 'true'">
     <IsPackable>false</IsPackable>
     <IsPublishable>true</IsPublishable>
-    <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:10.0-alpine</ContainerBaseImage>
+    <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:11.0-alpine</ContainerBaseImage>
     <ContainerFamily>alpine</ContainerFamily>
     <ContainerImageTag Condition="'$(ContainerImageTags)' == '' and '$(ContainerImageTag)' == ''">local</ContainerImageTag>
     <ContainerUser>app</ContainerUser>

@@ -20,7 +20,7 @@ public static class FitnessRuleMachineryTests
     [Fact]
     public static void NetArchTestParsesNet10AssembliesWithoutCecilFailure()
     {
-        // Gating-risk canary: Mono.Cecil 0.11.6 (via NetArchTest.eNhancedEdition 1.4.5) must parse net10.0 IL.
+        // Gating-risk canary: Mono.Cecil 0.11.6 (via NetArchTest.eNhancedEdition 1.4.5) must parse net11.0 IL.
         // A trivially-true rule that still forces a full Cecil load + inspection of a ChatBot assembly.
         NetArchTestResult result = Types.InAssembly(FitnessAssemblies.Server)
             .Should()

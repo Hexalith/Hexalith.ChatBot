@@ -23,6 +23,6 @@
           Condition="'$(DesignTimeBuild)' != 'true'">
     <MakeDir Directories="$(MSBuildProjectDirectory)/Generated" />
     <Exec WorkingDirectory="$(MSBuildProjectDirectory)"
-          Command="$(NSwagExe_Net100) run nswag.json /variables:Configuration=$(Configuration)" />
+          Command="$(NSwagExe_Net110) run nswag.json /variables:Configuration=$(Configuration)" />
   </Target>
 </Project>

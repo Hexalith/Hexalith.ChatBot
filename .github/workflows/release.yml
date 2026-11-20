@@ -56,7 +56,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-          dotnet-version: '10.0.404'
       - name: Build Release configuration
         run: bash .github/scripts/build-release-configuration.sh tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Setup checksum-pinned DAPR CLI
@@ -68,7 +67,7 @@ jobs:
       - name: Run required fail-closed tenant-bound topology smoke
         run: >-
           XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
-          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests
+          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net11.0/Hexalith.ChatBot.IntegrationTests
           TestResults/topology-acceptance.ctrf.json
           -method "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests.GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology"
           -result-trx TestResults/topology-acceptance.trx
@@ -78,7 +77,7 @@ jobs:
       - name: Run exact Story 13.2 authenticated production-client matrix
         run: >-
           XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
-          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests
+          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net11.0/Hexalith.ChatBot.IntegrationTests
           TestResults/story132-topology-acceptance.ctrf.json
           -method "Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests.AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix"
           -result-trx TestResults/story132-topology-acceptance.trx
@@ -92,7 +91,7 @@ jobs:
       - name: Run required committed-state M2 stop-ship gate
         run: >-
           XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
-          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests
+          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net11.0/Hexalith.ChatBot.IntegrationTests
           TestResults/m2-stop-ship.ctrf.json
           -method "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests.CommittedGovernedStateShouldPassM2StopShipSweepsInRealDaprTopology"
           -result-trx TestResults/m2-stop-ship.trx
@@ -165,7 +164,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-          dotnet-version: '10.0.404'
       - name: Build Release configuration
         run: bash .github/scripts/build-release-configuration.sh tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Setup checksum-pinned DAPR CLI
@@ -185,7 +183,7 @@ jobs:
           set -euo pipefail
           XUNIT_REQUIRE_ZERO_SKIPS=1 timeout --signal=INT --kill-after=15m 16800s \
             bash .github/scripts/run-xunit-v4.sh \
-            tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests \
+            tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net11.0/Hexalith.ChatBot.IntegrationTests \
             "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.ctrf.json" \
             -method "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2ETests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" \
             -result-trx "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.trx"
@@ -267,7 +265,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-          dotnet-version: '10.0.404'
       - name: Build Release configuration
         run: bash .github/scripts/build-release-configuration.sh tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Download retained live recovery evidence
@@ -278,7 +275,7 @@ jobs:
       - name: Evaluate the release evidence gate out of process
         run: >-
           XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
-          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests
+          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net11.0/Hexalith.ChatBot.IntegrationTests
           GateResults/live-recovery-evidence-gate.ctrf.json
           -method "Hexalith.ChatBot.IntegrationTests.Recovery.LiveRecoveryEvidenceGateReplayTests.RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess"
           -result-trx GateResults/live-recovery-evidence-gate.trx
@@ -321,7 +318,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-          dotnet-version: '10.0.404'
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

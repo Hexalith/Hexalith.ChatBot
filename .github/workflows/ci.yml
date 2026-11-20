@@ -57,7 +57,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-          dotnet-version: '10.0.404'
       - name: Bind the published Builds tooling for Platform CI
         run: |
           tool_root="$(bash .github/scripts/resolve-published-builds-tooling.sh)"
@@ -71,12 +70,12 @@ jobs:
       - name: Test synthetic merge story-evidence gate lane
         run: >-
           XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
-          tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
+          tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net11.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
           TestResults/story-evidence-gate.ctrf.json
       - name: Test synthetic merge executable story-evidence workflow guards
         env:
-          STORY_EVIDENCE_TEST_RUNNER: ${{ github.workspace }}/tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
-          STORY_EVIDENCE_GATE_DLL: ${{ github.workspace }}/tools/Hexalith.ChatBot.StoryEvidenceGate/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.dll
+          STORY_EVIDENCE_TEST_RUNNER: ${{ github.workspace }}/tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net11.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
+          STORY_EVIDENCE_GATE_DLL: ${{ github.workspace }}/tools/Hexalith.ChatBot.StoryEvidenceGate/bin/Release/net11.0/Hexalith.ChatBot.StoryEvidenceGate.dll
         run: |
           python3 -m unittest discover -s .github/scripts/tests -p 'test_story_evidence_guards.py' -v
           python3 -m unittest discover -s .github/scripts/tests -p 'test_recovery_result_projection.py' -v
@@ -103,7 +102,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-          dotnet-version: '10.0.404'
       - name: Bind the published Builds tooling for Platform CI
         run: |
           tool_root="$(bash .github/scripts/resolve-published-builds-tooling.sh)"
@@ -122,13 +120,13 @@ jobs:
       - name: Test story-evidence gate independently through its v4 runner
         run: >-
           XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
-          tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
+          tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net11.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
           TestResults/story-evidence-gate.ctrf.json
           -result-trx TestResults/story-evidence-gate.trx
       - name: Test executable story-evidence workflow guards
         env:
-          STORY_EVIDENCE_TEST_RUNNER: ${{ github.workspace }}/tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
-          STORY_EVIDENCE_GATE_DLL: ${{ github.workspace }}/tools/Hexalith.ChatBot.StoryEvidenceGate/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.dll
+          STORY_EVIDENCE_TEST_RUNNER: ${{ github.workspace }}/tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net11.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
+          STORY_EVIDENCE_GATE_DLL: ${{ github.workspace }}/tools/Hexalith.ChatBot.StoryEvidenceGate/bin/Release/net11.0/Hexalith.ChatBot.StoryEvidenceGate.dll
         run: |
           python3 -m unittest discover -s .github/scripts/tests -p 'test_story_evidence_guards.py' -v
           python3 -m unittest discover -s .github/scripts/tests -p 'test_recovery_result_projection.py' -v
@@ -170,7 +168,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-          dotnet-version: '10.0.404'
       - name: Build Release configuration
         run: >-
           bash .github/scripts/build-release-configuration.sh
@@ -278,7 +275,7 @@ jobs:
           fi
           XUNIT_REQUIRE_ZERO_SKIPS=1 timeout --signal=INT --kill-after=15m "${interrupt_after_seconds}s" \
             bash .github/scripts/run-xunit-v4.sh \
-            tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests \
+            tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net11.0/Hexalith.ChatBot.IntegrationTests \
             "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.ctrf.json" \
             -method "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" \
             -result-trx "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.trx"
@@ -306,7 +303,7 @@ jobs:
         if: always()
         run: >-
           XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
-          tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net10.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
+          tests/Hexalith.ChatBot.StoryEvidenceGate.Tests/bin/Release/net11.0/Hexalith.ChatBot.StoryEvidenceGate.Tests
           "${{ runner.temp }}/machine-results/story-evidence-gate/story-evidence-gate.ctrf.json"
           -result-trx "${{ runner.temp }}/machine-results/story-evidence-gate/story-evidence-gate.trx"
       - name: Summarize recovery attempt into metadata-only failure record
@@ -420,7 +417,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-          dotnet-version: '10.0.404'
       - name: Build Release configuration
         run: bash .github/scripts/build-release-configuration.sh tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Setup checksum-pinned DAPR CLI
@@ -432,7 +428,7 @@ jobs:
       - name: Run required fail-closed tenant-bound topology smoke
         run: >-
           XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
-          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests
+          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net11.0/Hexalith.ChatBot.IntegrationTests
           TestResults/topology-acceptance.ctrf.json
           -method "Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests.GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology"
           -result-trx TestResults/topology-acceptance.trx
@@ -442,7 +438,7 @@ jobs:
       - name: Run exact Story 13.2 authenticated production-client matrix
         run: >-
           XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
-          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests
+          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net11.0/Hexalith.ChatBot.IntegrationTests
           TestResults/story132-topology-acceptance.ctrf.json
           -method "Hexalith.ChatBot.IntegrationTests.Story132ProductionBrowserAspireE2ETests.AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix"
           -result-trx TestResults/story132-topology-acceptance.trx
@@ -517,7 +513,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-          dotnet-version: '10.0.404'
       - name: Build Release configuration
         run: bash .github/scripts/build-release-configuration.sh tools/Hexalith.ChatBot.StoryEvidenceGate/Hexalith.ChatBot.StoryEvidenceGate.csproj tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Setup checksum-pinned DAPR CLI
@@ -537,7 +532,7 @@ jobs:
           set -euo pipefail
           XUNIT_REQUIRE_ZERO_SKIPS=1 timeout --signal=INT --kill-after=15m 16800s \
             bash .github/scripts/run-xunit-v4.sh \
-            tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests \
+            tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net11.0/Hexalith.ChatBot.IntegrationTests \
             "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.ctrf.json" \
             -method "Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2ETests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate" \
             -result-trx "${{ runner.temp }}/raw-recovery-results/live-recovery-validation.trx"
@@ -618,7 +613,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-          dotnet-version: '10.0.404'
       - name: Build Release configuration
         run: bash .github/scripts/build-release-configuration.sh tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
       - name: Download retained live recovery evidence
@@ -629,7 +623,7 @@ jobs:
       - name: Evaluate the release evidence gate out of process
         run: >-
           XUNIT_REQUIRE_ZERO_SKIPS=1 bash .github/scripts/run-xunit-v4.sh
-          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/Hexalith.ChatBot.IntegrationTests
+          tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net11.0/Hexalith.ChatBot.IntegrationTests
           GateResults/live-recovery-evidence-gate.ctrf.json
           -method "Hexalith.ChatBot.IntegrationTests.Recovery.LiveRecoveryEvidenceGateReplayTests.RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess"
           -result-trx GateResults/live-recovery-evidence-gate.trx

@@ -16,6 +16,6 @@
     <_ChatBotUserProfile>$(USERPROFILE)</_ChatBotUserProfile>
     <_ChatBotUserProfile Condition="'$(_ChatBotUserProfile)' == ''">$(HOME)</_ChatBotUserProfile>
     <_ChatBotNuGetPackageRoot Condition="'$(_ChatBotNuGetPackageRoot)' == ''">$(_ChatBotUserProfile)/.nuget/packages</_ChatBotNuGetPackageRoot>
-    <_ChatBotPublishedToolRoot>$([System.IO.Path]::GetFullPath('$(_ChatBotNuGetPackageRoot)/hexalith.builds.module.cli/$(_ChatBotModuleToolVersion)/tools/net10.0/any', '$(MSBuildThisFileDirectory)..'))</_ChatBotPublishedToolRoot>
+    <_ChatBotPublishedToolRoot>$([System.IO.Path]::GetFullPath('$(_ChatBotNuGetPackageRoot)/hexalith.builds.module.cli/$(_ChatBotModuleToolVersion)/tools/net11.0/any', '$(MSBuildThisFileDirectory)..'))</_ChatBotPublishedToolRoot>
   </PropertyGroup>
 </Project>

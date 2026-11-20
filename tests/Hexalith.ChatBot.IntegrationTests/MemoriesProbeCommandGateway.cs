@@ -188,7 +188,7 @@ internal sealed class MemoriesProbeCommandGateway : IAsyncDisposable
             .GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration
             ?? throw new InvalidOperationException("The test build configuration is required for exact owner binding.");
         configuration.ShouldBe(expectedConfiguration, "The owner transport must execute the current build's live owner module.");
-        string serverAssembly = Path.Combine(Path.GetDirectoryName(projectPath)!, "bin", configuration, "net10.0", "Hexalith.Memories.Server.dll");
+        string serverAssembly = Path.Combine(Path.GetDirectoryName(projectPath)!, "bin", configuration, "net11.0", "Hexalith.Memories.Server.dll");
         _domain = new MemoriesProbeDomainTransport(serverAssembly);
 
         using HttpClient keycloak = new() { BaseAddress = application.GetEndpoint("security", "http"), Timeout = TimeSpan.FromSeconds(30) };

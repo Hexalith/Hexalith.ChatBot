@@ -88,7 +88,7 @@ public static class ClientGenerationTests
             .Single(item => item.Name.StartsWith("NSwag.MSBuild/", StringComparison.Ordinal)).Name;
         string version = package[(package.IndexOf('/') + 1)..];
         string tool = assets.RootElement.GetProperty("packageFolders").EnumerateObject()
-            .Select(folder => Path.Combine(folder.Name, "nswag.msbuild", version.ToLowerInvariant(), "tools", "Net100", "dotnet-nswag.dll"))
+            .Select(folder => Path.Combine(folder.Name, "nswag.msbuild", version.ToLowerInvariant(), "tools", "Net110", "dotnet-nswag.dll"))
             .First(File.Exists);
         string temporaryRoot = Path.Combine(Path.GetTempPath(), "chatbot-nswag-" + Guid.NewGuid().ToString("N"));
         string clientDirectory = Path.Combine(temporaryRoot, "src", "Hexalith.ChatBot.Client");

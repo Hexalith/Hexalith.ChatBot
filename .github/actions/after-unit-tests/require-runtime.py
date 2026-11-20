@@ -11,7 +11,7 @@ def main() -> None:
     subprocess.run(["dapr", "--version"], check=True)
     # Resolve the Playwright-managed browser already installed by shared preparation.
     # This is the same package build output used by the live browser test project.
-    driver = Path("tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net10.0/.playwright")
+    driver = Path("tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net11.0/.playwright")
     environment = os.environ.copy()
     javascript = """
 const fs = require('fs');

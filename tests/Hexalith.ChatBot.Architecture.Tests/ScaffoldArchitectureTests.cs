@@ -1096,7 +1096,7 @@ public static class ScaffoldArchitectureTests
         (sdkVersion.Build / 100).ShouldBe(1, "the repository pins the .NET 11.0.1xx SDK feature band");
         sdk.GetProperty("rollForward").GetString().ShouldBe("latestPatch");
 
-        File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<TargetFramework>net10.0</TargetFramework>");
+        File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<TargetFramework>net11.0</TargetFramework>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<Nullable>enable</Nullable>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<ImplicitUsings>enable</ImplicitUsings>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<TreatWarningsAsErrors>true</TreatWarningsAsErrors>");
