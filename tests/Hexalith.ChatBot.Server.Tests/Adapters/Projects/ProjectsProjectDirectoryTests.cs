@@ -242,13 +242,13 @@ public sealed class ProjectsProjectDirectoryTests
         : Generated.Client(new HttpClient { BaseAddress = new Uri("https://projects.invalid") })
     {
         public override Task<Generated.Project> GetProjectAsync(
-            string projectId,
-            string x_Correlation_Id,
+            string? projectId,
+            string? x_Correlation_Id,
             Generated.ReadConsistencyClass? x_Hexalith_Freshness,
             CancellationToken cancellationToken)
             => getProject is null
                 ? throw new InvalidOperationException("GetProjectAsync was not expected.")
-                : Task.FromResult(getProject(projectId));
+                : Task.FromResult(getProject(projectId ?? throw new ArgumentNullException(nameof(projectId))));
 
         public override Task<Generated.ProjectResolution> ResolveProjectFromConversationAsync(
             string conversationId,

@@ -2,6 +2,11 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <IsPublishable>false</IsPublishable>
+    <!-- The .NET 11 SDK adds Debug-only Hot Reload browser-tools assets at the root base path of every Web SDK
+         project. The referenced ChatBot.Server contributes the same _framework paths, so this host's JS-module
+         manifest cannot resolve an endpoint and the build fails. The sandbox only runs under the Tier-3 AppHost,
+         never under dotnet watch, so it does not generate its own copy. -->
+    <EnableHotReloadInRuntimeConfigDevFile>false</EnableHotReloadInRuntimeConfigDevFile>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Hexalith.ChatBot.IntegrationTests" />

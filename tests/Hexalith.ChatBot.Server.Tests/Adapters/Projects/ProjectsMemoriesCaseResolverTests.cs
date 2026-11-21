@@ -112,8 +112,8 @@ public sealed class ProjectsMemoriesCaseResolverTests
         public int Calls { get; private set; }
 
         public override Task<Generated.ProjectContext> GetProjectContextAsync(
-            string projectId,
-            string x_Correlation_Id,
+            string? projectId,
+            string? x_Correlation_Id,
             Generated.ReadConsistencyClass? x_Hexalith_Freshness,
             CancellationToken cancellationToken)
         {

@@ -49,10 +49,10 @@ internal static class PackageCatalogTestHelper
     {
         (string PackageId, string ExpectedVersion)[] expected =
         [
-            ("Microsoft.FluentUI.AspNetCore.Components", "5.0.1"),
-            ("Microsoft.FluentUI.AspNetCore.Components.Icons", "5.0.1"),
+            ("Microsoft.FluentUI.AspNetCore.Components", "5.1.0"),
+            ("Microsoft.FluentUI.AspNetCore.Components.Icons", "5.1.0"),
             ("Fluxor", "6.11.0"),
-            ("Microsoft.Playwright", "1.64.1"),
+            ("Microsoft.Playwright", "1.65.0"),
             ("xunit.v3", "4.0.3"),
             ("bunit", "2.15.2"),
         ];
@@ -91,15 +91,22 @@ internal static class PackageCatalogTestHelper
 
         string importExpression = imports[0].Attribute("Project")?.Value
             ?? throw new InvalidOperationException("The ChatBot package wrapper import has no Project value.");
+
+        // The wrapper resolves the shared Builds root itself (submodule first, then a sibling checkout), so the
+        // import is checked against the root MSBuild actually evaluates rather than a literal path.
+        using JsonDocument evaluation = EvaluateWrapper(wrapperPath);
+        string evaluatedBuildsRoot = evaluation.RootElement.GetProperty("Properties").GetProperty("HexalithBuildsRoot").GetString()
+            ?? string.Empty;
         string resolvedImport = Path.GetFullPath(
-            importExpression.Replace("$(MSBuildThisFileDirectory)", repositoryRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal));
+            importExpression
+                .Replace("$(MSBuildThisFileDirectory)", repositoryRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                .Replace("$(HexalithBuildsRoot)", evaluatedBuildsRoot, StringComparison.Ordinal));
         if (!string.Equals(resolvedImport, authorityPath, pathComparison))
         {
             throw new InvalidOperationException(
                 $"The ChatBot package wrapper imports '{resolvedImport}', expected '{authorityPath}'.");
         }
 
-        using JsonDocument evaluation = EvaluateWrapper(wrapperPath);
         return ReadVersions(evaluation, authorityPath, wrapperPath);
     }
 
@@ -118,6 +125,7 @@ internal static class PackageCatalogTestHelper
         startInfo.ArgumentList.Add("-property:Configuration=Release");
         startInfo.ArgumentList.Add("-getProperty:ManagePackageVersionsCentrally");
         startInfo.ArgumentList.Add("-getProperty:CentralPackageVersionOverrideEnabled");
+        startInfo.ArgumentList.Add("-getProperty:HexalithBuildsRoot");
         startInfo.ArgumentList.Add("-getItem:PackageVersion");
         if (globalProperties is not null)
         {
