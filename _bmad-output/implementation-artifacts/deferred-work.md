@@ -2234,6 +2234,7 @@ Final native follow-up qualification (2026-10-26): independent review correction
   evidence: `bf0f44f` deleted `tools/Hexalith.ChatBot.StoryEvidenceGate`, `story-evidence-policy.json` and the runner scripts, and moved the sweep to `Hexalith.ChatBot.Recovery.Tests.LiveContinuityAspireE2eTests`. Every job in the legacy `.github/workflows/ci.yml` and `release.yml` still calls a deleted script; on `8f846fd` every required job fails at its first build step. `docs/story-evidence-integrity.md:67` and `docs/adrs/live-recovery-validation-drivers.md:144` still bind `recovery-primary` to the old IntegrationTests class. Story 1.5 has no evidence contract yet, and none can be attested or validated.
   reason: The shared-CI migration owns the producer; 1.5 stays blocked by A6/A13 regardless.
   closure: The shared CI supplies a completion-evidence producer, or a correct-course proposal formally retires the TE-2 gate and states how stories reach `done` without it. Retire the legacy workflows and the stale doc bindings in the same change.
+  resolution: Resolved 2026-11-21 by `sprint-change-proposal-2026-11-21.md`: TE-2 is retired, and stories complete under the Story Completion policy (`docs/story-evidence-integrity.md`). The doc and ADR bindings are updated. Retiring the legacy workflows moved to the Hexalith.CiCd adoption entry below, because CiCd owns `.github/workflows/**`.
 
 ## Deferred from: code review of spec-1-5-establish-stable-operation-identity-and-concurrency-contracts (2026-11-21, round 22)
 
@@ -2279,3 +2280,11 @@ Final native follow-up qualification (2026-10-26): independent review correction
   reason: Updating the UI floor pins is an approval decision, and the Folders wrapper belongs to the Folders module.
   closure: Approve and update the UI foundation pins, or hold the catalog at the approved versions; Folders realigns its wrapper with the shared catalog.
   resolution: Partly resolved 2026-11-21: by the user's decision, `AssertUiFoundationPins` now expects Fluent UI Components/Icons 5.1.0 and Playwright 1.65.0 (UI.Tests 613/613). The Folders wrapper drift stays open (Architecture 118/119).
+
+## Deferred from: correct course sprint-change-proposal-2026-11-21 (2026-11-21)
+
+- source_spec: `_bmad-output/planning-artifacts/sprint-change-proposal-2026-11-21.md`
+  summary: Adopt Hexalith.CiCd so that a Release solution build and Server.Tests run on every push and the legacy workflows retire (medium).
+  evidence: ci run `44897519125` on `bd61641` builds the solution (0 errors, 7 CS0618 warnings), then fails at the deleted `.github/scripts/run-merge-test-lanes.sh` (`ci.yml:119`). `story-evidence-integrity` and every release job (run `44897518989`) fail at the deleted `build-release-configuration.sh`. No `.github/hexalith-ci.json` exists, and CiCd owns `.github/workflows/**`.
+  reason: Hexalith.CiCd owns the registration and the generated callers. ChatBot drafts the request (proposal §4.9) and lands the product preparation first.
+  closure: CiCd delivers `setup/Hexalith.ChatBot.yml` and generated callers that replace `ci.yml` and `release.yml`, and the first push run passes Server.Tests (closes R22-W2). Before the request, ChatBot realigns the Folders wrapper, fixes the `ChatBotMetricsTests` flake, closes R21-W2 and R21-W3, proves the Release build under the shared `-warnaserror` flags (CS0618 in `references/Hexalith.Platform` and in `RecoverySandboxTopologyComposer.cs:55`), and passes `python3 references/Hexalith.Builds/check.py` in a standalone clone. At delivery, also update the scheduler bullet in the Consequences section of `docs/adrs/live-recovery-validation-drivers.md`.

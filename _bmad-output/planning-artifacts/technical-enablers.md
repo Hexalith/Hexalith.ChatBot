@@ -1,6 +1,6 @@
 ---
 status: active-ledger
-updated: 2026-08-03
+updated: 2026-11-21
 sourceProposal: _bmad-output/planning-artifacts/sprint-change-proposal-2026-07-17.md
 productEpicCountImpact: 0
 ---
@@ -33,11 +33,11 @@ TE-1 remains complete only while the linked architecture decision and implementa
 
 ## TE-2 — Mechanical Story-Evidence Integrity Gate
 
-- **Status:** review; implementation self-validates prospectively, but completion remains blocked on the required protected check.
+- **Status:** retired 2026-11-21 (`sprint-change-proposal-2026-11-21.md`). `bf0f44f` removed the gate tool, policy and scripts during the shared-CI migration, and the Hexalith baseline keeps story-evidence checks out of module CI. Stories now complete under the Story Completion policy in `docs/story-evidence-integrity.md`.
 - **Source:** `sprint-change-proposal-2026-08-03.md`
 - **Owners:** Amelia (implementation) with Murat (evidence/primary-path policy); Winston reviews architecture and CI boundaries.
 - **Product impact:** none; delivery-integrity control only.
-- **Invariant:** a story or technical-enabler item may move to `done` only when the repository-owned gate passes for the proposed status, exact scoped diff, exact machine results, required primary paths, File List, and checked-task/acceptance mappings.
+- **Former invariant:** a story or technical-enabler item could move to `done` only when the repository-owned gate passed for the proposed status, exact scoped diff, exact machine results, required primary paths, File List, and checked-task/acceptance mappings.
 
 | Task | Outcome | Status |
 | --- | --- | --- |
@@ -45,11 +45,11 @@ TE-1 remains complete only while the linked architecture decision and implementa
 | TE-2.2 | Reconcile story/sprint status, File List, explicit out-of-scope disclosures, root and root-declared-submodule diffs/gitlinks, and mandatory checkbox state. | complete |
 | TE-2.3 | Parse policy-approved machine results, bind them to the tested implementation digest, and enforce required primary-path execution with zero-test/all-skipped/fallback-only failure. | complete |
 | TE-2.4 | Require every checked task and acceptance criterion to map to current diff and/or passing machine assertions; detect proposed `done` transitions in CI and emit a fail-closed report. | complete |
-| TE-2.5 | Prove the gate with positive, per-reason negative, mutation, multi-repository, and bootstrap self-validation fixtures; publish the developer runbook and activate the protected check. | in-progress — repository work complete; external required-check activation remains open |
+| TE-2.5 | Prove the gate with positive, per-reason negative, mutation, multi-repository, and bootstrap self-validation fixtures; publish the developer runbook and activate the protected check. | withdrawn — the required branch check was never activated; retired with TE-2 |
 
-### Completion evidence rule
+### Retirement
 
-TE-2 cannot waive its own gate. While its record is still `review`, CI evaluates it with `targetStatus=done`; after all negative mutations are proven to fail and the positive exact-scope run passes, its status may change to `complete`. The Epic 13 action stays open until that self-validation and required branch check are both active.
+TE-2 never reached `complete`. TE-2.1 through TE-2.4 stay recorded as built; the code is in history before `bf0f44f`. Its evidence contracts and reports under `../implementation-artifacts/evidence/` remain frozen history and are not re-validated. The Epic 13 action items that named this gate are closed by `sprint-change-proposal-2026-11-21.md`.
 
 
 ## TE-3 — Story-Evidence Gate Reliability Follow-ups

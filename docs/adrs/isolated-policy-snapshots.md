@@ -144,5 +144,5 @@ Any future domain write must use Hexalith.EventStore; queries, projections, read
 models, and cursors must use the domain-service SDK seams. There is no history
 migration or sibling change in this work. Atomic command admission and mutation /
 audit commitment remain Stories 1.7 and 1.8. Completion also requires the native
-persisted-end-state evidence described above and a passing TE-2 completion contract
-under [`story-evidence-integrity.md`](../story-evidence-integrity.md).
+persisted-end-state evidence described above, recorded under the Story Completion
+policy in [`story-evidence-integrity.md`](../story-evidence-integrity.md).

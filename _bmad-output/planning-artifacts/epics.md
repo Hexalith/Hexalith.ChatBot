@@ -8,7 +8,7 @@ requirementsExtractionStatus: confirmed
 epicDesignStatus: approved
 epicCount: 13
 storyGenerationStatus: approved
-storyCount: 146
+storyCount: 147
 finalValidationStatus: passed
 workflowStatus: complete
 functionalRequirementCount: 117
@@ -276,7 +276,7 @@ This document provides the complete epic and story breakdown for chatbot, decomp
 - ARCH-34 — Replay M2 uses a separate credential-free composition root and gate-owned before/after invariance manifests across every protected production store/resource ledger; any missing/unreadable/added/changed resource, egress, or verifier failure is stop-ship.
 - ARCH-35 — Deployable images use .NET SDK container support; the M2 target is Aspire K8s/AKS plus Helm with exact runtime digest and shared DataProtection key-ring evidence, or an explicit single-replica guard.
 - ARCH-36 — DataProtection admission/cursor keys use application name `Hexalith.ChatBot`; production config must supply `ChatBot:DataProtection:KeyRingPath` or explicitly set `ChatBot:DataProtection:SingleReplicaOnly=true`.
-- ARCH-37 — CI/release must build Release with warnings as errors, central package authority, enabled audit, individually executed test projects, non-vacuous topology/browser gates, exact source/evidence provenance, story-evidence integrity, and checkout-root-only non-recursive submodule initialization.
+- ARCH-37 — CI/release must build Release with warnings as errors, central package authority, enabled audit, individually executed test projects, non-vacuous topology/browser gates, exact source provenance, and checkout-root-only non-recursive submodule initialization. Story completion follows the Story Completion policy (docs/story-evidence-integrity.md), outside module CI.
 - ARCH-38 — Release inventory includes Contracts, Client, and Testing packages plus `hexalith-chatbot-server` and `hexalith-chatbot-ui` containers; semantic-release and Conventional Commits govern releases.
 - ARCH-39 — M0→M1→M2 dependency order is mandatory. M0 requires approved-current A5/A6/A13 and exact A9a records before detector/classifier use; M1 revalidates A5/A6/A13/A9a and additionally requires A11-M1; M2 revalidates changed lower gates and additionally requires A10 and A11-M2. Missing, stale, mismatched, partial, or historical evidence authorizes no pilot, compliance, tamper-evidence, or production claim.
 - ARCH-40 — A material sibling contract/authority/identifier/topology/RBAC change triggers an architect-owned source re-check within five business days, recorded in the manifest/memlog with required downstream updates; inaccessible sources are blockers.
@@ -1221,6 +1221,41 @@ So that governed behavior can be reproduced without exposing production data or 
 **And** synthetic preparation, stale results, or incomplete evidence cannot close A5, A6, A13, exact A9a evidence, or support pilot, compliance, tamper-evidence, or production claims.
 
 **Requirements:** FR92, FR93, ARCH-19, ARCH-33, ARCH-37, ARCH-39, NFR3, NFR4, NFR9a, NFR10, NFR11, NFR32, NFR50, NFR59, NFR65, NFR68.
+
+### Story 1.12: Accept Live Canonical Operation Execution
+
+As an authorized user submitting governed work,
+I want canonical operations to execute live once their data-protection and owner-execution contracts are accepted,
+So that the operation identity, concurrency, and status contracts hold in persisted owner state, not only in synthetic folds.
+
+**Acceptance Criteria:**
+
+**Given** A6 or A13 acceptance is missing, or the retry profile is unapproved
+**When** a canonical operation is requested in the live runtime
+**Then** it fails closed exactly as Story 1.5 established
+**And** no configuration, fixture, or caller switch can open canonical execution.
+
+**Given** the accepted A6 policy-snapshot data class (Story 1.6) and the accepted A13 owner-dispatched write target (Story 1.8)
+**When** a canonical operation is created, replayed, raced, and polled in the supported Aspire/Dapr topology
+**Then** its lifetime operation ID, immutable metadata, expected-revision guard, and monotonic status hold in the persisted owner state
+**And** assertions inspect the state-store and event-stream end state rather than only responses.
+
+**Given** the owner decisions on multi-event revision semantics, accepted numeric equivalence, and successor uniqueness
+**When** each decision is recorded
+**Then** the reducer, status-update policy, and OpenAPI contract implement it with regression coverage
+**And** every still-undecided case keeps failing closed.
+
+**Given** an approved retry profile
+**When** an eligible pre-effect failure is retried
+**Then** public retry eligibility reflects the profile and the retry is a new predecessor-linked attempt
+**And** no terminal outcome is reopened.
+
+**Given** the live recovery sweep
+**When** its mailbox admission probe runs against open canonical execution
+**Then** the probe is admitted and the sweep's admission phase passes without a Tier-3 skip.
+
+**Requirements:** FR80, FR90, ARCH-13, ARCH-20, ARCH-39, NFR13, NFR13a, NFR15, NFR70.
+**Depends on:** Story 1.5 (contracts), Story 1.6 (A6), Story 1.8 (A13).
 
 ## Epic 2: Email Intake, Association & Production Correction
 

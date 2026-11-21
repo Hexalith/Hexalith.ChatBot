@@ -1149,40 +1149,35 @@ redaction → swappable stage in `Gateway` + `Contracts/Messages/`; evidence/con
 
 ## Delivery and Evidence Integrity
 
-- **Shared ownership:** every Hexalith domain module uses the reusable `Hexalith.Builds` domain CI and release
-  workflows. Module callers contain only triggers, least-privilege permissions, concurrency, explicit secret
-  mappings, and module-specific inputs; they do not duplicate standard build, test, or release mechanics.
+- **Shared ownership:** Hexalith.CiCd owns module workflows, `.github/hexalith-ci.json`, Dependabot and the Builds
+  gitlink, and renders the callers of the shared `Hexalith.Builds` CI and release implementation. Module-specific
+  product checks live in product actions that CiCd enables (`.github/actions/after-unit-tests`,
+  `.github/actions/nightly`). Modules neither hand-edit workflows nor duplicate standard build, test or release
+  mechanics.
 - **Dependency modes:** local development uses root-declared project references where available. CI and release
   use published NuGet dependencies across repository boundaries, build in Release with warnings as errors and
   enabled NuGet auditing, and execute test projects individually.
 - **Non-vacuous gates:** required Aspire/Dapr topology and browser tiers must execute their named tests. Missing,
   zero-test, self-skipped, or all-skipped evidence fails the lane; uploaded results do not substitute for passing
   execution.
-- **Story status:** CI detects each story or sprint-ledger transition to `done` and requires a matching TE-2 evidence
-  contract plus a passing `story-evidence-integrity` report. The File List and scoped change sets must reconcile,
-  result provenance must match the tested implementation digest, mandatory tests must be non-vacuous, required
-  primary paths must be executed, and every checked task or acceptance item must have current evidence. Root-declared
-  submodule changes require both the submodule diff and superproject gitlink; nested submodules are never initialized.
-- **Completion authority:** the versioned policy fixes PR and push base/head selection, verifies the exact event head,
-  and makes a failed result-producing job fail the always-running gate. It admits current-digest machine results or an
-  approved retained exact-digest artifact within policy age; narrative summaries, screenshots, diagnostic fallbacks,
-  and unrelated aggregate suites cannot replace required primary-path evidence.
-- **Recovery diagnostics:** `recovery-primary-diagnostics` is metadata-only and has no completion or A10 authority.
-- **Recovery completion:** `recovery-primary` admits exactly one transition-declared current-run producer bound to the
-  exact candidate and policy. A side-effect-free planner validates scope before the isolated destructive lane. The
-  accepted tool target is Dapr CLI/runtime `1.18.2/1.18.4`, with the CLI archive SHA-256 fixed by the policy. Raw live
-  TRX stays outside retention; the authority channel contains only the aggregate cleanup receipt, canonical sanitized
-  result, allowed independently validated reports, and provenance sidecars. Planning, production, timeout/no-test,
-  restoration, cleanup, projection, attestation, validation, or publication failure fails completion.
+- **Story status:** a story reaches `done` under the Story Completion policy (`docs/story-evidence-integrity.md`).
+  That requires a closed review, an acceptance-to-test map bound to the completed commit, green required product CI
+  on that commit, a non-skipped run of the named live test for every live claim, an owner for every deliberate scope
+  gap, and maintainer approval. Fixtures, fallbacks, screenshots and unrelated suites never satisfy a live claim.
+  Story-evidence checks do not run in module CI. TE-2 was retired on 2026-11-21.
+- **Recovery sweep:** the destructive live-recovery sweep (`Hexalith.ChatBot.Recovery.Tests`) runs only in the
+  product `nightly` hook. Raw live TRX stays outside retention, and published reports and manifests are sanitized.
 - **A10 operational evidence:** scheduled/release controlled-loss and full-window bundles use a disjoint
-  retention/freshness channel. They can inform A10 but cannot satisfy story completion.
+  retention/freshness channel. They can inform A10. A story's live recovery claim cites the sweep run that executed
+  the named test.
 - **Activation:** the Epic 12 architecture remains `activation: pending` until its unique pull-request check identity,
   cleanup receipt, closeout deadlines, immutable tools, and fresh-runner isolation are independently verified.
 - **Release provenance:** reusable domain-module releases run only after successful push-triggered CI on `main`,
   check out and assert the triggering `workflow_run.head_sha`, do not repeat CI tests, and record the tested source
-  SHA with released artifacts. The ChatBot umbrella is an explicit exception: its repository-owned release workflow
-  triggers on push/manual dispatch and reruns the required Aspire/Dapr and live-recovery gates for that exact
-  `github.sha` before `semantic-release`; it must not be described as consuming `workflow_run.head_sha`.
+  SHA with released artifacts. ChatBot's legacy repository-owned release workflow is retired when Hexalith.CiCd
+  delivers its generated callers (`sprint-change-proposal-2026-11-21.md`, C1). ChatBot then follows the central
+  nightly release, and its positive-state Aspire/Dapr gates and weekly recovery sweep run in the product `nightly`
+  hook. Until that delivery, no ChatBot release can run.
 - **Security boundary:** reusable workflow callers use non-cancelling release concurrency, job-scoped write
   permissions, explicit named secrets, checkout-root-only non-recursive submodule initialization, CodeQL,
   dependency review, commitlint, and Dependabot. The checkout root is the workflow's repository; a ChatBot

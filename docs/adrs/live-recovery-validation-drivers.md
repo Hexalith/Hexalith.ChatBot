@@ -141,6 +141,13 @@ Reports, logs, traces, screenshots, filenames, and CI artifacts exclude message 
 
 ## Story-completion provenance lifecycle
 
+> **Superseded 2026-11-21** (`sprint-change-proposal-2026-11-21.md`): TE-2 is retired, and
+> `bf0f44f` removed the `story-evidence-integrity` job, policy and producer, so no
+> `recovery-primary` completion lane exists. The destructive sweep runs only in the product
+> `nightly` hook (`Hexalith.ChatBot.Recovery.Tests`). A story's live recovery claim cites that
+> run under the Story Completion policy in `../story-evidence-integrity.md`. The section below
+> is kept as the historical decision.
+
 `recovery-primary` has one TE-2 completion path: **transition-declared `current-run` production** inside the exact-head `story-evidence-integrity` job. At most one active contract may declare the logical lane, the exact bound `LiveContinuityAspireE2eTests` class selector, `source: current-run`, `trx: recovery-primary/live-recovery-validation.trx`, `provenance: recovery-primary/live-recovery-validation.provenance.json`, and its exact `file:` locator. The repository-owned side-effect-free `plan` command validates pinned policy, status/lifecycle, scope digest, File List, checked mapping declarations, collision-free paths, and this exact single-consumer binding before any destructive setup. Only its validated plan can enable DAPR initialization and the live recovery sweep; ordinary runs with no completion transition do not execute this additional producer.
 
 The completion path and the exact-head topology producer it consumes install a checksum-pinned Dapr CLI 1.18.0 archive, initialize runtime 1.18.0, and exchange evidence with current artifact-action majors. Recovery's raw TRX is staged outside all upload paths. After the live class and DAPR cleanup succeed, `RecoveryTrxSanitizer` projects only the bound test identity, times, counters, IDs, and passing outcome into the canonical completion TRX; raw output/error diagnostics are never published. The attestor then binds exact base/head, implementation digest, sanitized-TRX checksum, selector, source, timestamp, and locator into the sidecar. Validation consumes that sidecar in the same exact-head job. The 360-minute job fixes closeout at minute 330, refuses DAPR initialization at or after minute 40, caps initialization/live execution at 10/280 minutes, sets the in-process deadline to 265 minutes, and dynamically interrupts production early enough to preserve 15 minutes of unwind before fixed closeout. Producer, timeout, skip/no-test, cleanup, projection, attestation, or validation failure leaves the completion check red.
@@ -285,7 +292,7 @@ sits above the constant in the precedence chain and the unconditional form faile
 - The destructive scheduler is the Tier-3/release workflow (CI: scheduled/manual; release: per-commit non-cancelling concurrency — N concurrent 5.5-hour jobs accepted rather than a cancellable shared queue), never `PeriodicEnforcementBackgroundService` and never a second product hosted service.
 - Out-of-order `main` validation completion preserves every per-SHA verdict, but only the freshly fetched exact
   remote head may invoke semantic-release; included older SHAs finish successfully as superseded.
-- A story-completion transition may additionally run the same live class inside `story-evidence-integrity`, but only when its active contract declares current-run `recovery-primary`; this is evidence production, not a product scheduler.
+- (Superseded 2026-11-21: TE-2 is retired, so no story-completion transition runs the live class. The sweep runs only in the product `nightly` hook.)
 - AppHost lifecycle control stays outside ChatBot; the bounded sandbox controller can affect only closed provider/component switches for the dedicated test tenant.
 - A sandbox pass narrows uncertainty but does not erase the named external-service, durability, scale, or production-control residuals.
 - Successful, missed, and unmeasurable reports become inspectable evidence before aggregate reduction without changing evaluator semantics.

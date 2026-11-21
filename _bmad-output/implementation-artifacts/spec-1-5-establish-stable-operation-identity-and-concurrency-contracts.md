@@ -93,6 +93,8 @@ The user explicitly reopened these previously deferred corrections. During imple
 
 ## Spec Change Log
 
+- 2026-11-21: `sprint-change-proposal-2026-11-21.md` retired TE-2 and redefined done for this story as "contracts landed and proven to fail closed". Live A6/A13 acceptance, retry-profile approval, the three owner decisions (multi-event revision semantics, numeric equivalence, successor uniqueness) and R17-W5 moved to Story 1.12. The frozen intent, which already gated live acceptance, and the AC wording, baseline and status are unchanged.
+
 - 2026-10-20: User reopened the existing strict identifier composition, atomic workflow/duplicate-count and production SDK serializer deferrals after the carried-finding commit. Added concrete tasks without changing frozen intent or baseline; retain owner revision, numeric-equivalence and successor-uniqueness decisions. Story 1.5 returns consistently to `in-progress` for implementation; Story 1.6 stays literal `review`.
 
 - 2026-10-20: Reconciled spec `in-review` with sprint `in-progress` by reopening the three actionable Story 1.5 deferrals carried in Story 1.6 reviews (Round18Build-BH-1, Build15-VG-1, Resume-BH-10). Both tracked implementation as `in-progress`; after the three patches passed focused verification they moved consistently to spec `in-review` / sprint `review`. Earlier patches are complete; earlier explicit deferrals and missing native owner/protection evidence remain open. Preserve the frozen intent, original baseline and Story 1.6 policy-gate behavior.
@@ -1238,15 +1240,28 @@ Code-review actions: **0 decision-needed, 0 patch, 5 deferred (R22-W1 through R2
 - the completion evidence contract, which has no producer until R21-D1 closes;
 - green Release and Debug builds and a green Server lane (R22-W1, R22-W3 and R22-W4).
 
+### Correct course (2026-11-21)
+
+`sprint-change-proposal-2026-11-21.md` closes R21-D1: TE-2 is retired, and stories complete under the Story Completion policy (`docs/story-evidence-integrity.md`). It supersedes the completion-gate lists in rounds 14 through 22.
+
+Before this story moves to `done`:
+
+- a non-skipped, passing Tier-3 run of `TrivialGovernedCommandAspireE2eTests` on the completion commit (AC5 live proof);
+- passing Release package-mode Contracts, Client, CLI, Conformance and Server lanes on that commit;
+- a `## Completion` section that maps each acceptance criterion to its tests;
+- the maintainer's approval of the transition.
+
+Moved to Story 1.12: A6/A13 owner/protection evidence, retry-profile approval, the three owner decisions and R17-W5. R22-W2 (no CI Server lane) belongs to the Hexalith.CiCd adoption request, and is not a gate for this story.
+
 ## Design Notes
 
 GetWorkflowOperationStatus uses the existing typed GetOperationStatus boundary. RetryCommandExecution is distinct from legacy RequestFailedWorkflowRetry; this story supplies its prerequisites. No migrations, deployments or external effects. Preserve historical OperationId values exactly.
 
 ## Verification
 
-- `dotnet build Hexalith.ChatBot.slnx --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false` — then execute Contracts, Client and Server individually through `.github/scripts/run-xunit-v4.sh`, retaining TRX. Run Architecture/Conformance if affected.
+- `dotnet build Hexalith.ChatBot.slnx --configuration Release -p:UseHexalithProjectReferences=false -m:1 /nr:false`, then run Contracts, Client, CLI, Conformance and Server individually through their built xUnit runners (`tests/<project>/bin/Release/net11.0/<project> -noAutoReporters -failSkips -result-trx …`), keeping TRX local. For Debug source mode, wrap the build in `python3 .github/scripts/with-source-mapping.py`.
 - Assert revisions, winning folded state, immutable fields and polling safety directly. Synthetic fixtures cannot prove native persisted end-state.
-- Before proposing done, follow `docs/story-evidence-integrity.md` with exact scope, mappings and current-run provenance. An unavailable required native/primary lane leaves the story in review; never weaken the gate.
+- Before proposing done, follow the Story Completion policy in `docs/story-evidence-integrity.md`. AC5's live proof is a non-skipped Tier-3 run of `TrivialGovernedCommandAspireE2eTests`, which asserts the live `503 canonical-execution-unavailable` refusal. Live A6/A13 acceptance belongs to Story 1.12.
 
 ### Current-run validation (2026-10-15)
 
