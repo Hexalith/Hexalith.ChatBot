@@ -2,7 +2,7 @@
 title: 'TE-2 Mechanical Story-Evidence Integrity Gate'
 type: 'chore'
 created: '2026-08-22'
-status: 'in-review'
+status: 'retired'
 review_loop_iteration: 2
 baseline_commit: 'bef15d1caae4ea50a4d92f7de46e77c79315bcfb'
 context:
@@ -71,6 +71,7 @@ context:
 - 2026-08-03: Replaced synthetic policy-v1 primary selectors with exact shipped browser, SignalR, hosting/assets, Aspire/Dapr, and recovery test classes; fixture TRX names, architecture pins, and runbook producer mappings now prove the bound classes are executable. Frozen intent remained unchanged.
 - 2026-08-22: Review exposed that diff membership made delayed activation impossible and found adjacent fail-closed gaps. Replanned around v2 HEAD snapshot plus semantic lifecycle delta; avoid historical replay and preserve exact hashing, mappings, stable reports/reasons, producer-head checks, and transition-declared artifacts.
 - 2026-08-23: Hardened v2 after review: mode-aware primary triggers, root-owned transition paths, historical terminal-record protection, canonical namespace-strict TRX parsing, policy/contract/path preflight, multi-lane and multi-contract attestation atomicity, safe candidate identities, strict CLI allowlists, and fail-closed Git path normalization. Restored the workflow's ambient repository comparison while retaining policy-bound validation in code. Frozen intent remained unchanged.
+- 2026-11-21: Retired without completion by `sprint-change-proposal-2026-11-21.md` (A1). `bf0f44f` removed the gate tool, tests and policy during the shared-CI migration, and the Hexalith baseline keeps story-evidence checks out of module CI. TE-2 never reached `complete`; stories now complete under the Story Completion policy in `docs/story-evidence-integrity.md`. The evidence contract under `evidence/` stays frozen history and is not re-validated. Frozen intent remained unchanged.
 
 ## Design Notes
 
