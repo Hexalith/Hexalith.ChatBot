@@ -156,17 +156,33 @@
                     </p>
                 }
 
-                @* AC4: the Stop/Cancel control is always mounted in a stable focusable slot; it is enabled only
-                   while a non-terminal generation is in flight and announces "Response stopped" after the server
-                   verifies the terminal state. *@
-                <ChatBotStreamingStopControl IsStreaming="@(ActiveStreamingProgress is not null)"
-                                             Disabled="@State.Value.IsCancellingAiResponse"
-                                             DisabledReason="@StopDisabledReason"
-                                             StopVerified="@LatestStopVerified"
-                                             VerifiedStopAnnouncementGenerationId="@State.Value.VerifiedStopAnnouncementGenerationId"
-                                             StableId="project-conversation-ai-response-stop"
-                                             FocusReturnTargetId="@_composerInputId"
-                                             OnStop="@StopActiveAiResponse" />
+                @* AC4: every non-terminal generation has a Stop control. The newest keeps the historical stable id
+                   so existing browser lanes still find it; older in-flight generations remain independently stoppable. *@
+                @if (ActiveStreamingGenerations.Count == 0)
+                {
+                    <ChatBotStreamingStopControl IsStreaming="false"
+                                                 Disabled="false"
+                                                 DisabledReason="@StopDisabledReason"
+                                                 StopVerified="@LatestStopVerified"
+                                                 VerifiedStopAnnouncementGenerationId="@State.Value.VerifiedStopAnnouncementGenerationId"
+                                                 StableId="project-conversation-ai-response-stop"
+                                                 FocusReturnTargetId="@_composerInputId"
+                                                 OnStop="@StopActiveAiResponse" />
+                }
+                else
+                {
+                    @foreach (ProjectConversationAiResponseProgressModel generation in ActiveStreamingGenerations)
+                    {
+                        <ChatBotStreamingStopControl IsStreaming="true"
+                                                     Disabled="@IsCancellingGeneration(generation)"
+                                                     DisabledReason="@(IsCancellingGeneration(generation) ? StopDisabledReason : null)"
+                                                     StopVerified="@(LatestStopVerified && string.Equals(generation.GenerationId, State.Value.CancellingGenerationId, StringComparison.Ordinal))"
+                                                     VerifiedStopAnnouncementGenerationId="@State.Value.VerifiedStopAnnouncementGenerationId"
+                                                     StableId="@StopStableId(generation)"
+                                                     FocusReturnTargetId="@_composerInputId"
+                                                     OnStop="@(() => StopAiResponse(generation))" />
+                    }
+                }
 
                 <ChatBotGovernedComposer InputId="@_composerInputId"
                                          Mode="@State.Value.ComposerMode"
@@ -442,12 +458,15 @@
 
     // The non-terminal, in-flight generation that the Stop/Cancel control can act on.
     private ProjectConversationAiResponseProgressModel? ActiveStreamingProgress
+        => ActiveStreamingGenerations.FirstOrDefault();
+
+    private IReadOnlyList<ProjectConversationAiResponseProgressModel> ActiveStreamingGenerations
         => LatestProgressByGeneration()
             .Where(static transition => !transition.Progress.IsTerminal &&
                 ProjectConversationAiResponseProgressStates.IsActive(transition.Progress.State))
             .OrderByDescending(static transition => transition.OccurredAt)
             .Select(static transition => transition.Progress)
-            .FirstOrDefault();
+            .ToArray();
 
     private IEnumerable<(DateTimeOffset OccurredAt, ProjectConversationAiResponseProgressModel Progress)> LatestProgressByGeneration()
         => (Conversation?.Items ?? [])
@@ -467,6 +486,18 @@
         => State.Value.IsCancellingAiResponse
             ? UiText[ChatBotUiTextKey.ProjectConversationStreamingDisabledReason]
             : null;
+
+    private bool IsCancellingGeneration(ProjectConversationAiResponseProgressModel progress)
+        => State.Value.IsCancellingAiResponse &&
+            string.Equals(State.Value.CancellingResponseId, progress.ResponseId, StringComparison.Ordinal) &&
+            string.Equals(State.Value.CancellingGenerationId, progress.GenerationId, StringComparison.Ordinal);
+
+    private string StopStableId(ProjectConversationAiResponseProgressModel progress)
+        => ActiveStreamingProgress is { } newest &&
+            string.Equals(newest.GenerationId, progress.GenerationId, StringComparison.Ordinal) &&
+            string.Equals(newest.ResponseId, progress.ResponseId, StringComparison.Ordinal)
+            ? "project-conversation-ai-response-stop"
+            : $"project-conversation-ai-response-stop-{progress.GenerationId}";
 
     private string WorkspaceStateText
         => Conversation switch
@@ -562,9 +593,12 @@
     {
         if (ActiveStreamingProgress is { } progress)
         {
-            Dispatcher.Dispatch(new StopProjectConversationAiResponseAction(progress));
+            StopAiResponse(progress);
         }
     }
+
+    private void StopAiResponse(ProjectConversationAiResponseProgressModel progress)
+        => Dispatcher.Dispatch(new StopProjectConversationAiResponseAction(progress));
 
     // Items.Max() throws on an empty sequence and SourceVersion is a non-nullable long, so the old
     // `Conversation?.Items.Max(...) ?? 0` only covered a null Conversation -- submitting the first message on an

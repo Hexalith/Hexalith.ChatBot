@@ -190,6 +190,34 @@ public sealed class ProjectConversationStateTests
     }
 
     [Fact]
+    public void OwnerStreamCoverageShouldPurgeOmittedMessagesApprovalsAndAttachments()
+    {
+        ProjectConversationItemModel message = StreamItem("message-1", "owner-a", 4, "EmailDerived");
+        ProjectConversationItemModel approval = StreamItem("approval-1", "owner-a", 5, "ApprovalEvent");
+        ProjectConversationItemModel attachment = StreamItem("attachment-1", "owner-a", 6, "Attachment");
+        ProjectConversationItemModel retained = StreamItem("outside-1", "owner-a", 20, "EmailDerived");
+        ProjectConversationState initial = new(false, Conversation("project-alpha", [message, approval, attachment, retained]), null)
+        {
+            HistoricalItems = [message, approval, attachment, retained],
+            CurrentPageItemIds = new HashSet<string>(StringComparer.Ordinal),
+            RequestedProjectId = "project-alpha",
+        };
+        ProjectConversationModel covering = Conversation("project-alpha") with
+        {
+            AuthoritativeCoverage = [new ProjectConversationStreamCoverageModel("owner-a", 4, 6, true, true)],
+        };
+
+        ProjectConversationState next = ProjectConversationReducers.ReduceLoaded(
+            initial,
+            new ProjectConversationLoadedAction(covering));
+
+        next.Conversation!.Items.Select(static item => item.ItemId).ShouldBe([retained.ItemId]);
+        next.HistoricalItems.ShouldNotBeNull()
+            .Select(static item => item.ItemId)
+            .ShouldBe([retained.ItemId]);
+    }
+
+    [Fact]
     public void LoadedResponseForAnotherProjectShouldFailClosedAndKeepTheLastSafeView()
     {
         ProjectConversationModel safe = Conversation("project-alpha", [Item("item-safe", 1)]);
@@ -259,6 +287,12 @@ public sealed class ProjectConversationStateTests
             $$"""{"itemId":"{{itemId}}","sourceVersion":{{sourceVersion}}}""",
             new JsonSerializerOptions(JsonSerializerDefaults.Web))
             ?? throw new InvalidOperationException("The project-conversation item fixture could not be created.");
+
+    private static ProjectConversationItemModel StreamItem(string itemId, string owner, long sourceVersion, string kind)
+        => JsonSerializer.Deserialize<ProjectConversationItemModel>(
+            $$"""{"itemId":"{{itemId}}","kind":"{{kind}}","sourceConversationId":"{{owner}}","sourceVersion":{{sourceVersion}}}""",
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            ?? throw new InvalidOperationException("The owner-stream project-conversation item fixture could not be created.");
 
     private static ProjectConversationItemModel AiItem(string itemId, string owner, long sourceVersion)
         => JsonSerializer.Deserialize<ProjectConversationItemModel>(

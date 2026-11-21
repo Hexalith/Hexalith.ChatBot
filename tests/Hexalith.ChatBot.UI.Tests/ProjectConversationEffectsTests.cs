@@ -391,6 +391,29 @@ public sealed class ProjectConversationEffectsTests
             false);
 
     [Fact]
+    public async Task StopVerificationShouldPollForTheServerRecoveryDurationFromTheStopInstant()
+    {
+        FakeState state = new(new ProjectConversationState(false, null, null) { RequestedProjectId = "project-001" });
+        RecordingDispatcher dispatcher = new(state);
+        StubChatBotClient client = new()
+        {
+            ProgressState = AiResponseProgressState.Stopped,
+            ProgressIsTerminal = true,
+        };
+        ProjectConversationAiResponseProgressModel progress = ActiveProgress() with
+        {
+            RecoveryDeadlineUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
+        };
+
+        await new ProjectConversationEffects(new ProjectConversationService(client), state)
+            .HandleStopAiResponseAsync(new StopProjectConversationAiResponseAction(progress), dispatcher);
+
+        client.ConversationReadCount.ShouldBeGreaterThan(0);
+        dispatcher.Actions.OfType<ProjectConversationAiResponseCancellationFailedAction>()
+            .ShouldNotContain(static failed => string.Equals(failed.ErrorCode, "ai-response-cancellation-unverified", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ComposerEffectShouldRouteMessageAndAskAiModesToTheirOwnGovernedCommands()
     {
         // Nothing previously executed this branch, so inverting the ternary -- routing a plain "Send" down the risky

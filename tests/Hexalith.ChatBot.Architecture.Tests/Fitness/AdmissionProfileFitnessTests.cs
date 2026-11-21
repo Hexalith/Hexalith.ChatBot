@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Server.Gateway.Admission;
+using Hexalith.ChatBot.Server.Operations;
 using Shouldly;
 
 namespace Hexalith.ChatBot.Architecture.Tests.Fitness;
@@ -16,7 +17,12 @@ public sealed class AdmissionProfileFitnessTests
         string[] contracts = typeof(IChatBotCommand).Assembly.GetTypes()
             .Where(type => typeof(IChatBotCommand).IsAssignableFrom(type) && type.IsClass && !type.IsAbstract)
             .Select(type => type.Name).Order(StringComparer.Ordinal).ToArray();
-        catalog.Commands.Keys.Order(StringComparer.Ordinal).ShouldBe(contracts);
+        string[] executorTerminals =
+        [
+            nameof(CompleteAiResponseGenerationCancellation),
+            nameof(CompleteLowRiskAiAssistance),
+        ];
+        catalog.Commands.Keys.Order(StringComparer.Ordinal).ShouldBe(contracts.Concat(executorTerminals).Order(StringComparer.Ordinal));
         Enum.GetValues<ChatBotAdmissionProfile>().Length.ShouldBe(10);
         catalog.Commands.Values.ShouldAllBe(value => Enum.IsDefined(value));
         ChatBotCommandAdmissionCatalog.StableConcreteContracts.Keys.Order(StringComparer.Ordinal).ShouldBe(ChatBotCommandAdmissionCatalog.StableCommands.Keys.Order(StringComparer.Ordinal));
@@ -35,6 +41,7 @@ public sealed class AdmissionProfileFitnessTests
             nameof(SubmitEscalationPolicyChange),
         ];
         catalog.Commands.Keys.Except(ChatBotCommandAdmissionCatalog.StableConcreteContracts.Values.SelectMany(value => value), StringComparer.Ordinal)
+            .Except(executorTerminals, StringComparer.Ordinal)
             .Order(StringComparer.Ordinal).ShouldBe(legacyUnmapped.Order(StringComparer.Ordinal));
         // The only contracts with two revision dimensions must reach their exact approval validators.
         typeof(IChatBotCommand).Assembly.GetTypes()

@@ -59,6 +59,21 @@ public sealed class ReadModelProjectionStorePolicyTests
     }
 
     [Fact]
+    public async Task ConcurrentConversationIndexWritesShouldMergeItemIdsFromTheCasWinner()
+    {
+        ConcurrentReadModelStore store = new();
+        ReadModelProjectConversationProjectionStore projectionStore = new(store);
+        await Task.WhenAll(
+            projectionStore.UpsertAsync(ProjectConversationItem("item-a", 1), TestContext.Current.CancellationToken),
+            projectionStore.UpsertAsync(ProjectConversationItem("item-b", 2), TestContext.Current.CancellationToken));
+
+        ProjectConversationPage page = await projectionStore
+            .ReadPageAsync("tenant-alpha", "project-alpha", null, 25, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        page.Items.Select(static item => item.ItemId).Order(StringComparer.Ordinal).ShouldBe(["item-a", "item-b"]);
+    }
+
+    [Fact]
     public async Task ProjectConversationReadModelStoreShouldPageNewestFirstWithStableEqualTimeCursor()
     {
         ConflictingReadModelStore store = new();
@@ -307,6 +322,70 @@ public sealed class ReadModelProjectionStorePolicyTests
             cancellationToken.ThrowIfCancellationRequested();
             LastSaved = (GovernedControlStateView)(object)value;
             return Task.FromResult(true);
+        }
+    }
+
+    private sealed class ConcurrentReadModelStore : IReadModelStore
+    {
+        private readonly object _gate = new();
+        private readonly Dictionary<string, object> _values = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, long> _versions = new(StringComparer.Ordinal);
+
+        public Task<ReadModelEntry<TValue>> GetAsync<TValue>(
+            string storeName,
+            string key,
+            CancellationToken cancellationToken = default)
+            where TValue : class
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_gate)
+            {
+                return Task.FromResult(_values.TryGetValue(key, out object? value)
+                    ? new ReadModelEntry<TValue>((TValue)value, _versions[key].ToString(System.Globalization.CultureInfo.InvariantCulture))
+                    : new ReadModelEntry<TValue>(null, null));
+            }
+        }
+
+        public Task SaveAsync<TValue>(
+            string storeName,
+            string key,
+            TValue value,
+            CancellationToken cancellationToken = default)
+            where TValue : class
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_gate)
+            {
+                _values[key] = value;
+                _versions[key] = _versions.GetValueOrDefault(key) + 1;
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> TrySaveAsync<TValue>(
+            string storeName,
+            string key,
+            TValue value,
+            string etag,
+            CancellationToken cancellationToken = default)
+            where TValue : class
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_gate)
+            {
+                string current = _versions.TryGetValue(key, out long version)
+                    ? version.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    : string.Empty;
+                if (!string.Equals(current, etag, StringComparison.Ordinal))
+                {
+                    return Task.FromResult(false);
+                }
+
+                _values[key] = value;
+                _versions[key] = version + 1;
+                return Task.FromResult(true);
+            }
         }
     }
 

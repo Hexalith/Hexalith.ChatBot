@@ -289,10 +289,17 @@ public sealed class GovernedOperationState
 
     public string AssociationThresholdPolicyVersion => _associationThresholdPolicyVersion;
 
+    /// <summary>Gets the applied EventStore sequence of the event most recently replayed onto this state.</summary>
+    public long LastAppliedSourceVersion { get; private set; }
+
+    /// <summary>Records the EventStore sequence of the event currently being applied.</summary>
+    private void NoteApplied() => LastAppliedSourceVersion = checked(LastAppliedSourceVersion + 1);
+
     /// <summary>Applies an exact owner grant from EventStore replay.</summary>
     public void Apply(ChatBotAuthorityGranted e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _authorityGrantIds.Add(e.GrantId);
         CurrentAuthorityGrant = e;
         AuthorityGrantRevoked = false;
@@ -302,6 +309,7 @@ public sealed class GovernedOperationState
     public void Apply(ChatBotAuthorityRevoked e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (string.Equals(CurrentAuthorityGrant?.GrantId, e.GrantId, StringComparison.Ordinal))
         {
             AuthorityGrantRevoked = true;
@@ -312,6 +320,7 @@ public sealed class GovernedOperationState
     public void Apply(ChatBotAuthorityChangeRejected e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
     }
 
     /// <summary>
@@ -321,6 +330,7 @@ public sealed class GovernedOperationState
     public void Apply(GovernedNoteRecorded e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (IsRecorded)
         {
             return;
@@ -333,6 +343,7 @@ public sealed class GovernedOperationState
     public void Apply(MailboxMessageIntakeCaptured e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (IsMailboxIntakeCaptured)
         {
             return;
@@ -345,18 +356,21 @@ public sealed class GovernedOperationState
     public void Apply(WorkflowRetryRequested e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _workflowRetryIds.Add(e.RetryId);
     }
 
     public void Apply(ProjectConversationMessageAppended e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _projectConversationMessageIds.Add(e.MessageId);
     }
 
     public void Apply(AiResponseGenerationCancellationRequested e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _aiResponseCancellationIds.Add(e.CancellationId);
         string key = AiResponseGenerationKey(e.ResponseId, e.GenerationId);
         if (_activeAiResponseGenerations.TryGetValue(key, out ActiveAiResponseGeneration? generation))
@@ -372,12 +386,14 @@ public sealed class GovernedOperationState
     public void Apply(AiResponseGenerationCancellationConfirmed e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         CompleteAiResponseGeneration(e.ResponseId, e.GenerationId);
     }
 
     public void Apply(AiResponseGenerationCancellationFailed e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         string key = AiResponseGenerationKey(e.ResponseId, e.GenerationId);
         if (_activeAiResponseGenerations.TryGetValue(key, out ActiveAiResponseGeneration? generation) &&
             string.Equals(generation.CancellationId, e.CancellationId, StringComparison.Ordinal))
@@ -393,12 +409,14 @@ public sealed class GovernedOperationState
     public void Apply(TaskIntentCaptured e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         UpsertTaskIntent(e.Record);
     }
 
     public void Apply(TaskIntentConvertedToAiActionProposal e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         UpsertTaskIntent(e.TaskIntent);
         _aiActionProposals[e.Proposal.ProposalId] = e.Proposal;
         if (!string.IsNullOrWhiteSpace(e.TaskIntent.TransitionId))
@@ -410,6 +428,7 @@ public sealed class GovernedOperationState
     public void Apply(AiActionProposalInvalidatedByCorrection e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_invalidatedAiActionProposals.TryGetValue(e.ProposalId, out AiActionProposalInvalidatedByCorrection? existing) ||
             e.EvidenceSnapshotSourceVersion >= existing.EvidenceSnapshotSourceVersion)
         {
@@ -420,6 +439,7 @@ public sealed class GovernedOperationState
     public void Apply(TaskIntentDispositionMarked e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         UpsertTaskIntent(e.TaskIntent);
         if (!string.IsNullOrWhiteSpace(e.TaskIntent.TransitionId))
         {
@@ -430,6 +450,7 @@ public sealed class GovernedOperationState
     public void Apply(LowRiskAiAssistanceExecutionStarted e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _lowRiskAiExecutionIds.Add(e.ExecutionId);
 
         // A started low-risk assistance execution IS the in-flight AI response the project-conversation surface renders
@@ -438,7 +459,7 @@ public sealed class GovernedOperationState
             e.ProposalId,
             e.ExecutionId,
             e.ProjectId,
-            checked(e.ExpectedProposalSourceVersion + 1),
+            LastAppliedSourceVersion,
             e.CorrelationId,
             e.TenantId,
             e.ConversationId ?? e.ProjectId);
@@ -447,6 +468,7 @@ public sealed class GovernedOperationState
     public void Apply(LowRiskAiAssistanceRoutedToApproval e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _lowRiskAiExecutionIds.Add(e.Record.ExecutionId);
         CompleteAiResponseGeneration(e.Record.ProposalId, e.Record.ExecutionId);
     }
@@ -454,12 +476,14 @@ public sealed class GovernedOperationState
     public void Apply(LowRiskAiAssistanceExecutionSucceeded e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         CompleteAiResponseGeneration(e.Record.ProposalId, e.Record.ExecutionId);
     }
 
     public void Apply(LowRiskAiAssistanceExecutionFailed e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         CompleteAiResponseGeneration(e.Record.ProposalId, e.Record.ExecutionId);
     }
 
@@ -469,6 +493,7 @@ public sealed class GovernedOperationState
     public void Apply(ApprovedAiActionExecutionStarted e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_approvedAiExecutions.ContainsKey(e.ExecutionId))
         {
             _approvedAiExecutions[e.ExecutionId] = e;
@@ -478,6 +503,7 @@ public sealed class GovernedOperationState
     public void Apply(OutboundDraftCreated e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_outboundDrafts.ContainsKey(e.DraftId))
         {
             _outboundDrafts[e.DraftId] = e;
@@ -487,6 +513,7 @@ public sealed class GovernedOperationState
     public void Apply(OutboundApprovalRequested e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_outboundApprovalRequests.TryGetValue(e.ApprovalId, out OutboundApprovalRequested? existing) ||
             e.SourceVersion >= existing.SourceVersion)
         {
@@ -497,6 +524,7 @@ public sealed class GovernedOperationState
     public void Apply(OutboundApprovalDecisionRecorded e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_outboundApprovalDecisions.TryGetValue(e.ApprovalId, out OutboundApprovalDecisionRecorded? existing) ||
             e.SourceVersion >= existing.SourceVersion)
         {
@@ -507,6 +535,7 @@ public sealed class GovernedOperationState
     public void Apply(OutboundSendStarted e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_outboundSends.ContainsKey(e.SendKey))
         {
             _outboundSends[e.SendKey] = e;
@@ -516,6 +545,7 @@ public sealed class GovernedOperationState
     public void Apply(AiActionApprovalRequested e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_approvalRequests.TryGetValue(e.ApprovalId, out AiActionApprovalRequested? existing) ||
             e.SourceVersion >= existing.SourceVersion)
         {
@@ -526,6 +556,7 @@ public sealed class GovernedOperationState
     public void Apply(AiActionApprovalDecisionRecorded e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_approvalDecisions.TryGetValue(e.ApprovalId, out AiActionApprovalDecisionRecorded? existing) ||
             e.SourceVersion >= existing.SourceVersion)
         {
@@ -536,6 +567,7 @@ public sealed class GovernedOperationState
     public void Apply(TenantPolicyChangePendingApproval e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_tenantPolicyPendingApprovals.ContainsKey(e.PolicyChangeId))
         {
             _tenantPolicyPendingApprovals[e.PolicyChangeId] = e;
@@ -545,6 +577,7 @@ public sealed class GovernedOperationState
     public void Apply(TenantPolicySnapshotActivated e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _tenantPolicySnapshots[e.ActivatedPolicySnapshotId] = e;
         _ = _tenantPolicyPendingApprovals.Remove(e.PolicyChangeId);
     }
@@ -552,12 +585,14 @@ public sealed class GovernedOperationState
     public void Apply(NotificationRoutingSnapshotActivated e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _notificationRoutingSnapshots[e.ActivatedRoutingSnapshotId] = e;
     }
 
     public void Apply(MailboxSourceDisablePendingApproval e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_mailboxSourceDisablePendingApprovals.ContainsKey(e.DisableChangeId))
         {
             _mailboxSourceDisablePendingApprovals[e.DisableChangeId] = e;
@@ -567,6 +602,7 @@ public sealed class GovernedOperationState
     public void Apply(MailboxSourceDisabled e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _disabledMailboxSources[e.MailboxSourceRef] = e;
         _ = _mailboxSourceDisablePendingApprovals.Remove(e.DisableChangeId);
     }
@@ -574,6 +610,7 @@ public sealed class GovernedOperationState
     public void Apply(ServiceClientDisablePendingApproval e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_serviceClientDisablePendingApprovals.ContainsKey(e.DisableChangeId))
         {
             _serviceClientDisablePendingApprovals[e.DisableChangeId] = e;
@@ -583,6 +620,7 @@ public sealed class GovernedOperationState
     public void Apply(ServiceClientDisabled e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _disabledServiceClients[e.ServiceClientRef] = e;
         _ = _serviceClientDisablePendingApprovals.Remove(e.DisableChangeId);
     }
@@ -590,6 +628,7 @@ public sealed class GovernedOperationState
     public void Apply(AiActorDisablePendingApproval e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_aiActorDisablePendingApprovals.ContainsKey(e.DisableChangeId))
         {
             _aiActorDisablePendingApprovals[e.DisableChangeId] = e;
@@ -599,6 +638,7 @@ public sealed class GovernedOperationState
     public void Apply(AiActorDisabled e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _disabledAiActors[e.AiActorRef] = e;
         _ = _aiActorDisablePendingApprovals.Remove(e.DisableChangeId);
     }
@@ -606,6 +646,7 @@ public sealed class GovernedOperationState
     public void Apply(CommandCapabilityDisablePendingApproval e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_commandCapabilityDisablePendingApprovals.ContainsKey(e.DisableChangeId))
         {
             _commandCapabilityDisablePendingApprovals[e.DisableChangeId] = e;
@@ -615,6 +656,7 @@ public sealed class GovernedOperationState
     public void Apply(CommandCapabilityDisabled e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _disabledCommandCapabilities[e.CommandCapabilityRef] = e;
         _ = _commandCapabilityDisablePendingApprovals.Remove(e.DisableChangeId);
     }
@@ -622,6 +664,7 @@ public sealed class GovernedOperationState
     public void Apply(OutboundChannelDisablePendingApproval e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_outboundChannelDisablePendingApprovals.ContainsKey(e.DisableChangeId))
         {
             _outboundChannelDisablePendingApprovals[e.DisableChangeId] = e;
@@ -631,6 +674,7 @@ public sealed class GovernedOperationState
     public void Apply(OutboundChannelDisabled e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _disabledOutboundChannels[e.OutboundChannelRef] = e;
         _ = _outboundChannelDisablePendingApprovals.Remove(e.DisableChangeId);
     }
@@ -638,6 +682,7 @@ public sealed class GovernedOperationState
     public void Apply(OutboundChannelQuarantinePendingApproval e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_outboundChannelQuarantinePendingApprovals.ContainsKey(e.QuarantineChangeId))
         {
             _outboundChannelQuarantinePendingApprovals[e.QuarantineChangeId] = e;
@@ -647,6 +692,7 @@ public sealed class GovernedOperationState
     public void Apply(OutboundChannelQuarantined e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _quarantinedOutboundChannels[e.OutboundChannelRef] = e;
         _ = _outboundChannelQuarantinePendingApprovals.Remove(e.QuarantineChangeId);
     }
@@ -654,12 +700,14 @@ public sealed class GovernedOperationState
     public void Apply(OutboundChannelRateLimitConfigured e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _outboundChannelRateLimits[e.OutboundChannelRef] = e;
     }
 
     public void Apply(CommandCapabilityQuarantinePendingApproval e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_commandCapabilityQuarantinePendingApprovals.ContainsKey(e.QuarantineChangeId))
         {
             _commandCapabilityQuarantinePendingApprovals[e.QuarantineChangeId] = e;
@@ -669,6 +717,7 @@ public sealed class GovernedOperationState
     public void Apply(CommandCapabilityQuarantined e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _quarantinedCommandCapabilities[e.CommandCapabilityRef] = e;
         _ = _commandCapabilityQuarantinePendingApprovals.Remove(e.QuarantineChangeId);
     }
@@ -676,6 +725,7 @@ public sealed class GovernedOperationState
     public void Apply(AiActorQuarantinePendingApproval e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_aiActorQuarantinePendingApprovals.ContainsKey(e.QuarantineChangeId))
         {
             _aiActorQuarantinePendingApprovals[e.QuarantineChangeId] = e;
@@ -685,6 +735,7 @@ public sealed class GovernedOperationState
     public void Apply(AiActorQuarantined e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _quarantinedAiActors[e.AiActorRef] = e;
         _ = _aiActorQuarantinePendingApprovals.Remove(e.QuarantineChangeId);
     }
@@ -692,6 +743,7 @@ public sealed class GovernedOperationState
     public void Apply(ServiceClientQuarantinePendingApproval e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_serviceClientQuarantinePendingApprovals.ContainsKey(e.QuarantineChangeId))
         {
             _serviceClientQuarantinePendingApprovals[e.QuarantineChangeId] = e;
@@ -701,6 +753,7 @@ public sealed class GovernedOperationState
     public void Apply(ServiceClientQuarantined e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _quarantinedServiceClients[e.ServiceClientRef] = e;
         _ = _serviceClientQuarantinePendingApprovals.Remove(e.QuarantineChangeId);
     }
@@ -708,6 +761,7 @@ public sealed class GovernedOperationState
     public void Apply(MailboxSourceQuarantinePendingApproval e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         if (!_mailboxSourceQuarantinePendingApprovals.ContainsKey(e.QuarantineChangeId))
         {
             _mailboxSourceQuarantinePendingApprovals[e.QuarantineChangeId] = e;
@@ -717,6 +771,7 @@ public sealed class GovernedOperationState
     public void Apply(MailboxSourceQuarantined e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _quarantinedMailboxSources[e.MailboxSourceRef] = e;
         _ = _mailboxSourceQuarantinePendingApprovals.Remove(e.QuarantineChangeId);
     }
@@ -724,42 +779,49 @@ public sealed class GovernedOperationState
     public void Apply(MailboxSourceRateLimitConfigured e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _mailboxSourceRateLimits[e.MailboxSourceRef] = e;
     }
 
     public void Apply(ServiceClientRateLimitConfigured e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _serviceClientRateLimits[e.ServiceClientRef] = e;
     }
 
     public void Apply(AiActorRateLimitConfigured e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _aiActorRateLimits[e.AiActorRef] = e;
     }
 
     public void Apply(CommandCapabilityRateLimitConfigured e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _commandCapabilityRateLimits[e.CommandCapabilityRef] = e;
     }
 
     public void Apply(MailboxParticipantResolved e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _participantResolutionIds.Add(e.ResolutionId);
     }
 
     public void Apply(MailboxParticipantUnresolved e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _participantResolutionIds.Add(e.ResolutionId);
     }
 
     public void Apply(MailboxAssociationCandidatesGenerated e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _associationIds.Add(e.AssociationId);
         AssociationDecisionSource = new AssociationDecisionSourceSnapshot(
             e.AssociationId,
@@ -788,6 +850,7 @@ public sealed class GovernedOperationState
     public void Apply(MailboxEmailAssociatedToProject e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _associationIds.Add(e.AssociationId);
         AssociationDecisionSource = new AssociationDecisionSourceSnapshot(
             e.AssociationId,
@@ -819,6 +882,7 @@ public sealed class GovernedOperationState
     public void Apply(MailboxAssociationScoringFailedClosed e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _associationIds.Add(e.AssociationId);
         AssociationDecisionSource = new AssociationDecisionSourceSnapshot(
             e.AssociationId,
@@ -847,6 +911,7 @@ public sealed class GovernedOperationState
     public void Apply(MailboxEmailAssociationConfirmed e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _associationDecisionIds.Add(e.AssociationId);
         LastAssociationDecisionSourceVersion = e.SourceVersion;
         AssociationLifecycleState = LifecycleState.Associated;
@@ -857,6 +922,7 @@ public sealed class GovernedOperationState
     public void Apply(MailboxEmailAssociationRejected e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _associationDecisionIds.Add(e.AssociationId);
         LastAssociationDecisionSourceVersion = e.SourceVersion;
         AssociationLifecycleState = LifecycleState.Rejected;
@@ -865,6 +931,7 @@ public sealed class GovernedOperationState
     public void Apply(MailboxEmailAssociationDeferred e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _associationDecisionIds.Add(e.AssociationId);
         LastAssociationDecisionSourceVersion = e.SourceVersion;
         AssociationLifecycleState = LifecycleState.Deferred;
@@ -873,6 +940,7 @@ public sealed class GovernedOperationState
     public void Apply(MailboxEmailAssociationMarkedNeedsReview e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _associationDecisionIds.Add(e.AssociationId);
         LastAssociationDecisionSourceVersion = e.SourceVersion;
         AssociationLifecycleState = LifecycleState.NeedsReview;
@@ -881,6 +949,7 @@ public sealed class GovernedOperationState
     public void Apply(MailboxEmailAssociationCorrected e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _associationCorrectionIds.Add($"{e.AssociationId}:{e.CorrectionKind}:{e.SourceVersion}");
         LastAssociationDecisionSourceVersion = e.SourceVersion;
         AssociationLifecycleState = LifecycleState.Corrected;
@@ -894,6 +963,7 @@ public sealed class GovernedOperationState
     public void Apply(MailboxAssociationCorrectionPropagationStarted e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
 
         if (CorrectionPropagationSourceVersion is > 0 && e.SourceVersion < CorrectionPropagationSourceVersion)
         {
@@ -922,6 +992,7 @@ public sealed class GovernedOperationState
     public void Apply(MailboxAssociationCorrectionStoreInvalidated e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
 
         if (!IsCurrentCorrectionPropagation(e.CorrectionId, e.WorkflowInstanceId, e.SourceVersion))
         {
@@ -943,6 +1014,7 @@ public sealed class GovernedOperationState
     public void Apply(MailboxAssociationCorrectionPropagationCompleted e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
 
         if (!IsCurrentCorrectionPropagation(e.CorrectionId, e.WorkflowInstanceId, e.SourceVersion))
         {
@@ -958,6 +1030,7 @@ public sealed class GovernedOperationState
     public void Apply(MailboxAssociationCorrectionPropagationDelayed e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
 
         if (!IsCurrentCorrectionPropagation(e.CorrectionId, e.WorkflowInstanceId, e.SourceVersion))
         {
@@ -973,6 +1046,7 @@ public sealed class GovernedOperationState
     public void Apply(AssociationConfidenceThresholdsChanged e)
     {
         ArgumentNullException.ThrowIfNull(e);
+        NoteApplied();
         _ = _thresholdPolicyVersions.Add(e.PolicyVersion);
         _associationTHigh = e.THigh;
         _associationTLow = e.TLow;

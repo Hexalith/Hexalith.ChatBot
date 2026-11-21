@@ -16,7 +16,7 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
         _ = _items.AddOrUpdate(
             item.Key,
             item,
-            (_, current) => current.Status is AiExecutionWorkStatus.Terminal ? current : current);
+            (_, current) => AiExecutionWorkItem.MergeStarted(current, item));
         return ValueTask.CompletedTask;
     }
 
@@ -32,16 +32,10 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
             request.ConversationId,
             request.ResponseId,
             request.GenerationId);
-        if (!_items.ContainsKey(key))
-        {
-            // A replay can contain a cancellation for a legacy Started row that predates the reconstructable
-            // durable-work payload. Keep projecting the governed request, but never invent provider work.
-            return ValueTask.CompletedTask;
-        }
-
+        AiExecutionWorkItem placeholder = AiExecutionWorkItem.CancellationPlaceholder(request, key);
         _ = _items.AddOrUpdate(
             key,
-            _ => throw new InvalidOperationException($"AI execution work '{key}' disappeared while cancellation was recorded."),
+            placeholder,
             (_, current) => current.Status is AiExecutionWorkStatus.Terminal
                 ? current
                 : current with
@@ -62,9 +56,10 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
         cancellationToken.ThrowIfCancellationRequested();
         QuarantineInvalidRows();
         IReadOnlyList<AiExecutionWorkItem> result = _items.Values
-            .Where(item => IsRunnable(item, now))
+            .Where(item => item.Status is not (AiExecutionWorkStatus.Terminal or AiExecutionWorkStatus.Exhausted or AiExecutionWorkStatus.Quarantined))
             .GroupBy(static item => item.CanonicalKey, StringComparer.Ordinal)
             .Select(static group => group.OrderByDescending(static item => item.Key.StartsWith("ai-execution-v2.", StringComparison.Ordinal)).First())
+            .Where(item => IsRunnable(item, now))
             .OrderBy(static item => item.UpdatedAtUtc)
             .ThenBy(static item => item.Key, StringComparer.Ordinal)
             .Take(maximumCount)
@@ -189,10 +184,25 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
                         : AiExecutionWorkStatus.Pending,
                 LeaseOwner = null,
                 LeaseExpiresAtUtc = null,
-                TerminalSubmissionAttemptCount = checked(current.TerminalSubmissionAttemptCount + 1),
                 UpdatedAtUtc = now,
             },
             cancellationToken);
+
+    public async ValueTask RecordTerminalRelayFailureAsync(
+        string key,
+        string owner,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+        => await UpdateOwnedAsync(
+            key,
+            owner,
+            now,
+            current => current with
+            {
+                TerminalSubmissionAttemptCount = checked(current.TerminalSubmissionAttemptCount + 1),
+                UpdatedAtUtc = now,
+            },
+            cancellationToken).ConfigureAwait(false);
 
     public ValueTask MarkTerminalObservedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken)
     {
@@ -219,6 +229,12 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
         cancellationToken.ThrowIfCancellationRequested();
         while (_items.TryGetValue(key, out AiExecutionWorkItem? current))
         {
+            if (current.Execution is null && current.Status is not AiExecutionWorkStatus.Terminal)
+            {
+                _ = _items.TryRemove(key, out _);
+                break;
+            }
+
             AiExecutionWorkItem updated = current.Status is AiExecutionWorkStatus.Terminal
                 ? current
                 : current with
@@ -267,6 +283,7 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
         Func<bool>? authorityIsCurrent = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        RequireCurrentAuthority(authorityIsCurrent);
         IReadOnlyList<AiExecutionWorkItem> items = _items.Values
             .Where(item => item.Status is AiExecutionWorkStatus.Exhausted && (tenantId is null || item.TenantId == tenantId))
             .Where(item => afterKey is null || string.CompareOrdinal(item.Key, afterKey) > 0)
@@ -279,9 +296,10 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
     public ValueTask<bool> RecoverExhaustedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken, string? tenantId = null, Func<bool>? authorityIsCurrent = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        RequireCurrentAuthority(authorityIsCurrent);
         while (_items.TryGetValue(key, out AiExecutionWorkItem? current))
         {
-            if (authorityIsCurrent is not null && !authorityIsCurrent()) { return ValueTask.FromResult(false); }
+            RequireCurrentAuthority(authorityIsCurrent);
             if (current.Status is not AiExecutionWorkStatus.Exhausted || (tenantId is not null && current.TenantId != tenantId))
             {
                 return ValueTask.FromResult(false);
@@ -306,6 +324,14 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
         return ValueTask.FromResult(false);
     }
 
+    private static void RequireCurrentAuthority(Func<bool>? authorityIsCurrent)
+    {
+        if (authorityIsCurrent is not null && !authorityIsCurrent())
+        {
+            throw new Hexalith.ChatBot.Server.Gateway.Stages.ChatBotAuthorityLapsedException();
+        }
+    }
+
     private void QuarantineInvalidRows()
     {
         foreach ((string key, AiExecutionWorkItem item) in _items)
@@ -328,6 +354,7 @@ internal sealed class InMemoryAiExecutionWorkStore : IAiExecutionWorkStore
 
     private static bool IsRunnable(AiExecutionWorkItem item, DateTimeOffset now)
         => item.Status is not (AiExecutionWorkStatus.Terminal or AiExecutionWorkStatus.Exhausted or AiExecutionWorkStatus.Quarantined) &&
+            (item.Execution is not null || item.Status is AiExecutionWorkStatus.CancellationRequested) &&
             (item.LeaseExpiresAtUtc is null || item.LeaseExpiresAtUtc <= now);
 
     private ValueTask<bool> UpdateOwnedAsync(

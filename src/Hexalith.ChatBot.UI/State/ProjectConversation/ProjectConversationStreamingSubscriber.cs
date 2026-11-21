@@ -191,15 +191,23 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
+        await _subscriptionChanges.WaitAsync().ConfigureAwait(false);
+        try
         {
-            return;
-        }
+            if (_disposed)
+            {
+                return;
+            }
 
-        _disposed = true;
-        await _lifetime.CancelAsync().ConfigureAwait(false);
-        await DisposeConnectionAsync().ConfigureAwait(false);
-        _lifetime.Dispose();
+            _disposed = true;
+            await _lifetime.CancelAsync().ConfigureAwait(false);
+            await DisposeConnectionAsync().ConfigureAwait(false);
+            _lifetime.Dispose();
+        }
+        finally
+        {
+            _ = _subscriptionChanges.Release();
+        }
     }
 
     // Resolve the hub path against the base address WITHOUT discarding a path prefix. An absolute "/hubs/..." path

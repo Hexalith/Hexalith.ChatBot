@@ -9,8 +9,8 @@ namespace Hexalith.ChatBot.Server.Operations;
 /// <param name="GenerationId">The execution id the projection exposes as the generation id.</param>
 /// <param name="ProjectId">The project the generation belongs to; a cancellation must name the same one.</param>
 /// <param name="StartedSourceVersion">
-/// The proposal source version the generation started from. A cancellation asserting a version below this is
-/// definitionally stale.
+/// The applied EventStore sequence of the Started event. Stop must send this exact value, never proposal+1
+/// and never a later progress sequence.
 /// </param>
 /// <param name="CorrelationId">The generation's correlation id, retained for audit continuity.</param>
 public sealed record ActiveAiResponseGeneration(

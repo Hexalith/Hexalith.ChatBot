@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Server.Operations;
 
 namespace Hexalith.ChatBot.Server.Gateway.Admission;
 
@@ -24,6 +25,8 @@ internal sealed class ChatBotCommandAdmissionCatalog
         new(nameof(CancelAiResponseGeneration), ChatBotAdmissionProfile.GovernedChat),
         new(nameof(CaptureMailboxMessageIntake), ChatBotAdmissionProfile.MailboxIntake),
         new(nameof(CaptureTaskIntent), ChatBotAdmissionProfile.Workflow),
+        new(nameof(CompleteAiResponseGenerationCancellation), ChatBotAdmissionProfile.CommandExecution),
+        new(nameof(CompleteLowRiskAiAssistance), ChatBotAdmissionProfile.CommandExecution),
         new(nameof(CorrectEmailProjectAssociation), ChatBotAdmissionProfile.Workflow),
         new(nameof(CreateOutboundDraft), ChatBotAdmissionProfile.HumanEffect),
         new(nameof(DecideAiActionApproval), ChatBotAdmissionProfile.AiEffect),
@@ -335,4 +338,11 @@ internal sealed class ChatBotCommandAdmissionCatalog
 
     /// <summary>Resolves exact concrete contracts only; stable aliases cannot dispatch invented DTOs.</summary>
     public ChatBotAdmissionProfile? Find(string? command) => command is not null && _commands.TryGetValue(command, out ChatBotAdmissionProfile profile) ? profile : null;
+
+    /// <summary>
+    /// Protected executor terminals are catalogued so marked EventStore revalidation can find them, but they are not
+    /// public <c>IChatBotCommand</c> contracts and must not ride the contributor spine.
+    /// </summary>
+    public static bool IsExecutorTerminalCommand(string? command)
+        => command is nameof(CompleteLowRiskAiAssistance) or nameof(CompleteAiResponseGenerationCancellation);
 }

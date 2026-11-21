@@ -83,8 +83,8 @@ internal sealed class TaskIntentProjectionHandler(IProjectConversationProjection
             await _conversationStore.UpsertAiOutcomeEventAsync(new AiOutcomeEventView(
                 failed.TenantId,
                 failed.ProjectId,
-                Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.ExecutionFailed,
-                Hexalith.ChatBot.Contracts.Enums.AiOutcomeStatus.Failed,
+                Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.OutcomeRecorded,
+                Hexalith.ChatBot.Contracts.Enums.AiOutcomeStatus.Executing,
                 failed.FailedAtUtc,
                 published.SequenceNumber,
                 failed.CorrelationId,
@@ -96,10 +96,10 @@ internal sealed class TaskIntentProjectionHandler(IProjectConversationProjection
                 FailureCode: failed.FailureReasonCode,
                 SafeNextAction: failed.SafeNextAction,
                 AiResponseSequence: published.SequenceNumber,
-                AiResponseProgressState: "unavailable",
-                AiResponseTerminalReason: "unavailable",
+                AiResponseProgressState: "rendering",
+                AiResponseTerminalReason: "none",
                 AiResponseVisibilityState: "metadata_only",
-                AiResponseIsTerminal: true,
+                AiResponseIsTerminal: false,
                 RedactionState: failed.RedactionState), cancellationToken).ConfigureAwait(false);
             return ProjectionOutcome.Applied;
         }

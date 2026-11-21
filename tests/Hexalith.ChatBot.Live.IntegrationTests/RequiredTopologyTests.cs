@@ -10,7 +10,7 @@ public sealed class RequiredTopologyTests(ITestOutputHelper output)
     public async Task GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology()
         => await new TrivialGovernedCommandAspireE2eTests(output).RunGovernedCommandRefusalAsync().ConfigureAwait(true);
 
-    /// <summary>Requires the authenticated production-client Chrome matrix and unchanged persistence.</summary>
+    /// <summary>Requires the authenticated production-client Chrome matrix for admitted Message/Ask-AI/Stop.</summary>
     [Fact]
     public async Task AuthenticatedProductionClientShouldFailClosedWithoutPersistingAcrossRequiredChromeMatrix()
         => await new Story132ProductionBrowserAspireE2ETests(output).RunAuthenticatedProductionClientMatrixAsync().ConfigureAwait(true);

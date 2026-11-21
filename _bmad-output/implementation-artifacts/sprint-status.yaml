@@ -212,9 +212,9 @@ development_status:
   12-15-qualify-exact-candidate-recovery-without-evidence-substituti: backlog
   epic-12-retrospective: optional
 
-  epic-13: backlog
+  epic-13: in-progress
   13-1-adopt-the-frontcomposer-shell-and-enforce-ui-composition: backlog
-  13-2-deliver-governed-project-chat-with-safe-streaming-and-interr: backlog
+  13-2-deliver-governed-project-chat-with-safe-streaming-and-interr: in-progress
   13-3-conform-the-live-association-review-surface: backlog
   13-4-conform-ai-action-and-outbound-approval-surfaces: backlog
   13-5-conform-correction-tenant-administration-and-review-operatio: backlog

@@ -208,6 +208,7 @@ internal sealed record ProjectConversationItemView(
     string? AiResponseTerminalReason = null,
     string? AiResponseVisibilityState = null,
     bool? AiResponseIsTerminal = null,
+    long? AiResponseStartedSourceVersion = null,
     TaskIntentRecord? CapturedTaskIntent = null,
     MailboxAuthenticityMetadata? Authenticity = null,
     MailboxDelegatedSenderSnapshot? DelegatedSender = null,
@@ -229,6 +230,21 @@ internal sealed record ProjectConversationItemView(
         ArgumentNullException.ThrowIfNull(existing);
         ArgumentNullException.ThrowIfNull(incoming);
         return incoming.SourceVersion >= existing.SourceVersion;
+    }
+
+    /// <summary>
+    /// Keeps the Started event's applied sequence across later cancelling/failed progress rows so Stop can
+    /// compare that exact version instead of a later progress sequence.
+    /// </summary>
+    public ProjectConversationItemView WithPreservedStartedSourceVersion(ProjectConversationItemView? existing)
+    {
+        long? started = existing?.AiResponseStartedSourceVersion
+            ?? (existing is not null && string.Equals(existing.AiResponseProgressState, "rendering", StringComparison.Ordinal)
+                ? existing.SourceVersion
+                : (long?)null)
+            ?? AiResponseStartedSourceVersion
+            ?? (string.Equals(AiResponseProgressState, "rendering", StringComparison.Ordinal) ? SourceVersion : (long?)null);
+        return started is > 0 ? this with { AiResponseStartedSourceVersion = started } : this;
     }
 
     /// <summary>
@@ -391,7 +407,9 @@ internal sealed record ProjectConversationItemView(
             AiResponseIsTerminal ?? IsTerminalAiResponse(progressState))
         {
             StateOwnerAggregateId = SourceConversationId,
-            StartedSourceVersion = (AiResponseIsTerminal ?? IsTerminalAiResponse(progressState)) ? null : SourceVersion,
+            StartedSourceVersion = (AiResponseIsTerminal ?? IsTerminalAiResponse(progressState))
+                ? null
+                : AiResponseStartedSourceVersion ?? (progressState is Hexalith.ChatBot.Contracts.Enums.AiResponseProgressState.Rendering ? SourceVersion : null),
             RecoveryDeadlineUtc = OccurredAt.AddMinutes(2).AddSeconds(5),
         };
     }
@@ -1441,7 +1459,10 @@ internal sealed record ProjectConversationItemView(
             AiResponseProgressState: outcome.AiResponseProgressState,
             AiResponseTerminalReason: outcome.AiResponseTerminalReason,
             AiResponseVisibilityState: outcome.AiResponseVisibilityState,
-            AiResponseIsTerminal: outcome.AiResponseIsTerminal);
+            AiResponseIsTerminal: outcome.AiResponseIsTerminal,
+            AiResponseStartedSourceVersion: string.Equals(outcome.AiResponseProgressState, "rendering", StringComparison.Ordinal)
+                ? outcome.SourceVersion
+                : null);
     }
 
     public static string ParticipantItemIdFor(string resolutionId, string sourceParticipantId)

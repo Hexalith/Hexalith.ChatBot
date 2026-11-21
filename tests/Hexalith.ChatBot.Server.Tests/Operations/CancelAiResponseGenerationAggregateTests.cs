@@ -43,13 +43,13 @@ public sealed class CancelAiResponseGenerationAggregateTests
     }
 
     [Theory]
-    [InlineData("", "conversation-001", "response-001", "generation-001", 4L)]
-    [InlineData("project-001", "", "response-001", "generation-001", 4L)]
-    [InlineData("project-001", "conversation-001", "", "generation-001", 4L)]
-    [InlineData("project-001", "conversation-001", "response-001", "", 4L)]
-    [InlineData("project-001", "conversation-001", "response-001", "generation-001", 0L)]
-    [InlineData("project-001", "conversation-001", "response-001", "generation-001", -1L)]
-    [InlineData("project 001", "conversation-001", "response-001", "generation-001", 4L)]
+        [InlineData("", "conversation-001", "response-001", "generation-001", 1L)]
+        [InlineData("project-001", "", "response-001", "generation-001", 1L)]
+        [InlineData("project-001", "conversation-001", "", "generation-001", 1L)]
+        [InlineData("project-001", "conversation-001", "response-001", "", 1L)]
+        [InlineData("project-001", "conversation-001", "response-001", "generation-001", 0L)]
+        [InlineData("project-001", "conversation-001", "response-001", "generation-001", -1L)]
+        [InlineData("project 001", "conversation-001", "response-001", "generation-001", 1L)]
     public void UnsafeOrIncompleteCancellationPayloadShouldFailClosed(
         string projectId,
         string conversationId,
@@ -146,12 +146,77 @@ public sealed class CancelAiResponseGenerationAggregateTests
     [Fact]
     public void CancellationAssertingAVersionBelowTheGenerationBaselineShouldFailClosed()
     {
-        CancelAiResponseGeneration command = Command() with { ExpectedSourceVersion = 1 };
+        CancelAiResponseGeneration command = Command() with { ExpectedSourceVersion = 2 };
 
         DomainResult result = GovernedOperationAggregate.Handle(command, StateWithActiveGeneration(), Envelope(command));
 
         result.Events.OfType<AiResponseGenerationCancellationRequested>().ShouldBeEmpty();
         result.IsRejection.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void MixedStreamReplayShouldBindStopToAppliedStartedSequenceNotProposalPlusOne()
+    {
+        GovernedOperationState state = new();
+        state.Apply(new ProjectConversationMessageAppended(
+            "tenant-alpha",
+            "project-001",
+            "message-preceding-1",
+            "actor-alpha",
+            "fingerprint-1",
+            12,
+            "en-US",
+            new DateTimeOffset(2026, 6, 1, 0, 4, 0, TimeSpan.Zero),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+            "metadata_only",
+            "collaboration_input",
+            "chatbot.project-conversation-message.v1",
+            1,
+            "none"));
+        state.Apply(new ProjectConversationMessageAppended(
+            "tenant-alpha",
+            "project-001",
+            "message-preceding-2",
+            "actor-alpha",
+            "fingerprint-2",
+            12,
+            "en-US",
+            new DateTimeOffset(2026, 6, 1, 0, 4, 30, TimeSpan.Zero),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+            "metadata_only",
+            "collaboration_input",
+            "chatbot.project-conversation-message.v1",
+            2,
+            "none"));
+        state.Apply(new LowRiskAiAssistanceExecutionStarted(
+            "generation-001",
+            "response-001",
+            "project-001",
+            "task-intent-001",
+            "message-001",
+            "requester-001",
+            "summarize",
+            "context-package-001",
+            "v1",
+            "policy-snapshot-001",
+            "low-risk-allowed",
+            3,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+            new DateTimeOffset(2026, 6, 1, 0, 5, 0, TimeSpan.Zero),
+            TenantId: "tenant-alpha",
+            ConversationId: "conversation-001"));
+
+        ActiveAiResponseGeneration generation = state.FindActiveAiResponseGeneration("response-001", "generation-001").ShouldNotBeNull();
+        generation.StartedSourceVersion.ShouldBe(3);
+        state.LastAppliedSourceVersion.ShouldBe(3);
+
+        CancelAiResponseGeneration staleProposalPlusOne = Command() with { ExpectedSourceVersion = 4 };
+        DomainResult stale = GovernedOperationAggregate.Handle(staleProposalPlusOne, state, Envelope(staleProposalPlusOne));
+        stale.IsRejection.ShouldBeTrue();
+
+        CancelAiResponseGeneration applied = Command() with { ExpectedSourceVersion = 3 };
+        DomainResult accepted = GovernedOperationAggregate.Handle(applied, state, Envelope(applied));
+        accepted.Events.OfType<AiResponseGenerationCancellationRequested>().ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -182,7 +247,7 @@ public sealed class CancelAiResponseGenerationAggregateTests
         [
             valid with { ConversationId = "conversation-other" },
             valid with { Execution = valid.Execution with { ProjectId = "project-other" } },
-            valid with { Execution = valid.Execution with { ExpectedProposalSourceVersion = 4 } },
+            valid with { Execution = valid.Execution with { CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAY" } },
         ];
 
         foreach (CompleteLowRiskAiAssistance mismatch in mismatches)
@@ -364,7 +429,7 @@ public sealed class CancelAiResponseGenerationAggregateTests
         "conversation-001",
         "response-001",
         "generation-001",
-        4,
+        1,
         "01ARZ3NDEKTSV4RRFFQ69G5FAX",
         "cancel-001");
 

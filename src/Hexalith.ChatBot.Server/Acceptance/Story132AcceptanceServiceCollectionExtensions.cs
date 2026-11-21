@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Server.Adapters.AiProvider;
+using Hexalith.ChatBot.Server.Gateway.Admission;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 
@@ -34,9 +35,11 @@ internal static class Story132AcceptanceServiceCollectionExtensions
         services.RemoveAll<ITenantAiPolicySnapshotProvider>();
         services.RemoveAll<IAiAssistanceProvider>();
         services.RemoveAll<IRiskClassifier>();
+        services.RemoveAll<IChatBotAdmissionEvidenceValidator>();
         services.AddSingleton<ITenantAiPolicySnapshotProvider, Story132AcceptanceTenantAiPolicySnapshotProvider>();
         services.AddSingleton<IAiAssistanceProvider, Story132AcceptanceAiAssistanceProvider>();
         services.AddScoped<IRiskClassifier, Story132AcceptanceRiskClassifier>();
+        services.AddSingleton<IChatBotAdmissionEvidenceValidator, Story132AcceptanceAdmissionEvidenceValidator>();
         return services;
     }
 }

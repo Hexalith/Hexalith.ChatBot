@@ -176,8 +176,13 @@ public static class ProjectConversationReducers
         ProjectConversationItemModel item,
         IReadOnlyList<ProjectConversationStreamCoverageModel> coverage)
     {
-        ProjectConversationAiResponseProgressModel? progress = item.AiResponseProgress;
-        if (progress is null || string.IsNullOrWhiteSpace(progress.StateOwnerAggregateId))
+        string? owner = item.AiResponseProgress?.StateOwnerAggregateId;
+        if (string.IsNullOrWhiteSpace(owner))
+        {
+            owner = item.SourceConversationId;
+        }
+
+        if (string.IsNullOrWhiteSpace(owner))
         {
             return false;
         }
@@ -185,9 +190,9 @@ public static class ProjectConversationReducers
         return coverage.Any(interval =>
             interval.IsContiguous &&
             interval.CoversAllKnownItems &&
-            string.Equals(interval.StateOwnerAggregateId, progress.StateOwnerAggregateId, StringComparison.Ordinal) &&
-            progress.SourceVersion >= interval.FromSourceVersion &&
-            progress.SourceVersion <= interval.ThroughSourceVersion);
+            string.Equals(interval.StateOwnerAggregateId, owner, StringComparison.Ordinal) &&
+            item.SourceVersion >= interval.FromSourceVersion &&
+            item.SourceVersion <= interval.ThroughSourceVersion);
     }
 
     [ReducerMethod]

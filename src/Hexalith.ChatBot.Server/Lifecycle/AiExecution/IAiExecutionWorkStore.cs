@@ -49,6 +49,13 @@ internal interface IAiExecutionWorkStore
         DateTimeOffset now,
         CancellationToken cancellationToken);
 
+    /// <summary>Increments the terminal-relay attempt budget only when a terminal submit fails.</summary>
+    ValueTask RecordTerminalRelayFailureAsync(
+        string key,
+        string owner,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
     ValueTask MarkTerminalObservedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken);
 
     ValueTask MarkCancellationFailedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken);

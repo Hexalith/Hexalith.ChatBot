@@ -375,7 +375,7 @@ public sealed class ProjectConversationProjectionTests
     }
 
     [Fact]
-    public async Task TaskIntentHandlerShouldProjectUnconfirmedCancellationAsRetryableUnavailableTerminalState()
+    public async Task TaskIntentHandlerShouldProjectUnconfirmedCancellationAsRetryableNonTerminalRenderingState()
     {
         InMemoryProjectConversationProjectionStore store = new();
         TaskIntentProjectionHandler handler = new(store);
@@ -411,11 +411,13 @@ public sealed class ProjectConversationProjectionTests
         AiResponseProgress progress = item.BuildAiResponseProgress().ShouldNotBeNull();
 
         outcome.ShouldBe(TaskIntentProjectionHandler.ProjectionOutcome.Applied);
-        progress.State.ShouldBe(AiResponseProgressState.Unavailable);
-        progress.TerminalReason.ShouldBe(AiResponseTerminalReason.Unavailable);
-        progress.IsTerminal.ShouldBeTrue();
+        progress.State.ShouldBe(AiResponseProgressState.Rendering);
+        progress.TerminalReason.ShouldBe(AiResponseTerminalReason.None);
+        progress.IsTerminal.ShouldBeFalse();
         item.AiFailureCode.ShouldBe("provider-cancellation-unobserved");
         item.AiSafeNextAction.ShouldBe("retry-stop");
+        progress.RecoveryDeadlineUtc.ShouldBe(item.OccurredAt.AddMinutes(2).AddSeconds(5));
+        progress.StartedSourceVersion.ShouldNotBeNull();
     }
 
     [Fact]

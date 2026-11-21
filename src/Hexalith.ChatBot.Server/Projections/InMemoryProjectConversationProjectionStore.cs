@@ -789,6 +789,8 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         }
 
         ProjectConversationItemView item = ProjectConversationItemView.FromAiOutcomeEvent(outcome);
+        _ = _items.TryGetValue(eventKey, out ProjectConversationItemView? existingItem);
+        item = item.WithPreservedStartedSourceVersion(existingItem);
         _items.AddOrUpdate(
             eventKey,
             static (_, incoming) => incoming,

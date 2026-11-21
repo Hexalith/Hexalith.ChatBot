@@ -37,7 +37,7 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
         ArgumentNullException.ThrowIfNull(item);
         _ = await UpdateAsync(
             item.Key,
-            current => current is null ? item : current,
+            current => current is null ? item : AiExecutionWorkItem.MergeStarted(current, item),
             item.CorrelationId,
             cancellationToken).ConfigureAwait(false);
         bool indexed = await TryAddToSpillPageAsync(item, cancellationToken).ConfigureAwait(false);
@@ -59,17 +59,11 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
             request.ConversationId,
             request.ResponseId,
             request.GenerationId);
-        if (await GetAsync(key, cancellationToken).ConfigureAwait(false) is null)
-        {
-            // Legacy Started rows do not contain enough context to reconstruct safe provider work. Their governed
-            // cancellation still projects, but the coordinator must not fabricate a durable work item.
-            return;
-        }
-
+        AiExecutionWorkItem placeholder = AiExecutionWorkItem.CancellationPlaceholder(request, key);
         _ = await UpdateAsync(
             key,
             current => current is null
-                ? throw new InvalidOperationException($"AI execution work '{key}' disappeared while cancellation was recorded.")
+                ? placeholder
                 : current.Status is AiExecutionWorkStatus.Terminal
                     ? current
                     : current with
@@ -81,6 +75,16 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
                     },
             request.CorrelationId,
             cancellationToken).ConfigureAwait(false);
+        if (await GetAsync(key, cancellationToken).ConfigureAwait(false) is { Status: AiExecutionWorkStatus.CancellationRequested } persisted &&
+            persisted.Execution is null)
+        {
+            bool indexed = await TryAddToSpillPageAsync(persisted, cancellationToken).ConfigureAwait(false);
+            if (!indexed)
+            {
+                await QuarantineAsync(key, request.CorrelationId, "recovery-index-capacity-exhausted", cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
     }
 
     public async ValueTask<IReadOnlyList<AiExecutionWorkItem>> ListRunnableAsync(
@@ -144,8 +148,7 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
                 }
 
                 if (item is not null &&
-                    item.Status is not (AiExecutionWorkStatus.Terminal or AiExecutionWorkStatus.Exhausted or AiExecutionWorkStatus.Quarantined) &&
-                    (item.LeaseExpiresAtUtc is null || item.LeaseExpiresAtUtc <= now))
+                    item.Status is not (AiExecutionWorkStatus.Terminal or AiExecutionWorkStatus.Exhausted or AiExecutionWorkStatus.Quarantined))
                 {
                     items.Add(item);
                 }
@@ -157,6 +160,9 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
             .Select(static group => group
                 .OrderByDescending(static item => item.Key.StartsWith("ai-execution-v2.", StringComparison.Ordinal))
                 .First())
+            .Where(item =>
+                (item.Execution is not null || item.Status is AiExecutionWorkStatus.CancellationRequested) &&
+                (item.LeaseExpiresAtUtc is null || item.LeaseExpiresAtUtc <= now))
             .OrderBy(static item => item.UpdatedAtUtc)
             .ThenBy(static item => item.Key, StringComparer.Ordinal)
             .Take(maximumCount)
@@ -171,6 +177,11 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
         CancellationToken cancellationToken)
     {
         DateTimeOffset expires = now.Add(leaseDuration);
+        if (await GetAsync(key, cancellationToken).ConfigureAwait(false) is null)
+        {
+            return null;
+        }
+
         AiExecutionWorkItem claimed = await UpdateAsync(
             key,
             current => current is null ||
@@ -273,6 +284,21 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
                         : AiExecutionWorkStatus.Pending,
                 LeaseOwner = null,
                 LeaseExpiresAtUtc = null,
+                UpdatedAtUtc = now,
+            },
+            cancellationToken).ConfigureAwait(false);
+
+    public async ValueTask RecordTerminalRelayFailureAsync(
+        string key,
+        string owner,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+        => await UpdateOwnedAsync(
+            key,
+            owner,
+            now,
+            current => current with
+            {
                 TerminalSubmissionAttemptCount = checked(current.TerminalSubmissionAttemptCount + 1),
                 UpdatedAtUtc = now,
             },
@@ -298,6 +324,7 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
                 },
             "terminal-observed",
             cancellationToken).ConfigureAwait(false);
+        await CompactIndexAsync(key, "terminal-observed", cancellationToken).ConfigureAwait(false);
     }
 
     public async ValueTask MarkCancellationFailedAsync(string key, DateTimeOffset now, CancellationToken cancellationToken)
@@ -313,6 +340,16 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
                 ? throw new InvalidOperationException($"AI execution work '{key}' was not found.")
                 : current.Status is AiExecutionWorkStatus.Terminal
                     ? current
+                    : current.Execution is null
+                        ? current with
+                        {
+                            Status = AiExecutionWorkStatus.Pending,
+                            CancellationId = null,
+                            LeaseOwner = null,
+                            LeaseExpiresAtUtc = null,
+                            TerminalSubmissionAttemptCount = 0,
+                            UpdatedAtUtc = now,
+                        }
                     : current with
                     {
                         Status = current.CompletionRecord is null ? AiExecutionWorkStatus.Pending : AiExecutionWorkStatus.CompletionPending,
@@ -324,6 +361,10 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
                     },
             "cancellation-failed",
             cancellationToken).ConfigureAwait(false);
+        if (await GetAsync(key, cancellationToken).ConfigureAwait(false) is { Execution: null, Status: AiExecutionWorkStatus.Pending })
+        {
+            await CompactIndexAsync(key, "cancellation-failed", cancellationToken).ConfigureAwait(false);
+        }
     }
 
     public async ValueTask<bool> MarkExhaustedAsync(
@@ -544,6 +585,45 @@ internal sealed class ReadModelAiExecutionWorkStore : IAiExecutionWorkStore
                 },
             correlationId,
             cancellationToken).ConfigureAwait(false);
+        await CompactIndexAsync(key, correlationId, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static AiExecutionWorkIndex RemoveIndexEntry(AiExecutionWorkIndex? current, string entry)
+    {
+        string[] keys = (current?.Keys ?? [])
+            .Where(key => !string.Equals(key, entry, StringComparison.Ordinal))
+            .ToArray();
+        return new AiExecutionWorkIndex(keys);
+    }
+
+    private async Task CompactIndexAsync(string workKey, string correlationId, CancellationToken cancellationToken)
+    {
+        for (int probe = 0; probe < _maximumIndexPages; probe++)
+        {
+            string pageKey = IndexPageKey(workKey, probe);
+            AiExecutionWorkIndex? page = (await _store
+                .GetAsync<AiExecutionWorkIndex>(ChatBotReadModelStoreNames.StateStoreName, pageKey, cancellationToken)
+                .ConfigureAwait(false)).Value;
+            if (page is not null && page.Keys.Contains(workKey, StringComparer.Ordinal))
+            {
+                _ = await ReadModelWritePolicy.UpdateAsync<AiExecutionWorkIndex>(
+                    _store,
+                    ChatBotReadModelStoreNames.StateStoreName,
+                    pageKey,
+                    current => RemoveIndexEntry(current, workKey),
+                    new ReadModelWriteContext(nameof(AiExecutionWorkIndex), nameof(ReadModelAiExecutionWorkStore), correlationId),
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                return;
+            }
+        }
+
+        _ = await ReadModelWritePolicy.UpdateAsync<AiExecutionWorkIndex>(
+            _store,
+            ChatBotReadModelStoreNames.StateStoreName,
+            IndexKey,
+            current => RemoveIndexEntry(current, workKey),
+            new ReadModelWriteContext(nameof(AiExecutionWorkIndex), nameof(ReadModelAiExecutionWorkStore), correlationId),
+            cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     private Task<AiExecutionWorkItem> UpdateAsync(

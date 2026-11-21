@@ -1,4 +1,6 @@
+using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Gateway;
@@ -6,6 +8,7 @@ using Hexalith.ChatBot.Server.Gateway.Admission;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Operations;
 using Shouldly;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
@@ -288,6 +291,146 @@ public sealed partial class CommandGatewayTests
         identities.RecordCount.ShouldBe(0);
         audit.Envelopes.ShouldBeEmpty();
     }
+
+    /// <summary>
+    /// Marked Complete* executor terminals must be catalog-findable and skip A9a/atomic so EventStore revalidation
+    /// commits instead of returning command-not-allowlisted. [Story 13.2]
+    /// </summary>
+    [Theory]
+    [InlineData(nameof(CompleteLowRiskAiAssistance))]
+    [InlineData(nameof(CompleteAiResponseGenerationCancellation))]
+    public async Task MarkedExecutorTerminalCommandsShouldCommitThroughCatalogRevalidationWithoutAtomicParticipation(
+        string commandType)
+    {
+        new ChatBotCommandAdmissionCatalog().Find(commandType).ShouldBe(ChatBotAdmissionProfile.CommandExecution);
+        ChatBotCommandAdmissionCatalog.IsExecutorTerminalCommand(commandType).ShouldBeTrue();
+        FixedClock clock = new();
+        SyntheticObservedAtomicAdmissionValidator evidence = new(new ChatBotAdmissionEvidenceValidator());
+        RecordingAuditWriter audit = new();
+        InMemoryCoarseIdempotencyStore identities = new(clock);
+        InMemoryOperationStatusStore statuses = new();
+        ChatBotCommandAdmissionPipeline pipeline = new(
+            new ClaimsAuthenticationStage(),
+            new ClaimsTenantBindingStage(),
+            new PassThroughAuthorizationStage(),
+            new PassThroughRiskClassifier(),
+            new PassThroughApprovalGate(),
+            identities,
+            audit,
+            new RecordingReplayIntentQueue(),
+            new RecordingOperatorAlertSink(),
+            statuses,
+            clock,
+            new CommandSubmissionLifecycleTransitionGuard(),
+            new PermissiveSpineCommandAllowlist(),
+            Hexalith.ChatBot.Tests.TrustedAuthority.RegressionAuthorityFixture.Authorizer(clock),
+            admissionEvidence: evidence);
+        Microsoft.AspNetCore.Http.HttpContextAccessor accessor = new()
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext { User = Principal(BoundTenant) },
+        };
+        DataProtectionChatBotAdmissionMarker marker = new(new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider());
+        const string operation = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
+        const string conversation = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+        object command = commandType == nameof(CompleteLowRiskAiAssistance)
+            ? MarkedCompleteLowRisk(conversation)
+            : MarkedCompleteCancellation(conversation);
+        System.Text.Json.JsonElement payload = System.Text.Json.JsonSerializer.SerializeToElement(
+            command,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        Dictionary<string, string> extensions = new() { ["actorId"] = ActorId, ["surfaceOrigin"] = "ai-execution-coordinator" };
+        extensions[DataProtectionChatBotAdmissionMarker.ExtensionKey] = marker.Create(
+            operation,
+            BoundTenant,
+            conversation,
+            commandType,
+            payload,
+            CorrelationId,
+            ActorId,
+            "ai-execution-coordinator",
+            null);
+        Hexalith.EventStore.Contracts.Commands.CommandEnvelope envelope = new(
+            operation,
+            BoundTenant,
+            "chatbot",
+            conversation,
+            commandType,
+            System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(payload),
+            CorrelationId,
+            null,
+            ActorId,
+            extensions);
+        marker.IsValid(envelope).ShouldBeTrue();
+        ChatBotDomainServiceAdmissionStage stage = new(pipeline, identities, marker, new(accessor));
+
+        Hexalith.EventStore.DomainService.DomainServiceAdmissionResult result = await stage.EvaluateAsync(
+            new(new Hexalith.EventStore.Contracts.Commands.DomainServiceRequest(envelope, null)),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        evidence.OperationCalls.ShouldBe(0);
+        evidence.AtomicCalls.ShouldBe(0);
+        identities.RecordCount.ShouldBe(0);
+        audit.Envelopes.ShouldBeEmpty();
+        (await statuses.TryGetAsync(BoundTenant, operation, TestContext.Current.CancellationToken)).ShouldBeNull();
+    }
+
+    private static CompleteLowRiskAiAssistance MarkedCompleteLowRisk(string conversation)
+    {
+        ExecuteLowRiskAIAssistance execution = new(
+            "project-alpha",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAQ",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAR",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAS",
+            ActorId,
+            LowRiskAiAssistanceKind.SummarizeVisibleContext,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAT",
+            "v1",
+            "metadata_only",
+            "collaboration_input",
+            "disabled",
+            ["evidence:visible-context"],
+            ["evidence:visible-context"],
+            [],
+            8,
+            "policy-snapshot-alpha",
+            CorrelationId,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAU",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        LowRiskAiAssistanceExecutionRecord record = new(
+            execution.ExecutionId,
+            execution.ProposalId,
+            "summarize-visible-context",
+            "success",
+            "test-provider",
+            "test-model-v1",
+            new DateTimeOffset(2026, 6, 1, 0, 6, 0, TimeSpan.Zero),
+            execution.SourceEvidenceReferences,
+            execution.ContextPackageId,
+            execution.ContextPackageVersion,
+            execution.ContextPackageRedactionState,
+            execution.PolicySnapshotId!,
+            "low-risk-allowed",
+            $"audit:{execution.ExecutionId}",
+            "available",
+            execution.CorrelationId,
+            "metadata_only",
+            "metadata_only",
+            "none");
+        return new CompleteLowRiskAiAssistance(execution, conversation, record, "01ARZ3NDEKTSV4RRFFQ69G5FAZ");
+    }
+
+    private static CompleteAiResponseGenerationCancellation MarkedCompleteCancellation(string conversation)
+        => new(
+            "project-alpha",
+            conversation,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAQ",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAU",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            CorrelationId,
+            true,
+            null,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAZ");
 
     private static SyntheticObservedAtomicAdmissionValidator SyntheticBookkeepingEvidence(FixedClock clock)
     {

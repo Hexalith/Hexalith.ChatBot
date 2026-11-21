@@ -82,13 +82,11 @@ internal static class ChatBotReadQueryResultMapper
 
     private static IReadOnlyList<ProjectConversationStreamCoverage> BuildConversationCoverage(ProjectConversationPage page)
         => (page.AuthoritativeItems ?? page.Items)
-            .Select(static item => item.BuildAiResponseProgress())
-            .OfType<AiResponseProgress>()
-            .Where(static progress => !string.IsNullOrWhiteSpace(progress.StateOwnerAggregateId))
-            .GroupBy(static progress => progress.StateOwnerAggregateId!, StringComparer.Ordinal)
+            .Where(static item => !string.IsNullOrWhiteSpace(item.SourceConversationId))
+            .GroupBy(static item => item.SourceConversationId, StringComparer.Ordinal)
             .Select(static group =>
             {
-                long[] versions = group.Select(static progress => progress.SourceVersion).Distinct().Order().ToArray();
+                long[] versions = group.Select(static item => item.SourceVersion).Distinct().Order().ToArray();
                 bool contiguous = versions.Length == 0 || versions[^1] - versions[0] + 1 == versions.Length;
                 return new ProjectConversationStreamCoverage(
                     group.Key,

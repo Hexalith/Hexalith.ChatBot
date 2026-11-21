@@ -194,6 +194,8 @@ public sealed class ProjectConversationServiceTests
         ai.SupersedesAiOutcomeId.ShouldBe("ai:proposal-000:proposal:9");
         ai.AiResponseProgress.ShouldNotBeNull().State.ShouldBe("rendering");
         ai.AiResponseProgress.Sequence.ShouldBe(4);
+        ai.AiResponseProgress.StartedSourceVersion.ShouldBe(10);
+        ai.AiResponseProgress.RecoveryDeadlineUtc.ShouldBe(new DateTimeOffset(2026, 6, 1, 0, 8, 5, TimeSpan.Zero));
         ai.IsAiResponseActive.ShouldBeTrue();
         ai.AiSummaryProvenance.ShouldNotBeNull().GeneratedBy.ShouldBe("ai-model.v1");
         ai.AiSummaryProvenance.SourceEvidenceIds.ShouldBe(["evidence:summary:001"], ignoreOrder: false);
@@ -892,6 +894,8 @@ public sealed class ProjectConversationServiceTests
                             RedactionState = AiResponseProgressRedactionState.Metadata_only,
                             VisibilityState = AiResponseProgressVisibilityState.Metadata_only,
                             IsTerminal = false,
+                            StartedSourceVersion = 10,
+                            RecoveryDeadlineUtc = new DateTimeOffset(2026, 6, 1, 0, 8, 5, TimeSpan.Zero),
                         },
                         AiSummaryProvenance = new ProjectConversationAiSummaryProvenance
                         {

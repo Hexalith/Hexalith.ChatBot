@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Server.Gateway.Admission;
 using Hexalith.ChatBot.Server.Authentication;
@@ -11,6 +13,7 @@ using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Observability;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Governance.Policy;
+using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Contracts.Commands;
 
 namespace Hexalith.ChatBot.Server.Gateway;
@@ -46,6 +49,7 @@ internal sealed class ChatBotCommandAdmissionPipeline(
     private readonly ChatBotCommandAdmissionCatalog _admissionCatalog = admissionCatalog ?? new();
 
     private readonly IChatBotMetrics _metrics = metrics ?? NullChatBotMetrics.Instance;
+    private static readonly JsonSerializerOptions ExecutorTerminalJson = new(JsonSerializerDefaults.Web);
 
     /// <summary>Audits a denied SDK transport binding without admitting caller-controlled envelope authority.</summary>
     public ValueTask<ChatBotCommandAdmissionDecision> RejectTransportAsync(CommandEnvelope command, ChatBotRequestContext? context, string reasonCode, CancellationToken cancellationToken)
@@ -63,6 +67,11 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         ChatBotAdmissionProfile? profile = _admissionCatalog.Find(command.CommandType);
         if (profile is null) { return ChatBotAuthorizationReasonCodes.CommandNotAllowlisted; }
         using System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(command.Payload);
+        if (ChatBotCommandAdmissionCatalog.IsExecutorTerminalCommand(command.CommandType))
+        {
+            return ValidateExecutorTerminalSnapshot(command.CommandType, document.RootElement);
+        }
+
         ChatBotCommandSubmission submission = new(issuer.Principal, new CommandSubmissionRequest
         {
             CommandId = command.MessageId, CommandType = command.CommandType, Command = document.RootElement.Clone(),
@@ -71,6 +80,57 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         context.SelectAdmissionProfile(profile.Value);
         string? operationFailure = await _admissionEvidence.ValidateOperationAsync(context, cancellationToken).ConfigureAwait(false);
         return operationFailure ?? await _admissionEvidence.ValidateAtomicParticipationAsync(context, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static string? ValidateExecutorTerminalSnapshot(string commandType, JsonElement payload)
+    {
+        if (payload.ValueKind != JsonValueKind.Object)
+        {
+            return ChatBotMessageCodes.CommandContractInvalid;
+        }
+
+        if (string.Equals(commandType, nameof(CompleteLowRiskAiAssistance), StringComparison.Ordinal))
+        {
+            CompleteLowRiskAiAssistance? command = payload.Deserialize<CompleteLowRiskAiAssistance>(ExecutorTerminalJson);
+            if (command is null ||
+                command.Execution is null ||
+                command.Record is null ||
+                !AuditMetadata.IsSafeStableIdentifier(command.ConversationId) ||
+                !AuditMetadata.IsSafeStableIdentifier(command.CompletionId) ||
+                !AuditMetadata.IsSafeStableIdentifier(command.Execution.ProjectId) ||
+                !AuditMetadata.IsSafeStableIdentifier(command.Execution.ProposalId) ||
+                !AuditMetadata.IsSafeStableIdentifier(command.Execution.ExecutionId) ||
+                !AuditMetadata.IsSafeStableIdentifier(command.Execution.CorrelationId) ||
+                command.Execution.ExpectedProposalSourceVersion <= 0 ||
+                !string.Equals(command.Record.ExecutionId, command.Execution.ExecutionId, StringComparison.Ordinal) ||
+                !string.Equals(command.Record.ProposalId, command.Execution.ProposalId, StringComparison.Ordinal) ||
+                !string.Equals(command.Record.CorrelationId, command.Execution.CorrelationId, StringComparison.Ordinal))
+            {
+                return ChatBotMessageCodes.CommandContractInvalid;
+            }
+
+            return null;
+        }
+
+        if (string.Equals(commandType, nameof(CompleteAiResponseGenerationCancellation), StringComparison.Ordinal))
+        {
+            CompleteAiResponseGenerationCancellation? command = payload.Deserialize<CompleteAiResponseGenerationCancellation>(ExecutorTerminalJson);
+            if (command is null ||
+                !AuditMetadata.IsSafeStableIdentifier(command.ProjectId) ||
+                !AuditMetadata.IsSafeStableIdentifier(command.ConversationId) ||
+                !AuditMetadata.IsSafeStableIdentifier(command.ResponseId) ||
+                !AuditMetadata.IsSafeStableIdentifier(command.GenerationId) ||
+                !AuditMetadata.IsSafeStableIdentifier(command.CancellationId) ||
+                !AuditMetadata.IsSafeStableIdentifier(command.CorrelationId) ||
+                !AuditMetadata.IsSafeStableIdentifier(command.CompletionId))
+            {
+                return ChatBotMessageCodes.CommandContractInvalid;
+            }
+
+            return null;
+        }
+
+        return ChatBotAuthorizationReasonCodes.CommandNotAllowlisted;
     }
 
     public async ValueTask<ChatBotCommandAdmissionDecision> AdmitAsync(

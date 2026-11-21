@@ -809,6 +809,158 @@ public sealed partial class AiExecutionCoordinatorTests
         runnable.TerminalSubmissionAttemptCount.ShouldBe(0);
     }
 
+    [Fact]
+    public async Task CancelBeforeStartShouldRemainDurableUntilStartedWorkMerges()
+    {
+        InMemoryAiExecutionWorkStore store = new();
+        AiResponseGenerationCancellationRequested request = Cancellation(1);
+        await store.MarkCancellationRequestedAsync(request, TestContext.Current.CancellationToken);
+
+        AiExecutionWorkItem placeholder = (await store.ListRunnableAsync(Now.AddSeconds(2), 10, TestContext.Current.CancellationToken))
+            .ShouldHaveSingleItem();
+        placeholder.Execution.ShouldBeNull();
+        placeholder.Status.ShouldBe(AiExecutionWorkStatus.CancellationRequested);
+        placeholder.CancellationId.ShouldBe(request.CancellationId);
+
+        await store.UpsertStartedAsync(Item(Started(1)), TestContext.Current.CancellationToken);
+        AiExecutionWorkItem merged = (await store.ListRunnableAsync(Now.AddSeconds(2), 10, TestContext.Current.CancellationToken))
+            .ShouldHaveSingleItem();
+        merged.Execution.ShouldNotBeNull();
+        merged.Status.ShouldBe(AiExecutionWorkStatus.CancellationRequested);
+        merged.CancellationId.ShouldBe(request.CancellationId);
+    }
+
+    [Fact]
+    public async Task LeasedPreferredV2RowShouldSuppressEquivalentUnleasedLegacyKey()
+    {
+        InMemoryAiExecutionWorkStore store = new();
+        LowRiskAiAssistanceExecutionStarted started = Started(1);
+        AiExecutionWorkItem preferred = Item(started);
+        await store.UpsertStartedAsync(preferred, TestContext.Current.CancellationToken);
+        (await store.TryClaimAsync(
+            preferred.Key,
+            "replica-one",
+            Now,
+            TimeSpan.FromMinutes(5),
+            TestContext.Current.CancellationToken)).ShouldNotBeNull();
+        await store.UpsertStartedAsync(
+            preferred with
+            {
+                Key = AiExecutionWorkItem.LegacyKeyFor(
+                    preferred.TenantId,
+                    preferred.ProjectId,
+                    preferred.ConversationId,
+                    preferred.ResponseId,
+                    preferred.GenerationId),
+                LeaseOwner = null,
+                LeaseExpiresAtUtc = null,
+                Status = AiExecutionWorkStatus.Pending,
+            },
+            TestContext.Current.CancellationToken);
+
+        (await store.ListRunnableAsync(Now, 10, TestContext.Current.CancellationToken)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task TryClaimShouldSkipMissingWorkWithoutThrowing()
+    {
+        ReadModelAiExecutionWorkStore store = new(new DurableReadModelStore());
+        AiExecutionWorkItem? claimed = await store.TryClaimAsync(
+            "ai-execution-v2.missing-index-key",
+            "replica-one",
+            Now,
+            TimeSpan.FromMinutes(1),
+            TestContext.Current.CancellationToken);
+        claimed.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task TerminalObservationShouldCompactWorkOutOfTheRunnableIndex()
+    {
+        DurableReadModelStore durable = new();
+        ReadModelAiExecutionWorkStore store = new(durable);
+        AiExecutionWorkItem item = Item(Started(1));
+        await store.UpsertStartedAsync(item, TestContext.Current.CancellationToken);
+        await store.MarkTerminalObservedAsync(item.Key, Now, TestContext.Current.CancellationToken);
+        durable.ReadKeys.Clear();
+
+        (await store.ListRunnableAsync(Now.AddMinutes(5), 10, TestContext.Current.CancellationToken)).ShouldBeEmpty();
+        durable.ReadKeys.ShouldNotContain(item.Key);
+    }
+
+    [Fact]
+    public async Task ReleaseShouldNotConsumeTheTerminalRelayAttemptBudget()
+    {
+        InMemoryAiExecutionWorkStore store = new();
+        AiExecutionWorkItem item = Item(Started(1));
+        await store.UpsertStartedAsync(item, TestContext.Current.CancellationToken);
+        (await store.TryClaimAsync(item.Key, "replica-one", Now, TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken))
+            .ShouldNotBeNull();
+        (await store.ReleaseAsync(item.Key, "replica-one", Now, TestContext.Current.CancellationToken)).ShouldBeTrue();
+
+        AiExecutionWorkItem released = (await store.ListRunnableAsync(Now.AddMinutes(1), 10, TestContext.Current.CancellationToken))
+            .ShouldHaveSingleItem();
+        released.TerminalSubmissionAttemptCount.ShouldBe(0);
+        released.AttemptCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task HungProviderSlotShouldStayLeasedUntilTheInvocationEnds()
+    {
+        InMemoryAiExecutionWorkStore store = new();
+        HangUntilReleasedProvider provider = new();
+        RecordingGateway gateway = new();
+        using AiExecutionCoordinator coordinator = Coordinator(
+            store,
+            provider,
+            gateway,
+            providerExecutionDeadline: TimeSpan.FromMilliseconds(50));
+        AiExecutionWorkItem item = Item(Started(1));
+        await coordinator.RecordStartedAsync(
+            "tenant-alpha",
+            "conversation-alpha",
+            9,
+            Started(1),
+            TestContext.Current.CancellationToken);
+        await coordinator.StartAsync(TestContext.Current.CancellationToken);
+        await provider.Started.Task.WaitAsync(TestContext.Current.CancellationToken);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
+
+        (await store.TryClaimAsync(
+            item.Key,
+            "replica-two",
+            Now.AddSeconds(1),
+            TimeSpan.FromMinutes(1),
+            TestContext.Current.CancellationToken)).ShouldBeNull();
+        gateway.Submitted.ShouldBeEmpty();
+
+        provider.Release();
+        await WaitUntilAsync(() => gateway.Submitted.Count == 1, TestContext.Current.CancellationToken);
+        await coordinator.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task HostStopShouldDrainInFlightClaimedWorkBeforeReturning()
+    {
+        InMemoryAiExecutionWorkStore store = new();
+        HangUntilReleasedProvider provider = new();
+        using AiExecutionCoordinator coordinator = Coordinator(store, provider, new RecordingGateway());
+        await coordinator.RecordStartedAsync(
+            "tenant-alpha",
+            "conversation-alpha",
+            9,
+            Started(1),
+            TestContext.Current.CancellationToken);
+        await coordinator.StartAsync(TestContext.Current.CancellationToken);
+        await provider.Started.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        Task stop = coordinator.StopAsync(TestContext.Current.CancellationToken);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
+        stop.IsCompleted.ShouldBeFalse();
+        provider.Release();
+        await stop.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    }
+
     private static AiExecutionCoordinator Coordinator(
         IAiExecutionWorkStore store,
         IAiAssistanceProvider provider,
@@ -904,8 +1056,10 @@ public sealed partial class AiExecutionCoordinatorTests
             10,
             "wait-for-executor");
 
-    private static LowRiskAiAssistanceExecutionRecord CompletionRecord(ExecuteLowRiskAIAssistance execution)
-        => new(
+    private static LowRiskAiAssistanceExecutionRecord CompletionRecord(ExecuteLowRiskAIAssistance? execution)
+    {
+        ArgumentNullException.ThrowIfNull(execution);
+        return new(
             execution.ExecutionId,
             execution.ProposalId,
             "summarize-visible-context",
@@ -925,6 +1079,7 @@ public sealed partial class AiExecutionCoordinatorTests
             "metadata_only",
             "metadata_only",
             "none");
+    }
 
     private static async Task WaitUntilAsync(Func<bool> condition, CancellationToken cancellationToken)
     {
@@ -1100,6 +1255,43 @@ public sealed partial class AiExecutionCoordinatorTests
             StreamReadRequest request,
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+    }
+
+    private sealed class HangUntilReleasedProvider : IAiAssistanceProvider
+    {
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void Release() => _release.TrySetResult();
+
+        public async ValueTask<LowRiskAiAssistanceExecutionRecord> ExecuteAsync(
+            AiAssistanceProviderRequest request,
+            CancellationToken cancellationToken)
+        {
+            Started.TrySetResult();
+            await _release.Task.ConfigureAwait(false);
+            return new LowRiskAiAssistanceExecutionRecord(
+                request.ExecutionId,
+                request.ProposalId,
+                request.AssistanceKind,
+                "success",
+                "test-provider",
+                "test-model-v1",
+                Now,
+                request.SourceEvidenceReferences,
+                request.ContextPackageId,
+                request.ContextPackageVersion,
+                request.ContextRedactionState,
+                request.PolicySnapshotId,
+                request.PolicyReasonCode,
+                request.AuditOperationId,
+                "available",
+                request.CorrelationId,
+                "metadata_only",
+                "metadata_only",
+                "none");
+        }
     }
 
     private sealed class TokenIgnoringBurstProvider : IAiAssistanceProvider

@@ -1,5 +1,6 @@
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Server.Governance.Conversations;
 
 using System.Text;
 
@@ -13,7 +14,7 @@ internal sealed record AiExecutionWorkItem(
     string ResponseId,
     string GenerationId,
     long StartedSourceVersion,
-    ExecuteLowRiskAIAssistance Execution,
+    ExecuteLowRiskAIAssistance? Execution,
     AiExecutionWorkStatus Status,
     string CorrelationId,
     DateTimeOffset UpdatedAtUtc,
@@ -38,6 +39,17 @@ internal sealed record AiExecutionWorkItem(
                     Key,
                     LegacyKeyFor(TenantId, ProjectId, ConversationId, ResponseId, GenerationId),
                     StringComparison.Ordinal);
+            if (Execution is null)
+            {
+                return validKey &&
+                    Status is AiExecutionWorkStatus.CancellationRequested &&
+                    CancellationId is not null &&
+                    StartedSourceVersion > 0 &&
+                    !string.IsNullOrWhiteSpace(CorrelationId) &&
+                    AttemptCount >= 0 &&
+                    TerminalSubmissionAttemptCount >= 0;
+            }
+
             return validKey &&
                 StartedSourceVersion > 0 &&
                 !string.IsNullOrWhiteSpace(CorrelationId) &&
@@ -55,6 +67,46 @@ internal sealed record AiExecutionWorkItem(
     }
 
     public string CanonicalKey => KeyFor(TenantId, ProjectId, ConversationId, ResponseId, GenerationId);
+
+    internal static AiExecutionWorkItem MergeStarted(AiExecutionWorkItem current, AiExecutionWorkItem incoming)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        ArgumentNullException.ThrowIfNull(incoming);
+        if (current.Status is AiExecutionWorkStatus.Terminal)
+        {
+            return current;
+        }
+
+        if (current.Execution is null)
+        {
+            return incoming with
+            {
+                Status = current.CancellationId is null ? incoming.Status : AiExecutionWorkStatus.CancellationRequested,
+                CancellationId = current.CancellationId ?? incoming.CancellationId,
+                CorrelationId = incoming.CorrelationId,
+                UpdatedAtUtc = incoming.UpdatedAtUtc,
+            };
+        }
+
+        return current;
+    }
+
+    internal static AiExecutionWorkItem CancellationPlaceholder(
+        AiResponseGenerationCancellationRequested request,
+        string key)
+        => new(
+            key,
+            request.TenantId,
+            request.ProjectId,
+            request.ConversationId,
+            request.ResponseId,
+            request.GenerationId,
+            request.ExpectedSourceVersion,
+            null,
+            AiExecutionWorkStatus.CancellationRequested,
+            request.CorrelationId,
+            request.RequestedAtUtc,
+            CancellationId: request.CancellationId);
 
     public static string KeyFor(
         string tenantId,

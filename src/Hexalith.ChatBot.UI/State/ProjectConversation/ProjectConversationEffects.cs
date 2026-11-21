@@ -352,7 +352,11 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
         long scopeVersion,
         IDispatcher dispatcher)
     {
-        DateTimeOffset deadline = requested.RecoveryDeadlineUtc ?? DateTimeOffset.UtcNow.AddSeconds(2);
+        DateTimeOffset stopInstant = DateTimeOffset.UtcNow;
+        TimeSpan recoveryWindow = requested.RecoveryDeadlineUtc is not null
+            ? TimeSpan.FromMinutes(2) + TimeSpan.FromSeconds(5)
+            : TimeSpan.FromSeconds(2);
+        DateTimeOffset deadline = stopInstant.Add(recoveryWindow);
         while (DateTimeOffset.UtcNow <= deadline && IsCurrentCancellation(requested.ProjectId, requestId, scopeVersion))
         {
             try

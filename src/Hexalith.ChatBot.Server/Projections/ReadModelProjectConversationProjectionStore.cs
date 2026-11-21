@@ -842,6 +842,7 @@ internal sealed class ReadModelProjectConversationProjectionStore(
             return;
         }
 
+        item = item.WithPreservedStartedSourceVersion(existing);
         await SaveAsync(itemKey, item, cancellationToken)
             .ConfigureAwait(false);
 
@@ -1083,10 +1084,41 @@ internal sealed class ReadModelProjectConversationProjectionStore(
                 store,
                 ChatBotReadModelStoreNames.StateStoreName,
                 key,
-                _ => value,
+                current => MergeOnSave(current, value),
                 new ReadModelWriteContext(Category: typeof(T).Name, ProjectionType: ProjectionType),
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    private static T MergeOnSave<T>(T? current, T incoming)
+        where T : class
+    {
+        if (current is ProjectConversationIndex currentIndex && incoming is ProjectConversationIndex incomingIndex)
+        {
+            return (T)(object)(incomingIndex with
+            {
+                ItemIds = currentIndex.ItemIds
+                    .Concat(incomingIndex.ItemIds)
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.Ordinal)
+                    .ToArray(),
+            });
+        }
+
+        if (current is ProjectConversationIntakeIndex currentIntake && incoming is ProjectConversationIntakeIndex incomingIntake)
+        {
+            return (T)(object)(incomingIntake with
+            {
+                Items = currentIntake.Items
+                    .Concat(incomingIntake.Items)
+                    .Distinct()
+                    .OrderBy(static item => item.ProjectId, StringComparer.Ordinal)
+                    .ThenBy(static item => item.ItemId, StringComparer.Ordinal)
+                    .ToArray(),
+            });
+        }
+
+        return incoming;
     }
 
     private sealed record ProjectConversationIndex(

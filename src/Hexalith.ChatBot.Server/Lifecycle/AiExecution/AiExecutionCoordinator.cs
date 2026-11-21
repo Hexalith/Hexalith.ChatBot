@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
+using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Audit;
@@ -115,7 +116,16 @@ internal sealed partial class AiExecutionCoordinator(
             // still recording this request. Put the cancellation signal itself on the pool so this callback never
             // owns any part of that terminal relay call stack. The durable heartbeat remains the cross-replica path.
             ThreadPool.QueueUserWorkItem(
-                static execution => execution.Cancel(),
+                static execution =>
+                {
+                    try
+                    {
+                        execution.Cancel();
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                    }
+                },
                 active,
                 preferLocal: false);
         }
@@ -207,6 +217,18 @@ internal sealed partial class AiExecutionCoordinator(
                 await Task.Delay(PollInterval, stoppingToken).ConfigureAwait(false);
             }
         }
+
+        foreach (Task task in running.Values.ToArray())
+        {
+            try
+            {
+                await task.ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // Drain observes in-flight claimed work so hosted-service stop cannot dispose stores underneath it.
+            }
+        }
     }
 
     private async Task ProcessClaimedAsync(AiExecutionWorkItem work, CancellationToken stoppingToken)
@@ -249,11 +271,15 @@ internal sealed partial class AiExecutionCoordinator(
                 if (await Task.WhenAny(providerExecution, deadline).ConfigureAwait(false) != providerExecution)
                 {
                     await executionCancellation.CancelAsync().ConfigureAwait(false);
-                    _ = providerExecution.ContinueWith(
-                        static completed => _ = completed.Exception,
-                        CancellationToken.None,
-                        TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
-                        TaskScheduler.Default);
+                    try
+                    {
+                        _ = await providerExecution.ConfigureAwait(false);
+                    }
+                    catch (Exception)
+                    {
+                        // The slot stays occupied until the provider invocation itself ends.
+                    }
+
                     throw new TimeoutException($"AI provider execution '{work.Key}' exceeded its per-slot deadline.");
                 }
 
@@ -335,7 +361,14 @@ internal sealed partial class AiExecutionCoordinator(
                 .ConfigureAwait(false);
             if (refreshed is null)
             {
-                executionCancellation.Cancel();
+                try
+                {
+                    executionCancellation.Cancel();
+                }
+                catch (ObjectDisposedException)
+                {
+                }
+
                 return;
             }
 
@@ -343,7 +376,14 @@ internal sealed partial class AiExecutionCoordinator(
                 !string.IsNullOrWhiteSpace(refreshed.CancellationId))
             {
                 _requestedCancellations[key] = refreshed.CancellationId;
-                executionCancellation.Cancel();
+                try
+                {
+                    executionCancellation.Cancel();
+                }
+                catch (ObjectDisposedException)
+                {
+                }
+
                 return;
             }
         }
@@ -366,8 +406,10 @@ internal sealed partial class AiExecutionCoordinator(
         LowRiskAiAssistanceExecutionRecord record,
         CancellationToken cancellationToken)
     {
+        ExecuteLowRiskAIAssistance execution = work.Execution
+            ?? throw new InvalidOperationException($"AI execution work '{work.Key}' cannot complete without a started execution snapshot.");
         CompleteLowRiskAiAssistance command = new(
-            work.Execution,
+            execution,
             work.ConversationId,
             record,
             $"ai-completion:{work.GenerationId}");
@@ -485,9 +527,17 @@ internal sealed partial class AiExecutionCoordinator(
                 TerminalSubmissionCompleted(logger, work.Key, commandType, attempt);
                 return;
             }
-            catch (Exception ex) when (attempt < MaximumTerminalSubmissionAttempts)
+            catch (Exception ex)
             {
                 lastFailure = ex;
+                await workStore
+                    .RecordTerminalRelayFailureAsync(work.Key, _owner, clock.UtcNow, cancellationToken)
+                    .ConfigureAwait(false);
+                if (attempt >= MaximumTerminalSubmissionAttempts)
+                {
+                    break;
+                }
+
                 await Task.Delay(TimeSpan.FromMilliseconds(50 * attempt), cancellationToken).ConfigureAwait(false);
             }
         }
@@ -499,7 +549,8 @@ internal sealed partial class AiExecutionCoordinator(
 
     private static AiAssistanceProviderRequest ToProviderRequest(AiExecutionWorkItem work)
     {
-        var execution = work.Execution;
+        ExecuteLowRiskAIAssistance execution = work.Execution
+            ?? throw new InvalidOperationException($"AI execution work '{work.Key}' cannot invoke a provider without a started execution snapshot.");
         return new AiAssistanceProviderRequest(
             work.TenantId,
             work.ProjectId,

@@ -2327,7 +2327,6 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             !string.Equals(generation.ConversationId, command.ConversationId, StringComparison.Ordinal) ||
             execution.ExpectedProposalSourceVersion <= 0 ||
             execution.ExpectedProposalSourceVersion == long.MaxValue ||
-            generation.StartedSourceVersion != execution.ExpectedProposalSourceVersion + 1 ||
             !string.Equals(generation.CorrelationId, execution.CorrelationId, StringComparison.Ordinal) ||
             !string.Equals(generation.CorrelationId, command.Record.CorrelationId, StringComparison.Ordinal))
         {
