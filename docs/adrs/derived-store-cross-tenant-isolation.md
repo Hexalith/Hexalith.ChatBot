@@ -15,12 +15,11 @@ the store's native API **fails at the storage layer**, plus a **nightly syntheti
 (architecture cross-cutting #1; the Hexalith.Memories project-context: "Tenant isolation is physical, not just filtered —
 use tenant-scoped RediSearch indexes, Redis Vector indexes, FalkorDB databases/graphs").
 
-The live Hexalith.Memories Redis-Vector / FalkorDB backing is **not integrated into the ChatBot today**
-(architecture.md:324–325 marks vector/embedding/prompt-context as planned via Hexalith.Memories — **M2**; learned/AI
-candidate ranking is **M1**, architecture.md:306, 866). So — exactly like Stories 9.1–9.4's inert-control-floor — this
-story ships the **enforcement contract + store-access seam + in-memory default + synthetic probe + tests**, and **defers**
-the live Memories binding and the periodic trigger. The seam is built so the M2 live binding is **additive**, never a
-rewrite.
+Story 9.5 shipped the **enforcement contract + store-access seam + in-memory default + synthetic probe + tests** and
+deferred the live Memories binding. Story 12.16 adds a **Memories-owned metadata-only diagnostic namespace** (not the
+canonical Redis-Vector / FalkorDB record families) behind the same `IDerivedStore` seam. Candidate-ranking /
+evidence / proposal snapshots stay ChatBot-owned. Live Redis/FalkorDB probe proof remains outstanding until the composed
+acceptance lane can run.
 
 ## Decision
 
@@ -99,8 +98,10 @@ binding is an **additive** `IDerivedStore` implementation whose partition is `De
 
 ## Deferrals (inert-control-floor honesty)
 
-- **Live Hexalith.Memories Redis-Vector / FalkorDB `IDerivedStore` binding** — additive on this contract at M2
-  (Story 12.16).
+- ~~**Live Hexalith.Memories Redis-Vector / FalkorDB `IDerivedStore` binding**~~ — **wired by Story 12.16 (2026-08-28)
+  as a dedicated diagnostic namespace**, not as canonical Memories vector/graph records. Production selects
+  `MemoriesDerivedStore` when live backing is enabled. Persisted live-backend isolation evidence is still blocked on the
+  composed mailbox-content and Redis/FalkorDB acceptance lane.
 - ~~**Periodic scheduler trigger**~~ — **wired by Story 12.14 (2026-07-21).** `SweepAllTenantPairsAsync` runs from the
   existing `PeriodicEnforcementBackgroundService` on a configurable cadence (default once per UTC day, gated by
   `ChatBot:PeriodicEnforcement:RunM2AuditRecoverySweeps`), preserving the coordinator's fail-closed breach path. No

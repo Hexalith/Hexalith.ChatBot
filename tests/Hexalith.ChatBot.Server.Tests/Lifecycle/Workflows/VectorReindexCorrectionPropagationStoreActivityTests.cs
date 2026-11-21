@@ -64,6 +64,24 @@ public sealed class VectorReindexCorrectionPropagationStoreActivityTests
     }
 
     [Fact]
+    public async Task CanonicalReindexerReceivesGovernedCaseAndStaysPendingUntilTerminal()
+    {
+        CanonicalStubReindexer reindexer = new(CleanOutcome() with { IsTerminal = false, RemoteOperationId = "operation-9" });
+        VectorReindexCorrectionPropagationStoreActivity activity = new(reindexer);
+
+        CorrectionPropagationActivityResult result = await activity.InvalidateAndRebuildAsync(Request(), TestContext.Current.CancellationToken);
+
+        result.Outcome.ShouldBe("awaiting-completion");
+        result.IsPending.ShouldBeTrue();
+        result.RemoteOperationId.ShouldBe("operation-9");
+        reindexer.CanonicalCalls.ShouldBe(1);
+        reindexer.LegacyCalls.ShouldBe(0);
+        reindexer.LastIntakeId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        reindexer.LastCorrectedCaseId.ShouldBe("case-corrected-001");
+        reindexer.LastRemoteOperationId.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task ACompletedButLateReindexSurfacesTheSloExceededReasonCode()
     {
         VectorReindexOutcome late = CleanOutcome() with { SloBreached = true };
@@ -104,5 +122,51 @@ public sealed class VectorReindexCorrectionPropagationStoreActivityTests
             DateTimeOffset startedAtUtc,
             CancellationToken cancellationToken)
             => ValueTask.FromResult(outcome);
+    }
+
+    private sealed class CanonicalStubReindexer(VectorReindexOutcome outcome) : IVectorReindexer, ICanonicalVectorReindexer
+    {
+        public int CanonicalCalls { get; private set; }
+
+        public int LegacyCalls { get; private set; }
+
+        public string? LastIntakeId { get; private set; }
+
+        public string? LastCorrectedCaseId { get; private set; }
+
+        public string? LastRemoteOperationId { get; private set; }
+
+        public ValueTask<VectorReindexOutcome> ReindexVectorsAsync(
+            string tenantId,
+            string correctionId,
+            long sourceVersion,
+            IReadOnlyList<string> affectedResourceIds,
+            DateTimeOffset startedAtUtc,
+            CancellationToken cancellationToken)
+        {
+            LegacyCalls++;
+            return ValueTask.FromResult(Failed());
+        }
+
+        public ValueTask<VectorReindexOutcome> ReindexCanonicalVectorsAsync(
+            string tenantId,
+            string associationId,
+            string intakeId,
+            string correctionId,
+            long sourceVersion,
+            string correctedCaseId,
+            string? remoteOperationId,
+            DateTimeOffset startedAtUtc,
+            CancellationToken cancellationToken)
+        {
+            CanonicalCalls++;
+            LastIntakeId = intakeId;
+            LastCorrectedCaseId = correctedCaseId;
+            LastRemoteOperationId = remoteOperationId;
+            return ValueTask.FromResult(outcome);
+        }
+
+        private static VectorReindexOutcome Failed()
+            => new(0, 0, false, false, StartedAt, StartedAt, MemoriesVectorReindexer.InvalidStatusReasonCode);
     }
 }

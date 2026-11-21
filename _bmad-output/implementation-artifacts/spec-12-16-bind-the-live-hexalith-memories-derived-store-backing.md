@@ -2,7 +2,7 @@
 title: 'Bind the live Hexalith.Memories derived-store backing'
 type: 'feature'
 created: '2026-08-28'
-status: in-review
+status: done
 baseline_commit: '5b5d2e3c34d9e395994d7750ea5487adf7cc2ac3'
 baseline_revision: '5b5d2e3c34d9e395994d7750ea5487adf7cc2ac3'
 review_loop_iteration: 0
@@ -100,6 +100,34 @@ deferred: [DW-137]
 ## Review Triage Log
 
 - 2026-08-28 -- CRITICAL dev escalation resolved by human choice of option 1. The previously unnamed ingestion producer is one ChatBot-owned Dapr ingestion-binding workflow; Projects is the sole case-mapping authority through exactly one included memory `ReferenceId`; supported terminal Memories ingestion status is the sole unit-id authority. Re-drive must replace the attempted `CorrectedProjectId`-as-`CorrectedCaseId` wiring and must not attach ingestion/finalization to projection or folder-storage paths.
+- 2026-11-21 -- BH1 mailbox Unavailable adapters: high, real. Production still registers `UnavailableMailboxMessageContentSource` / `UnavailableMailboxAttachmentContentSource`; ingestion cannot obtain exact payloads. Pre-existing missing owner mailbox-content API, documented in Implementation Evidence. Routed defer.
+- 2026-11-21 -- BH2/EC1/EC19 process-local `EnumerateTenants`/`EnumerateResourceIds`: low, real for replica-local `_known`, but empty population is zero-coverage stop-ship via WORM union and `LastPopulation`. Rejected; interface change is not a direct correction.
+- 2026-11-21 -- BH3/EC2 probe cleanup does not prove residual absence: medium, real. `InvalidateAsync` ran under a 5s budget with no same-tenant Get. Patched to require delete plus empty residual read.
+- 2026-11-21 -- BH4 AppHost `UseLiveBacking=true`: false. AppHost is the composed live topology; Server DI still defaults in-memory outside Production unless that flag is set.
+- 2026-11-21 -- BH5 sourceVersion omitted from ingest identity: false. Frozen identity is `(tenantId, intakeId, recordKind, ordinal)`.
+- 2026-11-21 -- BH6 in-process activity `RunAsync`: false. Unit fences make ApplyCorrection re-entrant; the Dapr workflow already wraps Apply as one activity.
+- 2026-11-21 -- BH7 `conversation.echo` / empty secrets: maybe-false. Would be medium if embeddings used that component. Unverified; routed defer.
+- 2026-11-21 -- BH8 tenant-free ingest status path: false. ChatBot validates returned tenant/case/`MemoryUnitId` before treating status as complete.
+- 2026-11-21 -- BH9/EC8/EC11 correction create-race and duplicate schedule: high, real. Loser used `ShouldSchedule: false` and a local instance id; duplicate `ScheduleNewWorkflowAsync` became 503. Patched.
+- 2026-11-21 -- BH10 NL-semantic only for `SourceType.Event`: medium, real as Memories-native File ingest behavior reused by ChatBot's supported `IngestAsync`. Pre-existing Memories gate. Routed defer.
+- 2026-11-21 -- BH11 infinite retry / invalid manifest throw: false. Spec keeps those failures retryable; durable delays already retry start/status, and invalid manifests fail closed before ingestion as pinned by existing tests.
+- 2026-11-21 -- BH12 Projects resolver tenant vs owner: false. ProjectContext suppresses TenantId on the wire; owner-tenant equality is the ChatBot-side check.
+- 2026-11-21 -- BH13 Promote tests only in blocked Server.Tests: medium, real. `RedisDerivedStoreServiceTests` already linked into DerivedStores.Tests; Promote tests were not. Patched by compile include.
+- 2026-11-21 -- BH14 ADRs still defer live binding: medium, real. Gitlink/package 2.21.3 is a release-owner action (defer). DW-63 resolution-note is already truthful (false as a new defect). ADR text patched.
+- 2026-11-21 -- BH15 StoryEvidenceGate dropped from slnx: false. Not attributable to this story's files; no such project remains at HEAD.
+- 2026-11-21 -- EC3/EC4/EC5 TooLarge/Failed/identity retry: false. Spec marks unauthorized/invalid/nonterminal ingestion retryable.
+- 2026-11-21 -- EC6/EC7/EC9/EC10/EC18 GetCorrectionStatus ignores deadline: high, real. Timeout lived only inside Apply. Patched so GET persists TimedOut.
+- 2026-11-21 -- EC12 empty embedding chunks: medium, real `Chunks[0]` IndexOutOfRange. Patched with `EMBEDDING_CHUNKS_EMPTY`.
+- 2026-11-21 -- EC13 graph MATCH result ignored: high, real. Fence could commit after an empty corrected-case MATCH. Patched with `CORRECTION_GRAPH_CASE_MISSING`.
+- 2026-11-21 -- EC14 AppHost Memories Endpoint optional under external owners: medium, real. Patched to require `ChatBot:Memories:Endpoint`.
+- 2026-11-21 -- EC15 MemoryReferences NRE: false. Generated list is initialized and DisallowNull.
+- 2026-11-21 -- EC16 in-memory association keys: low, development-only non-canonical path. Rejected.
+- 2026-11-21 -- EC17 per-unit fence before intake fence: false. Per-unit fences exist to prevent repeated effects; intake fence still waits for full convergence.
+- 2026-11-21 -- EC20 raced WorkflowInstanceId harm: false given the loser did not schedule; the real race is BH9.
+- 2026-11-21 -- VG1 canonical reindexer untested: medium, pre-verified. Production `is ICanonicalVectorReindexer` path had no dual-interface stub. Patched.
+- 2026-11-21 -- VG2 resolve/finalize untested against stores: high, pre-verified. Patched with InMemory ordinal/resolve coverage and finalize HTTP recording.
+- 2026-11-21 -- VG3 diagnostic Redis writes untested: high, pre-verified. Patched with dedicated-hash and cross-tenant miss coverage.
+- 2026-11-21 -- VG-other duplicate GetIngestionSourceAsync divergence: low. Both paths fail closed. Rejected.
 
 ## Design Notes
 

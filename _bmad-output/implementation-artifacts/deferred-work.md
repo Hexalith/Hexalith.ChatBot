@@ -2435,3 +2435,19 @@ Final native follow-up qualification (2026-10-26): independent review correction
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-independent-worm-rebuild.md`
   summary: The PRD addendum NFR57 row no longer states the independently proven sandbox rebuild path this story recorded.
   evidence: Spec-commit addendum retired `RV-REBUILD-WORM` for the sandbox path; HEAD `addendum.md:404` only says there is no current production-shaped full-window proof. Later addendum rewrite (approval 2026-09-14), not this story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-12-16-bind-the-live-hexalith-memories-derived-store-backing.md`
+  summary: Production ingestion-binding cannot fetch exact mailbox message or attachment bytes because no owned repository exposes that content API.
+  evidence: ChatBot registers only `UnavailableMailboxMessageContentSource` and `UnavailableMailboxAttachmentContentSource`; Workers `GraphMailboxMessage` is metadata-only and has no Graph SDK download. Spec Implementation Evidence already records the required owner API.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-12-16-bind-the-live-hexalith-memories-derived-store-backing.md`
+  summary: Unverified: local Memories conversation.echo may prevent real embedding/NL-semantic regeneration even when Redis Stack and FalkorDB are up.
+  evidence: Would be settled by tracing `GenerateChunkEmbeddingsActivity` / NL description against `src/Hexalith.ChatBot.AppHost/DaprComponents/llm.memories.yaml`.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-12-16-bind-the-live-hexalith-memories-derived-store-backing.md`
+  summary: ChatBot mailbox ingest uses Memories `SourceType.File`, so correction skips Event-only natural-language-semantic rebuild.
+  evidence: `MemoriesClient.IngestCoreAsync` hard-codes `SourceType.File`; `ApplyDerivedStoreCorrectionActivity` runs NL-semantic only when `artifact.SourceType == SourceType.Event`. Native Memories File ingest has the same gate.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-12-16-bind-the-live-hexalith-memories-derived-store-backing.md`
+  summary: ChatBot package-mode Release still resolves published Memories 2.21.3, which has no `V1.DerivedStores` contracts, and the Memories gitlink was not moved.
+  evidence: Implementation Evidence records CS0234/CS0246 in package mode and that publishing `Hexalith.Memories.Contracts` / `Client.Rest` plus updating the Builds catalog is a package-owner action.

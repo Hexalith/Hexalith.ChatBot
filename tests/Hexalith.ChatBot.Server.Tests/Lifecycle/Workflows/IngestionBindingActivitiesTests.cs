@@ -1,6 +1,8 @@
 using System.Text;
 
+using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Server.Adapters.Mailbox;
+using Hexalith.ChatBot.Server.Adapters.Projects;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Projections;
@@ -110,6 +112,142 @@ public sealed class IngestionBindingActivitiesTests
         exception.Message.ShouldBe("ingestion_binding_status_identity_mismatch");
     }
 
+    [Fact]
+    public async Task InMemoryProjectionStore_TranslatesCapturedAttachmentOrdinalsToMessageThenProviderOrder()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        DateTimeOffset at = new(2026, 8, 28, 8, 0, 0, TimeSpan.Zero);
+        await store.UpsertSourceEmailAsync(
+            new ProjectConversationSourceEmailView(
+                "tenant-a",
+                "intake-1",
+                "mailbox-1",
+                "message-1",
+                "<internet-1@example.test>",
+                "conversation-1",
+                "thread-1",
+                at,
+                at,
+                at,
+                "UTC",
+                "Microsoft 365 mailbox",
+                "m365-mailbox-intake",
+                "metadata_only",
+                "collaboration_input",
+                ProjectConversationSourceEmailView.CurrentSchemaVersion,
+                7,
+                "correlation-1"),
+            TestContext.Current.CancellationToken);
+        await store.UpsertAttachmentReferencesAsync(
+            new ProjectConversationAttachmentSetView(
+                "tenant-a",
+                "intake-1",
+                [
+                    new ProjectConversationAttachmentReferenceView(
+                        "tenant-a",
+                        "intake-1",
+                        "attachment-1",
+                        0,
+                        "one.pdf",
+                        "application/pdf",
+                        12,
+                        ProjectConversationAttachmentStatus.Captured,
+                        ProjectConversationAttachmentStatus.Captured,
+                        ProjectConversationAttachmentStatus.Captured,
+                        null,
+                        null,
+                        "none",
+                        "none",
+                        "eligible",
+                        [],
+                        "none",
+                        "none",
+                        "metadata_only",
+                        "collaboration_input",
+                        7,
+                        "correlation-1"),
+                    new ProjectConversationAttachmentReferenceView(
+                        "tenant-a",
+                        "intake-1",
+                        "attachment-2",
+                        1,
+                        "two.txt",
+                        "text/plain",
+                        4,
+                        ProjectConversationAttachmentStatus.Captured,
+                        ProjectConversationAttachmentStatus.Captured,
+                        ProjectConversationAttachmentStatus.Captured,
+                        null,
+                        null,
+                        "none",
+                        "none",
+                        "eligible",
+                        [],
+                        "none",
+                        "none",
+                        "metadata_only",
+                        "collaboration_input",
+                        7,
+                        "correlation-1"),
+                ],
+                7,
+                "correlation-1"),
+            TestContext.Current.CancellationToken);
+        await store.UpsertAsync(
+            new ProjectConversationItemView(
+                "tenant-a",
+                "project-1",
+                "Project",
+                "association-1",
+                "intake-1",
+                ProjectConversationItemKind.EmailDerived,
+                ProjectConversationActorKind.Mailbox,
+                "Mailbox event",
+                at,
+                LifecycleState.Associated,
+                AssociationThresholdBand.Auto,
+                0.9,
+                "association-1",
+                "mailbox-1",
+                "message-1",
+                "<internet-1@example.test>",
+                "conversation-1",
+                "thread-1",
+                at,
+                at,
+                at,
+                "UTC",
+                "Microsoft 365 mailbox",
+                "m365-mailbox-intake",
+                "metadata_only",
+                "collaboration_input",
+                ProjectConversationItemView.CurrentSchemaVersion,
+                7,
+                "correlation-1"),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationIngestionSource? source = await store.GetIngestionSourceAsync(
+            "tenant-a",
+            "project-1",
+            "association-1",
+            "intake-1",
+            TestContext.Current.CancellationToken);
+
+        source.ShouldNotBeNull();
+        source.ProviderMessageId.ShouldBe("message-1");
+        source.Attachments.Select(static attachment => (attachment.ProviderAttachmentId, attachment.Ordinal))
+            .ShouldBe([("attachment-1", 1), ("attachment-2", 2)]);
+
+        IngestionBindingRequest request = Source(IngestionBindingRecordKind.Message, 0, providerAttachmentId: null).Request;
+        IngestionBindingResolvedContext resolved = await new IngestionBindingResolveActivity(
+            new StubCaseResolver("case-prior"),
+            store).RunAsync(null!, request);
+
+        resolved.PriorCaseId.ShouldBe("case-prior");
+        resolved.Source.Attachments.Select(static attachment => (attachment.ProviderAttachmentId, attachment.Ordinal))
+            .ShouldBe([("attachment-1", 1), ("attachment-2", 2)]);
+    }
+
     private static IngestionBindingSourceRequest Source(
         IngestionBindingRecordKind kind,
         int ordinal,
@@ -203,4 +341,14 @@ public sealed class IngestionBindingActivitiesTests
         byte[] Content,
         string ContentType,
         string? IdempotencyToken);
+
+    private sealed class StubCaseResolver(string caseId) : IMemoriesCaseResolver
+    {
+        public ValueTask<string> ResolveCaseIdAsync(
+            string tenantId,
+            string projectId,
+            string correlationId,
+            CancellationToken cancellationToken = default)
+            => ValueTask.FromResult(caseId);
+    }
 }

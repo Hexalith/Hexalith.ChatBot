@@ -158,7 +158,6 @@ DaprSidecarOptionsAnnotation memoriesSidecarOptions = memoriesSidecar.Annotation
 memoriesSidecar.Annotations.Remove(memoriesSidecarOptions);
 memoriesSidecar.Annotations.Add(new DaprSidecarOptionsAnnotation(memoriesSidecarOptions.Options with { Config = accessControlConfigPath }));
 EndpointReference memoriesHttp = memories.Server.GetEndpoint("http");
-ReferenceExpression memoriesEndpoint = ReferenceExpression.Create($"{memoriesHttp}");
 
 // Any explicit owner setting selects the external/static path as a whole; incomplete overrides never fall back.
 bool externalOwners = new[] { "ChatBot:Projects:Endpoint", "ChatBot:Projects:ApiToken", "ChatBot:Projects:TenantId",
@@ -171,13 +170,13 @@ if (externalOwners)
     string projectsEndpoint = RequiredOwnerSetting("ChatBot:Projects:Endpoint");
     string projectsApiToken = RequiredOwnerSetting("ChatBot:Projects:ApiToken");
     string memoriesApiToken = RequiredOwnerSetting("ChatBot:Memories:ApiToken");
+    string memoriesEndpointSetting = RequiredOwnerSetting("ChatBot:Memories:Endpoint");
     if (builder.Configuration.GetSection("ChatBot:Projects:OwnerAuthentication").Exists()
         || builder.Configuration.GetSection("ChatBot:Memories:OwnerAuthentication").Exists())
         throw new InvalidOperationException("The external AppHost owner setup requires complete static tokens without mixed client credentials.");
     _ = chatBot.WithEnvironment("ChatBot__Projects__Endpoint", projectsEndpoint)
         .WithEnvironment("ChatBot__Projects__ApiToken", builder.AddParameter("projects-api-token", () => projectsApiToken, publishValueAsDefault: false, secret: true))
-        .WithEnvironment("ChatBot__Memories__Endpoint", builder.Configuration["ChatBot:Memories:Endpoint"] is { } externalMemoriesEndpoint
-            ? ReferenceExpression.Create($"{externalMemoriesEndpoint}") : memoriesEndpoint)
+        .WithEnvironment("ChatBot__Memories__Endpoint", memoriesEndpointSetting)
         .WithEnvironment("ChatBot__Memories__ApiToken", builder.AddParameter("memories-api-token", () => memoriesApiToken, publishValueAsDefault: false, secret: true));
     foreach (string owner in new[] { "Projects", "Memories" })
     {

@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Lifecycle.Workflows;
+using Hexalith.ChatBot.Server.Projections;
 using Hexalith.ChatBot.Server.Projections.DerivedStores;
 using Hexalith.Memories.Client.Rest;
 using Hexalith.Memories.Contracts.V1.DerivedStores;
@@ -123,6 +125,63 @@ public sealed class MemoriesDerivedStoreAdapterTests
         outcome.FailureReasonCode.ShouldBeNull();
         outcome.RemoteOperationId.ShouldBe("operation-001");
         handler.Requests.Select(static request => request.Method).ShouldBe(["POST", "GET"]);
+    }
+
+    [Fact]
+    public async Task FinalizeAdapterPostsOrderedManifestAndRejectsIdentityMismatch()
+    {
+        DerivedStoreBinding binding = new(
+            "tenant-alpha",
+            "association-001",
+            "intake-001",
+            7,
+            "case-prior",
+            1,
+            [
+                new DerivedStoreBindingEntry(DerivedStoreRecordKind.Message, 0, "unit-message"),
+                new DerivedStoreBindingEntry(DerivedStoreRecordKind.Attachment, 1, "unit-attachment"),
+            ],
+            StartedAt);
+        RecordingHandler handler = new(_ => Json(binding with { AssociationId = "other-association" }));
+        MemoriesIngestionBindingSourceAdapter adapter = new(Client(handler));
+        IngestionBindingRequest request = new(
+            "tenant-alpha",
+            "association-001",
+            "intake-001",
+            "project-001",
+            7,
+            "correlation-001",
+            "workflow-001");
+        IngestionBindingResolvedContext context = new(
+            "case-prior",
+            new ProjectConversationIngestionSource(
+                request.TenantId,
+                request.AssociatedProjectId,
+                request.AssociationId,
+                request.IntakeId,
+                "mailbox-001",
+                "message-001",
+                [new("attachment-001", 1, "application/pdf")],
+                request.SourceVersion,
+                request.CorrelationId));
+
+        bool finalized = await adapter.FinalizeAsync(
+            new IngestionBindingFinalizeInput(
+                request,
+                context,
+                [
+                    new IngestionBindingCompletedSource(IngestionBindingRecordKind.Message, 0, "unit-message"),
+                    new IngestionBindingCompletedSource(IngestionBindingRecordKind.Attachment, 1, "unit-attachment"),
+                ]),
+            TestContext.Current.CancellationToken);
+
+        finalized.ShouldBeFalse();
+        handler.Requests.ShouldHaveSingleItem().Method.ShouldBe("POST");
+        handler.Requests[0].Uri.ShouldContain("/api/v1/tenants/tenant-alpha/");
+        handler.Requests[0].Body.ShouldContain("\"ordinal\":0");
+        handler.Requests[0].Body.ShouldContain("\"ordinal\":1");
+        handler.Requests[0].Body.ShouldContain("\"expectedAttachmentCount\":1");
+        handler.Requests[0].Body.ShouldContain("\"priorCaseId\":\"case-prior\"");
     }
 
     private static MemoriesClient Client(HttpMessageHandler handler)

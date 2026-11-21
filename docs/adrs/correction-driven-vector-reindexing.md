@@ -18,12 +18,12 @@ owner role + next safe action, and an SLO breach is a **P2 incident**. The archi
 twice — `ReindexVectors(tenantId, correctionId, sourceVersion)` (architecture.md:190, 399) — and marks it an idempotent,
 version-guarded **M2** activity.
 
-Like Stories 9.1–9.5's inert-control-floor, the live **Hexalith.Memories Redis-Vector / FalkorDB reindex backing is not
-integrated into the ChatBot today** (architecture.md:324–325 mark vector/embedding/prompt-context as planned via
-Hexalith.Memories — **M2**). So this story ships the **contract + version guard + delete seam + coordinator wiring + SLO
-contract + P2 delay path + tests**, and **defers** the live Memories binding, the async long-running reindex runtime, and
-the periodic SLO-deadline sweep. The seam is built so the live binding is **additive** (a Memories-backed
-`IVectorReindexer` whose partition is the Memories `IndexSchemaDefinitions` convention), never a rewrite.
+Story 9.6 shipped the **contract + version guard + delete seam + coordinator wiring + SLO contract + P2 delay path +
+tests** and deferred the live Memories binding. Story 12.16 does **not** map ChatBot's four `DerivedStoreClass` labels
+onto `IndexSchemaDefinitions`. Production correction is a **Memories-owned durable workflow** that preserves MemoryUnit
+ids, regenerates native derivatives from durable source artifacts, and is polled by the existing ChatBot correction
+workflow. The in-memory adapter remains the Development/test default. Live Redis/FalkorDB correction proof remains
+outstanding until the composed acceptance lane can run.
 
 ## Decision
 
@@ -88,10 +88,13 @@ the periodic SLO-deadline sweep. The seam is built so the live binding is **addi
 
 ## Deferrals (inert-control-floor honesty)
 
-- **The live Hexalith.Memories Redis-Vector / FalkorDB reindex binding** — an additive `IVectorReindexer` whose partition
-  maps onto the Memories `IndexSchemaDefinitions` convention (`{tenantId}:memories:vec`, prefixes `{tenantId}:vec:`).
-- **The async / long-running reindex runtime** — the in-memory reindex is synchronous.
-- **The periodic SLO-deadline sweep trigger** — a scheduler need only call the contract on its cadence.
+- ~~**The live Hexalith.Memories Redis-Vector / FalkorDB reindex binding**~~ — **wired by Story 12.16** as
+  `MemoriesVectorReindexer` / `ICanonicalVectorReindexer` over Memories' correction start/status workflow, not as a
+  ChatBot-built Redis document rewrite. Live backend identity is still unproven without the composed acceptance lane.
+- ~~**The async / long-running reindex runtime**~~ — Memories owns durable restart recovery and the 60-minute terminal
+  timeout; ChatBot polls with durable timers and never acknowledges scheduled work as complete.
+- ~~**The periodic SLO-deadline sweep trigger**~~ — **not required** once correction completion stays inside the durable
+  ChatBot correction workflow (DW-65 closed 2026-08-28). The distributed cadence lease in DW-64 remains open.
 
 The `ReindexVectors` contract, the version-guard ledger, the `IDerivedStore.InvalidateAsync` delete seam, the
 correction-propagation wiring, the `CorrectionPropagationSlo` deadline contract, and the P2 audit-then-deliver delay path

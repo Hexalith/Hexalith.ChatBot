@@ -131,11 +131,18 @@ internal sealed class DerivedStoreIsolationProbeCoordinator(
                     {
                         cleanupToken.ThrowIfCancellationRequested();
                         // Schedule the invocation too: an implementation may block before returning its ValueTask.
-                        _ = await Task.Run(
+                        bool deleted = await Task.Run(
                             () => derivedStore.InvalidateAsync(cls, ownerTenant, resourceId, cleanupToken).AsTask(),
                             cleanupToken)
                             .WaitAsync(cleanupToken)
                             .ConfigureAwait(false);
+                        DerivedStoreEntry? residual = await derivedStore
+                            .GetAsync(cls, ownerTenant, resourceId, cleanupToken)
+                            .ConfigureAwait(false);
+                        if (!deleted || residual is not null)
+                        {
+                            cleanupIncomplete = true;
+                        }
                     }
                     catch (OperationCanceledException) when (cleanupDeadline.IsCancellationRequested)
                     {
