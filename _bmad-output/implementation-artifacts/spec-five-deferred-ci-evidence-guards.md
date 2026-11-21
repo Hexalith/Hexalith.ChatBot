@@ -2,7 +2,7 @@
 title: 'Resolve five deferred CI evidence guard items'
 type: 'bugfix'
 created: '2026-10-22'
-status: 'in-review'
+status: 'done'
 route: 'dispatch'
 baseline_commit: 'b16a185f079055f3022487abe05e0cd1e02d7c1b'
 review_loop_iteration: 0
@@ -82,8 +82,21 @@ User authorization covers the full batch and final main push. No human-only inte
 | BH-7: synthetic fixtures omit freshness overrides | low / rejected | Freshness resolution is unchanged; existing PerLaneCurrentRunCeilingShouldRaiseOnlyForDeclaringLanes and range/presence/disagreement cases exercise override behavior, while full binding freshness tests retain both acceptance and atomic refusal. Additional synthetic ceilings add little evidence for the changed selection consumers. |
 | BH-8: observed LaneResult negatives absent | medium / patch | Valid declarations could hide lost observed-result guards. Add selector/source/class mismatch and zero-executed/failed/skipped cases against ValidatePrimaryPaths. |
 | BH-9: synthetic merge omits shell suite | low / patch | Merge and exact-head jobs should exercise the same added guard suite. Invoke it using the synthetic merge's built Release runner. |
+| BH-R2-1: architecture `ShouldContain` python discover once | low / rejected | Both merge and build jobs invoke the suite. Changing that pin to a count would add a new counting convention in a file that already uses `ShouldContain` for the same duplicated `run-merge-test-lanes.sh` command. Everyday CI still runs the suite. |
+| BH-R2-2: `unittest discover` exits 0 on zero loaded tests | low / rejected | The committed suite has twelve methods and CI invokes that file. Emptying it is a later edit, not a runtime zero-match path like DW-130. Wrapping discover with a ran-count guard adds CI complexity the executable matrix does not need. |
+| BH-R2-3: extracted scripts drop SHA/repo diagnostic text | low / rejected | Checkout mismatch, unsupported event, and foreign locator still refuse with no success output. Restoring interpolated SHAs/repo names adds message surface the spec did not require. |
+| BH-R2-4: architecture still pins old substrings not new fail-closed tokens | low / rejected | The Python suite already executes `rev-parse --end-of-options`, destination `-L` ancestry, last-line `read`, and `10#` clocks. Adding many new source pins is extra complexity, not a current miss. |
+| BH-R2-5: reserve JSON upload contract unpinned | false | `ci.yml` uploads `story-evidence-integrity-reports` with `if: always()` and includes `${{ runner.temp }}/story-evidence-reports`, which is `RESERVE_REPORT_PATH`'s directory. Success-only upload does not occur. |
+| BH-R2-6: invalid clocks write no JSON and do not clear a leftover closeout file | low / rejected | DW-90 is the 2400-second reserve code, which is emitted. Invalid clocks fail closed on a fresh `runner.temp`. Coding those refusals or unlinking a leftover closeout would add branches the GitHub job cannot reach. |
+| BH-R2-7: Select skips unrequired triggers; freshness `OfType` skips null/scalar bindings | low / rejected | carried All production entry points pin the single approved binding before reaching selection; selected binding metadata is subsequently validated against its result. Structural malformed unselected entries already refuse. Broader hypothetical policy semantics add guards without a reachable production defect. |
+| BH-R2-8: zero-test proof uses merge-lane override; nightly still `dotnet test` | false | Ordinary CI lanes already call `run-merge-test-lanes.sh`; the Python case drives that same wrapper until it refuses zero executed tests and writes no checksum. Nightly/release `dotnet test` is excluded by the frozen Never (no release-qualification change). |
+| BH-R2-9: omitted abbreviated SHA, root `HEAD^`, and locator-length cases | low / rejected | Exact-revision and regex guards already fail closed. Push checkout mismatch is tested. Extra length/root-commit cases would expand the matrix without a current passing path. |
+| BH-R2-10: `--dir` isolation unproven against real `gh`; failed download leaves empty dest; `RESULTS_ROOT` unvalidated | false | Production sets `RESULTS_ROOT` to `${{ runner.temp }}/machine-results`. Isolation is `gh run download --dir` after preflight. A failed step's empty directory dies with the runner; a new job gets a fresh temp. |
+| BH-R2-11: spec 11/11 vs 12/12, ubuntu pins, Subject, sibling freshness | false | Build and completion jobs are pinned to `ubuntu-latest`; merge was already `ubuntu-latest`. Spec-text and extra Subject/freshness assertions would edit this spec or add tests for code that already refuses. |
+| EC-R2-1: empty/`..` `RESULTS_ROOT` can land downloads outside the results tree | false | The only production caller sets `RESULTS_ROOT: ${{ runner.temp }}/machine-results`. Empty, `/`, or `..` values are not reachable from that workflow. |
+| EC-R2-2: duplicate observed lanes make `SingleOrDefault` throw `InvalidOperationException` | false | `ReadResults` already throws `machine_results_invalid`/`duplicate-lane` before `ValidatePrimaryPaths`. Production passes that list; tests pass a single `LaneResult`. `SingleOrDefault` predates this change. |
 
-Edge-case hunter returned no findings. Verification-gap reviewer returned no findings after tracing the consumers, executable scripts, and passing test matrix.
+Edge-case hunter returned two findings; both are unreachable from production callers. Verification-gap reviewer returned no findings after tracing the consumers, executable scripts, and test matrix.
 
 ## Verification
 
