@@ -1315,7 +1315,7 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
                 tenantRef,
                 "restore",
                 includeBearer: false,
-                cancellationToken).ConfigureAwait(false);
+                CancellationToken.None).ConfigureAwait(false);
             if (RecoverySandboxRestoreResponse.IsCurrentlyFaulted(restored.RootElement))
             {
                 throw new InvalidOperationException("The subscription simulator remained faulted after cleanup.");

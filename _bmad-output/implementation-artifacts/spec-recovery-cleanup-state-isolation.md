@@ -2,7 +2,7 @@
 title: 'Isolate recovery cleanup tracking state'
 type: 'bugfix'
 created: '2026-08-28'
-status: in-review
+status: done
 baseline_revision: '9fb71f24bbb9148eb6a406f889e046118c81e491'
 baseline_commit: '9fb71f24bbb9148eb6a406f889e046118c81e491'
 review_loop_iteration: 4
@@ -79,6 +79,32 @@ deferred: []
 
 ## Review Triage Log
 
+Resumed `in-review` against current `main`. Findings about the later IntegrationTests→Recovery.Tests live-sweep move are not caused by this spec.
+
+| Finding | Verdict / disposition | Evidence |
+| --- | --- | --- |
+| Subscription and scoped `finally` restore uses the caller cancellation token; exceptional tests stub restore to ignore it | medium / patched | `CleanupSubscriptionScenarioAsync` and `CleanupAsync` now restore with `CancellationToken.None`. Token-honoring restore stubs still see one restore on cancel. |
+| One `FailOnEraseKey` throw abandons remaining EventStore notes with no incomplete diagnostic | false / rejected | Erase throws before the false-result diagnostic path. The I/O matrix preserves exception semantics and isolation of the next active generation. |
+| `CheckpointCorrelationId` is required whenever `HasOwnedState` is true, so a fault-probe-only generation would throw | false / rejected | Live `RunEventStoreContinuityAsync` always seeds first. Always-run cases set a correlation id. No demonstrated path owns a probe without one. |
+| Graph cleanup does not erase control-tenant Graph intakes the way subscription uses `ControlTenantAbsenceRefs` | false / rejected | Graph control-tenant residue is `ControlOperationRefs`, which `CleanupAsync` already erases. Graph intakes are storage-tenant. |
+| Subscription and scoped incomplete cleanup return `false` with no EventStore check codes | false / rejected | Metadata-only diagnostics are the EventStore incomplete path. The spec preserves existing bool/exception semantics elsewhere. |
+| `*-faulted` diagnostic codes have no throwing-projection-read test | low / rejected | Everyday negatives pin `control-note-not-present`, `fault-probe-projection-present`, and `erased-projection-still-present`. Extra catch labels are not everyday defects. |
+| `CaptureResponseIdentities` is duplicated; scoped `AddIntakeTarget` skips whitespace while sandbox throws | false / rejected | Capture rejects noncanonical/whitespace identities before targets are built. Producer tests already prove whitespace never reaches durable polling. |
+| Subscription checkpoint `requireEquality: true` turns a distinct `candidateRef` into an invalid-identity failure | false / rejected | Spec requires retain-then-equality. `SubscriptionProducersRetainEveryValidIdentityBeforeLaterFailure` keeps both Ids then throws. |
+| `LateInventoryFailureRestoresConcreteCleanupWithoutStartingErasure` omits Identity | low / rejected | Identity erase/cancel restore is covered by `AssertScopedExceptionalCleanupAsync`. Inventory-before-erase is the same `CaptureKeysAsync` helper already covered on Graph. |
+| `RemainsGovernedOperationProjectionAbsentAsync` measures with `TimeProvider` but delays with wall-clock `Task.Delay` | false / rejected | Cleanup tests use `TimeProvider.System`, which matches `Task.Delay`. No fake frozen clock is wired. |
+| `HasOwnedState` ignores some durable-absence sets, so empty assertions could pass | false / rejected | `AssertSubscriptionEmpty` / `AssertScopedEmpty` assert those sets directly. Cleanup does not skip work via `HasOwnedState` on those surfaces. |
+| Shared scoped state means Identity/Dapr cleanup detaches Graph identities without erasing them | false / rejected | Live driver cleans the same dependency it just observed. Serial Graph then Identity starts from a reset generation. |
+| Exceptional/incomplete seeds plant three synthetic keys, not the production inventory | false / rejected | `ConcreteCleanupOwnsIndexedDescendantsAndDetectsReappearanceAfterIndexErasure` already uses `RecoveryIntakeReadModelProbe.CaptureKeysAsync`. |
+| `OnEraseKey` uses `GetAwaiter().GetResult()`; `SaveSentinelsAsync` discards `identityBranch` | false / rejected | Sync-over-async is test-callback only on an in-memory store. Identity sentinels are seeded in `SeedScopedCleanupAsync`. |
+| Sandbox test seam cannot stub mailbox acquisition | false / rejected | Always-run tests are required to stay infrastructure-free; `SendSandboxControlAsync` is the intended seam. |
+| `StateHandoffAndDiagnosticAllowlistRetireAllFlagsAndIdentifiers` asserts only flags on the detached instance | false / rejected | `DetachAndReset` is a reference swap, so flags moving is the same object as the refs. Successor emptiness is asserted. |
+| Exceptional cleanup helpers do not assert failed keys remained in the store | false / rejected | `FailedCleanupCannotReuseOldReferencesDuringTheNextScenario` already asserts the failed key stayed present. |
+| EventStore availability failure after detach leaves unconfirmed notes in the store | false / rejected | Specified partial-cleanup/exception behavior. `EventStoreCleanupDetachesBeforeFirstAwaitAndPropagatesCancellation` already requires the throw and an empty successor generation. |
+| Live `Fact` deleted from IntegrationTests while `ci.yml` still selects it | medium / deferred | Pre-verified other finding. The Fact now lives in `tests/Hexalith.ChatBot.Recovery.Tests`. `ci.yml:280` still names `Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests`. Caused by later shared-CI migration (`bf0f44f`), not this spec. Hexalith.CiCd owns workflows. |
+| Independent-control note refs are never asserted from `IsChatBotControlAvailableAsync` | medium / patched | Probe tests now require `ActiveCleanupState.ControlOperationRefs` to contain the POSTed `noteId` for Graph and Identity. |
+| `ObserveEventStoreFaultAsync` never records `FaultProbeNoteRef` in always-run tests | medium / patched | `ObserveEventStoreFaultRecordsProbeBeforeSubmitFails` calls the real producer and requires the probe ref after later submit failure. |
+
 ## Design Notes
 
 The isolation boundary is a generation handoff: capture all fields needed by the current cleanup, replace active state with a fresh empty generation before the first await, and never consult active fields again during that cleanup. This preserves diagnostic/erase inputs locally while making failure incapable of leaking them into the next serial scenario.
@@ -96,3 +122,9 @@ The isolation boundary is a generation handoff: capture all fields needed by the
 - Prescribed Release build from the repository root -- blocked before evaluation because `global.json` requests SDK 10.0.302 while only SDK 10.0.400 is installed.
 - Equivalent absolute-project Release build from a temporary working directory -- blocked before compiling the integration-test project by the package-mode `Hexalith.Memories.Contracts` dependency lacking the `V1.DerivedStores` contracts used by `Hexalith.ChatBot.Server` (21 compiler errors, zero warnings).
 - Full always-run executable -- 337 total, 18 failed, 6 skipped; failures are outside the cleanup-state class and include stale dependency API loading, current AppHost endpoint configuration, and an existing projection-rebuild write-count assertion.
+
+**Results (2026-11-21 review patches):**
+- Prescribed unmapped Release project build -- blocked: Conversations requires Platform source mapping (2 errors). Unmapped `--no-restore --no-dependencies` Release then failed copying missing EventStore RuntimeIdentityProbe Release assets.
+- `python3 .github/scripts/with-source-mapping.py dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false` -- succeeded, 0 errors; remaining CS0618 warnings are pre-existing obsolete `AddProject` calls allowed by `WarningsNotAsErrors`.
+- `./tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net11.0/Hexalith.ChatBot.IntegrationTests -class Hexalith.ChatBot.IntegrationTests.Recovery.AspireRecoveryCleanupStateTests -class Hexalith.ChatBot.IntegrationTests.Recovery.ScopedOutageControlProbeTests` -- 55 passed, 0 failed, 0 skipped.
+- `./tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net11.0/Hexalith.ChatBot.IntegrationTests` -- 550 passed, 0 failed, 1 skipped (`PolicyRefusalPreflightTests.MissingProofMustRefuseBothRealPrincipalsWithoutNativeMutation`).

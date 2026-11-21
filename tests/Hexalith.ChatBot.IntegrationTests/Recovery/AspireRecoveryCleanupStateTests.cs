@@ -58,8 +58,9 @@ public sealed class AspireRecoveryCleanupStateTests
         {
             ScopedOutageOperationsTestSeam seam = new()
             {
-                RestoreAsync = (_, _, _) =>
+                RestoreAsync = (_, _, cancellationToken) =>
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     restores++;
                     return ValueTask.FromResult(true);
                 },
@@ -71,8 +72,9 @@ public sealed class AspireRecoveryCleanupStateTests
         }
         else
         {
-            RecoverySandboxOperationsTestSeam seam = SandboxSeam(response: (_, _, _, _, _, _) =>
+            RecoverySandboxOperationsTestSeam seam = SandboxSeam(response: (_, _, _, cancellationToken, _, _) =>
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 restores++;
                 return ValueTask.FromResult(Json(RestoreBody()));
             });
@@ -533,6 +535,26 @@ public sealed class AspireRecoveryCleanupStateTests
             await AssertPresentAsync(store, faultKey);
             AssertEventStoreEmpty(reappearing.ActiveEventStoreCleanupState);
         }
+    }
+
+    /// <summary>
+    /// Pins the EventStore fault-probe producer to record the probe identity before later submit failure.
+    /// </summary>
+    [Fact]
+    public async Task ObserveEventStoreFaultRecordsProbeBeforeSubmitFails()
+    {
+        InMemoryRecoveryReadModelStore store = new();
+        using EventStoreDurableStateProbe durable = Durable(new RecoveryDurableStateMessageHandler());
+        AspireRecoverySandboxOperations operations = SandboxOperations(SandboxSeam(), store, durable);
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+            operations.ObserveEventStoreFaultAsync(
+                RecoveryValidationTopology.LogicalTenantRef,
+                Id8,
+                TestContext.Current.CancellationToken).AsTask());
+
+        thrown.Message.ShouldBe("This recovery operation requires the live ChatBot client.");
+        operations.ActiveEventStoreCleanupState.FaultProbeNoteRef.ShouldNotBeNullOrWhiteSpace();
     }
 
     [Theory]
@@ -1314,8 +1336,9 @@ public sealed class AspireRecoveryCleanupStateTests
         InMemoryRecoveryReadModelStore store = new();
         RecoveryDurableStateMessageHandler handler = new();
         int restores = 0;
-        RecoverySandboxOperationsTestSeam seam = SandboxSeam(response: (_, action, _, _, _, _) =>
+        RecoverySandboxOperationsTestSeam seam = SandboxSeam(response: (_, action, _, cancellationToken, _, _) =>
         {
+            cancellationToken.ThrowIfCancellationRequested();
             restores++;
             if (string.Equals(scenario, "restore", StringComparison.Ordinal) && string.Equals(action, "restore", StringComparison.Ordinal))
             {
@@ -1362,8 +1385,9 @@ public sealed class AspireRecoveryCleanupStateTests
         ScopedOutageOperationsTestSeam seam = new()
         {
             SendSubscriptionAsync = (_, _, _, _, _) => ValueTask.FromResult(Json("{\"faulted\":false}")),
-            RestoreAsync = (_, _, _) =>
+            RestoreAsync = (_, _, cancellationToken) =>
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 restores++;
                 return ValueTask.FromResult(true);
             },

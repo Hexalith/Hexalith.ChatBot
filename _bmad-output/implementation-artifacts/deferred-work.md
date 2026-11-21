@@ -2415,3 +2415,7 @@ Final native follow-up qualification (2026-10-26): independent review correction
   summary: Unverified: blank tenant or intake ids may inventory colliding read-model keys.
   evidence: Would be settled by a caller of `GetIntakeReadModelKeysAsync` with whitespace `tenantId` or `intakeId`.
 
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-recovery-cleanup-state-isolation.md`
+  summary: Legacy `ci.yml` still selects the deleted IntegrationTests live-recovery Fact after the sweep moved to Recovery.Tests.
+  evidence: `tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs` is gone; the Fact is `tests/Hexalith.ChatBot.Recovery.Tests/LiveContinuityAspireE2eTests.cs`. `.github/workflows/ci.yml:280` still passes `-method Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate`, and `.github/scripts/run-xunit-v4.sh` fails closed when `passed + failed == 0`. Caused by later shared-CI migration (`bf0f44f`), not this spec. Hexalith.CiCd owns the workflow.
+

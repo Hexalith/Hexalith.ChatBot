@@ -647,15 +647,15 @@ internal sealed class AspireScopedOutageOperations : IScopedOutageSandboxOperati
         {
             if (string.Equals(dependency, ScopedOutageDependencies.Identity, StringComparison.Ordinal))
             {
-                if (!await TryAcquireRecoveryTokenOnceAsync(cancellationToken).ConfigureAwait(false) ||
-                    !await IsIdentityAvailableAsync(cancellationToken).ConfigureAwait(false))
+                if (!await TryAcquireRecoveryTokenOnceAsync(CancellationToken.None).ConfigureAwait(false) ||
+                    !await IsIdentityAvailableAsync(CancellationToken.None).ConfigureAwait(false))
                 {
-                    await RestoreAsync(dependency, tenantRef, cancellationToken).ConfigureAwait(false);
+                    await RestoreAsync(dependency, tenantRef, CancellationToken.None).ConfigureAwait(false);
                 }
             }
             else
             {
-                await RestoreAsync(dependency, tenantRef, cancellationToken).ConfigureAwait(false);
+                await RestoreAsync(dependency, tenantRef, CancellationToken.None).ConfigureAwait(false);
             }
         }
 

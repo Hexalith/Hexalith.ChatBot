@@ -82,6 +82,7 @@ public sealed class ScopedOutageControlProbeTests
     public async Task ResponsesPreserveControlOutcome(bool accepted)
     {
         RecoveryDurableStateMessageHandler durableHandler = new();
+        string? postedNoteId = null;
         using SequenceHttpMessageHandler commandHandler = new((_, request) =>
         {
             if (request.Method == HttpMethod.Get)
@@ -90,20 +91,24 @@ public sealed class ScopedOutageControlProbeTests
             }
 
             using JsonDocument body = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+            postedNoteId = body.RootElement.GetProperty("command").GetProperty("noteId").GetString();
             durableHandler.AddGovernedNote(
                 RecoveryValidationTopology.ControlTenantRef,
-                body.RootElement.GetProperty("command").GetProperty("noteId").GetString()!);
+                postedNoteId!);
             return new HttpResponseMessage(accepted ? HttpStatusCode.Accepted : HttpStatusCode.ServiceUnavailable);
         });
         using HttpClient client = new(commandHandler) { BaseAddress = new Uri("http://chatbot.test") };
         using EventStoreDurableStateProbe durable = Durable(durableHandler);
+        AspireScopedOutageOperations operations = Operations(client, durable);
 
-        ScopedOutageControlAvailability result = await Operations(client, durable).IsChatBotControlAvailableAsync(
+        ScopedOutageControlAvailability result = await operations.IsChatBotControlAvailableAsync(
             ScopedOutageDependencies.Graph, TestContext.Current.CancellationToken);
 
         result.ShouldBe(new ScopedOutageControlAvailability(accepted, false, accepted ? null : "status-503"));
         commandHandler.Requests.ShouldBe(accepted ? 2 : 1);
         durableHandler.Requests.Count.ShouldBe(accepted ? 2 : 0);
+        postedNoteId.ShouldNotBeNullOrWhiteSpace();
+        operations.ActiveCleanupState.ControlOperationRefs.ShouldBe([postedNoteId]);
     }
 
     /// <summary>A caller-canceled POST propagates cancellation without fabricating a timeout observation.</summary>
@@ -147,21 +152,27 @@ public sealed class ScopedOutageControlProbeTests
     [Fact]
     public async Task IdentityUsesRetainedBearerWithoutAcquisition()
     {
+        string? postedNoteId = null;
         using SequenceHttpMessageHandler handler = new((_, request) =>
         {
             request.Headers.Authorization!.Scheme.ShouldBe("Bearer");
             request.Headers.Authorization.Parameter.ShouldBe("control");
+            using JsonDocument body = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+            postedNoteId = body.RootElement.GetProperty("command").GetProperty("noteId").GetString();
             return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
         });
         using HttpClient client = new(handler) { BaseAddress = new Uri("http://chatbot.test") };
         using EventStoreDurableStateProbe durable = Durable(new RecoveryDurableStateMessageHandler());
+        AspireScopedOutageOperations operations = Operations(client, durable, _ => throw new InvalidOperationException(
+            "Identity outage must not acquire a new token."));
 
-        ScopedOutageControlAvailability result = await Operations(client, durable, _ => throw new InvalidOperationException(
-            "Identity outage must not acquire a new token.")).IsChatBotControlAvailableAsync(
-                ScopedOutageDependencies.Identity, TestContext.Current.CancellationToken);
+        ScopedOutageControlAvailability result = await operations.IsChatBotControlAvailableAsync(
+            ScopedOutageDependencies.Identity, TestContext.Current.CancellationToken);
 
         result.ShouldBe(new ScopedOutageControlAvailability(false, false, "status-503"));
         handler.Requests.ShouldBe(1);
+        postedNoteId.ShouldNotBeNullOrWhiteSpace();
+        operations.ActiveCleanupState.ControlOperationRefs.ShouldBe([postedNoteId]);
     }
 
     private static EventStoreDurableStateProbe Durable(RecoveryDurableStateMessageHandler handler)
