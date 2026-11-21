@@ -1,11 +1,13 @@
 ---
 baseline_commit: 9567f43d61478192cf30d0cef08aa63857ae8796
-status: in-progress
+status: superseded
 ---
 
 # Story 1.1e: Centralize NuGet Package-Reference Version Authority
 
-Status: in-progress
+Status: superseded
+
+> **Superseded 2026-11-21.** The 2026-09-15 replan removed every `1-1a`…`1-1f` key from the active sprint ledger ([historical story evidence crosswalk](../planning-artifacts/historical-story-evidence-crosswalk-2026-09-17.md)), and historical identifiers authorize no completion claim. This file is kept as historical evidence and is not resumed: its unchecked AC5 tasks target gitlinks frozen at ChatBot `bd652e3`, which no current gitlink matches. A scan at ChatBot `843f886a4064493dbdb116e16ae8959dd8442999` found consumer-local package versions back in six root-declared submodules; that regression is tracked in [deferred-work.md](deferred-work.md) for a future correct-course.
 
 <!-- Validation completed against .agents/skills/bmad-create-story/checklist.md on 2026-07-18. -->
 
@@ -729,6 +731,7 @@ GPT-5 Codex
 
 ### Change Log
 
+- 2026-11-21: Closed as superseded, records only, at Jerome's choice. No code, task checkbox, or evidence changed. A current-state scan at ChatBot `843f886a4064493dbdb116e16ae8959dd8442999` found consumer-local `PackageVersion` rows and version properties again in Folders, Memories, Parties, Timesheets, Works, and McpCli; the inventory is recorded in `deferred-work.md`.
 - 2026-08-23: Used Jerome's explicit cross-repository baseline-repair authorization to prepare and validate the mutually compatible target graph without local version overrides, nested initialization, solution removal, or weakened gates. Added Builds authority/audit coverage for Works' `FsCheck` dependency, completed Fluent V5 rc5, StackExchange.Redis 3.1.13, strict Polymorphic analyzer, Parties package, Timesheets, and Works compatibility repairs, and published the target matrix plus required immutable landing order. Story remains `in-progress` because the uncommitted owning-repository commits and final root gitlink baseline do not yet have immutable hashes.
 - 2026-08-23: Executed the Correct Course standalone-checkout contract against exact baseline `bd652e3`, published the full identity/dependency/command/gate dossier, and retained `in-progress` status because only 4/12 standalone rows are fully green. The final ChatBot stage remains unrun by the story's ordered AC5 gate.
 - 2026-07-20: Adopted Jerome's standalone-checkout correction for independent validation. Recorded the `bd652e3` observed pin matrix, made checkout-root semantics explicit, permitted Timesheets' own root-declared Works only in standalone Timesheets, prohibited ChatBot nested initialization and manifest/solution workarounds, and defined the exact evidence dossier required before the final umbrella stage resumes. Story and sprint status remain `in-progress` pending that renewed evidence.
