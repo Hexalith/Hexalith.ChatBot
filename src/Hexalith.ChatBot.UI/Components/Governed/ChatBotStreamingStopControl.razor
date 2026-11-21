@@ -150,7 +150,24 @@
 
         if (!string.IsNullOrWhiteSpace(FocusReturnTargetId))
         {
-            await JSRuntime.InvokeVoidAsync("HexalithChatBot.focusElementById", FocusReturnTargetId).ConfigureAwait(true);
+            // Focus return is an enhancement: the announcement has already rendered, so a failed or interrupted
+            // interop call must not tear down the circuit from OnAfterRenderAsync.
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("HexalithChatBot.focusElementById", FocusReturnTargetId).ConfigureAwait(true);
+            }
+            catch (JSDisconnectedException)
+            {
+                // The circuit ended after the stop was verified; there is no composer left to focus.
+            }
+            catch (JSException)
+            {
+                // The focus script is unavailable; keyboard users keep the current focus position.
+            }
+            catch (TaskCanceledException)
+            {
+                // The interop call timed out or the circuit is shutting down.
+            }
         }
     }
 }
