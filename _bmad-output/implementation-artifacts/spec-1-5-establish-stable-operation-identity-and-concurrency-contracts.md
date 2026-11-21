@@ -1057,6 +1057,123 @@ Rejected:
 - **R20-E4 (`low`)** — Claim: R19-P2's note overstates its reach, because a filter keyed on token identity (`oce.CancellationToken != context.RequestAborted`) passes every row. True, but the harm needs a store that throws a cancellation carrying the request's own live token, and no `src` code compares cancellation tokens by identity (R19-B1). Pinning it would need a contrived row.
 - **R20-E5 (`false`)** — Claim: after R19-P3, a deadline filter `cancellationToken.CanBeCanceled && !cancellationToken.IsCancellationRequested` passes every row, so a host with a non-cancellable `RequestAborted` would fail untyped. No ASP.NET Core host that ChatBot runs on supplies a non-cancellable request token (Kestrel, and TestServer in tests). That is the premise R19-P3 was built on, and the mutant differs from production only on `CancellationToken.None`.
 
+### Review Findings — round 21 (2026-11-21, R20-patch and post-R20 File List review)
+
+Code review round 21 (bmad-code-review, full mode). The user confirmed the recommended scope; the push `8f846fd` during the round moved only 16 submodule pointers and did not change it. The diff combines two ranges:
+
+- the round-20 patch commit `7626f59`: `git diff --ignore-cr-at-eol da039da 7626f59 -- src tests`, covering `BoundaryAuditWriter.cs` and `ChatBotApplicationBoundaryResultHandlerTests.cs`, +16/−7;
+- the File List paths that the shared-CI migration commits `5c596c0`, `bf0f44f` and `e272732` changed after `7626f59`, with rename detection, 7 files, +52/−14. They comprise:
+  - the rename of `LiveContinuityAspireE2eTests.cs` to the `internal` class `LiveRecoverySweep.cs`, whose `[Fact]`, `[Trait]` and `[Collection]` moved to a 14-line wrapper in the new `Hexalith.ChatBot.Recovery.Tests` project;
+  - the wrapper, its collection and its csproj;
+  - the `InternalsVisibleTo` items;
+  - `LiveContinuityAspireE2eContractTests.cs`;
+  - the client-hash fixture.
+
+Together: 9 files, +68/−21, 248 diff lines. The 746-line `HexalithChatBotClient.g.cs` churn from `5c596c0` was excluded, because every changed line is an NSwag/NJsonSchema version stamp and the fixture hash `30d62d5b…` equals the file's SHA-256. Baseline `5bb56567499c6df1c621184d3c3d35aa45521166` and the frozen intent are unchanged. Loaded context: this spec, `epic-1-context.md` and `references/Hexalith.AI.Tools/hexalith-state-instructions.md`.
+
+All four independent layers completed, and none failed:
+
+| Layer | Findings |
+| --- | --- |
+| Blind Hunter | 10 (B1–B10) |
+| Edge Case Hunter | 6 (E1–E6) |
+| Verification Gap | 2 gaps (V1, V2) and 3 other findings (V3–V5) |
+| Acceptance Auditor | 4 (A1–A4); R20-P1 through R20-P3 confirmed as recorded |
+
+Parent triage of the 25 raw findings: **1 decision-needed, 1 patch, 4 defer, 13 rejected**. Only the patch concerns Story 1.5 code. The decision and the deferrals come from the shared-CI migration.
+
+Verified facts:
+
+- `bf0f44f` deleted the story-evidence producer, together with the `LiveRecoveryValidationArchitectureTests` guards (−558 lines):
+  - `tools/Hexalith.ChatBot.StoryEvidenceGate` and its tests;
+  - `story-evidence-policy.json`;
+  - the scripts `run-xunit-v4.sh`, `install-dapr-cli.sh`, `check-story-evidence-reserve.sh` and `build-release-configuration.sh`.
+
+  `.github/workflows/ci.yml` and `release.yml` still call these files, and both workflows failed on `50a7bbb`, `ddd385e`, `4aa212b` and `8f846fd`.
+- Several references still name the old class:
+  - `ci.yml:280` (`…E2eTests…`);
+  - `ci.yml:537` and `release.yml:188` (`…E2ETests…`, a casing that never matched the class);
+  - `docs/story-evidence-integrity.md:67` (the `recovery-primary` selector);
+  - `docs/adrs/live-recovery-validation-drivers.md:144`.
+- The replacement nightly hook (`.github/actions/nightly/action.yml`, `run-recovery.sh`) is not enabled. No `.github/hexalith-ci.json` exists, and `README.md` says to enable the hook only after the 330-minute job allowance is released. The central workflow `references/Hexalith.Builds/.github/workflows/release.yml:165-166` runs the hook with no artifact upload after it.
+- The Release configuration selects package mode (`eng/ChatBot.Composition.props:4-5`). `dotnet build src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj --configuration Release -m:1` at `8f846fd` succeeded with 0 warnings and 0 errors.
+- In `ReadDeniedCommandNameAsync`, `Task.WaitAsync` returns an already-faulted read task unchanged. So a body read that cancels the request and then throws reaches the transport catch (`ChatBotApplicationBoundaryResultHandler.cs:156-159`), not the deadline catch (`:152`).
+
+- [x] [Review][Defer] **R21-D1 (medium): the shared-CI migration retired Story 1.5's completion-evidence producer without retiring its consumers** [.github/workflows/ci.yml:144] — deferred: the shared-CI migration owns the producer; 1.5 stays blocked by A6/A13 regardless. Findings A2, B4 and V3.
+  - `bf0f44f` did three things:
+    - deleted the TE-2 producer (the gate tool, its policy and its runner scripts);
+    - moved the destructive sweep to `Hexalith.ChatBot.Recovery.Tests.LiveContinuityAspireE2eTests`;
+    - kept the consumers: the legacy `ci.yml` and `release.yml`, `docs/story-evidence-integrity.md:67` and the ADR at `:144` (see the verified facts).
+  - The legacy workflows still trigger on every push and are red.
+  - Story 1.5's fourth completion gate, "the completion evidence contract", has no runnable producer. Its `recovery-primary` lane is bound to a class that no longer exists, inside a job that can no longer run.
+  - Even with a producer, the live sweep cannot pass while A6/A13 are open (R17-W5).
+  - The TE-2 lifecycle covers every story that completes through the evidence gate, not only this one.
+  - **Resolution (2026-11-21):** the user chose option 1 (defer to the shared-CI migration and correct the File List). The rejected options were retiring the legacy workflows and the `recovery-primary` binding now, or retargeting only the selectors and docs. Measured before the choice:
+    - every job in both legacy workflows calls a script that `bf0f44f` deleted, and on `8f846fd` every required job fails at its first build step, so retargeting selectors changes nothing;
+    - no test guards the workflow text any more;
+    - Story 1.5 has no evidence contract yet, and with the gate tool and policy deleted none can be attested or validated;
+    - CiCd owns the generated callers (`references/Hexalith.Builds/docs/module-adoption-execution.md`), so hand-written workflow changes would be overwritten.
+  - The File List now names `LiveRecoverySweep.cs` and the `Hexalith.ChatBot.Recovery.Tests` wrapper instead of the deleted path.
+  - **Closure:** the shared CI supplies a completion-evidence producer, or a correct-course proposal formally retires the TE-2 gate and states how stories reach `done` without it. Until then, the fourth completion gate cannot be met.
+- [x] [Review][Patch] **R21-P1 (low): no row reaches the abort guard in the body-read transport catch** [tests/Hexalith.ChatBot.Server.Tests/Authentication/ChatBotApplicationBoundaryResultHandlerTests.cs:108]. Findings A4, B1, E4 and V1.
+  - `ChatBotApplicationBoundaryResultHandler.cs:158` guards the usual Kestrel disconnect case: an `IOException` or `BadHttpRequestException` thrown while `RequestAborted` is cancelled. No row reaches it:
+    - the transport, framing and invalid-data rows run on a live token;
+    - `RequestAbortedDuringMetadataReadMustPropagateWithoutAudit` leaves through the deadline catch;
+    - the pre-cancelled row throws at `:125`;
+    - the audit-write abort rows exit at `:91`/`:98`.
+  - Deleting `:158` passes all 24 rows. With the production writer, which ignores the token, the regressed handler records a denial fact for the aborted request, feeds the NFR43 counter and writes a 401 to the aborted response. That breaks the R16-P1 rule that an abort propagates without audit or response.
+  - R20-B3's rejection called this row cheap once R20-P1 landed, and R20-P1 has now landed.
+  - **Fix:** add a theory beside `RequestAbortedDuringMetadataReadMustPropagateWithoutAudit` whose body stream cancels `RequestAborted` and then returns the faulted read, once for each of the transport, framing and invalid-data kinds. Assert `OperationCanceledException`, no fact, an empty response body and an empty counter. Test-only.
+- [x] [Review][Defer] **R21-W1 (medium): no lane runs the moved destructive recovery sweep** [tests/Hexalith.ChatBot.Recovery.Tests/LiveContinuityAspireE2eTests.cs:13] — deferred: the replacement nightly hook is deliberately disabled until the shared 330-minute job allowance is released (`README.md`). Finding V2. The only scheduled selectors name a test that no longer exists, so the weekly live recovery check runs nowhere. For Story 1.5, its mailbox admission probe was already unpassable while A6/A13 are open (R17-W5). **Closure:** enable `nightly` in `hexalith-ci.json`, and retire the legacy selectors at the same time.
+- [x] [Review][Defer] **R21-W2 (medium, latent): the replacement nightly hook never uploads the evidence artifact the manifests name** [tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveRecoverySweep.cs:743] — deferred: outside Story 1.5 (shared-CI migration files), and latent until the hook is enabled. Finding B6.
+  - `EvidenceArtifactLocator()` stamps `artifact:live-recovery-validation-evidence` into every manifest unless `HEXALITH_CHATBOT_RECOVERY_EVIDENCE_ARTIFACT` is set.
+  - `action.yml` sets no locator, and nothing uploads `TestResults/live-recovery/<runId>` or the retention-failure markers under `$RUNNER_TEMP`.
+  - The locator's own summary records this exact defect as a past fix.
+  - **Closure:** when the hook is enabled, upload both directories under the locator's name, or set the variable to the uploaded name, and pin the binding with a guard.
+- [x] [Review][Defer] **R21-W3 (low): the recovery in-process deadline lives only in the action's environment** [.github/actions/nightly/run-recovery.sh:18] — deferred: outside Story 1.5, and the action is the hook's only caller and is not enabled. Finding B5.
+  - The script's comment relies on "the 250-minute in-process deadline", but only `action.yml:17` sets `HEXALITH_CHATBOT_RECOVERY_WORKFLOW_TIMEOUT_MINUTES` to 250.
+  - Without that variable, `RecoveryWorkflowTimeout` defaults to 300 minutes (`LiveRecoverySweep.cs:796`). That is later than the 280-minute SIGINT and equal to the 300-minute TERM bound.
+  - The guards that pinned the order "in-process deadline before SIGINT before the step limit" were deleted in `bf0f44f`.
+  - **Closure:** export the default in the script, or guard both files, when the hook is enabled.
+- [x] [Review][Defer] **R21-W4 (low): the shared CI would classify `Hexalith.ChatBot.Recovery.Tests` and `Hexalith.ChatBot.Release.Tests` as unit projects** [tests/Hexalith.ChatBot.Recovery.Tests/Hexalith.ChatBot.Recovery.Tests.csproj:12] — deferred: `.github/hexalith-ci.json` does not exist yet. Findings E3 and V4.
+  - `classify_projects` (`references/Hexalith.Builds/Github/lib/ci_pipeline.py:315-323`) sends any project to the unit stage whose name contains neither `E2E` nor an integration suffix. That stage runs before `after-unit-tests` exports the Tier-3 flags.
+  - With `failSkips: true` (`tests/required-live.xunit.runner.json`), the sweep's Tier-3 skip fails the stage (`FAIL_SKIP`, reproduced by two layers). A solution-wide `dotnet test` fails the same way.
+  - **Closure:** list both projects under `tests.exclude` when the file is written.
+
+Story 1.5 stays spec `in-review` / sprint `review`, not the generic workflow's `in-progress` or `done`. The completion gates restated in round 18 are unchanged, and R21-D1 concerns the fourth of them. R21-D1 is deferred, so that gate has no producer until the shared-CI migration supplies one or the TE-2 gate is retired.
+
+On 2026-11-21 the user chose option 1 for R21-D1 (defer, with the File List correction) and option 2, "Leave as action items", for the patch. R21-P1 stays unchecked above; no test file was edited. Code-review actions: **1 decision resolved (deferred), 1 patch left as an action item, 5 deferred (R21-D1, R21-W1 through R21-W4), 13 rejected**. Completion remains gated by:
+
+- the explicit owner/workflow deferrals;
+- the unapplied R21-P1 test item;
+- A6/A13 owner/protection evidence;
+- retry-profile approval;
+- the completion evidence contract, which has no producer until R21-D1 closes.
+
+Rejected:
+
+- **R21-A1 (`low`)** — Claim: the File List and the R17-W5/R17-W1 records still name the pre-rename `LiveContinuityAspireE2eTests.cs`, so a future File-List-scoped review would miss `LiveRecoverySweep.cs`. True, but the fix edits this spec. The File List itself was corrected under R21-D1's resolution; the R17 records stay historical.
+- **R21-A3 / R21-B8 (`low`)** — Claim: the hash fixture was refreshed in `bf0f44f`, four commits after the client was regenerated in `5c596c0`. True, but historical. `GeneratedOutputHashShouldMatchCheckedInFreshnessFixture` caught the window, and `HEAD` is consistent.
+- **R21-B2 / R21-E5 (`false`)** — Claim: an abort during an audit write that succeeds feeds the counter and writes a 401, which breaks the abort contract. The abort rule covers whatever the store raised (`ChatBotApplicationBoundaryResultHandler.cs:91-98`). A completed write is a recorded denial, the counter is fed "from the same path as the denial fact", and the gateway pipeline behaves the same way. Kestrel discards writes to an aborted response.
+- **R21-B3 (`false`)** — Claim: the new `RequestAborted` assertions can never fail. They fail when a row stops binding a cancellable token, because `DefaultHttpContext.RequestAborted` defaults to `CancellationToken.None`. That is the regression R20-P2 closed.
+- **R21-B7 / R21-E2 (`low`)** — Claim: the recovery collection no longer serializes the sweep against other live topologies in other assemblies. True only for a Tier-3 solution-wide parallel run, which `README.md` rules out ("Run each project individually"). The nightly hook runs the release project and then the recovery project in sequence. The fix would need a cross-process lock.
+- **R21-B9 (`false`)** — Claim: the diff mixes migration hunks into the round without their companion files. This is not a code defect. Triage read the companion files (both legacy workflows, the nightly action and script, `README.md` and the Builds workflows), and they produced R21-D1 and R21-W1 through R21-W4.
+- **R21-B10 (`low`)** — Claim: `LiveContinuityAspireE2eContractTests` now tests `LiveRecoverySweep`, and the wrapper constructs an instance only to call `RunAsync`. This is cosmetic, and a rename would ripple through the selectors, the ADR and the File List.
+- **R21-E1 (`false`)** — Claim: the stale `ci.yml:280` filter matches zero tests and exits 0, so the recovery gate passes without running. The job fails before that step, at the deleted `install-dapr-cli.sh` (`ci.yml:237`) and `check-story-evidence-reserve.sh` (`:244`). Its runner, `run-xunit-v4.sh`, is deleted too. The stale selector belongs to R21-D1.
+- **R21-E6 (`low`)** — Claim: the `_ =>` default arm would silently rerun the backend row for a misspelled `InlineData`. The sibling theory uses the same pattern (`:74`), such a typo is unlikely, and the fix adds an arm.
+- **R21-V5 (`false`)** — Claim: a Release package-mode build fails on `BL0016` in `ChatBotStreamingStopControl.razor`. The Release build of the UI project, which runs in package mode, succeeded at `8f846fd` with 0 warnings and 0 errors.
+
+### R21-P1 build follow-up (2026-11-21)
+
+The Story 1.5 build resumed the round-21 action item. `ChatBotApplicationBoundaryResultHandlerTests` now cancels `RequestAborted` during a metadata read and returns a faulted task for each of `IOException`, `BadHttpRequestException`, and `InvalidDataException`. Each row checks that the request's cancellation token propagates and the denial records no audit fact, response body, or counter entry.
+
+- The temporary focused harness linked the exact test fixture and used the source-mapped Debug Server assembly. All 27 boundary tests passed. Removing only the transport catch's abort guard in a temporary copy of the handler failed exactly the three new rows. The other 24 passed. See `TestResults/story-1-5-r21-p1/boundary.trx` and `guardless-boundary.trx`.
+- The source-mapped Debug solution build (`python3 .github/scripts/with-source-mapping.py dotnet build Hexalith.ChatBot.slnx --configuration Debug -p:UseHexalithProjectReferences=true -m:1 /nr:false`) exited 1. The log records BL0016 in `ChatBotStreamingStopControl.razor`, a missing Blazor Hot Reload asset endpoint in RecoverySandbox, missing SignalR client types, and Projects adapter test override nullability errors. The built Contracts (531), Client (141), CLI (61), and Conformance (151) lanes all passed with zero skips using the direct xUnit runner and TRX output. Logs and TRX files are under `TestResults/story-1-5-r21-p1/`.
+- The package-mode Release solution build (`dotnet build Hexalith.ChatBot.slnx --configuration Release -p:UseHexalithProjectReferences=false -m:1 /nr:false`) also exited 1 on BL0016. The UI build error blocked Architecture in both configurations.
+- The Release build produced the Server test runner. `tests/Hexalith.ChatBot.Server.Tests/bin/Release/net11.0/Hexalith.ChatBot.Server.Tests -noAutoReporters -noColor -failSkips -result-trx TestResults/story-1-5-r21-p1/server-release.trx` exited 1 with 3,629 passed, 3 failed, and zero skips. All 27 boundary cases passed again. The failures are the same-tenant join, cross-tenant join, and AI-progress subscriber cases in `ChatBotProjectConversationHubE2ETests`. Each received a hub authorization denial. The full build and Server results remain failing evidence.
+
+Story 1.5 remains spec `in-review` and sprint `review`. The owner/workflow deferrals, A6/A13 evidence, retry-profile approval, and the completion evidence producer remain open.
+
 ## Design Notes
 
 GetWorkflowOperationStatus uses the existing typed GetOperationStatus boundary. RetryCommandExecution is distinct from legacy RequestFailedWorkflowRetry; this story supplies its prerequisites. No migrations, deployments or external effects. Preserve historical OperationId values exactly.
@@ -1603,8 +1720,9 @@ Story 1.5 is spec `in-review` / sprint `review` following the completed review. 
 - `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/OpenApiContractSpineTests.cs`
 - `tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eContractTests.cs`
-- `tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs`
+- `tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveRecoverySweep.cs`
 - `tests/Hexalith.ChatBot.Mcp.Tests/ChatBotMcpServiceTests.cs`
+- `tests/Hexalith.ChatBot.Recovery.Tests/LiveContinuityAspireE2eTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.AuthorityExpiry.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.DispatchFencing.cs`

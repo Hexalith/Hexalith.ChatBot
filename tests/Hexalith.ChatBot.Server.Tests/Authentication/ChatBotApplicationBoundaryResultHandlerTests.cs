@@ -67,12 +67,7 @@ public sealed class ChatBotApplicationBoundaryResultHandlerTests
         using ServiceProvider services = Services(audit);
         DefaultHttpContext context = Context(services);
         context.RequestAborted = live.Token;
-        Exception failure = failureKind switch
-        {
-            "framing" => new BadHttpRequestException("restricted-body-framing", StatusCodes.Status400BadRequest),
-            "invalid-data" => new InvalidDataException("restricted-body-data"),
-            _ => new IOException("restricted-body-transport"),
-        };
+        Exception failure = BodyReadFailure(failureKind);
         using BoundaryRequestBodyStream body = new(_ => Task.FromException<int>(failure));
         context.Request.Body = body;
 
@@ -130,6 +125,35 @@ public sealed class ChatBotApplicationBoundaryResultHandlerTests
         {
             pending.TrySetResult(0);
         }
+    }
+
+    [Theory]
+    [InlineData("transport")]
+    [InlineData("framing")]
+    [InlineData("invalid-data")]
+    public async Task RequestAbortedDuringFailedMetadataReadMustPropagateWithoutAuditResponseOrCounter(string failureKind)
+    {
+        using CancellationTokenSource aborted = new();
+        BoundaryAuditWriter audit = new();
+        BoundaryAuthorizationFailureCounter failureCounter = new();
+        using ServiceProvider services = Services(audit, failureCounter);
+        DefaultHttpContext context = Context(services);
+        context.RequestAborted = aborted.Token;
+        Exception failure = BodyReadFailure(failureKind);
+        using BoundaryRequestBodyStream body = new(_ =>
+        {
+            aborted.Cancel();
+            return Task.FromException<int>(failure);
+        });
+        context.Request.Body = body;
+
+        OperationCanceledException exception = await Should.ThrowAsync<OperationCanceledException>(() => DenyAsync(context)
+            .WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken));
+
+        exception.CancellationToken.ShouldBe(aborted.Token);
+        audit.Facts.ShouldBeEmpty();
+        context.Response.Body.Length.ShouldBe(0);
+        failureCounter.Tenants.ShouldBeEmpty();
     }
 
     [Theory]
@@ -271,6 +295,15 @@ public sealed class ChatBotApplicationBoundaryResultHandlerTests
         context.Response.StatusCode.ShouldBe(StatusCodes.Status401Unauthorized);
         audit.Facts.ShouldBeEmpty();
     }
+
+    private static Exception BodyReadFailure(string failureKind)
+        => failureKind switch
+        {
+            "transport" => new IOException("restricted-body-transport"),
+            "framing" => new BadHttpRequestException("restricted-body-framing", StatusCodes.Status400BadRequest),
+            "invalid-data" => new InvalidDataException("restricted-body-data"),
+            _ => throw new ArgumentOutOfRangeException(nameof(failureKind), failureKind, "Unknown body read failure."),
+        };
 
     private static ServiceProvider Services(
         BoundaryAuditWriter? audit,
