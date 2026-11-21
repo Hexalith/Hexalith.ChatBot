@@ -2303,3 +2303,9 @@ Final native follow-up qualification (2026-10-26): independent review correction
   summary: Recovery mailbox token identity parsing has no bounded JWT error path.
   evidence: `RecoveryMailboxOwnerProvisioner.AssertMailboxTokenIdentity` parses the bearer payload with `Convert.FromBase64String` and `JsonDocument.Parse` and reads required claims with `GetProperty` and no catch. A non-Base64 or non-JSON payload fails as `FormatException`, `JsonException`, or `KeyNotFoundException` instead of the mailbox-token error used for a non-JWT shape. This is later live-harness code, not the five-boundary production change.
 
+## Retired: spec-chatbot-ci-cd-alignment (2026-11-21)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-chatbot-ci-cd-alignment.md` (deleted; git history keeps the text)
+  summary: The 2026-09-18 draft CI/CD alignment spec is retired as superseded by `sprint-change-proposal-2026-11-21.md` option C1 and Hexalith.CiCd story 19 (`spec-19-migrate-chatbot.md` in the CiCd repository).
+  evidence: Its frozen intent edits CiCd-owned `.github/workflows/**` and `.github/dependabot.yml`, adds workflow-YAML architecture tests, keeps story-evidence gates in module CI, and adds a module-owned manual release, all of which the current CI/CD ownership policy forbids.
+
