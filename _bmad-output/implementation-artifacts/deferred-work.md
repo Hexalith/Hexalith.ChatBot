@@ -2234,3 +2234,31 @@ Final native follow-up qualification (2026-10-26): independent review correction
   evidence: `bf0f44f` deleted `tools/Hexalith.ChatBot.StoryEvidenceGate`, `story-evidence-policy.json` and the runner scripts, and moved the sweep to `Hexalith.ChatBot.Recovery.Tests.LiveContinuityAspireE2eTests`. Every job in the legacy `.github/workflows/ci.yml` and `release.yml` still calls a deleted script; on `8f846fd` every required job fails at its first build step. `docs/story-evidence-integrity.md:67` and `docs/adrs/live-recovery-validation-drivers.md:144` still bind `recovery-primary` to the old IntegrationTests class. Story 1.5 has no evidence contract yet, and none can be attested or validated.
   reason: The shared-CI migration owns the producer; 1.5 stays blocked by A6/A13 regardless.
   closure: The shared CI supplies a completion-evidence producer, or a correct-course proposal formally retires the TE-2 gate and states how stories reach `done` without it. Retire the legacy workflows and the stale doc bindings in the same change.
+
+## Deferred from: code review of spec-1-5-establish-stable-operation-identity-and-concurrency-contracts (2026-11-21, round 22)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: R22-W1 — BL0016 breaks every Release and source-mapped Debug solution build (high).
+  evidence: `src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStreamingStopControl.razor:153` calls `JSRuntime.InvokeVoidAsync("HexalithChatBot.focusElementById", …)` outside a try/catch. `dotnet build src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj --configuration Release -m:1` exits 1 at `437f0fb` with `error BL0016` (also in `TestResults/story-1-5-r21-p1/release-build.log` and `solution-build.log`). The file is unchanged since `e209f2f`. Both the legacy `ci.yml:117` and the shared `references/Hexalith.Builds/Github/lib/ci_pipeline.py:335` build the whole solution, so the UI, UI.Tests, Architecture and every CI test lane are blocked. Round 21 rejected this as R21-V5 on a result that was not a fresh compile.
+  reason: Pre-existing and outside Story 1.5; the streaming stop control belongs to stories 1.16 and 10.6b.
+  closure: Guard the call as the analyzer requires, then rerun the Release UI build without incremental reuse.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: R22-W2 — No automated lane runs the Server.Tests rows, including R21-P1's abort-guard theory (medium).
+  evidence: The legacy build job fails on BL0016 (R22-W1) and then calls the deleted `.github/scripts/run-merge-test-lanes.sh` (`ci.yml:119`). `release.yml` has no Server.Tests lane, and no `.github/hexalith-ci.json` adopts the shared pipeline. `ChatBotApplicationBoundaryResultHandlerTests.cs:134` and every other Server.Tests row are protected only by local runs.
+  reason: Amends R21-D1; the lane outage belongs to the shared-CI migration and to R22-W1.
+  closure: A solution-building CI lane runs `tests/Hexalith.ChatBot.Server.Tests` on push.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: R22-W3 — Three hub cases fail in the Release Server lane and reopen R15-P2's hub-authentication closure (medium).
+  evidence: `tests/Hexalith.ChatBot.Server.Tests/bin/Release/net11.0/Hexalith.ChatBot.Server.Tests` at `437f0fb`: 3,629 passed and 3 failed (`TestResults/story-1-5-r21-p1/server-release.trx`). `ChatBotProjectConversationHubE2ETests` same-tenant join (`:133`), cross-tenant join (`:84`) and AI-progress subscriber (`:40`) each fail with `HubException: Failed to invoke 'JoinTenant' because user is unauthorized`. R15-P2 closed the hub-authentication blocker at 3643/3643 in Debug source mode, and the hub and its tests are unchanged since `e48e87e`.
+  reason: Pre-existing, because the round-22 diff does not touch the hub, and the hub belongs to story 10.6b. The cause (package-mode or dependency drift) was not reproduced.
+  closure: Find the drift, restore the three cases, and record a green Release Server lane.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: R22-W4 — The source-mapped Debug build cannot compile Server.Tests or RecoverySandbox (medium).
+  evidence: `python3 .github/scripts/with-source-mapping.py dotnet build Hexalith.ChatBot.slnx --configuration Debug -p:UseHexalithProjectReferences=true -m:1` at `437f0fb` (`TestResults/story-1-5-r21-p1/solution-build.log`) fails `Hexalith.ChatBot.Server.Tests` with CS0234/CS0246 at `Projections/ChatBotProjectConversationHubE2ETests.cs:14`, `:17` and `:219`, because the SignalR client types are missing in source mode, and with CS8765 at `Adapters/Projects/ProjectsMemoriesCaseResolverTests.cs:114` and `ProjectsProjectDirectoryTests.cs:244`. `Hexalith.ChatBot.RecoverySandbox` fails the static-web-assets check ("scoped css bundles do not have matching endpoints").
+  reason: Pre-existing and outside the round-22 diff, which R21-P1 verified through an out-of-tree harness.
+  closure: Reference the SignalR client in source mode, align the Projects test overrides with the regenerated client, fix the sandbox endpoint mapping, and rerun the Debug Server lane from the solution build.
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
+  summary: R22-W5 — An open ledger entry still closes against a deleted guard (low).
+  evidence: The spec-1-6 entry "Reconcile the release job timeout with its existing Architecture guard" (this file, around line 1725) cites `LiveRecoveryValidationArchitectureTests.cs:633`. `bf0f44f` cut that file to 266 lines and deleted the guard.
+  reason: Amends R21-D1's closure; the entry belongs to spec-1-6.
+  closure: When R21-D1 closes, retire or re-scope the ledger entries bound to the deleted guards and the legacy workflows.

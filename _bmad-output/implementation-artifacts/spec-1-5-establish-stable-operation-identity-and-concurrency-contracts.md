@@ -1174,6 +1174,70 @@ The Story 1.5 build resumed the round-21 action item. `ChatBotApplicationBoundar
 
 Story 1.5 remains spec `in-review` and sprint `review`. The owner/workflow deferrals, A6/A13 evidence, retry-profile approval, and the completion evidence producer remain open.
 
+### Review Findings — round 22 (2026-11-21, R21-P1 patch and records review)
+
+Code review round 22 (bmad-code-review, full mode). The user chose the whole-commit scope `git diff --ignore-cr-at-eol 8f846fd 437f0fb`: the R21-P1 test patch in `ChatBotApplicationBoundaryResultHandlerTests.cs` (+39/−6) and the round-21 records in this spec and `deferred-work.md`. Together: 3 files, +186/−7, 245 diff lines. Baseline `5bb56567499c6df1c621184d3c3d35aa45521166` and the frozen intent are unchanged. Loaded context: this spec, `epic-1-context.md` and `references/Hexalith.AI.Tools/hexalith-state-instructions.md`.
+
+All four independent layers completed, and none failed:
+
+| Layer | Findings |
+| --- | --- |
+| Blind Hunter | 11 (B1–B11) |
+| Edge Case Hunter | 7 (E1–E7) |
+| Verification Gap | 1 gap (V1) and 1 other finding (V2) |
+| Acceptance Auditor | 6 (A1–A6); no acceptance criterion broken |
+
+Parent triage of the 26 raw findings: **0 decision-needed, 0 patch, 5 defer, 17 rejected**. The R21-P1 patch itself drew no surviving finding. All five deferrals are pre-existing failures that the R21-P1 build follow-up observed outside this diff.
+
+Verified facts:
+
+- `437f0fb` applies R21-P1 as prescribed and closes it. The new theory reaches `ChatBotApplicationBoundaryResultHandler.cs:158`: the body double cancels `RequestAborted` and then returns a faulted read, `Task.WaitAsync` returns the completed task unchanged, and the transport catch rethrows on the request's token. Deleting `:158` fails exactly the three new rows (`TestResults/story-1-5-r21-p1/guardless-boundary.trx`: 24 passed, 3 failed). The `BodyReadFailure` helper also gives the sibling theory a throwing default arm, which addresses R21-E6. This record supersedes the round-21 closing paragraph's "R21-P1 stays unchecked" sentence and its "unapplied R21-P1 test item" gate.
+- R21-V5 was a real failure, not `false`. The UI project's package-mode Release build exits 1 at `437f0fb` with `ChatBotStreamingStopControl.razor(153,19): error BL0016`; a review layer reproduced it with round 21's exact command. The file is unchanged since `e209f2f` (2026-08-27), and `437f0fb` changes no `src` file, so round 21's "0 warnings and 0 errors" result was not a fresh compile. R22-W1 replaces the R21-V5 rejection.
+- The Release Server lane total (3,632) is consistent with the earlier Debug totals. Package mode removes `Adapters/Folders/FoldersNativeAttachmentTests.cs` (`Hexalith.ChatBot.Server.Tests.csproj:7-9`; 21 cases: 9 facts and 12 theory rows), and 3,649 + 1 (R20-P3) + 3 (R21-P1) − 21 = 3,632. No test was lost.
+- `ChatBotProjectConversationHubE2ETests.cs` and the hub source are unchanged since `e48e87e`.
+
+- [x] [Review][Defer] **R22-W1 (high): BL0016 breaks every Release and source-mapped Debug solution build** [src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStreamingStopControl.razor:153] — deferred: pre-existing and outside Story 1.5; the streaming stop control belongs to stories 1.16 and 10.6b. Findings V2, B2, A1 and E6.
+  - The unguarded `JSRuntime.InvokeVoidAsync("HexalithChatBot.focusElementById", …)` fails the UI project, so the UI, UI.Tests and Architecture lanes cannot build in either configuration.
+  - Both the legacy `ci.yml:117` and the shared `references/Hexalith.Builds/Github/lib/ci_pipeline.py:335` build the whole solution, so this error alone blocks every CI test lane, whatever happens to R21-D1.
+  - **Closure:** guard the call as the analyzer requires, then rerun the Release UI build without incremental reuse.
+- [x] [Review][Defer] **R22-W2 (medium): no automated lane runs the Server.Tests rows, including R21-P1's** [tests/Hexalith.ChatBot.Server.Tests/Authentication/ChatBotApplicationBoundaryResultHandlerTests.cs:134] — deferred: amends R21-D1; the lane outage belongs to the shared-CI migration and to R22-W1. Finding V1.
+  - The legacy build job fails on BL0016 and then calls the deleted `.github/scripts/run-merge-test-lanes.sh` (`ci.yml:119`). `release.yml` has no Server.Tests lane, and no `.github/hexalith-ci.json` adopts the shared pipeline.
+  - R21-P1's guard, like every other Server.Tests row, is protected only by local runs.
+  - **Closure:** a solution-building CI lane runs `tests/Hexalith.ChatBot.Server.Tests` on push.
+- [x] [Review][Defer] **R22-W3 (medium): three hub cases fail in the Release Server lane and reopen R15-P2's hub-authentication closure** [tests/Hexalith.ChatBot.Server.Tests/Projections/ChatBotProjectConversationHubE2ETests.cs:133] — deferred: pre-existing, because the diff does not touch the hub or its tests, and the hub belongs to story 10.6b. Findings A2 and B4.
+  - The same-tenant join (`:133`), cross-tenant join (`:84`) and AI-progress subscriber (`:40`) cases each fail with `HubException: Failed to invoke 'JoinTenant' because user is unauthorized` (`TestResults/story-1-5-r21-p1/server-release.log`).
+  - R15-P2 closed the "two hub authentication cases" blocker at 3643/3643 in Debug source mode. The source is unchanged since `e48e87e`, so the cause is package-mode or dependency drift. Not reproduced in this round.
+  - The follow-up recorded these failures, and the build errors in R22-W1 and R22-W4, without a ledger entry or owner. B4's tracking gap closes with these deferrals.
+  - **Closure:** find the drift, restore the three cases, and record a green Release Server lane.
+- [x] [Review][Defer] **R22-W4 (medium): the source-mapped Debug build cannot compile Server.Tests or RecoverySandbox** [tests/Hexalith.ChatBot.Server.Tests/Projections/ChatBotProjectConversationHubE2ETests.cs:14] — deferred: pre-existing and outside the diff. Finding B3.
+  - Server.Tests, the project that holds R21-P1, fails with CS0234/CS0246, because the SignalR client namespaces and `HubConnection` are missing in source mode, and with CS8765 for override nullability in `ProjectsMemoriesCaseResolverTests.cs:114` and `ProjectsProjectDirectoryTests.cs:244`. R21-P1's Debug evidence therefore came from an out-of-tree harness.
+  - RecoverySandbox fails the static-web-assets check ("scoped css bundles do not have matching endpoints").
+  - **Closure:** reference the SignalR client in source mode, align the Projects test overrides with the regenerated client, fix the sandbox endpoint mapping, and rerun the Debug Server lane from the solution build.
+- [x] [Review][Defer] **R22-W5 (low): an open ledger entry still closes against a deleted guard** [_bmad-output/implementation-artifacts/deferred-work.md:1725] — deferred: amends R21-D1's closure; the entry belongs to spec-1-6. Finding B10. The spec-1-6 entry "Reconcile the release job timeout with its existing Architecture guard" cites `LiveRecoveryValidationArchitectureTests.cs:633`, but `bf0f44f` cut that file to 266 lines and deleted the guard. **Closure:** when R21-D1 closes, retire or re-scope the ledger entries bound to the deleted guards and the legacy workflows.
+
+Rejected:
+
+- **R22-B1 / R22-A3 / R22-E5 (`low`)** — Claim: the round-21 closing paragraph still says R21-P1 is unchecked and lists it as a gate, and the patch row has no "Applied" sub-bullet. True, but the fix edits this spec. This round's verified facts supersede that paragraph.
+- **R22-B6 / R22-A5 / R22-E3 (`low`)** — Claim: the File List correction omits `Hexalith.ChatBot.Recovery.Tests.csproj`, `LiveRecoveryValidationCollection.cs`, the IntegrationTests `InternalsVisibleTo` items and `BoundaryRequestBodyStream.cs`. True, but the fix edits this spec.
+- **R22-B9 / R22-A6 (`low`)** — Claim: the follow-up applied R21-E6's rejected fix without saying so. True and harmless. This round's verified facts record it, and any further fix would edit this spec.
+- **R22-E4 (`low`)** — Claim: R21-E6 cites deleted code, and the audit-backend theory keeps a silent `_ =>` arm. The record part would edit this spec. The code part repeats R21-E6: a misspelled `InlineData` is unlikely, and the fix adds an arm.
+- **R22-B5 (`false`)** — Claim: the pending-read abort path propagates the linked deadline token and asserts only "no fact", so the abort rule is pinned on one path only. The token is the linked one, but nothing reads it: ChatBot.Server has no exception handler, and ASP.NET Core classifies an aborted request by `RequestAborted`, not by the exception's token. The 401 and the counter feed both come after the audit write (`ChatBotApplicationBoundaryResultHandler.cs:80-116`), so "no fact" already rules them out on that path.
+- **R22-B7 (`false`)** — Claim: R21-W1's closure does not list R21-W2 through R21-W4 as prerequisites, so closing it first would break things. R21-W2 and R21-W3 close "when the hook is enabled" and R21-W4 "when the file is written". That is exactly R21-W1's closure event, so each dependent entry already states the order.
+- **R22-B8 (`false`)** — Claim: the legacy sweep lane was always empty, and the closure needs an executed-count floor. Round 21 records that `ci.yml:280` used the matching `E2eTests` casing; only the scheduled selectors did not. The xUnit v3 runner exits 1 when a filter matches no test, so an empty run cannot pass silently.
+- **R22-B11 (`false`)** — Claim: the mutation evidence is not durable or reproducible. Repository policy keeps bulk diagnostic evidence out of commits, and the mutant is fully specified: delete only `:158`. The harness linked the `Hexalith.ChatBot.Server.dll` that the Debug solution build produced successfully. That build failed only in other projects.
+- **R22-A4 (`low`)** — Claim: the follow-up skipped the Mcp, UI.Tests, IntegrationTests and Recovery.Tests lanes. The diff changes one Server.Tests file and no other assembly, and R22-W1 blocks the UI lanes. Records-only.
+- **R22-E1 (`false`)** — Claim: if Kestrel faults the read before it cancels `RequestAborted`, the aborted request records a fact and writes a 401, and no test covers it. At the catch, that state is a live token, which the live-token transport theory already pins (one safe fact and a typed 401). A fact for a request that was really denied is true, and Kestrel discards writes to an aborted response (R21-B2).
+- **R22-E2 (`false`)** — Claim: the new rows do not assert the status code. The handler sets a status only through a problem result's `ExecuteAsync`, which writes the JSON body in the same call (`:99-102`, `:113-116`), so the body-length assertion catches it.
+- **R22-E7 (`low`)** — Claim: `437f0fb` uses the `fix` type for a change to tests and records only. True, but the commit is already on `origin/main`, and rewriting shared history is not allowed.
+
+Code-review actions: **0 decision-needed, 0 patch, 5 deferred (R22-W1 through R22-W5), 17 rejected**. Story 1.5 stays spec `in-review` / sprint `review`, not the generic workflow's `in-progress` or `done`. Completion remains gated by:
+
+- the explicit owner/workflow deferrals;
+- A6/A13 owner/protection evidence;
+- retry-profile approval;
+- the completion evidence contract, which has no producer until R21-D1 closes;
+- green Release and Debug builds and a green Server lane (R22-W1, R22-W3 and R22-W4).
+
 ## Design Notes
 
 GetWorkflowOperationStatus uses the existing typed GetOperationStatus boundary. RetryCommandExecution is distinct from legacy RequestFailedWorkflowRetry; this story supplies its prerequisites. No migrations, deployments or external effects. Preserve historical OperationId values exactly.
