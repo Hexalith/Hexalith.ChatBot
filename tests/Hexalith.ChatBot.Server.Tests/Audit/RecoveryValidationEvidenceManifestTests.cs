@@ -32,6 +32,41 @@ public sealed class RecoveryValidationEvidenceManifestTests
         manifest.ValidateProjectionEvidence().ShouldContain("projection_unmeasurable_evidence_not_empty");
     }
 
+    [Fact]
+    public void UnmeasurableFactoryMapsToEmptyProjectionEvidenceTheSinkCanRetain()
+    {
+        DateTimeOffset ended = Started + TimeSpan.FromMinutes(5);
+        ProjectionRebuildReport report = ProjectionRebuildReport.Unmeasurable(
+            "replay-test:projection-rebuild",
+            "baseline-dataset-1",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            Started,
+            ended,
+            "chatbot.governed-operation-view.v1");
+
+        RecoveryValidationEvidenceManifest manifest = ProjectionManifest() with
+        {
+            Verdict = report.Verdict,
+            ReasonCode = report.ReasonCode,
+            DatasetVolume = report.ResourcesCompared,
+            Coverage = new Dictionary<string, int> { ["scenario"] = report.ResourcesCompared },
+            ProjectionPreRebuildSchemaVersion = report.PreRebuildSchemaVersion,
+            ProjectionRebuiltSchemaVersion = report.RebuiltSchemaVersion,
+            ProjectionPreRebuildDigests = report.PreRebuildDigests,
+            ProjectionRebuiltDigests = report.RebuiltDigests,
+            ProjectionSourceResourceCount = report.SourceResourcesCompared,
+            ProjectionGovernedResourceCount = report.GovernedResourcesCompared,
+            ProjectionWormRecordCount = report.WormRecordsReplayed,
+            ProjectionWormOperationCount = report.WormOperationsReplayed,
+            ProjectionFingerprintAlgorithmVersion = report.FingerprintAlgorithmVersion,
+            ProjectionPreRebuildFingerprint = report.PreRebuildFingerprint,
+            ProjectionRebuiltFingerprint = report.RebuiltFingerprint,
+        };
+
+        manifest.ValidateProjectionEvidence().ShouldBeEmpty();
+        manifest.Validate().ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("artifact:tokenization/reports.trx")]
     [InlineData("artifact:secretariat/reports.trx")]
@@ -169,6 +204,19 @@ public sealed class RecoveryValidationEvidenceManifestTests
             .ValidateProjectionEvidence().ShouldContain("projection_fingerprint_mismatch");
         (ProjectionManifest() with { ProjectionGovernedResourceCount = 2 })
             .ValidateProjectionEvidence().ShouldContain("projection_resource_count_mismatch");
+        IReadOnlyList<ProjectionResourceDigest> misSplit =
+        [
+            new("governed-resource-1", new string('a', 64)),
+            new("governed-resource-2", new string('b', 64)),
+        ];
+        string misSplitFingerprint = ProjectionSnapshotFingerprint.Compute(misSplit);
+        (ProjectionManifest() with
+        {
+            ProjectionPreRebuildDigests = misSplit,
+            ProjectionRebuiltDigests = misSplit,
+            ProjectionPreRebuildFingerprint = misSplitFingerprint,
+            ProjectionRebuiltFingerprint = misSplitFingerprint,
+        }).ValidateProjectionEvidence().ShouldContain("projection_resource_count_mismatch");
         (ProjectionManifest() with { ProjectionRebuiltSchemaVersion = "governed-v2" })
             .ValidateProjectionEvidence().ShouldContain("projection_verdict_reason_mismatch");
         (ProjectionManifest() with { ProjectionFingerprintAlgorithmVersion = "sha256-v0" })

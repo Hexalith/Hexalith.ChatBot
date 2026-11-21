@@ -2419,3 +2419,19 @@ Final native follow-up qualification (2026-10-26): independent review correction
   summary: Legacy `ci.yml` still selects the deleted IntegrationTests live-recovery Fact after the sweep moved to Recovery.Tests.
   evidence: `tests/Hexalith.ChatBot.IntegrationTests/Recovery/LiveContinuityAspireE2eTests.cs` is gone; the Fact is `tests/Hexalith.ChatBot.Recovery.Tests/LiveContinuityAspireE2eTests.cs`. `.github/workflows/ci.yml:280` still passes `-method Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate`, and `.github/scripts/run-xunit-v4.sh` fails closed when `passed + failed == 0`. Caused by later shared-CI migration (`bf0f44f`), not this spec. Hexalith.CiCd owns the workflow.
 
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-independent-worm-rebuild.md`
+  summary: Architecture tests no longer prevent Graph/mailbox re-ingestion, Party/Folder current-state reads, or baseline-partition writes the live-recovery ADR still says they prevent.
+  evidence: `docs/adrs/live-recovery-validation-drivers.md` still claims those scans; `LiveRecoveryValidationArchitectureTests.ProjectionRebuildTopology_ShouldKeepIndependentSeedAndProductionReplayPaths` only string-matches seed/rebuild datasets and the production replay types. Later architecture-test rewrite, not this story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-independent-worm-rebuild.md`
+  summary: Workflow attempt-envelope, deadline, runsettings, and live-method architecture pins were removed after this story.
+  evidence: Those facts are absent from `tests/Hexalith.ChatBot.Architecture.Tests/LiveRecoveryValidationArchitectureTests.cs` on HEAD; the deletion is in the later architecture-test rewrite, not the independent WORM rebuild.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-independent-worm-rebuild.md`
+  summary: Legacy CI still selects the deleted IntegrationTests live-recovery Fact after the sweep moved to Recovery.Tests.
+  evidence: Hosted producers in `.github/workflows/ci.yml` and `release.yml` still name `Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests`; the Fact is `tests/Hexalith.ChatBot.Recovery.Tests/LiveContinuityAspireE2eTests.cs`. Later `bf0f44f`; Hexalith.CiCd owns workflows.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-independent-worm-rebuild.md`
+  summary: The PRD addendum NFR57 row no longer states the independently proven sandbox rebuild path this story recorded.
+  evidence: Spec-commit addendum retired `RV-REBUILD-WORM` for the sandbox path; HEAD `addendum.md:404` only says there is no current production-shaped full-window proof. Later addendum rewrite (approval 2026-09-14), not this story.

@@ -255,6 +255,42 @@ public sealed class FileRecoveryValidationEvidenceSinkTests
     }
 
     [Fact]
+    public async Task UnmeasurableProjectionReportRetainsEmptySnapshotEvidence()
+    {
+        string evidenceDirectory = CreateEvidenceDirectory();
+        LiveRecoveryValidationOptions options = Options(evidenceDirectory);
+        FileRecoveryValidationEvidenceSink sink = new(
+            options,
+            repositoryCommit: "0123456789abcdef0123456789abcdef01234567",
+            daprRuntimeVersion: "1.18.4",
+            aspireVersion: "13.4.6",
+            appHostVersion: "1.0.0");
+        DateTimeOffset started = DateTimeOffset.Parse(
+            "2026-08-01T00:00:00Z",
+            System.Globalization.CultureInfo.InvariantCulture);
+        string correlationId = ChatBotCorrelationId.New().Value;
+
+        await sink.RecordAsync(
+            ProjectionRebuildReport.Unmeasurable(
+                options.TestTenantRef,
+                options.DatasetRef,
+                correlationId,
+                started,
+                started.AddSeconds(1),
+                ProjectConversationSourceEmailView.CurrentSchemaVersion),
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
+
+        RecoveryValidationEvidenceManifest manifest = DeserializeManifest(
+            Path.Combine(evidenceDirectory, $"{options.DatasetRef}.manifest.json"));
+        manifest.Verdict.ShouldBe(ProjectionRebuildVerdicts.Unmeasurable);
+        manifest.ReasonCode.ShouldBe(ProjectionRebuildReport.ValidationUnmeasurableReasonCode);
+        manifest.ValidateProjectionEvidence().ShouldBeEmpty();
+        (manifest.ProjectionPreRebuildDigests ?? []).ShouldBeEmpty();
+        (manifest.ProjectionRebuiltDigests ?? []).ShouldBeEmpty();
+        manifest.ProjectionFingerprintAlgorithmVersion.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task RecordAsyncSanitizesPathSeparatorsInScenarioTokens()
     {
         string evidenceDirectory = CreateEvidenceDirectory();
@@ -403,8 +439,9 @@ public sealed class FileRecoveryValidationEvidenceSinkTests
     private static IReadOnlyList<ProjectionResourceDigest> SnapshotDigests(int count)
         =>
         [
-            .. Enumerable.Range(0, count).Select(index => new ProjectionResourceDigest(
-                $"resource-{index}",
+            new("source-resource-0", new string('a', 64)),
+            .. Enumerable.Range(1, count - 1).Select(index => new ProjectionResourceDigest(
+                $"governed-resource-{index}",
                 new string((char)('a' + index), 64))),
         ];
 

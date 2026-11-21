@@ -398,6 +398,28 @@ public sealed class LiveProjectionRebuildDriverTests
     }
 
     [Fact]
+    public async Task PrefixedSourceDigestIdThatExceedsTheSafeTokenCeilingIsRejectedInsteadOfCollapsed()
+    {
+        string tenantRef = RecoveryValidationTopology.LogicalTenantRef;
+        InMemoryWormAuditStore worm = new();
+        _ = await worm.AppendAsync(Envelope(tenantRef, "resource-001"), TestContext.Current.CancellationToken);
+        InMemoryRecoveryReadModelStore readModels = new();
+        ProjectConversationSourceEmailView source = Source(tenantRef) with { IntakeId = new string('a', 194) };
+
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => LiveProjectionRebuildDriver.SeedBaselineAsync(
+                readModels,
+                tenantRef,
+                Descriptor(),
+                [source],
+                worm.EnumerateChain(tenantRef),
+                TestContext.Current.CancellationToken));
+
+        exception.Message.ShouldContain("unsafe");
+        readModels.Writes.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task DisabledLiveModeIsRejectedBeforeTheRebuildReadsItsPopulation()
     {
         LiveRecoveryValidationOptions options = Options();

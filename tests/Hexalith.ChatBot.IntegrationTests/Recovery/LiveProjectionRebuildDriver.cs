@@ -94,7 +94,7 @@ internal sealed class LiveProjectionRebuildDriver(
         }
 
         if (sources.Select(static source => source.IntakeId).Distinct(StringComparer.Ordinal).Count() != sources.Length ||
-            sources.Any(static source => !AuditMetadata.IsSafeStableIdentifier(source.IntakeId)))
+            sources.Any(static source => !IsSafeSnapshotResourceId("source-", source.IntakeId)))
         {
             throw new InvalidOperationException("The immutable rebuild source contains an unsafe or duplicate logical resource id.");
         }
@@ -254,7 +254,7 @@ internal sealed class LiveProjectionRebuildDriver(
         }
 
         if (sources.Select(static source => source.IntakeId).Distinct(StringComparer.Ordinal).Count() != sources.Count ||
-            sources.Any(static source => !AuditMetadata.IsSafeStableIdentifier(source.IntakeId)))
+            sources.Any(static source => !IsSafeSnapshotResourceId("source-", source.IntakeId)))
         {
             throw new InvalidOperationException("Projection baseline sources contain an unsafe or duplicate logical resource id.");
         }
@@ -628,7 +628,7 @@ internal sealed class LiveProjectionRebuildDriver(
 
         foreach (WormAuditChainRecord record in records)
         {
-            if (!AuditMetadata.IsSafeStableIdentifier(record.Envelope.ResourceId) ||
+            if (!IsSafeSnapshotResourceId("governed-", record.Envelope.ResourceId) ||
                 !AuditMetadata.IsSafeStableIdentifier(record.Envelope.CorrelationId))
             {
                 throw new InvalidOperationException("The selected WORM chain contains an unsafe logical resource or operation id.");
@@ -770,7 +770,12 @@ internal sealed class LiveProjectionRebuildDriver(
         return true;
     }
 
-    /// <summary>Builds the persisted keys for a rebuild or baseline partition (shared with the Aspire E2E cleanup).</summary>
+    /// <summary>
+    /// Builds the persisted keys for a rebuild or baseline partition (shared with the Aspire E2E cleanup).
+    /// Source-email rebuild also writes attachment-set and attachment-index rows; those keys are included so cleanup
+    /// erases every reachable handler write. Snapshot equivalence remains the source-email and governed-operation views
+    /// only.
+    /// </summary>
     internal static IReadOnlyList<string> ProjectionKeys(
         string partitionTenant,
         IReadOnlyList<ProjectConversationSourceEmailView> sources,
@@ -856,6 +861,10 @@ internal sealed class LiveProjectionRebuildDriver(
 
     private static string BaselinePartitionTenant(string testTenantRef, string validationPartitionRef)
         => $"{testTenantRef}:baseline:{validationPartitionRef}";
+
+    private static bool IsSafeSnapshotResourceId(string prefix, string id)
+        => AuditMetadata.IsSafeStableIdentifier(id)
+            && AuditMetadata.IsSafeStableIdentifier(prefix + id);
 
     private static string Digest(params string[] values)
     {

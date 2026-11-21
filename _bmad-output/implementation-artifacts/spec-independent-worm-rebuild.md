@@ -2,7 +2,7 @@
 title: 'Independent governed and WORM rebuild equivalence'
 type: 'feature'
 created: '2026-08-28'
-status: 'in-review'
+status: 'done'
 baseline_revision: efd2d9291dc491338fea2a983c0a6efeea99baa5
 baseline_commit: efd2d9291dc491338fea2a983c0a6efeea99baa5
 review_loop_iteration: 1
@@ -101,6 +101,30 @@ deferred: []
   - `[medium]` `[bad_spec]` Fingerprints lacked an algorithm/version contract and known-answer vector; required both for replay stability.
   - `[medium]` `[bad_spec]` Architecture proof was source-text-only; required runtime proof of independent inputs and mutation behavior.
   - `[medium]` `[bad_spec]` Projection verdict/reason combinations were not validated; required projection-specific consistency checks.
+
+### 2026-11-21 — Review pass 2
+- `[false]` Handler ignores reconstructed decision/outcome/redaction when applying `GovernedNoteRecordedNotification`. Spec Design Notes already compensate with independently derived WORM history tokens; production view schema is metadata-only.
+- `[false]` Baseline history tokens hash the same envelope fields the reconstructor copies. Independent helpers (not a shared derivation path) are what the spec required; a rebuild-side mutation still diverges.
+- `[false]` `MailboxReingestionAbsent` is constructor-shaped, not observed. Gate comments document that the live driver only accepts immutable sources and a tenant WORM store; a false value is the stop-ship, not an unmeasured operational probe.
+- `[medium]` `[patch]` Attachment-set and attachment-index rows are written and erased but omitted from source-plus-governed snapshots. Intent compares source and governed views; the task required a documented completeness boundary, which was missing.
+- `[false]` `FirstDivergingResourceLocator` is not bound to digest mismatch. Divergent evidence still stop-ships on fingerprints/verdict; the locator is diagnostic. The leakage fixture's `resource:resource-b` is not gate input.
+- `[low]` `[reject]` Gate calls `ValidateProjectionEvidence` and then `Validate()`, which repeats it. Extra `{job}:invalid_evidence` codes still fail closed; everyday rebuilds do not take the wrong verdict.
+- `[false]` `Unmeasurable` stamps the legacy `ProjectionSchemaVersion` and leaves the new schema/fingerprint fields empty. Empty extra fields are what `ValidateProjectionEvidence` requires for unmeasurable evidence.
+- `[low]` `[reject]` `RequiredResidualsFor` uses raw job strings and a mixed-CRLF hunk. Current literals match `LiveRecoveryValidationJobs`; no wrong residual set is produced.
+- `[false]` Live sweep loads one JSON path twice. Spec wants independently materialized equivalent corpora; `LiveRecoverySweep` loads twice into distinct objects and distinct WORM stores.
+- `[low]` `[reject]` No test for a grouped operation the production handler `Ignored`. The driver already throws, which the coordinator converts to unmeasurable.
+- `[low]` `[reject]` Fingerprint tests omit empty/ceiling/duplicate cases. Known-answer plus gate malformed/oversized checks already cover the contract.
+- `[low]` `[reject]` `ProjectionRebuildBaselineEvidence` and `WormOperationGroup` lack `<param>` docs. Internal test records; not an end-user defect.
+- `[medium]` `[defer]` Later addendum rewrite dropped the sandbox NFR57 proof text; ADR still retires `RV-REBUILD-WORM` for the sandbox path and notes the historical hosted run.
+- `[medium]` `[patch]` Prefixed `source-{id}` / `governed-{id}` digest ids can exceed the 200-character safe token and collapse to `redacted-ref` after the unprefixed id passed.
+- `[medium]` `[patch]` `ValidateProjectionEvidence` binds total source+governed counts to snapshot length but not to `source-` / `governed-` prefixes, so a mis-split list with the right length can replay.
+- `[false]` Null `baselineEvidence` collections throw before unmeasurable conversion. Coordinator `catch (Exception)` already substitutes `Unmeasurable`.
+- `[false]` Null authenticity header/evidence lists throw while hashing. Same coordinator fail-safe; not a fabricated equivalent.
+- `[medium]` `[defer]` Architecture tests that pinned workflow attempt-envelope, deadline, runsettings, and live-method filters were removed in a later architecture-test rewrite, not this story.
+- `[medium]` `[defer]` `LiveContinuityAspireE2eTests` moved to Recovery.Tests while legacy `ci.yml`/`release.yml` still name the IntegrationTests type. Later `bf0f44f` / Hexalith.CiCd ownership.
+- `[false]` Claim that independent seed/rebuild loading must live in the deleted IntegrationTests file. Fix would be a spec-path edit; `LiveRecoverySweep` still loads independent datasets.
+- `[medium]` `[patch]` No test maps `ProjectionRebuildReport.Unmeasurable` through the sink/`ValidateProjectionEvidence` empty-evidence rule, so a future factory that stamps schema/fingerprint fields would fail retention with green unit tests.
+- `[false]` Baseline `RedactionState` vs handler `MetadataOnlyRedactionState` for non-metadata-only WORM. The pinned sandbox dataset is metadata-only, which both paths map to the same token.
 
 ## Design Notes
 

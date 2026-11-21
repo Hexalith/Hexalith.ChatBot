@@ -346,10 +346,16 @@ internal sealed record RecoveryValidationEvidenceManifest
         }
 
         int expectedResources = ProjectionSourceResourceCount + ProjectionGovernedResourceCount;
+        int preSourceCount = CountPrefixed(pre, "source-");
+        int preGovernedCount = CountPrefixed(pre, "governed-");
+        int rebuiltSourceCount = CountPrefixed(rebuilt, "source-");
+        int rebuiltGovernedCount = CountPrefixed(rebuilt, "governed-");
         if (ProjectionSourceResourceCount <= 0 || ProjectionGovernedResourceCount <= 0 ||
             ProjectionWormRecordCount <= 0 || ProjectionWormOperationCount <= 0 ||
             ProjectionWormOperationCount > ProjectionWormRecordCount || expectedResources != pre.Count ||
             expectedResources != rebuilt.Count || DatasetVolume != expectedResources ||
+            preSourceCount != ProjectionSourceResourceCount || preGovernedCount != ProjectionGovernedResourceCount ||
+            rebuiltSourceCount != ProjectionSourceResourceCount || rebuiltGovernedCount != ProjectionGovernedResourceCount ||
             Coverage is null || !Coverage.TryGetValue("scenario", out int coverage) || coverage != expectedResources)
         {
             reasons.Add("projection_resource_count_mismatch");
@@ -440,6 +446,10 @@ internal sealed record RecoveryValidationEvidenceManifest
             ProjectionWormRecordCount != 0 || ProjectionWormOperationCount != 0 ||
             ProjectionFingerprintAlgorithmVersion is not null || ProjectionPreRebuildFingerprint is not null ||
             ProjectionRebuiltFingerprint is not null;
+
+    private static int CountPrefixed(IReadOnlyList<ProjectionResourceDigest?> snapshot, string prefix)
+        => snapshot.Count(digest => digest is not null
+            && digest.ResourceId.StartsWith(prefix, StringComparison.Ordinal));
 
     private static bool IsCanonicalSnapshot(IReadOnlyList<ProjectionResourceDigest?> snapshot)
     {
