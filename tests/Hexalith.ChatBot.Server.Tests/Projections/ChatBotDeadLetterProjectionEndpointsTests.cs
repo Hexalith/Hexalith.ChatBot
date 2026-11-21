@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 
 using Hexalith.ChatBot.Server.Projections;
 
@@ -129,6 +131,60 @@ public sealed class ChatBotDeadLetterProjectionEndpointsTests
             .ShouldHaveSingleItem();
         deadLetterLog.ShouldNotContain(SensitivePayloadMarker, Case.Insensitive);
         deadLetterLog.ShouldContain("unknown");
+    }
+
+    [Fact]
+    public async Task EmptyDeadLetterBodyShouldStillDrainWithOk()
+    {
+        RecordingLoggerProvider recorder = new();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+                services.AddSingleton<ILoggerProvider>(recorder)));
+        using HttpClient client = factory.CreateAppChannelClient();
+
+        using ByteArrayContent content = new([]);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        using HttpRequestMessage request = new(HttpMethod.Post, ChatBotDeadLetterProjectionEndpoints.DeadLetterDrainRoute)
+        {
+            Content = content,
+        };
+
+        using HttpResponseMessage response = await client
+            .SendAsync(request, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        recorder.Entries
+            .Where(static entry => entry.Level == LogLevel.Error
+                && string.Equals(entry.Category, DrainCategory, StringComparison.Ordinal))
+            .Select(static entry => entry.Message)
+            .ShouldHaveSingleItem("An empty dead-letter body must still be drained with one Error log.");
+    }
+
+    [Fact]
+    public async Task NonJsonDeadLetterBodyShouldStillDrainWithoutLeakingThePayload()
+    {
+        RecordingLoggerProvider recorder = new();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+                services.AddSingleton<ILoggerProvider>(recorder)));
+        using HttpClient client = factory.CreateAppChannelClient();
+
+        using StringContent content = new(SensitivePayloadMarker, Encoding.UTF8, "text/plain");
+        using HttpRequestMessage request = new(HttpMethod.Post, ChatBotDeadLetterProjectionEndpoints.DeadLetterDrainRoute)
+        {
+            Content = content,
+        };
+
+        using HttpResponseMessage response = await client
+            .SendAsync(request, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        foreach (RecordedLogEntry entry in recorder.Entries)
+        {
+            entry.Message.ShouldNotContain(SensitivePayloadMarker, Case.Insensitive);
+        }
     }
 
     private static object PoisonEnvelope()

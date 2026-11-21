@@ -2309,3 +2309,45 @@ Final native follow-up qualification (2026-10-26): independent review correction
   summary: The 2026-09-18 draft CI/CD alignment spec is retired as superseded by `sprint-change-proposal-2026-11-21.md` option C1 and Hexalith.CiCd story 19 (`spec-19-migrate-chatbot.md` in the CiCd repository).
   evidence: Its frozen intent edits CiCd-owned `.github/workflows/**` and `.github/dependabot.yml`, adds workflow-YAML architecture tests, keeps story-evidence gates in module CI, and adds a module-owned manual release, all of which the current CI/CD ownership policy forbids.
 
+## Deferred from: review of spec-1-1c-aspire-dapr-topology-review-remediation (2026-11-21)
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
+  summary: The required topology-acceptance job still filters a Fact that now lives only on Live.IntegrationTests, so the live Running/403 assertions never execute.
+  evidence: `ci.yml:433` and `release.yml:72` pass `-method Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2ETests.GovernedCommandsShouldFailClosedWithoutAtomicParticipationInRealDaprTopology` to the IntegrationTests runner. That Fact is only on `tests/Hexalith.ChatBot.Live.IntegrationTests/RequiredTopologyTests.cs:10`. `run-xunit-v4.sh` fails the lane on zero tests, but the live contract is still not run. Caused by the later Live.IntegrationTests split; Hexalith.CiCd owns the workflow files.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
+  summary: Architecture tests no longer pin topology-acceptance `-method` strings, TRX paths, or guard-step names.
+  evidence: `ScaffoldArchitectureTests.TopologySmokeShouldPreserveRefusalOrderAndCommittedStateProof` only reads helper method bodies in `TrivialGovernedCommandAspireE2eTests.cs`. Hexalith.CiCd forbids workflow-YAML architecture tests; a stale CI filter cannot be caught here.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
+  summary: Twelve required topology resources share a 10-minute readiness budget originally sized for seven waits.
+  evidence: `RequiredTopologyResources` in `TrivialGovernedCommandAspireE2eTests.cs:82-96` now includes parties, projects, Memories, `memories-vectors`, and `memories-graphs`. `TopologyReadinessBudget` remains 10 minutes. Later topology expansion, not this story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
+  summary: Selecting any external owner key can leave local Memories without JWT wiring.
+  evidence: `Program.cs:163-181` treats any Projects/Memories owner key as `externalOwners`, then optionally keeps the local Memories endpoint when `ChatBot:Memories:Endpoint` is unset, while `:277-285` skips Memories JWT in that mode. Later owner-composition, not this story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
+  summary: `Dapr:SpineAppIdSuffix` does not suffix parties or projects app ids.
+  evidence: `ChatBotAspireModule.ResolveSpineAppId` (`:127-134`) only suffixes `AppId` and `EventStoreServiceName`. Isolated topologies can collide on unsuffixed parties/projects sidecars. Later suffix work, not this story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
+  summary: Unique Dapr internal gRPC port validation cannot see Memories' default port 50002.
+  evidence: `SidecarAppIds` (`ChatBotAspireModule.cs:77-86`) omits Memories; that sidecar is attached in `Program.cs`. A configured `Dapr:InternalGrpcPorts` value of 50002 can collide. Later Memories composition, not this story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
+  summary: Isolated Dapr HTTP port reservations still cover only four sidecars while parties and projects also run sidecars.
+  evidence: `IsolatedDaprHttpResourceNames` (`TrivialGovernedCommandAspireE2eTests.cs:74-80`) is eventstore, tenants, chatbot, eventstore-admin. `RequiredDaprSidecarResources` also lists parties, projects, Memories, and eventstore-admin-ui. Later sidecar expansion, not this story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
+  summary: A Dapr workflow outage clears `NextRetryAt` on an operation-status read.
+  evidence: `DaprCorrectionPropagationWorkflowRuntime.ReadProgressAsync` returns null on non-cancel faults (`:29-32`). `OperationStatusQueryHandler.cs:53-58` then writes `record with { NextRetryAt = null }`. Later correction-propagation, not this story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
+  summary: CI and release topology jobs invoke `.github/scripts/install-dapr-cli.sh`, which is not in the tree.
+  evidence: `ci.yml:423` and `release.yml:62` run that script; `.github/scripts/` has other untracked helpers but not `install-dapr-cli.sh`. Later CiCd migration, not this story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
+  summary: CI and release workflows still build and run deleted `Hexalith.ChatBot.StoryEvidenceGate` projects.
+  evidence: `ci.yml` (e.g. `:73-78`, `:200-207`) and `release.yml:168` name `tools/Hexalith.ChatBot.StoryEvidenceGate` and `tests/Hexalith.ChatBot.StoryEvidenceGate.Tests`; those projects are gone. Later deletion; Hexalith.CiCd owns the workflows.
+
