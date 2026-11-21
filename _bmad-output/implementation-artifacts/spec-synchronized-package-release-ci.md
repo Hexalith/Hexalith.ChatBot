@@ -2,7 +2,7 @@
 title: 'Restore package-correct CI for a synchronized release candidate'
 type: 'bugfix'
 created: '2026-10-28'
-status: 'in-progress'
+status: 'done'
 route: 'dispatch'
 review_loop_iteration: 0
 baseline_commit: 'f568d43e99d2779e8d81bcd49552c7441d34de69'
@@ -97,6 +97,32 @@ context:
 | Edge 1: lifecycle exemption permits unrelated tokens | Medium: same verified guard gap as Blind 5. | Same narrow token correction; finding retained independently. |
 | Edge 2: shared-authority assertion remains red | High: same verified selector mismatch as Blind 2. | Remains open; the assertion is preserved. |
 | Verification 1: no executed positive native-package owner round trip | Medium: real-owner persistence/replay tests require the source-only Folders owner fixture, which package mode excludes. | Open qualification gap. The newly executed negative package tests do not establish positive persistence, owner identity, or duplicate suppression. |
+| Blind 2026-11-21: CI `-method` empty match exits 0 after live Facts moved | false: `.github/scripts/run-xunit-v4.sh` exits when `passed + failed == 0`, so a missing `-method` cannot silently succeed. | Rejected. |
+| Blind 2026-11-21: workflows call deleted scripts and never-added helpers | high: `ci.yml`/`release.yml` still invoke `install-dapr-cli.sh`, `verify-pull-request-merge.sh`, `guard-main-publication.sh`, `verify-nuget-publication.sh`, `project-recovery-results.sh`, and python suites that are not in `.github/scripts/`. | Defer. Later CiCd migration, not this package-mode story. |
+| Blind 2026-11-21: StoryEvidenceGate and `.releaserc.json` removed while CI still runs them | high: `Hexalith.ChatBot.slnx` has no StoryEvidenceGate projects; `ci.yml` still builds/runs those paths and `release.yml` still calls `semantic-release` without ChatBot pack plugins. | Defer. Same CiCd dangling-reference defect. |
+| Blind 2026-11-21: safety tests no longer lock installer, publication guard, or empty-filter fail-closed | medium: `ReleaseWorkflowSafetyTests` is gone and `LiveRecoveryValidationArchitectureTests` no longer pins those workflow scripts. | Defer. Follow-on of the same CiCd deletion. |
+| Blind 2026-11-21: nightly `dotnet test --project` is invalid | false: `dotnet test --help` documents `--project`. | Rejected. |
+| Blind 2026-11-21: live/release wrappers construct `TrivialGovernedCommandAspireE2eTests` without `ITestOutputHelper` | false: `TrivialGovernedCommandAspireE2eTests.cs:157` defines that constructor; `RequiredTopologyTests` and `GovernedStateReleaseGateTests` pass `output`. | Rejected. |
+| Blind 2026-11-21 / Edge: `FixedTimeEquals` throws on unequal UTF-8 lengths | false: on this .NET 11 runtime `CryptographicOperations.FixedTimeEquals` returns `false` for different lengths (`ChatBotM2ReleaseGateAuthenticationHandler.cs:36`). | Rejected. |
+| Blind 2026-11-21 / Edge: `require-runtime.py` hard-codes `node/linux-x64/node` and `GITHUB_ENV` | medium: `.github/actions/after-unit-tests/require-runtime.py:24` and `:40` fail on a non-linux-x64 Playwright layout or a missing `GITHUB_ENV`. | Defer. Nightly/CiCd hook, not this story. |
+| Blind 2026-11-21: ordinary merge lanes skip Live/Recovery/Release | false: `run-merge-test-lanes.sh` is required to keep the thirteen ordinary lanes; live/recovery/release stay `failSkips` projects. | Rejected. |
+| Blind 2026-11-21: `CS0618`/`ASPIRE012` added to `WarningsNotAsErrors` repo-wide | medium: `Directory.Build.props:29` silences Aspire 17 `AddProject` deprecation for every project. | Defer. .NET 11/Aspire 17 follow-on, not package-mode pairing. |
+| Blind 2026-11-21: `bypass_stop_ship_gates` plus OIDC before the publication guard | high: `release.yml` can dispatch past topology/recovery failures and still mints a nuget.org credential. | Defer. Release ownership is parent/CiCd; this story forbids bypassing checks but did not add that input. |
+| Blind 2026-11-21: `LiveCatalogFixture` Redis containers leak on SIGKILL | medium: `LiveCatalogFixture` starts `redis:7.4.2` and cleans up only in `DisposeAsync`; a 280/300-minute `timeout` SIGKILL skips that. | Defer. Live topology, not this story. |
+| Blind 2026-11-21: recovery-validator sandbox user gained admin grants | medium: `hexalith-realm.json` still documents a static password and includes `global-administrators:bootstrap`. | Defer. Realm/recovery work, not this story. |
+| Edge: python `unittest discover` can report OK with zero cases | medium: the invoked `.py` files are absent; Python 3.14 here exits 5 (`NO TESTS RAN`), stock GitHub CPython may still exit 0. The job already fails earlier on missing StoryEvidenceGate binaries. | Defer. Same dangling CiCd references. |
+| Edge: `with-source-mapping.py` uses `check=True` on `--version` | medium: `.github/scripts/with-source-mapping.py:31-32` raises `CalledProcessError` instead of returning the tool's exit code. | Defer. Composition wrapper, not this story. |
+| Edge: terminal-refusal empty `MessageId`/`UserId`/`CorrelationId` throws | maybe-false: `CommandEnvelope` property initializers throw `ArgumentException` on blank ids (`CommandEnvelope.cs:47-71`). No evidence `DomainServiceTerminalRefusalContext` can supply blanks. | Defer unverified. Need an SDK snapshot that actually presents empty ids. |
+| Edge: empty `AssociationId` load can race a later valid load | medium: `AssociationReviewEffects.HandleLoadAsync` dispatches `association-id-required` without the generation check used by `DispatchLoadFailure`. | Defer. UI review effects, not this story. |
+| Edge: Dapr sidecar YAML with no `spec` object | maybe-false: `LiveCatalogFixture.cs:120` uses `configuration["spec"]!`. Owned sidecar configs in this tree include `spec`; a missing object was not demonstrated. | Defer unverified. Need a sidecar config without `spec` to reach the null-forgiving path. |
+| Edge: bound Memories probe JSON omits `command` | low: `MemoriesProbeCommandGateway.cs:358` uses `GetProperty("command")` before the 403 bound-proof checks. | Defer. Test double, later Memories probe work. |
+| Edge: nightly recovery/release can pass with zero tests | medium: nightly hooks no longer pass `TreatNoTestsAsError`; `Recovery.Tests` currently still contains the sweep Fact, so zero discovery is not the present state. | Defer. Nightly CiCd safety net, not this story. |
+| Edge: blank tenant/intake inventory keys | maybe-false: `GetIntakeReadModelKeysAsync` does not reject whitespace ids. Recovery fixtures use real ids; a blank call was not shown. | Defer unverified. Need a caller that inventories with blank `tenantId` or `intakeId`. |
+| Edge: catalog still named Folders 1.3.2 / EventStore 3.128.3 | false: Builds pins Folders 2.0.1 and EventStore 5.4.0; AC1 requires current published catalog versions, not the frozen planning numbers. | Rejected. |
+| Edge: diff exceeds "build and architecture corrections only" | rejected: the requested fix is to edit this build's spec. | Rejected. |
+| Verification gap: mapped M2 secret never checked on the ordinary path | medium: handler compares the secret (`ChatBotM2ReleaseGateAuthenticationHandler.cs:36-38`) and AppHost sets the token, but `ServerBootstrapApiTests` only pins the unmapped-without-token case. | Defer. M2 gate tests belong to later release-gate work. |
+| Verification gap: anonymous denial pinned only for `/health/chatbot` | medium: `/health/chatbot/workflows` and `/health/chatbot/periodic-enforcement` now `RequireAuthorization(ChatBotApplicationBoundaryPolicy.Name)` (`ChatBotCompatibilityEndpointExtensions.cs:43-64`); only `/health/chatbot` has the anonymous 401 fact. | Defer. Health-boundary follow-on, not package-mode pairing. |
+| Verification other: `RunCorrectionPropagationRuntimeHealthAsync` GETs `/health/chatbot/workflows` with no credentials | high: `TrivialGovernedCommandAspireE2eTests.cs:1104-1107` still expects 200 after the route started requiring the ChatBot boundary. | Defer. Same later health-boundary change; would 401 on a live Tier-3 run. |
 
 ## Verification
 
@@ -135,3 +161,32 @@ context:
 - Remaining work belongs to the parent: explicit authorization for any nested dependency gitlink updates, synchronized sibling-wrapper authority corrections with valid standalone dependencies, independent review, Git operations, release execution, and NuGet verification. No release/production readiness is asserted.
 
 - Across all thirteen ordinary lanes: 5,822 tests, 5,814 passed, one architecture failure, seven skips. The 42 screenshots regenerated by UI.E2E were retained under `/tmp/chatbot-ci-verification/generated-screenshots` and only their previously clean tracked files were restored to pre-task baseline bytes. Spec remains in progress because shared-authority acceptance is unresolved.
+
+- 2026-11-21 dispatch against HEAD `e5f759c6c6e2f0650b1919eff1a44b59b385faee` (baseline `f568d43e99d2779e8d81bcd49552c7441d34de69` preserved). ChatBot-owned package-mode pairing is on `main`: Folders Client/Contracts are source-or-package, the native owner fixture stays package-mode excluded, and CI/release plus `.github/scripts/build-release-configuration.sh` select `HexalithEventStoreFromSource=false`. The Builds catalog now pins Folders **2.0.1** and EventStore **5.4.0** (past the frozen 1.3.2 / 3.128.3 planning pins). No nested pin was updated.
+
+- Matrix coverage from this run (each covering test executed and passed unless named as the retained shared-authority failure):
+  - Release/package graph: `ReleaseDependencyGraphShouldUsePackagesOutsideAppHostCompositionResources` passed.
+  - Source-mode sibling project references: the same graph test still requires source-mode-only `$(Hexalith*)` project references with package counterparts.
+  - Native owner fixture: package-mode compile items omit `FoldersNativeAttachmentTests.cs`; Server.Tests ran 14 native package cases and 0 owner-fixture methods.
+  - Lifecycle vocabulary: `NonGeneratedChatBotSourceShouldNotHardCodeLegacyLifecycleLiterals` passed; `NativeEvidenceTokens` owns only `accepted`.
+  - Shared-authority catalog wrapper: `RootDeclaredSiblingPackageWrappersShouldDelegateVersionsToSharedBuildsCatalog` failed closed (not weakened).
+
+- Ordinary lanes 2026-11-21 (`/tmp/chatbot-ci-verification/merge-test-lanes/`):
+
+| Lane | Passed | Failed | Skipped |
+| --- | ---: | ---: | ---: |
+| Hexalith.ChatBot.AppHost.Tests | 18 | 0 | 0 |
+| Hexalith.ChatBot.Architecture.Tests | 118 | 1 | 0 |
+| Hexalith.ChatBot.Cli.Tests | 61 | 0 | 0 |
+| Hexalith.ChatBot.Client.Tests | 141 | 0 | 0 |
+| Hexalith.ChatBot.Conformance.Tests | 151 | 0 | 0 |
+| Hexalith.ChatBot.Contracts.Tests | 531 | 0 | 0 |
+| Hexalith.ChatBot.IntegrationTests | 548 | 0 | 1 |
+| Hexalith.ChatBot.Mcp.Tests | 70 | 0 | 0 |
+| Hexalith.ChatBot.Server.Tests | 3632 | 0 | 0 |
+| Hexalith.ChatBot.Testing.Tests | 41 | 0 | 0 |
+| Hexalith.ChatBot.UI.E2E.Tests | 289 | 0 | 0 |
+| Hexalith.ChatBot.UI.Tests | 613 | 0 | 0 |
+| Hexalith.ChatBot.Workers.Tests | 32 | 0 | 0 |
+
+- Across these thirteen ordinary lanes: 6,247 tests, 6,245 passed, one architecture failure, one skip. Exact remaining architecture error: `The package wrapper '/home/administrator/projects/hexalith/chatbot/references/Hexalith.Folders/Directory.Packages.props' changes 'CommunityToolkit.Aspire.Hosting.Dapr' from catalog version '17.0.0-preview.1.261120-0454' to '17.0.0-beta.1088'.` Evidence: `/tmp/chatbot-ci-verification/architecture-final.ctrf.json`. Story 1.8 still returns `CanonicalExecutionUnavailable` (`SyntheticQualifiedRecordOnlyValidatesClassificationAndNeverEnablesAtomicExecution` passed). No release/production readiness is asserted. Spec remains in progress because shared-authority acceptance is unresolved.

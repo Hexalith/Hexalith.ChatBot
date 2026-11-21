@@ -2351,3 +2351,67 @@ Final native follow-up qualification (2026-10-26): independent review correction
   summary: CI and release workflows still build and run deleted `Hexalith.ChatBot.StoryEvidenceGate` projects.
   evidence: `ci.yml` (e.g. `:73-78`, `:200-207`) and `release.yml:168` name `tools/Hexalith.ChatBot.StoryEvidenceGate` and `tests/Hexalith.ChatBot.StoryEvidenceGate.Tests`; those projects are gone. Later deletion; Hexalith.CiCd owns the workflows.
 
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/1-1e-centralize-nuget-package-reference-version-authority.md`
+  summary: Consumer-local package versions are back in six root-declared submodules, so Hexalith.Builds is no longer the only package-version authority.
+  evidence: At ChatBot `843f886a4064493dbdb116e16ae8959dd8442999` the root wrapper is still version-free, but these `Directory.Packages.props` wrappers declare versions locally again: Folders `73ca79b4` (4 `PackageVersion Update` rows, plus `HexalithAspireHostingDaprVersion` 17.0.0-beta.1088), Memories `e413124b` (18 rows, including a `Hexalith.EventStore.*` floor override via `MemoriesEventStoreMinimumVersion` and two `Hexalith.Memories.*` rows the catalog lacks; Dapr hosting 17.0.0-beta.1078), Parties `d8d599e6` (16 rows, plus local Commons/Tenants/FrontComposer/Memories version defaults), Timesheets `271442d0` (16 rows; Dapr hosting 17.0.0-beta.1052), Works `93322fa5` (3 conditional `Microsoft.Build*` rows) and McpCli `e79b7f8b` (14 rows; Dapr hosting 17.0.0-beta.1078). Most rows restate the catalog value (for example `Aspire.Hosting` 17.0.0), but `CommunityToolkit.Aspire.Hosting.Dapr` differs from the catalog's 17.0.0-preview.1.261120-0454 in four repositories. Recent history points to Dependabot bumps and local version-floor fixes (Memories `9677a0c5`, Folders `c00df5d8`, 2026-11-19/20). No CI runs workspace-mode authority validation (DW-80), and Hexalith.CiCd owns Dependabot. Fixes belong in each owning repository. Story 1.1e was closed as superseded on 2026-11-21 instead of being resumed.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
+  summary: GitHub workflows still call deleted StoryEvidenceGate projects, release scripts, and python suites.
+  evidence: `ci.yml` and `release.yml` invoke missing `install-dapr-cli.sh`, `verify-pull-request-merge.sh`, `guard-main-publication.sh`, `verify-nuget-publication.sh`, `project-recovery-results.sh`, StoryEvidenceGate binaries, and absent `test_*.py` files; `.releaserc.json` is gone. Later CiCd migration, not this package-mode story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
+  summary: The nightly runtime hook hard-codes linux-x64 Playwright node and requires `GITHUB_ENV`.
+  evidence: `.github/actions/after-unit-tests/require-runtime.py:24` and `:40`. Nightly/CiCd hook, not this story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
+  summary: `with-source-mapping.py` raises if `hexalith-module --version` fails after restore.
+  evidence: `.github/scripts/with-source-mapping.py:31-32` uses `check=True` instead of returning the tool exit code. Composition wrapper, not this story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
+  summary: An empty association-id load dispatches failure without the generation guard used for other load failures.
+  evidence: `AssociationReviewEffects.HandleLoadAsync` returns after `AssociationReviewFailedAction("association-id-required")` without `DispatchLoadFailure`. UI review effects, not this story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
+  summary: The bound Memories probe helper throws if JSON omits `command` instead of returning 403.
+  evidence: `MemoriesProbeCommandGateway.cs:358` calls `GetProperty("command")` before bound-proof 403 handling. Test double, later Memories probe work.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
+  summary: ChatBot silences Aspire 17 `AddProject` deprecations for every project.
+  evidence: `Directory.Build.props:29` adds `CS0618` and `ASPIRE012` to `WarningsNotAsErrors`. .NET 11/Aspire 17 follow-on, not package-mode pairing.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
+  summary: Release dispatch can bypass stop-ship gates and still mint a nuget.org credential.
+  evidence: `release.yml` `bypass_stop_ship_gates` plus OIDC before `guard-main-publication.sh`. Parent/CiCd release ownership.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
+  summary: Live catalog Redis containers can leak when the recovery timeout SIGKILLs the process.
+  evidence: `LiveCatalogFixture` starts `redis:7.4.2` and cleans up only in `DisposeAsync`. Live topology, not this story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
+  summary: The recovery-validator sandbox user still carries a static password and bootstrap admin grants.
+  evidence: `src/Hexalith.ChatBot.AppHost/KeycloakRealms/hexalith-realm.json` user `recovery-validator` includes `global-administrators:bootstrap`. Realm/recovery work, not this story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
+  summary: Ordinary tests never pin the mapped M2 release-gate secret (401 without/wrong header, 200/503 with it).
+  evidence: `ChatBotM2ReleaseGateAuthenticationHandler` compares the secret, but `M2ReleaseGateEndpointShouldNotBeMappedWithoutAToken` only covers the unmapped-without-token case. Later release-gate work.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
+  summary: Sibling ChatBot health routes require the boundary policy, but ordinary tests pin anonymous 401 only for `/health/chatbot`, and the live workflow probe still GETs `/health/chatbot/workflows` with no credentials.
+  evidence: `ChatBotCompatibilityEndpointExtensions.cs:43-64` vs `ServerBootstrapApiTests` `/health/chatbot` only; `TrivialGovernedCommandAspireE2eTests.cs:1104-1107` expects 200. Later health-boundary change.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
+  summary: Nightly recovery/release hooks no longer fail closed when they discover zero tests.
+  evidence: `live-recovery.runsettings` (`TreatNoTestsAsError`) was deleted; `.github/actions/nightly/run-recovery.sh` and `run-release.sh` call `dotnet test` without that switch. Nightly CiCd safety net, not this story.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
+  summary: Unverified: empty SDK terminal-refusal ids may throw from `CommandEnvelope` instead of a typed refusal.
+  evidence: Would be settled by a `DomainServiceTerminalRefusalContext` with blank `MessageId`, `UserId`, or `CorrelationId` reaching `RefuseUnsupportedAsync`.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
+  summary: Unverified: live catalog setup may throw if a Dapr sidecar YAML has no `spec` object.
+  evidence: Would be settled by a sidecar `Config` whose deserialized JSON lacks `spec`, hitting `LiveCatalogFixture.cs:120`.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
+  summary: Unverified: blank tenant or intake ids may inventory colliding read-model keys.
+  evidence: Would be settled by a caller of `GetIntakeReadModelKeysAsync` with whitespace `tenantId` or `intakeId`.
+
