@@ -2,6 +2,7 @@ using System.Security.Claims;
 
 using Hexalith.ChatBot.Server.Authentication;
 
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 
@@ -14,6 +15,14 @@ namespace Hexalith.ChatBot.Server.Projections;
 /// client always re-queries authoritative server state. Colocated with the in-process ChatBot read model (unlike the
 /// cross-host EventStore relay, which the real topology cannot wire), so it is directly verifiable in one host.
 /// </summary>
+/// <remarks>
+/// Each hub method names the ChatBot boundary policy that the endpoint's <c>RequireAuthorization</c> already applies
+/// to the connection. Since .NET 11, SignalR authorizes an invocation from all of the method's own attributes, and
+/// when none of them is authorization data it applies the host fallback policy. An <c>async</c> method always carries
+/// the compiler's state-machine attribute, and the EventStore SDK's fallback denies every unclassified endpoint, so
+/// without its own attribute every <see cref="JoinTenant"/> call would be refused before the tenant check runs.
+/// Hub-class attributes guard only the connection, not the invocations.
+/// </remarks>
 internal sealed class ChatBotProjectConversationHub(IConfiguration configuration) : Hub
 {
     private readonly IConfiguration _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
@@ -33,6 +42,7 @@ internal sealed class ChatBotProjectConversationHub(IConfiguration configuration
     /// bearer auth is configured (the deployment security posture). An unauthenticated caller is allowed only in the
     /// no-JWT dev/test posture, mirroring the rest of the self-hosted topology.
     /// </summary>
+    [Authorize(Policy = ChatBotApplicationBoundaryPolicy.Name)]
     public async Task JoinTenant(string tenantId)
     {
         if (string.IsNullOrWhiteSpace(tenantId) || tenantId.Contains(':', StringComparison.Ordinal))
@@ -49,6 +59,7 @@ internal sealed class ChatBotProjectConversationHub(IConfiguration configuration
     }
 
     /// <summary>Leaves the caller from the tenant's project-conversation change group.</summary>
+    [Authorize(Policy = ChatBotApplicationBoundaryPolicy.Name)]
     public Task LeaveTenant(string tenantId)
         => string.IsNullOrWhiteSpace(tenantId)
             ? Task.CompletedTask
