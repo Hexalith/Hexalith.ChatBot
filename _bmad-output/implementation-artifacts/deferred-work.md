@@ -2288,3 +2288,18 @@ Final native follow-up qualification (2026-10-26): independent review correction
   evidence: ci run `44897519125` on `bd61641` builds the solution (0 errors, 7 CS0618 warnings), then fails at the deleted `.github/scripts/run-merge-test-lanes.sh` (`ci.yml:119`). `story-evidence-integrity` and every release job (run `44897518989`) fail at the deleted `build-release-configuration.sh`. No `.github/hexalith-ci.json` exists, and CiCd owns `.github/workflows/**`.
   reason: Hexalith.CiCd owns the registration and the generated callers. ChatBot drafts the request (proposal §4.9) and lands the product preparation first.
   closure: CiCd delivers `setup/Hexalith.ChatBot.yml` and generated callers that replace `ci.yml` and `release.yml`, and the first push run passes Server.Tests (closes R22-W2). Before the request, ChatBot realigns the Folders wrapper, fixes the `ChatBotMetricsTests` flake, closes R21-W2 and R21-W3, proves the Release build under the shared `-warnaserror` flags (CS0618 in `references/Hexalith.Platform` and in `RecoverySandboxTopologyComposer.cs:55`), and passes `python3 references/Hexalith.Builds/check.py` in a standalone clone. At delivery, also update the scheduler bullet in the Consequences section of `docs/adrs/live-recovery-validation-drivers.md`.
+
+## Deferred from: review of spec-five-deferred-recovery-boundaries (2026-11-21)
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-recovery-boundaries.md`
+  summary: Legacy CI and release workflows still consume deleted recovery scripts, test identities, and the StoryEvidenceGate producer.
+  evidence: Current `ci.yml` and `release.yml` still call missing `.github/scripts/run-xunit-v4.sh`, `build-release-configuration.sh`, and `project-recovery-results.sh`; they still `-method` the old IntegrationTests live Fact and `RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess`; they still build `tools/Hexalith.ChatBot.StoryEvidenceGate`. The live Fact now lives only in ungated `Hexalith.ChatBot.Recovery.Tests`. The ADR still documents the retired TE-2 / Dapr 1.18.0 sanitizer path beside the nightly hook. This is later shared-CI migration, not the five-boundary hardening.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-recovery-boundaries.md`
+  summary: The after-unit-tests runtime hook only resolves Playwright's linux-x64 node and requires GITHUB_ENV.
+  evidence: `.github/actions/after-unit-tests/require-runtime.py` hard-codes `tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net11.0/.playwright/node/linux-x64/node` and opens `os.environ["GITHUB_ENV"]`. A non-linux-x64 runner or a local invocation without that variable fails before fail-closed live tests can be enabled.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-recovery-boundaries.md`
+  summary: Recovery mailbox token identity parsing has no bounded JWT error path.
+  evidence: `RecoveryMailboxOwnerProvisioner.AssertMailboxTokenIdentity` parses the bearer payload with `Convert.FromBase64String` and `JsonDocument.Parse` and reads required claims with `GetProperty` and no catch. A non-Base64 or non-JSON payload fails as `FormatException`, `JsonException`, or `KeyNotFoundException` instead of the mailbox-token error used for a non-JWT shape. This is later live-harness code, not the five-boundary production change.
+

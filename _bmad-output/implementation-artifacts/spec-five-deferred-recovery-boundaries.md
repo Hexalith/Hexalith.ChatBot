@@ -2,7 +2,7 @@
 title: 'Harden five deferred recovery-validation boundaries'
 type: 'bugfix'
 created: '2026-10-28'
-status: 'in-review'
+status: 'done'
 route: 'oneshot'
 baseline_commit: 'b4046c8041aad87505fbc4c0ebfc20c5cf0b9f33'
 review_loop_iteration: 0
@@ -80,6 +80,47 @@ The resumed cumulative review also examined the already committed hardening. The
 | New wrapper refusal branches needed executable verification | medium / patched | `SourceMappingWrapperTests` uses a fake producer and execution marker for eight refusals plus valid environment/child-exit forwarding. It is included in the existing CI unittest discovery file. |
 
 The dependency diff received a fresh blind review and edge-case review with no actionable findings. The verification reviewer requested the wrapper regression coverage above.
+
+## Review Triage Log (2026-11-21 resumed review)
+
+Resumed `in-review` against current `main` (`c323546`). The staged diff is every superproject change since `baseline_commit` `b4046c8041aad87505fbc4c0ebfc20c5cf0b9f33` (106 later commits). Findings about later shared-CI migration, nightly recovery split, and platform upgrades are not caused by the five-boundary hardening.
+
+| Finding | Verdict / disposition | Evidence |
+| --- | --- | --- |
+| Legacy `ci.yml`/`release.yml` still invoke deleted `run-xunit-v4.sh`, `install-dapr-cli.sh`, `build-release-configuration.sh`, `run-merge-test-lanes.sh`, and `project-recovery-results.sh` | medium / deferred | Those scripts are absent from `.github/scripts/`; the workflows still call them. Caused by later shared-CI migration (`bf0f44f`), not this spec's recovery-boundary sources. Already tracked as R21-D1 / 2026-11-21 CiCd adoption. |
+| Workflow `-method` filters still name `Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests` (and `E2E` casing) | medium / deferred | The `[Fact]` now lives in `tests/Hexalith.ChatBot.Recovery.Tests/LiveContinuityAspireE2eTests.cs`. Same later Fact move as R21-W1. |
+| Nightly recovery hook is not enabled (no ChatBot `.github/hexalith-ci.json`, no evidence upload, in-process deadline only on the composite) | medium / deferred | `.github/actions/nightly/run-recovery.sh` exists; README keeps the hook disabled until the 330-minute allowance. Same later enablement work as R21-W1/W2/W3. |
+| Specs stay `in-review`; sprint-status omits this oneshot; no `validation/five-deferred-recovery-boundaries.json` | false / rejected | Status `in-review` is this spec's recorded completion state after live mailbox HTTP 403. Adding sprint-status or a validation JSON would edit process artifacts, not the five-boundary product code. |
+| Tracked evidence JSON cites deleted harness paths, `net10.0`, and disagrees on source SHA-256 after SDK 11 | low / rejected | `evidence/five-deferred-recovery-boundaries.json` labels itself historical diagnostic evidence. Later SDK/source drift is expected; rewriting historical evidence is not a direct product correction. |
+| `tools/Hexalith.ChatBot.StoryEvidenceGate` is deleted while legacy workflows still build and run it | medium / deferred | No remaining StoryEvidenceGate project; `ci.yml`/`release.yml` still name the csproj and `net11.0` test runner. Same shared-CI producer retirement as R21-D1. |
+| ADR still documents both the nightly `Recovery.Tests` sweep and the retired TE-2 / Dapr 1.18.0 / `RecoveryTrxSanitizer` path | medium / deferred | `docs/adrs/live-recovery-validation-drivers.md` line 147 vs 153. Documentation lag of the same later migration; the 2026-11-21 CiCd adoption entry already asks to update the ADR scheduler bullet at delivery. |
+| `release.yml` `bypass_stop_ship_gates` can publish when topology or live-recovery jobs fail | low / rejected | Dispatch-only, default false; the workflow comments that push publication still requires green gates. Changing that override is a later release-policy decision, not a five-boundary defect. |
+| `IsSafeArtifactLocator` rejects hyphenated names such as `artifact:reports/access-token/value` | false / rejected | Hyphen is a token bound; `RecoveryValidationEvidenceManifestTests.ArtifactLocatorRejectsSensitiveTokensAndUnsafeUriShape` requires that locator to fail. Matches the frozen intent to reject sensitive bounded path tokens while accepting substrings (`tokenization`, `passwordless`). |
+| Residual `%` after one unescape still refuses percent-bearing artifact names | carried low / rejected | carried The nested-encoding rule is unchanged at `RecoveryValidationEvidenceManifest.cs:399-403`. No general arbitrary-filename acceptance is claimed. |
+| Isolation cleanup: `Task.Run` + `WaitAsync` abandons cancellation-ignoring `InvalidateAsync` when the five-second budget expires | carried medium / deferred | carried Bounded waiting still does not supervise the store operation lifetime (`DerivedStoreIsolationProbeCoordinator.cs:134-143`). Same sentinel-lifecycle limitation as the original deferred row. |
+| `seeded.Add` still runs only after `PutAsync` succeeds | carried medium / deferred | carried `ProbePairInternalAsync` still records the nonce after the put (`:104-107`). Same synthetic-sentinel lifecycle follow-up. |
+| Cleanup timeout during a later seed/read exception overwrites a witnessed leak | false / rejected | When the caller is not cancelled, the outer catch at `:167-177` re-verifies `observableThroughIntruder` and keeps the leak. The follow-up already patched this. |
+| Nonce-scoped orphans have no reaper after failed deletion | carried medium / deferred | carried Fast cleanup still fails closed; fencing stays; no bounded-storage claim is made. Same original deferred lifecycle policy. |
+| `EventStoreDurableStateProbe` copies `RestorationTimeout` onto both presence and HTTP timeout | false / rejected | That bind is DW-41. The options constructor sets `_presenceWindow` and `_client.Timeout` from `RestorationWindow(options)` (`EventStoreDurableStateProbe.cs:34-38`). |
+| A presence window plus an independently request-bounded closing read can exceed a restoration interval | carried medium / carried | carried `ReadActorStateAsync` still uses `CancelAfter(RequestTimeout)` linked to the caller token (`:354-355`). Some scenario call sites still lack an enclosing restoration token. No hard operation-wide deadline is claimed. |
+| Live constructor assertions sit after mailbox admission, so the recorded 403 runs never executed them | carried medium / patched | carried `LiveRecoverySweep.cs:255-258` still asserts both bounds equal `options.RestorationTimeout`. The live 403 is the documented remaining completion blocker, not a missing assertion. |
+| Dormant `EvidenceDirectory` can contain NUL | false / rejected | `Validate` rejects `Path.GetInvalidPathChars()` for enabled and dormant absolute paths (`LiveRecoveryValidationOptions.cs:143-145`). NUL is in that set. Broader Windows component legality remains on the follow-ups spec, not this row. |
+| `LastPassSucceeded` is an init-only extra property, so other stores drop it | false / rejected | `IPeriodicEnforcementStatusStore` is internal. The only implementer is `InMemoryPeriodicEnforcementStatusStore`, which sets the property on every `Read()`. No second implementer exists to diverge. |
+| `_lastSchedulerAlertByReason` is not reset by a successful pass | false / rejected | A recovered pass with successful M2 completions removes `periodic_enforcement_pass_failed` (`PeriodicEnforcementCoordinator.cs:246`). Fail-success-fail re-arm was resolved in the runtime-guards follow-up. |
+| Story Completion criterion 4 has no passing live citation | false / rejected | The spec already records the live 403 and stays `in-review` for that reason. Not a new product defect. |
+| `require-runtime.py` hard-codes `tests/.../net11.0/.playwright/node/linux-x64/node` and requires `GITHUB_ENV` | medium / deferred | `.github/actions/after-unit-tests/require-runtime.py:14-24,40`. Later CI hook; non-linux or missing `GITHUB_ENV` fails before fail-closed live tests. Not part of the five-boundary sources. |
+| M2 release-gate `FixedTimeEquals` throws on length mismatch and returns 500 | false / rejected | `ChatBotM2ReleaseGateAuthenticationHandler.cs:36` calls `FixedTimeEquals` once. Unequal lengths return false; the handler returns `AuthenticateResult.Fail`, not an untyped 500. |
+| Attachment index extra keys make recovery cleanup erase the index and leave set rows | false / rejected | `GetIntakeReadModelKeysAsync` does not iterate `AttachmentKeys` or throw `foreign attachment`. Canonical set and index keys are already in `IntakeReadModelKeysFor` roots (`:23-30`). |
+| Inventory `GetAsync` hangs ignoring cancellation because the inventory deadline is missing | false / rejected | There is no `inventoryDeadline` / `inventoryBudget` in this store. The cited snippet is not in the current method. |
+| Caller cancel after a witnessed leak discards the breach as `OperationCanceledException` | false / rejected | After independent cleanup, `:154` and `:181` rethrow the caller token. `SweepAllTenantPairsAsync` does not catch it, so a cancelled probe cannot look like a successful zero-breach sweep. |
+| Mailbox bearer payload that is not Base64 JSON fails with an unclassified parse exception | medium / deferred | `RecoveryMailboxOwnerProvisioner.AssertMailboxTokenIdentity` (`:148-154`) has no catch around `FromBase64String` / `JsonDocument.Parse` / `GetProperty`. Later live harness, not this spec's production boundary. |
+| EventStore status or admin query exceeding the 30s `HttpClient` timeout aborts the two-minute command wait | false / rejected | `SubmitChatBotGrantAsync` catches `TaskCanceledException` when the caller token is live and continues until `CommandBudget` (`:204-210`). |
+| `with-source-mapping.py` crashes with a traceback on invalid JSON | false / rejected | No `JSONDecodeError` handler exists in that script; the cited branch is not present. |
+| `resolve-published-builds-tooling.sh` exports a bogus root when `_ChatBotPublishedToolRoot` is empty | false / rejected | An empty root fails the assembly `[[ -f ]]` check and exits 1 (`resolve-published-builds-tooling.sh:7-9`). Nothing is printed on that path. |
+| `RecordM2SweepSucceeded` changed from `void` to `bool` | false / rejected | Internal store, single implementer, updated with the clock-regression snapshot. Not a public production contract break. |
+| Aspire SDK 13.5.3→17, Dapr 1.19.1, `net10.0`→`net11.0` pin moves | false / rejected | Those pins moved in later main commits. The five-boundary sources do not change them. |
+| Live `RestorationTimeout` probe wiring is only asserted in a Fact no enabled lane runs | medium / deferred | Pre-verified. The live construction assertions exist (`LiveRecoverySweep.cs:255-258`); `EventStoreDurableStateProbeTests` covers the options constructor. The Fact now lives only in ungated `Recovery.Tests` (R21-W1). Same later lane split, not a missing bind. |
+| `RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess` was deleted while CI still selects it | medium / deferred | Pre-verified. The method is gone from `LiveRecoveryEvidenceGateReplayTests`; `ci.yml:628` and `release.yml:280` still name it. Same later producer/consumer split as the deleted scripts. |
 
 
 ## Supported dependency build workflow
