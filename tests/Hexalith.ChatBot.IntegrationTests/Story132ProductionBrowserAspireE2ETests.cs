@@ -115,7 +115,7 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
             using HttpClient chatBot = app.CreateHttpClient(ChatBotResourceName);
             chatBot.Timeout = TimeSpan.FromSeconds(30);
             using HttpClient eventStore = app.CreateHttpClient("eventstore", "http");
-            eventStore.Timeout = TimeSpan.FromSeconds(15);
+            eventStore.Timeout = TimeSpan.FromSeconds(60);
             using HttpClient tenants = app.CreateHttpClient("tenants", "http");
             tenants.Timeout = TimeSpan.FromSeconds(15);
             await TrivialGovernedCommandAspireE2eTests.WaitForListenerAsync(eventStore, cancellationToken).ConfigureAwait(true);
@@ -135,6 +135,9 @@ public sealed class Story132ProductionBrowserAspireE2ETests(ITestOutputHelper ou
                 accessToken,
                 ChatBotCommandId.New().ToString(),
                 cancellationToken).ConfigureAwait(true);
+            await new TrivialGovernedCommandAspireE2eTests(output)
+                .SeedStory132ConversationAuthorityAsync(app, eventStore, chatBot, accessToken, ProjectId, cancellationToken)
+                .ConfigureAwait(true);
             Uri uiEndpoint = app.GetEndpoint(ChatBotUiResourceName, "http");
             await WaitForUiListeningAsync(uiEndpoint, cancellationToken).ConfigureAwait(true);
 

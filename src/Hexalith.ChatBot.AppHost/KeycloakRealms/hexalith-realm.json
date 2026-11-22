@@ -1770,6 +1770,20 @@
             "userinfo.token.claim": "true",
             "aggregate.attrs": "true"
           }
+        },
+        {
+          "name": "ui-surface-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:surface",
+            "claim.value": "ui",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
         }
       ]
     },
@@ -1784,6 +1798,75 @@
       ],
       "webOrigins": [
         "*"
+      ],
+      "protocolMappers": [
+        {
+          "name": "subject-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": {
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "hexalith-tenants",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "global-admin-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "global_admin",
+            "claim.name": "global_admin",
+            "jsonType.label": "String",
+            "multivalued": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "tenants-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "tenants",
+            "claim.name": "eventstore:tenant",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "aggregate.attrs": "true"
+          }
+        },
+        {
+          "name": "permissions-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "permissions",
+            "claim.name": "eventstore:permission",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "aggregate.attrs": "true"
+          }
+        }
       ]
     },
     {
@@ -1802,6 +1885,22 @@
       "attributes": {
         "access.token.lifespan": "300"
       },
+      "protocolMappers": [
+        {
+          "name": "service-surface-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:surface",
+            "claim.value": "service",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ],
       "defaultClientScopes": [],
       "optionalClientScopes": [
         "eventstore-audience.chatbot",
@@ -1828,6 +1927,22 @@
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": false,
       "attributes": { "access.token.lifespan": "300" },
+      "protocolMappers": [
+        {
+          "name": "service-surface-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:surface",
+            "claim.value": "service",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ],
       "defaultClientScopes": [],
       "optionalClientScopes": [
         "eventstore-audience.eventstore",
@@ -1849,10 +1964,27 @@
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": false,
       "attributes": { "access.token.lifespan": "300" },
+      "protocolMappers": [
+        {
+          "name": "service-surface-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:surface",
+            "claim.value": "service",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ],
       "defaultClientScopes": [],
       "optionalClientScopes": [
         "eventstore-audience.eventstore",
-        "eventstore-operation.eventstore.stream-read"
+        "eventstore-operation.eventstore.stream-read",
+        "eventstore-operation.eventstore.command-submit"
       ]
     },
     {
@@ -1868,6 +2000,22 @@
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": false,
       "attributes": { "access.token.lifespan": "300" },
+      "protocolMappers": [
+        {
+          "name": "service-surface-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:surface",
+            "claim.value": "service",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ],
       "defaultClientScopes": [],
       "optionalClientScopes": [
         "eventstore-audience.eventstore",
@@ -1887,6 +2035,22 @@
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": false,
       "attributes": { "access.token.lifespan": "300" },
+      "protocolMappers": [
+        {
+          "name": "service-surface-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:surface",
+            "claim.value": "service",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ],
       "defaultClientScopes": [],
       "optionalClientScopes": [
         "eventstore-audience.eventstore",
@@ -1907,6 +2071,22 @@
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": false,
       "attributes": { "access.token.lifespan": "300" },
+      "protocolMappers": [
+        {
+          "name": "service-surface-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:surface",
+            "claim.value": "service",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ],
       "defaultClientScopes": [],
       "optionalClientScopes": [
         "eventstore-audience.eventstore",

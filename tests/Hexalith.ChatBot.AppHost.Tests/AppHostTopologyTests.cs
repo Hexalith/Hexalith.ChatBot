@@ -143,6 +143,7 @@ public static class AppHostTopologyTests
         source.ShouldContain("\"hexalith-chatbot\"");
         source.ShouldContain("\"hexalith-eventstore\"");
         source.ShouldContain("\"hexalith-tenants\"");
+        source.ShouldContain("Authentication__BoundCommand__AllowedDomains__tenants");
         realm.ShouldContain("\"clientId\": \"hexalith-chatbot\"");
         realm.ShouldContain("\"clientId\": \"hexalith-eventstore\"");
         realm.ShouldContain("\"clientId\": \"hexalith-tenants\"");
@@ -377,6 +378,19 @@ public static class AppHostTopologyTests
         mcpMapperText.ShouldContain("\"claim.value\": \"mcp-tool\"");
         mcpMapperText.ShouldContain("\"claim.value\": \"mcp\"");
         mcpMapperText.ShouldNotContain("\"claim.value\": \"hexalith-chatbot\"");
+
+        foreach (string workloadClientId in new[] { "eventstore", "chatbot", "tenants", "parties", "projects", "memories" })
+        {
+            JsonElement surfaceMapper = clientsById[workloadClientId].GetProperty("protocolMappers").EnumerateArray()
+                .Single(mapper => mapper.GetProperty("name").GetString() == "service-surface-mapper");
+            surfaceMapper.GetProperty("protocolMapper").GetString().ShouldBe("oidc-hardcoded-claim-mapper", workloadClientId);
+            surfaceMapper.GetProperty("config").GetProperty("claim.name").GetString()
+                .ShouldBe("eventstore:surface", workloadClientId);
+            surfaceMapper.GetProperty("config").GetProperty("claim.value").GetString()
+                .ShouldBe("service", workloadClientId);
+            surfaceMapper.GetProperty("config").GetProperty("access.token.claim").GetString()
+                .ShouldBe("true", workloadClientId);
+        }
     }
 
     /// <summary>

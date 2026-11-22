@@ -736,6 +736,15 @@ public sealed partial class AiExecutionCoordinatorTests
         }
 
         await coordinator.StartAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => provider.ExecuteCount >= 4, TestContext.Current.CancellationToken);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
+
+        // Deadline cancel must not Release while the token-ignoring invocation is still running, so the fifth
+        // generation cannot start until those four slots actually end.
+        provider.ExecuteCount.ShouldBe(4);
+        gateway.Submitted.ShouldBeEmpty();
+
+        provider.ReleaseHung();
         await WaitUntilAsync(() => gateway.Submitted.Count > 0, TestContext.Current.CancellationToken);
         await coordinator.StopAsync(TestContext.Current.CancellationToken);
 
@@ -1301,6 +1310,8 @@ public sealed partial class AiExecutionCoordinatorTests
         private int _executeCount;
 
         public int ExecuteCount => Volatile.Read(ref _executeCount);
+
+        public void ReleaseHung() => _never.TrySetCanceled();
 
         public ValueTask<LowRiskAiAssistanceExecutionRecord> ExecuteAsync(
             AiAssistanceProviderRequest request,

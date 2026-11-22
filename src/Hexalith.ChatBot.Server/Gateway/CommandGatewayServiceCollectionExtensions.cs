@@ -107,10 +107,12 @@ internal static class CommandGatewayServiceCollectionExtensions
         // EventStore sidecar then injects the verified `dapr-caller-app-id: chatbot` header that EventStore's
         // DaprInternal scheme validates against its allow-list (the AppHost grants `chatbot`). BaseAddress is the
         // caller's own sidecar (DAPR_HTTP_ENDPOINT / DAPR_HTTP_PORT, default 3500); the literal localhost host is
-        // deliberately opaque to AddServiceDiscovery so it stays a direct sidecar call. In-process tests replace
-        // IEventStoreGatewayClient with an accepting fake, so this wiring is exercised only in the live topology.
-        string daprHttpEndpoint = Ipv4Loopback(Environment.GetEnvironmentVariable("DAPR_HTTP_ENDPOINT")
-            ?? $"http://127.0.0.1:{Environment.GetEnvironmentVariable("DAPR_HTTP_PORT") ?? "3500"}");
+        // deliberately opaque to AddServiceDiscovery so it stays a direct sidecar call. Do not rewrite that
+        // host to 127.0.0.1: Development TechnicalHttp catalogs bind OwnedEndpoint to the sidecar URL the
+        // catalog observed (typically http://localhost:port). In-process tests replace IEventStoreGatewayClient
+        // with an accepting fake, so this wiring is exercised only in the live topology.
+        string daprHttpEndpoint = Environment.GetEnvironmentVariable("DAPR_HTTP_ENDPOINT")
+            ?? $"http://127.0.0.1:{Environment.GetEnvironmentVariable("DAPR_HTTP_PORT") ?? "3500"}";
         string? daprApiToken = Environment.GetEnvironmentVariable("DAPR_API_TOKEN");
         services.AddTransient<ChatBotBoundCommandHandler>();
         _ = services

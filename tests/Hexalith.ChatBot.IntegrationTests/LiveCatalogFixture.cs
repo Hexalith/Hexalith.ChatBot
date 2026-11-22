@@ -11,6 +11,7 @@ using Aspire.Hosting.Testing;
 using CommunityToolkit.Aspire.Hosting.Dapr;
 
 using Hexalith.EventStore.Aspire;
+using Hexalith.EventStore.DomainService;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -39,6 +40,12 @@ internal sealed class LiveCatalogFixture : IAsyncDisposable
 
     /// <summary>Gets the actual endpoint of this fixture's newly created private Redis backend.</summary>
     public string RedisHost { get; private set; } = string.Empty;
+
+    /// <summary>Gets the Tenants hosted bootstrap receipt path inside this run's private catalog directory.</summary>
+    public string BootstrapReceiptPath =>
+        _catalog is null
+            ? throw new InvalidOperationException("The live catalog has not been composed.")
+            : Path.Combine(_catalog.Directory, "tenants.bootstrap.json");
 
     /// <summary>Creates fresh owner material only alongside a newly created, labeled and isolated business backend.</summary>
     public static async Task<LiveCatalogFixture> CreateAsync(CancellationToken cancellationToken)
@@ -151,45 +158,74 @@ internal sealed class LiveCatalogFixture : IAsyncDisposable
         IResourceBuilder<ProjectResource> Project(string name)
             => builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == name));
         IResourceBuilder<ProjectResource> gateway = Project("eventstore");
-        gateway.WithEnvironment("Authentication__BoundCommand__AllowedDomains__tenants", "tenants,global-administrators");
+        gateway.WithEnvironment("Authentication__BoundCommand__AllowedDomains__tenants", "global-administrators")
+            .WithEnvironment("EventStore__Projections__WorkersEnabled", "false")
+            .WithEnvironment("EventStore__Projections__DefaultRefreshIntervalMs", "0")
+            .WithEnvironment("EventStore__Projections__Domains__global-administrators__RefreshIntervalMs", "0")
+            .WithEnvironment("EventStore__Projections__Domains__tenants__RefreshIntervalMs", "0")
+            .WithEnvironment("EventStore__Projections__Domains__projects__RefreshIntervalMs", "0")
+            .WithEnvironment("EventStore__Projections__Domains__chatbot__RefreshIntervalMs", "0")
+            .WithEnvironment("EventStore__Projections__Domains__party__RefreshIntervalMs", "0")
+            .WithEnvironment("EventStore__ProjectionDispatch__CatalogRefreshInterval", "01:00:00");
+        // Catalog composition later sets DOTNET_ENVIRONMENT on every receiver. Capture that value before
+        // PrepareEventStoreDevelopmentOwnerAsync so ObserveStarts does not treat the same assignment as drift.
+        foreach (string name in new[] { "tenants", "parties", "projects", "chatbot" })
+        {
+            Project(name)
+                .WithEnvironment("DOTNET_ENVIRONMENT", "Development")
+                .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development");
+        }
+
+        // Catalog composition sets DevelopmentBootstrap:Directory on Projects. That host then requires exactly
+        // one of SupportedReads or IsolatedLiveFixtures; this umbrella enrolls Projects as a catalog owner.
+        Project("projects").WithEnvironment("Projects__SupportedReads__Enabled", "true");
+
         foreach ((string name, string? declarations, string? adapters) in new[]
         {
             ("tenants", "Hexalith.Tenants.Contracts.dll", "Hexalith.Tenants.Server.dll"),
             ("parties", "Hexalith.Parties.Contracts.dll", "Hexalith.Parties.EventStoreExtensions.dll"),
             ("projects", (string?)null, (string?)null),
+            ("chatbot", (string?)null, (string?)null),
         })
         {
             // Tenants and Parties enroll their declarations/adapters in separate real runtime
             // dependencies. The public split-artifact overload verifies both against this child.
+            // ChatBot keeps declarations and adapters on the same compiled server image.
             _owners.Add(declarations is null
                 ? await Project(name).PrepareEventStoreDevelopmentOwnerAsync(TimeSpan.FromMinutes(3), cancellationToken).ConfigureAwait(false)
                 : await Project(name).PrepareEventStoreDevelopmentOwnerAsync(declarations, adapters!, TimeSpan.FromMinutes(3), cancellationToken).ConfigureAwait(false));
         }
 
-        List<DevelopmentRouteCatalogReceiver> receivers = [];
-        foreach (string name in new[] { "eventstore", "tenants", "parties", "projects", "chatbot" })
-        {
-            List<DevelopmentRouteCatalogInvocation> traffic = [];
-            if (name == "eventstore")
-            {
-                foreach (string caller in new[] { "tenants", "parties", "projects", "chatbot" })
-                {
-                    foreach (string method in new[] { "api/v1/streams/bound/workload", "api/v1/queries/owner-authority/workload", "api/v1/commands/bound/workload" })
-                    {
-                        traffic.Add(new(Project(caller), method, ["POST"]));
-                    }
-                }
-            }
-            else
-            {
-                foreach (string method in new[] { "process", "replay-state", "query", "project" })
-                {
-                    traffic.Add(new(gateway, method, ["POST"]));
-                }
-            }
-
-            receivers.Add(new(Project(name), traffic));
-        }
+        IResourceBuilder<ProjectResource> tenants = Project("tenants");
+        IResourceBuilder<ProjectResource> parties = Project("parties");
+        IResourceBuilder<ProjectResource> projects = Project("projects");
+        IResourceBuilder<ProjectResource> chatbot = Project("chatbot");
+        DevelopmentRouteCatalogInvocation[] DomainCalls(params string[] methods) => methods
+            .Select(method => new DevelopmentRouteCatalogInvocation(gateway, method, ["POST"]))
+            .ToArray();
+        DevelopmentRouteCatalogReceiver[] receivers =
+        [
+            new(gateway,
+            [
+                new(tenants, "api/v1/commands/bound/workload", ["POST"]),
+                new(tenants, "api/v1/streams/read/workload", ["POST"]),
+                new(parties, "api/v1/commands/bound/workload", ["POST"]),
+                new(parties, "api/v1/streams/read/workload", ["POST"]),
+                new(projects, "api/v1/queries/owner-authority/workload", ["POST"]),
+                new(projects, "api/v1/streams/read/workload", ["POST"]),
+                new(projects, "api/v1/commands", ["POST"]),
+                new(chatbot, "api/v1/commands/bound/workload", ["POST"]),
+                new(chatbot, "api/v1/commands", ["POST"]),
+                new(chatbot, "api/v1/streams/read/workload", ["POST"]),
+                new(chatbot, "api/v1/queries/owner-authority/workload", ["POST"]),
+            ]) { TechnicalHttp = true },
+            new(tenants, DomainCalls("process", "replay-state", "query", "project", "admin/operational-index-metadata")),
+            new(parties, DomainCalls("process", "replay-state", "query", "project", "admin/operational-index-metadata")),
+            new(projects, DomainCalls("process", "query", "project", "project/v2", "project/rebuild/v1", "admin/operational-index-metadata")),
+            new(chatbot, EventStoreDomainServiceRoutes.Operational
+                .Select(route => new DevelopmentRouteCatalogInvocation(gateway, route.Route.Trim('/'), ["POST"]))
+                .ToArray()),
+        ];
 
         string component = Path.Combine(_directory, "business-store.component.json");
         await WritePrivateAsync(component, JsonSerializer.SerializeToUtf8Bytes(new
@@ -205,6 +241,9 @@ internal sealed class LiveCatalogFixture : IAsyncDisposable
             "chatbot-route-catalog", "catalog-authority", "fixture-v1",
             new Dictionary<string, string> { ["fixture-v1"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) }, "fixture-v1");
         _catalog = builder.AddEventStoreDevelopmentRouteCatalog(gateway, _owners.Select(owner => owner.Owner).ToArray(), receivers, component, custody);
+        Project("tenants").WithEnvironment(
+            "Tenants__BootstrapBoundWorkloadReceiptPath",
+            Path.Combine(_catalog.Directory, "tenants.bootstrap.json"));
         builder.Services.AddSingleton<LiveCatalogFixture>(_ => this);
     }
 

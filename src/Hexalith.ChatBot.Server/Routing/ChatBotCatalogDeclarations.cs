@@ -75,6 +75,15 @@ public static class ChatBotCatalogDeclarations
         .. Commands.Select(command => command.Route), .. Queries, .. Projections,
     ]);
 
+    /// <summary>Actual canonical receiver methods for the compiled owner inventory.</summary>
+    public static IReadOnlyDictionary<string, string> ReceiverMethods => Routes.ToDictionary(route => route.RouteId,
+        route => route.Kind switch
+        {
+            "command" => "process",
+            "query" => "query",
+            _ => "project",
+        }, StringComparer.Ordinal);
+
     /// <summary>Actual workload-only receiver contracts. Enrollment does not introduce a machine gateway surface.</summary>
     public static IReadOnlyList<RouteOperationContract> Operations => Array.AsReadOnly(Routes.Select(route =>
     {

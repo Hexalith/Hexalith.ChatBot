@@ -36,6 +36,13 @@ public sealed class ChatBotCatalogTests
         ChatBotCatalogDeclarations.Projections.ShouldHaveSingleItem().Execution!.ProjectionOutputs.ShouldBe(["chatbot"]);
         ChatBotCatalogDeclarations.Operations.Count.ShouldBe(73);
         ChatBotCatalogDeclarations.Operations.ShouldAllBe(operation => operation.Ingress == "internal" && operation.Eligibility == "UI-only");
+        ChatBotCatalogDeclarations.ReceiverMethods.Count.ShouldBe(73);
+        ChatBotCatalogDeclarations.Commands.ShouldAllBe(command =>
+            ChatBotCatalogDeclarations.ReceiverMethods[command.Route.RouteId] == "process");
+        ChatBotCatalogDeclarations.Queries.ShouldAllBe(query =>
+            ChatBotCatalogDeclarations.ReceiverMethods[query.RouteId] == "query");
+        ChatBotCatalogDeclarations.Projections.ShouldAllBe(projection =>
+            ChatBotCatalogDeclarations.ReceiverMethods[projection.RouteId] == "project");
     }
 
     /// <summary>Every actual payload has one typed adapter, and extra payload members cannot silently collide.</summary>

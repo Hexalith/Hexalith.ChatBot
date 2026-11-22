@@ -121,8 +121,9 @@ IResourceBuilder<ProjectResource> parties = prepareDevelopmentCatalogOwners
 IResourceBuilder<ProjectResource> projects = prepareDevelopmentCatalogOwners
     ? builder.AddProject(ChatBotAspireModule.ProjectsAppId, new Projects.Hexalith_Projects_Server().ProjectPath)
     : builder.AddProject<Projects.Hexalith_Projects_Server>(ChatBotAspireModule.ProjectsAppId);
-IResourceBuilder<ProjectResource> chatBot = builder.AddProject<Projects.Hexalith_ChatBot_Server>(
-    ChatBotAspireModule.AppId);
+IResourceBuilder<ProjectResource> chatBot = prepareDevelopmentCatalogOwners
+    ? builder.AddProject(ChatBotAspireModule.AppId, new Projects.Hexalith_ChatBot_Server().ProjectPath)
+    : builder.AddProject<Projects.Hexalith_ChatBot_Server>(ChatBotAspireModule.AppId);
 
 HexalithChatBotResources resources = builder.AddHexalithChatBot(eventStore, tenants, parties, projects, chatBot, accessControlConfigPath);
 
@@ -292,7 +293,8 @@ if (security is not null)
         .WithEnvironment("Authentication__BoundStreamRead__PublicKeys__memories", memoriesCommandPublicKeyParameter)
         .WithEnvironment("Authentication__BoundCommand__AllowedDomains__memories", "memories-tenants,memories-cases,memories-memory-units")
         .WithEnvironment("Authentication__BoundStreamRead__PublicKeys__tenants", tenantsAuthorityReadPublicKeyParameter)
-        .WithEnvironment("Authentication__BoundStreamRead__AllowedDomains__tenants", "tenants")
+        .WithEnvironment("Authentication__BoundStreamRead__AllowedDomains__tenants", "tenants,global-administrators")
+        .WithEnvironment("Authentication__BoundCommand__AllowedDomains__tenants", "global-administrators")
         .WithEnvironment("Authentication__BoundStreamRead__PublicKeys__parties", partiesAuthorityReadPublicKeyParameter)
         .WithEnvironment("Authentication__BoundStreamRead__AllowedDomains__parties", "party")
         .WithEnvironment("Authentication__BoundStreamRead__PublicKeys__projects", projectsAuthorityReadPublicKeyParameter)
@@ -303,15 +305,32 @@ if (security is not null)
             "Hexalith.Tenants.Contracts.Queries.ResolveTenantOwnerAuthority,Hexalith.Parties.Contracts.Queries.ResolveChatBotPartyAuthority");
     _ = tenants.WithJwtBearerSecurity(security, "hexalith-tenants")
         .WithEnvironment("Authentication__JwtBearer__ValidAudiences__0", "tenants")
+        .WithEnvironment("Authentication__JwtBearer__ValidAudiences__1", "hexalith-eventstore")
         .WithEnvironment("EventStore__DomainService__AppId", "tenants")
         .WithEnvironment("Authentication__Workload__Audience", "tenants")
+        .WithEnvironment("Authentication__WorkloadIssuer__Workload", "tenants")
         .WithEnvironment("Authentication__Workload__AllowedCallers__0", "eventstore")
         .WithEventStoreWorkloadClientCredentials("tenants", tenantsAuthorityReaderSecretParameter)
         .WithEnvironment("Authentication__BoundStreamRead__PrivateKey", tenantsAuthorityReadPrivateKeyParameter);
+    if (prepareDevelopmentCatalogOwners)
+    {
+        // BootstrapGlobalAdmin stays catalog-internal. The hosted bound-workload path
+        // preserves the administrator subject; a human POST of that command is refused.
+        _ = tenants
+            .WithEnvironment("Tenants__BootstrapGlobalAdminEnabled", "true")
+            .WithEnvironment("Tenants__BootstrapGlobalAdminUserId", "admin-user")
+            .WithEnvironment("Tenants__BootstrapBoundWorkloadEnabled", "true")
+            .WithEnvironment("EventStore__Authentication__Authority", security.RealmUrl)
+            .WithEnvironment("EventStore__Authentication__ClientId", "hexalith-eventstore")
+            .WithEnvironment("EventStore__Authentication__Username", "admin-user")
+            .WithEnvironment("EventStore__Authentication__Password", eventStoreAdminPassword);
+    }
+
     _ = parties.WithJwtBearerSecurity(security, "hexalith-parties")
         .WithEnvironment("Authentication__JwtBearer__ValidAudiences__0", "parties")
         .WithEnvironment("EventStore__DomainService__AppId", "parties")
         .WithEnvironment("Authentication__Workload__Audience", "parties")
+        .WithEnvironment("Authentication__WorkloadIssuer__Workload", "parties")
         .WithEnvironment("Authentication__Workload__AllowedCallers__0", "eventstore")
         .WithEventStoreWorkloadClientCredentials("parties", partiesAuthorityReaderSecretParameter)
         .WithEnvironment("Authentication__BoundStreamRead__PrivateKey", partiesAuthorityReadPrivateKeyParameter);
@@ -319,6 +338,7 @@ if (security is not null)
         .WithEnvironment("Authentication__JwtBearer__AllowAnonymousDevelopment", "false")
         .WithEnvironment("EventStore__DomainService__AppId", "projects")
         .WithEnvironment("Authentication__Workload__Audience", "projects")
+        .WithEnvironment("Authentication__WorkloadIssuer__Workload", "projects")
         .WithEnvironment("Authentication__Workload__AllowedCallers__0", "eventstore")
         .WithEventStoreWorkloadClientCredentials("projects", projectsAuthorityReaderSecretParameter)
         .WithEnvironment("Authentication__BoundStreamRead__PrivateKey", projectsAuthorityReadPrivateKeyParameter);
@@ -326,6 +346,7 @@ if (security is not null)
         .WithEnvironment("Authentication__JwtBearer__ValidAudiences__0", ChatBotAspireModule.AppId)
         .WithEnvironment("EventStore__DomainService__AppId", ChatBotAspireModule.AppId)
         .WithEnvironment("Authentication__Workload__Audience", ChatBotAspireModule.AppId)
+        .WithEnvironment("Authentication__WorkloadIssuer__Workload", ChatBotAspireModule.AppId)
         .WithEnvironment("Authentication__Workload__AllowedCallers__0", "eventstore");
     _ = chatBot.WithEventStoreWorkloadClientCredentials("chatbot", chatBotAuthorityReaderSecretParameter)
         .WithEnvironment("Authentication__BoundStreamRead__PrivateKey", authorityReadPrivateKeyParameter);
