@@ -26,6 +26,9 @@ decisionLog: .memlog.md
 
 # Hexalith.ChatBot — Experience Spine
 
+> **Current McpCli disposition (Story 5.11 candidate):** The module CLI and stdio MCP adapter are retained compatibility sources. ChatBot has no operation enrolled in the current shipped McpCli cohort. Eligible reads/proposals need decorated Contracts, handler/admission and enrollment proof first. Association decisions, AI-action approval, execution and confirmation-required behavior stay on confidential UI; human-delegated MCP, presence, actorType or confirm claims never grant public-agent authority.
+
+
 **Approved McpCli experience correction (2026-09-27):** Machine-access journeys use `Hexalith.McpCli` CLI and stdio MCP heads for approved agent-eligible ChatBot operations. The old ChatBot CLI/MCP adapters are migration compatibility. Human association decisions, AI-action approvals, and other confirmation-required actions remain on confidential ChatBot UI; the shared heads show a safe refusal and UI handoff. Cross-surface parity applies only to eligible operations and their approved inventory.
 
 

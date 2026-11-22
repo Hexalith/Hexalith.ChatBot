@@ -32,6 +32,9 @@ companions:
 
 # Architecture Spine — Hexalith.ChatBot
 
+> **Current McpCli disposition (Story 5.11 candidate):** The module CLI and stdio MCP adapter are retained compatibility sources. ChatBot has no operation enrolled in the current shipped McpCli cohort. Eligible reads/proposals need decorated Contracts, handler/admission and enrollment proof first. Association decisions, AI-action approval, execution and confirmation-required behavior stay on confidential UI; human-delegated MCP, presence, actorType or confirm claims never grant public-agent authority.
+
+
 **Approved McpCli course correction (2026-09-27):** `Hexalith.McpCli` is the target for Hexalith-owned CLI/MCP access to eligible ChatBot operations. `Hexalith.ChatBot.Cli` and `.Mcp` are obsolete migration sources, not target adapters. ChatBot keeps domain governance, audit, and UI confirmation; McpCli must refuse UI-only or human-confirmation operations under Platform AD-14. Machine-parity claims below apply only to the approved replacement inventory and must not imply unsupported v1 McpCli capability.
 
 

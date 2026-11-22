@@ -75,7 +75,7 @@ Epic 3 project conversation context is currently a ChatBot-owned read projection
 
 Epic 4 AI mediation is currently implemented inside the ChatBot command spine. `DeterministicAiActionRiskClassifier` and `AiActionApprovalGate` are the registered gateway stages, `ExecuteLowRiskAIAssistance` uses the scoped context-package contract, and approved M0 execution is constrained by `ai-action-command-allowlist.m0` to `Project.AppendConversationMessage`. The current conversation writer is metadata-only; do not describe it as a durable sibling `Hexalith.Conversations` write until that binding exists in code.
 
-Epic 5 CLI and MCP surfaces are implemented as thin adapters over `Hexalith.ChatBot.Client`. The CLI uses `System.CommandLine`, the MCP server uses `ModelContextProtocol`, and both submit typed commands through `IChatBotClient.SubmitAsync` with their surface origin. They must not be described as direct DAPR/EventStore/projection clients or as local authorization/governance layers.
+The retained compatibility Epic 5 CLI and MCP surfaces are implemented as thin adapters over `Hexalith.ChatBot.Client`. The CLI uses `System.CommandLine`, the MCP server uses `ModelContextProtocol`, and both submit typed commands through `IChatBotClient.SubmitAsync` with their surface origin. They must not be described as direct DAPR/EventStore/projection clients or as local authorization/governance layers.
 
 The Epic 5 differential-conformance harness now drives the production CLI and MCP adapter translation paths plus the UI/API client seam. Do not describe current parity verification as only M0 CLI/MCP shims.
 
@@ -178,5 +178,22 @@ Every client, user, and secret the AppHost renders into `KeycloakRealms/hexalith
 
 These are versioned compatibility binaries. They are not retired and stay outside every Hexalith.Platform composition.
 
-- `Hexalith.ChatBot.Cli` (CLI): removal gate "ChatBot inventory gates" ([technical-tools inventory 1.0.3](https://github.com/Hexalith/Hexalith.McpCli/blob/main/_bmad-output/implementation-artifacts/technical-tools-migration-inventory-v1.0.3.md) PS12; [ChatBot inventory 1.1.0](https://github.com/Hexalith/Hexalith.McpCli/blob/main/_bmad-output/implementation-artifacts/chatbot-migration-inventory-v1.1.0.md)). Technical inventory SHA-256: `7f2810174ae929e569d9affaccabe745565dcfe4f0487b71847806f3eda1ef8c`. ChatBot inventory SHA-256: `3d801aed7bd80a9a6f3ec225a694ed1aa9e9a9ce7fa263745d90184af5ced49c`.
-- `Hexalith.ChatBot.Mcp` (stdio MCP server): removal gate "ChatBot inventory gates" ([technical-tools inventory 1.0.3](https://github.com/Hexalith/Hexalith.McpCli/blob/main/_bmad-output/implementation-artifacts/technical-tools-migration-inventory-v1.0.3.md) PS13; [ChatBot inventory 1.1.0](https://github.com/Hexalith/Hexalith.McpCli/blob/main/_bmad-output/implementation-artifacts/chatbot-migration-inventory-v1.1.0.md)). Technical inventory SHA-256: `7f2810174ae929e569d9affaccabe745565dcfe4f0487b71847806f3eda1ef8c`. ChatBot inventory SHA-256: `3d801aed7bd80a9a6f3ec225a694ed1aa9e9a9ce7fa263745d90184af5ced49c`.
+- `Hexalith.ChatBot.Cli` (CLI): removal gate "ChatBot inventory gates" ([technical-tools inventory 1.0.4](https://github.com/Hexalith/Hexalith.McpCli/blob/main/_bmad-output/implementation-artifacts/technical-tools-migration-inventory-v1.0.4.md) PS12; [ChatBot inventory 1.1.0](https://github.com/Hexalith/Hexalith.McpCli/blob/main/_bmad-output/implementation-artifacts/chatbot-migration-inventory-v1.1.0.md)). Technical inventory SHA-256: `94985d72232864ab8f40ba212cd0fc73dbd0c5497856073cfd19c2972b89e8b8`. ChatBot inventory SHA-256: `3d801aed7bd80a9a6f3ec225a694ed1aa9e9a9ce7fa263745d90184af5ced49c`.
+- `Hexalith.ChatBot.Mcp` (stdio MCP server): removal gate "ChatBot inventory gates" ([technical-tools inventory 1.0.4](https://github.com/Hexalith/Hexalith.McpCli/blob/main/_bmad-output/implementation-artifacts/technical-tools-migration-inventory-v1.0.4.md) PS13; [ChatBot inventory 1.1.0](https://github.com/Hexalith/Hexalith.McpCli/blob/main/_bmad-output/implementation-artifacts/chatbot-migration-inventory-v1.1.0.md)). Technical inventory SHA-256: `94985d72232864ab8f40ba212cd0fc73dbd0c5497856073cfd19c2972b89e8b8`. ChatBot inventory SHA-256: `3d801aed7bd80a9a6f3ec225a694ed1aa9e9a9ce7fa263745d90184af5ced49c`.
+
+## Shared McpCli access (reconciliation candidate)
+
+The module CLI and stdio MCP adapter are retained compatibility sources. ChatBot has no operation enrolled in the current shipped McpCli cohort. Eligible reads/proposals need decorated Contracts, handler/admission and enrollment proof first. Association decisions, AI-action approval, execution and confirmation-required behavior stay on confidential UI; human-delegated MCP, presence, actorType or confirm claims never grant public-agent authority.
+
+For the verified 2.0.1 examples, install `dotnet tool install --global Hexalith.McpCli --version 2.0.1`.
+Run `hexalith modules`, `hexalith operations tenants` or
+`hexalith operations parties`, and `hexalith describe tenants.list-tenants`
+for offline discovery of the installed cohort. Start the MCP server with
+`hexalith mcp --transport stdio`; it offers five generic tools, never a tool or
+CLI subcommand per operation. Configure a McpCli profile with the documented
+`hexalith config --help` flow before authorized `query` or `send` submission.
+Do not copy the Admin `profiles.json`. Offline Catalog discovery proves neither
+Gateway authorization, live availability nor retirement. A missing operation
+fails safely; confidential human actions hand off to the owning UI, never to
+an alternative module endpoint. No Gateway call is needed for this setup check.
+

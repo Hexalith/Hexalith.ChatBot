@@ -43,6 +43,9 @@ openReleaseGates: [A5, A6, A9a, A10, A11-M1, A11-M2, A13]
 
 # Architecture Decision Document
 
+> **Current McpCli disposition (Story 5.11 candidate):** The module CLI and stdio MCP adapter are retained compatibility sources. ChatBot has no operation enrolled in the current shipped McpCli cohort. Eligible reads/proposals need decorated Contracts, handler/admission and enrollment proof first. Association decisions, AI-action approval, execution and confirmation-required behavior stay on confidential UI; human-delegated MCP, presence, actorType or confirm claims never grant public-agent authority.
+
+
 **Approved McpCli course correction (2026-09-27):** `Hexalith.McpCli` is the target for Hexalith-owned CLI/MCP access to eligible ChatBot operations. `Hexalith.ChatBot.Cli` and `.Mcp` are obsolete migration sources, not target adapters. ChatBot keeps domain governance, audit, and UI confirmation; McpCli must refuse UI-only or human-confirmation operations under Platform AD-14. Machine-parity claims below apply only to the approved replacement inventory and must not imply unsupported v1 McpCli capability.
 
 
@@ -386,8 +389,8 @@ Repository pins were verified against repository state on 2026-09-14.
 | Hosting integrations | `Aspire.Hosting.Keycloak 13.5.3-preview.1.26425.3`; `CommunityToolkit.Aspire.Hosting.Dapr 13.5.0-preview.1.260825-0345` | Deliberate prerelease pins; repository Dapr 1.18 pairing requires live topology evidence and is not upstream-certified by package presence |
 | Published runtime base | `mcr.microsoft.com/dotnet/aspnet:10.0-alpine` | Floating 10.0 patch; exact image digest belongs in candidate evidence |
 | UI | Blazor + prerelease **Fluent UI v5 `5.0.0-rc.5-26219.1`** via FrontComposer | Shared-catalog prerelease pin; upgrade only through dependency governance |
-| CLI surface (M1) | System.CommandLine `2.0.11` wrapping `Hexalith.ChatBot.Client` | Shared-catalog pin |
-| MCP surface (M1) | **ModelContextProtocol 2.2.0**; the implemented ChatBot MCP adapter uses stdio server transport, wraps `Hexalith.ChatBot.Client`, and translates tools to commands/queries without local governance | Pinned in the shared Builds catalog and evaluated through the consumer wrapper; architecture tests assert the evaluated pin and adapter boundary |
+| Retained compatibility CLI surface (M1) | System.CommandLine `2.0.11` wrapping `Hexalith.ChatBot.Client` | Shared-catalog pin |
+| Retained compatibility MCP surface (M1) | **ModelContextProtocol 2.2.0**; the implemented ChatBot MCP adapter uses stdio server transport, wraps `Hexalith.ChatBot.Client`, and translates tools to commands/queries without local governance | Pinned in the shared Builds catalog and evaluated through the consumer wrapper; architecture tests assert the evaluated pin and adapter boundary |
 | AI context / vector store | Hexalith.Memories (Redis Vector / FalkorDB) for scoped AI context + vector indexes (M2, NFR9a isolation) | Existing module |
 | Testing | xUnit v3 `4.0.0`, Shouldly, NSubstitute, Testcontainers; unit / Dapr integration / Aspire E2E; conformance + isolation + idempotency as release gates | Shared-catalog pin; four UI contract assertions still expect `3.2.2`, so their passing status is not inferred |
 | Code organization | Fixed module boundaries; strict Contracts→Server direction; CLI/MCP/UI depend only on Client; governance interfaces `internal` in Server (mechanical FR81a parity guarantee, NetArchTest-verifiable) | Platform convention |
@@ -579,7 +582,7 @@ interfaces, or platform packages are evidence inputs only and do not waive the r
   EventStore can conditionally co-commit an aggregate-local event batch but not the full terminal-idempotency/audit
   unit. Before M0, A13 requires owner acceptance, supported-write-path ACLs, provider ETag/first-write fencing, and
   concurrent-write, duplicate-predecessor, fork, reorder, checkpoint-rebuild, and recovery tests.
-- **Surfaces:** EventStore command/query + REST; CLI (M1); MCP server (M1, shared-catalog-pinned
+- **Surfaces:** EventStore command/query + REST; retained compatibility CLI (M1); MCP server (M1, shared-catalog-pinned
   ModelContextProtocol 2.2.0 with stdio transport in the current implementation);
   SignalR projection-nudge (re-query on nudge, never trust payload).
 - **Long-running response boundary:** return operation identity and current status within five seconds p95. Never hold
@@ -1043,8 +1046,8 @@ Hexalith.ChatBot/                              # umbrella module repo root
 │   │                                            #   accesscontrol.local.yaml), sibling app refs
 │   ├── Hexalith.ChatBot.UI/                   # [M0] Blazor + FrontComposer: S1 conversation, S2 association
 │   │                                            #   review, S3 AI approval; [M1] S4–S7; [M2] S8–S10
-│   ├── Hexalith.ChatBot.Cli/                  # [M1] System.CommandLine, wraps Client (no DAPR, no stages)
-│   ├── Hexalith.ChatBot.Mcp/                  # [M1] ModelContextProtocol stdio server, wraps Client
+│   ├── Hexalith.ChatBot.Cli/                  # Retained compatibility: System.CommandLine, wraps Client (no DAPR, no stages)
+│   ├── Hexalith.ChatBot.Mcp/                  # Retained compatibility: ModelContextProtocol stdio server, wraps Client
 │   ├── Hexalith.ChatBot.Workers/             # [M0] mailbox-ingestion + retry; [M2] projection rebuild, replay
 │   └── Hexalith.ChatBot.Testing/             # [M0] fakes/builders, InMemoryChatBotService, command helpers
 └── tests/
