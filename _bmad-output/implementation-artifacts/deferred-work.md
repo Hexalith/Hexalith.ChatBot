@@ -2451,3 +2451,7 @@ Final native follow-up qualification (2026-10-26): independent review correction
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-12-16-bind-the-live-hexalith-memories-derived-store-backing.md`
   summary: ChatBot package-mode Release still resolves published Memories 2.21.3, which has no `V1.DerivedStores` contracts, and the Memories gitlink was not moved.
   evidence: Implementation Evidence records CS0234/CS0246 in package mode and that publishing `Hexalith.Memories.Contracts` / `Client.Rest` plus updating the Builds catalog is a package-owner action.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-builds-catalog-consumer-authority-completeness.md`
+  summary: Hexalith.Builds `docs/dotnet-11-migration.md:34` still says CommunityToolkit.Aspire.Hosting.Dapr "is 17.0.0-beta.1052", in present tense, but the catalog selects 17.0.0-preview.1.261120-0454.
+  evidence: The sentence sits under "Retained compatibility" and was already stale at Builds 27fe4d62, after the catalog moved through beta.1078 to the preview build. The Builds catalog consumer-authority change edited only the next two lines of that bullet. Fix it by putting the sentence in past tense or by naming the current selection.
