@@ -27,11 +27,15 @@ public sealed class ChatBotMetricsTests
     public void AllOperationalInstrumentsPlusGapCounterAreRegisteredOnTheChatBotMeter()
     {
         using ChatBotMetrics metrics = new(new EmptyLagSource());
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         capture.PublishedInstrumentNames.ShouldBe(
             new[]
             {
+                ChatBotMetrics.ReviewDepth,
+                ChatBotMetrics.ReviewAge,
+                ChatBotMetrics.ReviewWorkflowDepth,
+                ChatBotMetrics.ReviewDelay,
                 ChatBotMetrics.IngestionLatencyInstrumentName,
                 ChatBotMetrics.AssociationLatencyInstrumentName,
                 ChatBotMetrics.ApprovalLatencyInstrumentName,
@@ -47,10 +51,28 @@ public sealed class ChatBotMetricsTests
     }
 
     [Fact]
+    public void ReviewMetricsExposeOnlyBoundedMetadata()
+    {
+        using ChatBotMetrics metrics = new(new EmptyLagSource());
+        using MetricCapture capture = new(metrics);
+        const Contracts.Enums.OperationalQueueFamily family = Contracts.Enums.OperationalQueueFamily.FailedIngestion;
+        metrics.RecordReviewQueue("tenant", family, "private-evidence", 5, 17);
+        metrics.RecordReviewQueue("tenant", family, "failed", 5, 17);
+        metrics.RecordReviewQueue("tenant", family, "retrying", 5, 17);
+        metrics.RecordReviewProjectionDelay("tenant", 12);
+        var transitions = capture.Snapshot().Where(m => m.InstrumentName == ChatBotMetrics.ReviewWorkflowDepth).ToArray();
+        transitions.Select(m => m.Tags[ChatBotMetrics.StatusTagName]).ShouldBe(new[] { "failed", "retrying" });
+        transitions[0].Tags.Keys.ShouldBe(new[] { ChatBotMetrics.TenantTagName, "queue-family", ChatBotMetrics.StatusTagName }, ignoreOrder: true);
+        capture.Single(ChatBotMetrics.ReviewDelay).Tags.Keys.ShouldBe(new[] { ChatBotMetrics.TenantTagName });
+        capture.Snapshot().Where(m => m.InstrumentName == ChatBotMetrics.ReviewDepth).Select(m => m.Value).ShouldBe([5, 5, 5]);
+        capture.Snapshot().Where(m => m.InstrumentName == ChatBotMetrics.ReviewAge).Select(m => m.Value).ShouldBe([17, 17, 17]);
+    }
+
+    [Fact]
     public void WorkflowLifecycleCounterCarriesOnlyBoundedWorkflowDimensions()
     {
         using ChatBotMetrics metrics = new(new EmptyLagSource());
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         metrics.RecordWorkflowLifecycle("tenant-workflow", "started", "none");
 
@@ -71,7 +93,7 @@ public sealed class ChatBotMetricsTests
     public void LatencyHistogramsRecordDurationsWithBoundedDimensions(string instrumentName, string operationClass)
     {
         using ChatBotMetrics metrics = new(new EmptyLagSource());
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         switch (instrumentName)
         {
@@ -91,7 +113,7 @@ public sealed class ChatBotMetricsTests
     public void RetryExhaustedAndDuplicateSuppressedCountersFire()
     {
         using ChatBotMetrics metrics = new(new EmptyLagSource());
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         metrics.RecordRetryExhausted("tenant-beta");
         metrics.RecordDuplicateSuppressed("tenant-beta");
@@ -110,7 +132,7 @@ public sealed class ChatBotMetricsTests
     public void EveryOperationalMeasurementCarriesOnlyTenantAndOperationClassDimensions()
     {
         using ChatBotMetrics metrics = new(new EmptyLagSource());
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         metrics.RecordIngestionLatency("tenant-a", 1);
         metrics.RecordAssociationLatency("tenant-a", 1);
@@ -136,7 +158,7 @@ public sealed class ChatBotMetricsTests
         StubLagSource source = new(
             [new AuditProjectionLagReading("tenant-lag", LastProjectedPosition: 100, LatestCommittedPosition: 105, DateTimeOffset.UtcNow)]);
         using ChatBotMetrics metrics = new(source);
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         capture.RecordObservable();
 
@@ -153,7 +175,7 @@ public sealed class ChatBotMetricsTests
         StubLagSource source = new(
             [new AuditProjectionLagReading("tenant-lag", LastProjectedPosition: null, LatestCommittedPosition: null, DateTimeOffset.UtcNow)]);
         using ChatBotMetrics metrics = new(source);
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         capture.RecordObservable();
 
@@ -170,7 +192,7 @@ public sealed class ChatBotMetricsTests
         {
             InstrumentPublished = (instrument, listener) =>
             {
-                if (instrument.Meter.Name == ChatBotMetrics.MeterName &&
+                if (ReferenceEquals(instrument.Meter, metrics.Meter) &&
                     instrument.Name == ChatBotMetrics.IngestionLatencyInstrumentName)
                 {
                     listener.EnableMeasurementEvents(instrument);
@@ -180,7 +202,7 @@ public sealed class ChatBotMetricsTests
         thrower.SetMeasurementEventCallback<double>((_, _, _, _) => throw new InvalidOperationException("exporter down"));
         thrower.Start();
 
-        using MetricCapture gapCapture = new(instrument => instrument.Name == ChatBotMetrics.EmissionFailuresInstrumentName);
+        using MetricCapture gapCapture = new(metrics, instrument => instrument.Name == ChatBotMetrics.EmissionFailuresInstrumentName);
 
         // Must not throw into the operation path even though the underlying record throws.
         Should.NotThrow(() => metrics.RecordIngestionLatency("tenant-gamma", 9.0));
@@ -195,7 +217,7 @@ public sealed class ChatBotMetricsTests
     public void MissingBoundTenantIsCountedAsAGapAndSkipsTheMeasurement()
     {
         using ChatBotMetrics metrics = new(new EmptyLagSource());
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         metrics.RecordIngestionLatency("   ", 4.0);
 
@@ -211,7 +233,7 @@ public sealed class ChatBotMetricsTests
         // AC4/AC6 dimension-name ban for the gap signal itself: the meta-counter must NOT carry the tenant tag (the
         // failure being counted is often a missing/blank bound tenant) — only operation-class + a stable reason.
         using ChatBotMetrics metrics = new(new EmptyLagSource());
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         // A blank bound tenant is a gap: it increments the meta-counter with reason `tenant-unavailable`.
         metrics.RecordIngestionLatency(" ", 3.0);
@@ -229,7 +251,7 @@ public sealed class ChatBotMetricsTests
         StubLagSource source = new(
             [new AuditProjectionLagReading("tenant-lag", LastProjectedPosition: 100, LatestCommittedPosition: 105, DateTimeOffset.UtcNow)]);
         using ChatBotMetrics metrics = new(source);
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         capture.RecordObservable();
 
@@ -244,7 +266,7 @@ public sealed class ChatBotMetricsTests
         // carrying only the low-cardinality tenant tag (the fraction is never a dimension).
         StubCompletenessSource source = new([new AuditCompletenessReading("tenant-c", IsMeasurable: true, Fraction: 0.994)]);
         using ChatBotMetrics metrics = new(new EmptyLagSource(), auditCompletenessSource: source);
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         capture.RecordObservable();
 
@@ -260,7 +282,7 @@ public sealed class ChatBotMetricsTests
         // Fail-safe doctrine: an unmeasurable tenant publishes NO measurement — never a fabricated 1.0.
         StubCompletenessSource source = new([new AuditCompletenessReading("tenant-c", IsMeasurable: false, Fraction: 0.0)]);
         using ChatBotMetrics metrics = new(new EmptyLagSource(), auditCompletenessSource: source);
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         capture.RecordObservable();
 
@@ -271,7 +293,7 @@ public sealed class ChatBotMetricsTests
     public void AuditCompletenessSourceFailureIsSwallowedAndCountedAsAGap()
     {
         using ChatBotMetrics metrics = new(new EmptyLagSource(), auditCompletenessSource: new ThrowingCompletenessSource());
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         Should.NotThrow(capture.RecordObservable);
 
@@ -285,7 +307,7 @@ public sealed class ChatBotMetricsTests
     public void AuditLagSourceFailureIsSwallowedAndCountedAsAGap()
     {
         using ChatBotMetrics metrics = new(new ThrowingLagSource());
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         Should.NotThrow(capture.RecordObservable);
 
@@ -302,7 +324,7 @@ public sealed class ChatBotMetricsTests
         // ReadAndClear picks it up — the integration that turns the OTel counter into a fired alert.
         RecordingRetrySource retrySource = new();
         using ChatBotMetrics metrics = new(new EmptyLagSource(), retrySource);
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         metrics.RecordRetryExhausted("tenant-beta");
 
@@ -316,7 +338,7 @@ public sealed class ChatBotMetricsTests
         // Story 8.4 (AC2/NFR43 non-invasive): a throwing alert source must never surface on the metric-recording path;
         // it is swallowed and gap-counted (same exception-isolation posture as the OTel emissions).
         using ChatBotMetrics metrics = new(new EmptyLagSource(), new ThrowingRetrySource());
-        using MetricCapture capture = new();
+        using MetricCapture capture = new(metrics);
 
         Should.NotThrow(() => metrics.RecordRetryExhausted("tenant-beta"));
 
@@ -389,11 +411,11 @@ public sealed class ChatBotMetricsTests
         private readonly List<string> _published = [];
         private readonly object _sync = new();
 
-        public MetricCapture(Func<Instrument, bool>? enable = null)
+        public MetricCapture(ChatBotMetrics metrics, Func<Instrument, bool>? enable = null)
         {
             _listener.InstrumentPublished = (instrument, listener) =>
             {
-                if (instrument.Meter.Name != ChatBotMetrics.MeterName)
+                if (!ReferenceEquals(instrument.Meter, metrics.Meter))
                 {
                     return;
                 }
@@ -408,6 +430,7 @@ public sealed class ChatBotMetricsTests
                     listener.EnableMeasurementEvents(instrument);
                 }
             };
+            _listener.SetMeasurementEventCallback<int>((instrument, value, tags, _) => Record(instrument.Name, value, tags));
             _listener.SetMeasurementEventCallback<double>((instrument, value, tags, _) => Record(instrument.Name, value, tags));
             _listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) => Record(instrument.Name, value, tags));
             _listener.Start();

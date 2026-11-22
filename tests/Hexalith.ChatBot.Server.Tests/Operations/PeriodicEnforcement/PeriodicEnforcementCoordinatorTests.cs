@@ -529,6 +529,9 @@ public sealed class PeriodicEnforcementCoordinatorTests
             .UpsertApprovalEventAsync(ApprovalDecision(Tenant, "approval-alpha"), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         await store
+            .UpsertApprovalEventAsync(ApprovalRequest(Tenant, "approval-still-open"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        await store
             .UpsertApprovalEventAsync(ApprovalRequest("tenant-beta", "approval-beta"), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 

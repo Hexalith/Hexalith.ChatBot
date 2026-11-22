@@ -92,7 +92,7 @@ public sealed class ChatBotDevelopmentBootstrapTests
                 .ShouldBe(ChatBotCatalogDeclarations.Routes.Select(RouteCatalogCodec.ComputeDeclarationDigest).Order());
             observation.Operations.ShouldNotBeNull().Select(operation => operation.Digest).Order()
                 .ShouldBe(ChatBotCatalogDeclarations.Operations.Select(operation => operation.Digest).Order());
-            observation.Targets.Count.ShouldBe(73);
+            observation.Targets.Count.ShouldBe(77);
             observation.Targets.ShouldAllBe(target => target.AppId == "chatbot");
             observation.ReceiverSurface.ShouldNotBeNull().FenceVersion.ShouldBe(FiniteRouteCatalogReceiver.Version);
             foreach (string path in new[] { "/process", "/query", "/project" })

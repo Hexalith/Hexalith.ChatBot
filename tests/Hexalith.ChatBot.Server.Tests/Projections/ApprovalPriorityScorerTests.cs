@@ -126,7 +126,7 @@ public sealed class ApprovalPriorityScorerTests
             "correlation-alpha");
 
         result.Rows.Count.ShouldBe(3);
-        result.Rows[0].ItemRef.ShouldContain("approval-high");
+        result.Rows[0].ItemRef.ShouldBe(items[1].ItemRef);
         result.Rows.Select(static row => row.PriorityScore).ShouldBeInOrder(SortDirection.Descending);
         result.Rows.ShouldAllBe(static row => row.GroupKey != null && row.GroupKey.StartsWith("sha256:"));
         // Priority explanation is a single safe token (no spaces) — never a free-form sentence carrying content.
@@ -149,6 +149,7 @@ public sealed class ApprovalPriorityScorerTests
         AdminQueueSummaryProjectionItem lower = ApprovalQueueItemBuilder.TryBuild(lowerVersion, ApprovalPriorityWeights.SafeDefaults, clock)!;
         AdminQueueSummaryProjectionItem higher = ApprovalQueueItemBuilder.TryBuild(higherVersion, ApprovalPriorityWeights.SafeDefaults, clock)!;
         lower.PriorityScore.ShouldBe(higher.PriorityScore);
+        lower.ItemRef.ShouldBe(higher.ItemRef);
 
         OperationalQueueSearchResult result = AdminQueueSummaryProjector.Search(
             new SearchOperationalQueueItems(

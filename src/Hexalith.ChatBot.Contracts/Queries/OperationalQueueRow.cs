@@ -26,4 +26,4 @@ public sealed record OperationalQueueRow(
     string? GroupKey = null,
     string? GroupRequesterRef = null,
     string? GroupCommandRef = null,
-    string? GroupProjectRef = null);
+    string? GroupProjectRef = null, string? Revision = null);

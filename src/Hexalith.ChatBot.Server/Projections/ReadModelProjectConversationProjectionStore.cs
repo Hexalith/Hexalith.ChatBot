@@ -282,7 +282,7 @@ internal sealed class ReadModelProjectConversationProjectionStore(
                     attachment.FileId,
                     attachment.RedactionState,
                     Math.Max(association.SourceVersion, attachment.SourceVersion),
-                    string.IsNullOrWhiteSpace(association.CorrelationId) ? attachment.CorrelationId : association.CorrelationId)));
+                    string.IsNullOrWhiteSpace(association.CorrelationId) ? attachment.CorrelationId : association.CorrelationId, attachment.RetryState)));
         }
 
         return candidates;
@@ -675,11 +675,7 @@ internal sealed class ReadModelProjectConversationProjectionStore(
 
         FixedClock clock = new(nowUtc);
         IReadOnlyList<ApprovalEventView> approvals = await ReadApprovalEventsAsync(tenantId, cancellationToken).ConfigureAwait(false);
-        return approvals
-            .Select(approval => ApprovalQueueItemBuilder.TryBuild(approval, ApprovalPriorityWeights.SafeDefaults, clock))
-            .OfType<AdminQueueSummaryProjectionItem>()
-            .OrderBy(static item => item.ItemRef, StringComparer.Ordinal)
-            .ToArray();
+        return ApprovalQueueItemBuilder.BuildPending(approvals, clock);
     }
 
     public async Task<IReadOnlyList<ApprovalEventView>> ReadApprovalEventsAsync(
@@ -696,7 +692,10 @@ internal sealed class ReadModelProjectConversationProjectionStore(
             foreach (string itemId in projectIndex.ItemIds)
             {
                 ApprovalEventView? approval = await GetAsync<ApprovalEventView>(ApprovalEventStateKeyFor(tenantId, projectId, itemId), cancellationToken).ConfigureAwait(false);
-                if (approval is not null)
+                if (approval is not null &&
+                    string.Equals(approval.TenantId, tenantId, StringComparison.Ordinal) &&
+                    string.Equals(approval.ProjectId, projectId, StringComparison.Ordinal) &&
+                    string.Equals(approval.StableItemId, itemId, StringComparison.Ordinal))
                 {
                     approvals.Add(approval);
                 }

@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Server.Audit;
@@ -14,6 +16,18 @@ namespace Hexalith.ChatBot.Server.Projections;
 internal static class ApprovalQueueItemBuilder
 {
     public const string QueueRef = "queue:pending-approval";
+
+    /// <summary>Folds retained event history to each approval's current state before selecting open work.</summary>
+    public static IReadOnlyList<AdminQueueSummaryProjectionItem> BuildPending(
+        IEnumerable<ApprovalEventView> history,
+        ISystemClock clock)
+        => history
+            .GroupBy(static approval => (approval.TenantId, approval.ProjectId, approval.ApprovalId))
+            .Select(static subject => subject.MaxBy(static approval => (approval.SourceVersion, approval.EventKind))!)
+            .Select(approval => TryBuild(approval, ApprovalPriorityWeights.SafeDefaults, clock))
+            .OfType<AdminQueueSummaryProjectionItem>()
+            .OrderBy(static item => item.ItemRef, StringComparer.Ordinal)
+            .ToArray();
 
     /// <summary>
     /// Maps a single pending approval to its prioritized/grouped queue row, or returns <see langword="null"/> for a
@@ -39,7 +53,7 @@ internal static class ApprovalQueueItemBuilder
 
         return new AdminQueueSummaryProjectionItem(
             QueueRef: QueueRef,
-            ItemRef: view.StableItemId,
+            ItemRef: "approval:" + ProjectConversationStableId.Hash(JsonSerializer.Serialize(new[] { view.TenantId, view.ProjectId, view.ApprovalId })),
             Status: OperationalQueueFamilies.ToWireValue(OperationalQueueFamily.PendingApproval),
             OwnerClass: "operations",
             Health: ChatBotHealthStatus.Healthy,

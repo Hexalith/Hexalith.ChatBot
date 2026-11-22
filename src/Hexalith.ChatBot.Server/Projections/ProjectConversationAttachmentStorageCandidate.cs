@@ -19,4 +19,4 @@ internal sealed record ProjectConversationAttachmentStorageCandidate(
     string? FileId,
     string RedactionState,
     long SourceVersion,
-    string CorrelationId);
+    string CorrelationId, string? RetryState = null);

@@ -6,3 +6,6 @@ runs:
     - name: Require live topology and browser prerequisites
       shell: bash
       run: python3 .github/actions/after-unit-tests/require-runtime.py
+    - name: Verify review queue restarts on a disposable state store
+      shell: bash
+      run: bash .github/actions/after-unit-tests/run-native-review-queues.sh

@@ -6,4 +6,5 @@ public sealed record OperationalQueueItemDetail(
     OperationalQueueRow Summary,
     string DetailAccessState,
     string SafeDetailStatus,
-    IReadOnlyList<string> EscalationActions);
+    IReadOnlyList<string> EscalationActions,
+    IReadOnlyList<ReviewQueueHistoryEntry>? History = null);

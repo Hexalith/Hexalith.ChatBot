@@ -22,21 +22,21 @@ public sealed class ChatBotCatalogTests
     {
         Type[] actual = typeof(GovernedOperationAggregate).GetMethods(BindingFlags.Public | BindingFlags.Static)
             .Where(method => method.Name == "Handle").Select(method => method.GetParameters()[0].ParameterType).Distinct().ToArray();
-        ChatBotCatalogDeclarations.CommandTypes.Count.ShouldBe(64);
+        ChatBotCatalogDeclarations.CommandTypes.Count.ShouldBe(65);
         ChatBotCatalogDeclarations.CommandTypes.OrderBy(type => type.FullName)
             .ShouldBe(actual.OrderBy(type => type.FullName));
         IReadOnlyList<RouteContractDeclaration> queries = DomainCatalogCapabilities.Queries(typeof(GovernedOperationAggregate).Assembly);
-        queries.Count.ShouldBe(8);
+        queries.Count.ShouldBe(11);
         queries.Select(RouteCatalogCodec.ComputeDeclarationDigest).Order()
             .ShouldBe(ChatBotCatalogDeclarations.Queries.Select(RouteCatalogCodec.ComputeDeclarationDigest).Order());
-        ChatBotCatalogDeclarations.Routes.Count.ShouldBe(73);
+        ChatBotCatalogDeclarations.Routes.Count.ShouldBe(77);
         CompiledRouteCatalogDeclarations.Read([typeof(GovernedOperationAggregate).Assembly]).Select(route => route.RouteId).Order()
             .ShouldBe(ChatBotCatalogDeclarations.Routes.Select(route => route.RouteId).Order());
         foreach (RouteContractDeclaration route in ChatBotCatalogDeclarations.Routes) { RouteCatalogValidator.ValidateDeclaration(route); }
         ChatBotCatalogDeclarations.Projections.ShouldHaveSingleItem().Execution!.ProjectionOutputs.ShouldBe(["chatbot"]);
-        ChatBotCatalogDeclarations.Operations.Count.ShouldBe(73);
+        ChatBotCatalogDeclarations.Operations.Count.ShouldBe(77);
         ChatBotCatalogDeclarations.Operations.ShouldAllBe(operation => operation.Ingress == "internal" && operation.Eligibility == "UI-only");
-        ChatBotCatalogDeclarations.ReceiverMethods.Count.ShouldBe(73);
+        ChatBotCatalogDeclarations.ReceiverMethods.Count.ShouldBe(77);
         ChatBotCatalogDeclarations.Commands.ShouldAllBe(command =>
             ChatBotCatalogDeclarations.ReceiverMethods[command.Route.RouteId] == "process");
         ChatBotCatalogDeclarations.Queries.ShouldAllBe(query =>
@@ -50,7 +50,7 @@ public sealed class ChatBotCatalogTests
     public void OwnerAdaptersMustBindAllPayloadFieldsWithIndependentSdkRetention()
     {
         IReadOnlyList<IDeclaredIdempotencyIntentAdapter> adapters = ChatBotCatalogAdapters.Create();
-        adapters.Count.ShouldBe(64);
+        adapters.Count.ShouldBe(65);
         adapters.Select(adapter => adapter.CommandType).Order().ShouldBe(ChatBotCatalogDeclarations.CommandTypes.Select(type => type.Name).Order());
         adapters.ShouldAllBe(adapter => adapter.RetentionTier == IdempotencyReplayRetentionTier.Mutation);
         IDeclaredIdempotencyIntentAdapter note = adapters.Single(adapter => adapter.CommandType == nameof(RecordGovernedNote));

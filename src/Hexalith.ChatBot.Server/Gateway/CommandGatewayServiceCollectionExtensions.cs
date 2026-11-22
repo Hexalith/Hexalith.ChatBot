@@ -175,6 +175,14 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<AiExecutionCoordinator>();
         services.TryAddSingleton<IAiExecutionCoordinator>(static provider => provider.GetRequiredService<AiExecutionCoordinator>());
         services.TryAddSingleton<IApprovedAiActionCommandAllowlist, ApprovedAiActionCommandAllowlist>();
+        services.TryAddScoped<Hexalith.EventStore.Client.Streams.IAuthoritativeEventStreamReader>(provider =>
+            new Hexalith.EventStore.Client.Streams.AuthoritativeEventStreamReader(provider.GetRequiredService<ChatBotBoundOwnerStreamGateway>(),
+                TimeProvider.System, TimeSpan.FromSeconds(5)));
+        services.AddKeyedScoped<Hexalith.EventStore.Client.Streams.IAuthoritativeEventStreamReader>("review-queue-native", (provider, _) =>
+            new Hexalith.EventStore.Client.Streams.AuthoritativeEventStreamReader(provider.GetRequiredService<ChatBotBoundOwnerStreamGateway>(),
+                TimeProvider.System, TimeSpan.FromSeconds(5), requireNativeProof: true));
+        services.TryAddScoped<Governance.Policy.ReviewQueueDisclosurePolicy>();
+        services.TryAddScoped<ReviewQueueAggregateReader>();
         services.TryAddSingleton<IConversationWriter, MetadataOnlyConversationWriter>();
         services.TryAddSingleton<IAssociationProjectionStore, InMemoryAssociationProjectionStore>();
         services.TryAddSingleton<IAiActionProposalInvalidationCoordinator, AiActionProposalInvalidationCoordinator>();
@@ -371,6 +379,7 @@ internal static class CommandGatewayServiceCollectionExtensions
     public static IServiceCollection AddChatBotCorrectionPropagationWorkflow(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+        services.TryAddSingleton<ReviewRetryScheduler>();
 
         services.RemoveAll<ICorrectionPropagationWorkflowRuntime>();
         services.RemoveAll<IIngestionBindingWorkflowRuntime>();
@@ -380,6 +389,9 @@ internal static class CommandGatewayServiceCollectionExtensions
         {
             options.RegisterWorkflow<CorrectionPropagationWorkflow>();
             options.RegisterWorkflow<IngestionBindingWorkflow>();
+            options.RegisterWorkflow<ReviewedIngestionBindingWorkflow>();
+            options.RegisterWorkflow<ReviewRetryWorkflow>();
+            options.RegisterActivity<RejoinReviewOperationActivity>();
             options.RegisterActivity<CorrectionPropagationScopeActivity>();
             options.RegisterActivity<CorrectionPropagationResolveCaseActivity>();
             options.RegisterActivity<CorrectionPropagationRetryStatusActivity>();
@@ -392,6 +404,7 @@ internal static class CommandGatewayServiceCollectionExtensions
             options.RegisterActivity<IngestionBindingStartSourceActivity>();
             options.RegisterActivity<IngestionBindingGetStatusActivity>();
             options.RegisterActivity<IngestionBindingFinalizeActivity>();
+            options.RegisterActivity<IngestionReviewActivity>();
         });
 
         return services;
@@ -415,6 +428,8 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.RemoveAll<IOperationStatusStore>();
         services.RemoveAll<IAiExecutionWorkStore>();
         return services
+            .AddSingleton<ReviewQueueStore>()
+            .AddSingleton<IWorkflowReviewCommandWriter, WorkflowReviewCommandWriter>()
             .AddSingleton<IReadModelStore, DaprReadModelStore>()
             .AddSingleton<IGovernedOperationProjectionStore, ReadModelGovernedOperationViewStore>()
             .AddSingleton<IGovernedControlStateProjectionStore, ReadModelGovernedControlStateProjectionStore>()

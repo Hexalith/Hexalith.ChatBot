@@ -47,6 +47,20 @@ internal sealed class ChatBotRequestAuthorizer(ChatBotAuthorityCatalog catalog, 
         return allowed;
     }
 
+    internal async Task<bool> HasQueueResourceAuthoritiesAsync(ChatBotAuthorityPrincipal principal, string[] resources, string operation, CancellationToken token)
+    {
+        if (resources.Length is 0 or > MaxDistinctOwnerReferences) { return false; }
+        DateTimeOffset started = clock.UtcNow;
+        foreach (string resource in resources)
+        {
+            if (!IsCurrent(principal) || !AuditMetadata.IsSafeStableIdentifier(resource) || resource == "*") { return false; }
+            var evidence = await GetEvidenceAsync(Request(principal.Context, "ChatBot", resource, operation, "operation", true), started, token).ConfigureAwait(false);
+            if (evidence is null) { return false; }
+            principal.RetainValidatedEvidence([(evidence, started)]);
+        }
+        return IsCurrent(principal);
+    }
+
     /// <summary>Checks the closed operation row and every bound owner scope.</summary>
     public async ValueTask<ChatBotAuthorityDecision> AuthorizeAsync(ChatBotRequestContext context, string operation, bool isQuery, object? payload, CancellationToken cancellationToken, string? fallbackAggregateId = null)
     {

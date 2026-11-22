@@ -50,6 +50,8 @@ public sealed class IngestionBindingWorkflowRunnerTests
 
         await Should.ThrowAsync<InvalidOperationException>(() => IngestionBindingWorkflowRunner.RunAsync(request, steps));
 
+        steps.Review.Last().Reason.ShouldBe("attachment_manifest_invalid");
+        steps.Review.Last().State.ShouldBe("exhausted");
         steps.Started.ShouldBeEmpty();
         steps.Finalized.ShouldBeEmpty();
     }
@@ -75,6 +77,8 @@ public sealed class IngestionBindingWorkflowRunnerTests
         steps.FinalizeFailuresRemaining.ShouldBe(0);
         steps.Finalized.Count.ShouldBe(1);
         steps.Delays.ShouldBe(7);
+        foreach (var phase in steps.Review.GroupBy(f => f.Phase))
+        { phase.Select(f => f.State).ShouldBe(["failed", "retrying", "recovered"]); }
     }
 
     [Fact]
@@ -95,6 +99,33 @@ public sealed class IngestionBindingWorkflowRunnerTests
         steps.Delays.ShouldBe(4);
         steps.Started.Count.ShouldBe(3);
         steps.Finalized.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task ExhaustionCommitsTheFinalOwnerFailureWithoutFinalizing()
+    {
+        var request = Request();
+        var steps = new RecordingSteps(Context(request)) { StartFailuresRemaining = 10 };
+        await Should.ThrowAsync<InvalidOperationException>(() => IngestionBindingWorkflowRunner.RunAsync(request, steps));
+        steps.Review.Last().State.ShouldBe("exhausted");
+        steps.Review.Last().Attempt.ShouldBe(4);
+        steps.Review.Count(f => f.State == "retrying").ShouldBe(4);
+        steps.Review.ShouldNotContain(f => f.State == "recovered");
+        steps.Finalized.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task FinalizeRetryResumesTheOwnerConfirmedUnitsWithoutNewSourceWork()
+    {
+        var original = Request();
+        var steps = new RecordingSteps(Context(original)) { FinalizeFailuresRemaining = 10 };
+        await Should.ThrowAsync<InvalidOperationException>(() => IngestionBindingWorkflowRunner.RunAsync(original, steps));
+        var receipt = steps.Review.First(f => f.Phase == "finalize" && f.State == "failed");
+        var retry = original with { RetryPhase = "finalize", RetryAttempt = 1, IndexedUnits = receipt.IndexedUnits };
+        var resumed = new RecordingSteps(Context(retry));
+        await IngestionBindingWorkflowRunner.RunAsync(retry, resumed);
+        resumed.Started.ShouldBeEmpty();
+        resumed.Finalized.ShouldHaveSingleItem().CompletedSources.Select(s => s.MemoryUnitId).ShouldBe(receipt.IndexedUnits!);
     }
 
     private static IngestionBindingRequest Request()
@@ -186,6 +217,14 @@ public sealed class IngestionBindingWorkflowRunnerTests
                 completed ? "Completed" : "Running",
                 completed ? $"unit-{operation.Source.RecordKind}-{operation.Source.Ordinal}" : null,
                 completed));
+        }
+
+        public List<IngestionReviewInput> Review { get; } = [];
+
+        public Task RecordReviewAsync(IngestionReviewInput input)
+        {
+            Review.Add(input);
+            return Task.CompletedTask;
         }
 
         public Task DelayAsync(TimeSpan delay)

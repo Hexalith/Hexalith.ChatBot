@@ -19,7 +19,12 @@ internal sealed partial class FoldersFolderStore
         _nativeClock = clock ?? TimeProvider.System;
     }
 
-    private async ValueTask<MailboxAttachmentStorageResult> StoreNativeAsync(StoreMailboxAttachmentRequest request, CancellationToken token)
+    public bool NeedsSubmissionFence => _native is null;
+
+    public ValueTask<MailboxAttachmentStorageResult> ConfirmMailboxAttachmentAsync(StoreMailboxAttachmentRequest request, CancellationToken cancellationToken)
+        => _native is null ? ValueTask.FromResult(EvidenceUnavailable()) : StoreNativeAsync(request, cancellationToken, confirmationOnly: true);
+
+    private async ValueTask<MailboxAttachmentStorageResult> StoreNativeAsync(StoreMailboxAttachmentRequest request, CancellationToken token, bool confirmationOnly = false)
     {
         if (!string.Equals(request.TenantId, _nativeTenant, StringComparison.Ordinal)) return NativeFailure(false, "folders_authorization_unavailable");
         if (request.Content.Kind is not Adapters.Mailbox.MailboxAttachmentContentResultKind.Available)
@@ -51,6 +56,7 @@ internal sealed partial class FoldersFolderStore
             prior = await QueryAsync(task, operation, path, key, false, NativeEvidenceTokens.Accepted, 0, work.Token).ConfigureAwait(false);
             if (prior.Status == NativeEvidenceTokens.Accepted) return await FinishAsync(prior, task, operation, key, work.Token).ConfigureAwait(false);
             if (prior.Status != "missing") return EvidenceUnavailable();
+            if (confirmationOnly) return EvidenceUnavailable();
             lease = await _native!.ChangeNativeTaskLeaseAsync(folder, workspace, request.CorrelationId, task,
                 new NativeLeaseRequest { Operation = "acquire", RequestedLeaseSeconds = 300 }, work.Token).ConfigureAwait(false);
             if (lease.LockFence <= 0 || string.IsNullOrWhiteSpace(lease.LockId) || string.IsNullOrWhiteSpace(lease.OwnershipProof)
@@ -162,7 +168,7 @@ internal sealed partial class FoldersFolderStore
                     LockFence = evidence.LockFence, OperationId = queryOperation, AcceptedKey = key, Fingerprint = evidence.Fingerprint }, cancellation).ConfigureAwait(false);
             }
             return MailboxAttachmentStorageResult.Succeeded(new StoredMailboxAttachmentReference(folder, evidence.FileId,
-                replay ? "duplicate-suppressed" : "unique", "not-retryable", "pending-scan", [], queryOperation, key));
+                replay ? "duplicate-suppressed" : "unique", "not-retryable", "pending-scan", [], queryOperation, key, ContentConfirmed: true));
         }
     }
     internal static DateTimeOffset NextLeaseObservationAt(NativeLease lease, DateTimeOffset lastAuthorization)

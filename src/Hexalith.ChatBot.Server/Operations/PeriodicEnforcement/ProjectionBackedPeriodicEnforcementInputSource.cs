@@ -16,10 +16,14 @@ namespace Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
 
 internal sealed class ProjectionBackedPeriodicEnforcementInputSource(
     IProjectConversationProjectionStore conversationStore,
-    ISystemClock clock) : IPeriodicEnforcementInputSource
+    ISystemClock clock, ReviewQueueStore? queues = null, IServiceScopeFactory? scopes = null, IChatBotMetrics? metrics = null) : IPeriodicEnforcementInputSource
 {
     public async ValueTask<IReadOnlyList<string>> GetTenantRefsAsync(CancellationToken cancellationToken)
-        => await conversationStore.EnumerateTenantIdsAsync(cancellationToken).ConfigureAwait(false);
+    {
+        var tenants = await conversationStore.EnumerateTenantIdsAsync(cancellationToken).ConfigureAwait(false);
+        return queues is null ? tenants : tenants.Concat(await queues.ReadTenantsAsync(cancellationToken).ConfigureAwait(false))
+            .Distinct(StringComparer.Ordinal).ToArray();
+    }
 
     public async ValueTask<PeriodicEnforcementTenantInputs> GetTenantInputsAsync(
         string tenantRef,
@@ -27,9 +31,29 @@ internal sealed class ProjectionBackedPeriodicEnforcementInputSource(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantRef);
 
-        IReadOnlyList<AdminQueueSummaryProjectionItem> queueItems = await conversationStore
-            .ReadOperationalQueueItemsAsync(tenantRef, clock.UtcNow, cancellationToken)
-            .ConfigureAwait(false);
+        IReadOnlyList<AdminQueueSummaryProjectionItem> queueItems;
+        if (queues is null)
+        {
+            queueItems = await conversationStore.ReadOperationalQueueItemsAsync(tenantRef, clock.UtcNow, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            using var scope = scopes?.CreateScope();
+            var observations = scope?.ServiceProvider.GetService<ReviewQueueAggregateReader>();
+            List<AdminQueueSummaryProjectionItem> work = [];
+            foreach (var family in OperationalQueueFamilies.All)
+            {
+                var subjects = await queues.ReadFamilyAsync(tenantRef, family, cancellationToken).ConfigureAwait(false);
+                work.AddRange(subjects.Where(subject => !subject.Current.Terminal).Select(subject => subject.ToItem(clock.UtcNow)));
+                if (observations is not null && metrics is not null)
+                {
+                    var observation = await observations.ReadAsync(tenantRef, family, cancellationToken).ConfigureAwait(false);
+                    foreach (var bucket in AdminQueueSummaryProjector.EligibleBuckets(observation.Coverage.Scope, observation.Items, observation.Policy?.Minimum))
+                    { metrics.RecordReviewQueue(tenantRef, family, bucket.Status, bucket.Count, bucket.OldestAgeSeconds); }
+                }
+            }
+            queueItems = work;
+        }
         IReadOnlyList<ApprovalEventView> approvals = await conversationStore
             .ReadApprovalEventsAsync(tenantRef, cancellationToken)
             .ConfigureAwait(false);

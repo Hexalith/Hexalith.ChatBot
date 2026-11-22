@@ -1,4 +1,14 @@
 using System.Text.Json;
+using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Lifecycle.Workflows;
+using Hexalith.ChatBot.Server.Tests.Projections;
+using Hexalith.EventStore.Client.Gateway;
+using Hexalith.EventStore.Client.Streams;
+using Hexalith.EventStore.Contracts.Commands;
+using Hexalith.EventStore.Contracts.Queries;
+using Hexalith.EventStore.Contracts.Streams;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.DependencyInjection;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
@@ -103,14 +113,16 @@ public sealed class AttachmentCaptureCoordinatorTests
         InMemoryProjectConversationProjectionStore store = await StoreWithAssociationAndAttachments(
             new MailboxAttachmentReference("graph-attachment-duplicate", "one.pdf", "application/pdf", 100),
             new MailboxAttachmentReference("graph-attachment-duplicate", "two.pdf", "application/pdf", 200)).ConfigureAwait(true);
+        var review = new RecordingReviewWriter();
         AttachmentCaptureCoordinator coordinator = new(
             store,
             new FakeMailboxContentSource(MailboxAttachmentContentResult.Available("hello"u8.ToArray(), "application/pdf", "hashref_abc")),
-            new FakeFolderStore());
+            new FakeFolderStore(), reviewWriter: review);
 
         AttachmentCaptureCoordinatorResult result = await coordinator.CaptureAsync(Request(10), TestContext.Current.CancellationToken);
 
         result.StoredCount.ShouldBe(2);
+        review.Transitions.Count(t => t.State == "recovered").ShouldBe(2);
         ProjectConversationItemView[] attachments = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
             .Items
             .Where(static item => item.Kind == ProjectConversationItemKind.Attachment)
@@ -316,6 +328,92 @@ public sealed class AttachmentCaptureCoordinatorTests
         attachment.AttachmentAllowedActions.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task DuplicateProviderIdsHaveDistinctFailureSubjectsAndOnlyTheRetriedOneExhausts()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var store = await StoreWithAssociationAndAttachments(new("duplicate", "a", "application/pdf", 1), new("duplicate", "b", "application/pdf", 2));
+        var review = new RecordingReviewWriter();
+        var coordinator = new AttachmentCaptureCoordinator(store, new FakeMailboxContentSource(MailboxAttachmentContentResult.Available("data"u8.ToArray(), "application/pdf")),
+            new UnavailableFolderStore(), reviewWriter: review);
+        await coordinator.CaptureAsync(Request(10), token);
+        review.Transitions.Select(x => x.SubjectId).Distinct().Count().ShouldBe(2);
+        var target = review.Transitions[0];
+        await coordinator.CaptureAsync(Request(10) with { ProjectId = target.ProjectId, AssociationId = AssociationId, SubjectId = target.SubjectId, Attempt = 4 }, token);
+        review.Transitions.Where(x => x.SubjectId == target.SubjectId).Select(x => x.State).ShouldBe(["failed", "retrying", "exhausted"]);
+    }
+
+    [Fact]
+    public async Task AcceptedUploadRemainsReconcilableAndDoesNotResubmit()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var store = await StoreWithAssociationAndAttachments();
+        var folder = new FakeFolderStore(confirmed: false);
+        var review = new RecordingReviewWriter();
+        var coordinator = new AttachmentCaptureCoordinator(store, new FakeMailboxContentSource(MailboxAttachmentContentResult.Available("content"u8.ToArray(), "text/plain")),
+            folder, reviewWriter: review);
+        (await coordinator.CaptureAsync(Request(10), token)).StoredCount.ShouldBe(0);
+        var failed = review.Transitions.ShouldHaveSingleItem();
+        failed.Reason.ShouldBe("attachment_confirmation_pending");
+        await store.UpsertAttachmentSafetyOutcomeAsync(new(Tenant, failed.ProjectId, AssociationId, IntakeId, "graph-attachment-001", 0,
+            ProjectConversationAttachmentStatus.Captured, "pending", [], "not-retryable", "none", "scan_clean", 10, CorrelationId, "quarantine"), token);
+        var scoped = Request(10) with { ProjectId = failed.ProjectId, AssociationId = AssociationId, SubjectId = failed.SubjectId, Attempt = 1 };
+        (await coordinator.CaptureAsync(scoped with { SubjectId = "missing" }, token)).EvaluatedCount.ShouldBe(0);
+        (await coordinator.CaptureAsync(scoped with { SourceVersion = 9 }, token)).EvaluatedCount.ShouldBe(0);
+        (await coordinator.CaptureAsync(scoped, token)).ConfirmedSubjectId.ShouldBeNull();
+        folder.Requests.Count.ShouldBe(1);
+        review.Transitions.ShouldNotContain(t => t.State == "recovered");
+    }
+
+    [Fact]
+    public async Task PermanentFolderFailureRetainsOwnerClassification()
+    {
+        var review = new RecordingReviewWriter();
+        var coordinator = new AttachmentCaptureCoordinator(await StoreWithAssociationAndAttachments(),
+            new FakeMailboxContentSource(MailboxAttachmentContentResult.Unavailable("source_unavailable")), new ContentAwareFolderStore(), reviewWriter: review);
+        await coordinator.CaptureAsync(Request(10), TestContext.Current.CancellationToken);
+        review.Transitions.ShouldHaveSingleItem().State.ShouldBe("nonretryable");
+    }
+
+    [Fact]
+    public async Task AcceptedTransitionReceiptWithoutCommitCannotMarkCaptured()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var store = await StoreWithAssociationAndAttachments();
+        var gateway = new UncommittedGateway();
+        using var services = new ServiceCollection().AddSingleton<IAuthoritativeEventStreamReader>(new ReviewQueueTestStreamReader(_ => null)).BuildServiceProvider();
+        var writer = new WorkflowReviewCommandWriter(gateway, new DataProtectionChatBotAdmissionMarker(new EphemeralDataProtectionProvider()),
+            services.GetRequiredService<IServiceScopeFactory>());
+        var coordinator = new AttachmentCaptureCoordinator(store, new FakeMailboxContentSource(MailboxAttachmentContentResult.Available("data"u8.ToArray(), "text/plain")),
+            new FakeFolderStore(), reviewWriter: writer);
+        (await Should.ThrowAsync<InvalidOperationException>(() => coordinator.CaptureAsync(Request(10), token))).Message.ShouldBe("workflow_review_commit_unconfirmed");
+        gateway.Submitted.ShouldBe(1);
+        (await SingleAttachmentAsync(store)).AttachmentStorageStatus.ShouldBe(ProjectConversationAttachmentStatus.Pending);
+    }
+
+    private sealed class UncommittedGateway : IEventStoreGatewayClient
+    {
+        public int Submitted { get; private set; }
+        public Task<SubmitCommandResponse> SubmitCommandAsync(SubmitCommandRequest request, CancellationToken cancellationToken = default)
+        {
+            Submitted++;
+            return Task.FromResult(new SubmitCommandResponse(request.CorrelationId!, MessageId: request.MessageId));
+        }
+        public Task<EventStoreQueryResult> SubmitQueryAsync(SubmitQueryRequest request, string? ifNoneMatch = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<EventStoreQueryResult<T>> SubmitQueryAsync<T>(SubmitQueryRequest request, string? ifNoneMatch = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<StreamReadPage> ReadStreamAsync(StreamReadRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
+    private sealed class RecordingReviewWriter : Server.Lifecycle.Workflows.IWorkflowReviewCommandWriter
+    {
+        public List<Server.Operations.RecordWorkflowReviewTransition> Transitions { get; } = [];
+        public Task RecordAsync(string tenant, string correlation, Server.Operations.RecordWorkflowReviewTransition command, CancellationToken token)
+        {
+            Transitions.Add(command);
+            return Task.CompletedTask;
+        }
+    }
+
     private static AttachmentCaptureCoordinatorRequest Request(long sourceVersion)
         => new(Tenant, IntakeId, sourceVersion, CorrelationId);
 
@@ -456,7 +554,7 @@ public sealed class AttachmentCaptureCoordinatorTests
         }
     }
 
-    private sealed class FakeFolderStore : IFolderStore
+    private sealed class FakeFolderStore(bool confirmed = true) : IFolderStore
     {
         public List<StoreMailboxAttachmentRequest> Requests { get; } = [];
 
@@ -474,7 +572,7 @@ public sealed class AttachmentCaptureCoordinatorTests
                 "pending-scan",
                 [],
                 $"operation-{request.ProviderAttachmentId}-{request.Ordinal}",
-                $"idempotency-{request.ProviderAttachmentId}-{request.Ordinal}")));
+                $"idempotency-{request.ProviderAttachmentId}-{request.Ordinal}", ContentConfirmed: confirmed)));
         }
     }
 

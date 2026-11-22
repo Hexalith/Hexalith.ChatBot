@@ -79,6 +79,10 @@ for project in "${projects[@]}"; do
         runner="$runner_override"
     fi
 
+    if [[ "$lane" == "Hexalith.ChatBot.IntegrationTests" && -z "$runner_override" ]]; then
+        bash "$script_directory/../actions/after-unit-tests/run-native-review-queues.sh"
+    fi
+
     trx="${results_root}/${lane}.trx"
     rm -f -- "$trx" "${trx}.sha256"
     XUNIT_TEST_LANE="$lane" bash "$runner_boundary" \

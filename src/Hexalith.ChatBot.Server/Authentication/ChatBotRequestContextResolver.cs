@@ -110,6 +110,15 @@ internal sealed class ChatBotRequestContextResolver(IHttpContextAccessor httpCon
     private bool HasEventStoreWorkloadIdentity()
         => httpContextAccessor.HttpContext?.User.Identities.Any(static identity => identity.IsAuthenticated && identity.AuthenticationType == "EventStoreWorkload") == true;
 
+    internal bool IsReviewWorkflow(CommandEnvelope command)
+        => IsEventStoreRelay("domain-service:process") &&
+            command.UserId == Lifecycle.Workflows.WorkflowReviewCommandWriter.Actor &&
+            TryRelayExtension(command, EventStoreGatewayVerifiedOrigin.ExtensionKey, out string? gateway) && gateway == "chatbot" &&
+            TryRelayExtension(command, EventStoreGatewayVerifiedOrigin.ActorExtensionKey, out string? boundActor) && boundActor == command.UserId &&
+            TryRelayExtension(command, "actorId", out string? actor) && actor == command.UserId &&
+            TryRelayExtension(command, "actorType", out string? kind) && kind == "system" &&
+            TryRelayExtension(command, "surfaceOrigin", out string? origin) && origin == "workflow";
+
     private bool IsEventStoreRelay(string operation)
     {
         ClaimsPrincipal? principal = httpContextAccessor.HttpContext?.User;

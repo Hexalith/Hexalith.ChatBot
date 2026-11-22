@@ -10,6 +10,11 @@ namespace Hexalith.ChatBot.Server.Observability;
 /// </summary>
 internal interface IChatBotMetrics
 {
+    /// <summary>Observes eligible aggregated depth and age without carrying any subject or evidence.</summary>
+    void RecordReviewQueue(string tenantId, Contracts.Enums.OperationalQueueFamily family, string state, int depth, int oldestAgeSeconds) { }
+
+    void RecordReviewProjectionDelay(string tenantId, double seconds) { }
+
     /// <summary>Records mailbox-intake (ingestion) latency in milliseconds. Operation-class <c>message-intake</c>.</summary>
     void RecordIngestionLatency(string tenantId, double milliseconds);
 

@@ -15,7 +15,7 @@ internal sealed class DaprIngestionBindingWorkflowRuntime(DaprWorkflowClient wor
         {
             _ = await workflowClient
                 .ScheduleNewWorkflowAsync(
-                    nameof(IngestionBindingWorkflow),
+                    nameof(ReviewedIngestionBindingWorkflow),
                     request.WorkflowInstanceId,
                     request,
                     startTime: null,

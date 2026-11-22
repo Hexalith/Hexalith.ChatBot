@@ -37,4 +37,4 @@ internal sealed record AdminQueueSummaryProjectionItem(
     string? TenantRef = null,
     string? LastTransitionFromState = null,
     string? LastTransitionActor = null,
-    DateTimeOffset? LastTransitionTimestampUtc = null);
+    DateTimeOffset? LastTransitionTimestampUtc = null, string? Revision = null);

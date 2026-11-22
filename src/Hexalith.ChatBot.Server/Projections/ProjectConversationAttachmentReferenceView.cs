@@ -171,7 +171,7 @@ internal sealed record ProjectConversationAttachmentReferenceView(
         return this with
         {
             ScanStatus = outcome.ScanStatus,
-            RetryState = SafeMetadataToken(outcome.RetryState, RetryState),
+            RetryState = RetryState == "awaiting-confirmation" ? RetryState : SafeMetadataToken(outcome.RetryState, RetryState),
             AiContextEligibility = metadataVisible
                 ? SafeMetadataToken(outcome.AiContextEligibility, AiContextEligibility)
                 : "redacted",

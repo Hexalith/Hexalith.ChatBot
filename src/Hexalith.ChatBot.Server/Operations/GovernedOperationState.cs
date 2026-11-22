@@ -23,6 +23,16 @@ namespace Hexalith.ChatBot.Server.Operations;
 /// </summary>
 public sealed class GovernedOperationState
 {
+    /// <summary>The last admitted observation in an internal workflow review stream.</summary>
+    public RecordWorkflowReviewTransition? WorkflowReviewTransition { get; private set; }
+
+    /// <summary>Replays the owner observation used for causal admission.</summary>
+    public void Apply(WorkflowReviewTransitionRecorded recorded)
+    {
+        ArgumentNullException.ThrowIfNull(recorded);
+        WorkflowReviewTransition = recorded.Transition;
+    }
+
     private readonly HashSet<string> _participantResolutionIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _associationIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _associationDecisionIds = new(StringComparer.Ordinal);

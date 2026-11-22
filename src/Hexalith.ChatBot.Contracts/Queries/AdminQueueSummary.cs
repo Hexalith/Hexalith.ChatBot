@@ -13,4 +13,6 @@ public sealed record AdminQueueSummary(
     IReadOnlyList<AdminQueueSummaryItemRef> VisibleItemRefs,
     AdminOperationReference AuditRef,
     string SchemaVersion,
-    string CorrelationId);
+    string CorrelationId,
+    ReviewQueueCoverage? Coverage = null,
+    string? DisclosureState = null);

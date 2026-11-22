@@ -7,4 +7,5 @@ internal sealed record IngestionBindingSourceRequest(
     IngestionBindingRecordKind RecordKind,
     int Ordinal,
     string? ProviderAttachmentId,
-    string? ContentType);
+    string? ContentType,
+    int RecoveryGeneration = 0);

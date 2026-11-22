@@ -389,9 +389,9 @@ public sealed class ChatBotTerminalRefusalTests
         committed.RequiredHosts.ShouldAllBe(host => host.ExecutableDigest != null);
         RouteCatalogEnvelope catalog = RouteCatalogCodec.Decode(committed.CanonicalCatalog, committed.RootDigest);
         catalog.SchemaVersion.ShouldBe(3);
-        catalog.Declarations.Count.ShouldBe(73);
+        catalog.Declarations.Count.ShouldBe(77);
         catalog.Declarations.ShouldNotContain(declaration => declaration.MessageType == nameof(ExecuteAdminQueueOperation));
-        ChatBotCatalogAdapters.Create().Count.ShouldBe(64);
+        ChatBotCatalogAdapters.Create().Count.ShouldBe(65);
         ChatBotCanonicalDispatchTarget.IsSupported(nameof(ExecuteAdminQueueOperation)).ShouldBeFalse();
     }
 }

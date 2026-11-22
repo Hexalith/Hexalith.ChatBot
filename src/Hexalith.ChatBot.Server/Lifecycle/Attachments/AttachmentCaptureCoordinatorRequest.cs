@@ -9,4 +9,4 @@ internal sealed record AttachmentCaptureCoordinatorRequest(
     string TenantId,
     string IntakeId,
     long SourceVersion,
-    string CorrelationId);
+    string CorrelationId, string? ProjectId = null, string? AssociationId = null, string? SubjectId = null, int Attempt = 0, string? RetryId = null);

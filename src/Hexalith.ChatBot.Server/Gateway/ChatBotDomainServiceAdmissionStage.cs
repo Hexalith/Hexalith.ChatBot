@@ -48,6 +48,13 @@ internal sealed class ChatBotDomainServiceAdmissionStage(
             return await RejectTransportAsync(context.Command, issuer, reason, cancellationToken).ConfigureAwait(false);
         }
 
+        if (context.Command.CommandType == nameof(Operations.RecordWorkflowReviewTransition))
+        {
+            return admissionMarker.IsValid(context.Command) && requestContextResolver.IsReviewWorkflow(context.Command)
+                ? DomainServiceAdmissionResult.Accepted()
+                : await RejectTransportAsync(context.Command, null, ChatBotAuthorizationReasonCodes.AuthorizationDenied, cancellationToken).ConfigureAwait(false);
+        }
+
         if (admissionMarker.IsValid(context.Command))
         {
             if (context.Command.CommandType is nameof(GrantChatBotAuthority) or nameof(RevokeChatBotAuthority))

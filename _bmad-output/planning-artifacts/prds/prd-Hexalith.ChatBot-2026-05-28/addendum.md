@@ -147,6 +147,7 @@ The Tenant Policy Schema is a closed, versioned product contract. Tenants can se
 
 | Knob | Type/range and safe default | Sensitivity / authorized mutator | Increment | Validation and failure behavior |
 | --- | --- | --- | --- | --- |
+| `review-queue.minimum-group-size` | Whole number from 2 through 2147483647. Counts are unavailable by default. | Security-sensitive. Two distinct policy administrators approve the tenant value. | M0 | Count distinct subjects in each authorized group. Suppress smaller groups and any derived total or age that would expose them. Missing or unverified policy keeps counts unavailable. |
 | `association.t-high` | float `[0.80,1.00]`; `0.90` | security-sensitive / `policy-admin` with two-person approval | M0 | Must exceed `t-low`; invalid snapshot rejected |
 | `association.t-low` | float `[0.50,t-high)`; `0.60` | security-sensitive / `policy-admin` with two-person approval | M0 | Ranking only; cannot enable auto-association |
 | `attachments.unsafe-handling` | enum `quarantine|block|reject-message`; `quarantine` | standard / `policy-admin` | M0 | Unknown value fails to `quarantine` |

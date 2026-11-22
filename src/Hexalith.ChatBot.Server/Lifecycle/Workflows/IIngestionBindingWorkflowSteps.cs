@@ -9,6 +9,8 @@ internal interface IIngestionBindingWorkflowSteps
 
     Task<IngestionBindingSourceStatus> GetStatusAsync(IngestionBindingSourceOperation operation);
 
+    Task RecordReviewAsync(IngestionReviewInput input);
+
     Task DelayAsync(TimeSpan delay);
 
     Task FinalizeAsync(IngestionBindingFinalizeInput input);

@@ -45,7 +45,7 @@ internal sealed class ImmutableTenantPolicySnapshot
         // Sorting ensures the schema's cross-knob low/high check sees high before low.
         if (!TenantPolicySchema.Validate(Values).IsValid ||
             TenantPolicySchema.Definitions.Where(definition => definition.SchemaVersion == TenantPolicySchemaVersions.M0 ||
-                definition.SchemaVersion == schemaVersion).Any(definition => !copied.Any(value => value.KnobId == definition.KnobId)) ||
+                definition.SchemaVersion == schemaVersion).Any(definition => definition.KnobId != TenantPolicyKnobIds.ReviewQueueMinimum && !copied.Any(value => value.KnobId == definition.KnobId)) ||
             copied.Any(value => TenantPolicySchema.TryGetDefinition(value.KnobId, out TenantPolicyKnobDefinition definition) &&
                 schemaVersion == TenantPolicySchemaVersions.M0 && definition.SchemaVersion != schemaVersion))
         {

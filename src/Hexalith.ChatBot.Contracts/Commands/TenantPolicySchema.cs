@@ -77,6 +77,7 @@ public static class TenantPolicySchema
 
     private static IEnumerable<TenantPolicyKnobDefinition> BuildDefinitions()
     {
+        yield return new(TenantPolicyKnobIds.ReviewQueueMinimum, TenantPolicyKnobType.Double, TenantPolicyKnobSensitivity.SecuritySensitive, TenantPolicySchemaVersions.M0, 2, int.MaxValue);
         yield return new(TenantPolicyKnobIds.AssociationTHigh, TenantPolicyKnobType.Double, TenantPolicyKnobSensitivity.SecuritySensitive, TenantPolicySchemaVersions.M0, 0.80, 1.00);
         yield return new(TenantPolicyKnobIds.AssociationTLow, TenantPolicyKnobType.Double, TenantPolicyKnobSensitivity.SecuritySensitive, TenantPolicySchemaVersions.M0, 0.50, 1.00);
         yield return new(TenantPolicyKnobIds.AttachmentsUnsafeHandling, TenantPolicyKnobType.Enum, TenantPolicyKnobSensitivity.Standard, TenantPolicySchemaVersions.M0, EnumValues: TenantPolicyUnsafeAttachmentHandling.All);
@@ -204,7 +205,8 @@ public static class TenantPolicySchema
             yield break;
         }
 
-        if (definition.Minimum is { } minimum && number < minimum ||
+        if (definition.KnobId == TenantPolicyKnobIds.ReviewQueueMinimum && number != Math.Truncate(number) ||
+            definition.Minimum is { } minimum && number < minimum ||
             definition.Maximum is { } maximum && number > maximum)
         {
             yield return $"range_invalid:{definition.KnobId}";

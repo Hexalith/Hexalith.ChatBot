@@ -19,54 +19,49 @@ internal static class AdminQueueSummaryProjector
         string queueRef,
         IEnumerable<AdminQueueSummaryProjectionItem> items,
         AdminOperationReference auditRef,
-        string correlationId)
+        string correlationId,
+        int? minimum = null,
+        ReviewQueueCoverage? coverage = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(queueRef);
         ArgumentNullException.ThrowIfNull(items);
         ArgumentNullException.ThrowIfNull(auditRef);
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
 
-        AdminQueueSummaryProjectionItem[] visibleItems = items
-            .Where(item => string.Equals(item.QueueRef, queueRef, StringComparison.Ordinal))
-            .ToArray();
-
         string safeQueueRef = SafeSummaryToken(queueRef) ?? "queue:redacted";
-
-        IReadOnlyList<AdminQueueSummaryBucket> buckets = visibleItems
-            .GroupBy(static item => new { item.Status, item.OwnerClass })
-            .Select(group => new AdminQueueSummaryBucket(
-                SafeSummaryToken(group.Key.Status) ?? "redacted",
-                SafeSummaryToken(group.Key.OwnerClass) ?? "redacted",
-                group.Count(),
-                group.Max(static item => Math.Max(0, item.AgeSeconds))))
-            .OrderBy(static bucket => bucket.Status, StringComparer.Ordinal)
-            .ThenBy(static bucket => bucket.OwnerClass, StringComparer.Ordinal)
-            .ToArray();
-
-        IReadOnlyList<AdminQueueSummaryItemRef> itemRefs = visibleItems
-            .Select(item => new
-            {
-                ItemRef = SafeSummaryToken(item.ItemRef),
-                Status = SafeSummaryToken(item.Status) ?? "redacted",
-                OwnerClass = SafeSummaryToken(item.OwnerClass) ?? "redacted",
-            })
-            .Where(static item => item.ItemRef is not null)
-            .Select(static item => new AdminQueueSummaryItemRef(
-                item.ItemRef!,
-                item.Status,
-                item.OwnerClass,
-                [ChatBotDisabledActionReasons.InsufficientAuthority]))
-            .ToArray();
-
-        return new AdminQueueSummary(
-            safeQueueRef,
-            WorstHealth(visibleItems),
-            buckets,
-            itemRefs,
-            auditRef,
-            "chatbot.admin-queue-summary.v1",
-            correlationId);
+        var buckets = EligibleBuckets(queueRef, items, minimum);
+        return new AdminQueueSummary(safeQueueRef, coverage?.Reason == "current" ? ChatBotHealthStatus.Healthy : ChatBotHealthStatus.Unknown,
+            buckets, [], auditRef with { ItemRefs = [], ItemCount = 0, SourceVersion = 0 }, "chatbot.admin-queue-summary.v1", correlationId,
+            coverage, minimum is >= 2 ? "threshold-applied" : "policy-unavailable");
     }
+
+    internal static IReadOnlyList<AdminQueueSummaryBucket> EligibleBuckets(string queueRef, IEnumerable<AdminQueueSummaryProjectionItem> items, int? minimum)
+    {
+        AdminQueueSummaryProjectionItem[] visibleItems = items
+            .Where(item => !item.IsTerminal && string.Equals(item.QueueRef, queueRef, StringComparison.Ordinal))
+            .DistinctBy(static item => item.ItemRef, StringComparer.Ordinal)
+            .ToArray();
+
+        return visibleItems.GroupBy(item => new { Status = SummaryState(item.Status), OwnerClass = SummaryRole(item.OwnerClass) })
+            .Where(group => minimum is >= 2 && group.Count() >= minimum.Value)
+            .Select(group => new AdminQueueSummaryBucket(SafeSummaryToken(group.Key.Status) ?? "redacted",
+                SafeSummaryToken(group.Key.OwnerClass) ?? "redacted", group.Count(), group.Max(item => Math.Max(0, item.AgeSeconds))))
+            .OrderBy(bucket => bucket.Status, StringComparer.Ordinal).ThenBy(bucket => bucket.OwnerClass, StringComparer.Ordinal).ToArray();
+    }
+
+    private static string SummaryRole(string value) => value switch
+    {
+        "operations" or "operations-admin" or "approval-reviewer" or "association-reviewer" or "participant-reviewer" or
+            "mailbox-admin" or "mailbox-operator" or "tenant-admin" or "project-owner" => value,
+        _ => "responsible-reviewer",
+    };
+
+    private static string SummaryState(string state) => state.ToLowerInvariant() switch
+    {
+        Association.CorrectionPropagationStatuses.Pending or "waiting" or "unresolved" or "needsreview" or "deferred" or "correctiondelayed" or "failed" or
+            "retrying" or "retryable" or "retry-requested" or "blocked" => state.ToLowerInvariant(),
+        _ => "review",
+    };
 
     public static OperationalQueueSearchResult Search(
         SearchOperationalQueueItems query,
@@ -134,26 +129,6 @@ internal static class AdminQueueSummaryProjector
             hasProjectAuthority ? [] : ["request-access", "escalate"]);
     }
 
-    private static ChatBotHealthStatus WorstHealth(IReadOnlyList<AdminQueueSummaryProjectionItem> items)
-    {
-        if (items.Count == 0)
-        {
-            return ChatBotHealthStatus.Unknown;
-        }
-
-        if (items.Any(static item => item.Health == ChatBotHealthStatus.Failed))
-        {
-            return ChatBotHealthStatus.Failed;
-        }
-
-        if (items.Any(static item => item.Health == ChatBotHealthStatus.Degraded))
-        {
-            return ChatBotHealthStatus.Degraded;
-        }
-
-        return ChatBotHealthStatus.Healthy;
-    }
-
     private static string? SafeSummaryToken(string? value)
         => !string.IsNullOrWhiteSpace(value) &&
             value.Length <= 200 &&
@@ -179,7 +154,7 @@ internal static class AdminQueueSummaryProjector
         return markers.Any(marker => value.Contains(marker, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static OperationalQueueRow ToOperationalRow(AdminQueueSummaryProjectionItem item)
+    internal static OperationalQueueRow ToOperationalRow(AdminQueueSummaryProjectionItem item)
     {
         string itemRef = SafeSummaryToken(item.ItemRef) ?? "item:redacted";
         string queueRef = SafeSummaryToken(item.QueueRef) ?? "queue:redacted";
@@ -223,7 +198,7 @@ internal static class AdminQueueSummaryProjector
             SafeSummaryToken(item.GroupKey),
             SafeSummaryToken(item.GroupRequesterRef),
             SafeSummaryToken(item.GroupCommandRef),
-            SafeSummaryToken(item.GroupProjectRef));
+            SafeSummaryToken(item.GroupProjectRef), item.Revision);
     }
 
     // NFR44 runbook-real last transition: from-state + actor + timestamp as a single safe triple. Each component is

@@ -160,6 +160,26 @@ internal static class ChatBotCompatibilityEndpointExtensions
 
     private static void MapReadCompatibilityEndpoints(IEndpointRouteBuilder app)
     {
+        _ = app.MapGet("/api/v1/admin/review-queues/{family}/summary",
+            (string family, HttpContext http, IServiceProvider services, IChatBotProblemDetailsFactory problems, CancellationToken token)
+                => ExecuteReadQueryAsync("queue:" + family, ChatBotReadQueryTypes.AdminQueueSummary,
+                    new GetAdminQueueSummary("queue:" + family, AdminScope.SeeOnly, http.GetCorrelationContext().CorrelationId, 0),
+                    http, services, problems, token)).RequireAuthorization(ChatBotApplicationBoundaryPolicy.Name);
+        _ = app.MapGet("/api/v1/projects/{projectId}/review-queues/{family}",
+            (string projectId, string family, string? sourceStreamId, HttpContext http, IServiceProvider services,
+                IChatBotProblemDetailsFactory problems, CancellationToken token)
+                => OperationalQueueFamilies.TryFromWireValue(family, out var parsed) && OperationalQueueFamilies.ToWireValue(parsed) == family
+                    ? ExecuteReadQueryAsync(projectId, ChatBotReadQueryTypes.QueueItems, new GetProjectReviewQueue(projectId, parsed, sourceStreamId),
+                        http, services, problems, token)
+                    : Task.FromResult(Denied(http.GetCorrelationContext(), problems, ChatBotAuthorizationReasonCodes.SafeNotFound)))
+            .RequireAuthorization(ChatBotApplicationBoundaryPolicy.Name);
+        _ = app.MapGet("/api/v1/review-queues/{family}/items/{itemRef}",
+            (string family, string itemRef, long sourceVersion, string? revision, HttpContext http, IServiceProvider services, IChatBotProblemDetailsFactory problems, CancellationToken token)
+                => OperationalQueueFamilies.TryFromWireValue(family, out var parsed) && OperationalQueueFamilies.ToWireValue(parsed) == family
+                    ? ExecuteReadQueryAsync(itemRef, ChatBotReadQueryTypes.QueueItemDetail, new GetOperationalQueueItemDetail(parsed, "queue:" + family, itemRef, sourceVersion, revision),
+                        http, services, problems, token)
+                    : Task.FromResult(Denied(http.GetCorrelationContext(), problems, ChatBotAuthorizationReasonCodes.SafeNotFound)))
+            .RequireAuthorization(ChatBotApplicationBoundaryPolicy.Name);
         _ = app.MapGet(
             "/api/v1/associations/{associationId}/routing-status",
             async (

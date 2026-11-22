@@ -40,6 +40,30 @@ namespace Hexalith.ChatBot.Server.Operations;
 [EventStoreDomain(ChatBotEventStore.DomainName)]
 public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOperationState>
 {
+    /// <summary>Applies only a new causal workflow observation for the exact owning stream.</summary>
+    public static DomainResult Handle(RecordWorkflowReviewTransition command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+        if (command.Family is not (OperationalQueueFamily.FailedAttachment or OperationalQueueFamily.FailedIngestion) ||
+            !IsSafeGrantToken(command.SubjectId) || !IsSafeGrantToken(command.ProjectId) || !IsSafeGrantToken(command.Reason) ||
+            command.Generation < 1 || command.Attempt < 0 || command.Stage == 0 ||
+            command.Target is { } target && (!IsSafeGrantToken(target.AssociationId) || !IsSafeGrantToken(target.IntakeId) ||
+                !IsSafeGrantToken(target.Phase) || command.Family == OperationalQueueFamily.FailedAttachment && target.Phase != command.SubjectId) ||
+            envelope.UserId != Lifecycle.Workflows.WorkflowReviewCommandWriter.Actor || envelope.AggregateId != command.StreamId(envelope.TenantId))
+        {
+            return DomainResult.Rejection([new WorkflowRetryInvalidRejection(null, "invalid_workflow_review_transition")]);
+        }
+
+        if (state?.WorkflowReviewTransition is { } previous &&
+            (command.Generation < previous.Generation || (command.Generation == previous.Generation &&
+                (previous.State == "recovered" || previous.State is ("exhausted" or "nonretryable") && command.State != "recovered" || (command.Attempt, command.Stage).CompareTo((previous.Attempt, previous.Stage)) <= 0))))
+        {
+            return DomainResult.NoOp();
+        }
+        return DomainResult.Success([new WorkflowReviewTransitionRecorded(command)]);
+    }
+
     /// <summary>Persists one bounded, exact owner grant after the admission stage has verified its issuer.</summary>
     public static DomainResult Handle(GrantChatBotAuthority command, GovernedOperationState? state, CommandEnvelope envelope)
     {
@@ -177,10 +201,19 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(envelope);
 
-        if (!IsValidTenantPolicyChange(command))
+        if (!IsValidTenantPolicyChange(command) ||
+            (envelope.AggregateId == ReviewQueueDisclosurePolicy.StreamId || command.PolicyChangeId == ReviewQueueDisclosurePolicy.StreamId ||
+                command.ChangedKnobIds.Contains(TenantPolicyKnobIds.ReviewQueueMinimum, StringComparer.Ordinal)) &&
+            (command.ChangedKnobIds is not [TenantPolicyKnobIds.ReviewQueueMinimum] || command.PolicyChangeId != ReviewQueueDisclosurePolicy.StreamId ||
+                envelope.AggregateId != ReviewQueueDisclosurePolicy.StreamId))
         {
             return RejectTenantPolicyChange(command.PolicyChangeId, "invalid_tenant_policy_change", command.SourceVersion, command.CorrelationId);
         }
+
+        if (command.PolicyChangeId == ReviewQueueDisclosurePolicy.StreamId && state?.TenantPolicySnapshots.Values
+            .Where(v => v.PolicyChangeId == command.PolicyChangeId).MaxBy(v => v.SourceVersion) is { } active &&
+            (command.SourcePolicySnapshotId != active.ActivatedPolicySnapshotId || command.SourceVersion != active.SourceVersion))
+        { return RejectTenantPolicyChange(command.PolicyChangeId, "tenant_policy_stale_source", command.SourceVersion, command.CorrelationId); }
 
         if (state?.TenantPolicyPendingApprovals.ContainsKey(command.PolicyChangeId) == true ||
             state?.TenantPolicySnapshots.ContainsKey(command.ProposedPolicySnapshotId) == true)

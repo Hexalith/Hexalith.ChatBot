@@ -16,5 +16,6 @@ public static class TenantPolicyKnobIds
     public const string InboundAuthenticityStrictness = "inbound-authenticity.strictness";
     public const string ApprovalPriorityWeights = "approval.priority-weights";
     public const string NotificationThrottleCeilings = "notification.throttle-ceilings";
+    public const string ReviewQueueMinimum = "review-queue.minimum-group-size";
     public const string ReviewerBacklogThreshold = "notification.reviewer-backlog-threshold";
 }

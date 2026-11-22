@@ -90,6 +90,11 @@ internal sealed class IngestionBindingStartSourceActivity(
             input.Request.IntakeId,
             input.RecordKind.ToString(),
             input.Ordinal.ToString(CultureInfo.InvariantCulture));
+        if (input.RecoveryGeneration > 0)
+        {
+            // A new operation is permitted only after Memories confirmed a terminal failure.
+            value += "|" + input.RecoveryGeneration.ToString(CultureInfo.InvariantCulture);
+        }
         return $"chatbot-ingest-{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant()}";
     }
 

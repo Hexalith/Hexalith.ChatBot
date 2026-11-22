@@ -39,9 +39,9 @@ public sealed class AdminQueueSummaryProjectorTests
             "correlation-alpha");
 
         summary.QueueRef.ShouldBe("queue:failure");
-        summary.Health.ShouldBe(ChatBotHealthStatus.Degraded);
-        summary.Buckets.Single().Count.ShouldBe(1);
-        summary.VisibleItemRefs.Single().ItemRef.ShouldBe("item:001");
+        summary.Health.ShouldBe(ChatBotHealthStatus.Unknown);
+        summary.Buckets.ShouldBeEmpty();
+        summary.VisibleItemRefs.ShouldBeEmpty();
 
         string json = JsonSerializer.Serialize(summary, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         json.ShouldNotContain("Project Alpha", Case.Insensitive);
@@ -50,6 +50,20 @@ public sealed class AdminQueueSummaryProjectorTests
         json.ShouldNotContain("raw audit reason", Case.Insensitive);
         json.ShouldNotContain("customer subject", Case.Insensitive);
         json.ShouldNotContain("candidate evidence", Case.Insensitive);
+    }
+
+    [Fact]
+    public void ApprovedMinimumSuppressesDistinctSmallGroupsAndAllDerivedTotals()
+    {
+        var first = QueueItem(OperationalQueueFamily.PendingApproval, "first", 30, "low", 0.6m, 1, 1);
+        var second = first with { ItemRef = "second" };
+        var hidden = first with { ItemRef = "hidden", Status = "sensitive", AgeSeconds = 9999 };
+        var summary = AdminQueueSummaryProjector.Create(first.QueueRef, [first, first, second, hidden], AuditRef(), "correlation", minimum: 2);
+        summary.Buckets.ShouldHaveSingleItem().Count.ShouldBe(2);
+        summary.Buckets.Single().OldestAgeSeconds.ShouldBe(30);
+        summary.VisibleItemRefs.ShouldBeEmpty();
+        summary.AuditRef.ItemRefs.ShouldBeEmpty();
+        summary.AuditRef.ItemCount.ShouldBe(0);
     }
 
     [Fact]

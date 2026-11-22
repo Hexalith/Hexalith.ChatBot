@@ -240,7 +240,7 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
                     attachment.FileId,
                     attachment.RedactionState,
                     Math.Max(association.SourceVersion, attachment.SourceVersion),
-                    string.IsNullOrWhiteSpace(association.CorrelationId) ? attachment.CorrelationId : association.CorrelationId)))
+                    string.IsNullOrWhiteSpace(association.CorrelationId) ? attachment.CorrelationId : association.CorrelationId, attachment.RetryState)))
             .ToArray();
 
         return Task.FromResult<IReadOnlyList<ProjectConversationAttachmentStorageCandidate>>(candidates);
@@ -620,13 +620,9 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         cancellationToken.ThrowIfCancellationRequested();
 
         FixedClock clock = new(nowUtc);
-        AdminQueueSummaryProjectionItem[] items = _approvalEvents.Values
-            .Where(approval => string.Equals(approval.TenantId, tenantId, StringComparison.Ordinal))
-            .Select(approval => ApprovalQueueItemBuilder.TryBuild(approval, ApprovalPriorityWeights.SafeDefaults, clock))
-            .OfType<AdminQueueSummaryProjectionItem>()
-            .OrderBy(static item => item.ItemRef, StringComparer.Ordinal)
-            .ToArray();
-        return Task.FromResult<IReadOnlyList<AdminQueueSummaryProjectionItem>>(items);
+        IEnumerable<ApprovalEventView> approvals = _approvalEvents.Values
+            .Where(approval => string.Equals(approval.TenantId, tenantId, StringComparison.Ordinal));
+        return Task.FromResult(ApprovalQueueItemBuilder.BuildPending(approvals, clock));
     }
 
     public Task<IReadOnlyList<ApprovalEventView>> ReadApprovalEventsAsync(

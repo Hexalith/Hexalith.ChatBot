@@ -6,4 +6,4 @@ public sealed record GetOperationalQueueItemDetail(
     OperationalQueueFamily QueueFamily,
     string QueueRef,
     string ItemRef,
-    long SourceVersion);
+    long SourceVersion, string? Revision = null);

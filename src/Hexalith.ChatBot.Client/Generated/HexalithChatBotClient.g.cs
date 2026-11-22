@@ -245,6 +245,61 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<TaskIntentReview> GetTaskIntentReviewAsync(string projectId, string taskIntentId, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken);
 
+        /// <summary>
+        /// Read the governed aggregate view and its source coverage.
+        /// </summary>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <returns>Authorized queue response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<TenantReviewQueueSummary> ReadTenantReviewQueueSummaryAsync(ReviewQueueFamily family, string? x_Correlation_Id);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read the governed aggregate view and its source coverage.
+        /// </summary>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <returns>Authorized queue response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<TenantReviewQueueSummary> ReadTenantReviewQueueSummaryAsync(ReviewQueueFamily family, string? x_Correlation_Id, System.Threading.CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Read open work visible within the current project.
+        /// </summary>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <returns>Authorized queue response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ProjectReviewQueue> ReadProjectReviewQueueAsync(ReviewQueueFamily family, string projectId, string? sourceStreamId, string? x_Correlation_Id);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read open work visible within the current project.
+        /// </summary>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <returns>Authorized queue response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ProjectReviewQueue> ReadProjectReviewQueueAsync(ReviewQueueFamily family, string projectId, string? sourceStreamId, string? x_Correlation_Id, System.Threading.CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Read authorized metadata and the committed transition history.
+        /// </summary>
+        /// <param name="sourceVersion">Current source-local version from the authorized row.</param>
+        /// <param name="revision">Opaque row revision. Required when more than one stream contributed to the subject.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <returns>Authorized queue response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ReviewQueueDetail> ReadReviewQueueDetailAsync(ReviewQueueFamily family, string itemRef, long sourceVersion, string? revision, string? x_Correlation_Id);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read authorized metadata and the committed transition history.
+        /// </summary>
+        /// <param name="sourceVersion">Current source-local version from the authorized row.</param>
+        /// <param name="revision">Opaque row revision. Required when more than one stream contributed to the subject.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <returns>Authorized queue response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ReviewQueueDetail> ReadReviewQueueDetailAsync(ReviewQueueFamily family, string itemRef, long sourceVersion, string? revision, string? x_Correlation_Id, System.Threading.CancellationToken cancellationToken);
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -1440,6 +1495,376 @@ namespace Hexalith.ChatBot.Client.Generated
             }
         }
 
+        /// <summary>
+        /// Read the governed aggregate view and its source coverage.
+        /// </summary>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <returns>Authorized queue response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<TenantReviewQueueSummary> ReadTenantReviewQueueSummaryAsync(ReviewQueueFamily family, string? x_Correlation_Id)
+        {
+            return ReadTenantReviewQueueSummaryAsync(family, x_Correlation_Id, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read the governed aggregate view and its source coverage.
+        /// </summary>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <returns>Authorized queue response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<TenantReviewQueueSummary> ReadTenantReviewQueueSummaryAsync(ReviewQueueFamily family, string? x_Correlation_Id, System.Threading.CancellationToken cancellationToken)
+        {
+            if (family == null)
+                throw new System.ArgumentNullException("family");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (x_Correlation_Id != null)
+                        request_.Headers.TryAddWithoutValidation("X-Correlation-Id", ConvertToString(x_Correlation_Id, System.Globalization.CultureInfo.InvariantCulture));
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/v1/admin/review-queues/{family}/summary"
+                    urlBuilder_.Append("api/v1/admin/review-queues/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(family, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/summary");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<TenantReviewQueueSummary>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authentication failure.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authorization denial.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new HexalithChatBotApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Read open work visible within the current project.
+        /// </summary>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <returns>Authorized queue response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<ProjectReviewQueue> ReadProjectReviewQueueAsync(ReviewQueueFamily family, string projectId, string? sourceStreamId, string? x_Correlation_Id)
+        {
+            return ReadProjectReviewQueueAsync(family, projectId, sourceStreamId, x_Correlation_Id, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read open work visible within the current project.
+        /// </summary>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <returns>Authorized queue response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ProjectReviewQueue> ReadProjectReviewQueueAsync(ReviewQueueFamily family, string projectId, string? sourceStreamId, string? x_Correlation_Id, System.Threading.CancellationToken cancellationToken)
+        {
+            if (family == null)
+                throw new System.ArgumentNullException("family");
+
+            if (projectId == null)
+                throw new System.ArgumentNullException("projectId");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (x_Correlation_Id != null)
+                        request_.Headers.TryAddWithoutValidation("X-Correlation-Id", ConvertToString(x_Correlation_Id, System.Globalization.CultureInfo.InvariantCulture));
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/v1/projects/{projectId}/review-queues/{family}"
+                    urlBuilder_.Append("api/v1/projects/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(projectId, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/review-queues/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(family, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('?');
+                    if (sourceStreamId != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("sourceStreamId")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(sourceStreamId, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProjectReviewQueue>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authentication failure.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authorization denial.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new HexalithChatBotApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Read authorized metadata and the committed transition history.
+        /// </summary>
+        /// <param name="sourceVersion">Current source-local version from the authorized row.</param>
+        /// <param name="revision">Opaque row revision. Required when more than one stream contributed to the subject.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <returns>Authorized queue response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<ReviewQueueDetail> ReadReviewQueueDetailAsync(ReviewQueueFamily family, string itemRef, long sourceVersion, string? revision, string? x_Correlation_Id)
+        {
+            return ReadReviewQueueDetailAsync(family, itemRef, sourceVersion, revision, x_Correlation_Id, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read authorized metadata and the committed transition history.
+        /// </summary>
+        /// <param name="sourceVersion">Current source-local version from the authorized row.</param>
+        /// <param name="revision">Opaque row revision. Required when more than one stream contributed to the subject.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <returns>Authorized queue response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ReviewQueueDetail> ReadReviewQueueDetailAsync(ReviewQueueFamily family, string itemRef, long sourceVersion, string? revision, string? x_Correlation_Id, System.Threading.CancellationToken cancellationToken)
+        {
+            if (family == null)
+                throw new System.ArgumentNullException("family");
+
+            if (itemRef == null)
+                throw new System.ArgumentNullException("itemRef");
+
+            if (sourceVersion == null)
+                throw new System.ArgumentNullException("sourceVersion");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (x_Correlation_Id != null)
+                        request_.Headers.TryAddWithoutValidation("X-Correlation-Id", ConvertToString(x_Correlation_Id, System.Globalization.CultureInfo.InvariantCulture));
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/v1/review-queues/{family}/items/{itemRef}"
+                    urlBuilder_.Append("api/v1/review-queues/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(family, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/items/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(itemRef, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('?');
+                    urlBuilder_.Append(System.Uri.EscapeDataString("sourceVersion")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(sourceVersion, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    if (revision != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("revision")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(revision, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ReviewQueueDetail>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authentication failure.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authorization denial.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new HexalithChatBotApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
         protected struct ObjectResponseResult<T>
         {
             public ObjectResponseResult(T responseObject, string responseText)
@@ -1570,6 +1995,435 @@ namespace Hexalith.ChatBot.Client.Generated
             var result = System.Convert.ToString(value, cultureInfo);
             return result == null ? "" : result;
         }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ReviewQueueFamily
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ambiguous-association")]
+        AmbiguousAssociation = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unresolved-participant")]
+        UnresolvedParticipant = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"pending-approval")]
+        PendingApproval = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failed-ingestion")]
+        FailedIngestion = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failed-attachment")]
+        FailedAttachment = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"retryable-operation")]
+        RetryableOperation = 5,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ReviewQueueCoverage
+    {
+
+        [Newtonsoft.Json.JsonProperty("scope", Required = Newtonsoft.Json.Required.Always)]
+        public string Scope { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reason", Required = Newtonsoft.Json.Required.Always)]
+        public string Reason { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("ownerRole", Required = Newtonsoft.Json.Required.Always)]
+        public string OwnerRole { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("nextAction", Required = Newtonsoft.Json.Required.Always)]
+        public string NextAction { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("knownSourceVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long? KnownSourceVersion { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ReviewQueueDiagnostics
+    {
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("tenantRef", Required = Newtonsoft.Json.Required.Always)]
+        public string TenantRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("mailboxRef", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? MailboxRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("workflowItemRef", Required = Newtonsoft.Json.Required.Always)]
+        public string WorkflowItemRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("currentState", Required = Newtonsoft.Json.Required.Always)]
+        public string CurrentState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("lastTransition", Required = Newtonsoft.Json.Required.Always)]
+        public string LastTransition { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("failureReason", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? FailureReason { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("nextSafeAction", Required = Newtonsoft.Json.Required.Always)]
+        public string NextSafeAction { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("retryCount", Required = Newtonsoft.Json.Required.Always)]
+        public int RetryCount { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ReviewQueueRow
+    {
+
+        [Newtonsoft.Json.JsonProperty("queueFamily", Required = Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ReviewQueueFamily QueueFamily { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("queueRef", Required = Newtonsoft.Json.Required.Always)]
+        public string QueueRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("itemRef", Required = Newtonsoft.Json.Required.Always)]
+        public string ItemRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.Always)]
+        public string State { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("risk", Required = Newtonsoft.Json.Required.Always)]
+        public string Risk { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("assigneeRef", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AssigneeRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("nextAction", Required = Newtonsoft.Json.Required.Always)]
+        public string NextAction { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("ownerRole", Required = Newtonsoft.Json.Required.Always)]
+        public string OwnerRole { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
+        public string RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("priorityExplanation", Required = Newtonsoft.Json.Required.Always)]
+        public string PriorityExplanation { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("groupKey", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? GroupKey { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("groupRequesterRef", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? GroupRequesterRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("groupCommandRef", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? GroupCommandRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("groupProjectRef", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? GroupProjectRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("ageSeconds", Required = Newtonsoft.Json.Required.Always)]
+        public int AgeSeconds { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("retryCount", Required = Newtonsoft.Json.Required.Always)]
+        public int RetryCount { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("confidence", Required = Newtonsoft.Json.Required.Always)]
+        public double Confidence { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("priorityScore", Required = Newtonsoft.Json.Required.Always)]
+        public double PriorityScore { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("isTerminal", Required = Newtonsoft.Json.Required.Always)]
+        public bool IsTerminal { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("health", Required = Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ChatBotHealthStatus Health { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("freshnessTimestampUtc", Required = Newtonsoft.Json.Required.Always)]
+        public System.DateTimeOffset FreshnessTimestampUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("disabledActionReasonCodes", Required = Newtonsoft.Json.Required.Always)]
+        public System.Collections.Generic.ICollection<string> DisabledActionReasonCodes { get; set; } = new System.Collections.Generic.List<string>();
+
+        [Newtonsoft.Json.JsonProperty("diagnostics", Required = Newtonsoft.Json.Required.Always)]
+        public ReviewQueueDiagnostics Diagnostics { get; set; } = new ReviewQueueDiagnostics();
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("revision", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? Revision { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ReviewQueueHistoryEntry
+    {
+
+        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.Always)]
+        public string State { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reason", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? Reason { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.Always)]
+        public string OperationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("occurredAtUtc", Required = Newtonsoft.Json.Required.Always)]
+        public System.DateTimeOffset OccurredAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("terminal", Required = Newtonsoft.Json.Required.Always)]
+        public bool Terminal { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("retryCount", Required = Newtonsoft.Json.Required.Always)]
+        public int RetryCount { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceStreamId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SourceStreamId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("actor", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? Actor { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ReviewQueueDetail
+    {
+
+        [Newtonsoft.Json.JsonProperty("summary", Required = Newtonsoft.Json.Required.Always)]
+        public ReviewQueueRow Summary { get; set; } = new ReviewQueueRow();
+
+        [Newtonsoft.Json.JsonProperty("detailAccessState", Required = Newtonsoft.Json.Required.Always)]
+        public string DetailAccessState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("safeDetailStatus", Required = Newtonsoft.Json.Required.Always)]
+        public string SafeDetailStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("escalationActions", Required = Newtonsoft.Json.Required.Always)]
+        public System.Collections.Generic.ICollection<string> EscalationActions { get; set; } = new System.Collections.Generic.List<string>();
+
+        [Newtonsoft.Json.JsonProperty("history", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<ReviewQueueHistoryEntry>? History { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ProjectReviewQueue
+    {
+
+        [Newtonsoft.Json.JsonProperty("rows", Required = Newtonsoft.Json.Required.Always)]
+        public System.Collections.Generic.ICollection<ReviewQueueRow> Rows { get; set; } = new System.Collections.Generic.List<ReviewQueueRow>();
+
+        [Newtonsoft.Json.JsonProperty("coverage", Required = Newtonsoft.Json.Required.Always)]
+        public ReviewQueueCoverage Coverage { get; set; } = new ReviewQueueCoverage();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class QueueSummaryBucket
+    {
+
+        [Newtonsoft.Json.JsonProperty("status", Required = Newtonsoft.Json.Required.Always)]
+        public string Status { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("ownerClass", Required = Newtonsoft.Json.Required.Always)]
+        public string OwnerClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("count", Required = Newtonsoft.Json.Required.Always)]
+        public int Count { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("oldestAgeSeconds", Required = Newtonsoft.Json.Required.Always)]
+        public int OldestAgeSeconds { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class QueueSummaryAuditReference
+    {
+
+        [Newtonsoft.Json.JsonProperty("adminId", Required = Newtonsoft.Json.Required.Always)]
+        public string AdminId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("actorType", Required = Newtonsoft.Json.Required.Always)]
+        public string ActorType { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("scopeUsed", Required = Newtonsoft.Json.Required.Always)]
+        public string ScopeUsed { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("queueRef", Required = Newtonsoft.Json.Required.Always)]
+        public string QueueRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Always)]
+        public string ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Always)]
+        public string PolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Always)]
+        public string RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("itemRefs", Required = Newtonsoft.Json.Required.Always)]
+        public System.Collections.Generic.ICollection<string> ItemRefs { get; set; } = new System.Collections.Generic.List<string>();
+
+        [Newtonsoft.Json.JsonProperty("itemCount", Required = Newtonsoft.Json.Required.Always)]
+        public int ItemCount { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("timestamp", Required = Newtonsoft.Json.Required.Always)]
+        public System.DateTimeOffset Timestamp { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Always)]
+        public long SourceVersion { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class QueueSummaryItemReference
+    {
+
+        [Newtonsoft.Json.JsonProperty("itemRef", Required = Newtonsoft.Json.Required.Always)]
+        public string ItemRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("status", Required = Newtonsoft.Json.Required.Always)]
+        public string Status { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("ownerClass", Required = Newtonsoft.Json.Required.Always)]
+        public string OwnerClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("disabledActionReasonCodes", Required = Newtonsoft.Json.Required.Always)]
+        public System.Collections.Generic.ICollection<string> DisabledActionReasonCodes { get; set; } = new System.Collections.Generic.List<string>();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class TenantReviewQueueSummary
+    {
+
+        [Newtonsoft.Json.JsonProperty("queueRef", Required = Newtonsoft.Json.Required.Always)]
+        public string QueueRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Always)]
+        public string SchemaVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Always)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("disclosureState", Required = Newtonsoft.Json.Required.Always)]
+        public string DisclosureState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("health", Required = Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ChatBotHealthStatus Health { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("buckets", Required = Newtonsoft.Json.Required.Always)]
+        public System.Collections.Generic.ICollection<QueueSummaryBucket> Buckets { get; set; } = new System.Collections.Generic.List<QueueSummaryBucket>();
+
+        [Newtonsoft.Json.JsonProperty("visibleItemRefs", Required = Newtonsoft.Json.Required.Always)]
+        public System.Collections.Generic.ICollection<QueueSummaryItemReference> VisibleItemRefs { get; set; } = new System.Collections.Generic.List<QueueSummaryItemReference>();
+
+        [Newtonsoft.Json.JsonProperty("auditRef", Required = Newtonsoft.Json.Required.Always)]
+        public QueueSummaryAuditReference AuditRef { get; set; } = new QueueSummaryAuditReference();
+
+        [Newtonsoft.Json.JsonProperty("coverage", Required = Newtonsoft.Json.Required.Always)]
+        public ReviewQueueCoverage Coverage { get; set; } = new ReviewQueueCoverage();
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]

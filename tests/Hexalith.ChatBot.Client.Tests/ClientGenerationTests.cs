@@ -985,6 +985,37 @@ public static class ClientGenerationTests
 
         public CancellationToken LastCancellationToken { get; private set; }
 
+        public Task<TenantReviewQueueSummary> ReadTenantReviewQueueSummaryAsync(ReviewQueueFamily family, string? x_Correlation_Id)
+            => ReadTenantReviewQueueSummaryAsync(family, x_Correlation_Id, CancellationToken.None);
+
+        public Task<TenantReviewQueueSummary> ReadTenantReviewQueueSummaryAsync(ReviewQueueFamily family, string? x_Correlation_Id, CancellationToken cancellationToken)
+        {
+            LastCorrelationId = x_Correlation_Id;
+            LastCancellationToken = cancellationToken;
+            return Task.FromResult(new TenantReviewQueueSummary());
+        }
+
+        public Task<ProjectReviewQueue> ReadProjectReviewQueueAsync(ReviewQueueFamily family, string projectId, string? sourceStreamId, string? x_Correlation_Id)
+            => ReadProjectReviewQueueAsync(family, projectId, sourceStreamId, x_Correlation_Id, CancellationToken.None);
+
+        public Task<ProjectReviewQueue> ReadProjectReviewQueueAsync(ReviewQueueFamily family, string projectId, string? sourceStreamId, string? x_Correlation_Id, CancellationToken cancellationToken)
+        {
+            LastProjectId = projectId;
+            LastCorrelationId = x_Correlation_Id;
+            LastCancellationToken = cancellationToken;
+            return Task.FromResult(new ProjectReviewQueue());
+        }
+
+        public Task<ReviewQueueDetail> ReadReviewQueueDetailAsync(ReviewQueueFamily family, string itemRef, long sourceVersion, string? revision, string? x_Correlation_Id)
+            => ReadReviewQueueDetailAsync(family, itemRef, sourceVersion, revision, x_Correlation_Id, CancellationToken.None);
+
+        public Task<ReviewQueueDetail> ReadReviewQueueDetailAsync(ReviewQueueFamily family, string itemRef, long sourceVersion, string? revision, string? x_Correlation_Id, CancellationToken cancellationToken)
+        {
+            LastCorrelationId = x_Correlation_Id;
+            LastCancellationToken = cancellationToken;
+            return Task.FromResult(new ReviewQueueDetail());
+        }
+
         public Task<CommandSubmissionResponse> SubmitCommandAsync(string? x_Correlation_Id, string? x_Hexalith_Task_Id, CommandSubmissionRequest body)
             => SubmitCommandAsync(x_Correlation_Id, x_Hexalith_Task_Id, body, CancellationToken.None);
 

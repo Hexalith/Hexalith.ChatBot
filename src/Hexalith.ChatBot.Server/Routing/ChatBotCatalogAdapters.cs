@@ -24,7 +24,7 @@ public static class ChatBotCatalogAdapters
         Adapter<SubmitServiceClientRateLimit>(), Adapter<SubmitAiActorRateLimit>(), Adapter<SubmitCommandCapabilityRateLimit>(),
         Adapter<SubmitOutboundChannelRateLimit>(), Adapter<CreateOutboundDraft>(), Adapter<RequestOutboundSendApproval>(),
         Adapter<DecideOutboundApproval>(), Adapter<ExecuteApprovedOutboundDraft>(), Adapter<CaptureMailboxMessageIntake>(),
-        Adapter<RequestFailedWorkflowRetry>(), Adapter<RecordProjectConversationMessage>(), Adapter<CancelAiResponseGeneration>(),
+        Adapter<RecordWorkflowReviewTransition>(), Adapter<RequestFailedWorkflowRetry>(), Adapter<RecordProjectConversationMessage>(), Adapter<CancelAiResponseGeneration>(),
         Adapter<CompleteAiResponseGenerationCancellation>(), Adapter<CaptureTaskIntent>(), Adapter<ProposeAIAction>(),
         Adapter<MarkAiActionProposalInvalidatedByCorrection>(), Adapter<ExecuteLowRiskAIAssistance>(), Adapter<CompleteLowRiskAiAssistance>(),
         Adapter<DecideAiActionApproval>(), Adapter<ExecuteApprovedAIAction>(), Adapter<MarkTaskIntentDisposition>(),

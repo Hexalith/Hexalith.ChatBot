@@ -383,6 +383,110 @@ paths:
         responseVisibility: authorized-review-only
         unknownOrCrossTenantResult: safe_not_found
         uiSurface: S1
+  /api/v1/admin/review-queues/{family}/summary:
+    get:
+      operationId: ReadTenantReviewQueueSummary
+      tags:
+      - reviews
+      summary: Read the governed aggregate view and its source coverage.
+      parameters:
+      - name: family
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/ReviewQueueFamily'
+      - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Authorized queue response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantReviewQueueSummary'
+        '401':
+          $ref: '#/components/responses/SafeAuthorizationDenial401'
+        '403':
+          $ref: '#/components/responses/SafeAuthorizationDenial403'
+  /api/v1/projects/{projectId}/review-queues/{family}:
+    get:
+      operationId: ReadProjectReviewQueue
+      tags:
+      - reviews
+      summary: Read open work visible within the current project.
+      parameters:
+      - name: family
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/ReviewQueueFamily'
+      - name: projectId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      - name: sourceStreamId
+        in: query
+        required: false
+        schema:
+          type: string
+          minLength: 1
+      - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Authorized queue response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectReviewQueue'
+        '401':
+          $ref: '#/components/responses/SafeAuthorizationDenial401'
+        '403':
+          $ref: '#/components/responses/SafeAuthorizationDenial403'
+  /api/v1/review-queues/{family}/items/{itemRef}:
+    get:
+      operationId: ReadReviewQueueDetail
+      tags:
+      - reviews
+      summary: Read authorized metadata and the committed transition history.
+      parameters:
+      - name: family
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/ReviewQueueFamily'
+      - name: itemRef
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+      - name: sourceVersion
+        description: Current source-local version from the authorized row.
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+      - name: revision
+        in: query
+        required: false
+        description: Opaque row revision. Required when more than one stream contributed to the subject.
+        schema:
+          type: string
+      - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Authorized queue response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewQueueDetail'
+        '401':
+          $ref: '#/components/responses/SafeAuthorizationDenial401'
+        '403':
+          $ref: '#/components/responses/SafeAuthorizationDenial403'
 components:
   securitySchemes:
     oidcBearer:
@@ -567,6 +671,337 @@ components:
           schema:
             $ref: "#/components/schemas/TaskIntentReview"
   schemas:
+    ReviewQueueFamily:
+      type: string
+      enum:
+      - ambiguous-association
+      - unresolved-participant
+      - pending-approval
+      - failed-ingestion
+      - failed-attachment
+      - retryable-operation
+    ReviewQueueCoverage:
+      type: object
+      required:
+      - scope
+      - reason
+      - ownerRole
+      - nextAction
+      properties:
+        scope:
+          type: string
+        reason:
+          type: string
+        ownerRole:
+          type: string
+        nextAction:
+          type: string
+        knownSourceVersion:
+          type: integer
+          format: int64
+          nullable: true
+    ReviewQueueDiagnostics:
+      type: object
+      required:
+      - correlationId
+      - tenantRef
+      - workflowItemRef
+      - currentState
+      - lastTransition
+      - nextSafeAction
+      - retryCount
+      properties:
+        correlationId:
+          type: string
+        tenantRef:
+          type: string
+        mailboxRef:
+          type: string
+          nullable: true
+        workflowItemRef:
+          type: string
+        currentState:
+          type: string
+        lastTransition:
+          type: string
+        failureReason:
+          type: string
+          nullable: true
+        nextSafeAction:
+          type: string
+        retryCount:
+          type: integer
+          format: int32
+    ReviewQueueRow:
+      type: object
+      required:
+      - queueFamily
+      - queueRef
+      - itemRef
+      - state
+      - risk
+      - nextAction
+      - ownerRole
+      - redactionState
+      - priorityExplanation
+      - ageSeconds
+      - retryCount
+      - confidence
+      - priorityScore
+      - isTerminal
+      - health
+      - freshnessTimestampUtc
+      - disabledActionReasonCodes
+      - diagnostics
+      - sourceVersion
+      properties:
+        queueFamily:
+          $ref: '#/components/schemas/ReviewQueueFamily'
+        queueRef:
+          type: string
+        itemRef:
+          type: string
+        state:
+          type: string
+        risk:
+          type: string
+        assigneeRef:
+          type: string
+          nullable: true
+        nextAction:
+          type: string
+        ownerRole:
+          type: string
+        redactionState:
+          type: string
+        priorityExplanation:
+          type: string
+        groupKey:
+          type: string
+          nullable: true
+        groupRequesterRef:
+          type: string
+          nullable: true
+        groupCommandRef:
+          type: string
+          nullable: true
+        groupProjectRef:
+          type: string
+          nullable: true
+        ageSeconds:
+          type: integer
+          format: int32
+        retryCount:
+          type: integer
+          format: int32
+        confidence:
+          type: number
+        priorityScore:
+          type: number
+        isTerminal:
+          type: boolean
+        health:
+          $ref: '#/components/schemas/ChatBotHealthStatus'
+        freshnessTimestampUtc:
+          type: string
+          format: date-time
+        disabledActionReasonCodes:
+          type: array
+          items:
+            type: string
+        diagnostics:
+          $ref: '#/components/schemas/ReviewQueueDiagnostics'
+        sourceVersion:
+          type: integer
+          format: int64
+        revision:
+          type: string
+          nullable: true
+    ReviewQueueHistoryEntry:
+      type: object
+      required:
+      - state
+      - operationId
+      - correlationId
+      - occurredAtUtc
+      - terminal
+      - sourceVersion
+      - retryCount
+      properties:
+        state:
+          type: string
+        reason:
+          type: string
+          nullable: true
+        operationId:
+          type: string
+        correlationId:
+          type: string
+        occurredAtUtc:
+          type: string
+          format: date-time
+        terminal:
+          type: boolean
+        sourceVersion:
+          type: integer
+          format: int64
+        retryCount:
+          type: integer
+          format: int32
+        sourceStreamId:
+          type: string
+          nullable: true
+        actor:
+          type: string
+          nullable: true
+    ReviewQueueDetail:
+      type: object
+      required:
+      - summary
+      - detailAccessState
+      - safeDetailStatus
+      - escalationActions
+      properties:
+        summary:
+          $ref: '#/components/schemas/ReviewQueueRow'
+        detailAccessState:
+          type: string
+        safeDetailStatus:
+          type: string
+        escalationActions:
+          type: array
+          items:
+            type: string
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewQueueHistoryEntry'
+          nullable: true
+    ProjectReviewQueue:
+      type: object
+      required:
+      - rows
+      - coverage
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewQueueRow'
+        coverage:
+          $ref: '#/components/schemas/ReviewQueueCoverage'
+    QueueSummaryBucket:
+      type: object
+      required:
+      - status
+      - ownerClass
+      - count
+      - oldestAgeSeconds
+      properties:
+        status:
+          type: string
+        ownerClass:
+          type: string
+        count:
+          type: integer
+          format: int32
+        oldestAgeSeconds:
+          type: integer
+          format: int32
+    QueueSummaryAuditReference:
+      type: object
+      required:
+      - adminId
+      - actorType
+      - scopeUsed
+      - queueRef
+      - reasonCode
+      - policySnapshotId
+      - redactionState
+      - itemRefs
+      - itemCount
+      - timestamp
+      - sourceVersion
+      properties:
+        adminId:
+          type: string
+        actorType:
+          type: string
+        scopeUsed:
+          type: string
+        queueRef:
+          type: string
+        reasonCode:
+          type: string
+        policySnapshotId:
+          type: string
+        redactionState:
+          type: string
+        itemRefs:
+          type: array
+          items:
+            type: string
+        itemCount:
+          type: integer
+          format: int32
+        timestamp:
+          type: string
+          format: date-time
+        sourceVersion:
+          type: integer
+          format: int64
+    QueueSummaryItemReference:
+      type: object
+      required:
+      - itemRef
+      - status
+      - ownerClass
+      - disabledActionReasonCodes
+      properties:
+        itemRef:
+          type: string
+        status:
+          type: string
+        ownerClass:
+          type: string
+        disabledActionReasonCodes:
+          type: array
+          items:
+            type: string
+    TenantReviewQueueSummary:
+      type: object
+      required:
+      - queueRef
+      - schemaVersion
+      - correlationId
+      - disclosureState
+      - health
+      - buckets
+      - visibleItemRefs
+      - auditRef
+      - coverage
+      properties:
+        queueRef:
+          type: string
+        schemaVersion:
+          type: string
+        correlationId:
+          type: string
+        disclosureState:
+          type: string
+        health:
+          $ref: '#/components/schemas/ChatBotHealthStatus'
+        buckets:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueueSummaryBucket'
+        visibleItemRefs:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueueSummaryItemReference'
+        auditRef:
+          $ref: '#/components/schemas/QueueSummaryAuditReference'
+        coverage:
+          $ref: '#/components/schemas/ReviewQueueCoverage'
     CommandSubmissionRequest:
       type: object
       additionalProperties: false

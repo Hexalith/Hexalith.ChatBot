@@ -242,8 +242,17 @@ public static class AdminContractTests
                 TenantPolicyKnobIds.MailboxRoutingRules,
                 TenantPolicyKnobIds.ReviewerBacklogThreshold,
                 TenantPolicyKnobIds.NotificationThrottleCeilings,
+                TenantPolicyKnobIds.ReviewQueueMinimum,
             ],
             ignoreOrder: false);
+
+        TenantPolicySchema.IsSensitive(TenantPolicyKnobIds.ReviewQueueMinimum).ShouldBeTrue();
+        TenantPolicySchema.DefaultM0Values.ShouldNotContain(value => value.KnobId == TenantPolicyKnobIds.ReviewQueueMinimum);
+        foreach (double invalid in new[] { 1, 1.5, 2.5, double.NaN, double.PositiveInfinity })
+        {
+            TenantPolicySchema.Validate(new([new(TenantPolicyKnobIds.ReviewQueueMinimum, NumberValue: invalid)])).IsValid.ShouldBeFalse();
+        }
+        TenantPolicySchema.Validate(new([new(TenantPolicyKnobIds.ReviewQueueMinimum, NumberValue: 2)])).IsValid.ShouldBeTrue();
 
         TenantPolicySchema.DefaultM0Values.ShouldContain(static value => value.KnobId == TenantPolicyKnobIds.AssociationTHigh && value.NumberValue == 0.90);
         TenantPolicySchema.DefaultM0Values.ShouldContain(static value => value.KnobId == TenantPolicyKnobIds.AssociationTLow && value.NumberValue == 0.60);

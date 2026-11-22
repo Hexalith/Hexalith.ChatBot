@@ -8,4 +8,4 @@ internal sealed record IngestionBindingRequest(
     string AssociatedProjectId,
     long SourceVersion,
     string CorrelationId,
-    string WorkflowInstanceId);
+    string WorkflowInstanceId, string? RetryPhase = null, int RetryAttempt = 0, string? RetryId = null, string[]? IndexedUnits = null);

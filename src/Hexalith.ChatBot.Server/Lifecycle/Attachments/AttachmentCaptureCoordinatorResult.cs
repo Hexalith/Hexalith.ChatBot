@@ -8,4 +8,4 @@ namespace Hexalith.ChatBot.Server.Lifecycle.Attachments;
 internal sealed record AttachmentCaptureCoordinatorResult(
     int EvaluatedCount,
     int StoredCount,
-    int DegradedCount);
+    int DegradedCount, string? ConfirmedSubjectId = null, long? ConfirmedGeneration = null);

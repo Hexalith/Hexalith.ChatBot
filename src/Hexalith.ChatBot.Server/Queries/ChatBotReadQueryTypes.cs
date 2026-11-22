@@ -4,6 +4,9 @@ internal static class ChatBotReadQueryTypes
 {
     public const string Domain = "chatbot";
     public const string AssociationRoutingStatus = "association-routing-status";
+    public const string AdminQueueSummary = "admin-queue-summary";
+    public const string QueueItemDetail = "operational-queue-item-detail";
+    public const string QueueItems = "operational-queue-items";
     public const string ProjectConversation = "project-conversation";
     public const string TaskIntentReview = "task-intent-review";
     public const string OperationStatus = "operation-status";

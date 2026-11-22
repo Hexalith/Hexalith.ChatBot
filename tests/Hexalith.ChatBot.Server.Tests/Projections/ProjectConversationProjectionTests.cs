@@ -15,6 +15,7 @@ using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
+using Hexalith.ChatBot.Server.Tests.Gateway.Status;
 using Hexalith.ChatBot.Tests.TrustedAuthority;
 
 using Microsoft.AspNetCore.Builder;
@@ -1254,6 +1255,49 @@ public sealed class ProjectConversationProjectionTests
         foreign.Items.ShouldBeEmpty();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DecidedApprovalShouldStayClosedAfterRequestRedelivery(bool useSerializedStore)
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        AtomicOperationStatusReadModelStore bytes = new();
+        IProjectConversationProjectionStore store = useSerializedStore
+            ? new ReadModelProjectConversationProjectionStore(bytes)
+            : new InMemoryProjectConversationProjectionStore();
+        ApprovalProjectionHandler handler = new(store);
+        PublishedAiActionApprovalEvent request = ApprovalRequestPublished(8);
+        PublishedAiActionApprovalEvent decision = ApprovalDecisionPublished(9);
+        DateTimeOffset now = decision.Timestamp.AddMinutes(1);
+
+        await handler.HandleAsync(request, cancellationToken);
+        (await store.ReadOperationalQueueItemsAsync(Tenant, now, cancellationToken)).ShouldHaveSingleItem();
+        (await store.ReadOperationalQueueItemsAsync(OtherTenant, now, cancellationToken)).ShouldBeEmpty();
+        await handler.HandleAsync(decision, cancellationToken);
+
+        if (useSerializedStore)
+        {
+            store = new ReadModelProjectConversationProjectionStore(bytes);
+            handler = new ApprovalProjectionHandler(store);
+        }
+
+        await handler.HandleAsync(request, cancellationToken);
+        await handler.HandleAsync(decision, cancellationToken);
+        (await store.ReadOperationalQueueItemsAsync(Tenant, now, cancellationToken)).ShouldBeEmpty();
+        IReadOnlyList<ApprovalEventView> history = await store.ReadApprovalEventsAsync(Tenant, cancellationToken);
+        history.Select(e => e.SourceVersion).ShouldBe([8L, 9L]);
+        history[1].Status.ShouldBe(ApprovalStatus.Approved);
+        history[1].DecidedAtUtc.ShouldBe(decision.Timestamp);
+
+        // Reusing the approval ID in another project or tenant creates an independent pending subject.
+        await handler.HandleAsync(request with { Request = request.Request! with { ProjectId = "project-002" } }, cancellationToken);
+        await handler.HandleAsync(request with { TenantId = OtherTenant }, cancellationToken);
+        (await store.ReadOperationalQueueItemsAsync(Tenant, now, cancellationToken)).ShouldHaveSingleItem()
+            .GroupProjectRef.ShouldBe("project:project-002");
+        (await store.ReadOperationalQueueItemsAsync(OtherTenant, now, cancellationToken)).ShouldHaveSingleItem()
+            .GroupProjectRef.ShouldBe("project:project-001");
+    }
+
     [Fact]
     public async Task ApprovalProjectionShouldMaterializeAggregateRequestAndDecisionEvents()
     {
@@ -2329,7 +2373,7 @@ public sealed class ProjectConversationProjectionTests
             ActionSummaryRedactionState: "metadata_only",
             SafeNextAction: "review-outbound-send");
 
-    private static PublishedAiActionApprovalEvent ApprovalRequestPublished(long sourceVersion)
+    internal static PublishedAiActionApprovalEvent ApprovalRequestPublished(long sourceVersion)
         => new(
             Tenant,
             ApprovalProjectionTranslator.ChatBotDomain,
@@ -2365,7 +2409,7 @@ public sealed class ProjectConversationProjectionTests
                 sourceVersion,
                 CorrelationId));
 
-    private static PublishedAiActionApprovalEvent ApprovalDecisionPublished(long sourceVersion)
+    internal static PublishedAiActionApprovalEvent ApprovalDecisionPublished(long sourceVersion)
         => new(
             Tenant,
             ApprovalProjectionTranslator.ChatBotDomain,
@@ -2499,7 +2543,7 @@ public sealed class ProjectConversationProjectionTests
                 "pending-scan",
                 [],
                 $"operation-{request.ProviderAttachmentId}-{request.Ordinal}",
-                $"idempotency-{request.ProviderAttachmentId}-{request.Ordinal}")));
+                $"idempotency-{request.ProviderAttachmentId}-{request.Ordinal}", ContentConfirmed: true)));
         }
     }
 

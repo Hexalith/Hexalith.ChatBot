@@ -194,6 +194,10 @@ internal static class AssociationProjectionTranslator
             : LifecycleState.NeedsReview;
     }
 
+    internal static bool IsAssociationEvent(string eventType)
+        => eventType == CandidatesGeneratedEventType || eventType == AutoAssociatedEventType || eventType == FailedClosedEventType ||
+            IsDecisionEvent(eventType) || IsCorrectionEvent(eventType);
+
     private static bool IsDecisionEvent(string? eventTypeName)
         => string.Equals(eventTypeName, DecisionConfirmedEventType, StringComparison.Ordinal)
             || string.Equals(eventTypeName, DecisionRejectedEventType, StringComparison.Ordinal)

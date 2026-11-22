@@ -50,6 +50,16 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
     private readonly IAuditCompletenessSource _auditCompletenessSource;
     private readonly IRetryExhaustionAlertSource? _retryExhaustionSource;
     private readonly Meter _meter;
+    internal Meter Meter => _meter;
+    public const string ReviewDepth = "chatbot.review.queue.depth";
+    public const string ReviewAge = "chatbot.review.queue.oldest.age";
+    public const string ReviewWorkflowDepth = "chatbot.review.queue.workflow.depth";
+    public const string ReviewDelay = "chatbot.review.queue.projection.delay";
+
+    private readonly Histogram<int> _reviewWorkflowDepth;
+    private readonly Histogram<double> _reviewDelay;
+    private readonly Histogram<int> _reviewDepth;
+    private readonly Histogram<int> _reviewAge;
     private readonly Histogram<double> _ingestionLatency;
     private readonly Histogram<double> _associationLatency;
     private readonly Histogram<double> _approvalLatency;
@@ -73,6 +83,10 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
         _auditCompletenessSource = auditCompletenessSource ?? new UnavailableAuditCompletenessSource();
         _meter = new Meter(MeterName);
 
+        _reviewDepth = _meter.CreateHistogram<int>(ReviewDepth, "{items}");
+        _reviewAge = _meter.CreateHistogram<int>(ReviewAge, "s");
+        _reviewWorkflowDepth = _meter.CreateHistogram<int>(ReviewWorkflowDepth, "{items}", "Disclosed failure and retry bucket depths.");
+        _reviewDelay = _meter.CreateHistogram<double>(ReviewDelay, "s", "Elapsed time from a committed event to its first completed projection checkpoint.");
         _ingestionLatency = _meter.CreateHistogram<double>(IngestionLatencyInstrumentName, LatencyUnit, "Mailbox-intake (ingestion) latency.");
         _associationLatency = _meter.CreateHistogram<double>(AssociationLatencyInstrumentName, LatencyUnit, "Association-scoring latency.");
         _approvalLatency = _meter.CreateHistogram<double>(ApprovalLatencyInstrumentName, LatencyUnit, "Approval-decision latency.");
@@ -90,6 +104,26 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
         // Emits no measurement when a tenant's fraction is unmeasurable (fail-safe), and swallows + gap-counts any
         // source failure. Low-cardinality tenant tag only.
         _ = _meter.CreateObservableGauge(AuditCompletenessInstrumentName, ObserveAuditCompleteness, "{fraction}", "Audit-completeness fraction (reconstructable operations), per tenant.");
+    }
+
+    public void RecordReviewQueue(string tenantId, Contracts.Enums.OperationalQueueFamily family, string state, int depth, int oldestAgeSeconds)
+    {
+        if (!TryResolveTenant(tenantId, ChatBotOperationClasses.Workflow, out string tenant) || !Enum.IsDefined(family)) { return; }
+        var familyTag = new KeyValuePair<string, object?>("queue-family", Contracts.Enums.OperationalQueueFamilies.ToWireValue(family));
+        var tenantTag = new KeyValuePair<string, object?>(TenantTagName, tenant);
+        SafeEmit(ChatBotOperationClasses.Workflow, () =>
+        {
+            _reviewDepth.Record(depth, tenantTag, familyTag);
+            _reviewAge.Record(oldestAgeSeconds, tenantTag, familyTag);
+            if (state is "failed" or "retry-requested" or "retrying" or "blocked" or "retryable")
+            { _reviewWorkflowDepth.Record(depth, tenantTag, familyTag, new KeyValuePair<string, object?>(StatusTagName, state)); }
+        });
+    }
+
+    public void RecordReviewProjectionDelay(string tenantId, double seconds)
+    {
+        if (seconds < 0 || !double.IsFinite(seconds) || !TryResolveTenant(tenantId, ChatBotOperationClasses.Workflow, out string tenant)) { return; }
+        SafeEmit(ChatBotOperationClasses.Workflow, () => _reviewDelay.Record(seconds, new KeyValuePair<string, object?>(TenantTagName, tenant)));
     }
 
     public void RecordIngestionLatency(string tenantId, double milliseconds)

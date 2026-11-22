@@ -11,4 +11,5 @@ internal sealed record StoredMailboxAttachmentReference(
     string AiContextEligibility,
     IReadOnlyList<string> AllowedActions,
     string StorageOperationId,
-    string IdempotencyKey);
+    string IdempotencyKey,
+    bool ContentConfirmed = false);

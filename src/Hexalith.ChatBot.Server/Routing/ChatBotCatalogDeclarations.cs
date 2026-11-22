@@ -35,7 +35,7 @@ public static class ChatBotCatalogDeclarations
         typeof(SubmitServiceClientRateLimit), typeof(SubmitAiActorRateLimit), typeof(SubmitCommandCapabilityRateLimit),
         typeof(SubmitOutboundChannelRateLimit), typeof(CreateOutboundDraft), typeof(RequestOutboundSendApproval),
         typeof(DecideOutboundApproval), typeof(ExecuteApprovedOutboundDraft), typeof(CaptureMailboxMessageIntake),
-        typeof(RequestFailedWorkflowRetry), typeof(RecordProjectConversationMessage), typeof(CancelAiResponseGeneration),
+        typeof(RecordWorkflowReviewTransition), typeof(RequestFailedWorkflowRetry), typeof(RecordProjectConversationMessage), typeof(CancelAiResponseGeneration),
         typeof(CompleteAiResponseGenerationCancellation), typeof(CaptureTaskIntent), typeof(ProposeAIAction),
         typeof(MarkAiActionProposalInvalidatedByCorrection), typeof(ExecuteLowRiskAIAssistance), typeof(CompleteLowRiskAiAssistance),
         typeof(DecideAiActionApproval), typeof(ExecuteApprovedAIAction), typeof(MarkTaskIntentDisposition),
@@ -51,9 +51,12 @@ public static class ChatBotCatalogDeclarations
     public static IReadOnlyList<CommandIntentDeclaration> Commands { get; } = Array.AsReadOnly(
         CommandTypes.Select(Command).ToArray());
 
-    /// <summary>Declarations attached to all eight actual query handlers.</summary>
+    /// <summary>Declarations attached to all actual query handlers.</summary>
     public static IReadOnlyList<RouteContractDeclaration> Queries => Array.AsReadOnly<RouteContractDeclaration>([
         AssociationRoutingStatusQueryHandler.CatalogDeclaration,
+        AdminQueueSummaryQueryHandler.CatalogDeclaration,
+        ReviewQueueDetailQueryHandler.CatalogDeclaration,
+        ProjectReviewQueueQueryHandler.CatalogDeclaration,
         ProjectConversationQueryHandler.CatalogDeclaration,
         TaskIntentReviewQueryHandler.CatalogDeclaration,
         OperationStatusQueryHandler.CatalogDeclaration,
@@ -119,6 +122,9 @@ public static class ChatBotCatalogDeclarations
     private static Type QueryPayloadType(string wire) => wire switch
     {
         ChatBotReadQueryTypes.AssociationRoutingStatus => typeof(AssociationRoutingStatusQuery),
+        ChatBotReadQueryTypes.AdminQueueSummary => typeof(Contracts.Queries.GetAdminQueueSummary),
+        ChatBotReadQueryTypes.QueueItemDetail => typeof(Contracts.Queries.GetOperationalQueueItemDetail),
+        ChatBotReadQueryTypes.QueueItems => typeof(Contracts.Queries.GetProjectReviewQueue),
         ChatBotReadQueryTypes.ProjectConversation => typeof(ProjectConversationQuery),
         ChatBotReadQueryTypes.TaskIntentReview => typeof(TaskIntentReviewQuery),
         ChatBotReadQueryTypes.OperationStatus => typeof(OperationStatusQuery),

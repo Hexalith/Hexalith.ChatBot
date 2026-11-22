@@ -88,6 +88,20 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void DisclosureMinimumRequiresTheLatestActivatedSnapshot()
+    {
+        const string stream = ReviewQueueDisclosurePolicy.StreamId;
+        var values = new TenantPolicyChangeSet([new(TenantPolicyKnobIds.ReviewQueueMinimum, NumberValue: 3)]);
+        var command = TenantPolicyChange(TenantPolicyKnobIds.ReviewQueueMinimum, values) with { PolicyChangeId = stream };
+        var state = new GovernedOperationState();
+        state.Apply(new TenantPolicySnapshotActivated(stream, "tenant-alpha", "base", "active-policy", [TenantPolicyKnobIds.ReviewQueueMinimum], values,
+            TenantPolicyApprovalStatus.Approved, "requester", "approver", "changed", DateTimeOffset.UtcNow, 9, "correlation"));
+        var envelope = Envelope(command) with { AggregateId = stream };
+        GovernedOperationAggregate.Handle(command, state, envelope).IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(command with { SourcePolicySnapshotId = "active-policy", SourceVersion = 9 }, state, envelope).IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
     public static void HandleTenantPolicyStandardChangeShouldActivateSnapshotDirectly()
     {
         SubmitTenantPolicyChange command = TenantPolicyChange(
@@ -114,7 +128,9 @@ public static class GovernedOperationAggregateTests
                 SchemaVersion = definition.SchemaVersion,
             };
 
-            DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+            if (definition.KnobId == TenantPolicyKnobIds.ReviewQueueMinimum)
+            { command = command with { PolicyChangeId = ReviewQueueDisclosurePolicy.StreamId }; }
+            DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command) with { AggregateId = command.PolicyChangeId });
 
             result.IsSuccess.ShouldBeTrue(definition.KnobId);
             if (definition.Sensitivity is TenantPolicyKnobSensitivity.SecuritySensitive)
@@ -3558,6 +3574,7 @@ public static class GovernedOperationAggregateTests
             TenantPolicyKnobIds.InboundAuthenticityStrictness => new(definition.KnobId, StringValue: "strict"),
             TenantPolicyKnobIds.ApprovalPriorityWeights => new(definition.KnobId, ApprovalPriorityWeightsValue: ApprovalPriorityWeights.SafeDefaults),
             TenantPolicyKnobIds.NotificationThrottleCeilings => new(definition.KnobId, NotificationThrottleCeilingsValue: NotificationThrottleCeilings.SafeDefaults),
+            TenantPolicyKnobIds.ReviewQueueMinimum => new(definition.KnobId, NumberValue: 3),
             TenantPolicyKnobIds.ReviewerBacklogThreshold => new(definition.KnobId, ReviewerBacklogThresholdValue: ReviewerBacklogThreshold.SafeDefault),
             _ => new(definition.KnobId, StringValue: "policy-token-001"),
         };
