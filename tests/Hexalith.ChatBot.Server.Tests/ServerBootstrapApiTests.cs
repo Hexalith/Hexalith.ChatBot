@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
@@ -12,6 +13,7 @@ using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Adapters.Projects;
 using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Association.Scoring;
+using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
@@ -27,6 +29,7 @@ using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.ChatBot.Server.Queries;
+using Hexalith.ChatBot.Server.Tests.Authentication;
 using Hexalith.ChatBot.Server.Tests.TrustedAuthority;
 using Hexalith.ChatBot.Tests.TrustedAuthority;
 using Hexalith.EventStore.Client.Gateway;
@@ -977,12 +980,64 @@ public sealed class ServerBootstrapApiTests
         body.ShouldNotContain("worm-audit-chain", Case.Insensitive);
     }
 
+    /// <summary>Only requests authenticated by the configured release-gate scheme can execute the gate.</summary>
+    [Fact]
+    public async Task M2ReleaseGateEndpointShouldRequireTheConfiguredSecret()
+    {
+        const string route = "/health/chatbot/periodic-enforcement/m2";
+        const string token = "fixture-m2-release-gate-token";
+        int gateDependenciesResolved = 0;
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                ChatBotSignedBearerFixture.Configure(builder);
+                _ = builder.UseSetting(ChatBotM2ReleaseGateAuthentication.TokenConfigurationKey, token);
+                _ = builder.UseSetting("ChatBot:UsePeriodicEnforcementRuntime", "false");
+                _ = builder.UseSetting("ChatBot:PeriodicEnforcement:UsePeriodicEnforcementRuntime", "false");
+                _ = builder.ConfigureServices(services =>
+                    services.AddSingleton<IPeriodicEnforcementStatusStore>(_ =>
+                    {
+                        Interlocked.Increment(ref gateDependenciesResolved);
+                        return new InMemoryPeriodicEnforcementStatusStore();
+                    }));
+            });
+        using HttpClient client = factory.CreateClient();
+        using HttpResponseMessage missing = await client.GetAsync(route, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        missing.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+
+        using HttpRequestMessage wrongSecret = new(HttpMethod.Get, route);
+        wrongSecret.Headers.Add(ChatBotCompatibilityEndpointExtensions.M2ReleaseGateTokenHeader, "wrong-fixture-token");
+        using HttpResponseMessage wrong = await client.SendAsync(wrongSecret, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        wrong.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        AuthenticationHeaderValue applicationBearer = new("Bearer", ChatBotSignedBearerFixture.CreateToken("tenant-alpha"));
+        using HttpRequestMessage applicationHealth = new(HttpMethod.Get, "/health/chatbot");
+        applicationHealth.Headers.Authorization = applicationBearer;
+        using HttpResponseMessage applicationHealthResponse = await client.SendAsync(applicationHealth, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        applicationHealthResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        using HttpRequestMessage applicationGate = new(HttpMethod.Get, route);
+        applicationGate.Headers.Authorization = applicationBearer;
+        using HttpResponseMessage applicationGateResponse = await client.SendAsync(applicationGate, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        applicationGateResponse.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        Volatile.Read(ref gateDependenciesResolved).ShouldBe(0);
+
+        using HttpRequestMessage correctSecret = new(HttpMethod.Get, route);
+        correctSecret.Headers.Add(ChatBotCompatibilityEndpointExtensions.M2ReleaseGateTokenHeader, token);
+        using HttpResponseMessage authorized = await client.SendAsync(correctSecret, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        authorized.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        Volatile.Read(ref gateDependenciesResolved).ShouldBe(1);
+        JsonElement gate = await authorized.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        gate.GetProperty("isStopShip").GetBoolean().ShouldBeTrue();
+        gate.GetProperty("stopShipReasons").GetArrayLength().ShouldBeGreaterThan(0);
+    }
+
     [Fact]
     public async Task M2ReleaseGateEndpointShouldNotBeMappedWithoutAToken()
     {
         // The SDK now denies anonymous requests to unknown routes through its fallback policy. Check the endpoint
         // inventory as well as the response so this still proves the tokenless M2 route was not mapped.
-        using WebApplicationFactory<Program> factory = new();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.UseSetting(ChatBotM2ReleaseGateAuthentication.TokenConfigurationKey, string.Empty));
         using HttpClient client = factory.CreateClient();
 
         factory.Services.GetServices<EndpointDataSource>()

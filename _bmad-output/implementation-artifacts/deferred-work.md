@@ -2213,6 +2213,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: Ordinary tests never pin the mapped M2 release-gate secret (401 without/wrong header, 200/503 with it).
   evidence: `ChatBotM2ReleaseGateAuthenticationHandler` compares the secret, but `M2ReleaseGateEndpointShouldNotBeMappedWithoutAToken` only covers the unmapped-without-token case. Later release-gate work.
+  resolution: Resolved 2026-11-24. The HTTP bootstrap tests prove absent and incorrect secrets return 401 without resolving the gate dependencies. The configured secret reaches the stop-ship logic and returns 503 with its typed verdict. The unmapped case remains covered. ServerBootstrapApiTests passed all 107 cases.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: Sibling ChatBot health routes require the boundary policy, but ordinary tests pin anonymous 401 only for `/health/chatbot`, and the live workflow probe still GETs `/health/chatbot/workflows` with no credentials.
