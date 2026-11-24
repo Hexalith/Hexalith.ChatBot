@@ -33,8 +33,8 @@
                     <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.RecordGovernedNote]"
                                             AccessibleLabel="@UiText[ChatBotUiTextKey.RecordGovernedNote]"
                                             StableId="record-governed-note"
-                                            State="@(State.Value.IsSubmitting ? ChatBotGovernedActionState.DisabledWithReason : ChatBotGovernedActionState.Enabled)"
-                                            DisabledReason="@UiText[ChatBotUiTextKey.DisabledReasonAlreadySubmitting]"
+                                            State="@(RendererInfo.IsInteractive && !State.Value.IsSubmitting ? ChatBotGovernedActionState.Enabled : ChatBotGovernedActionState.DisabledWithReason)"
+                                            DisabledReason="@UiText[State.Value.IsSubmitting ? ChatBotUiTextKey.DisabledReasonAlreadySubmitting : ChatBotUiTextKey.DisabledReasonDefault]"
                                             OnActivate="@Submit" />
                 </Actions>
             </FcPageHeader>

@@ -397,6 +397,7 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
         ILocator action = page.Locator("[data-chatbot-stable-id='record-governed-note']");
         ILocator record = action.Locator("fluent-button");
         await AssertMotionSuppressedAsync(action);
+        await Assertions.Expect(record).ToBeEnabledAsync(new() { Timeout = 20_000 });
         await record.FocusAsync();
         await Assertions.Expect(record).ToBeFocusedAsync();
         await record.ClickAsync();
@@ -684,7 +685,7 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
 
     private static async Task ScreenshotAsync(IPage page, Surface surface, string culture, ColorMode mode, string width)
     {
-        string dir = Path.Combine(SolutionRoot(), "_bmad-output", "implementation-artifacts", "tests", "screenshots", "story-13.9");
+        string dir = Path.Combine(SolutionRoot(), "TestResults", "screenshots", "story-13.9");
         Directory.CreateDirectory(dir);
         string file = Path.Combine(dir, $"{surface.Key}.{culture}.{mode.Name}.{width}.png");
         await page.ScreenshotAsync(new() { Path = file });
