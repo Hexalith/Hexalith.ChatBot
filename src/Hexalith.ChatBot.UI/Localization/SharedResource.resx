@@ -1125,4 +1125,17 @@
   <data name="AuditHistory_Outcome_Label" xml:space="preserve"><value>Audit outcome</value></data>
   <data name="AuditHistory_Origin_Label" xml:space="preserve"><value>Surface origin</value></data>
   <data name="AuditHistory_NoRecords" xml:space="preserve"><value>No audit records are available.</value></data>
+  <data name="ReviewQueue_Project" xml:space="preserve"><value>Project identifier</value></data>
+  <data name="ReviewQueue_OpenProject" xml:space="preserve"><value>View project queues</value></data>
+  <data name="ReviewQueue_TenantSummary" xml:space="preserve"><value>Tenant queue summary</value></data>
+  <data name="ReviewQueue_Disclosure" xml:space="preserve"><value>Disclosure</value></data>
+  <data name="ReviewQueue_Coverage" xml:space="preserve"><value>Source coverage</value></data>
+  <data name="ReviewQueue_Loading" xml:space="preserve"><value>Loading review queue.</value></data>
+  <data name="ReviewQueue_LoadFailed" xml:space="preserve"><value>The review queue is unavailable for this selection.</value></data>
+  <data name="ReviewQueue_SelectProject" xml:space="preserve"><value>Choose a project to view its approval priorities.</value></data>
+  <data name="ReviewQueue_PriorityOrder" xml:space="preserve"><value>Highest returned priority score first</value></data>
+  <data name="ReviewQueue_NoApprovals" xml:space="preserve"><value>No pending approvals were returned.</value></data>
+  <data name="ReviewQueue_BatchUnavailable" xml:space="preserve"><value>Batch approval is unavailable. Review approvals individually.</value></data>
+  <data name="ReviewQueue_Retry" xml:space="preserve"><value>Retry queue read</value></data>
+  <data name="ReviewQueue_Item" xml:space="preserve"><value>Queue item</value></data>
 </root>

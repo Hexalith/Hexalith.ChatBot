@@ -35,6 +35,18 @@ internal sealed class FakeChatBotClient(string? submissionErrorCode = null) : IC
     private bool _proposalSubmitted;
     private bool _responseStopped;
 
+    public Func<string, ReviewQueueFamily, Task<ProjectReviewQueue>>? ProjectQueueRead { get; init; }
+
+    public Func<ReviewQueueFamily, TenantReviewQueueSummary>? TenantQueueRead { get; init; }
+
+    public Task<ProjectReviewQueue> GetProjectReviewQueueAsync(
+        string projectId, ReviewQueueFamily family, CancellationToken cancellationToken = default)
+        => ProjectQueueRead?.Invoke(projectId, family) ?? Task.FromResult(new ProjectReviewQueue());
+
+    public Task<TenantReviewQueueSummary> GetTenantReviewQueueSummaryAsync(
+        ReviewQueueFamily family, CancellationToken cancellationToken = default)
+        => Task.FromResult(TenantQueueRead?.Invoke(family) ?? new TenantReviewQueueSummary());
+
     public Task<CommandSubmissionResponse> SubmitAsync(
         IChatBotCommand command,
         string? correlationId = null,

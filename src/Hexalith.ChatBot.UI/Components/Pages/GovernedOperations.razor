@@ -1,8 +1,12 @@
 @page "/governed-operations"
+@using Hexalith.ChatBot.Client
+@using Hexalith.ChatBot.Client.Generated
 @namespace Hexalith.ChatBot.UI.Components.Pages
 @inherits FluxorComponent
 @inject IState<GovernedOperationsState> State
 @inject IDispatcher Dispatcher
+@inject IChatBotClient ChatBotClient
+@inject NavigationManager Navigation
 @inject ChatBotUiTextLocalizer UiText
 
 <ChatBotConversationShell ShellLabel="@UiText[ChatBotUiTextKey.GovernedOperationsTitle]"
@@ -68,120 +72,102 @@
                 <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.GovernedOperationsOperationalQueueTitle]" HeadingLevel="2" Expanded="true">
                     <section class="chatbot-section"
                              aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsOperationalQueueTitle]"
-                             data-chatbot-operational-queue="true"
-                             data-chatbot-loading-mode="@QueueLoadingMode">
+                             data-chatbot-operational-queue="true" aria-busy="@(QueueLoading ? "true" : "false")">
+                        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" VerticalAlignment="VerticalAlignment.Bottom">
+                            <FluentTextInput Label="@UiText[ChatBotUiTextKey.ReviewQueueProject]" @bind-Value="_projectInput" />
+                            <FluentButton OnClick="@SelectProject">@UiText[ChatBotUiTextKey.ReviewQueueOpenProject]</FluentButton>
+                            @if (ProjectId is not null)
+                            {
+                                <FluentButton Appearance="ButtonAppearance.Outline" OnClick="@ClearProject">@UiText[ChatBotUiTextKey.ReviewQueueTenantSummary]</FluentButton>
+                            }
+                        </FluentStack>
+                        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" role="group" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFamilyLabel]">
+                            @foreach (OperationalQueueFamily family in OperationalQueueFamilies.All)
+                            {
+                                string familyToken = OperationalQueueFamilies.ToWireValue(family);
+                                <FluentButton Appearance="@(family == _queueFamily ? ButtonAppearance.Primary : ButtonAppearance.Outline)"
+                                              aria-pressed="@(family == _queueFamily ? "true" : "false")"
+                                              aria-label="@($"{UiText[ChatBotUiTextKey.GovernedOperationsQueueFamilyLabel]}: {familyToken}")"
+                                              OnClick="@(() => SelectFamilyAsync(family))">
+                                    <code class="chatbot-code">@familyToken</code>
+                                </FluentButton>
+                            }
+                        </FluentStack>
 
-                <FluentStack Orientation="Orientation.Horizontal" Wrap="true" role="group" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFamilyLabel]">
-                    @foreach (OperationalQueueFamily family in QueueFamilies)
-                    {
-                        string familyToken = OperationalQueueFamilies.ToWireValue(family);
-                        <FluentButton Appearance="@(family == SelectedQueueFamily ? ButtonAppearance.Primary : ButtonAppearance.Outline)"
-                                      aria-pressed="@(family == SelectedQueueFamily ? "true" : "false")"
-                                      aria-label="@($"{UiText[ChatBotUiTextKey.GovernedOperationsQueueFamilyLabel]}: {familyToken}")"
-                                      OnClick="@(() => SelectedQueueFamily = family)">
-                            @* The wire token is the family's identity; presenting it as a code token rather than
-                               prose stops it reading as an untranslated sentence. *@
-                            <code class="chatbot-code">@familyToken</code>
-                        </FluentButton>
-                    }
-                </FluentStack>
-
-                @* Decision D4 (2026-08-26): this queue renders a hard-coded sample set, not a live query. It is
-                   labelled as such until the split-out story wires it to a real query. The filter/sort/pagination
-                   rows previously asserted query provenance that no query produced — the only real filter is the
-                   selected family — so they now describe exactly what the surface does. *@
-                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Warning"
-                                     Message="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel]"
-                                     AccessibleLabel="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel]"
-                                     StableId="operational-queue-sample-data"
-                                     StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
-                                     AnnouncementKey="operational-queue-sample-data">
-                    <code class="chatbot-code">sample-data:not-a-live-query</code>
-                </ChatBotStatusBanner>
-
-                <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" role="group" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel]">
-                    @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel], $"family:{OperationalQueueFamilies.ToWireValue(SelectedQueueFamily)}")
-                    @ChatBotMetadataRendering.TextRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueResultCountLabel], VisibleQueueRows.Length.ToString(System.Globalization.CultureInfo.CurrentCulture))
-                </FluentStack>
-
-                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
-                                     Message="@UiText[ChatBotUiTextKey.GovernedOperationsQueuePhoneSummary]"
-                                     AccessibleLabel="@UiText[ChatBotUiTextKey.GovernedOperationsQueuePhoneSummary]"
-                                     StableId="operational-queue-phone-summary"
-                                     StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
-                                     AnnouncementKey="operational-queue-phone-summary" />
-
-                @if (VisibleQueueRows.Length == 0)
-                {
-                    <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
-                                         Message="@UiText[ChatBotUiTextKey.GovernedOperationsQueueResultCountLabel]"
-                                         AccessibleLabel="@UiText[ChatBotUiTextKey.GovernedOperationsQueueResultCountLabel]"
-                                         StableId="operational-queue-empty"
-                                         StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
-                                         AnnouncementKey="@($"operational-queue-empty-{SelectedQueueFamily}")" />
-                }
-
-                @* role="list"/"listitem", not role="table": each row is a key-value stack with no cell children,
-                   and an ARIA row without cells collapses to noise in screen-reader table mode. *@
-                <div class="chatbot-table" role="list" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsOperationalQueueTitle]">
-                    @foreach (OperationalQueueFixtureRow row in VisibleQueueRows)
-                    {
-                        <article class="chatbot-labelled-row-list"
-                                 role="listitem"
-                                 data-chatbot-queue-family="@row.FamilyToken"
-                                 data-chatbot-queue-ref="@row.QueueRef"
-                                 data-chatbot-item-ref="@row.ItemRef"
-                                 data-chatbot-source-version="@row.SourceVersion">
+                        @if (QueueLoading || QueueFailed)
+                        {
+                            string statusKey = QueueFailed ? ChatBotUiTextKey.ReviewQueueLoadFailed : ChatBotUiTextKey.ReviewQueueLoading;
+                            <ChatBotStatusBanner Kind="@(QueueFailed ? ChatBotFeedbackKind.Warning : ChatBotFeedbackKind.Info)"
+                                                 StableId="operational-queue-status" Message="@UiText[statusKey]"
+                                                 AccessibleLabel="@UiText[statusKey]" />
+                            @if (QueueFailed)
+                            {
+                                <FluentButton Appearance="ButtonAppearance.Outline" OnClick="@ReloadQueueAsync">@UiText[ChatBotUiTextKey.ReviewQueueRetry]</FluentButton>
+                            }
+                        }
+                        else if (_tenantSummary is { } summary)
+                        {
                             <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
-                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueFamilyLabel], row.FamilyToken)
-                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], row.State)
-                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueRiskLabel], row.Risk)
-                                @ChatBotMetadataRendering.TextRow(UiText[ChatBotUiTextKey.ConfidenceLabel], row.Confidence)
-                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.OperationOwnerRoleLabel], row.OwnerRole)
-                                @ChatBotMetadataRendering.TextRow(UiText[ChatBotUiTextKey.RetryCountLabel], row.RetryCount.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], row.NextAction)
+                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel], OperationalQueueFamilies.ToWireValue(_queueFamily))
+                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.ReviewQueueDisclosure], summary.DisclosureState)
+                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.ReviewQueueCoverage], summary.Coverage.Reason)
                             </FluentStack>
-
-                            <FluentStack Orientation="Orientation.Horizontal" Wrap="true">
-                                @* These have no handler and no backing command yet. Presenting them as Enabled
-                                   made critical governed actions swallow the click with no feedback; they carry a
-                                   reachable reason until the split-out story wires them. *@
-                                <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.GovernedOperationsQueuePrimaryAction]"
-                                                        AccessibleLabel="@UiText.Get(ChatBotUiTextKey.GovernedOperationsQueuePrimaryActionAccessible, row.ItemRef)"
-                                                        StableId="@($"claim-{row.ItemRef}")"
-                                                        State="@ChatBotGovernedActionState.DisabledWithReason"
-                                                        DisabledReason="@UiText[ChatBotUiTextKey.GovernedOperationsQueueDetailUnavailable]"
-                                                        CriticalAction="true" />
-                                <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueSecondaryActions]"
-                                                        AccessibleLabel="@UiText.Get(ChatBotUiTextKey.GovernedOperationsQueueSecondaryActionsAccessible, row.ItemRef)"
-                                                        StableId="@($"secondary-{row.ItemRef}")"
-                                                        State="@ChatBotGovernedActionState.DisabledWithReason"
-                                                        DisabledReason="@UiText[ChatBotUiTextKey.GovernedOperationsQueueDetailUnavailable]"
-                                                        Appearance="@ButtonAppearance.Outline"
-                                                        CriticalAction="true" />
-                                <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueOpenDetail]"
-                                                        AccessibleLabel="@UiText.Get(ChatBotUiTextKey.GovernedOperationsQueueOpenDetailAccessible, row.ItemRef)"
-                                                        StableId="@($"detail-{row.ItemRef}")"
-                                                        State="@ChatBotGovernedActionState.DisabledWithReason"
-                                                        DisabledReason="@UiText[ChatBotUiTextKey.GovernedOperationsQueueDetailUnavailable]"
-                                                        Appearance="@ButtonAppearance.Outline"
-                                                        CriticalAction="false" />
+                            <div role="list" aria-label="@UiText[ChatBotUiTextKey.ReviewQueueTenantSummary]">
+                                @foreach (QueueSummaryBucket bucket in summary.Buckets)
+                                {
+                                    <FluentStack role="listitem" Wrap="true" Class="chatbot-labelled-row-list">
+                                        @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], bucket.Status)
+                                        @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.OperationOwnerRoleLabel], bucket.OwnerClass)
+                                        @ChatBotMetadataRendering.TextRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueResultCountLabel], FormatCount(bucket.Count))
+                                    </FluentStack>
+                                }
+                            </div>
+                        }
+                        else if ((IsProjectApprovalQueue ? _approvalQueue : _projectQueue) is { } projectQueue)
+                        {
+                            <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
+                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel], OperationalQueueFamilies.ToWireValue(_queueFamily))
+                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.ReviewQueueProject], ProjectId!)
+                                @ChatBotMetadataRendering.TextRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueResultCountLabel], FormatCount(projectQueue.Rows.Count))
+                                @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.ReviewQueueCoverage], projectQueue.Coverage.Reason)
                             </FluentStack>
-
-                            <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
-                                                 Message="@UiText[ChatBotUiTextKey.GovernedOperationsQueueRetrySafety]"
-                                                 AccessibleLabel="@UiText[ChatBotUiTextKey.GovernedOperationsQueueRetrySafety]"
-                                                 StableId="@($"retry-safety-{row.ItemRef}")"
-                                                 StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
-                                                 AnnouncementKey="@($"retry-safety-{row.ItemRef}")" />
-                        </article>
-                    }
-                </div>
+                            <div role="list" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsOperationalQueueTitle]">
+                                @foreach (ReviewQueueRow row in projectQueue.Rows)
+                                {
+                                    <article class="chatbot-labelled-row-list" role="listitem"
+                                             data-chatbot-queue-family="@OperationalQueueFamilies.ToWireValue(_queueFamily)"
+                                             data-chatbot-queue-ref="@row.QueueRef" data-chatbot-item-ref="@row.ItemRef"
+                                             data-chatbot-source-version="@row.SourceVersion">
+                                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
+                                            @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.ReviewQueueItem], row.ItemRef)
+                                            @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], row.State)
+                                            @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueRiskLabel], row.Risk)
+                                            @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.OperationOwnerRoleLabel], row.OwnerRole)
+                                            @ChatBotMetadataRendering.TextRow(UiText[ChatBotUiTextKey.RetryCountLabel], FormatCount(row.RetryCount))
+                                            @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], row.NextAction)
+                                        </FluentStack>
+                                    </article>
+                                }
+                            </div>
+                        }
                     </section>
                 </FluentAccordionItem>
 
                 <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.ApprovalQueuePriorityTitle]" HeadingLevel="2" Expanded="true">
-                    <ChatBotApprovalQueuePriorityView ShowHeading="false" />
+                    @if (ProjectId is null || _approvalLoading || _approvalFailed)
+                    {
+                        <ChatBotStatusBanner Kind="@(_approvalFailed ? ChatBotFeedbackKind.Warning : ChatBotFeedbackKind.Info)"
+                                             StableId="approval-queue-status" Message="@UiText[ApprovalStatusKey]"
+                                             AccessibleLabel="@UiText[ApprovalStatusKey]" />
+                        @if (_approvalFailed && !IsProjectApprovalQueue)
+                        {
+                            <FluentButton Appearance="ButtonAppearance.Outline" OnClick="@(() => LoadApprovalsAsync(ProjectId))">@UiText[ChatBotUiTextKey.ReviewQueueRetry]</FluentButton>
+                        }
+                    }
+                    else if (_approvalQueue is { } approvalQueue)
+                    {
+                        <ChatBotApprovalQueuePriorityView ShowHeading="false" Groups="@ApprovalGroups(approvalQueue.Rows)" Coverage="@approvalQueue.Coverage.Reason" />
+                    }
                 </FluentAccordionItem>
 
                 @if (State.Value.Outcome is { } outcome)
@@ -296,32 +282,170 @@
 </ChatBotConversationShell>
 
 @code {
-    private static readonly OperationalQueueFamily[] QueueFamilies =
-    [
-        OperationalQueueFamily.AmbiguousAssociation,
-        OperationalQueueFamily.UnresolvedParticipant,
-        OperationalQueueFamily.PendingApproval,
-        OperationalQueueFamily.FailedIngestion,
-        OperationalQueueFamily.FailedAttachment,
-        OperationalQueueFamily.RetryableOperation,
-    ];
+    /// <summary>Gets or sets the project selected for authorized queue detail.</summary>
+    [SupplyParameterFromQuery]
+    public string? ProjectId { get; set; }
 
-    private static readonly OperationalQueueFixtureRow[] QueueRows =
-    [
-        Row(OperationalQueueFamily.AmbiguousAssociation, "queue:ambiguous", "item:ambiguous-001", "waiting", "high", "0.62", "operations-admin", 1, "claim", 12),
-        Row(OperationalQueueFamily.UnresolvedParticipant, "queue:participant", "item:participant-001", "blocked", "medium", "0.44", "operations-admin", 0, "assign", 9),
-        Row(OperationalQueueFamily.PendingApproval, "queue:approval", "item:approval-001", "escalation-needed", "critical", "0.91", "operations-admin", 0, "prioritize", 21),
-        Row(OperationalQueueFamily.FailedIngestion, "queue:ingestion", "item:ingestion-001", "failed", "high", "0.70", "operations-admin", 3, "retry", 33),
-        Row(OperationalQueueFamily.FailedAttachment, "queue:attachment", "item:attachment-001", "retryable", "medium", "0.68", "operations-admin", 2, "retry", 18),
-        Row(OperationalQueueFamily.RetryableOperation, "queue:retry", "item:retry-001", "retryable", "low", "0.80", "operations-admin", 1, "requeue", 7),
-    ];
+    private OperationalQueueFamily _queueFamily = OperationalQueueFamily.AmbiguousAssociation;
+    private TenantReviewQueueSummary? _tenantSummary;
+    private ProjectReviewQueue? _projectQueue;
+    private ProjectReviewQueue? _approvalQueue;
+    private string? _projectInput;
+    private string? _loadedProject;
+    private bool _scopeLoaded;
+    private bool _queueLoading;
+    private bool _queueFailed;
+    private bool _approvalLoading;
+    private bool _approvalFailed;
+    private long _queueRequest;
+    private long _approvalRequest;
 
-    private OperationalQueueFamily SelectedQueueFamily { get; set; } = OperationalQueueFamily.AmbiguousAssociation;
+    private bool IsProjectApprovalQueue => ProjectId is not null && _queueFamily == OperationalQueueFamily.PendingApproval;
 
-    private string QueueLoadingMode => ChatBotQueueLoadingMode.Pagination.ToString();
+    private bool QueueLoading => IsProjectApprovalQueue ? _approvalLoading : _queueLoading;
 
-    private OperationalQueueFixtureRow[] VisibleQueueRows
-        => QueueRows.Where(row => row.Family == SelectedQueueFamily).ToArray();
+    private bool QueueFailed => IsProjectApprovalQueue ? _approvalFailed : _queueFailed;
+
+    private string ApprovalStatusKey => ProjectId is null ? ChatBotUiTextKey.ReviewQueueSelectProject
+        : _approvalFailed ? ChatBotUiTextKey.ReviewQueueLoadFailed : ChatBotUiTextKey.ReviewQueueLoading;
+
+    /// <inheritdoc />
+    protected override Task OnParametersSetAsync()
+    {
+        string? project = string.IsNullOrWhiteSpace(ProjectId) ? null : ProjectId.Trim();
+        ProjectId = project;
+        if (_scopeLoaded && string.Equals(_loadedProject, project, StringComparison.Ordinal))
+        {
+            return Task.CompletedTask;
+        }
+
+        _scopeLoaded = true;
+        _loadedProject = project;
+        _projectInput = project;
+        _queueRequest++;
+        _tenantSummary = null;
+        _projectQueue = null;
+        return IsProjectApprovalQueue
+            ? LoadApprovalsAsync(project)
+            : Task.WhenAll(LoadQueueAsync(project, _queueFamily), LoadApprovalsAsync(project));
+    }
+
+    private void SelectProject()
+    {
+        if (!string.IsNullOrWhiteSpace(_projectInput))
+        {
+            Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("projectId", _projectInput.Trim()));
+        }
+    }
+
+    private void ClearProject() => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("projectId", (string?)null));
+
+    private Task SelectFamilyAsync(OperationalQueueFamily family)
+    {
+        _queueFamily = family;
+        return IsProjectApprovalQueue ? Task.CompletedTask : LoadQueueAsync(ProjectId, family);
+    }
+
+    private Task ReloadQueueAsync() => IsProjectApprovalQueue
+        ? LoadApprovalsAsync(ProjectId) : LoadQueueAsync(ProjectId, _queueFamily);
+
+    private async Task LoadQueueAsync(string? projectId, OperationalQueueFamily family)
+    {
+        long request = ++_queueRequest;
+        _tenantSummary = null;
+        _projectQueue = null;
+        _queueLoading = true;
+        _queueFailed = false;
+        ReviewQueueFamily wireFamily = Enum.Parse<ReviewQueueFamily>(family.ToString());
+        try
+        {
+            if (projectId is null)
+            {
+                TenantReviewQueueSummary summary = await ChatBotClient.GetTenantReviewQueueSummaryAsync(wireFamily);
+                if (request == _queueRequest)
+                {
+                    _tenantSummary = summary;
+                }
+            }
+            else
+            {
+                ProjectReviewQueue queue = await ChatBotClient.GetProjectReviewQueueAsync(projectId, wireFamily);
+                if (request == _queueRequest)
+                {
+                    _projectQueue = queue;
+                }
+            }
+        }
+        catch (Exception ex) when (IsQueueReadFailure(ex))
+        {
+            if (request == _queueRequest)
+            {
+                _queueFailed = true;
+            }
+        }
+        finally
+        {
+            if (request == _queueRequest)
+            {
+                _queueLoading = false;
+            }
+        }
+    }
+
+    private async Task LoadApprovalsAsync(string? projectId)
+    {
+        long request = ++_approvalRequest;
+        _approvalQueue = null;
+        _approvalFailed = false;
+        _approvalLoading = projectId is not null;
+        if (projectId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            ProjectReviewQueue queue = await ChatBotClient.GetProjectReviewQueueAsync(projectId, ReviewQueueFamily.PendingApproval);
+            if (request == _approvalRequest)
+            {
+                _approvalQueue = queue;
+            }
+        }
+        catch (Exception ex) when (IsQueueReadFailure(ex))
+        {
+            if (request == _approvalRequest)
+            {
+                _approvalFailed = true;
+            }
+        }
+        finally
+        {
+            if (request == _approvalRequest)
+            {
+                _approvalLoading = false;
+            }
+        }
+    }
+
+    private static bool IsQueueReadFailure(Exception exception)
+        => exception is HexalithChatBotApiException or HttpRequestException or OperationCanceledException or ArgumentException or NotSupportedException;
+
+    private static string FormatCount(int count) => count.ToString(System.Globalization.CultureInfo.CurrentCulture);
+
+    private static IReadOnlyList<ChatBotApprovalPriorityGroupRow> ApprovalGroups(IEnumerable<ReviewQueueRow> rows)
+        => rows.GroupBy(static row => row.GroupKey ?? row.ItemRef, StringComparer.Ordinal)
+            .Select(static group => (GroupKey: group.Key, Count: group.Count(),
+                First: group.OrderByDescending(static row => row.PriorityScore).ThenBy(static row => row.ItemRef, StringComparer.Ordinal).First()))
+            .OrderByDescending(static group => group.First.PriorityScore)
+            .ThenBy(static group => group.GroupKey, StringComparer.Ordinal)
+            .Select(static group => new ChatBotApprovalPriorityGroupRow(
+                group.GroupKey, group.First.GroupRequesterRef ?? string.Empty, group.First.GroupCommandRef ?? string.Empty,
+                group.First.GroupProjectRef ?? string.Empty, FormatPriority(group.First), group.First.PriorityExplanation,
+                group.Count))
+            .ToArray();
+
+    private static string FormatPriority(ReviewQueueRow row)
+        => row.PriorityScore.ToString("0.##", System.Globalization.CultureInfo.CurrentCulture);
 
     // The route description folds the intro + the surface-origin literal ("ui") + the suffix into a single plain
     // string for FcPageHeader.Description (a plain string rendered in one FluentText). The original interleaved
@@ -362,46 +486,4 @@
         => outcome.AuditStatus.Contains("Committed", StringComparison.OrdinalIgnoreCase) &&
             !outcome.AuditStatus.Contains("NotCommitted", StringComparison.OrdinalIgnoreCase);
 
-    private static OperationalQueueFixtureRow Row(
-        OperationalQueueFamily family,
-        string queueRef,
-        string itemRef,
-        string state,
-        string risk,
-        string confidence,
-        string ownerRole,
-        int retryCount,
-        string nextAction,
-        long sourceVersion)
-        => new(
-            family,
-            OperationalQueueFamilies.ToWireValue(family),
-            queueRef,
-            itemRef,
-            state,
-            risk,
-            confidence,
-            ownerRole,
-            retryCount,
-            nextAction,
-            sourceVersion);
-
-    // Story 13.4: the former <dl> queue-filter / per-row / outcome dumps render
-    // as structured Fluent key-value blocks. Opaque query expressions, ids, command/operation classes,
-    // lifecycle/completion/audit/risk/owner-role/next-action tokens keep <code class="chatbot-code">; numeric
-    // metrics (result count, confidence, retry count) and the duplicate-safety note render as plain
-    // FluentText (AC3). Blank-guarded rows render nothing.
-
-    private sealed record OperationalQueueFixtureRow(
-        OperationalQueueFamily Family,
-        string FamilyToken,
-        string QueueRef,
-        string ItemRef,
-        string State,
-        string Risk,
-        string Confidence,
-        string OwnerRole,
-        int RetryCount,
-        string NextAction,
-        long SourceVersion);
 }

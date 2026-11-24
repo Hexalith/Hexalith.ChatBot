@@ -40,6 +40,19 @@ public interface IChatBotClient
         string? taskId = null,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Reads the metadata-only tenant summary for a review queue family.</summary>
+    Task<TenantReviewQueueSummary> GetTenantReviewQueueSummaryAsync(
+        ReviewQueueFamily family,
+        CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Tenant review queues are not supported by this client implementation.");
+
+    /// <summary>Reads the review queue rows visible to the caller for a project.</summary>
+    Task<ProjectReviewQueue> GetProjectReviewQueueAsync(
+        string projectId,
+        ReviewQueueFamily family,
+        CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Project review queues are not supported by this client implementation.");
+
     Task<ProjectConversationResponse> GetProjectConversationAsync(
         string projectId,
         string? cursor = null,

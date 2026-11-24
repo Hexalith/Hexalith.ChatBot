@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 using Hexalith.ChatBot.Contracts.Enums;
 
 namespace Hexalith.ChatBot.Server.Projections;
@@ -5,6 +7,10 @@ namespace Hexalith.ChatBot.Server.Projections;
 /// <summary>Retains the original facts even when an earlier delivery arrives after its decision.</summary>
 internal sealed record ReviewQueueSubject(ReviewQueueTransition Current, ReviewQueueTransition[] History)
 {
+    // This is derived from the retained approval event when a family is read.
+    [JsonIgnore]
+    internal AdminQueueSummaryProjectionItem? ApprovalPriority { get; init; }
+
     public static ReviewQueueSubject Add(ReviewQueueSubject? existing, ReviewQueueTransition fact)
     {
         if (existing is null) { return new(fact, [fact]); }
@@ -60,6 +66,11 @@ internal sealed record ReviewQueueSubject(ReviewQueueTransition Current, ReviewQ
             (int)Math.Clamp((now - entered).TotalSeconds, 0, int.MaxValue), current.Family,
             Risk: current.Risk ?? "unknown", Confidence: current.Confidence ?? 0, AssigneeRef: current.Assignee,
             NextAction: current.NextAction, RetryCount: current.RetryCount, IsTerminal: current.Terminal,
+            PriorityScore: ApprovalPriority?.PriorityScore ?? 0,
+            PriorityExplanation: ApprovalPriority?.PriorityExplanation ?? "stable-order",
+            GroupKey: ApprovalPriority?.GroupKey,
+            GroupRequesterRef: ApprovalPriority?.GroupRequesterRef,
+            GroupCommandRef: ApprovalPriority?.GroupCommandRef,
             GroupProjectRef: current.IdentityProject is { } project ? "project:" + project : null, FreshnessTimestampUtc: current.At, OwnerRole: current.OwnerRole, MailboxRef: current.Mailbox,
             FailureState: current.Reason, SourceVersion: current.Version, Revision: Revision, CorrelationId: current.CorrelationId,
             TenantRef: current.TenantId, LastTransitionActor: current.Actor, LastTransitionTimestampUtc: current.At,

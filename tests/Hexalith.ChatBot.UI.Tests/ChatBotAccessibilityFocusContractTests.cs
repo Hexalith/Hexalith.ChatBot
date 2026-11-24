@@ -85,8 +85,8 @@ public sealed class ChatBotAccessibilityFocusContractTests
                 "data-chatbot-operational-queue=\"true\"",
                 "role=\"list\"",
                 "role=\"listitem\"",
-                "GovernedOperationsQueueOpenDetailAccessible",
-                "GovernedOperationsQueueDetailUnavailable",
+                "ReviewQueueOpenProject",
+                "ReviewQueueLoadFailed",
             ]),
         new(
             "Operational dashboards",

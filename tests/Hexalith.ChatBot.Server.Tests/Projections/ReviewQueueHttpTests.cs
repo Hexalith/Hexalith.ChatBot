@@ -101,6 +101,14 @@ public sealed class ReviewQueueHttpTests
         summary = (await client.GetFromJsonAsync<AdminQueueSummary>(summaryUrl, token)).ShouldNotBeNull();
         summary.Buckets.ShouldHaveSingleItem().Count.ShouldBe(2);
         summary.VisibleItemRefs.ShouldBeEmpty();
+        var facade = new Client.ChatBotClient(new Client.Generated.Client(client));
+        var typedSummary = await facade.GetTenantReviewQueueSummaryAsync(Client.Generated.ReviewQueueFamily.PendingApproval, token);
+        typedSummary.Buckets.ShouldHaveSingleItem().Count.ShouldBe(2);
+        var typedRows = await facade.GetProjectReviewQueueAsync(project, Client.Generated.ReviewQueueFamily.PendingApproval, token);
+        typedRows.Rows.Select(row => row.ItemRef).Order(StringComparer.Ordinal)
+            .ShouldBe(subjects.Select(subject => subject.ItemRef).Order(StringComparer.Ordinal));
+        (await facade.GetProjectReviewQueueAsync(project, Client.Generated.ReviewQueueFamily.FailedIngestion, token))
+            .Rows.ShouldBeEmpty();
         policy = policy with { ObservedAt = clock.UtcNow.AddHours(-1) };
         await worker.GetTenantInputsAsync(tenant, token);
         depths.ShouldBe([2]);

@@ -83,7 +83,7 @@ public sealed class ChatBotApprovalQueuePriorityContractTests
         component.ShouldContain("data-approval-priority-explanation");
         component.ShouldContain("data-approval-partial-authority-reason=\"true\"");
         component.ShouldContain("ChatBotUiTextKey.ApprovalQueuePriorityBatchApproveAction");
-        component.ShouldContain("ChatBotUiTextKey.ApprovalQueuePriorityPartialAuthorityReason");
+        component.ShouldContain("ChatBotUiTextKey.ReviewQueueBatchUnavailable");
         component.ShouldContain("data-small-screen-fallback");
         component.ShouldContain("ChatBotGovernedActionState.DisabledWithReason");
 

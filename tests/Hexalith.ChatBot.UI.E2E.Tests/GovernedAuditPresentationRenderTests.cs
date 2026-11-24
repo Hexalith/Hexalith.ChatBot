@@ -274,6 +274,8 @@ public sealed class GovernedAuditPresentationRenderTests
             services.AddLocalization();
             services.AddFluentUIComponents();
             services.AddFluxor(options => options.ScanAssemblies(typeof(GovernedAuditPresentationRenderTests).Assembly));
+            services.AddSingleton<NavigationManager, StaticRenderNavigationManager>();
+            services.AddSingleton<Hexalith.ChatBot.Client.IChatBotClient>(new FakeChatBotClient());
             services.AddSingleton<IState<GovernedOperationsState>>(new SafeOutcomeRenderState<GovernedOperationsState>(new(false, outcome, null)));
             services.AddSingleton<IDispatcher>(new SafeOutcomeRenderDispatcher());
             services.AddSingleton<IJSRuntime, AuditPresentationJsRuntime>();

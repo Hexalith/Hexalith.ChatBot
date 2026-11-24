@@ -9,6 +9,9 @@ using Shouldly;
 using ApprovalDecisionKind = Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind;
 using ApprovalEvidenceFreshness = Hexalith.ChatBot.Client.Generated.ApprovalEvidenceFreshness;
 using ChatBotSurfaceOrigin = Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigin;
+using ProjectReviewQueue = Hexalith.ChatBot.Client.Generated.ProjectReviewQueue;
+using ReviewQueueFamily = Hexalith.ChatBot.Client.Generated.ReviewQueueFamily;
+using ReviewQueueRow = Hexalith.ChatBot.Client.Generated.ReviewQueueRow;
 
 namespace Hexalith.ChatBot.UI.E2E.Tests;
 
@@ -134,30 +137,38 @@ public sealed class RealRenderApprovalE2ETests
         ConcurrentQueue<IChatBotCommand> submissions = new();
         await using RealRenderFixture fixture = new(() => new FakeChatBotClient
         {
+            ProjectQueueRead = (project, family) => Task.FromResult(new ProjectReviewQueue
+            {
+                Coverage = new() { Reason = "project-source-inventory-unverified" },
+                Rows = family == ReviewQueueFamily.PendingApproval && project == ProjectId
+                    ? [ApprovalRow("p3", 12, "e"), ApprovalRow("p2", 33, "c"), ApprovalRow("p1", 92, "a"),
+                        ApprovalRow("p2", 32, "d"), ApprovalRow("p1", 91, "b"), ApprovalRow("p1", 90, "f")]
+                    : [],
+            }),
             SubmissionObserved = (command, _, _) => submissions.Enqueue(command),
         });
         await fixture.InitializeAsync();
         Assert.SkipWhen(!fixture.BrowserAvailable, RealRenderFixture.NoBrowserSkipReason);
 
         await using IBrowserContext context = await fixture.NewContextAsync();
-        IPage page = await OpenAsync(context, fixture.BaseUri, "/governed-operations");
+        IPage page = await OpenAsync(context, fixture.BaseUri, "/governed-operations?projectId=" + ProjectId);
         ILocator priority = page.GetByRole(AriaRole.Region, new() { NameString = "Prioritized approval queue", Exact = true });
         ILocator table = priority.GetByRole(AriaRole.Table, new() { NameString = "Prioritized approval queue", Exact = true });
         await Assertions.Expect(table).ToBeVisibleAsync();
         await Assertions.Expect(table.GetByRole(AriaRole.Columnheader)).ToHaveTextAsync(
             ["Priority", "Approval group", "Requester", "Command", "Project", "Items in group", "Approve group"]);
         ILocator rows = table.Locator("tbody tr");
-        await Assertions.Expect(rows.Locator(".chatbot-priority-label")).ToHaveTextAsync(["Critical", "High", "Medium"]);
+        await Assertions.Expect(rows.Locator(".chatbot-priority-label")).ToHaveTextAsync(["92", "33", "12"]);
         await Assertions.Expect(rows.Locator("[data-approval-group-item-count]")).ToHaveTextAsync(["3", "2", "1"]);
 
-        ILocator approveGroup = rows.First.GetByRole(AriaRole.Button, new() { NameString = "Approve group", Exact = true });
+        ILocator approveGroup = rows.First.Locator("fluent-button[aria-label=\"Approve group\"]");
         await Assertions.Expect(approveGroup).ToHaveAttributeAsync("aria-disabled", "true");
         string? reasonId = await approveGroup.GetAttributeAsync("aria-describedby");
         reasonId.ShouldNotBeNullOrWhiteSpace();
         await Assertions.Expect(rows.First.Locator($"[id='{reasonId}']"))
-            .ToContainTextAsync("Per-project approval authority is required for every item in the group");
+            .ToContainTextAsync("Batch approval is unavailable");
         await Assertions.Expect(priority.Locator("[data-approval-partial-authority-reason]"))
-            .ToContainTextAsync("Only items you are authorized to decide are acted on");
+            .ToContainTextAsync("Batch approval is unavailable");
         await approveGroup.FocusAsync();
         await Assertions.Expect(approveGroup).ToBeFocusedAsync();
         await page.Keyboard.PressAsync("Enter");
@@ -168,13 +179,25 @@ public sealed class RealRenderApprovalE2ETests
         await Assertions.Expect(summary).ToBeVisibleAsync();
         await Assertions.Expect(summary.Locator("code")).ToHaveTextAsync(
         [
-            "Critical · requester:requester-1 · command:appendconversationmessage · project:project-1 · 3",
-            "High · requester:requester-2 · command:createoutbounddraft · project:project-2 · 2",
-            "Medium · requester:requester-3 · command:appendconversationmessage · project:project-3 · 1",
+            "92 · requester:p1 · command:appendconversationmessage · project:project-alpha · 3",
+            "33 · requester:p2 · command:appendconversationmessage · project:project-alpha · 2",
+            "12 · requester:p3 · command:appendconversationmessage · project:project-alpha · 1",
         ]);
-        await Assertions.Expect(summary).ToContainTextAsync("Dense batch approval controls are unavailable on this screen size.");
+        await Assertions.Expect(summary).ToContainTextAsync("Batch approval is unavailable.");
         submissions.ShouldBeEmpty();
     }
+
+    private static ReviewQueueRow ApprovalRow(string group, int score, string item)
+        => new()
+        {
+            ItemRef = $"approval:{item}",
+            GroupKey = $"sha256:{group}",
+            GroupRequesterRef = $"requester:{group}",
+            GroupCommandRef = "command:appendconversationmessage",
+            GroupProjectRef = $"project:{ProjectId}",
+            PriorityScore = score,
+            PriorityExplanation = "risk:high",
+        };
 
     private static async Task<IPage> OpenAsync(IBrowserContext context, string baseUri, string route, int width = 1280)
     {

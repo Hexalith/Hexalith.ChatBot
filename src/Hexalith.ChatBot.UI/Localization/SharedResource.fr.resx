@@ -1125,4 +1125,17 @@
   <data name="AuditHistory_Outcome_Label" xml:space="preserve"><value>Résultat d’audit</value></data>
   <data name="AuditHistory_Origin_Label" xml:space="preserve"><value>Surface d’origine</value></data>
   <data name="AuditHistory_NoRecords" xml:space="preserve"><value>Aucun enregistrement d’audit n’est disponible.</value></data>
+  <data name="ReviewQueue_Project" xml:space="preserve"><value>Identifiant du projet</value></data>
+  <data name="ReviewQueue_OpenProject" xml:space="preserve"><value>Afficher les files du projet</value></data>
+  <data name="ReviewQueue_TenantSummary" xml:space="preserve"><value>Synthèse des files du locataire</value></data>
+  <data name="ReviewQueue_Disclosure" xml:space="preserve"><value>Divulgation</value></data>
+  <data name="ReviewQueue_Coverage" xml:space="preserve"><value>Couverture de la source</value></data>
+  <data name="ReviewQueue_Loading" xml:space="preserve"><value>Chargement de la file de révision.</value></data>
+  <data name="ReviewQueue_LoadFailed" xml:space="preserve"><value>La file de révision est indisponible pour cette sélection.</value></data>
+  <data name="ReviewQueue_SelectProject" xml:space="preserve"><value>Sélectionnez un projet pour afficher ses priorités d’approbation.</value></data>
+  <data name="ReviewQueue_PriorityOrder" xml:space="preserve"><value>Score de priorité le plus élevé en premier</value></data>
+  <data name="ReviewQueue_NoApprovals" xml:space="preserve"><value>Aucune approbation en attente n’a été renvoyée.</value></data>
+  <data name="ReviewQueue_BatchUnavailable" xml:space="preserve"><value>L’approbation groupée est indisponible. Examinez les approbations individuellement.</value></data>
+  <data name="ReviewQueue_Retry" xml:space="preserve"><value>Réessayer de lire la file</value></data>
+  <data name="ReviewQueue_Item" xml:space="preserve"><value>Élément de la file</value></data>
 </root>

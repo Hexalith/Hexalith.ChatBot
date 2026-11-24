@@ -122,6 +122,26 @@ public sealed partial class ChatBotClient : IChatBotClient
             cancellationToken);
     }
 
+    /// <inheritdoc />
+    public Task<TenantReviewQueueSummary> GetTenantReviewQueueSummaryAsync(
+        ReviewQueueFamily family,
+        CancellationToken cancellationToken = default)
+        => _transportClient.ReadTenantReviewQueueSummaryAsync(family, NormalizeCorrelationId(null), cancellationToken);
+
+    /// <inheritdoc />
+    public Task<ProjectReviewQueue> GetProjectReviewQueueAsync(
+        string projectId,
+        ReviewQueueFamily family,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(projectId) || !SafeProjectIdPattern().IsMatch(projectId))
+        {
+            throw new ArgumentException("Project identifiers must be stable metadata identifiers.", nameof(projectId));
+        }
+
+        return _transportClient.ReadProjectReviewQueueAsync(family, projectId, null, NormalizeCorrelationId(null), cancellationToken);
+    }
+
     public Task<ProjectConversationResponse> GetProjectConversationAsync(
         string projectId,
         string? cursor = null,

@@ -175,25 +175,18 @@ public sealed class ChatBotInteractionGuardrailContractTests
     }
 
     [Fact]
-    public void GovernedOperationsShouldExposeOperationalQueueSurfaceWithoutInfiniteScroll()
+    public void GovernedOperationsShouldUseLiveScopedQueuesWithoutInventedPagination()
     {
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor");
 
         page.ShouldContain("data-chatbot-operational-queue=\"true\"");
-        page.ShouldContain("ChatBotQueueLoadingMode.Pagination");
-        page.ShouldNotContain("ChatBotQueueLoadingMode.InfiniteScroll");
-        page.ShouldContain("OperationalQueueFamily.AmbiguousAssociation");
-        page.ShouldContain("OperationalQueueFamily.UnresolvedParticipant");
-        page.ShouldContain("OperationalQueueFamily.PendingApproval");
-        page.ShouldContain("OperationalQueueFamily.FailedIngestion");
-        page.ShouldContain("OperationalQueueFamily.FailedAttachment");
-        page.ShouldContain("OperationalQueueFamily.RetryableOperation");
-        page.ShouldContain("GovernedOperationsQueuePrimaryAction");
-        page.ShouldContain("GovernedOperationsQueueSecondaryActions");
-        page.ShouldContain("GovernedOperationsQueueDetailUnavailable");
-        page.ShouldContain("DisabledWithReason");
+        page.ShouldContain("OperationalQueueFamilies.All");
+        page.ShouldContain("GetTenantReviewQueueSummaryAsync");
+        page.ShouldContain("GetProjectReviewQueueAsync");
         page.ShouldContain("data-chatbot-source-version");
-        page.ShouldContain("sample-data:not-a-live-query");
+        page.ShouldNotContain("ChatBotQueueLoadingMode.");
+        page.ShouldNotContain("sample-data:not-a-live-query");
+        page.ShouldNotContain("page-size:100");
     }
 
     private static string ReadProjectFile(string relativePath)

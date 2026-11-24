@@ -1145,7 +1145,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15 chunk 
 location: GovernedOperations.razor:254-262
 severity: high
 reason: **[HIGH · data-integrity] Two routed governance surfaces present hard-coded fixture data as live product data.** `GovernedOperations.razor:254-262` embeds six fake queue rows (`item:ambiguous-001`, `operations-admin`, …); `ChatBotApprovalQueuePriorityView.razor:127` binds the entire priority table to `ChatBotApprovalQueuePriorityContract.CreateDefault()`, a design-time fixture (`sha256:11aa`, `requester:requester-1`) whose batch action is hard-coded `DisabledWithReason` (`:88`) so no approval is ever possible there. `GovernedOperations.razor:86-90` additionally asserts `"age>0 risk:any confidence:any …"`, `"priority desc, item-ref asc"` and `"page-size:100"` as if they described the live query — the only real filter is `SelectedQueueFamily` and there is no pagination. The data layer behind it is not ready either: `OperationalDashboardService` returns `ChatBotHealthStatus.Unknown` with `depth: 0` placeholder views (`:51-54`). **Decision (2026-08-26):** split out of canonical 13.4, which makes only its own new AI Action Review route real; these surfaces are labelled in-product as sample data in the interim. **Owner:** ChatBot UI + operational query backend. **Closure evidence:** both surfaces bound to real queries, with the stated filter/sort/page metadata derived from the query actually issued.
-status: open
+status: done 2026-11-24
+resolution: The governed route queries tenant-summary or authorized project scope and renders returned coverage and counts. The priority view uses live pending approvals with the retained scorer and group metadata. Browser regressions cover disclosure, project switching, refused reads, ordering and mobile rendering.
 decision: 2026-08-27 Keep open for backend
 decision: 2026-08-26 Keep open for backend
 

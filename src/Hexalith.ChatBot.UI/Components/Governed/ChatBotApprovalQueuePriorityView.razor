@@ -5,8 +5,7 @@
          aria-label="@(ShowHeading ? null : UiText[ChatBotUiTextKey.ApprovalQueuePriorityTitle])"
          data-chatbot-surface="approval-queue-priority-s3"
          data-approval-queue-priority="true"
-         data-validation-summary-id="approval-queue-priority-validation-summary"
-         data-small-screen-fallback="@SmallScreenFallback.PreservedStateMarker">
+         data-small-screen-fallback="approval-queue-summary">
     @* Story 13.7: when grouped inside a FluentAccordionItem the accordion item Header is the heading, so the
        host suppresses this duplicate inner <h2> (ShowHeading="false") and the section keeps its accessible name
        via aria-label. ShowHeading defaults to true to preserve the standalone behavior. *@
@@ -15,34 +14,14 @@
         <h2 id="approval-queue-priority-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityTitle]</h2>
     }
 
-    <div id="@Validation.SummaryId"
-         class="chatbot-status-group"
-         tabindex="-1"
-         aria-label="@Validation.SummaryLabel"
-         data-validation-placement="@Recovery.ValidationSummaryPlacement">
-        @if (Validation.AffectedFieldIds.Count > 0)
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
+        @ChatBotMetadataRendering.CodeRow(UiText[ChatBotUiTextKey.ReviewQueueCoverage], Coverage)
+        @ChatBotMetadataRendering.TextRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueSortLabel], UiText[ChatBotUiTextKey.ReviewQueuePriorityOrder])
+        @if (Groups.Count == 0)
         {
-            <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Warning"
-                                 Message="@Validation.SafeNextAction"
-                                 AccessibleLabel="@Validation.SummaryLabel"
-                                 StableId="@Validation.SummaryId"
-                                 StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
-                                 AnnouncementKey="@Validation.SummaryId" />
-        }
-    </div>
-
-    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" role="group" aria-label="@UiText[ChatBotUiTextKey.ApprovalQueuePriorityScoreLabel]">
-        @foreach (string row in ShownPriorityMetadata)
-        {
-            <code class="chatbot-code">@row</code>
+            <FluentText role="status">@UiText[ChatBotUiTextKey.ReviewQueueNoApprovals]</FluentText>
         }
     </FluentStack>
-
-    @* Decision D4 (2026-08-26): bound to ChatBotApprovalQueuePriorityContract.CreateDefault(), a design-time
-       fixture. Labelled as sample data until the split-out story wires it to a real query. *@
-    <p class="chatbot-body" data-approval-priority-sample-data="true">
-        <code class="chatbot-code">sample-data:not-a-live-query</code>
-    </p>
 
     <table class="chatbot-approval-priority-table"
            data-approval-priority-table="true"
@@ -92,19 +71,15 @@
                                                 AccessibleLabel="@UiText[ChatBotUiTextKey.ApprovalQueuePriorityBatchApproveAction]"
                                                 StableId="@($"approval-queue-batch-approve:{row.GroupKey}")"
                                                 State="ChatBotGovernedActionState.DisabledWithReason"
-                                                DisabledReason="@DisabledBatchAction.DisabledReasonLabel" />
+                                                DisabledReason="@UiText[ChatBotUiTextKey.ReviewQueueBatchUnavailable]" />
                     </td>
                 </tr>
             }
         </tbody>
     </table>
 
-    <p id="@DisabledBatchAction.DisabledReasonId" class="chatbot-body">
-        @DisabledBatchAction.DisabledReasonLabel
-    </p>
-
     <p class="chatbot-body" data-approval-partial-authority-reason="true">
-        @UiText[ChatBotUiTextKey.ApprovalQueuePriorityPartialAuthorityReason]
+        @UiText[ChatBotUiTextKey.ReviewQueueBatchUnavailable]
     </p>
 
     <aside class="chatbot-small-screen-fallback approval-queue-priority-phone-fallback"
@@ -115,9 +90,7 @@
         {
             <p><code class="chatbot-code">@($"{row.PriorityLabel} · {row.RequesterRef} · {row.CommandRef} · {row.ProjectRef} · {row.ItemCount}")</code></p>
         }
-        <p>@SmallScreenFallback.CurrentStatus</p>
-        <p>@UiText[ChatBotUiTextKey.ApprovalQueuePriorityPhoneDenseUnavailable]</p>
-        <p>@SmallScreenFallback.ReachableExplanation</p>
+        <p>@UiText[ChatBotUiTextKey.ReviewQueueBatchUnavailable]</p>
     </aside>
 </section>
 
@@ -130,19 +103,13 @@
     [Parameter]
     public bool ShowHeading { get; set; } = true;
 
-    private ChatBotApprovalQueuePriorityContract Contract { get; } = ChatBotApprovalQueuePriorityContract.CreateDefault();
+    /// <summary>Gets or sets the authorized approval groups for the selected project.</summary>
+    [Parameter]
+    public IReadOnlyList<ChatBotApprovalPriorityGroupRow> Groups { get; set; } = [];
 
-    private ChatBotValidationErrorContract Validation => Contract.Validation;
-
-    private ChatBotRecoveryPatternContract Recovery => Contract.Recovery;
-
-    private ChatBotSmallScreenFallbackContract SmallScreenFallback => Contract.SmallScreenFallback;
-
-    private ChatBotDisabledActionContract DisabledBatchAction => Contract.DisabledBatchAction;
-
-    private IReadOnlyList<ChatBotApprovalPriorityGroupRow> Groups => Contract.Groups;
-
-    private IReadOnlyList<string> ShownPriorityMetadata => Contract.ShownPriorityMetadata;
+    /// <summary>Gets or sets the queue source coverage supplied by the server.</summary>
+    [Parameter]
+    public string Coverage { get; set; } = string.Empty;
 
     [Inject]
     private ChatBotUiTextLocalizer UiText { get; set; } = null!;

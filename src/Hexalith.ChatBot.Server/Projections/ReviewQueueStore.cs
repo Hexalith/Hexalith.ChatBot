@@ -172,15 +172,28 @@ internal sealed class ReviewQueueStore(IReadModelStore store, Observability.ICha
             Risk: view.RiskClass?.ToString().ToLowerInvariant(), Actor: view.DecisionActorId ?? view.RequesterId,
             ResourceIds: view.AffectedResourceReferences?.ToArray(), RetainedApproval: true);
 
-    private static ReviewQueueSubject? MergeRetained(string tenant, ReviewQueueSubject? named, IEnumerable<ApprovalEventView> retained)
+    private ReviewQueueSubject? MergeRetained(string tenant, ReviewQueueSubject? named, IEnumerable<ApprovalEventView> retained)
     {
+        ApprovalEventView[] views = retained.Where(view => view.TenantId == tenant)
+            .OrderBy(view => view.SourceVersion).ToArray();
         var result = named;
-        foreach (var view in retained.Where(v => v.TenantId == tenant).OrderBy(v => v.SourceVersion))
+        foreach (var view in views)
         {
             if (named?.History.Any(f => f.Version == view.SourceVersion && f.State == view.Status.ToString()) == true) { continue; }
             result = ReviewQueueSubject.Add(result, ToRetained(view));
         }
-        return result;
+
+        if (result is null || result.Current.Terminal || clock is null)
+        {
+            return result;
+        }
+
+        var matching = views.Where(view => view.SourceVersion == result.Current.Version && view.Status.ToString() == result.Current.State)
+            .MaxBy(view => view.EventKind);
+        return matching is null ? result : result with
+        {
+            ApprovalPriority = ApprovalQueueItemBuilder.TryBuild(matching, Contracts.Commands.ApprovalPriorityWeights.SafeDefaults, clock),
+        };
     }
 
     private async Task<ReviewQueueSubject?> ReadNamedAsync(string tenant, string itemRef, CancellationToken token)
@@ -205,8 +218,12 @@ internal sealed class ReviewQueueStore(IReadModelStore store, Observability.ICha
         if (family == OperationalQueueFamily.PendingApproval && conversations is not null)
         {
             var byItem = subjects.ToDictionary(s => s.Current.ItemRef, StringComparer.Ordinal);
-            foreach (var group in (await conversations.ReadApprovalEventsAsync(tenant, token).ConfigureAwait(false)).Where(v => v.TenantId == tenant).GroupBy(v => ToRetained(v).ItemRef))
-            { byItem[group.Key] = MergeRetained(tenant, byItem.GetValueOrDefault(group.Key), group)!; }
+            var retained = (await conversations.ReadApprovalEventsAsync(tenant, token).ConfigureAwait(false))
+                .Where(view => view.TenantId == tenant);
+            foreach (var group in retained.GroupBy(view => ToRetained(view).ItemRef, StringComparer.Ordinal))
+            {
+                byItem[group.Key] = MergeRetained(tenant, byItem.GetValueOrDefault(group.Key), group)!;
+            }
             return byItem.Values.ToArray();
         }
         return subjects;

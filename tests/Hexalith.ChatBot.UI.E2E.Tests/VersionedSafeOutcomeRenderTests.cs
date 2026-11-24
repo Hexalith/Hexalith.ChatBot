@@ -1128,6 +1128,8 @@ public sealed class VersionedSafeOutcomeRenderTests
             services.AddSingleton<IState<ProjectConversationState>>(new SafeOutcomeRenderState<ProjectConversationState>(project ?? new(false, null, null)));
             services.AddSingleton<IState<AssociationReviewState>>(new SafeOutcomeRenderState<AssociationReviewState>(association ?? new(false, false, null, null, "", "", null, null)));
             services.AddSingleton<IState<GovernedOperationsState>>(new SafeOutcomeRenderState<GovernedOperationsState>(governed ?? new(false, null, null)));
+            services.AddSingleton<NavigationManager, StaticRenderNavigationManager>();
+            services.AddSingleton<Hexalith.ChatBot.Client.IChatBotClient>(new FakeChatBotClient());
             services.AddSingleton<IState<OperationalDashboardsState>>(new SafeOutcomeRenderState<OperationalDashboardsState>(dashboards ?? new(false, null, null)));
             services.AddSingleton<IDispatcher>(dispatcher ?? new SafeOutcomeRenderDispatcher());
             services.AddSingleton(new ChatBotHubEndpoint(new Uri("http://127.0.0.1")));

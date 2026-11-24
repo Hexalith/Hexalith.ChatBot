@@ -542,9 +542,9 @@ public sealed class ChatBotLocalizationContractTests
         reviewHistory.ShouldContain("ReviewHistoryAccessible");
         reviewHistory.ShouldContain("UiText.ReviewHistoryActionLabel");
         reviewHistory.ShouldContain("UiText.ReviewHistoryDecisionLabel");
-        governedOperations.ShouldContain("ChatBotUiTextKey.GovernedOperationsQueuePrimaryActionAccessible");
-        governedOperations.ShouldContain("ChatBotUiTextKey.GovernedOperationsQueueSecondaryActionsAccessible");
-        governedOperations.ShouldContain("ChatBotUiTextKey.GovernedOperationsQueueOpenDetailAccessible");
+        governedOperations.ShouldContain("ChatBotUiTextKey.ReviewQueueItem");
+        governedOperations.ShouldContain("ChatBotUiTextKey.ReviewQueueOpenProject");
+        governedOperations.ShouldContain("ChatBotUiTextKey.ReviewQueueLoadFailed");
         statusSummary.ShouldContain("aria-live");
         statusSummary.ShouldContain("ChatBotAnnouncementDeduplicationState");
         statusSummary.ShouldContain("OncePerStableOperationKey");

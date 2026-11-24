@@ -404,6 +404,19 @@ public static class ChatBotUiTextKey
     public const string GovernedOperationsIntro = "GovernedOperations_Intro";
     public const string GovernedOperationsIntroSuffix = "GovernedOperations_IntroSuffix";
     public const string GovernedOperationsOperationalQueueTitle = "GovernedOperations_OperationalQueue_Title";
+    public const string ReviewQueueItem = "ReviewQueue_Item";
+    public const string ReviewQueueProject = "ReviewQueue_Project";
+    public const string ReviewQueueOpenProject = "ReviewQueue_OpenProject";
+    public const string ReviewQueueTenantSummary = "ReviewQueue_TenantSummary";
+    public const string ReviewQueueDisclosure = "ReviewQueue_Disclosure";
+    public const string ReviewQueueCoverage = "ReviewQueue_Coverage";
+    public const string ReviewQueueRetry = "ReviewQueue_Retry";
+    public const string ReviewQueueLoading = "ReviewQueue_Loading";
+    public const string ReviewQueueLoadFailed = "ReviewQueue_LoadFailed";
+    public const string ReviewQueueSelectProject = "ReviewQueue_SelectProject";
+    public const string ReviewQueuePriorityOrder = "ReviewQueue_PriorityOrder";
+    public const string ReviewQueueNoApprovals = "ReviewQueue_NoApprovals";
+    public const string ReviewQueueBatchUnavailable = "ReviewQueue_BatchUnavailable";
     public const string GovernedOperationsQueueFamilyLabel = "GovernedOperations_QueueFamily_Label";
     public const string GovernedOperationsQueueFiltersLabel = "GovernedOperations_QueueFilters_Label";
     public const string GovernedOperationsQueueSortLabel = "GovernedOperations_QueueSort_Label";
@@ -1318,6 +1331,19 @@ public static class ChatBotUiTextKey
         GovernedOperationsIntro,
         GovernedOperationsIntroSuffix,
         GovernedOperationsOperationalQueueTitle,
+        ReviewQueueItem,
+        ReviewQueueProject,
+        ReviewQueueOpenProject,
+        ReviewQueueTenantSummary,
+        ReviewQueueDisclosure,
+        ReviewQueueCoverage,
+        ReviewQueueRetry,
+        ReviewQueueLoading,
+        ReviewQueueLoadFailed,
+        ReviewQueueSelectProject,
+        ReviewQueuePriorityOrder,
+        ReviewQueueNoApprovals,
+        ReviewQueueBatchUnavailable,
         GovernedOperationsQueueFamilyLabel,
         GovernedOperationsQueueFiltersLabel,
         GovernedOperationsQueueSortLabel,

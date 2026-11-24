@@ -254,6 +254,8 @@ public sealed class SafeOutcomeInteractionTests
             services.AddLocalization();
             services.AddFluentUIComponents();
             services.AddFluxor(options => options.ScanAssemblies(typeof(SafeOutcomeInteractionTests).Assembly));
+            services.AddSingleton<NavigationManager, StaticRenderNavigationManager>();
+            services.AddSingleton<Hexalith.ChatBot.Client.IChatBotClient>(new FakeChatBotClient());
             services.AddSingleton<IState<ProjectConversationState>>(new SafeOutcomeRenderState<ProjectConversationState>(new(false, null, ChatBotMessageCodes.AuditUnavailable)));
             services.AddSingleton<IState<OperationalDashboardsState>>(new SafeOutcomeRenderState<OperationalDashboardsState>(new(false, null, dashboardError)));
             services.AddSingleton<IState<GovernedOperationsState>>(new SafeOutcomeRenderState<GovernedOperationsState>(new(false, null, ChatBotMessageCodes.DependencyDegraded)));
