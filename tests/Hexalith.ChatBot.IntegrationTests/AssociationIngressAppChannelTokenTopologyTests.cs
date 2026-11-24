@@ -24,6 +24,7 @@ public sealed class AssociationIngressAppChannelTokenTopologyTests
     [
         $"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={new string('a', 32)}",
         "--ChatBot:Projects:Endpoint=http://localhost:65535",
+        "--ChatBot:Memories:Endpoint=http://localhost:65535",
         $"--ChatBot:Projects:ApiToken={new string('b', 32)}",
         $"--ChatBot:Memories:ApiToken={new string('c', 32)}",
     ];

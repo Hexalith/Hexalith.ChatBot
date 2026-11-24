@@ -142,7 +142,7 @@ public sealed class OwnerServiceTopologyTests
     {
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
             .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(
-                [.. StaticArgs, "--ChatBot:Memories:Endpoint=https://external-memories.invalid/gateway",
+                [.. StaticArgs,
                     "--ChatBot:Projects:TenantId=external-project-tenant", "--ChatBot:Memories:TenantId=external-memory-tenant"],
                 TestContext.Current.CancellationToken).ConfigureAwait(true);
         try
@@ -150,8 +150,7 @@ public sealed class OwnerServiceTopologyTests
             Dictionary<string, object> environment = await EnvironmentAsync(builder,
                 builder.Resources.Single(resource => resource.Name == "chatbot")).ConfigureAwait(true);
             environment["ChatBot__Projects__Endpoint"].ShouldBe("https://external-projects.invalid/gateway");
-            environment["ChatBot__Memories__Endpoint"].ShouldBeOfType<ReferenceExpression>().ValueExpression
-                .ShouldBe("https://external-memories.invalid/gateway");
+            environment["ChatBot__Memories__Endpoint"].ShouldBe("https://external-memories.invalid/gateway");
             foreach ((string owner, string tenant, string token) in new[]
             {
                 ("Projects", "external-project-tenant", "external-project-token"),
@@ -176,6 +175,7 @@ public sealed class OwnerServiceTopologyTests
     [
         "--environment=Development", $"--ChatBot:LiveRecoveryValidation:MailboxClientSecret={new string('a', 32)}",
         "--ChatBot:Projects:Endpoint=https://external-projects.invalid/gateway",
+        "--ChatBot:Memories:Endpoint=https://external-memories.invalid/gateway",
         "--ChatBot:Projects:ApiToken=external-project-token", "--ChatBot:Memories:ApiToken=external-memory-token",
     ];
 
