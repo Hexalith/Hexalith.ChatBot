@@ -11,7 +11,7 @@ import sys
 def playwright_node(driver: Path, system: str, architecture: str) -> Path:
     """Resolve the Node executable bundled with Playwright for this runner."""
     host = (system, architecture.lower())
-    platform_directory = {
+    platforms = {
         ("Linux", "x86_64"): "linux-x64",
         ("Linux", "aarch64"): "linux-arm64",
         ("Linux", "arm64"): "linux-arm64",
@@ -20,10 +20,21 @@ def playwright_node(driver: Path, system: str, architecture: str) -> Path:
         ("Windows", "amd64"): "win32_x64",
         ("Windows", "x86_64"): "win32_x64",
         ("Windows", "arm64"): "win32_x64",
-    }.get(host)
+    }
+    platform_directory = platforms.get(host)
     if platform_directory is None:
         raise ValueError(f"Playwright does not bundle a Node executable for {system} {architecture}")
-    return driver / "node" / platform_directory / ("node.exe" if system == "Windows" else "node")
+    node_root = driver / "node"
+    executable = "node.exe" if system == "Windows" else "node"
+    preferred = node_root / platform_directory / executable
+    if preferred.is_file():
+        return preferred
+    # A Python running under emulation can report a different architecture than the .NET build.
+    folders = {folder for (candidate_system, _), folder in platforms.items() if candidate_system == system}
+    available = [candidate for folder in folders if (candidate := node_root / folder / executable).is_file()]
+    if len(available) == 1:
+        return available[0]
+    raise FileNotFoundError(f"The prepared Playwright output has no matching Node executable for {system} {architecture}")
 
 
 def main() -> None:

@@ -24,11 +24,24 @@ class RequireRuntimeTests(unittest.TestCase):
             ("Darwin", "arm64", "darwin-arm64/node"),
             ("Windows", "AMD64", "win32_x64/node.exe"),
         ):
-            with self.subTest(system=system, architecture=architecture):
-                self.assertEqual(RUNTIME["playwright_node"](Path(".playwright"), system, architecture),
-                                 Path(".playwright/node", locator))
+            with self.subTest(system=system, architecture=architecture), tempfile.TemporaryDirectory() as directory:
+                driver = Path(directory, ".playwright")
+                expected = driver / "node" / locator
+                expected.parent.mkdir(parents=True)
+                expected.touch()
+                self.assertEqual(RUNTIME["playwright_node"](driver, system, architecture), expected)
         with self.assertRaisesRegex(ValueError, "does not bundle a Node executable"):
             RUNTIME["playwright_node"](Path(".playwright"), "Linux", "riscv64")
+
+    def test_uses_the_platform_binary_from_the_prepared_output_under_emulation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            driver = Path(directory, ".playwright")
+            node = driver / "node/darwin-arm64/node"
+            node.parent.mkdir(parents=True)
+            node.touch()
+            self.assertEqual(RUNTIME["playwright_node"](driver, "Darwin", "x86_64"), node)
+            with self.assertRaises(FileNotFoundError):
+                RUNTIME["playwright_node"](driver, "Linux", "x86_64")
 
     def test_writes_github_settings_or_shell_quoted_exports_after_verification(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -37,6 +50,9 @@ class RequireRuntimeTests(unittest.TestCase):
             (tool_root / "Hexalith.Builds.Tooling.dll").touch()
             environment_file = Path(directory, "github-env")
             chromium = "/fixture/test browser/with 'quote'"
+            node = Path(directory, "tests/Hexalith.ChatBot.IntegrationTests/bin/Release/net11.0/.playwright/node/linux-arm64/node")
+            node.parent.mkdir(parents=True)
+            node.touch()
             for github_env in ({"GITHUB_ENV": str(environment_file)}, {}):
                 outputs = [None, None, chromium, None, str(tool_root)]
                 results = [subprocess.CompletedProcess([], 0, stdout=output) for output in outputs]
@@ -45,6 +61,7 @@ class RequireRuntimeTests(unittest.TestCase):
                       patch("platform.system", return_value="Linux"),
                       patch("platform.machine", return_value="aarch64"),
                       patch("subprocess.run", side_effect=results) as run,
+                      contextlib.chdir(directory),
                       contextlib.redirect_stdout(stdout)):
                     RUNTIME["main"]()
 

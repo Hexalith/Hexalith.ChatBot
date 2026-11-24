@@ -2189,6 +2189,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: The nightly runtime hook hard-codes linux-x64 Playwright node and requires `GITHUB_ENV`.
   evidence: `.github/actions/after-unit-tests/require-runtime.py:24` and `:40`. Nightly/CiCd hook, not this story.
+  resolution: Resolved 2026-11-24 by the shared after-unit-tests runtime hook fix. Both entries refer to the same defect.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: `with-source-mapping.py` raises if `hexalith-module --version` fails after restore.
