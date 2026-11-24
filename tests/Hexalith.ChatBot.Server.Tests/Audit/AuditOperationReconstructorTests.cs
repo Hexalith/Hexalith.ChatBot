@@ -43,6 +43,18 @@ public sealed class AuditOperationReconstructorTests
         result.ReasonCode.ShouldBe(AuditOperationReconstructionResult.UnmappedPathReasonCode);
     }
 
+    [Theory]
+    [InlineData("SubmitRetentionConfigurationChange")]
+    [InlineData("SubmitDataClassInventoryChange")]
+    public void ComplianceSnapshotChangesReconstructUnderTenantPolicyMutation(string commandName)
+    {
+        AuditOperationReconstructionResult result = AuditOperationReconstructor.Reconstruct(
+            [WormAuditTestData.Envelope("tenant-alpha", commandName: commandName)]);
+
+        result.IsReconstructable.ShouldBeTrue();
+        result.PathCode.ShouldBe("tenant-policy-mutation");
+    }
+
     [Fact]
     public void MissingOutcomeIsNotReconstructable()
     {

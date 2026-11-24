@@ -71,6 +71,8 @@ internal static class ChatBotAuditPathMap
         [nameof(SubmitNotificationRoutingChange)] = "tenant-policy-mutation",
         [nameof(SubmitEscalationPolicyChange)] = "tenant-policy-mutation",
         [nameof(SetAssociationConfidenceThresholds)] = "tenant-policy-mutation",
+        [nameof(SubmitRetentionConfigurationChange)] = "tenant-policy-mutation",
+        [nameof(SubmitDataClassInventoryChange)] = "tenant-policy-mutation",
 
         // allowlist-mutation
         [nameof(AssignTenantAdminRole)] = "allowlist-mutation",

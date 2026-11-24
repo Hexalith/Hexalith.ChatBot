@@ -1499,6 +1499,7 @@ archived: 2026-11-24
 - source_spec: `spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Retention and data-class inventory audit envelopes map to no NFR15a inventory path, so the completeness measurer will count every admitted change as a gap once the policy gate lifts (pre-existing, medium).
   evidence: `AuditEnvelopeFactory.cs:3064` and `:3108` build envelopes for `SubmitRetentionConfigurationChange` (Story 7.4) and `SubmitDataClassInventoryChange` (Story 9.7); `ChatBotAuditPathMap.cs:67-73` classifies neither; `AuditOperationReconstructor.cs:47-51` returns `UnmappedPathReasonCode`, which `AuditCompletenessMeasurer.cs:139` counts. Both commands are denied by the Story 1.6 gate today, so no envelope is produced. Choose their inventory path code before the gate lifts; the gate's structural membership already covers both.
+  resolution: Resolved 2026-11-24. Both compliance snapshot commands now reconstruct under the existing tenant-policy-mutation inventory path. A regression theory covers both command types.
 
 
 ## Deferred from: Story 1.6 round-22 build workflow review (2026-10-19; historical release maintenance)
