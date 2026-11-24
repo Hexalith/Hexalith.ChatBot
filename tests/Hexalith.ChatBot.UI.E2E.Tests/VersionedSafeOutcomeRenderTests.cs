@@ -844,7 +844,7 @@ public sealed class VersionedSafeOutcomeRenderTests
                 string repeated = await renderer.Dispatcher.InvokeAsync(root.ToHtmlString).ConfigureAwait(true);
                 repeated.ShouldContain("data-chatbot-live-announced=\"false\"");
                 repeated.ShouldContain("aria-live=\"off\"");
-                repeated.ShouldNotContain("role=\"alert\"");
+                repeated.ShouldContain("role=\"alert\"");
                 repeated.ShouldContain("The operation is not available to this caller.");
             }
         }
@@ -939,8 +939,9 @@ public sealed class VersionedSafeOutcomeRenderTests
 
             await host.UpdateAsync([current, history], currentIds).ConfigureAwait(true);
             string repeated = await renderer.Dispatcher.InvokeAsync(root.ToHtmlString).ConfigureAwait(true);
-            Regex.Match(repeated, "<[^>]+data-chatbot-failure-announcement=\"current-failure\"[^>]*>").Value
-                .ShouldContain("aria-live=\"off\"");
+            string repeatedCurrent = Regex.Match(repeated, "<[^>]+data-chatbot-failure-announcement=\"current-failure\"[^>]*>").Value;
+            repeatedCurrent.ShouldContain("aria-live=\"off\"");
+            repeatedCurrent.ShouldContain("role=\"alert\"");
         }
         finally
         {

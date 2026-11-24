@@ -86,6 +86,8 @@
 
     private bool _shouldAnnounceLiveRegion = true;
 
+    private bool _hasAnnounced;
+
     protected override void OnParametersSet()
     {
         _feedbackContract = ResolvedStateFamily is { } stateFamily ? ChatBotStateFeedbackMatrix.For(stateFamily) : null;
@@ -94,6 +96,7 @@
         _shouldAnnounceLiveRegion = LiveRegionPoliteness != ChatBotLiveRegionPoliteness.None &&
             ((_feedbackContract is null && !HasCatalogFailure)
                 || AnnouncementDeduplication.ShouldAnnounce(ResolvedAnnouncementKey, repeatRule, AnnouncementActivation));
+        _hasAnnounced |= _shouldAnnounceLiveRegion;
     }
 
     private ChatBotLiveRegionPoliteness ResolvedPoliteness
@@ -108,17 +111,20 @@
             ? ChatBotLiveRegionPoliteness.Assertive
             : ChatBotLiveRegionPoliteness.Polite;
 
-    // The role follows the effective politeness, like aria-live. A deduplicated banner that remounts is inserted
-    // again, and an inserted role="alert" can raise an alert event even with aria-live off, so a suppressed banner
-    // carries no role attribute.
+    // Once an instance has announced it keeps its role, while aria-live follows each render. A deduplicated banner
+    // that remounts has never announced, and an inserted role="alert" can raise an alert event even with aria-live
+    // off, so that instance carries no role attribute.
     private string? AriaRole
-        => EffectivePoliteness switch
+        => RolePoliteness switch
         {
             ChatBotLiveRegionPoliteness.Polite => "status",
             ChatBotLiveRegionPoliteness.Assertive => "alert",
             ChatBotLiveRegionPoliteness.None => null,
-            _ => throw new ArgumentOutOfRangeException(nameof(EffectivePoliteness), EffectivePoliteness, null),
+            _ => throw new ArgumentOutOfRangeException(nameof(RolePoliteness), RolePoliteness, null),
         };
+
+    private ChatBotLiveRegionPoliteness RolePoliteness
+        => _hasAnnounced ? ResolvedPoliteness : ChatBotLiveRegionPoliteness.None;
 
     private string AriaLive
         => EffectivePoliteness switch

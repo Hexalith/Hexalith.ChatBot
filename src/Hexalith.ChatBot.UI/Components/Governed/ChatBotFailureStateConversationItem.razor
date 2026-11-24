@@ -141,12 +141,14 @@
     private string? ResolvedFailureStateKind => IsGenericDenial ? "terminal-failure" : Item.FailureStateKind;
 
     private bool _announce;
+    private bool _hasAnnounced;
     private bool _announcementPending;
     private string _announcementText = string.Empty;
 
     protected override void OnParametersSet()
     {
         _announce = (Announce || OnNextAction.HasDelegate) && AnnouncementDeduplication.ShouldAnnounce($"{Item.ItemId}-{CatalogEntry.Code}-{CatalogEntry.State}", ChatBotAnnouncementDedupRule.OncePerStableOperationKey);
+        _hasAnnounced |= _announce;
         _announcementPending = _announce;
     }
 
@@ -164,8 +166,9 @@
         }
     }
 
-    // A quiet or deduplicated item keeps no live role, so its remount cannot raise an alert with aria-live off.
-    private string? AriaRole => _announce ? (IsTerminal ? "alert" : "status") : null;
+    // Once an instance has announced it keeps its role; a quiet or deduplicated instance never gets one, so its
+    // remount cannot raise an alert with aria-live off.
+    private string? AriaRole => _hasAnnounced ? (IsTerminal ? "alert" : "status") : null;
 
     private string AriaLive => _announce ? (IsTerminal ? "assertive" : "polite") : "off";
 

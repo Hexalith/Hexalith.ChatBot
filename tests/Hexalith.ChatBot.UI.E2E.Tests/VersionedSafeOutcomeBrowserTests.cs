@@ -62,7 +62,7 @@ public sealed class VersionedSafeOutcomeBrowserTests
         (await page.EvaluateAsync<string[]>("() => window.safeOutcomeLiveActivations").ConfigureAwait(true)).Length.ShouldBe(2);
     }
 
-    /// <summary>A deduplicated failure banner remounted in the same circuit keeps no live role; its announcing render keeps one.</summary>
+    /// <summary>A deduplicated failure banner remounted in the same circuit has no live role; the instance that announced keeps one.</summary>
     [Fact]
     public async Task RemountedSuppressedBannerShouldDropItsLiveRole()
     {
@@ -139,9 +139,7 @@ public sealed class VersionedSafeOutcomeBrowserTests
         string[] renders = await page.EvaluateAsync<string[]>("() => window.suppressedBannerRenders").ConfigureAwait(true);
         renders.ShouldContain($"1|{Key}|true|assertive|alert", string.Join(", ", renders));
         renders.ShouldAllBe(render => render.Contains($"|{Key}|", StringComparison.Ordinal), string.Join(", ", renders));
-        renders.Where(render => render.Contains("|off|", StringComparison.Ordinal))
-            .ShouldAllBe(render => render.EndsWith("|none", StringComparison.Ordinal), string.Join(", ", renders));
-        renders.Where(render => render.Contains("|assertive|", StringComparison.Ordinal))
+        renders.Where(render => render.StartsWith("1|", StringComparison.Ordinal))
             .ShouldAllBe(render => render.EndsWith("|alert", StringComparison.Ordinal), string.Join(", ", renders));
         foreach (int mount in new[] { 2, 3 })
         {
@@ -226,11 +224,12 @@ public sealed class VersionedSafeOutcomeBrowserTests
         ILocator banner = composer.Locator("[data-chatbot-stable-id$=\"project-conversation-composer-status\"]");
         await Assertions.Expect(banner).ToHaveAttributeAsync("data-chatbot-feedback-state",
             code == "authorization_denied" ? "BlockedAction" : "TerminalPolicyFailure").ConfigureAwait(true);
-        // The role follows the effective politeness: the announcing render is an alert, and a later render that
-        // suppresses the repeat turns aria-live off and drops the role with it.
-        string liveState = await banner.EvaluateAsync<string>(
-            "banner => `${banner.getAttribute('aria-live')}|${banner.getAttribute('role') ?? 'none'}`").ConfigureAwait(true);
-        liveState.ShouldBeOneOf("assertive|alert", "off|none");
+        await Assertions.Expect(banner).ToHaveAttributeAsync("role", "alert").ConfigureAwait(true);
+        // Editing the draft re-renders the still-mounted banner: the repeat is not announced, and the role stays.
+        await input.FillAsync("Safe failure test submission, edited").ConfigureAwait(true);
+        await Assertions.Expect(banner).ToHaveAttributeAsync("data-chatbot-live-announced", "false").ConfigureAwait(true);
+        await Assertions.Expect(banner).ToHaveAttributeAsync("aria-live", "off").ConfigureAwait(true);
+        await Assertions.Expect(banner).ToHaveAttributeAsync("role", "alert").ConfigureAwait(true);
         string reason = code == "authorization_denied"
             ? culture == "fr" ? "L'opération n'est pas disponible pour cet appelant." : "The operation is not available to this caller."
             : culture == "fr" ? "L'action demandée est indisponible." : "The requested action is unavailable.";
