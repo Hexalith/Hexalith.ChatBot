@@ -67,7 +67,7 @@ public sealed partial class CommandGatewayTests
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public async Task RealPlanningFailureShouldReleaseOnlyUndispatchedPreparedOwnership(bool durable, bool cleanupUnavailable)
+    public async Task MalformedPlanShouldReleaseOnlyUndispatchedPreparedOwnership(bool durable, bool cleanupUnavailable)
     {
         FakeCoarseIdempotencyStateClient state = new();
         MutableClock clock = new(FixedClock.FixedUtcNow);
@@ -79,8 +79,8 @@ public sealed partial class CommandGatewayTests
         ChatBotGatewayResult failure = await Gateway(dispatcher, clock: clock, idempotencyStore: store, auditWriter: audit)
             .SubmitAsync(bad, TestContext.Current.CancellationToken);
         failure.IsAccepted.ShouldBeFalse();
-        failure.Problem!.Status.ShouldBe(503);
-        failure.Problem.Retryable.ShouldBeTrue();
+        failure.Problem!.Status.ShouldBe(400);
+        failure.Problem.Retryable.ShouldBeFalse();
         platform.SubmissionCount.ShouldBe(0);
         if (cleanupUnavailable)
         {

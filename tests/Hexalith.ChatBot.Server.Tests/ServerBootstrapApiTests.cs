@@ -1042,9 +1042,8 @@ public sealed class ServerBootstrapApiTests
     /// Pins the boundary order the live Tier-3 mailbox-bearer probes rely on. The EventStore conforming host
     /// authenticates the ChatBot boundary before any handler runs, so without credentials every body, contract-valid
     /// or not, answers the typed authentication denial (401). With an admitted principal the published request
-    /// contract is validated next (a contract-invalid body answers the versioned 400), and a contract-valid body reaches
-    /// dispatch, whose deliberately invalid intake identity yields dispatch-unavailable — the only response that proves
-    /// admission. A 400 therefore proves authentication, never admission.
+    /// contract is validated next. A contract-invalid request answers 400 before admission, while a contract-valid
+    /// request records pre-commit audit evidence and reaches dispatch validation for its invalid intake identity.
     /// </summary>
     [Fact]
     public async Task CommandEndpointShouldAuthenticateBeforeContractValidationAndValidateBeforeAdmission()
@@ -1064,7 +1063,9 @@ public sealed class ServerBootstrapApiTests
             problem.RootElement.GetProperty("code").GetString().ShouldBe("authentication_denied");
         }
 
-        using WebApplicationFactory<Program> admittedFactory = AuthenticatedFactory("tenant-alpha");
+        InMemoryAuditWriter audit = new();
+        using WebApplicationFactory<Program> admittedFactory = AuthenticatedFactory(
+            "tenant-alpha", services => services.AddSingleton<IAuditWriter>(audit));
         using HttpClient admitted = admittedFactory.CreateClient();
         using HttpResponseMessage incomplete = await admitted
             .SendAsync(MailboxAdmissionProbeRequest(IncompleteMailboxAdmissionProbeBody(commandId)), TestContext.Current.CancellationToken)
@@ -1076,14 +1077,20 @@ public sealed class ServerBootstrapApiTests
             problem.RootElement.GetProperty("code").GetString().ShouldBe("command_contract_invalid");
         }
 
-        using HttpResponseMessage dispatchUnavailable = await admitted
+        audit.Envelopes.ShouldBeEmpty();
+
+        using HttpResponseMessage malformedDispatch = await admitted
             .SendAsync(MailboxAdmissionProbeRequest(MailboxAdmissionProbeBody(commandId)), TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
-        dispatchUnavailable.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
-        using (JsonDocument problem = JsonDocument.Parse(await dispatchUnavailable.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true)))
+        malformedDispatch.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        using (JsonDocument problem = JsonDocument.Parse(await malformedDispatch.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true)))
         {
-            problem.RootElement.GetProperty("type").GetString().ShouldBe(ChatBotProblemTypes.DispatchUnavailable);
+            problem.RootElement.GetProperty("type").GetString().ShouldBe(ChatBotProblemTypes.ValidationFailure);
+            problem.RootElement.GetProperty("code").GetString().ShouldBe("command_contract_invalid");
+            problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBeFalse();
         }
+
+        audit.Envelopes.ShouldHaveSingleItem().Phase.ShouldBe(AuditCommitPhase.PreCommit);
     }
 
     [Fact]

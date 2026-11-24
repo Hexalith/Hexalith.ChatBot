@@ -223,6 +223,62 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         body.ShouldNotContain("Sender Raw", Case.Insensitive);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CommandGatewayApi_ShouldDistinguishInvalidDispatchMetadataFromDirectoryFailure(bool malformed)
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        RecordingParticipantDirectory directory = new()
+        {
+            Failure = malformed ? null : new JsonException("Synthetic malformed directory response."),
+        };
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        InMemoryAuditReplayIntentQueue replay = new();
+        InMemoryOperatorAlertSink alerts = new();
+        using WebApplicationFactory<Program> factory = ParticipantResolutionGatewayFactory(
+            "tenant-alpha", eventStore, auditWriter, directory, idempotencyStore)
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IAuditReplayIntentQueue>(replay);
+                services.AddSingleton<IOperatorAlertSink>(alerts);
+            }));
+        using HttpClient client = factory.CreateClient();
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        string intakeId = malformed ? "not-an-intake-ulid" : "01ARZ3NDEKTSV4RRFFQ69G5FBZ";
+
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            using HttpRequestMessage request = ParticipantResolutionSubmissionRequest(intakeId);
+            using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
+
+            response.StatusCode.ShouldBe(malformed ? HttpStatusCode.BadRequest : HttpStatusCode.ServiceUnavailable);
+            string body = await response.Content.ReadAsStringAsync(cancellationToken);
+            using JsonDocument problem = JsonDocument.Parse(body);
+            problem.RootElement.GetProperty("type").GetString().ShouldBe(
+                malformed ? ChatBotProblemTypes.ValidationFailure : ChatBotProblemTypes.DispatchUnavailable);
+            problem.RootElement.GetProperty("code").GetString().ShouldBe(
+                malformed ? ChatBotMessageCodes.CommandContractInvalid : ChatBotMessageCodes.AuditUnavailable);
+            problem.RootElement.GetProperty("retryable").GetBoolean().ShouldBe(!malformed);
+            problem.RootElement.GetProperty("clientAction").GetString().ShouldBe(malformed ? "correct-request" : "retry-later");
+            body.ShouldNotContain("not-an-intake-ulid");
+            body.ShouldNotContain("Synthetic malformed directory response.");
+            idempotencyStore.Records.ShouldBeEmpty();
+        }
+
+        eventStore.Submitted.ShouldBeEmpty();
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe([AuditCommitPhase.PreCommit, AuditCommitPhase.PreCommit]);
+        int failureCount = malformed ? 0 : 2;
+        directory.Lookups.Count.ShouldBe(failureCount);
+        replay.Intents.Count.ShouldBe(failureCount);
+        replay.Intents.ShouldAllBe(intent =>
+            intent.Kind == AuditReplayIntentKind.PreCommitOperationReplay && intent.ReasonCode == "dispatch_unavailable");
+        alerts.Alerts.Count.ShouldBe(failureCount);
+        alerts.Alerts.ShouldAllBe(alert =>
+            alert.Kind == OperatorAlertKind.AuditUnavailable && alert.ReasonCode == "dispatch_unavailable");
+    }
+
     [Fact]
     public async Task CommandGatewayApi_ShouldScoreMailboxAssociationBeforeEventStoreSubmission()
     {
@@ -3952,17 +4008,17 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         return request;
     }
 
-    private static HttpRequestMessage ParticipantResolutionSubmissionRequest()
+    private static HttpRequestMessage ParticipantResolutionSubmissionRequest(string intakeId = "01ARZ3NDEKTSV4RRFFQ69G5FBZ")
     {
-        const string payload =
-            """
+        string payload =
+            $$"""
             {
               "commandId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
               "commandType": "ResolveMailboxMessageParticipants",
               "origin": "mailbox",
               "command": {
                 "resolutionId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-                "intakeId": "01ARZ3NDEKTSV4RRFFQ69G5FBZ",
+                "intakeId": "{{intakeId}}",
                 "sourceMailboxId": "controlled-mailbox-001",
                 "sourceParticipants": [
                   {
@@ -4205,6 +4261,8 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     {
         private readonly List<ParticipantDirectoryLookup> _lookups = [];
 
+        public Exception? Failure { get; init; }
+
         public IReadOnlyList<ParticipantDirectoryLookup> Lookups => _lookups;
 
         public ValueTask<ParticipantDirectoryResolution> ResolveEmailEvidenceAsync(
@@ -4213,6 +4271,11 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         {
             cancellationToken.ThrowIfCancellationRequested();
             _lookups.Add(lookup);
+            if (Failure is not null)
+            {
+                throw Failure;
+            }
+
             if (string.Equals(lookup.SourceParticipantId, "01ARZ3NDEKTSV4RRFFQ69G5FAZ", StringComparison.Ordinal))
             {
                 return ValueTask.FromResult(ParticipantDirectoryResolution.FromResolved(

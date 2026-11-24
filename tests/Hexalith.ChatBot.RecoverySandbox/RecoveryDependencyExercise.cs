@@ -53,7 +53,7 @@ internal sealed class RecoveryDependencyExercise(
     private readonly InMemoryCoarseIdempotencyStore _idempotencyStore = new(new SystemClock());
     private readonly HashSet<string> _seededAttachmentIntakes = new(StringComparer.Ordinal);
 
-    /// <summary>Runs the selected dependency contract for one idempotent correlation.</summary>
+    /// <summary>Runs the selected dependency contract in the sandbox storage tenant for one idempotent correlation.</summary>
     public async ValueTask<(RecoveryDependencyExerciseResult Result, RecoveryScopeObservation? Scope)> ProcessAsync(
         string dependency,
         string tenantRef,
@@ -197,14 +197,9 @@ internal sealed class RecoveryDependencyExercise(
                 // AiExecutionCoordinator owns the provider call. Reconstruct that boundary with the actual
                 // aggregate handler and the actual coordinator type rather than assuming the pre-coordinator
                 // synchronous shape this exercise was originally written against.
-                // The dispatcher's SubmitCommandRequest carries the raw logical `replay-test:` tenant label
-                // (CommandEnvelope/AggregateIdentity reject the ':' it contains); resolve the same physical
-                // storage tenant ReplayTenantPolicy.IsTestTenant guards before constructing identity-bearing types.
-                string storageTenantRef = ReplayTenantPolicy.StorageTenantFor(dispatchedSubmission.Tenant)
-                    ?? throw new InvalidOperationException("The ai-provider recovery exercise did not resolve a guarded storage tenant.");
                 CommandEnvelope envelope = new(
                     MessageId: dispatchedSubmission.MessageId,
-                    TenantId: storageTenantRef,
+                    TenantId: dispatchedSubmission.Tenant,
                     Domain: dispatchedSubmission.Domain,
                     AggregateId: dispatchedSubmission.AggregateId,
                     CommandType: dispatchedSubmission.CommandType,
@@ -225,9 +220,6 @@ internal sealed class RecoveryDependencyExercise(
                     eventStore,
                     new SystemClock(),
                     NullLogger<AiExecutionCoordinator>.Instance);
-                // The coordinator's own work tracking (and, through it, the sandbox's effect ledger) is keyed by
-                // the exercise's logical `replay-test:` tenant like every other dependency in this file — only
-                // GovernedOperationAggregate.Handle's CommandEnvelope needs the guarded physical storage tenant.
                 await coordinator.RecordStartedAsync(
                     tenantRef,
                     dispatchedSubmission.AggregateId,
@@ -317,7 +309,7 @@ internal sealed class RecoveryDependencyExercise(
             await RecordAdmissionOutcomeAsync(decision, cancellationToken).ConfigureAwait(false);
             return (FaultObserved: false, Committed: true, FaultSignalCode: null);
         }
-        catch (Exception) when (state.IsFaulted("command-execution"))
+        catch (HttpRequestException) when (state.IsFaulted("command-execution"))
         {
             await AbortControlledFaultAsync(decision, prepared, "command-execution", effectsBefore).ConfigureAwait(false);
             return (FaultObserved: true, Committed: false, FaultSignalCode: "command_execution_unavailable");

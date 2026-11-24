@@ -112,9 +112,8 @@ internal sealed class ChatBotProblemDetailsFactory : IChatBotProblemDetailsFacto
 
     public ProblemDetails CreateDispatchUnavailable(string correlationId, string? taskId)
     {
-        // A dispatch outage (EventStore gateway unreachable / non-2xx) or an unreadable command payload is a
-        // fail-closed, transient internal error: no durable state was written. Reuse the catalog-backed,
-        // redacted audit-unavailable copy (RetryLater) so no raw exception text ever reaches the caller (NFR40).
+        // Reuse the catalog-backed, redacted audit-unavailable copy (RetryLater) for dispatch outages so
+        // no raw exception text ever reaches the caller (NFR40).
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AuditUnavailable);
 
         return _redactionStage.Apply(new ProblemDetails

@@ -749,6 +749,7 @@ location: validate-consumer-package-authority.ps1
 severity: medium
 reason: **[MEDIUM] Workspace-mode package-authority enforcement runs in no CI.** `validate-consumer-package-authority.ps1` (workspace/consumer mode) and `validate-package-version-exceptions.ps1` (workspace mode) are the story's actual enforcement mechanisms, but Builds CI runs the consumer validator only against Builds itself and the exception validator only in schema mode, and ChatBot `ci.yml`/`release.yml` invoke neither. Until wired, the closed SDK/tool allowlist and consumer exclusivity are enforced only by convention plus ChatBot's architecture tests. Owned by Story 1.1f (reusable domain-module CI/CD alignment proposal 2026-07-18).
 status: open
+triage: 2026-11-24 Skipped. Workspace CI enforcement belongs to the separately tracked Hexalith.CiCd adoption and Builds ownership work.
 
 ### DW-81: [LOW] Partial/standalone checkout rough edges in path-resolution conventions.
 
@@ -857,6 +858,7 @@ location: ScaffoldArchitectureTests.cs:273
 severity: medium
 reason: **[MEDIUM · governance] `ModelContextProtocol` 1.4.1 → 2.2.0 major bump is unratified.** Commit `f804229` accepted a major-version bump of the SDK the M1 MCP surface wraps by editing `ScaffoldArchitectureTests.cs:273` and the `architecture.md` / `epics.md` planning records — all three inside Story 12.15's File List — with no ADR entry and no decision-log record. The pins match the current `references/Hexalith.Builds` catalog, so nothing is drifting; what is missing is the decision. Disclosed as out-of-scope in Story 12.15 by the 2026-08-25 review. Release-claim impact: a major SDK bump under the MCP surface is unreviewed. Closure evidence: an ADR plus decision-log entry owned by the package-authority story.
 status: open
+triage: 2026-11-24 Skipped. Requires package-owner compatibility ratification and the decision record for the retained MCP surface.
 decision: 2026-08-27 Ratify 2.2.0 — Review compatibility impact, add an accepted ADR and decision-log record, and execute MCP adapter conformance coverage.
 decision: 2026-08-26 Ratify 2.2.0 — Review compatibility impact, add an accepted ADR and decision-log record, and execute MCP adapter conformance coverage.
 
@@ -866,7 +868,8 @@ origin: migrated from legacy ledger ("Deferred from: hosted-lane review of 12-15
 location: ChatBot gateway/API
 severity: medium
 reason: **[MEDIUM · api-contract] A permanently malformed command payload is reported as a retryable `503` and raises an operator alert on every attempt.** `AcceptedCommandDispatcher.BuildPlanAsync` throws `InvalidOperationException` for an unparseable aggregate identity, and `CommandGateway.SubmitAsync` classifies it with genuine dispatch outages: the caller is told `retryable: true`, `clientAction: retry-later`, and each attempt queues a pre-commit replay intent and an `OperatorAlertKind.AuditUnavailable` alert. During one recovery run a single malformed field produced ~1,000 such alerts. Changing it means changing a shipped API contract (`400`/`422` semantics, the message catalog, OpenAPI and conformance tests), so it is out of Story 12.15's scope. **Owner:** ChatBot gateway/API. **Closure evidence:** a decided and documented status/reason for malformed payloads, with alerting no longer triggered per attempt.
-status: open
+status: done 2026-11-24
+resolution: Pre-effect caller validation yields the catalogued terminal HTTP 400 response. Exact preparation ownership is released, without dispatch outage alerts or replay. A public API regression distinguishes repeated malformed input from a real directory failure.
 decision: 2026-08-27 Client-error contract — Define 400 or 422 semantics with a catalogued reason, update OpenAPI and conformance tests, and suppress outage alerts for permanent defects.
 decision: 2026-08-26 Client-error contract — Define 400 or 422 semantics with a catalogued reason, update OpenAPI and conformance tests, and suppress outage alerts for permanent defects.
 

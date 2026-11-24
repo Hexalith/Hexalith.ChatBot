@@ -46,6 +46,8 @@ paths:
         proposal, approval or idempotency record. Remediation requires a new linked request.
         An assistance request requiring human approval returns HTTP 409 approval-required and
         must be submitted separately through the governed action proposal command.
+        Malformed command metadata detected during dispatch planning before an external effect
+        returns HTTP 400 command_contract_invalid with retryable false and clientAction correct-request.
       parameters:
         - $ref: "#/components/parameters/CorrelationId"
         - $ref: "#/components/parameters/TaskId"

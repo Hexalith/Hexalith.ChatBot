@@ -196,7 +196,7 @@ app.MapPost(
             return Results.NotFound();
         }
 
-        return Results.Ok(state.Restore(dependency, requestedTenant, DateTimeOffset.UtcNow));
+        return Results.Ok(state.Restore(dependency, storageTenantRef, DateTimeOffset.UtcNow));
     });
 
 app.MapPost(
@@ -222,7 +222,7 @@ app.MapPost(
         }
 
         (RecoveryDependencyExerciseResult result, RecoveryScopeObservation? scope) = await exercise
-            .ProcessAsync(dependency, requestedTenant, correlationId, cancellationToken)
+            .ProcessAsync(dependency, storageTenantRef, correlationId, cancellationToken)
             .ConfigureAwait(false);
         return Results.Ok(new
         {

@@ -173,6 +173,11 @@ internal sealed class CommandGateway(
             await AbortUndispatchedIndependentlyAsync(idempotency, response).ConfigureAwait(false);
             return Denied(await admission.RejectAuthorityLapseAsync(context, cancellationToken).ConfigureAwait(false));
         }
+        catch (CommandDispatchValidationException) when (!context.ExternalEffectAttempted)
+        {
+            await AbortUndispatchedIndependentlyAsync(idempotency, response).ConfigureAwait(false);
+            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateValidationProblem(submission.CorrelationId, submission.TaskId));
+        }
         catch (OperationCanceledException)
         {
             if (!context.ExternalEffectAttempted)

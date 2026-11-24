@@ -42,6 +42,21 @@ public sealed partial class AcceptedCommandDispatcherTests
     private const string CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
     private const string TaskId = "01ARZ3NDEKTSV4RRFFQ69G5FAX";
 
+    [Fact]
+    public async Task NoteWithInvalidEventStoreAggregateIdShouldFailBeforeExternalSubmission()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(), new SystemClock());
+        ChatBotGatewayContext context = Context(WireCommand("note:invalid"));
+
+        _ = await Should.ThrowAsync<CommandDispatchValidationException>(
+            () => dispatcher.DispatchAsync(context, TestContext.Current.CancellationToken).AsTask());
+
+        gateway.Submitted.ShouldBeEmpty();
+        context.ExternalEffectAttempted.ShouldBeFalse();
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

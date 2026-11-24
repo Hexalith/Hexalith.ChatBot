@@ -37,7 +37,7 @@ public sealed class RecoveryDependencyExerciseTests
 
         (RecoveryDependencyExerciseResult fault, RecoveryScopeObservation? scope) = await exercise.ProcessAsync(
             dependency,
-            "replay-test:recovery-validation",
+            RecoveryValidationTopology.StorageTenantRef,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             cancellationToken);
 
@@ -48,19 +48,19 @@ public sealed class RecoveryDependencyExerciseTests
         scope.ObservedScope.ShouldBe(expectedScope);
         scope.ScopeRecordedAtUtc.ShouldBeGreaterThanOrEqualTo(scope.DependencyFailureObservedAtUtc);
 
-        string restoreJson = JsonSerializer.Serialize(state.Restore(dependency, "replay-test:recovery-validation", DateTimeOffset.UtcNow));
+        string restoreJson = JsonSerializer.Serialize(state.Restore(dependency, RecoveryValidationTopology.StorageTenantRef, DateTimeOffset.UtcNow));
         using JsonDocument restoreDocument = JsonDocument.Parse(restoreJson);
         RecoverySandboxRestoreResponse.WasPreviouslyFaulted(restoreDocument.RootElement).ShouldBeTrue();
         RecoverySandboxRestoreResponse.IsCurrentlyFaulted(restoreDocument.RootElement).ShouldBeFalse();
 
         (RecoveryDependencyExerciseResult first, _) = await exercise.ProcessAsync(
             dependency,
-            "replay-test:recovery-validation",
+            RecoveryValidationTopology.StorageTenantRef,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             cancellationToken);
         (RecoveryDependencyExerciseResult replay, _) = await exercise.ProcessAsync(
             dependency,
-            "replay-test:recovery-validation",
+            RecoveryValidationTopology.StorageTenantRef,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             cancellationToken);
 

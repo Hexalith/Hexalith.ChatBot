@@ -18,6 +18,7 @@ using Hexalith.ChatBot.Server.Notifications;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Contracts.Commands;
+using Hexalith.EventStore.Contracts.Identity;
 
 namespace Hexalith.ChatBot.Server.Gateway.Stages;
 
@@ -133,7 +134,9 @@ internal sealed class AcceptedCommandDispatcher(
 
             return new ChatBotDispatchResult(context.PreparedAcceptedAt ?? clock.UtcNow.ToUniversalTime(), plan.AggregateId);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException and not ChatBotAuthorityLapsedException && !context.ExternalEffectAttempted)
+        catch (Exception exception) when (
+            exception is not (OperationCanceledException or ChatBotAuthorityLapsedException or CommandDispatchValidationException)
+            && !context.ExternalEffectAttempted)
         {
             throw new CommandNotSubmittedException(exception);
         }
@@ -172,25 +175,26 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(GrantChatBotAuthority), StringComparison.Ordinal))
         {
-            GrantChatBotAuthority grant = command.Deserialize<GrantChatBotAuthority>(ReadOptions)
-                ?? throw new InvalidOperationException("The authority grant payload could not be read.");
+            GrantChatBotAuthority grant = ReadPayload<GrantChatBotAuthority>(command);
             return new EventStoreDispatchPlan(grant.AuthorityKey, commandType, JsonSerializer.SerializeToElement(grant));
         }
 
         if (string.Equals(commandType, nameof(RevokeChatBotAuthority), StringComparison.Ordinal))
         {
-            RevokeChatBotAuthority revoke = command.Deserialize<RevokeChatBotAuthority>(ReadOptions)
-                ?? throw new InvalidOperationException("The authority revocation payload could not be read.");
+            RevokeChatBotAuthority revoke = ReadPayload<RevokeChatBotAuthority>(command);
             return new EventStoreDispatchPlan(revoke.AuthorityKey, commandType, JsonSerializer.SerializeToElement(revoke));
         }
 
         if (string.Equals(commandType, nameof(RecordGovernedNote), StringComparison.Ordinal))
         {
-            RecordGovernedNote note = command.Deserialize<RecordGovernedNote>(ReadOptions)
-                ?? throw new InvalidOperationException("The governed note command payload could not be read.");
-            if (string.IsNullOrWhiteSpace(note.NoteId))
+            RecordGovernedNote note = ReadPayload<RecordGovernedNote>(command);
+            try
             {
-                throw new InvalidOperationException("The governed note command is missing its aggregate identity.");
+                _ = new AggregateIdentity(context.TenantBinding.TenantId, ChatBotEventStore.DomainName, note.NoteId);
+            }
+            catch (ArgumentException invalid) when (string.Equals(invalid.ParamName, "aggregateId", StringComparison.Ordinal))
+            {
+                throw new CommandDispatchValidationException("The governed note command has an invalid aggregate identity.");
             }
 
             // PascalCase payload (default options) so the case-sensitive aggregate engine round-trips it.
@@ -200,17 +204,17 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(CaptureMailboxMessageIntake), StringComparison.Ordinal))
         {
-            CaptureMailboxMessageIntake intake = command.Deserialize<CaptureMailboxMessageIntake>(ReadOptions)
-                ?? throw new InvalidOperationException("The mailbox-intake command payload could not be read.");
+            CaptureMailboxMessageIntake intake = ReadPayload<CaptureMailboxMessageIntake>(command);
             if (!MailboxMessageIntakeId.TryParse(intake.IntakeId, out _))
             {
-                throw new InvalidOperationException("The mailbox-intake command is missing its aggregate identity.");
+                throw new CommandDispatchValidationException("The mailbox-intake command is missing its aggregate identity.");
             }
 
-            if (string.IsNullOrWhiteSpace(intake.Source.ProviderMessageId) ||
+            if (intake.Source is null ||
+                string.IsNullOrWhiteSpace(intake.Source.ProviderMessageId) ||
                 string.IsNullOrWhiteSpace(intake.Source.MailboxId))
             {
-                throw new InvalidOperationException("The mailbox-intake command is missing its source identity.");
+                throw new CommandDispatchValidationException("The mailbox-intake command is missing its source identity.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(intake);
@@ -219,19 +223,18 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(ResolveMailboxMessageParticipants), StringComparison.Ordinal))
         {
-            ResolveMailboxMessageParticipants commandPayload = command.Deserialize<ResolveMailboxMessageParticipants>(ReadOptions)
-                ?? throw new InvalidOperationException("The participant-resolution command payload could not be read.");
+            ResolveMailboxMessageParticipants commandPayload = ReadPayload<ResolveMailboxMessageParticipants>(command);
             if (!ParticipantResolutionId.TryParse(commandPayload.ResolutionId, out _) ||
                 !MailboxMessageIntakeId.TryParse(commandPayload.IntakeId, out _))
             {
-                throw new InvalidOperationException("The participant-resolution command is missing its aggregate identity.");
+                throw new CommandDispatchValidationException("The participant-resolution command is missing its aggregate identity.");
             }
 
             if (commandPayload.SourceParticipants is null ||
                 string.IsNullOrWhiteSpace(commandPayload.SourceMailboxId) ||
                 string.IsNullOrWhiteSpace(commandPayload.ResolutionKernelVersion))
             {
-                throw new InvalidOperationException("The participant-resolution command is missing its source identity.");
+                throw new CommandDispatchValidationException("The participant-resolution command is missing its source identity.");
             }
 
             RequireCurrentAuthority(context);
@@ -244,12 +247,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(ScoreMailboxMessageAssociation), StringComparison.Ordinal))
         {
-            ScoreMailboxMessageAssociation commandPayload = command.Deserialize<ScoreMailboxMessageAssociation>(ReadOptions)
-                ?? throw new InvalidOperationException("The association-scoring command payload could not be read.");
+            ScoreMailboxMessageAssociation commandPayload = ReadPayload<ScoreMailboxMessageAssociation>(command);
             if (!AssociationWorkflowId.TryParse(commandPayload.AssociationId, out _) ||
                 !MailboxMessageIntakeId.TryParse(commandPayload.IntakeId, out _))
             {
-                throw new InvalidOperationException("The association-scoring command is missing its aggregate identity.");
+                throw new CommandDispatchValidationException("The association-scoring command is missing its aggregate identity.");
             }
 
             if (commandPayload.DeterministicSignals is null ||
@@ -257,7 +259,7 @@ internal sealed class AcceptedCommandDispatcher(
                 string.IsNullOrWhiteSpace(commandPayload.SourceMailboxId) ||
                 string.IsNullOrWhiteSpace(commandPayload.SourceConversationId))
             {
-                throw new InvalidOperationException("The association-scoring command is missing its deterministic evidence.");
+                throw new CommandDispatchValidationException("The association-scoring command is missing its deterministic evidence.");
             }
 
             RequireCurrentAuthority(context);
@@ -270,12 +272,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(SetAssociationConfidenceThresholds), StringComparison.Ordinal))
         {
-            SetAssociationConfidenceThresholds commandPayload = command.Deserialize<SetAssociationConfidenceThresholds>(ReadOptions)
-                ?? throw new InvalidOperationException("The association-threshold command payload could not be read.");
+            SetAssociationConfidenceThresholds commandPayload = ReadPayload<SetAssociationConfidenceThresholds>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.PolicyId) ||
                 string.IsNullOrWhiteSpace(commandPayload.PolicyVersion))
             {
-                throw new InvalidOperationException("The association-threshold command is missing its aggregate identity.");
+                throw new CommandDispatchValidationException("The association-threshold command is missing its aggregate identity.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload with { ChangedAt = clock.UtcNow });
@@ -284,12 +285,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(SubmitTenantPolicyChange), StringComparison.Ordinal))
         {
-            SubmitTenantPolicyChange commandPayload = command.Deserialize<SubmitTenantPolicyChange>(ReadOptions)
-                ?? throw new InvalidOperationException("The tenant-policy change command payload could not be read.");
+            SubmitTenantPolicyChange commandPayload = ReadPayload<SubmitTenantPolicyChange>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.PolicyChangeId) ||
                 !TenantPolicySchema.Validate(commandPayload.ChangeSet).IsValid)
             {
-                throw new InvalidOperationException("The tenant-policy change command is missing valid policy metadata.");
+                throw new CommandDispatchValidationException("The tenant-policy change command is missing valid policy metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -298,12 +298,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(ApproveTenantPolicyChange), StringComparison.Ordinal))
         {
-            ApproveTenantPolicyChange commandPayload = command.Deserialize<ApproveTenantPolicyChange>(ReadOptions)
-                ?? throw new InvalidOperationException("The tenant-policy approval command payload could not be read.");
+            ApproveTenantPolicyChange commandPayload = ReadPayload<ApproveTenantPolicyChange>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.PolicyChangeId) ||
                 string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("The tenant-policy approval command is missing valid approval metadata.");
+                throw new CommandDispatchValidationException("The tenant-policy approval command is missing valid approval metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -312,12 +311,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(SubmitNotificationRoutingChange), StringComparison.Ordinal))
         {
-            SubmitNotificationRoutingChange commandPayload = command.Deserialize<SubmitNotificationRoutingChange>(ReadOptions)
-                ?? throw new InvalidOperationException("The notification-routing change command payload could not be read.");
+            SubmitNotificationRoutingChange commandPayload = ReadPayload<SubmitNotificationRoutingChange>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.RoutingChangeId) ||
                 !NotificationRoutingSchema.Validate(commandPayload.ChangeSet).IsValid)
             {
-                throw new InvalidOperationException("The notification-routing change command is missing valid routing metadata.");
+                throw new CommandDispatchValidationException("The notification-routing change command is missing valid routing metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -326,12 +324,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(SubmitMailboxSourceDisable), StringComparison.Ordinal))
         {
-            SubmitMailboxSourceDisable commandPayload = command.Deserialize<SubmitMailboxSourceDisable>(ReadOptions)
-                ?? throw new InvalidOperationException("The mailbox-source disable command payload could not be read.");
+            SubmitMailboxSourceDisable commandPayload = ReadPayload<SubmitMailboxSourceDisable>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
                 string.IsNullOrWhiteSpace(commandPayload.MailboxSourceRef))
             {
-                throw new InvalidOperationException("The mailbox-source disable command is missing valid disable metadata.");
+                throw new CommandDispatchValidationException("The mailbox-source disable command is missing valid disable metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -340,12 +337,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(ApproveMailboxSourceDisable), StringComparison.Ordinal))
         {
-            ApproveMailboxSourceDisable commandPayload = command.Deserialize<ApproveMailboxSourceDisable>(ReadOptions)
-                ?? throw new InvalidOperationException("The mailbox-source disable approval command payload could not be read.");
+            ApproveMailboxSourceDisable commandPayload = ReadPayload<ApproveMailboxSourceDisable>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
                 string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("The mailbox-source disable approval command is missing valid approval metadata.");
+                throw new CommandDispatchValidationException("The mailbox-source disable approval command is missing valid approval metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -354,12 +350,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(SubmitServiceClientDisable), StringComparison.Ordinal))
         {
-            SubmitServiceClientDisable commandPayload = command.Deserialize<SubmitServiceClientDisable>(ReadOptions)
-                ?? throw new InvalidOperationException("The service-client disable command payload could not be read.");
+            SubmitServiceClientDisable commandPayload = ReadPayload<SubmitServiceClientDisable>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
                 string.IsNullOrWhiteSpace(commandPayload.ServiceClientRef))
             {
-                throw new InvalidOperationException("The service-client disable command is missing valid disable metadata.");
+                throw new CommandDispatchValidationException("The service-client disable command is missing valid disable metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -368,12 +363,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(ApproveServiceClientDisable), StringComparison.Ordinal))
         {
-            ApproveServiceClientDisable commandPayload = command.Deserialize<ApproveServiceClientDisable>(ReadOptions)
-                ?? throw new InvalidOperationException("The service-client disable approval command payload could not be read.");
+            ApproveServiceClientDisable commandPayload = ReadPayload<ApproveServiceClientDisable>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
                 string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("The service-client disable approval command is missing valid approval metadata.");
+                throw new CommandDispatchValidationException("The service-client disable approval command is missing valid approval metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -382,12 +376,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(SubmitAiActorDisable), StringComparison.Ordinal))
         {
-            SubmitAiActorDisable commandPayload = command.Deserialize<SubmitAiActorDisable>(ReadOptions)
-                ?? throw new InvalidOperationException("The AI-actor disable command payload could not be read.");
+            SubmitAiActorDisable commandPayload = ReadPayload<SubmitAiActorDisable>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
                 string.IsNullOrWhiteSpace(commandPayload.AiActorRef))
             {
-                throw new InvalidOperationException("The AI-actor disable command is missing valid disable metadata.");
+                throw new CommandDispatchValidationException("The AI-actor disable command is missing valid disable metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -396,12 +389,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(ApproveAiActorDisable), StringComparison.Ordinal))
         {
-            ApproveAiActorDisable commandPayload = command.Deserialize<ApproveAiActorDisable>(ReadOptions)
-                ?? throw new InvalidOperationException("The AI-actor disable approval command payload could not be read.");
+            ApproveAiActorDisable commandPayload = ReadPayload<ApproveAiActorDisable>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
                 string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("The AI-actor disable approval command is missing valid approval metadata.");
+                throw new CommandDispatchValidationException("The AI-actor disable approval command is missing valid approval metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -410,12 +402,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(SubmitCommandCapabilityDisable), StringComparison.Ordinal))
         {
-            SubmitCommandCapabilityDisable commandPayload = command.Deserialize<SubmitCommandCapabilityDisable>(ReadOptions)
-                ?? throw new InvalidOperationException("The command-capability disable command payload could not be read.");
+            SubmitCommandCapabilityDisable commandPayload = ReadPayload<SubmitCommandCapabilityDisable>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
                 string.IsNullOrWhiteSpace(commandPayload.CommandCapabilityRef))
             {
-                throw new InvalidOperationException("The command-capability disable command is missing valid disable metadata.");
+                throw new CommandDispatchValidationException("The command-capability disable command is missing valid disable metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -424,12 +415,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(ApproveCommandCapabilityDisable), StringComparison.Ordinal))
         {
-            ApproveCommandCapabilityDisable commandPayload = command.Deserialize<ApproveCommandCapabilityDisable>(ReadOptions)
-                ?? throw new InvalidOperationException("The command-capability disable approval command payload could not be read.");
+            ApproveCommandCapabilityDisable commandPayload = ReadPayload<ApproveCommandCapabilityDisable>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
                 string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("The command-capability disable approval command is missing valid approval metadata.");
+                throw new CommandDispatchValidationException("The command-capability disable approval command is missing valid approval metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -438,12 +428,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(SubmitOutboundChannelDisable), StringComparison.Ordinal))
         {
-            SubmitOutboundChannelDisable commandPayload = command.Deserialize<SubmitOutboundChannelDisable>(ReadOptions)
-                ?? throw new InvalidOperationException("The outbound-channel disable command payload could not be read.");
+            SubmitOutboundChannelDisable commandPayload = ReadPayload<SubmitOutboundChannelDisable>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
                 string.IsNullOrWhiteSpace(commandPayload.OutboundChannelRef))
             {
-                throw new InvalidOperationException("The outbound-channel disable command is missing valid disable metadata.");
+                throw new CommandDispatchValidationException("The outbound-channel disable command is missing valid disable metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -455,12 +444,11 @@ internal sealed class AcceptedCommandDispatcher(
         // the aggregate also enforce it (the two-person rule is enforced three times for the 7.18–7.24 disable cells).
         if (string.Equals(commandType, nameof(ApproveOutboundChannelDisable), StringComparison.Ordinal))
         {
-            ApproveOutboundChannelDisable commandPayload = command.Deserialize<ApproveOutboundChannelDisable>(ReadOptions)
-                ?? throw new InvalidOperationException("The outbound-channel disable approval command payload could not be read.");
+            ApproveOutboundChannelDisable commandPayload = ReadPayload<ApproveOutboundChannelDisable>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
                 string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("The outbound-channel disable approval command is missing valid approval metadata.");
+                throw new CommandDispatchValidationException("The outbound-channel disable approval command is missing valid approval metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -469,12 +457,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(SubmitOutboundChannelQuarantine), StringComparison.Ordinal))
         {
-            SubmitOutboundChannelQuarantine commandPayload = command.Deserialize<SubmitOutboundChannelQuarantine>(ReadOptions)
-                ?? throw new InvalidOperationException("The outbound-channel quarantine command payload could not be read.");
+            SubmitOutboundChannelQuarantine commandPayload = ReadPayload<SubmitOutboundChannelQuarantine>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
                 string.IsNullOrWhiteSpace(commandPayload.OutboundChannelRef))
             {
-                throw new InvalidOperationException("The outbound-channel quarantine command is missing valid quarantine metadata.");
+                throw new CommandDispatchValidationException("The outbound-channel quarantine command is missing valid quarantine metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -487,12 +474,11 @@ internal sealed class AcceptedCommandDispatcher(
         // quarantine cells).
         if (string.Equals(commandType, nameof(ApproveOutboundChannelQuarantine), StringComparison.Ordinal))
         {
-            ApproveOutboundChannelQuarantine commandPayload = command.Deserialize<ApproveOutboundChannelQuarantine>(ReadOptions)
-                ?? throw new InvalidOperationException("The outbound-channel quarantine approval command payload could not be read.");
+            ApproveOutboundChannelQuarantine commandPayload = ReadPayload<ApproveOutboundChannelQuarantine>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
                 string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("The outbound-channel quarantine approval command is missing valid approval metadata.");
+                throw new CommandDispatchValidationException("The outbound-channel quarantine approval command is missing valid approval metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -501,12 +487,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(SubmitCommandCapabilityQuarantine), StringComparison.Ordinal))
         {
-            SubmitCommandCapabilityQuarantine commandPayload = command.Deserialize<SubmitCommandCapabilityQuarantine>(ReadOptions)
-                ?? throw new InvalidOperationException("The command-capability quarantine command payload could not be read.");
+            SubmitCommandCapabilityQuarantine commandPayload = ReadPayload<SubmitCommandCapabilityQuarantine>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
                 string.IsNullOrWhiteSpace(commandPayload.CommandCapabilityRef))
             {
-                throw new InvalidOperationException("The command-capability quarantine command is missing valid quarantine metadata.");
+                throw new CommandDispatchValidationException("The command-capability quarantine command is missing valid quarantine metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -515,12 +500,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(ApproveCommandCapabilityQuarantine), StringComparison.Ordinal))
         {
-            ApproveCommandCapabilityQuarantine commandPayload = command.Deserialize<ApproveCommandCapabilityQuarantine>(ReadOptions)
-                ?? throw new InvalidOperationException("The command-capability quarantine approval command payload could not be read.");
+            ApproveCommandCapabilityQuarantine commandPayload = ReadPayload<ApproveCommandCapabilityQuarantine>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
                 string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("The command-capability quarantine approval command is missing valid approval metadata.");
+                throw new CommandDispatchValidationException("The command-capability quarantine approval command is missing valid approval metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -529,12 +513,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(SubmitAiActorQuarantine), StringComparison.Ordinal))
         {
-            SubmitAiActorQuarantine commandPayload = command.Deserialize<SubmitAiActorQuarantine>(ReadOptions)
-                ?? throw new InvalidOperationException("The AI-actor quarantine command payload could not be read.");
+            SubmitAiActorQuarantine commandPayload = ReadPayload<SubmitAiActorQuarantine>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
                 string.IsNullOrWhiteSpace(commandPayload.AiActorRef))
             {
-                throw new InvalidOperationException("The AI-actor quarantine command is missing valid quarantine metadata.");
+                throw new CommandDispatchValidationException("The AI-actor quarantine command is missing valid quarantine metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -543,12 +526,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(ApproveAiActorQuarantine), StringComparison.Ordinal))
         {
-            ApproveAiActorQuarantine commandPayload = command.Deserialize<ApproveAiActorQuarantine>(ReadOptions)
-                ?? throw new InvalidOperationException("The AI-actor quarantine approval command payload could not be read.");
+            ApproveAiActorQuarantine commandPayload = ReadPayload<ApproveAiActorQuarantine>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
                 string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("The AI-actor quarantine approval command is missing valid approval metadata.");
+                throw new CommandDispatchValidationException("The AI-actor quarantine approval command is missing valid approval metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -557,12 +539,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(SubmitServiceClientQuarantine), StringComparison.Ordinal))
         {
-            SubmitServiceClientQuarantine commandPayload = command.Deserialize<SubmitServiceClientQuarantine>(ReadOptions)
-                ?? throw new InvalidOperationException("The service-client quarantine command payload could not be read.");
+            SubmitServiceClientQuarantine commandPayload = ReadPayload<SubmitServiceClientQuarantine>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
                 string.IsNullOrWhiteSpace(commandPayload.ServiceClientRef))
             {
-                throw new InvalidOperationException("The service-client quarantine command is missing valid quarantine metadata.");
+                throw new CommandDispatchValidationException("The service-client quarantine command is missing valid quarantine metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -571,12 +552,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(ApproveServiceClientQuarantine), StringComparison.Ordinal))
         {
-            ApproveServiceClientQuarantine commandPayload = command.Deserialize<ApproveServiceClientQuarantine>(ReadOptions)
-                ?? throw new InvalidOperationException("The service-client quarantine approval command payload could not be read.");
+            ApproveServiceClientQuarantine commandPayload = ReadPayload<ApproveServiceClientQuarantine>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
                 string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("The service-client quarantine approval command is missing valid approval metadata.");
+                throw new CommandDispatchValidationException("The service-client quarantine approval command is missing valid approval metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -585,12 +565,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(SubmitMailboxSourceQuarantine), StringComparison.Ordinal))
         {
-            SubmitMailboxSourceQuarantine commandPayload = command.Deserialize<SubmitMailboxSourceQuarantine>(ReadOptions)
-                ?? throw new InvalidOperationException("The mailbox-source quarantine command payload could not be read.");
+            SubmitMailboxSourceQuarantine commandPayload = ReadPayload<SubmitMailboxSourceQuarantine>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
                 string.IsNullOrWhiteSpace(commandPayload.MailboxSourceRef))
             {
-                throw new InvalidOperationException("The mailbox-source quarantine command is missing valid quarantine metadata.");
+                throw new CommandDispatchValidationException("The mailbox-source quarantine command is missing valid quarantine metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -599,12 +578,11 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(ApproveMailboxSourceQuarantine), StringComparison.Ordinal))
         {
-            ApproveMailboxSourceQuarantine commandPayload = command.Deserialize<ApproveMailboxSourceQuarantine>(ReadOptions)
-                ?? throw new InvalidOperationException("The mailbox-source quarantine approval command payload could not be read.");
+            ApproveMailboxSourceQuarantine commandPayload = ReadPayload<ApproveMailboxSourceQuarantine>(command);
             if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
                 string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("The mailbox-source quarantine approval command is missing valid approval metadata.");
+                throw new CommandDispatchValidationException("The mailbox-source quarantine approval command is missing valid approval metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -613,15 +591,14 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(RequestFailedWorkflowRetry), StringComparison.Ordinal))
         {
-            RequestFailedWorkflowRetry retry = command.Deserialize<RequestFailedWorkflowRetry>(ReadOptions)
-                ?? throw new InvalidOperationException("The workflow-retry command payload could not be read.");
+            RequestFailedWorkflowRetry retry = ReadPayload<RequestFailedWorkflowRetry>(command);
             if (string.IsNullOrWhiteSpace(retry.RetryId) ||
                 string.IsNullOrWhiteSpace(retry.FailedEventId) ||
                 string.IsNullOrWhiteSpace(retry.FailedOperationClass) ||
                 string.IsNullOrWhiteSpace(retry.FailureReasonCode) ||
                 retry.ExpectedFailedSourceVersion <= 0)
             {
-                throw new InvalidOperationException("The workflow-retry command is missing its retry metadata.");
+                throw new CommandDispatchValidationException("The workflow-retry command is missing its retry metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(retry);
@@ -630,15 +607,14 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(RecordProjectConversationMessage), StringComparison.Ordinal))
         {
-            RecordProjectConversationMessage append = command.Deserialize<RecordProjectConversationMessage>(ReadOptions)
-                ?? throw new InvalidOperationException("The project conversation message append command payload could not be read.");
+            RecordProjectConversationMessage append = ReadPayload<RecordProjectConversationMessage>(command);
             if (string.IsNullOrWhiteSpace(append.ProjectId) ||
                 string.IsNullOrWhiteSpace(append.MessageId) ||
                 string.IsNullOrWhiteSpace(append.TextFingerprint) ||
                 append.TextLength <= 0 ||
                 string.IsNullOrWhiteSpace(append.CorrelationId))
             {
-                throw new InvalidOperationException("The project conversation message append command is missing valid metadata.");
+                throw new CommandDispatchValidationException("The project conversation message append command is missing valid metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(append);
@@ -650,8 +626,7 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(CancelAiResponseGeneration), StringComparison.Ordinal))
         {
-            CancelAiResponseGeneration cancel = command.Deserialize<CancelAiResponseGeneration>(ReadOptions)
-                ?? throw new InvalidOperationException("The AI response cancellation command payload could not be read.");
+            CancelAiResponseGeneration cancel = ReadPayload<CancelAiResponseGeneration>(command);
             if (string.IsNullOrWhiteSpace(cancel.ProjectId) ||
                 string.IsNullOrWhiteSpace(cancel.ConversationId) ||
                 string.IsNullOrWhiteSpace(cancel.ResponseId) ||
@@ -659,7 +634,7 @@ internal sealed class AcceptedCommandDispatcher(
                 string.IsNullOrWhiteSpace(cancel.CancellationId) ||
                 string.IsNullOrWhiteSpace(cancel.CorrelationId))
             {
-                throw new InvalidOperationException("The AI response cancellation command is missing valid metadata.");
+                throw new CommandDispatchValidationException("The AI response cancellation command is missing valid metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(cancel);
@@ -670,11 +645,14 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(ProposeAIAction), StringComparison.Ordinal))
         {
-            ProposeAIAction proposal = command.Deserialize<ProposeAIAction>(ReadOptions)
-                ?? throw new InvalidOperationException("The AI action proposal command payload could not be read.");
+            ProposeAIAction proposal = ReadPayload<ProposeAIAction>(command);
             if (string.IsNullOrWhiteSpace(proposal.TaskIntentId) ||
-                string.IsNullOrWhiteSpace(proposal.SourceMessageId) ||
-                context.RiskClassification?.Record is null)
+                string.IsNullOrWhiteSpace(proposal.SourceMessageId))
+            {
+                throw new CommandDispatchValidationException("The AI action proposal command is missing its source identity.");
+            }
+
+            if (context.RiskClassification?.Record is null)
             {
                 throw new InvalidOperationException("The AI action proposal command is missing its classification metadata.");
             }
@@ -685,12 +663,15 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal))
         {
-            ExecuteLowRiskAIAssistance execution = command.Deserialize<ExecuteLowRiskAIAssistance>(ReadOptions)
-                ?? throw new InvalidOperationException("The low-risk AI assistance execution command payload could not be read.");
+            ExecuteLowRiskAIAssistance execution = ReadPayload<ExecuteLowRiskAIAssistance>(command);
             if (string.IsNullOrWhiteSpace(execution.ExecutionId) ||
                 string.IsNullOrWhiteSpace(execution.ProposalId) ||
-                string.IsNullOrWhiteSpace(execution.ContextPackageId) ||
-                context.RiskClassification?.Record is null ||
+                string.IsNullOrWhiteSpace(execution.ContextPackageId))
+            {
+                throw new CommandDispatchValidationException("The low-risk AI assistance execution command is missing its identities.");
+            }
+
+            if (context.RiskClassification?.Record is null ||
                 context.ApprovalResult?.Kind is not ChatBotApprovalResultKind.AllowedLowRiskExecution)
             {
                 throw new InvalidOperationException("The low-risk AI assistance execution command is missing trusted admission metadata.");
@@ -710,8 +691,7 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(DecideAiActionApproval), StringComparison.Ordinal))
         {
-            DecideAiActionApproval decision = command.Deserialize<DecideAiActionApproval>(ReadOptions)
-                ?? throw new InvalidOperationException("The AI action approval decision command payload could not be read.");
+            DecideAiActionApproval decision = ReadPayload<DecideAiActionApproval>(command);
             if (string.IsNullOrWhiteSpace(decision.ProjectId) ||
                 string.IsNullOrWhiteSpace(decision.ApprovalId) ||
                 string.IsNullOrWhiteSpace(decision.ProposalId) ||
@@ -722,7 +702,7 @@ internal sealed class AcceptedCommandDispatcher(
                 string.IsNullOrWhiteSpace(decision.RationaleRedactionState) ||
                 string.IsNullOrWhiteSpace(decision.SchemaVersion))
             {
-                throw new InvalidOperationException("The AI action approval decision command is missing trusted decision metadata.");
+                throw new CommandDispatchValidationException("The AI action approval decision command is missing valid decision metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(decision);
@@ -731,16 +711,19 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(ExecuteApprovedAIAction), StringComparison.Ordinal))
         {
-            ExecuteApprovedAIAction execution = command.Deserialize<ExecuteApprovedAIAction>(ReadOptions)
-                ?? throw new InvalidOperationException("The approved AI action execution command payload could not be read.");
+            ExecuteApprovedAIAction execution = ReadPayload<ExecuteApprovedAIAction>(command);
             IApprovedAiActionCommandAllowlist allowlist = approvedAiActionAllowlist
                 ?? new ApprovedAiActionCommandAllowlist();
             if (string.IsNullOrWhiteSpace(execution.ExecutionId) ||
                 string.IsNullOrWhiteSpace(execution.ProposalId) ||
                 string.IsNullOrWhiteSpace(execution.ApprovalId) ||
                 string.IsNullOrWhiteSpace(execution.SourceMessageId) ||
-                string.IsNullOrWhiteSpace(execution.CommandName) ||
-                !allowlist.IsAllowed(execution.CommandName, execution.CommandAllowlistVersion))
+                string.IsNullOrWhiteSpace(execution.CommandName))
+            {
+                throw new CommandDispatchValidationException("The approved AI action execution command is missing valid command metadata.");
+            }
+
+            if (!allowlist.IsAllowed(execution.CommandName, execution.CommandAllowlistVersion))
             {
                 throw new InvalidOperationException("The approved AI action execution command is missing trusted allowlist metadata.");
             }
@@ -798,14 +781,13 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(MarkAiActionProposalInvalidatedByCorrection), StringComparison.Ordinal))
         {
-            MarkAiActionProposalInvalidatedByCorrection invalidation = command.Deserialize<MarkAiActionProposalInvalidatedByCorrection>(ReadOptions)
-                ?? throw new InvalidOperationException("The AI action proposal invalidation command payload could not be read.");
+            MarkAiActionProposalInvalidatedByCorrection invalidation = ReadPayload<MarkAiActionProposalInvalidatedByCorrection>(command);
             if (string.IsNullOrWhiteSpace(invalidation.ProposalId) ||
                 string.IsNullOrWhiteSpace(invalidation.SourceMessageId) ||
                 string.IsNullOrWhiteSpace(invalidation.AssociationId) ||
                 string.IsNullOrWhiteSpace(invalidation.CorrectionId))
             {
-                throw new InvalidOperationException("The AI action proposal invalidation command is missing correction lineage metadata.");
+                throw new CommandDispatchValidationException("The AI action proposal invalidation command is missing correction lineage metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(invalidation);
@@ -814,15 +796,14 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(CreateOutboundDraft), StringComparison.Ordinal))
         {
-            CreateOutboundDraft draft = command.Deserialize<CreateOutboundDraft>(ReadOptions)
-                ?? throw new InvalidOperationException("The outbound draft creation command payload could not be read.");
+            CreateOutboundDraft draft = ReadPayload<CreateOutboundDraft>(command);
             if (string.IsNullOrWhiteSpace(draft.DraftId) ||
                 string.IsNullOrWhiteSpace(draft.ProjectId) ||
                 string.IsNullOrWhiteSpace(draft.RequesterId) ||
                 string.IsNullOrWhiteSpace(draft.PolicySnapshotId) ||
                 draft.GovernedContent is null)
             {
-                throw new InvalidOperationException("The outbound draft creation command is missing governed draft metadata.");
+                throw new CommandDispatchValidationException("The outbound draft creation command is missing governed draft metadata.");
             }
 
             var classification = OutboundDraftAuthorityEvaluator.Classify(draft, context.Actor.Principal, context.TenantBinding.TenantId);
@@ -838,14 +819,13 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(RequestOutboundSendApproval), StringComparison.Ordinal))
         {
-            RequestOutboundSendApproval request = command.Deserialize<RequestOutboundSendApproval>(ReadOptions)
-                ?? throw new InvalidOperationException("The outbound approval request command payload could not be read.");
+            RequestOutboundSendApproval request = ReadPayload<RequestOutboundSendApproval>(command);
             if (string.IsNullOrWhiteSpace(request.ApprovalId) ||
                 string.IsNullOrWhiteSpace(request.DraftId) ||
                 string.IsNullOrWhiteSpace(request.ProjectId) ||
                 request.ContentSnapshot is null)
             {
-                throw new InvalidOperationException("The outbound approval request command is missing approval metadata.");
+                throw new CommandDispatchValidationException("The outbound approval request command is missing approval metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(request);
@@ -854,15 +834,14 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(DecideOutboundApproval), StringComparison.Ordinal))
         {
-            DecideOutboundApproval decision = command.Deserialize<DecideOutboundApproval>(ReadOptions)
-                ?? throw new InvalidOperationException("The outbound approval decision command payload could not be read.");
+            DecideOutboundApproval decision = ReadPayload<DecideOutboundApproval>(command);
             if (string.IsNullOrWhiteSpace(decision.ApprovalId) ||
                 string.IsNullOrWhiteSpace(decision.DraftId) ||
                 string.IsNullOrWhiteSpace(decision.ProjectId) ||
                 string.IsNullOrWhiteSpace(decision.DecisionId) ||
                 decision.ExpectedApprovalSourceVersion <= 0)
             {
-                throw new InvalidOperationException("The outbound approval decision command is missing decision metadata.");
+                throw new CommandDispatchValidationException("The outbound approval decision command is missing decision metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(decision);
@@ -871,8 +850,7 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(ExecuteApprovedOutboundDraft), StringComparison.Ordinal))
         {
-            ExecuteApprovedOutboundDraft send = command.Deserialize<ExecuteApprovedOutboundDraft>(ReadOptions)
-                ?? throw new InvalidOperationException("The outbound send command payload could not be read.");
+            ExecuteApprovedOutboundDraft send = ReadPayload<ExecuteApprovedOutboundDraft>(command);
             if (string.IsNullOrWhiteSpace(send.SendId) ||
                 string.IsNullOrWhiteSpace(send.DraftId) ||
                 string.IsNullOrWhiteSpace(send.ApprovalId) ||
@@ -880,7 +858,7 @@ internal sealed class AcceptedCommandDispatcher(
                 send.ExpectedApprovalSourceVersion <= 0 ||
                 send.ExpectedDraftSourceVersion <= 0)
             {
-                throw new InvalidOperationException("The outbound send command is missing trusted send metadata.");
+                throw new CommandDispatchValidationException("The outbound send command is missing valid send metadata.");
             }
 
             SenderAuthorityClassificationResult authority = OutboundSendAuthorityEvaluator.Classify(
@@ -1008,15 +986,14 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(CorrectEmailProjectAssociation), StringComparison.Ordinal))
         {
-            CorrectEmailProjectAssociation payload = command.Deserialize<CorrectEmailProjectAssociation>(ReadOptions)
-                ?? throw new InvalidOperationException("The association-correction command payload could not be read.");
+            CorrectEmailProjectAssociation payload = ReadPayload<CorrectEmailProjectAssociation>(command);
             ValidateAssociationDecision(payload.AssociationId, payload.IntakeId, payload.SourceVersion, payload.SchemaVersion);
             if (string.IsNullOrWhiteSpace(payload.PriorProjectId) ||
                 string.IsNullOrWhiteSpace(payload.TargetProjectId) ||
                 string.IsNullOrWhiteSpace(payload.PredecessorAssociationId) ||
                 string.IsNullOrWhiteSpace(payload.CandidateEvidenceFingerprint))
             {
-                throw new InvalidOperationException("The association-correction command is missing its correction metadata.");
+                throw new CommandDispatchValidationException("The association-correction command is missing its correction metadata.");
             }
 
             long propagationSourceVersion = payload.SourceVersion + 1;
@@ -1065,6 +1042,26 @@ internal sealed class AcceptedCommandDispatcher(
             ? element
             : JsonSerializer.SerializeToElement(command, ReadOptions);
 
+    private static T ReadPayload<T>(JsonElement command)
+        where T : class
+    {
+        const string message = "The command payload could not be read.";
+        if (command.ValueKind != JsonValueKind.Object)
+        {
+            throw new CommandDispatchValidationException(message);
+        }
+
+        try
+        {
+            return command.Deserialize<T>(ReadOptions)
+                ?? throw new CommandDispatchValidationException(message);
+        }
+        catch (JsonException exception)
+        {
+            throw new CommandDispatchValidationException(message, exception);
+        }
+    }
+
     private static bool IsAssociationDecisionCommand(string commandType)
         => commandType is nameof(AssociateEmailToProject)
             or nameof(RejectEmailProjectAssociation)
@@ -1078,12 +1075,11 @@ internal sealed class AcceptedCommandDispatcher(
     {
         if (string.Equals(commandType, nameof(AssociateEmailToProject), StringComparison.Ordinal))
         {
-            AssociateEmailToProject payload = command.Deserialize<AssociateEmailToProject>(ReadOptions)
-                ?? throw new InvalidOperationException("The association-decision command payload could not be read.");
+            AssociateEmailToProject payload = ReadPayload<AssociateEmailToProject>(command);
             ValidateAssociationDecision(payload.AssociationId, payload.IntakeId, payload.SourceVersion, payload.SchemaVersion);
             if (string.IsNullOrWhiteSpace(payload.ProjectId))
             {
-                throw new InvalidOperationException("The association-decision command is missing its selected project identity.");
+                throw new CommandDispatchValidationException("The association-decision command is missing its selected project identity.");
             }
 
             IngestionBindingRequest binding = new(
@@ -1107,24 +1103,21 @@ internal sealed class AcceptedCommandDispatcher(
 
         if (string.Equals(commandType, nameof(RejectEmailProjectAssociation), StringComparison.Ordinal))
         {
-            RejectEmailProjectAssociation payload = command.Deserialize<RejectEmailProjectAssociation>(ReadOptions)
-                ?? throw new InvalidOperationException("The association-decision command payload could not be read.");
+            RejectEmailProjectAssociation payload = ReadPayload<RejectEmailProjectAssociation>(command);
             ValidateAssociationDecision(payload.AssociationId, payload.IntakeId, payload.SourceVersion, payload.SchemaVersion);
             return new EventStoreDispatchPlan(payload.AssociationId, commandType, JsonSerializer.SerializeToElement(payload));
         }
 
         if (string.Equals(commandType, nameof(DeferEmailProjectAssociation), StringComparison.Ordinal))
         {
-            DeferEmailProjectAssociation payload = command.Deserialize<DeferEmailProjectAssociation>(ReadOptions)
-                ?? throw new InvalidOperationException("The association-decision command payload could not be read.");
+            DeferEmailProjectAssociation payload = ReadPayload<DeferEmailProjectAssociation>(command);
             ValidateAssociationDecision(payload.AssociationId, payload.IntakeId, payload.SourceVersion, payload.SchemaVersion);
             return new EventStoreDispatchPlan(payload.AssociationId, commandType, JsonSerializer.SerializeToElement(payload));
         }
 
         if (string.Equals(commandType, nameof(MarkEmailAssociationNeedsReview), StringComparison.Ordinal))
         {
-            MarkEmailAssociationNeedsReview payload = command.Deserialize<MarkEmailAssociationNeedsReview>(ReadOptions)
-                ?? throw new InvalidOperationException("The association-decision command payload could not be read.");
+            MarkEmailAssociationNeedsReview payload = ReadPayload<MarkEmailAssociationNeedsReview>(command);
             ValidateAssociationDecision(payload.AssociationId, payload.IntakeId, payload.SourceVersion, payload.SchemaVersion);
             return new EventStoreDispatchPlan(payload.AssociationId, commandType, JsonSerializer.SerializeToElement(payload));
         }
@@ -1143,7 +1136,7 @@ internal sealed class AcceptedCommandDispatcher(
             sourceVersion <= 0 ||
             string.IsNullOrWhiteSpace(schemaVersion))
         {
-            throw new InvalidOperationException("The association-decision command is missing its aggregate or source identity.");
+            throw new CommandDispatchValidationException("The association-decision command is missing its aggregate or source identity.");
         }
     }
 
