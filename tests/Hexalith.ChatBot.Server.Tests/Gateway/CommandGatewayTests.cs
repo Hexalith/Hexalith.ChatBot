@@ -1375,6 +1375,59 @@ public sealed partial class CommandGatewayTests
     }
 
     [Fact]
+    public void RetentionConfigurationChangePreCommitAuditIncludesSnapshotAndWindowEvidence()
+    {
+        AuditEnvelope envelope = AuditEnvelopeFactory.PreCommit(
+            DirectContext(RetentionConfigurationChangeCommand(), "01ARZ3NDEKTSV4RRFFQ69G5FAY"),
+            new LifecycleTransitionDefinition(LifecycleStates.Received, LifecycleStates.Proposed),
+            new FixedClock().UtcNow);
+
+        envelope.Phase.ShouldBe(AuditCommitPhase.PreCommit);
+        foreach (string reference in new[]
+        {
+            "admin-operation:submit-retention-change", "admin-scope:compliance", "retention-change:retention-change-001",
+            "retention-snapshot:retention-snapshot-current", "retention-snapshot:retention-snapshot-proposed",
+            "retention-old-fingerprint:sha256:oldretentionfingerprint001", "retention-new-fingerprint:sha256:newretentionfingerprint001",
+            $"retention-class:{ComplianceRetentionClassIds.SourceEmailMetadata}", $"retention-class:{ComplianceRetentionClassIds.AuditRecords}",
+            "retention-window:source-email-metadata-window", "retention-window:audit-records-window",
+        })
+        {
+            envelope.SourceEvidenceRefs.ShouldContain(reference);
+        }
+    }
+
+    [Fact]
+    public void InventoryChangePreCommitAuditIncludesSnapshotAndClassificationEvidence()
+    {
+        SubmitDataClassInventoryChange command = DataClassInventoryChangeCommand();
+        AuditEnvelope envelope = AuditEnvelopeFactory.PreCommit(
+            DirectContext(command, "01ARZ3NDEKTSV4RRFFQ69G5FAY"),
+            new LifecycleTransitionDefinition(LifecycleStates.Received, LifecycleStates.Proposed),
+            new FixedClock().UtcNow);
+
+        envelope.Phase.ShouldBe(AuditCommitPhase.PreCommit);
+        foreach (string reference in new[]
+        {
+            "admin-operation:submit-data-class-inventory-change", "admin-scope:compliance", "inventory-change:inventory-change-001",
+            "inventory-snapshot:inventory-snapshot-current", "inventory-snapshot:inventory-snapshot-proposed",
+            "inventory-old-fingerprint:sha256:oldinventoryfingerprint001", "inventory-new-fingerprint:sha256:newinventoryfingerprint001",
+        })
+        {
+            envelope.SourceEvidenceRefs.ShouldContain(reference);
+        }
+
+        foreach (var classification in command.ChangeSet.Classifications)
+        {
+            envelope.SourceEvidenceRefs.ShouldContain($"data-class:{classification.DataClassId}");
+            envelope.SourceEvidenceRefs.ShouldContain($"retention-class:{classification.RetentionClassId}");
+            envelope.SourceEvidenceRefs.ShouldContain($"owner-role:{classification.OwnerRole}");
+            envelope.SourceEvidenceRefs.ShouldContain($"deletion-behavior:{classification.DeletionBehavior}");
+            envelope.SourceEvidenceRefs.ShouldContain($"export-eligibility:{classification.ExportEligibility}");
+            envelope.SourceEvidenceRefs.ShouldContain($"redaction-sensitivity:{classification.RedactionSensitivity}");
+        }
+    }
+
+    [Fact]
     public async Task PreCommitAuditUnavailableShouldQueueReplayAlertAndNeverDispatch()
     {
         RecordingDispatcher dispatcher = new();
