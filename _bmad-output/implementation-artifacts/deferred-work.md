@@ -371,6 +371,7 @@ location: Architecture/DevOps with observability
 severity: medium
 reason: **[MEDIUM · `RV-EVIDENCE-KINDS`] Missing logs/traces/metrics/state-end-state evidence kinds remain a platform residual.** Chunk 1d owes only stamping `RV-EVIDENCE-KINDS` on manifests (patch); producing the artifacts stays deferred. **Release-claim impact:** as on the existing `RV-EVIDENCE-KINDS` entry. **Owner:** Architecture/DevOps with observability. **Closure evidence:** per existing residual.
 status: open
+triage: 2026-11-24 Skipped. Required residual stamps already ship. The outstanding artifact collection is tracked in DW-59.
 
 ### DW-41: [LOW · Aspire/E2E options] `EventStoreDurableStateProbe` uses fixed 30s/250ms/10s bounds unbound from `LiveRecoveryValidationOptions.RestorationTimeout`.
 
@@ -397,6 +398,7 @@ location: provider-integration / `RV-PROVIDER-SCALE`
 severity: medium
 reason: **[MEDIUM · `RV-PROVIDER-SCALE`] NFR59 unauthorized-mutation / cross-tenant flags remain structurally unreachable for the four sandbox deps.** Fault/commit pairs are mutually exclusive by stub design; foreign-tenant effect writes are blocked by `Authorized`. Already covered by chunk 1b decision 2. **Release-claim impact:** do not treat sandbox Contained NFR59 flags as product isolation proof. **Owner:** provider-integration / `RV-PROVIDER-SCALE`. **Closure evidence:** per existing residual.
 status: open
+triage: 2026-11-24 Skipped. Requires product-composed dependency faulting and real authorization/end-state measurements under DW-57.
 
 ### DW-44: [MEDIUM · `RV-PROVIDER-SCALE`] NFR58 `scope_escape` remains unreachable on the four-dep happy path.
 
@@ -405,6 +407,7 @@ location: `RV-PROVIDER-SCALE`
 severity: medium
 reason: **[MEDIUM · `RV-PROVIDER-SCALE`] NFR58 `scope_escape` remains unreachable on the four-dep happy path.** Exercises emit the canonical signal; the monitor maps that signal to the ExpectedScope value. **Release-claim impact:** sandbox Contained must not be cited as product scope-containment proof. **Owner:** `RV-PROVIDER-SCALE`. **Closure evidence:** per existing residual.
 status: open
+triage: 2026-11-24 Skipped. Requires a product scope observation path under DW-57. The sandbox scope mapping is fixed by design.
 
 ### DW-45: [MEDIUM · chunk 1a/1b carry] NFR41 stamps are sandbox self-timing (control POST / `UtcNow` + 200 ms poll), not product monitoring evidence.
 
@@ -413,6 +416,7 @@ location: Story 12.15 evidence-integrity (driver + monitor)
 severity: medium
 reason: **[MEDIUM · chunk 1a/1b carry] NFR41 stamps are sandbox self-timing (control POST / `UtcNow` + 200 ms poll), not product monitoring evidence.** Continues the open driver/monitor honesty residual. **Release-claim impact:** NFR41 figures remain provisional. **Owner:** Story 12.15 evidence-integrity (driver + monitor). **Closure evidence:** honest observation clocks or explicit unmeasurable when product monitoring is absent.
 status: open
+triage: 2026-11-24 Skipped. The scoped-outage lane has no independently published product-monitoring clocks. The current gate requires NFR41 measurements.
 
 ### DW-46: [LOW · Aspire continuity ops] Subscription simulator restore does not reset absolute processing counters.
 
@@ -430,6 +434,7 @@ location: performance/capacity and provider-integration owners
 severity: medium
 reason: **[MEDIUM · `RV-PROVIDER-SCALE` · decision 2] Four generic scoped deps remain sandbox-contract Contained.** Administrator chose option 2 (2026-08-03): keep provisional-live sandbox evidence; claim narrowing recorded on the existing `RV-PROVIDER-SCALE` entry (see 2026-08-03 update). **Release-claim impact:** as on that entry. **Owner:** performance/capacity and provider-integration owners. **Closure evidence:** product-composed client paths for the four tokens under the same gate.
 status: open
+triage: 2026-11-24 Skipped. Requires product-composed provider fault seams under DW-57. The approved sandbox contract remains provisional.
 
 ### DW-48: [HIGH · `RV-MEASURABLE-CEILING`] Tier-3 E2E sets `RestorationTimeout = 3 minutes` while A10/NFR56 `MaxRto` remains 4 hours.
 
@@ -530,6 +535,7 @@ location: performance/capacity and provider-integration owners
 severity: medium
 reason: **[MEDIUM · `RV-PROVIDER-SCALE` · provider, product-composition, and workload scale] Local provider/component contract implementations and the configured six-record baseline do not represent product DI composition, production volume, latency, replicas, quotas, or regional failure modes.** Story 12.15 proves bounded contract behavior only. The baseline is **not** fully materialized: of its six categories, only `sourceRecords` and `wormAuditRecords` become real entities that are seeded, projected or compared; `governedCommands`, `approvals`, `policySnapshots` and `attachmentMetadata` are parsed into inert records that are never observed. Evidence no longer presents the configured corpus as exercised coverage: `configuredDatasetVolume` carries the six-record provenance, continuity and scoped-outage manifests publish `datasetVolume: 0`, and projection rebuild publishes the actual compared-resource count. Retained hosted evidence of this same bounded, non-production-shaped contract behavior now exists — see release run `33066358280` / evidence `01M11EYSDMP1ZF38B7KZA1A6FA` (2026-08-27) in `.decision-log.md` — but it is hosted proof of the same local-provider/sandbox-scale limitations described below, not a step toward production-shaped coverage; that gap is unaffected. **Update 2026-08-02:** the round-2 evidence-integrity remediation genuinely materialized `attachmentMetadata` — `attachment-processing` now runs through the real `AttachmentCaptureCoordinator` against a seeded projection candidate — though the candidate is exercise-seeded rather than sourced from the dataset file's own attachment record. `governedCommands`, `approvals`, and `policySnapshots` remain unmaterialized as described above. **Update 2026-08-03 (chunk 1b decision 2):** Contained for `ai-provider`, `command-execution`, `audit-store`, and `attachment-processing` is **sandbox-contract** evidence only — Aspire ops `fault`/`process`/`restore` the recovery-sandbox and trust that JSON (including NFR41 stamps and safety flags); ChatBot's real dependency clients are not the faulted seam. Independent control succeeding during `audit-store` is expected under this harness shape and must not be read as product audit fail-closed proof. **Update 2026-08-04:** the manifest/gate split closes the evidence-labeling defect only; it does not materialize the remaining categories or close the scale residual. **Release-claim impact:** local provider/rebuild timings cannot be advertised as production performance or capacity evidence; do not claim product DI composition, real AI-provider outage behavior, product command-execution path, or ChatBot audit-store fail-closed mutation from the Tier-3 sandbox Contained sweep for those four tokens. **Owner:** performance/capacity and provider-integration owners. **Closure evidence:** retained load-profile evidence at an approved production-shaped dataset and replica count, including product-composed provider paths (ChatBot client seams for the four tokens), quota/latency/failure modes, target measurements, isolation/end-state assertions, and the same manifest provenance.
 status: open
+triage: 2026-11-24 Skipped. Requires an approved production workload, replica and failure profile with retained product evidence.
 decision: 2026-08-27 Build production-shaped lane — Exercise product-composed clients at an approved dataset, replica count, quota, latency, and regional failure profile with retained end-state evidence.
 decision: 2026-08-26 Build production-shaped lane — Exercise product-composed clients at an approved dataset, replica count, quota, latency, and regional failure profile with retained end-state evidence.
 
@@ -551,6 +557,7 @@ location: src/Hexalith.ChatBot.Server/Audit/RecoveryValidationEvidenceManifest.c
 severity: medium
 reason: **[MEDIUM · `RV-EVIDENCE-KINDS` · the retained evidence bundle carries no logs, traces, metrics or state-store end-state] The manifest requires only `test-output` and `reports`.** Task 2 and the "Evidence is retained and reviewable" obligation originally required links to raw CI artifacts, logs, traces, metrics, state-store end-state and test output; `RecoveryValidationEvidenceManifest` requires two kinds, and both workflows upload `TestResults` only. Requiring the other four did not make them exist — it guaranteed every manifest carried syntactically valid links to nothing, which `IsSafeArtifactLocator` (a syntax check) cannot detect. Round 5 narrowed the obligation to what the lane produces rather than leaving the documents asserting six. **Release-claim impact:** a reviewer investigating a failed or disputed run has the `.trx` and the retained reports/manifests only; there is no trace, metric or state-store end-state evidence to corroborate a verdict, so a disputed measurement cannot be independently reconstructed from the artifact. **Owner:** Architecture/DevOps with observability. **Closure evidence:** the lane emits OTLP traces and metrics plus a state-store end-state dump into `TestResults`, both workflows upload them, the manifest requires the full vocabulary again, and a test asserts each required locator resolves to a file the workflow actually produces. [`src/Hexalith.ChatBot.Server/Audit/RecoveryValidationEvidenceManifest.cs`, `.github/workflows/ci.yml`, `.github/workflows/release.yml`]
 status: open
+triage: 2026-11-24 Skipped. Requires live collection of sanitized telemetry, state snapshots and verified hosted artifact retention.
 
 ### DW-60: [LOW] `TierThreeParallelValidationShouldRetainEveryNonCancellationSiblingFailure` is a flaky concurrency test.
 
@@ -576,7 +583,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: _bmad-output/implementation-artifacts/deferred-work.md:7-10
 severity: medium
 reason: **[MEDIUM] The `RV-*` entries' "Release-claim impact: do not claim …" constraints have no enforcement point.** Each of the four Story 12.15 residuals above states prohibited claims (external-M365 disaster-recovery equivalence, durable audit-chain disaster recovery, Kubernetes/platform recovery automation, production performance/capacity), but nothing in the release workflow, the evidence gate, or the release-notes path checks that those claims are absent from shipped material. The constraint lives only as ledger prose. Release-claim impact: a prohibited disaster-recovery claim can ship with no gate catching it. Closure evidence: a named owner plus a defined checkpoint (release-notes review step or claim validator) where each open residual's prohibited-claim list is checked. Pre-existing: this ledger format predates Story 12.15. [`_bmad-output/implementation-artifacts/deferred-work.md:7-10`]
-status: open
+status: done 2026-11-24
+resolution: The release procedure assigns Architecture/DevOps sign-off and records the target revision, retained artifact, scope and verdict. The checklist blocks broader claims until the matching recovery residual has qualified evidence.
 
 ### DW-63: [HIGH · pre-existing production binding] The scheduled controls still read and emit only through process-local defaults.
 

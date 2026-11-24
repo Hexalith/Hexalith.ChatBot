@@ -52,6 +52,22 @@ hook runs the complete recovery project with its 250-minute in-process deadline,
 and 300-minute step limit. Enable it only after the shared 330-minute job allowance has been released.
 After CiCd adoption, run `python3 references/Hexalith.Builds/check.py` successfully before each push.
 
+## Recovery claims in release notes
+
+Before publication, the release owner sends draft recovery claims and their retained evidence
+to Architecture/DevOps for sign-off. Architecture/DevOps records the release revision, artifact
+locator, claimed scope and verdict in the [decision log](_bmad-output/planning-artifacts/.decision-log.md). A release may include
+a sandbox result with its measured scope and limits. The following broader claims require closure
+of the corresponding residual in the [recovery ADR](docs/adrs/live-recovery-validation-drivers.md).
+
+| Claim | Required evidence |
+| --- | --- |
+| External Microsoft 365 or Graph disaster recovery | Close `RV-EXT-M365` with the retained, authorized Graph test-tenant drill. |
+| Durable audit-chain, storage or KMS disaster recovery | Close `RV-DURABLE-WORM` with retained failure, restoration, chain verification and end-state evidence. |
+| Kubernetes or production orchestration and replica coordination | Close `RV-PROD-CONTROL` with an authorized multi-replica platform drill and non-overlap evidence. |
+| Production workload capacity, latency, provider coverage or isolation | Close `RV-PROVIDER-SCALE` with the approved production-shaped profile and end-state evidence. |
+| Recovery or rebuild at the full target | Close `RV-MEASURABLE-CEILING` with retained full-window evidence and review the target's gate limitations. |
+
 ## Aspire and DAPR
 
 The retained AppHost is a local-development umbrella only. It wires ChatBot with EventStore, Tenants, Keycloak, and DAPR sidecars while reusable hosting behavior stays in the EventStore DomainService SDK.
