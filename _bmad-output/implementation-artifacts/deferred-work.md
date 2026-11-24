@@ -2191,6 +2191,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: An empty association-id load dispatches failure without the generation guard used for other load failures.
   evidence: `AssociationReviewEffects.HandleLoadAsync` returns after `AssociationReviewFailedAction("association-id-required")` without `DispatchLoadFailure`. UI review effects, not this story.
+  resolution: Resolved 2026-11-24. Blank loads share the effect's generation guard and carry the originating load into the reducer so a queued failure cannot replace a newer route. The current blank route still reports the required ID. The association-review effects and state test classes passed all 79 cases.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: The bound Memories probe helper throws if JSON omits `command` instead of returning 403.

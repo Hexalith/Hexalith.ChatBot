@@ -48,6 +48,39 @@ public sealed class AssociationReviewEffectsTests
         AssociationReviewFailureCatalog.IsRetryable(failed.ErrorCode).ShouldBeFalse();
     }
 
+    /// <summary>A blank-ID failure can reach the reducer after a newer route was selected.</summary>
+    [Fact]
+    public async Task StaleBlankAssociationFailureShouldNotOverwriteNewerRoute()
+    {
+        RecordingClient client = new();
+        LoadAssociationReviewAction blankLoad = new(" ");
+        AssociationReviewState current = AssociationReviewReducers.ReduceLoad(StateOf(client), blankLoad);
+        AssociationReviewEffects effects = EffectsFor(client, current);
+        RecordingDispatcher dispatcher = new();
+
+        await effects.HandleLoadAsync(blankLoad, dispatcher);
+        AssociationReviewFailedAction failure = dispatcher.Actions.ShouldHaveSingleItem().ShouldBeOfType<AssociationReviewFailedAction>();
+        current = AssociationReviewReducers.ReduceLoad(current, new LoadAssociationReviewAction("new-association"));
+
+        AssociationReviewState result = AssociationReviewReducers.ReduceFailed(current, failure);
+        result.ShouldBeSameAs(current);
+        result.IsLoading.ShouldBeTrue();
+        result.ErrorCode.ShouldBeNull();
+    }
+
+    /// <summary>A stale blank-ID effect cannot supersede a route already selected by its load reducer.</summary>
+    [Fact]
+    public async Task SupersededBlankAssociationLoadShouldNotPublishFailure()
+    {
+        RecordingClient client = new();
+        AssociationReviewState current = AssociationReviewReducers.ReduceLoad(StateOf(client), new LoadAssociationReviewAction("new-association"));
+        RecordingDispatcher dispatcher = new();
+
+        await EffectsFor(client, current).HandleLoadAsync(new LoadAssociationReviewAction(" "), dispatcher);
+
+        dispatcher.Actions.ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -75,6 +108,39 @@ public sealed class AssociationReviewEffectsTests
         await earlier.ConfigureAwait(true);
         dispatcher.Actions.ShouldHaveSingleItem().ShouldBeOfType<AssociationReviewFailedAction>()
             .ErrorCode.ShouldBe("association-id-required");
+    }
+
+    /// <summary>A result dispatched by the previous load cannot overwrite the newer blank route at reduction.</summary>
+    /// <param name="failPreviousLoad">Whether the prior request returns a failure instead of a review.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DelayedPreviousResultShouldNotOverwriteBlankRoute(bool failPreviousLoad)
+    {
+        RecordingClient client = new();
+        LoadAssociationReviewAction previous = new("old-association");
+        AssociationReviewState current = AssociationReviewReducers.ReduceLoad(StateOf(client), previous);
+        if (failPreviousLoad)
+        {
+            client.PendingRoutingRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            client.PendingRoutingRead.SetException(new TimeoutException("previous failure"));
+        }
+
+        RecordingDispatcher dispatcher = new();
+        await EffectsFor(client, current).HandleLoadAsync(previous, dispatcher);
+        object previousResult = dispatcher.Actions.ShouldHaveSingleItem();
+        LoadAssociationReviewAction blank = new(" ");
+        current = AssociationReviewReducers.ReduceLoad(current, blank);
+        dispatcher.Actions.Clear();
+        await EffectsFor(client, current).HandleLoadAsync(blank, dispatcher);
+        AssociationReviewFailedAction blankResult = dispatcher.Actions.ShouldHaveSingleItem().ShouldBeOfType<AssociationReviewFailedAction>();
+        AssociationReviewState blankState = AssociationReviewReducers.ReduceFailed(current, blankResult);
+
+        AssociationReviewState afterPrevious = failPreviousLoad
+            ? AssociationReviewReducers.ReduceFailed(blankState, previousResult.ShouldBeOfType<AssociationReviewFailedAction>())
+            : AssociationReviewReducers.ReduceLoaded(blankState, previousResult.ShouldBeOfType<AssociationReviewLoadedAction>());
+        afterPrevious.ShouldBeSameAs(blankState);
+        afterPrevious.ErrorCode.ShouldBe("association-id-required");
     }
 
     [Theory]

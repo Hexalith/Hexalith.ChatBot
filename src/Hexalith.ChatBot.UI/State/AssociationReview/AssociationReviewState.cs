@@ -13,6 +13,9 @@ public sealed record AssociationReviewState(
     string? PendingDecisionCode = null,
     AssociationOperationIdentity? LastAcceptedOperation = null)
 {
+    /// <summary>Gets the exact load action that established the current route.</summary>
+    internal LoadAssociationReviewAction? CurrentLoad { get; init; }
+
     public AssociationCandidateModel? SelectedCandidate
         => Review?.Candidates.FirstOrDefault(candidate => string.Equals(candidate.ProjectId, SelectedCandidateId, StringComparison.Ordinal));
 

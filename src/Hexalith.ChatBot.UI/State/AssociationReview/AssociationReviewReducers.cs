@@ -18,6 +18,7 @@ public static class AssociationReviewReducers
         return state with
         {
             IsLoading = true,
+            CurrentLoad = action,
             Review = sameAssociation ? state.Review : null,
             SelectedCandidateId = sameAssociation ? state.SelectedCandidateId : null,
             DecisionNote = sameAssociation ? state.DecisionNote : string.Empty,
@@ -36,6 +37,11 @@ public static class AssociationReviewReducers
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
 
+        if (action.OriginatingLoad is { } load && !ReferenceEquals(state.CurrentLoad, load))
+        {
+            return state;
+        }
+
         return state with
         {
             IsLoading = false,
@@ -52,6 +58,11 @@ public static class AssociationReviewReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
+        if (action.OriginatingLoad is { } load && !ReferenceEquals(state.CurrentLoad, load))
+        {
+            return state;
+        }
+
         return state with
         {
             IsLoading = false,

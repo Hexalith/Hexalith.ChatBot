@@ -25,10 +25,16 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
         ArgumentNullException.ThrowIfNull(action);
         ArgumentNullException.ThrowIfNull(dispatcher);
 
+        LoadAssociationReviewAction? currentLoad = _state.Value.CurrentLoad;
+        if (currentLoad is not null && !ReferenceEquals(currentLoad, action))
+        {
+            return;
+        }
+
         long generation = Interlocked.Increment(ref _loadGeneration);
         if (string.IsNullOrWhiteSpace(action.AssociationId))
         {
-            dispatcher.Dispatch(new AssociationReviewFailedAction("association-id-required"));
+            DispatchLoadFailure(generation, "association-id-required", dispatcher, action);
             return;
         }
 
@@ -45,7 +51,7 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
                 return;
             }
 
-            dispatcher.Dispatch(new AssociationReviewLoadedAction(review));
+            dispatcher.Dispatch(new AssociationReviewLoadedAction(review) { OriginatingLoad = action });
         }
         catch (OperationCanceledException cancellation) when (!ChatBotUiFailureCatalog.IsTimeout(cancellation))
         {
@@ -53,19 +59,20 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
         }
         catch (HexalithChatBotApiException<ProblemDetails> problem)
         {
-            DispatchLoadFailure(generation, SafeFailureCode(ChatBotUiFailureCatalog.Resolve(problem)), dispatcher);
+            DispatchLoadFailure(generation, SafeFailureCode(ChatBotUiFailureCatalog.Resolve(problem)), dispatcher, action);
         }
         catch (Exception exception)
         {
-            DispatchLoadFailure(generation, ChatBotUiFailureCatalog.Resolve(exception), dispatcher);
+            DispatchLoadFailure(generation, ChatBotUiFailureCatalog.Resolve(exception), dispatcher, action);
         }
     }
 
-    private void DispatchLoadFailure(long generation, string code, IDispatcher dispatcher)
+    private void DispatchLoadFailure(
+        long generation, string code, IDispatcher dispatcher, LoadAssociationReviewAction originatingLoad)
     {
         if (generation == Volatile.Read(ref _loadGeneration))
         {
-            dispatcher.Dispatch(new AssociationReviewFailedAction(code));
+            dispatcher.Dispatch(new AssociationReviewFailedAction(code) { OriginatingLoad = originatingLoad });
         }
     }
 
