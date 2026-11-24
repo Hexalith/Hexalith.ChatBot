@@ -1,3 +1,7 @@
+using System.Collections.Frozen;
+
+using Hexalith.ChatBot.Contracts.Enums;
+
 namespace Hexalith.ChatBot.Server.Governance.AiMediation;
 
 /// <summary>Resolved AI policy evidence with an exact immutable tenant, identity, and version reference.</summary>
@@ -19,4 +23,22 @@ internal sealed record TenantAiPolicySnapshot(
     IReadOnlyList<string> AssistanceKinds,
     bool IsFresh,
     bool IsValid,
-    IReadOnlyDictionary<Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass, bool>? LowRiskAllowedByActionClass = null);
+    IReadOnlyDictionary<AiActionRiskActionClass, bool>? LowRiskAllowedByActionClass = null)
+{
+    /// <summary>Gets the permitted assistance kinds captured with the snapshot.</summary>
+    public IReadOnlyList<string> AssistanceKinds
+    {
+        get;
+        init => field = CopyAssistanceKinds(value);
+    } = CopyAssistanceKinds(AssistanceKinds);
+
+    /// <summary>Gets the optional action-class restrictions captured with the snapshot.</summary>
+    public IReadOnlyDictionary<AiActionRiskActionClass, bool>? LowRiskAllowedByActionClass
+    {
+        get;
+        init => field = value?.ToFrozenDictionary();
+    } = LowRiskAllowedByActionClass?.ToFrozenDictionary();
+
+    private static IReadOnlyList<string> CopyAssistanceKinds(IReadOnlyList<string> kinds)
+        => kinds is null ? null! : Array.AsReadOnly(kinds.ToArray());
+}

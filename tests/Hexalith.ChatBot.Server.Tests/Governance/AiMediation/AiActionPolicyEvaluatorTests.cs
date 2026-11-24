@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Acceptance;
@@ -30,6 +32,57 @@ public sealed class AiActionPolicyEvaluatorTests
         decision.TenantId.ShouldBe("tenant-alpha");
         decision.PolicySnapshotId.ShouldBe("policy-snap-001");
         decision.PolicyVersion.ShouldBe(1);
+    }
+
+    /// <summary>Provider-owned collections cannot change the evidence attached to an existing policy reference.</summary>
+    /// <param name="assignOnCopy">Whether collections are supplied through a record copy.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SnapshotShouldOwnItsPolicyCollections(bool assignOnCopy)
+    {
+        List<string> kinds = ["summarize-visible-context"];
+        Dictionary<AiActionRiskActionClass, bool> restrictions = new()
+        {
+            [AiActionRiskActionClass.ModifiesState] = false,
+        };
+        TenantAiPolicySnapshot snapshot = assignOnCopy
+            ? new TenantAiPolicySnapshot("tenant-alpha", 1, "policy-snap-001", true, "read-only", [], true, true)
+                with { AssistanceKinds = kinds, LowRiskAllowedByActionClass = restrictions }
+            : new("tenant-alpha", 1, "policy-snap-001", true, "read-only", kinds, true, true, restrictions);
+        kinds[0] = "other-kind";
+        restrictions[AiActionRiskActionClass.ModifiesState] = true;
+
+        snapshot.AssistanceKinds.ShouldBe(["summarize-visible-context"]);
+        snapshot.LowRiskAllowedByActionClass.ShouldNotBeNull()[AiActionRiskActionClass.ModifiesState].ShouldBeFalse();
+        DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(snapshot));
+        AiActionPolicyDecision decision = await evaluator.EvaluateAsync(Request(), TestContext.Current.CancellationToken);
+        decision.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskExecuteAllowed);
+        decision.PolicySnapshotId.ShouldBe("policy-snap-001");
+    }
+
+    /// <summary>A collection that throws while the provider constructs evidence follows the unavailable path.</summary>
+    /// <param name="throwFromRestrictions">Whether the throwing collection is the restriction map.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ThrowingProviderCollectionMustReturnRedactedUnavailable(bool throwFromRestrictions)
+    {
+        // The default immutable array is uninitialized and throws when enumerated.
+        ImmutableArray<string> uninitializedKinds = default;
+        IReadOnlyList<string> kinds = throwFromRestrictions ? ["summarize-visible-context"] : uninitializedKinds;
+        DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(null, buildSnapshot: () =>
+            new("tenant-alpha", 1, "policy-snap-001", true, "read-only", kinds, true, true,
+                throwFromRestrictions ? new ThrowingAiPolicyRestrictionMap() : null)));
+
+        AiActionPolicyDecision decision = await evaluator.EvaluateAsync(Request(), TestContext.Current.CancellationToken);
+
+        decision.Kind.ShouldBe(AiActionPolicyDecisionKind.Blocked);
+        decision.ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+        decision.PolicySnapshotId.ShouldBe("unavailable");
+        decision.TenantId.ShouldBeNull();
+        decision.PolicyVersion.ShouldBeNull();
+        System.Text.Json.JsonSerializer.Serialize(decision).ShouldNotContain("restricted-policy-map-detail");
     }
 
     /// <summary>Pins the Story 13.2 acceptance provider to the exact tuple the evaluator requires.</summary>
@@ -389,7 +442,12 @@ public sealed class AiActionPolicyEvaluatorTests
             [AiActionRiskActionClass.ActsOnBehalf] = true,
         };
 
-    private sealed class FixedProvider(TenantAiPolicySnapshot? snapshot, bool fails = false, Exception? failure = null, Action? onRead = null) : ITenantAiPolicySnapshotProvider
+    private sealed class FixedProvider(
+        TenantAiPolicySnapshot? snapshot,
+        bool fails = false,
+        Exception? failure = null,
+        Action? onRead = null,
+        Func<TenantAiPolicySnapshot>? buildSnapshot = null) : ITenantAiPolicySnapshotProvider
     {
         public ValueTask<TenantAiPolicySnapshot?> TryGetAsync(
             string tenantId,
@@ -399,7 +457,7 @@ public sealed class AiActionPolicyEvaluatorTests
         {
             onRead?.Invoke();
             if (failure is not null) { throw failure; }
-            return fails ? throw new IOException("restricted-provider-detail") : ValueTask.FromResult(snapshot);
+            return fails ? throw new IOException("restricted-provider-detail") : ValueTask.FromResult(buildSnapshot?.Invoke() ?? snapshot);
         }
     }
 }

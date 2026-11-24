@@ -1328,6 +1328,7 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Defensively copy collections in the pre-existing TenantAiPolicySnapshot provider evidence contract before activating a live policy provider.
   evidence: The primary-constructor record retained caller-owned AssistanceKinds and LowRiskAllowedByActionClass before Story 1.6; mutating them changes authorization values under the same reference. Story 1.6's separate synthetic snapshot copies nested collections, and its production AI snapshot provider remains unavailable.
+  resolution: Resolved 2026-11-24. Snapshot construction copies provider collections into read-only data. Collection failures during provider resolution use the redacted unavailable path and caller cancellation still propagates. AiActionPolicyEvaluatorTests passed all 29 cases.
 
 ## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-15)
 
@@ -1341,6 +1342,7 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
   summary: Before enabling a live AI policy provider, verify provider-owned collection failures produce redacted unavailable decisions.
   evidence: The pre-existing TenantAiPolicySnapshot contract exposes provider-owned collections and baseline enumeration/lookup already occurred without failure translation. Current providers use ordinary arrays/maps and production remains unavailable; a reachable provider whose enumeration or lookup throws would settle this unverified medium concern.
+  resolution: Resolved 2026-11-24. Snapshot construction copies provider collections into read-only data. Collection failures during provider resolution use the redacted unavailable path and caller cancellation still propagates. AiActionPolicyEvaluatorTests passed all 29 cases.
 
 ## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-16, round 4)
 
