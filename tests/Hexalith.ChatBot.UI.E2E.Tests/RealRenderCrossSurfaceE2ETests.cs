@@ -659,13 +659,21 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
 
     private static async Task AssertSkipLinkFocusFlowAsync(IPage page, Surface surface)
     {
-        // Visible focus is not lost: the first Tab stop is the skip link, and on focus it is on-screen (the
-        // fc-skip-link:focus rule pulls it into the viewport from its visually-hidden resting position).
-        await page.Locator("body").ClickAsync(new() { Position = new() { X = 1, Y = 1 } });
+        // The router focuses the heading after navigation. Let it finish before testing the tab order from the
+        // start of the document. A coordinate click can set the sequential focus origin inside the shell header.
+        await page.WaitForFunctionAsync("() => document.activeElement?.matches('h1')", null, new() { Timeout = 20000 });
+        await page.EvaluateAsync(
+            """
+            () => {
+              const body = document.body;
+              body.setAttribute('tabindex', '-1');
+              body.focus();
+              body.removeAttribute('tabindex');
+            }
+            """);
         await page.Keyboard.PressAsync("Tab");
-        string focusedClass = await page.EvaluateAsync<string>("() => document.activeElement?.className?.toString() || ''");
-        focusedClass.ShouldContain("fc-skip-link", Case.Insensitive,
-            $"[{surface.Key}] the first Tab stop must be the skip link (visible focus not lost).");
+        await Assertions.Expect(page.Locator("a.fc-skip-link").First)
+            .ToBeFocusedAsync(new() { Timeout = 5000 });
 
         LocatorBoundingBoxResult? skipBox = await page.Locator("a.fc-skip-link:focus").BoundingBoxAsync();
         skipBox.ShouldNotBeNull($"[{surface.Key}] the focused skip link must be laid out (visible focus).");
