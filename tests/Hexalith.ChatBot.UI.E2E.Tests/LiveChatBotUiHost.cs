@@ -29,7 +29,10 @@ namespace Hexalith.ChatBot.UI.E2E.Tests;
 /// </para>
 /// </summary>
 /// <param name="submissionErrorCode">Optional rejection code for the typed client test seam.</param>
-internal sealed class LiveChatBotUiHost(string? submissionErrorCode = null) : WebApplicationFactory<Program>
+/// <param name="createClient">Optional factory for the client used in each test service scope.</param>
+internal sealed class LiveChatBotUiHost(
+    string? submissionErrorCode = null,
+    Func<IChatBotClient>? createClient = null) : WebApplicationFactory<Program>
 {
     private IHost? _kestrelHost;
 
@@ -50,7 +53,7 @@ internal sealed class LiveChatBotUiHost(string? submissionErrorCode = null) : We
             // Swap the live typed Client facade for the deterministic metadata-only fake. Everything else
             // (FrontComposer shell, Fluxor, localization, Fluent UI) stays exactly as the production host wires it.
             services.RemoveAll<IChatBotClient>();
-            services.AddScoped<IChatBotClient>(_ => new FakeChatBotClient(submissionErrorCode));
+            services.AddScoped<IChatBotClient>(_ => createClient?.Invoke() ?? new FakeChatBotClient(submissionErrorCode));
             // Real-render tests exercise an authorized tenant workspace. Reuse the production claim extractor
             // with test claims so the shell's fail-closed context guard remains active.
             services.AddHexalithFrontComposerServerAuthenticationState();

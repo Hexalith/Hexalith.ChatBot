@@ -22,8 +22,15 @@ public sealed class Story12FluentReleaseReadinessE2ETests
             ["AssociationReviewShouldSelectCandidateCompareEvidenceAndKeepDisabledReasonsReachable", "<fluent-button", "<fluent-text-area", "data-chatbot-association-candidate", "projection-invalidation-unavailable"]),
         new(
             "approval-and-governed-actions",
-            ["tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs", "tests/Hexalith.ChatBot.UI.E2E.Tests/ApprovalQueuePriorityE2ETests.cs"],
-            ["AssertApprovalDecisionSurfaceCoverageWithoutBrowser", "AssertTaskIntentReviewPanelCoverageWithoutBrowser", "<fluent-button", "aria-disabled=\"true\"", "ApprovalQueuePriority"]),
+            ["tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs", "tests/Hexalith.ChatBot.UI.E2E.Tests/RealRenderApprovalE2ETests.cs"],
+            [
+                "AssertTaskIntentReviewPanelCoverageWithoutBrowser",
+                "FreshApprovalShouldSubmitOnlyTheDecisionAndAnnounceTheOutcome",
+                "ExpiredEvidenceShouldExplainTheBlockAndPreventSubmission",
+                "PriorityQueueShouldRenderOrderedGroupsAndKeepBatchApprovalUnavailable",
+                "GotoAsync",
+                "Assert.SkipWhen",
+            ]),
         new(
             "policy-notification-escalation-editors",
             ["tests/Hexalith.ChatBot.UI.E2E.Tests/EscalationPolicyEditorE2ETests.cs", "tests/Hexalith.ChatBot.UI.E2E.Tests/NotificationRoutingEditorE2ETests.cs", "tests/Hexalith.ChatBot.UI.E2E.Tests/TenantPolicyEditorE2ETests.cs"],

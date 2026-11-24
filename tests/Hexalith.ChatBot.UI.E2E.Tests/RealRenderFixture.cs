@@ -1,3 +1,5 @@
+using Hexalith.ChatBot.Client;
+
 using Microsoft.Playwright;
 
 namespace Hexalith.ChatBot.UI.E2E.Tests;
@@ -15,9 +17,19 @@ public sealed class RealRenderFixture : IAsyncLifetime
         "Story 13.9 real-render lane requires a real Chromium browser; none was found (set CHROME_EXECUTABLE_PATH "
         + "or install /usr/bin/google-chrome). Skipping rather than taking a non-browser fallback.";
 
+    private readonly Func<IChatBotClient>? _createClient;
     private LiveChatBotUiHost? _host;
     private IPlaywright? _playwright;
     private IBrowser? _browser;
+
+    /// <summary>Creates a fixture with the default scoped client.</summary>
+    public RealRenderFixture()
+    {
+    }
+
+    /// <summary>Creates a fixture with a client factory for the browser scenario.</summary>
+    internal RealRenderFixture(Func<IChatBotClient> createClient)
+        => _createClient = createClient;
 
     /// <summary>Gets the loopback base URI (no trailing slash) the browser navigates to.</summary>
     public string BaseUri => (_host ?? throw new InvalidOperationException("Host not initialised.")).BaseUri;
@@ -27,7 +39,7 @@ public sealed class RealRenderFixture : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        _host = new LiveChatBotUiHost();
+        _host = new LiveChatBotUiHost(createClient: _createClient);
         _ = _host.Server; // Force CreateHost so the real app boots on its loopback Kestrel listener.
 
         _playwright = await Playwright.CreateAsync().ConfigureAwait(false);

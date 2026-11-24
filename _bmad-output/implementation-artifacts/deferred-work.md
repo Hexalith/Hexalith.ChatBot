@@ -136,6 +136,7 @@ location: Architecture/DevOps
 severity: high
 reason: **[HIGH · `RV-MEASURABLE-CEILING`] E2E `RestorationTimeout = 3 minutes` vs A10/NFR56 `MaxRto` 4 hours.** Reconfirmed. **Release-claim impact:** do not cite this lane as confirming RTO ≤ 4 hr. **Owner:** Architecture/DevOps. **Closure evidence:** per existing entry.
 status: open
+triage: 2026-11-24 Skipped. Same full-window limitation and closure criteria as DW-58.
 
 ### DW-16: [MEDIUM · NFR41] Scoped-outage missing/degenerate monitoring → driver unmeasurable conversion still open. Ops reject bad stamps; driver path to audited unmeasurable remains.
 
@@ -433,6 +434,7 @@ location: Architecture/DevOps
 severity: high
 reason: **[HIGH · `RV-MEASURABLE-CEILING`] Tier-3 E2E sets `RestorationTimeout = 3 minutes` while A10/NFR56 `MaxRto` remains 4 hours.** Already tracked as `RV-MEASURABLE-CEILING`; reconfirmed in chunk 1b against `LiveContinuityAspireE2eTests`. A recovery between 3m and 4h becomes `unmeasurable`, never a measurable miss. **Release-claim impact:** do not cite this lane as confirming RTO ≤ 4 hr. **Owner:** Architecture/DevOps. **Closure evidence:** per existing `RV-MEASURABLE-CEILING` entry.
 status: open
+triage: 2026-11-24 Skipped. Duplicate of the full-window recovery limitation in DW-58.
 
 ### DW-49: [HIGH · `RV-REBUILD-WORM`] Live E2E still passes the same `SourceRecords` instance to seed and rebuild driver.
 
@@ -491,6 +493,7 @@ location: M365 integration / production validation owner
 severity: high
 reason: **[HIGH · `RV-EXT-M365` · external M365/Graph fidelity] The live subscription and Graph scenarios use the topology-composed Worker/provider simulator, not Microsoft Graph.** The Story 12.15 implementation exercises `GraphMailboxIntakeWorker`, expired-subscription recovery, independent DAPR read-model sentinels, and EventStore actor-state end-state assertions. Retained hosted evidence for this simulator-backed exercise now exists — see release run `33066358280` / evidence `01M11EYSDMP1ZF38B7KZA1A6FA` (2026-08-27) in `.decision-log.md` — but it does not, and cannot, prove production Graph behavior; this residual is about fidelity to the real Microsoft Graph service, not about whether a hosted run occurred. **Release-claim impact:** A10 remains provisional; no sandbox result may claim external-M365 disaster-recovery equivalence. **Owner:** M365 integration / production validation owner. **Closure evidence:** a retained production-shaped pre-production drill against a real Graph test tenant that exercises subscription expiry/renewal, webhook/reconciliation, throttling, permissions, and end-state assertions through the same fail-closed evidence gate.
 status: open
+triage: 2026-11-24 Skipped. Requires an approved Microsoft Graph test tenant, permissions and retained external drill evidence.
 decision: 2026-08-27 Build Graph drill — Create an approved test-tenant drill covering subscription expiry, renewal, webhook reconciliation, throttling, permissions, and retained end-state evidence.
 decision: 2026-08-26 Build Graph drill — Create an approved test-tenant drill covering subscription expiry, renewal, webhook reconciliation, throttling, permissions, and retained end-state evidence.
 
@@ -501,6 +504,7 @@ location: durable WORM/audit infrastructure owner, coordinated with Story 12.16 
 severity: high
 reason: **[HIGH · `RV-DURABLE-WORM` · durable audit-storage fidelity] Projection rebuild and audit-store fault validation still use `InMemoryWormAuditStore` or a test-hosted `IAuditWriter`.** The repaired rebuild executes real persisted projection writes/read-back/cleanup, but it does not prove durable WORM/KMS/storage recovery or product audit composition. **Release-claim impact:** do not claim durable audit-chain disaster recovery or storage/KMS outage coverage. **Owner:** durable WORM/audit infrastructure owner, coordinated with Story 12.16 where applicable. **Closure evidence:** retained live evidence from the production binding showing append/read failure, fail-closed mutation behavior, recovery, chain verification, rebuild equivalence, and cleanup against durable storage.
 status: open
+triage: 2026-11-24 Skipped. Requires the approved durable WORM/KMS production binding and retained outage and restore evidence.
 decision: 2026-08-27 Build durable binding — Bind an approved durable WORM and KMS store and retain failure, recovery, chain-verification, rebuild, and cleanup evidence.
 decision: 2026-08-26 Build durable binding — Bind an approved durable WORM and KMS store and retain failure, recovery, chain-verification, rebuild, and cleanup evidence.
 
@@ -511,6 +515,7 @@ location: deployment/platform reliability owner
 severity: high
 reason: **[HIGH · `RV-PROD-CONTROL` · production orchestration and replica coordination] The destructive scheduler runs isolated GitHub/Aspire test jobs, not a production AKS/multi-replica control plane.** The scheduled lane is serialized within its own concurrency group; release validation is deliberately concurrent per commit so required checks are not cancelled. The run proves allowlisted Aspire resource commands and restoration in a single local topology. **Release-claim impact:** do not claim Kubernetes/platform recovery automation, distributed lease safety, replica coordination, or production resource-control authorization. **Owner:** deployment/platform reliability owner. **Closure evidence:** an approved pre-production platform drill with least-privilege resource authority, distributed lease/non-overlap proof, multi-replica behavior, bounded restoration, health/end-state verification, and retained gate evidence.
 status: open
+triage: 2026-11-24 Skipped. Requires an approved multi-replica pre-production platform and bounded control permissions.
 decision: 2026-08-27 Build platform drill — Add an approved pre-production multi-replica drill with least-privilege controls, distributed non-overlap, restoration, health, and retained evidence.
 decision: 2026-08-26 Build platform drill — Add an approved pre-production multi-replica drill with least-privilege controls, distributed non-overlap, restoration, health, and retained evidence.
 
@@ -531,6 +536,7 @@ location: src/Hexalith.ChatBot.Server/Audit/LiveRecoveryValidationOptions.cs
 severity: high
 reason: **[HIGH · `RV-MEASURABLE-CEILING` · the lane cannot reach the targets it is cited for] The Tier-3 restoration budget is 180 seconds against a 4-hour RTO (A10/NFR56) and a 4-hour rebuild target (NFR57).** `LiveRecoveryValidationOptions.Validate()` places no lower bound on `RestorationTimeout` relative to `MaxRto`, so any genuine recovery between 3 minutes and 4 hours converts to `unmeasurable`, never `missed`. Round 5 removed the companion `PerScenarioTimeout >= MaxRto` rule, which claimed to "permit measurement through the recovery target" while being unsatisfiable — nine serial scenarios at 4 hours each cannot fit a sub-`RunnerBudget` workflow — and replaced it with a serial fair-share bound; it deliberately did **not** add a `RestorationTimeout` floor, because any such number is invented (see the round-2 note that removed an earlier attempt). Each manifest publishes `MeasurableRecoveryCeilingSeconds` and the gate emits a non-blocking `{job}:{key}:target_exceeds_measurable_ceiling` claim limitation, so the limit is disclosed rather than hidden — but it is not enforced at ratification. A shorter budget is a deliberate trade: a 4-hour restoration window is impractical on every scheduled run. **Release-claim impact:** a pass from this lane is evidence for recovery within 180 seconds only; it must never be cited as confirming RTO ≤ 4 hr or rebuild ≤ 4 hr, and A10 ratification from it is bounded accordingly. **Owner:** Architecture/DevOps, with performance/capacity. **Closure evidence:** either a lane whose restoration budget reaches `RecoveryTargets.MaxRto` with retained evidence of a measurable miss and pass either side of the boundary, or a separately evidenced pre-production drill that measures the full window, plus a ratification rule that rejects a candidate artifact carrying the claim-limitation token for the target being ratified. [`src/Hexalith.ChatBot.Server/Audit/LiveRecoveryValidationOptions.cs`, `LiveRecoveryValidationEvidenceGate.cs`]
 status: open
+triage: 2026-11-24 Skipped. Requires a separately approved full-window lane and retained pass and measurable-miss evidence.
 decision: 2026-08-27 Build full-window evidence — Add a separately scheduled full-window pre-production lane and reject ratification artifacts whose measurable ceiling is below the claimed target.
 decision: 2026-08-26 Build full-window evidence — Add a separately scheduled full-window pre-production lane and reject ratification artifacts whose measurable ceiling is below the claimed target.
 
@@ -575,6 +581,7 @@ location: CommandGatewayServiceCollectionExtensions.cs:103,113,164-168,228-229
 severity: high
 reason: **[HIGH · pre-existing production binding] The scheduled controls still read and emit only through process-local defaults.** `CommandGatewayServiceCollectionExtensions.cs:103,113,164-168,228-229` binds the outbound trace, derived store, WORM store, and operator-alert sink to in-memory implementations. The hosted proof therefore demonstrates scheduler invocation but not durable production evidence, and its empty default stores can report zero breaches without exercising production tenant data. Story 12.16 explicitly owns the live Hexalith.Memories derived-store binding; the WORM/outbound-trace/alert production bindings need an equally explicit owner before “continuous production enforcement” or production release-gate claims are accepted.
 status: open
+triage: 2026-11-24 Skipped. The scheduler remains dependent on process-local outbound trace, WORM and alert bindings. Production providers and tenant evidence are prerequisites.
 decision: 2026-08-27 Build durable bindings — Assign owners and implement production bindings for outbound trace, derived store, WORM audit, and operator alerts with production-data scheduler evidence.
 decision: 2026-08-26 Build durable bindings — Assign owners and implement production bindings for outbound trace, derived store, WORM audit, and operator alerts with production-data scheduler evidence.
 resolution-note: Story 12.16 replaces only the Production derived-store and vector-reindex defaults with validated Hexalith.Memories service/client adapters. This entry stays open because the outbound-trace, WORM-audit, and operator-alert sinks remain process-local and the live Aspire acceptance lane was not executable without the configured mailbox client secret.
@@ -1018,7 +1025,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of canonical st
 location: ProjectConversationE2ETests.cs
 severity: high
 reason: **[HIGH · test-integrity] The E2E fixtures for the approval surfaces assert markup the components no longer produce.** `ProjectConversationE2ETests.cs` carries 136 occurrences of `chatbot-definition-list` — the exact class `Story13DefinitionListMigrationTests` forbids in the components — plus `<time class="chatbot-code">` at `:5229` and `<header class="chatbot-approval-conversation-item__header">` at `:6402`, which the current `ChatBotApprovalConversationItem` renders as a `FluentStack` inside a `FluentCard` with no `<header>` element. `ApprovalQueuePriorityE2ETests.cs:29-31` reads `[data-priority-label]`, an attribute the component never emits (it renders `<span class="chatbot-priority-label">`), and expects `["Critical","High","Low"]` against a contract whose third row is `Medium`. The suites are green because 30 `SetContentAsync` calls and 0 `GotoAsync` mean they assert their own hand-written strings. **Not covered:** legacy Story 13.9 was supposed to replace these fixtures with real renders and only added a parallel real-render suite; no open story owns the retirement. **Owner:** ChatBot UI test architecture. **Closure evidence:** the approval fixtures are deleted or driven from the real components/contracts, so a component change breaks them.
-status: open
+status: done 2026-11-24
+resolution: Live Chromium coverage replaces stale approval fixtures. Tests drive the actual decision controls, verify expiration and refusal feedback, and exercise the priority component on desktop and phone.
 
 ### DW-113: [MEDIUM · localization] Display formatting for audit history is built in the service layer.
 

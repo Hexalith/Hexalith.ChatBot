@@ -23,6 +23,12 @@ internal sealed class FakeChatBotClient(string? submissionErrorCode = null) : IC
     /// <summary>Gets an optional complete audit response for metadata-boundary render tests.</summary>
     public OperationAuditHistory? AuditHistoryOverride { get; init; }
 
+    /// <summary>Gets an optional adjustment to the pending approval projected into the first conversation page.</summary>
+    public Action<ProjectConversationItem>? ConfigurePendingApproval { get; init; }
+
+    /// <summary>Gets an optional observer for attempted submissions at the typed client boundary.</summary>
+    public Action<IChatBotCommand, string?, ChatBotSurfaceOrigin>? SubmissionObserved { get; init; }
+
     private static readonly DateTimeOffset At = new(2026, 5, 31, 9, 0, 0, TimeSpan.Zero);
     private const string CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
     private bool _messageSubmitted;
@@ -36,6 +42,8 @@ internal sealed class FakeChatBotClient(string? submissionErrorCode = null) : IC
         ChatBotSurfaceOrigin origin = ChatBotSurfaceOrigin.Api,
         CancellationToken cancellationToken = default)
     {
+        SubmissionObserved?.Invoke(command, correlationId, origin);
+
         if (submissionErrorCode is not null)
         {
             return Task.FromException<CommandSubmissionResponse>(new HexalithChatBotApiException<ProblemDetails>(
@@ -216,7 +224,9 @@ internal sealed class FakeChatBotClient(string? submissionErrorCode = null) : IC
 
     private ICollection<ProjectConversationItem> CurrentItems()
     {
-        List<ProjectConversationItem> items = [PendingApprovalItem, ActiveResponseItem(_responseStopped)];
+        ProjectConversationItem pending = PendingApprovalItem;
+        ConfigurePendingApproval?.Invoke(pending);
+        List<ProjectConversationItem> items = [pending, ActiveResponseItem(_responseStopped)];
         if (_messageSubmitted)
         {
             items.Insert(0, SubmittedItem("item:message-submitted", "message:submitted", 4));
