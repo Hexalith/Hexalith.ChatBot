@@ -1161,9 +1161,11 @@ archived: 2026-11-24
 - source_spec: `spec-1-2-publish-the-openapi-contract-spine-and-typed-client.md`
   summary: A typed EventStore domain rejection is answered as a retryable 503 `dispatch-unavailable` (with a `PreCommitOperationReplay` intent and an `AuditUnavailable` alert) instead of a terminal, non-retryable rejection problem, so callers retry a deterministic rejection indefinitely.
   evidence: Loop 17 BH1/EH4/VG-O2 (medium), pre-existing: baseline `CommandGateway.cs:95-111` mapped every `EventStoreGatewayException`, domain rejections included, to the same 503/intent/alert; Loop 16 added only the ownership release. EventStore's actor message-ID dedupe (`AggregateActor.cs:845-858` → `SubmitCommandHandler.ThrowDeterministicFailure`) replays the cached rejection on every same-ID retry. Back-pressure is not cached and should stay retryable. Needs a catalog-backed rejection code/problem type in the OpenAPI and the problem factory.
+  triage: 2026-11-24 Skipped. A terminal rejection needs a new public problem type in the OpenAPI document and generated client, so it needs owner sign-off.
 - source_spec: `spec-1-2-publish-the-openapi-contract-spine-and-typed-client.md`
   summary: Durable recovery ignores authoritative EventStore non-commit evidence; a retained `Dispatching` reservation whose command status is `Rejected` stays `RecoveryPending` (retryable 503) indefinitely, blocking the same caller ID and equivalent specialized requests.
   evidence: Loop 17 BH2/EH3 (medium): `DaprCoarseIdempotencyStore.RecoverPendingOutcomeAsync` acts only on `HasCommittedOutcomeEvidence`. Same defect class as the Loop 16 finding-3 entry (no terminal resolution for retained ownership; human decision 2026-10-05 routes it to a Retry Profile story). A safe automatic release needs a persisted writer-attempt flag on the reservation, because `ExternalEffectAttempted` is process-local and conversation/mailbox writes may precede the EventStore submission.
+  triage: 2026-11-24 Skipped. The 2026-10-05 decision assigns this to the Retry Profile story, and it changes the durable reservation schema.
 
 ## Deferred from: code review of spec-1-2-publish-the-openapi-contract-spine-and-typed-client (2026-10-07, contract/client split)
 
@@ -1184,6 +1186,7 @@ archived: 2026-11-24
 - source_spec: `spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
   summary: Owner authority evidence validation tolerates zero clock skew: `IsValidEvidence` requires `ObservedAt <= now` and, for current requests, `ObservedAt >= started` (same for `RevocationCheckedAt`), so a real provider stamping owner-clock times denies every request (owner ahead) or every mutation (owner behind).
   evidence: Edge-case-hunter EC5 at `src/Hexalith.ChatBot.Server/Authorization/ChatBotRequestAuthorizer.cs:270-277`; high if true, unverified because only the unavailable and synthetic providers exist and both stamp ChatBot's `ISystemClock`. Settle in A13 provider design by stating in the `IChatBotOwnerAuthorityProvider` contract which clock stamps evidence, or by adding a bounded skew allowance.
+  triage: 2026-11-24 Skipped. Any clock-skew allowance widens the freshness and revocation windows, so the tolerated skew needs a product security decision.
 - source_spec: `spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
   summary: Creation commands authorize against their new client-generated identifier (`NoteId`, `DraftId`, `IntakeId`, `*ChangeId`), so a real ChatBot owner mapping must either accept any not-yet-existing id (making the check meaningless) or reject every creation.
   evidence: Blind-hunter BH12 at `src/Hexalith.ChatBot.Server/Authorization/ChatBotAuthorityCatalog.cs` resource-property column; medium if true, unverified because owner-mapping semantics for `ChatBot`/`operation` requests are unspecified until A13. Settle by defining whether create rows need a parent/target scope separate from the new id.
@@ -1205,13 +1208,15 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
   summary: Seven of eight Dapr subscription routes (AiOutcome, Approval, GovernedOperation, MailboxIntake, ParticipantResolution, TaskIntent, DeadLetter) accept unauthenticated HTTP with any tenant id; only the association route checks the app-channel token.
   evidence: Third review, pre-existing, at `src/Hexalith.ChatBot.Server/Gateway/ChatBotCompatibilityEndpointExtensions.cs:143`. MailboxIntake's `AssociationProjectionHandler` overload never reaches the invalidation coordinator, so R-B5's narrow scope holds for marker minting. Settle in the shared subscription-ingress follow-up.
+  resolution: Resolved before 2026-11-24 by 64afc6a. Every projection route, the dead-letter drain and the subscribe handler require the EventStore sidecar channel. The fan-out tests from 3d63cf9 prove that missing and wrong app tokens return 401 on all eight projection routes.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
   summary: All seven projection routes subscribe to the same pubsub/topic without `Match` rules, so the Dapr .NET SDK may keep only the first-mapped route (GovernedOperation) as the topic's default route.
   evidence: Third review, pre-existing; high if true, not verified at runtime (`ChatBotCompatibilityEndpointExtensions.cs:142`). The SDK logs "A default subscription to topic … already exists". Settle by inspecting `/dapr/subscribe` and live delivery in a running sidecar topology.
-  resolution: Resolved 2026-11-24. The host subscription discovery confirmed the collision: only the governed-operation route received the shared topic. One sidecar-guarded fan-out route now carries the single subscription with its dead-letter topic and runs every family's shared projection method in mapping order; the seven family routes stay mapped and guarded without subscriptions. Host tests cover discovery, per-family delivery and replay, untrusted ingress, non-object bodies, unbindable families and fault propagation. Server.Tests passed all 3755 cases and AppHostTopologyTests all 18. Live sidecar delivery was not exercised.
+  resolution: Resolved 2026-11-24. The host subscription discovery confirmed the collision: only the governed-operation route received the shared topic. One sidecar-guarded fan-out route now carries the single subscription with its dead-letter topic and runs every family's shared projection method in mapping order; the seven family routes stay mapped and guarded without subscriptions. Host tests cover discovery, per-family delivery and replay, untrusted ingress, non-object bodies, unbindable families and fault propagation. Server.Tests passed all 3755 cases and AppHostTopologyTests all 18. Live sidecar delivery was not exercised. Review follow-up 7c40c9c keeps later families running past association's token check, warns when a family cannot bind, and covers all seven families plus a CloudEvent-wrapped EventStore envelope. The routing collision is resolved. The review also found that EventStore publishes each event inside `payload` bytes, so the six families that read flattened fields still ignore live events; that is tracked as a separate entry below.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
   summary: Internal-producer admission markers expire after 5 minutes while workflow message ids are deterministic, so one late `/process` callback could leave a correction-propagation or invalidation command permanently rejected.
   evidence: Third review; medium if true, not verified (`src/Hexalith.ChatBot.Server/Gateway/DataProtectionChatBotAdmissionMarker.cs:18`). EventStore replays a cached rejection for a reused messageId; `AiExecutionCoordinator` shares the pattern. Settle by measuring submit→`/process` latency bounds and checking whether a retried submission with a fresh marker escapes the cached rejection.
+  triage: 2026-11-24 Skipped. Needs a measured submit-to-`/process` latency bound and confirmation of how EventStore records a thrown admission failure.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
   summary: The internal-producer marker path has no proof through the real EventStore relay.
   evidence: Third review; medium if true, not verified. `TrustedAuthorityInternalProducerTests.cs:66` builds the `CommandEnvelope` by hand and calls `stage.EvaluateAsync` directly. Settle with a live dispatch→`/process` round trip once the Aspire runtime blocker clears, checking that extensions and the payload digest survive the relay.
@@ -1227,6 +1232,7 @@ archived: 2026-11-24
 - source_spec: `spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
   summary: Bound exhausted AI-execution recovery listing by tenant and page before loading the complete indexed work inventory.
   evidence: Workflow review W-B8; ReadModelAiExecutionWorkStore.ListExhaustedAsync/ListIndexedAsync scan index pages and tenant items before status/cursor/maximumCount filtering. The same global-scan shape exists at original baseline a8b421b6690ab9c0e66d7274ee5745b26a9e117c. Large inventories impose avoidable operator storage work; settle with tenant/page indexed access and storage-read-count tests without weakening authority expiry checks.
+  triage: 2026-11-24 Skipped. Closing it needs a durable per-tenant exhausted index with lazy migration of the existing global pages. That storage-format change needs its own story.
 
 ## Deferred from: code review of spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context (2026-10-08 fifth review)
 
@@ -1239,6 +1245,7 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-3-bind-every-request-to-trusted-tenant-and-actor-context.md`
   summary: The request-context resolver binds any authenticated token whose `preferred_username` is `service-account-<id>` as service client `<id>`, with no client-credentials evidence beyond that username convention.
   evidence: Triage S-E3, pre-existing. Baseline `ClaimsAuthenticationStage` (a8b421b6690ab9c0e66d7274ee5745b26a9e117c, lines 72-76) used the same Keycloak convention, and `ChatBotRequestContextResolver.TryResolve` keeps it while adding conflict checks. Medium if true, unverified. To settle it, confirm whether the configured identity provider realm can issue a human user a `service-account-` prefixed `preferred_username` (or any non-client token carrying one). If it can, require client-credentials evidence (for example a matching `azp`/`client_id` and no human session markers) before machine classification. Machine grants still require owner evidence for that exact client, and production denies meanwhile through the unavailable owner provider.
+  triage: 2026-11-24 Skipped. Needs verification of the production identity provider's username rules. Hardening the relay path also needs an EventStore relay contract that carries `azp`.
 
 ## Deferred from: Story 1.3 A13 reconciliation review (2026-10-11)
 
@@ -1251,6 +1258,7 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: Failure conversation items can still expose sensitive token-shaped category, scope, dependency, or escalation metadata.
   evidence: `ChatBotFailureStateConversationItem.razor` displays these projected fields; `FailureStateProjectionTranslator.SafeOptionalToken` checks shape only. This display existed at Story 1.4 baseline. Audit the producer provenance and replace any sensitive field with a fixed safe catalog value.
+  triage: 2026-11-24 Skipped. No production path writes these fields today, because `FailureStateProjectionHandler` has no route or registration. Category, scope and dependency also need a product allowlist.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: The gateway redaction stage copies correlation and task identifiers without validating their provenance.
   evidence: `CoarseUserFacingRedactionStage.Apply` copied both fields at Story 1.4 baseline. HTTP middleware validates incoming identifiers, but internal callers should be traced before deciding whether the stage needs its own validation.
@@ -1266,11 +1274,13 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: Unverified medium risk: distinguish a fresh blocked workspace failure from repeated polling when the component uses a fixed stable identity.
   evidence: ChatBotBlockedState deduplicates by StableId, Reason and catalog code; fixed workspace callers supply no attempt identity. A live repeated-failure trace with distinct attempted operations would establish whether the second failure is incorrectly silent.
+  triage: 2026-11-24 Skipped. Needs a UX decision on whether a user's repeated same-code retry should announce in the blocked workspace.
 
 ## Deferred from: code review of spec-1-4-return-versioned-safe-outcomes (2026-10-12)
 
 - Unknown completion or audit text still throws before the generic-denial path (`OperationStatusHttpResults.cs:29`). Pre-existing parser. The fallback state still needs the schema and forward-compatibility decision already recorded above.
 - Failure items still render category, scope, dependency, and escalation fields (`ChatBotFailureStateConversationItem.razor:45`). Pre-existing projected fields; same exposure as the earlier Story 1.4 deferral.
+  triage: 2026-11-24 Skipped. Same latent exposure and allowlist decision as the 2026-10-12 failure-metadata entry above.
 - Story commit `abcb637` advances the EventStore, FrontComposer, and Memories gitlinks. Maybe-false, medium if those pointer moves are unnecessary. Settle by building this story against the previous commits `1b7b8ce`, `c7491c7`, and `b16ab01`.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
@@ -1306,6 +1316,7 @@ archived: 2026-11-24
 - Suppressed status banners keep `role="alert"`/`"status"` with `aria-live="off"` (`src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor:106`). Maybe-false, medium if true: a remounted suppressed alert may still announce, which would defeat once-per-failure deduplication. Settle with NVDA and JAWS on Chrome against a remounted suppressed banner.
   resolution: Resolved 2026-11-24. `ChatBotStatusBanner` now derives `role` from the effective politeness, like `aria-live`: an announcing banner keeps `alert` or `status`, and a deduplicated one renders no role with `aria-live="off"`. The failure item's hidden announcement span follows the same rule. Chromium confirmed the premise: it still exposes an inserted `role="alert"` with `aria-live="off"` as an alert in its accessibility tree. The browser test `VersionedSafeOutcomeBrowserTests.RemountedSuppressedBannerShouldDropItsLiveRole` fails a governed note on the real UI host, records every banner render with a MutationObserver, remounts the banner twice in the same circuit, and checks the DOM and Chromium's accessibility tree (no alert role, no live region). It fails without the fix. NVDA and JAWS were not run; the Chromium accessibility tree stands in for them. UI.E2E.Tests passed 298/298 with 0 skipped, and UI.Tests passed 634/634.
 - A failure item whose code or state changes under the same `ItemId` is never announced (`src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor:90`). Maybe-false, medium if true. Settle by checking whether failure-state projections update one conversation item in place or append a new item per transition.
+  resolution: Verified 2026-11-24 as not a defect. Each failure transition is stored under a new item id (`failure:{operation}:{kind}:{version}`), so the stream announces it as a new item. Only a same-version redelivery with a different catalog code replaces an item in place, and that is not a state transition.
 
 
 ## Deferred from: Story 1.4 workflow review (2026-10-14)
@@ -1313,6 +1324,7 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: Preserve instance-specific backend retry permissions through code-only UI failure state.
   evidence: F-B4/F-E4; the baseline effects already discarded Retryable and ClientAction and enabled non-authorization load retries. Define the state fields and rendering intersection before changing this pre-existing behavior; a typed audit_unavailable with Retryable=false/ClientAction=None currently retains catalog retry guidance.
+  triage: 2026-11-24 Skipped. Needs a UX decision on how the backend `Retryable` and `ClientAction` flags combine with the catalog action.
 ### DW-146: Define malformed typed-problem category handling at the UI failure state boundary.
 
 status: done 2026-11-24
@@ -1326,6 +1338,7 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/1-6-canonical-lifecycle-state-model-and-transition-enforcement.md`
   summary: `CommandSubmissionLifecycleTransitionGuard` always validates the constant `Received->Proposed` edge, so the invalid-transition rejection path is reachable only via fake guards.
   evidence: Make the guard validate `current->requested` once a story persists per-item lifecycle state; do not accept a client-supplied current state.
+  triage: 2026-11-24 Skipped. Validating the actual edge needs stored per-item lifecycle state, which no story provides yet.
 - source_spec: `_bmad-output/implementation-artifacts/1-6-canonical-lifecycle-state-model-and-transition-enforcement.md`
   summary: `LifecycleReprocessFactory` has no production caller and emits no `supersedes`/`superseded_by` audit envelope (AC4 wiring).
   evidence: No `src` caller; wire it in the reprocess story (FR48d, Epic 6) together with the audit link emission.
@@ -1342,6 +1355,7 @@ archived: 2026-11-24
 ## Deferred from: code review of spec-1-6-persist-the-first-isolated-policy-snapshot (2026-10-16)
 
 - Audit-enabled builds fail with NU1903 on `Microsoft.AspNetCore.SignalR.Common` (GHSA-334f-vvp4-7g6p); Story 1.6 evidence passes only with `-p:NuGetAudit=false` and no tracked item exists. Pre-existing dependency advisory; track a package bump or documented suppression.
+  resolution: Resolved before 2026-11-24 by e466cbb. Central transitive pinning selects `Microsoft.AspNetCore.SignalR.Common` 11.0.0 from the shared catalog. The 2026-11-24 Release solution build ran with `NuGetAudit` enabled and reported no NU1903.
 - Denial for all eight policy-snapshot commands listed in the 2026-10-15 entry is not repeated in `GovernedOperationAggregate` / `AcceptedCommandDispatcher` (raised again in round 3). Unverified medium; trace dispatch paths for every listed command as described in that entry.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-6-persist-the-first-isolated-policy-snapshot.md`
@@ -1612,6 +1626,7 @@ archived: 2026-11-24
 - source_spec: `spec-1-7-admit-commands-through-the-single-commandgateway.md`
   summary: Repair the existing Story 13.2 live browser fixture's current owner-authority prerequisites before claiming a passing production-client refusal matrix (high; pre-existing at the Story 1.7 baseline).
   evidence: `Story132ProductionBrowserAspireE2ETests` initializes the realm and recovery protocol but no current ChatBot operation/query grant, Party identity or Project authority. `AddStory132AcceptanceFixture` replaces only policy/provider/classifier services. The authoritative authorizer, acceptance fixture and recovery provisioner are unchanged from baseline `cd8314401488c7ba3453cec25bdf305e34e0d146`, whose positive-submit browser test already omitted the same owner prerequisites. Fresh state denies before the asserted 503 and before an authorized conversation can enable the composer. Closure requires owner-supported fixture provisioning and an executed fresh-state browser result; the unavailable atomic participation must not be bypassed, authority must not be fabricated and a 403 must not be represented as a passed 503 boundary.
+  triage: 2026-11-24 Skipped. The live browser fixture still needs current owner grants, and another session holds uncommitted edits to `Story132ProductionBrowserAspireE2ETests.cs`.
 
 ## Deferred from: code review of spec-1-7-admit-commands-through-the-single-commandgateway (2026-10-21, round 3)
 
@@ -1662,6 +1677,7 @@ archived: 2026-11-24
 - source_spec: `spec-five-deferred-recovery-diagnostics.md`
   summary: Captured recovery failures retain original inner exceptions whose rendered diagnostic text can escape the metadata-only wrapper message (medium; pre-existing).
   evidence: At baseline 6b92c2970d8fd7fb6bc2d3ad26f864e80313e111, all three Capturing* decorators retain the original exception as InnerException; LiveContinuityAspireE2eTests later aggregates those failures, so Exception.ToString can include provider messages or stack traces in raw TRX. The new capture tests verify wrapper-message redaction and exact cause retention, not full rendered-output sanitization. Closure requires an explicit diagnostic retention/redaction boundary with injected sensitive inner-message tests, coordinated with the still-open scheduled/release raw-TRX sanitization work (DW-95). This batch preserves the existing diagnostic contract and does not claim full exception rendering is sanitized.
+  triage: 2026-11-24 Skipped. `RecoveryFailureCaptureTests` pins the retained cause. Keeping or redacting it needs a decision, and the raw upload is owned by CiCd (DW-95).
 
 
 ## Deferred from: five recovery-harness contract checks (2026-10-23)
@@ -1923,6 +1939,7 @@ Final native follow-up qualification (2026-10-26): independent review correction
 - source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-validation-limits.md`
   summary: Reconcile the existing FrontComposer EventStore Admin package overrides with the current shared Builds catalog.
   evidence: The original full Architecture Debug suite reports 156 passed, one failed, zero skipped. RootDeclaredSiblingPackageWrappersShouldDelegateVersionsToSharedBuildsCatalog rejects unchanged FrontComposer Directory.Packages.props selecting Hexalith.EventStore.Admin.Abstractions 3.128.2 against shared catalog 3.128.3. FrontComposer remains 5f665c4d38afb2255a7dde4620330e09824a40a1; Builds remains 81ab049208678bd6616828824729c0ddac02f7d1. Exact command and result are retained in validation/five-deferred-validation-limits.json; no dependency or submodule change is included.
+  resolution: Resolved before 2026-11-24 by FrontComposer c092e8f9, recorded at gitlink 781a48f (868f27e). FrontComposer's `Directory.Packages.props` only imports the shared catalog, and `RootDeclaredSiblingPackageWrappersShouldDelegateVersionsToSharedBuildsCatalog` passed on 2026-11-24.
 
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-five-deferred-ui-presentation-lifecycle.md`
@@ -2104,6 +2121,7 @@ archived: 2026-11-24
   evidence: The full Debug Server lane failed it once. It captured 20 instrument names, two complete sets, because another test class's host kept a second `Hexalith.ChatBot` meter alive while it ran. The class passes 3/3 in isolation and passed in both Release lanes. `MetricCapture` filters instruments by meter name only (`ChatBotMetricsTests.cs:396`).
   reason: Pre-existing and outside the build-blocker fixes; the metrics seam belongs to story 8.2.
   closure: Capture by the test's own meter instance instead of the shared meter name, or run every class that creates the ChatBot meter in one non-parallel collection.
+  resolution: Resolved before 2026-11-24 by ca2e7e7. `MetricCapture` and the throwing listener select instruments by reference to the ChatBot meter. Server.Tests passed in full on 2026-11-24.
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
   summary: Shared-catalog drift fails the UI.Tests and Architecture pin guards (medium).
   evidence: `4aa212b` made the root wrapper import `$(HexalithBuildsRoot)/Props/Directory.Packages.props`, and `tests/PackageCatalogTestHelper.cs` read the unexpanded text, so 12 UI.Tests/Architecture rows failed before any version was compared. BL0016 (R22-W1) had kept both lanes from compiling. The helper now substitutes the MSBuild-evaluated `HexalithBuildsRoot`, and the defining-project check still requires every `PackageVersion` to come from `references/Hexalith.Builds`. With that fix, real drift remains: `AssertUiFoundationPins` expects Fluent UI Components/Icons 5.0.1 and Playwright 1.64.1, while the catalog has 5.1.0 and 1.65.0 (UI.Tests 609/613). `references/Hexalith.Folders/Directory.Packages.props` pins `CommunityToolkit.Aspire.Hosting.Dapr` 17.0.0-beta.1088, while the catalog has 17.0.0-preview.1.261120-0454 (Architecture 118/119).
@@ -2162,6 +2180,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: `Dapr:SpineAppIdSuffix` does not suffix parties or projects app ids.
   evidence: `ChatBotAspireModule.ResolveSpineAppId` (`:127-134`) only suffixes `AppId` and `EventStoreServiceName`. Isolated topologies can collide on unsuffixed parties/projects sidecars. Later suffix work, not this story.
+  triage: 2026-11-24 Skipped. Parties and Projects call EventStore through a literal `eventstore` app id, so suffix isolation first needs configurable EventStore app ids in those repositories.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: Unique Dapr internal gRPC port validation cannot see Memories' default port 50002.
@@ -2171,10 +2190,12 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: Isolated Dapr HTTP port reservations still cover only four sidecars while parties and projects also run sidecars.
   evidence: `IsolatedDaprHttpResourceNames` (`TrivialGovernedCommandAspireE2eTests.cs:74-80`) is eventstore, tenants, chatbot, eventstore-admin. `RequiredDaprSidecarResources` also lists parties, projects, Memories, and eventstore-admin-ui. Later sidecar expansion, not this story.
+  triage: 2026-11-24 Skipped. Parties, Projects and Memories already take dynamic app ports. The remaining fixed Memories daprd ports are guarded by the 2026-11-24 internal gRPC port resolution.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: A Dapr workflow outage clears `NextRetryAt` on an operation-status read.
   evidence: `DaprCorrectionPropagationWorkflowRuntime.ReadProgressAsync` returns null on non-cancel faults (`:29-32`). `OperationStatusQueryHandler.cs:53-58` then writes `record with { NextRetryAt = null }`. Later correction-propagation, not this story.
+  triage: 2026-11-24 Skipped. Hiding an unverified retry time is the current fail-closed behavior, pinned by `CorrectionPropagationProgressReadTests`. Changing it is a product decision.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-1-1c-aspire-dapr-topology-review-remediation.md`
   summary: CI and release topology jobs invoke `.github/scripts/install-dapr-cli.sh`, which is not in the tree.
@@ -2246,6 +2267,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: Unverified: empty SDK terminal-refusal ids may throw from `CommandEnvelope` instead of a typed refusal.
   evidence: Would be settled by a `DomainServiceTerminalRefusalContext` with blank `MessageId`, `UserId`, or `CorrelationId` reaching `RefuseUnsupportedAsync`.
+  triage: 2026-11-24 Skipped. ChatBot cannot receive blank ids here: the SDK's `CommandEnvelope` constructor rejects them before admission. Any typed refusal belongs to Hexalith.EventStore.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: Unverified: live catalog setup may throw if a Dapr sidecar YAML has no `spec` object.
@@ -2255,6 +2277,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-synchronized-package-release-ci.md`
   summary: Unverified: blank tenant or intake ids may inventory colliding read-model keys.
   evidence: Would be settled by a caller of `GetIntakeReadModelKeysAsync` with whitespace `tenantId` or `intakeId`.
+  resolution: Verified 2026-11-24 as not reachable. `GetIntakeReadModelKeysAsync` builds keys through `ProjectConversationSourceEmailView.KeyFor`, which has rejected blank tenant and intake ids before any store read since f1262bd.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-recovery-cleanup-state-isolation.md`
   summary: Legacy `ci.yml` still selects the deleted IntegrationTests live-recovery Fact after the sweep moved to Recovery.Tests.
@@ -2302,3 +2325,19 @@ archived: 2026-11-24
   summary: Verify that the nightly release hook executes both required release checks.
   evidence: The minimum discovery count rejects an empty run, but one surviving test can satisfy it if discovery loses the M2 or origin-parity check. The two required identities are declared in `tests/Hexalith.ChatBot.Release.Tests/GovernedStateReleaseGateTests.cs`.
   resolution: Resolved 2026-11-24. The nightly hook requires both named release checks to pass exactly once in a fresh TRX. Controlled runs covered success, missing, skipped, renamed and duplicate results, and runner failure.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-deferred-work-priority-batch-2.md`
+  summary: Six projection families (mailbox-intake, association, participant-resolution, ai-outcome, task-intent and approval) read flattened domain fields, but EventStore publishes each event inside the envelope's `payload` bytes, so live deliveries bind with null domain data and are ignored.
+  evidence: High, pre-existing, exposed by the L1208 fan-out. `references/Hexalith.EventStore/src/Hexalith.EventStore.Server/Events/EventPublisher.cs:199-229` publishes `EventEnvelope` (metadata plus `Payload`). Only the governed-operation and governed-control translators decode `payload`. The other `Published*Event` records expect top-level `record`, `request`, `intakeId` and similar, and their fan-out tests post pre-flattened records. Failure-state projections also have no route or registration. Settle by decoding each family's payload by `eventTypeName` and adding EventStore-envelope rows to `ChatBotProjectionFanOutEndpointsTests`.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-deferred-work-priority-batch-2.md`
+  summary: A decision or correction failure that completes after the reviewer moved to another association may still be applied, announced and focused on the new association's page.
+  evidence: Maybe-false, medium if true. `AssociationReviewReducers.ReduceSubmitFailed` and `ReduceCorrectionFailed` do not compare the originating association, and the 2026-11-24 activation counter now makes such a failure announce. Settle with a reducer test that dispatches a stale failure after navigation.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-deferred-work-priority-batch-2.md`
+  summary: Returning to the association review page with an already-announced failure moves focus to the error summary again, although the banner stays silent.
+  evidence: Low, pre-existing. `_announcedFailure`, formerly `_announcedErrorCode`, belongs to the component instance and starts empty on every remount. Fix by seeding it from the current state on first render or keeping it in circuit-scoped state.
+
+- source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-deferred-work-priority-batch-2.md`
+  summary: A validation code shown after an association-review failure can send focus to the removed failure-summary element.
+  evidence: Unverified medium, pre-existing. The focus guard reads `ValidationErrorCode ?? ErrorCode` and focuses `_errorSummary`, which only renders while `ErrorCode` is set. The validation banner in `ChatBotAssociationReviewActions.razor` has no focus target of its own. Settle with a browser test that fails, then validates on the same page.
