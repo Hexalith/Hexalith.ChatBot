@@ -80,8 +80,9 @@ internal sealed class CommandGateway(
         {
             admissionDecision = await admission.AdmitAsync(submission, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateDependencyUnavailable(submission.CorrelationId, submission.TaskId));
         }
 

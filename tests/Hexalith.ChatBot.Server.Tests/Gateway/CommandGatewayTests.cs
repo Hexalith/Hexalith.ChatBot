@@ -5115,6 +5115,48 @@ public sealed partial class CommandGatewayTests
         counter.RecordedTenants.ShouldHaveSingleItem().ShouldBe(BoundTenant);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task AdmissionDenialAuditFailurePreservesCallerCancellation(bool abortCaller, bool dependencyCancelled)
+    {
+        using CancellationTokenSource caller = new();
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter writer = new()
+        {
+            OnAuthorizationFailure = () =>
+            {
+                if (abortCaller)
+                {
+                    caller.Cancel();
+                }
+
+                throw dependencyCancelled
+                    ? new OperationCanceledException("audit-provider-diagnostic")
+                    : new IOException("audit-provider-diagnostic");
+            },
+        };
+        CommandGateway gateway = Gateway(dispatcher, auditWriter: writer,
+            authorizationStage: new DenyingAuthorizationStage(ChatBotAuthorizationReasonCodes.AuthorizationDenied));
+        ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "denied-resource"));
+
+        if (abortCaller)
+        {
+            await Should.ThrowAsync<OperationCanceledException>(() => gateway.SubmitAsync(submission, caller.Token).AsTask());
+        }
+        else
+        {
+            ChatBotGatewayResult result = await gateway.SubmitAsync(submission, caller.Token);
+            result.Problem.ShouldNotBeNull().Code.ShouldBe(ChatBotMessageCodes.DependencyDegraded);
+            Serialized(result.Problem).ShouldNotContain("audit-provider-diagnostic");
+        }
+
+        writer.AuthorizationFailures.ShouldHaveSingleItem();
+        dispatcher.DispatchCount.ShouldBe(0);
+    }
+
     private sealed class RecordingAuthorizationFailureCounter : IAuthorizationFailureCounter
     {
         public List<string> RecordedTenants { get; } = [];
@@ -7040,6 +7082,7 @@ public sealed partial class CommandGatewayTests
         public bool ThrowPreCommit { get; init; }
 
         public Action? OnPreCommit { get; init; }
+        public Action? OnAuthorizationFailure { get; set; }
 
         public AuditWriteResult PreCommitResult { get; init; } = AuditWriteResult.Success;
         public AuditWriteResult PostCommitResult { get; init; } = AuditWriteResult.Success;
@@ -7052,6 +7095,7 @@ public sealed partial class CommandGatewayTests
         public ValueTask RecordAuthorizationFailureAsync(ChatBotAuthorizationFailureAuditFact fact, CancellationToken cancellationToken)
         {
             AuthorizationFailures.Add(fact);
+            OnAuthorizationFailure?.Invoke();
             return ValueTask.CompletedTask;
         }
 

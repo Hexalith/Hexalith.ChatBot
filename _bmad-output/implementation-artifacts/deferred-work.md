@@ -2020,6 +2020,7 @@ archived: 2026-11-24
   evidence: `CommandGateway.SubmitAsync` (`src/Hexalith.ChatBot.Server/Gateway/CommandGateway.cs:83`) wraps `AdmitAsync` in `when (exception is not OperationCanceledException)`, and the pipeline's `DenyAsync` audit writes have no inner catch. A store-raised cancellation on a live request therefore escapes as an untyped 500, and an `IOException` raised under a request abort writes a 503 to the aborted response. For the same route and writer, `ChatBotApplicationBoundaryResultHandler` (`8ea98fb`, R16-P1) answers the typed 503 and propagates the abort. No test injects a denial-audit failure on the gateway path.
   reason: Pre-existing and outside the round-18 delta. It is latent because `InMemoryAuditWriter.RecordAuthorizationFailureAsync` cannot fail and ignores cancellation.
   closure: When a durable denial-fact writer lands, `CommandGateway.cs:83` uses `when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)` plus `ThrowIfCancellationRequested()`, and a `CommandGatewayTests` row whose denial-audit double raises its own cancellation on a live token asserts the typed `DependencyDegraded` result.
+  resolution: Resolved 2026-11-24. Admission denial-audit faults yield the typed dependency problem while caller abort propagates. Four cases exercise dependency cancellation, I/O errors and caller cancellation with zero dispatch.
 
 ## Deferred from: code review of spec-1-5-establish-stable-operation-identity-and-concurrency-contracts (2026-11-04, round 20)
 
