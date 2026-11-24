@@ -335,7 +335,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of 12-15-stand-
 location: attempt.summary.json
 severity: medium
 reason: **[MEDIUM · gate producer summary] Gate still trusts producer-written `LatestAttemptCompletedSuccessfully` and `AlertsDeliveredByJob`.** Known round-5 design: the out-of-process gate job still reads those fields from `attempt.summary.json`. **Release-claim impact:** a buggy producer can still influence completion/alert grading for those two inputs. **Owner:** Story 12.15 workflows/CI (group 3) if further independence is required. **Closure evidence:** derive completion/alerts from retained manifests alone, or accept and document the residual.
-status: open
+status: done 2026-11-24
+resolution: Applies the documented-residual closure option. The recovery ADR identifies the producer completion veto and alert-count trust boundary, explains the independent scenario grading, and requires independent receipts for claims of downstream alert delivery.
 
 ### DW-37: [LOW · AppHost cleanup] Temp realm cleanup is only on `AppDomain.ProcessExit`.
 

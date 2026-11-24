@@ -133,6 +133,15 @@ validated SHA's recovery verdict.
 
 The required lanes initialize a metadata-only workflow-attempt envelope before checkout, finalize it under `if: always()`, and use `if: always()` artifact upload with `if-no-files-found: error` and an explicit 30-day retention policy. Raw CTRF/TRX stays under runner-temporary staging outside all upload paths. An always-run projection retains a payload-free attempt summary for failed, missing or malformed TRX; successful producers additionally project the canonical sanitized `.trx`. Generated reports/manifests and the workflow envelope remain under uploaded `TestResults`. The complete coordinator sequence also retains an incomplete domain attempt summary in the independent marker root after any stage throws, using a bounded write independent of caller cancellation and counting only delivered alerts from that run. State-store assertions are captured in the domain report verdicts; the workflow envelope is diagnostic and cannot substitute for the domain attempt summary. The lane does not currently claim separate logs, traces, metrics, or state snapshots. Local ignored `TestResults` files are diagnostic only and are not repository-retained evidence.
 
+**Attempt-summary trust boundary.** The retained replay grades each expected scenario's manifest
+and matching report independently. It also consumes two producer attestations in
+`attempt.summary.json`. `LatestAttemptCompletedSuccessfully` is a conservative veto: a true
+value still requires complete, current and passing scenario evidence. `AlertsDeliveredByJob`
+reports acceptance by the configured recovery alert sink. A count can satisfy the
+`unalerted_breach` diagnostic for its job, while the breach itself still disqualifies the run.
+The summary can support local operational reconciliation. Claims of downstream notification
+delivery require independent delivery receipts.
+
 Evidence older than `MaximumEvidenceAge` (8 days, matching the 7-day cadence) is rejected as `stale_result`. Note the asymmetry with the 30-day artifact retention: an artifact aged 8–30 days is still downloadable but is no longer citable for ratification.
 
 The gate fails closed on disabled required validation, never-run/incomplete/stale/future evidence, a newer incomplete attempt, exception or timeout failure, `Unmeasurable`, divergence, containment breach, unalerted serious breach (unmeasurable / structural / target-deviation only — `cleanup_incomplete` and failed safety assertions are gate-only stop-ships without an `unalerted_breach` obligation), zero population, zero scenario coverage, missing dataset/scenario provenance, missing artifact locators, or `cleanup-complete: false` (`{job}:cleanup_incomplete`). Measurable RPO/RTO misses, rebuild-duration misses, and late scope recording remain distinct target deviations and are governed by their A10/NFR decision; the gate never relabels them as met/equivalent/contained.
