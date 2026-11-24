@@ -84,7 +84,10 @@
   <data name="AssociationReview_DisabledReason_ProjectionPending" xml:space="preserve"><value>Le statut de projection est encore en attente.</value></data>
   <data name="AssociationReview_DisabledReason_TerminalState" xml:space="preserve"><value>Cette association est déjà terminale.</value></data>
   <data name="AssociationReview_Empty" xml:space="preserve"><value>Aucun candidat autorisé n'est disponible pour cet élément.</value></data>
+  <data name="AssociationReview_EvidenceClose" xml:space="preserve"><value>Fermer le panneau de preuve</value></data>
+  <data name="AssociationReview_EvidenceKind" xml:space="preserve"><value>Type de preuve</value></data>
   <data name="AssociationReview_EvidenceRestricted" xml:space="preserve"><value>Preuve restreinte</value></data>
+  <data name="AssociationReview_EvidenceTitle" xml:space="preserve"><value>Preuve à l’appui</value></data>
   <data name="AssociationReview_Loading" xml:space="preserve"><value>Chargement de la revue d'association.</value></data>
   <data name="AssociationReview_Metadata" xml:space="preserve"><value>Métadonnées d'association</value></data>
   <data name="AssociationReview_SafeNextAction" xml:space="preserve"><value>Revoyez les métadonnées autorisées, puis différez ou escaladez jusqu'à ce que l'enregistrement de décision soit disponible.</value></data>

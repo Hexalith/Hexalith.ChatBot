@@ -880,6 +880,7 @@ location: ChatBotUiHostDefaultsExtensions.cs:34-37
 severity: medium
 reason: **[MEDIUM · reliability] The ChatBot UI host can still be made unstoppable by an unreachable OTLP collector.** `ChatBotUiHostDefaultsExtensions.cs:34-37` registers `UseOtlpExporter()` with no bounded telemetry shutdown, and `chatbot-ui` is a composed resource in the same DCP application as the EventStore host that was fixed. Provider disposal joins the batch-exporter thread with no timeout while that thread is parked in the exporter's retry sleep, so `IHost.DisposeAsync` never returns and the resource cannot be stopped. **Constraint:** the fix that exists, `BoundedTelemetryShutdownService`, is `internal sealed` to `Hexalith.EventStore.ServiceDefaults`, so the UI host cannot adopt it without a visibility change in that repository — which is why this is recorded rather than copied. **Owner:** ChatBot UI hosting, with EventStore ServiceDefaults for the visibility decision. **Closure evidence:** the UI host stops cleanly with an unreachable OTLP endpoint, proven the same falsifiable way as the EventStore host (disable the bound, the dispose test fails).
 status: open
+triage: 2026-11-24 Skipped. The bounded shutdown implementation remains internal to EventStore. The supported reusable platform API is required.
 decision: 2026-08-27 Expose platform API — Publish a reusable bounded-shutdown seam from EventStore ServiceDefaults, consume it in ChatBot UI, and add an unreachable-collector test.
 decision: 2026-08-26 Expose platform API — Publish a reusable bounded-shutdown seam from EventStore ServiceDefaults, consume it in ChatBot UI, and add an unreachable-collector test.
 
@@ -936,6 +937,7 @@ location: Hexalith.EventStore
 severity: medium
 reason: **[MEDIUM · test-design] D2 — three of four checkpoint-refusal reason codes are unasserted.** `ProjectionCheckpointRefusalDiagnosticsTests` covers `post-cutover-writer-protocol` only. **Not covered:** `delivery-row-requires-fenced-completion`, `delivery-row-schema-regression`, `delivery-row-unsupported` — each needs a delivery row that `ProjectionDeliveryStateClassifier` classifies accordingly, which the current fixture cannot build. A draft covering them was written and **reverted rather than shipped half-working**; the gap is also recorded in the test's own remarks. Its `GetStateAsync<ProjectionDeliveryState?>` arrangement is additionally inert, because production reads through `GetStateAndETagAsync`, so that precondition comes from NSubstitute's default rather than the stub. **Owner:** Hexalith.EventStore.
 status: open
+triage: 2026-11-24 Skipped. The classifier, checkpoint tracker and existing diagnostics tests are owned by Hexalith.EventStore.
 
 ### DW-101: [MEDIUM · test-design] D5 — the capture-filter fix is untested and its token check is approximate.
 
@@ -1070,6 +1072,7 @@ location: GovernedOperations.razor:57-58
 severity: medium
 reason: **[MEDIUM · user-safety] Server problem codes reach the user verbatim and mint unbounded announcement keys.** `GovernedOperationsEffects.SafeFailureCode` (`:51`) returns `problem.Result?.Code` unchanged; `GovernedOperations.razor:57-58` prints it through `SubmissionFailedBodyTemplate` and interpolates it into `AnnouncementKey`. **Not covered:** the code is never validated against the localized problem-details catalog, so an unknown or newly added server code surfaces as untranslated machine text — the same catalog-wiring asymmetry recorded for the rate-limit cells. **Owner:** ChatBot UI + problem-details catalog. **Closure evidence:** unknown codes fall back to a catalogued generic message, and announcement keys are drawn from a bounded set.
 status: open
+triage: 2026-11-24 Skipped. The existing localized catalog and generic fallback already prevent display of server-supplied codes. Per-attempt identities are locally generated to support retry announcements.
 
 ### DW-116: `.chatbot-conversation-shell` hand-rolled chrome still wraps the `FcPageLayout`/`FcPageHeader` composition. `chatbot.tokens.css:59-99` forces `display:grid` on `__body`, which is a `FluentStack Orientation="Horizontal"` supplying its own flex layout, so the `@media (min-width:900px)` `grid-template-columns` rule at :279-283 is fragile or inert; `Wrap` is left `false` so main and complementary cannot wrap at phone width; and the shell caps at `70rem` while content declares `FcPageLayoutMode.FullWidth`. Pre-existing — the Epic 13 application frame is Story 13.1 (`done`).
 
@@ -1126,7 +1129,8 @@ origin: migrated from legacy ledger ("Deferred from: code review of story-13.2 (
 location: ChatBotEvidenceChip.razor:105-113
 severity: medium
 reason: **[MEDIUM · missing-capability] The evidence drawer specified by EXPERIENCE.md does not exist on the association surface.** EXPERIENCE.md Component Patterns requires an evidence drawer that "expands source evidence without forcing users to read the full email thread" and redacts inaccessible details, and specifies that an evidence chip "click or keyboard activation opens the supporting evidence when permitted". No drawer or expansion exists anywhere on `/association-review/{id}`; `ChatBotEvidenceChip.ActivateAsync` (`ChatBotEvidenceChip.razor:105-113`) invokes an `OnActivate` callback that neither call site binds. **Deferred by decision 6 of the 2026-08-25 Story 13.3 review:** that review unnests the chips and drives `CanOpenEvidence` from `evidence.State` so the surface stops advertising an action it cannot perform; building the drawer is scoped to its own story. **Owner:** ChatBot UI. **Closure evidence:** a drawer that opens permitted evidence from a chip by pointer and keyboard, with redaction preserved for Redacted/Unauthorized/Unavailable states, verified on the live route.
-status: open
+status: done 2026-11-24
+resolution: Association chips open available source metadata in a nonmodal drawer. The panel clears on scope changes, preserves all restricted states, and restores focus on close. Live interaction coverage uses pointer and keyboard.
 decision: 2026-08-27 Build evidence drawer — Implement permitted evidence loading and drawer presentation with pointer and keyboard activation plus fail-closed redaction states.
 decision: 2026-08-26 Build evidence drawer — Implement permitted evidence loading and drawer presentation with pointer and keyboard activation plus fail-closed redaction states.
 

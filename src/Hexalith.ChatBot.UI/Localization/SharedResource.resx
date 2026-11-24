@@ -84,7 +84,10 @@
   <data name="AssociationReview_DisabledReason_ProjectionPending" xml:space="preserve"><value>Projection status is still pending.</value></data>
   <data name="AssociationReview_DisabledReason_TerminalState" xml:space="preserve"><value>This association is already terminal.</value></data>
   <data name="AssociationReview_Empty" xml:space="preserve"><value>No authorized candidates are available for this item.</value></data>
+  <data name="AssociationReview_EvidenceClose" xml:space="preserve"><value>Close supporting evidence</value></data>
+  <data name="AssociationReview_EvidenceKind" xml:space="preserve"><value>Evidence kind</value></data>
   <data name="AssociationReview_EvidenceRestricted" xml:space="preserve"><value>Evidence restricted</value></data>
+  <data name="AssociationReview_EvidenceTitle" xml:space="preserve"><value>Supporting evidence</value></data>
   <data name="AssociationReview_Loading" xml:space="preserve"><value>Loading association review.</value></data>
   <data name="AssociationReview_Metadata" xml:space="preserve"><value>Association metadata</value></data>
   <data name="AssociationReview_SafeNextAction" xml:space="preserve"><value>Review authorized metadata, then defer or escalate until decision recording is available.</value></data>

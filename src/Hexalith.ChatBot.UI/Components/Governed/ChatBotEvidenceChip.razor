@@ -1,10 +1,14 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
 @inject ChatBotUiTextLocalizer UiText
 
-@if (CanOpenEvidence)
+@if (CanOpenEvidence && !IsUnavailable)
 {
     <FluentButton Appearance="ButtonAppearance.Subtle"
                   Type="ButtonType.Button"
+                  Id="@ActivationId"
+                  role="button"
+                  aria-expanded="@ExpandedState"
+                  aria-controls="@(IsExpanded is true ? PanelId : null)"
                   Class="chatbot-chip chatbot-chip--evidence"
                   data-chatbot-evidence-state="@State"
                   data-chatbot-off-surface-kind="@OffSurfaceKind"
@@ -67,8 +71,22 @@ else
     [Parameter]
     public ChatBotOffSurfaceAffordanceContract? OffSurfaceAffordance { get; set; }
 
+    /// <summary>Gets or sets the focus-return target for an interactive chip.</summary>
+    [Parameter]
+    public string? ActivationId { get; set; }
+
+    /// <summary>Gets or sets the expanded state when the chip controls an evidence panel.</summary>
+    [Parameter]
+    public bool? IsExpanded { get; set; }
+
+    /// <summary>Gets or sets the ID of the evidence panel controlled by the chip.</summary>
+    [Parameter]
+    public string? PanelId { get; set; }
+
     [Parameter]
     public EventCallback OnActivate { get; set; }
+
+    private string? ExpandedState => IsExpanded switch { true => "true", false => "false", _ => null };
 
     private bool IsUnavailable => State is ChatBotEvidenceState.Unavailable or ChatBotEvidenceState.Redacted or ChatBotEvidenceState.Unauthorized;
 

@@ -32,11 +32,17 @@
     @for (int index = 0; index < Candidate.Evidence.Count; index++)
     {
         AssociationEvidenceModel evidence = Candidate.Evidence[index];
+        string chipId = EvidenceStableId(index);
+        bool canOpen = OnEvidenceSelected.HasDelegate && AssociationReviewRendering.CanOpenEvidence(evidence);
         <ChatBotEvidenceChip Text="@AssociationReviewRendering.EvidenceText(evidence, UiText)"
                              State="@evidence.State"
-                             CanOpenEvidence="@(evidence.State is ChatBotEvidenceState.Available)"
+                             CanOpenEvidence="@canOpen"
                              UnavailableReason="@evidence.UnavailableReason"
-                             StableId="@EvidenceStableId(index)" />
+                             StableId="@chipId"
+                             ActivationId="@chipId"
+                             IsExpanded="@(canOpen ? string.Equals(ExpandedChipId, chipId, StringComparison.Ordinal) : null)"
+                             PanelId="@EvidencePanelId"
+                             OnActivate="@(() => OnEvidenceSelected.InvokeAsync((Candidate, evidence, chipId)))" />
     }
 </span>
 
@@ -72,6 +78,18 @@
             Candidate.Rank,
             Formatter.FormatConfidence(Candidate.ConfidenceScore),
             Candidate.DisplayLabel);
+
+    /// <summary>Gets or sets the chip that opened the supporting evidence panel.</summary>
+    [Parameter]
+    public string? ExpandedChipId { get; set; }
+
+    /// <summary>Gets or sets the controlled evidence panel ID.</summary>
+    [Parameter]
+    public string? EvidencePanelId { get; set; }
+
+    /// <summary>Raised with the candidate, available evidence, and focus-return target.</summary>
+    [Parameter]
+    public EventCallback<(AssociationCandidateModel Candidate, AssociationEvidenceModel Evidence, string ChipId)> OnEvidenceSelected { get; set; }
 
     private string EvidenceStableId(int position) => $"{_instanceId}-evidence-{position}";
 

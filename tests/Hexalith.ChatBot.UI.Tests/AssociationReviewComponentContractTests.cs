@@ -152,7 +152,8 @@ public sealed class AssociationReviewComponentContractTests
             helper.ShouldContain("AssociationReviewEvidenceRestricted");
 
             // The chip must not advertise an open affordance for evidence it cannot open.
-            source.ShouldContain("CanOpenEvidence=\"@(evidence.State is ChatBotEvidenceState.Available)\"");
+            source.ShouldContain("OnEvidenceSelected.HasDelegate && AssociationReviewRendering.CanOpenEvidence(evidence)");
+            source.ShouldContain("CanOpenEvidence=\"@canOpen\"");
             source.ShouldNotContain("CanOpenEvidence=\"true\"");
 
             // Ids are derived from the instance and position, never from the free-text reference - the chip

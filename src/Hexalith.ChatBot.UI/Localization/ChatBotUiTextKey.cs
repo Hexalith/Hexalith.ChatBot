@@ -188,7 +188,10 @@ public static class ChatBotUiTextKey
     public const string AssociationReviewDisabledReasonProjectionPending = "AssociationReview_DisabledReason_ProjectionPending";
     public const string AssociationReviewDisabledReasonTerminalState = "AssociationReview_DisabledReason_TerminalState";
     public const string AssociationReviewEmpty = "AssociationReview_Empty";
+    public const string AssociationReviewEvidenceClose = "AssociationReview_EvidenceClose";
+    public const string AssociationReviewEvidenceKind = "AssociationReview_EvidenceKind";
     public const string AssociationReviewEvidenceRestricted = "AssociationReview_EvidenceRestricted";
+    public const string AssociationReviewEvidenceTitle = "AssociationReview_EvidenceTitle";
     public const string AssociationReviewLoading = "AssociationReview_Loading";
     public const string AssociationReviewMetadata = "AssociationReview_Metadata";
     public const string AssociationReviewSafeNextAction = "AssociationReview_SafeNextAction";
@@ -1117,7 +1120,10 @@ public static class ChatBotUiTextKey
         AssociationReviewDisabledReasonProjectionPending,
         AssociationReviewDisabledReasonTerminalState,
         AssociationReviewEmpty,
+        AssociationReviewEvidenceClose,
+        AssociationReviewEvidenceKind,
         AssociationReviewEvidenceRestricted,
+        AssociationReviewEvidenceTitle,
         AssociationReviewLoading,
         AssociationReviewMetadata,
         AssociationReviewSafeNextAction,

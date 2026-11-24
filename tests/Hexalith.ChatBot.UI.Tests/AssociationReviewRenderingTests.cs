@@ -125,19 +125,24 @@ public sealed class AssociationReviewRenderingTests
         {
             Evidence = [new("REFERENCE<sentinel>", "FINGERPRINT_SENTINEL", "KIND<sentinel>", state, "Unavailable")],
         };
+        EventCallback<(AssociationCandidateModel Candidate, AssociationEvidenceModel Evidence, string ChipId)> open =
+            EventCallback.Factory.Create<(AssociationCandidateModel, AssociationEvidenceModel, string)>(this, static _ => { });
         string comparison = await RenderPairAsync<ChatBotAssociationEvidenceComparison>(new()
         {
             [nameof(ChatBotAssociationEvidenceComparison.Candidate)] = candidate,
+            [nameof(ChatBotAssociationEvidenceComparison.OnEvidenceSelected)] = open,
         });
         string row = await RenderPairAsync<ChatBotAssociationCandidateRow>(new()
         {
             [nameof(ChatBotAssociationCandidateRow.Candidate)] = candidate,
+            [nameof(ChatBotAssociationCandidateRow.OnEvidenceSelected)] = open,
         });
         foreach (string html in new[] { comparison, row })
         {
             html.Contains("REFERENCE&lt;sentinel&gt;", StringComparison.Ordinal).ShouldBe(state == ChatBotEvidenceState.Available);
             html.Contains("KIND&lt;sentinel&gt;", StringComparison.Ordinal).ShouldBe(state == ChatBotEvidenceState.Available);
             html.ShouldNotContain("FINGERPRINT_SENTINEL");
+            Regex.Matches(html, "aria-expanded=\"false\"").Count.ShouldBe(state == ChatBotEvidenceState.Available ? 2 : 0);
             html.ShouldNotContain("<sentinel>");
             if (state != ChatBotEvidenceState.Available)
             {

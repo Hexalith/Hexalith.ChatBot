@@ -21,6 +21,13 @@ internal static class AssociationReviewRendering
     /// <returns>The Fluent key-value row.</returns>
     internal static RenderFragment TextRow(string label, string? value) => ChatBotMetadataRendering.TextRow(label, value);
 
+    /// <summary>Checks whether the available evidence has metadata to show in the panel.</summary>
+    internal static bool CanOpenEvidence(AssociationEvidenceModel evidence)
+        => evidence.State is ChatBotEvidenceState.Available
+            && (!string.IsNullOrWhiteSpace(evidence.Reference)
+                || !string.IsNullOrWhiteSpace(evidence.Fingerprint)
+                || !string.IsNullOrWhiteSpace(evidence.Kind));
+
     /// <summary>Withholds both kind and reference unless evidence is available.</summary>
     /// <param name="evidence">The server-authorized evidence metadata.</param>
     /// <param name="text">The active phrase localizer.</param>
