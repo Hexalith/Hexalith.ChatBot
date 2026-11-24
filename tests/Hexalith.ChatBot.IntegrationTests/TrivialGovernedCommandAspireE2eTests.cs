@@ -1299,9 +1299,10 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             client.Timeout = TimeSpan.FromSeconds(30);
             await WaitForChatBotListeningAsync(client, cancellationToken).ConfigureAwait(true);
 
-            using HttpResponseMessage response = await client
-                .GetAsync("/health/chatbot/workflows", cancellationToken)
-                .ConfigureAwait(true);
+            string accessToken = await AcquireTenantBoundAccessTokenAsync(app, cancellationToken).ConfigureAwait(true);
+            using HttpRequestMessage health = new(HttpMethod.Get, "/health/chatbot/workflows");
+            health.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            using HttpResponseMessage response = await client.SendAsync(health, cancellationToken).ConfigureAwait(true);
             response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
             using JsonDocument body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(true));
