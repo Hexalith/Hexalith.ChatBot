@@ -620,6 +620,28 @@ public sealed class OperationStatusMonotonicityTests
         OperationStatusHttpResults.ToJsonElement(OperationStatusRecord.FromCanonical(projected)).GetProperty("completionStatus").GetString().ShouldBe("completed");
     }
 
+    [Theory]
+    [InlineData("private-completion", "committed", "committed")]
+    [InlineData("completed", "private-audit", "reconciling")]
+    [InlineData("0", "1", "reconciling")]
+    public void UnknownPersistedStatusShouldReturnGenericDenial(string completion, string audit, string expectedAudit)
+    {
+        OperationStatusRecord record = OperationStatusRecord.FromCanonical(Committed()) with
+        {
+            CompletionStatus = completion,
+            AuditStatus = audit,
+            ResourceIds = ["private-resource"],
+        };
+        System.Text.Json.JsonElement wire = OperationStatusHttpResults.ToJsonElement(record);
+        wire.GetProperty("operationId").GetString().ShouldBe(record.OperationId);
+        wire.GetProperty("completionStatus").GetString().ShouldBe("failed");
+        wire.GetProperty("auditStatus").GetString().ShouldBe(expectedAudit);
+        wire.GetProperty("partialOutputs").GetProperty("auditStatus").GetString().ShouldBe(expectedAudit);
+        wire.GetProperty("reasonCode").GetString().ShouldBe("generic_denial");
+        wire.GetProperty("retryEligible").GetBoolean().ShouldBeFalse();
+        wire.GetRawText().ShouldNotContain("private-");
+    }
+
     [Fact]
     public void UnknownSafeReasonShouldSuppressAllNewMetadataAndRetryPermission()
     {

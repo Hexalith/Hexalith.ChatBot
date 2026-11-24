@@ -26,11 +26,15 @@ internal static class OperationStatusHttpResults
 
     private static OperationStatus ToWire(OperationStatusRecord record, DateTimeOffset now)
     {
-        OperationCompletionStatus completion = Parse<OperationCompletionStatus>(record.CompletionStatus);
-        OperationAuditStatus audit = Parse<OperationAuditStatus>(record.AuditStatus);
+        bool knownCompletion = TryParse(record.CompletionStatus, out OperationCompletionStatus completion);
+        bool knownAudit = TryParse(record.AuditStatus, out OperationAuditStatus audit);
+        if (!knownAudit)
+        {
+            audit = OperationAuditStatus.Reconciling;
+        }
         CommandSubmissionResponse? previous = record.PriorOutcome;
-        bool validCanonicalMetadata = OperationStatusUpdatePolicy.HasValidMetadata(record);
-        bool knownReason = validCanonicalMetadata && KnownCode(record.ReasonCode) && Enum.IsDefined(record.LifecycleState) &&
+        bool knownReason = knownCompletion && knownAudit && OperationStatusUpdatePolicy.HasValidMetadata(record) &&
+            KnownCode(record.ReasonCode) && Enum.IsDefined(record.LifecycleState) &&
             (record.ExecutionState is null || Enum.IsDefined(record.ExecutionState.Value)) &&
             (record.ProjectionState is null || Enum.IsDefined(record.ProjectionState.Value)) &&
             (record.LastTransition is null || (KnownCode(record.LastTransition.ReasonCode) &&
@@ -144,9 +148,6 @@ internal static class OperationStatusHttpResults
 
     private static bool KnownCode(string? code)
         => code != ChatBotMessageCodes.GenericDenial && ChatBotMessageCatalog.IsKnown(code);
-
-    private static T Parse<T>(string code) where T : struct, Enum
-        => TryParse(code, out T value) ? value : throw new ArgumentOutOfRangeException(nameof(code), code, "Unknown contract enum value.");
 
     private static bool TryParse<T>(string code, out T value) where T : struct, Enum
     {

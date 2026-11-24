@@ -1502,9 +1502,16 @@ resolution: System.Text.Json reads and writes declared policy-map wire keys. Con
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: The gateway redaction stage copies correlation and task identifiers without validating their provenance.
   evidence: `CoarseUserFacingRedactionStage.Apply` copied both fields at Story 1.4 baseline. HTTP middleware validates incoming identifiers, but internal callers should be traced before deciding whether the stage needs its own validation.
-- source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
-  summary: Operation status serialization throws when stored completion or audit enum text is unknown.
-  evidence: `OperationStatusHttpResults.Parse<T>` threw for unknown enum text at Story 1.4 baseline. Check store schema migration and forward compatibility before choosing a fallback completion or audit state.
+### DW-144: Operation status serialization throws when stored completion or audit enum text is unknown.
+
+origin: legacy ledger entry from Deferred from: Story 1.4 versioned safe outcomes review (2026-10-12)
+source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
+severity: medium
+reason: `OperationStatusHttpResults.Parse<T>` threw for unknown enum text at Story 1.4 baseline. Check store schema migration and forward compatibility before choosing a fallback completion or audit state.
+status: done 2026-11-24
+resolution: Unknown persisted completion or audit values produce a generic, non-retryable failure with closed status values and preserved operation identity. Unknown audit is shown as reconciling. Tests exercise unknown names and numeric strings.
+
+
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: Unverified medium risk: distinguish a fresh blocked workspace failure from repeated polling when the component uses a fixed stable identity.
