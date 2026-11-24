@@ -33,6 +33,8 @@ public sealed class VersionedSafeOutcomeBrowserTests
         IPage page = await context.NewPageAsync().ConfigureAwait(true);
         await page.GotoAsync($"{host.BaseUri}/projects/project-alpha/conversation").ConfigureAwait(true);
         ILocator composer = page.Locator(".chatbot-governed-composer");
+        await Assertions.Expect(composer.Locator(".chatbot-governed-composer__actions fluent-button"))
+            .ToBeEnabledAsync().ConfigureAwait(true);
         await composer.Locator("textarea").FillAsync("Repeated safe submission").ConfigureAwait(true);
         ILocator banner = composer.Locator("[data-chatbot-stable-id$=\"project-conversation-composer-status\"]");
         await page.EvaluateAsync("""
@@ -126,6 +128,8 @@ public sealed class VersionedSafeOutcomeBrowserTests
         await Assertions.Expect(themeMenu).ToContainTextAsync(selectedTheme).ConfigureAwait(true);
 
         ILocator composer = page.Locator(".chatbot-governed-composer");
+        await Assertions.Expect(composer.Locator(".chatbot-governed-composer__actions fluent-button"))
+            .ToBeEnabledAsync().ConfigureAwait(true);
         ILocator input = composer.Locator("textarea");
         await input.FillAsync("Safe failure test submission").ConfigureAwait(true);
         await composer.Locator(".chatbot-governed-composer__actions fluent-button")

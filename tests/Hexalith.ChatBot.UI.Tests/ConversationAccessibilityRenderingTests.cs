@@ -22,6 +22,24 @@ namespace Hexalith.ChatBot.UI.Tests;
 /// <summary>Exercises actual repeated conversation components and their accessibility references.</summary>
 public sealed class ConversationAccessibilityRenderingTests
 {
+    /// <summary>Keeps draft entry and submission unavailable until the interactive circuit can handle them.</summary>
+    [Fact]
+    public async Task PrerenderedComposersShouldDisableInputAndActions()
+    {
+        List<string> renders = await RenderPairAsync<ChatBotGovernedComposer>(_ => new(), []);
+        string[] composers = ComposerSections(renders[0]).ToArray();
+        composers.Length.ShouldBe(2);
+        foreach (string composer in composers)
+        {
+            MatchCollection controls = Regex.Matches(composer, @"<fluent-(?:button|text-?area)\b[^>]*>");
+            controls.Count.ShouldBe(4);
+            foreach (Match control in controls)
+            {
+                Regex.IsMatch(control.Value, @"\sdisabled(?=[=\s>])").ShouldBeTrue(control.Value);
+            }
+        }
+    }
+
     /// <summary>Validation and status transitions preserve each composer's identity and references.</summary>
     [Fact]
     public async Task RepeatedComposersShouldKeepLocalReferencesAcrossValidationStatusAndReceiptTransitions()

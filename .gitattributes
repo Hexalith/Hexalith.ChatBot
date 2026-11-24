@@ -1,4 +1,7 @@
-# Preserve the authored CRLF bytes in these test files.
+# Preserve the authored CRLF bytes in these files.
+src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor whitespace=cr-at-eol
 tests/Hexalith.ChatBot.Architecture.Tests/LiveRecoveryValidationArchitectureTests.cs whitespace=cr-at-eol
 tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.AuthorityExpiry.cs whitespace=cr-at-eol
 tests/Hexalith.ChatBot.UI.E2E.Tests/RealRenderCrossSurfaceE2ETests.cs whitespace=cr-at-eol
+tests/Hexalith.ChatBot.UI.E2E.Tests/VersionedSafeOutcomeBrowserTests.cs whitespace=cr-at-eol
+tests/Hexalith.ChatBot.UI.Tests/ConversationAccessibilityRenderingTests.cs whitespace=cr-at-eol

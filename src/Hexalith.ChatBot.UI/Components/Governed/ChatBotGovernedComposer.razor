@@ -42,20 +42,20 @@
         <FluentButton Type="ButtonType.Button"
                       Appearance="ButtonAppearance.Outline"
                       aria-pressed="@(Mode is ProjectConversationComposerMode.Message ? "true" : "false")"
-                      Disabled="@Disabled"
+                      Disabled="@ControlsDisabled"
                       OnClick="@(() => OnModeChanged.InvokeAsync(ProjectConversationComposerMode.Message))">
             @UiText[ChatBotUiTextKey.ProjectConversationComposerMessageMode]
         </FluentButton>
         <FluentButton Type="ButtonType.Button"
                       Appearance="ButtonAppearance.Outline"
                       aria-pressed="@(Mode is ProjectConversationComposerMode.AskAi ? "true" : "false")"
-                      Disabled="@Disabled"
+                      Disabled="@ControlsDisabled"
                       OnClick="@(() => OnModeChanged.InvokeAsync(ProjectConversationComposerMode.AskAi))">
             @UiText[ChatBotUiTextKey.ProjectConversationComposerAskAiMode]
         </FluentButton>
     </div>
 
-    <FluentLabel Class="chatbot-labelled-row" for="@InputId" Disabled="@Disabled">
+    <FluentLabel Class="chatbot-labelled-row" for="@InputId" Disabled="@ControlsDisabled">
         @UiText[ChatBotUiTextKey.ProjectConversationComposerInputLabel]
     </FluentLabel>
     <FluentTextArea Id="@InputId"
@@ -68,7 +68,7 @@
                     aria-describedby="@InputDescriptionIds"
                     aria-errormessage="@(string.IsNullOrWhiteSpace(ValidationMessage) ? null : Id("project-conversation-composer-error"))"
                     aria-invalid="@(!string.IsNullOrWhiteSpace(ValidationMessage))"
-                    Disabled="@Disabled"
+                    Disabled="@ControlsDisabled"
                     @onkeydown:stopPropagation="true" />
     <p id="@Id("project-conversation-composer-help")" class="chatbot-muted-text">@UiText[ChatBotUiTextKey.ProjectConversationComposerHelp]</p>
 
@@ -77,7 +77,7 @@
                       Appearance="ButtonAppearance.Primary"
                       Class="chatbot-touch-target-primary"
                       data-chatbot-touch-target="primary"
-                      Disabled="@Disabled"
+                      Disabled="@ControlsDisabled"
                       OnClick="SubmitAsync">
             @(IsSubmitting ? UiText[ChatBotUiTextKey.ProjectConversationComposerSubmitting] : UiText[ChatBotUiTextKey.ProjectConversationComposerSubmit])
         </FluentButton>
@@ -136,6 +136,8 @@
     public EventCallback<string> OnSubmit { get; set; }
 
     private string Text { get; set; } = string.Empty;
+
+    private bool ControlsDisabled => Disabled || !RendererInfo.IsInteractive;
 
     private string? ValidationMessage
         => string.IsNullOrWhiteSpace(ValidationErrorCode) ? null : UiText[ChatBotUiTextKey.ProjectConversationComposerValidationRequired];
@@ -242,7 +244,7 @@
     // OnAfterRenderAsync only once an accepted receipt for THIS submission arrives. [AC2]
     private async Task SubmitAsync()
     {
-        if (Disabled || IsSubmitting || _awaitingSubmissionReceipt)
+        if (ControlsDisabled || IsSubmitting || _awaitingSubmissionReceipt)
         {
             return;
         }
