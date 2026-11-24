@@ -21,9 +21,13 @@ required = (
     "CommittedGovernedStateShouldPassM2StopShipSweepsInRealDaprTopology",
     "GovernedNoteShouldProjectIdenticalDurableEndStateRegardlessOfDeclaredOrigin",
 )
-results = ElementTree.parse(sys.argv[1]).findall("./trx:Results/trx:UnitTestResult", namespace)
+report = ElementTree.parse(sys.argv[1])
+definitions = report.findall("./trx:TestDefinitions/trx:UnitTest", namespace)
+results = report.findall("./trx:Results/trx:UnitTestResult", namespace)
 for method in required:
-    outcomes = [result.get("outcome") for result in results if result.get("testName") == f"{test_class}.{method}"]
-    if outcomes != ["Passed"]:
+    ids = [definition.get("id") for definition in definitions if definition.find(
+        f"trx:TestMethod[@className='{test_class}'][@name='{method}']", namespace) is not None]
+    outcomes = [result.get("outcome") for result in results if result.get("testId") in ids]
+    if len(ids) != 1 or not ids[0] or outcomes != ["Passed"]:
         raise SystemExit(f"Required ChatBot release check did not pass exactly once: {method}")
 PYTHON
