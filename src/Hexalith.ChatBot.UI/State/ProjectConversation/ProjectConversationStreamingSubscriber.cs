@@ -28,7 +28,8 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
     private Func<Task>? _onReconnected;
     private string? _subscribedTenant;
     private int _recoveryActive;
-    private volatile bool _disposed;
+    private volatile bool _disposeRequested;
+    private bool _disposed;
 
     public ProjectConversationStreamingSubscriber(
         ChatBotHubEndpoint endpoint,
@@ -67,7 +68,7 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(onProjectConversationChanged);
         ArgumentNullException.ThrowIfNull(onReconnected);
-        if (_disposed || string.IsNullOrWhiteSpace(tenantId))
+        if (_disposeRequested || string.IsNullOrWhiteSpace(tenantId))
         {
             return;
         }
@@ -87,7 +88,7 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
 
         await DisposeConnectionAsync().ConfigureAwait(false);
 
-        if (_disposed)
+        if (_disposeRequested)
         {
             return;
         }
@@ -111,7 +112,7 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
         _connection = connection;
         _subscribedTenant = tenantId;
 
-        if (_disposed)
+        if (_disposeRequested)
         {
             await DisposeConnectionAsync(expectedConnection: connection).ConfigureAwait(false);
             return;
@@ -191,6 +192,7 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
+        _disposeRequested = true;
         await _subscriptionChanges.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -243,11 +245,11 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
     }
 
     private bool IsCurrentConnection(IProjectConversationHubConnection connection)
-        => !_disposed && ReferenceEquals(_connection, connection);
+        => !_disposeRequested && ReferenceEquals(_connection, connection);
 
     private async Task NotifyAsync(Func<Task>? callback)
     {
-        if (_disposed || callback is null)
+        if (_disposeRequested || callback is null)
         {
             return;
         }
@@ -264,7 +266,7 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
 
     private void ScheduleRecovery()
     {
-        if (_disposed || string.IsNullOrWhiteSpace(_subscribedTenant) ||
+        if (_disposeRequested || string.IsNullOrWhiteSpace(_subscribedTenant) ||
             Interlocked.CompareExchange(ref _recoveryActive, 1, 0) != 0)
         {
             return;
@@ -305,7 +307,7 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
         finally
         {
             _ = Interlocked.Exchange(ref _recoveryActive, 0);
-            if (!_disposed && _connection?.State is not HubConnectionState.Connected &&
+            if (!_disposeRequested && _connection?.State is not HubConnectionState.Connected &&
                 !string.IsNullOrWhiteSpace(_subscribedTenant))
             {
                 ScheduleRecovery();
@@ -319,7 +321,7 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
         try
         {
             // Read only after admission: a newer render may have changed tenant/project while recovery was queued.
-            if (_disposed || _subscribedTenant is not { } tenant ||
+            if (_disposeRequested || _subscribedTenant is not { } tenant ||
                 _onChanged is not { } onChanged || _onReconnected is not { } onReconnected)
             {
                 return false;
