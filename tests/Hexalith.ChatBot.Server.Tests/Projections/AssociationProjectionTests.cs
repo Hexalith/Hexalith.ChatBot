@@ -521,7 +521,7 @@ public sealed class AssociationProjectionTests
                 }
             }));
 
-    private static PublishedAssociationEvent Published(long sourceVersion)
+    internal static PublishedAssociationEvent Published(long sourceVersion)
         => new(
             Tenant,
             "chatbot",

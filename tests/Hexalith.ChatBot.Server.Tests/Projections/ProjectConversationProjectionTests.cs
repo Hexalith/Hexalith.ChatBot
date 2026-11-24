@@ -2277,7 +2277,7 @@ public sealed class ProjectConversationProjectionTests
             DetectedAt.AddMinutes(1),
             DetectedAt.AddMinutes(1));
 
-    private static PublishedMailboxIntakeEvent PublishedIntake(long sequenceNumber)
+    internal static PublishedMailboxIntakeEvent PublishedIntake(long sequenceNumber)
         => new(
             Tenant,
             ChatBotEventStore.DomainName,

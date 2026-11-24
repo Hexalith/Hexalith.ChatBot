@@ -25,7 +25,7 @@ internal static class AssociationProjectionEndpoints
         ArgumentNullException.ThrowIfNull(endpoints);
 
         _ = endpoints
-            .MapPost(AssociationRoute, ProjectAsync)
+            .MapPost(AssociationRoute, VerifyChannelAndProjectAsync)
             .RequireEventStoreSidecarChannel();
 
         return endpoints;
@@ -40,7 +40,7 @@ internal static class AssociationProjectionEndpoints
     /// <param name="handler">The association projection handler.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>401 without a single matching channel credential; otherwise an empty 200 result.</returns>
-    public static async Task<IResult> ProjectAsync(
+    public static async Task<IResult> VerifyChannelAndProjectAsync(
         HttpContext context,
         IConfiguration configuration,
         PublishedAssociationEvent published,
@@ -49,7 +49,6 @@ internal static class AssociationProjectionEndpoints
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(configuration);
-        ArgumentNullException.ThrowIfNull(handler);
 
         string? expected = configuration["APP_API_TOKEN"];
         Microsoft.Extensions.Primitives.StringValues presented = context.Request.Headers["dapr-api-token"];
@@ -58,6 +57,24 @@ internal static class AssociationProjectionEndpoints
         {
             return Results.StatusCode(StatusCodes.Status401Unauthorized);
         }
+
+        return await ProjectAsync(published, handler, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Projects one published association event whose application channel the caller already verified, as the
+    /// sidecar-guarded fan-out route does.
+    /// </summary>
+    /// <param name="published">The published event envelope.</param>
+    /// <param name="handler">The association projection handler.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>An empty 200 result; foreign events are acknowledged without projection.</returns>
+    public static async Task<IResult> ProjectAsync(
+        PublishedAssociationEvent published,
+        AssociationProjectionHandler handler,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
 
         AssociationNotification? notification =
             AssociationProjectionTranslator.TryCreateNotification(published);

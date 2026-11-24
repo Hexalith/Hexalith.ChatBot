@@ -104,7 +104,7 @@ public sealed class ParticipantResolutionProjectionTests
             RecordedAt,
             CorrelationId);
 
-    private static PublishedParticipantResolutionEvent PublishedResolved(long sourceVersion)
+    internal static PublishedParticipantResolutionEvent PublishedResolved(long sourceVersion)
         => new(
             Tenant,
             "chatbot",

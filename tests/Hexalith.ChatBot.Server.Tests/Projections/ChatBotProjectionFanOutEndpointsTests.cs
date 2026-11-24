@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Server.Governance.Conversations;
+using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.ServiceDefaults.Authentication;
 
@@ -14,6 +15,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 
 using Shouldly;
+
+using EventStoreEnvelope = Hexalith.EventStore.Server.Events.EventEnvelope;
 
 namespace Hexalith.ChatBot.Server.Tests.Projections;
 
@@ -29,6 +32,10 @@ public sealed class ChatBotProjectionFanOutEndpointsTests
     private const string NoteId = "01ARZ3NDEKTSV4RRFFQ69G5FAZ";
     private const string MessageId = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
     private const string CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW";
+    private const string IntakeId = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
+    private const string AssociationId = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+    private const string ResolutionId = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+    private const string SourceParticipantId = "01ARZ3NDEKTSV4RRFFQ69G5FAZ";
     private static readonly DateTimeOffset OccurredAt = new(2026, 6, 1, 0, 0, 0, TimeSpan.Zero);
 
     /// <summary>Gets every sidecar-originated projection route: the fan-out subscription and the seven family routes.</summary>
@@ -111,6 +118,9 @@ public sealed class ChatBotProjectionFanOutEndpointsTests
     /// </summary>
     /// <param name="family">The projection family whose published event is delivered.</param>
     [Theory]
+    [InlineData("mailbox-intake")]
+    [InlineData("association")]
+    [InlineData("participant-resolution")]
     [InlineData("approval")]
     [InlineData("task-intent")]
     [InlineData("ai-outcome")]
@@ -120,6 +130,9 @@ public sealed class ChatBotProjectionFanOutEndpointsTests
         using HttpClient client = factory.CreateAppChannelClient();
         object published = family switch
         {
+            "mailbox-intake" => ProjectConversationProjectionTests.PublishedIntake(3),
+            "association" => AssociationProjectionTests.Published(1),
+            "participant-resolution" => ParticipantResolutionProjectionTests.PublishedResolved(1),
             "approval" => ProjectConversationProjectionTests.ApprovalRequestPublished(8),
             "task-intent" => TaskIntentMessagePublished(),
             _ => AiOutcomePublished(),
@@ -134,24 +147,75 @@ public sealed class ChatBotProjectionFanOutEndpointsTests
 
         first.StatusCode.ShouldBe(HttpStatusCode.OK);
         replay.StatusCode.ShouldBe(HttpStatusCode.OK);
-        ProjectConversationItemView item = (await ConversationItemsAsync(factory).ConfigureAwait(true)).ShouldHaveSingleItem();
+        IReadOnlyList<ProjectConversationItemView> items = await ConversationItemsAsync(factory).ConfigureAwait(true);
         switch (family)
         {
+            case "mailbox-intake":
+                ProjectConversationSourceEmailView source = (await factory.Services
+                    .GetRequiredService<IProjectConversationProjectionStore>()
+                    .GetSourceEmailAsync(Tenant, IntakeId, TestContext.Current.CancellationToken)
+                    .ConfigureAwait(true)).ShouldNotBeNull();
+                source.SourceVersion.ShouldBe(3);
+                items.ShouldBeEmpty();
+                break;
+            case "association":
+                AssociationCandidateView association = (await factory.Services
+                    .GetRequiredService<IAssociationProjectionStore>()
+                    .GetAsync(Tenant, AssociationId, TestContext.Current.CancellationToken)
+                    .ConfigureAwait(true)).ShouldNotBeNull();
+                association.SourceVersion.ShouldBe(1);
+                items.ShouldHaveSingleItem().SourceVersion.ShouldBe(1);
+                break;
+            case "participant-resolution":
+                ParticipantResolutionView participant = (await factory.Services
+                    .GetRequiredService<IParticipantResolutionProjectionStore>()
+                    .GetAsync(Tenant, ResolutionId, SourceParticipantId, TestContext.Current.CancellationToken)
+                    .ConfigureAwait(true)).ShouldNotBeNull();
+                participant.SourceVersion.ShouldBe(1);
+                items.ShouldBeEmpty();
+                break;
             case "approval":
-                item.Kind.ShouldBe(ProjectConversationItemKind.ApprovalEvent);
-                item.ApprovalId.ShouldBe("approval-001");
-                item.SourceVersion.ShouldBe(8);
+                ProjectConversationItemView approval = items.ShouldHaveSingleItem();
+                approval.Kind.ShouldBe(ProjectConversationItemKind.ApprovalEvent);
+                approval.ApprovalId.ShouldBe("approval-001");
+                approval.SourceVersion.ShouldBe(8);
                 break;
             case "task-intent":
-                item.ItemId.ShouldBe("ui-message:001");
-                item.SurfaceOrigin.ShouldBe("ui");
-                item.SourceVersion.ShouldBe(12);
+                ProjectConversationItemView message = items.ShouldHaveSingleItem();
+                message.ItemId.ShouldBe("ui-message:001");
+                message.SurfaceOrigin.ShouldBe("ui");
+                message.SourceVersion.ShouldBe(12);
                 break;
             default:
-                item.Kind.ShouldBe(ProjectConversationItemKind.AiOutcome);
-                item.SourceVersion.ShouldBe(60);
+                ProjectConversationItemView outcome = items.ShouldHaveSingleItem();
+                outcome.Kind.ShouldBe(ProjectConversationItemKind.AiOutcome);
+                outcome.SourceVersion.ShouldBe(60);
                 break;
         }
+    }
+
+    /// <summary>
+    /// The fan-out runs the association family without its own channel comparison. The sidecar guard trims the
+    /// configured token, so a padded configuration admits the delivery while the association route's untrimmed
+    /// comparison refuses it; the families after association must still project.
+    /// </summary>
+    [Fact]
+    public async Task FanOutShouldRunTheFamiliesAfterAssociationWhenTheGuardAdmitsAPaddedChannelToken()
+    {
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithWebHostBuilder(static builder =>
+            builder.UseSetting(DaprAppChannelToken.ConfigurationKey, $"  {DaprAppChannelTestAccess.Token}  "));
+        using HttpClient client = factory.CreateAppChannelClient();
+
+        using HttpResponseMessage association = await client
+            .PostAsJsonAsync(AssociationProjectionEndpoints.AssociationRoute, AssociationProjectionTests.Published(1), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage fanOut = await client
+            .PostAsJsonAsync(FanOutRoute, ProjectConversationProjectionTests.ApprovalRequestPublished(8), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        association.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        fanOut.StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await ConversationItemsAsync(factory).ConfigureAwait(true)).ShouldHaveSingleItem().Kind.ShouldBe(ProjectConversationItemKind.ApprovalEvent);
     }
 
     /// <summary>
@@ -181,7 +245,8 @@ public sealed class ChatBotProjectionFanOutEndpointsTests
     }
 
     /// <summary>
-    /// A family whose envelope cannot bind the delivered body is skipped while the families that bind still project.
+    /// A family whose envelope cannot bind the delivered body is skipped, including the AI outcome family that binds
+    /// the raw body itself, while the families that bind still project.
     /// </summary>
     [Fact]
     public async Task FanOutShouldSkipAFamilyWhoseEnvelopeCannotBind()
@@ -193,8 +258,10 @@ public sealed class ChatBotProjectionFanOutEndpointsTests
             .ShouldNotBeNull()
             .AsObject();
 
-        // The mailbox-intake envelope types "sender" as a participant identity, so a string cannot bind to it.
+        // The mailbox-intake envelope types "sender" as a participant identity, and the AI action execution envelope
+        // types "started" as an execution event, so strings cannot bind to either.
         body["sender"] = "not-a-participant-identity";
+        body["started"] = "not-an-execution-event";
         using HttpResponseMessage mailbox = await client
             .PostAsJsonAsync(MailboxIntakeProjectionEndpoints.MailboxIntakeRoute, body, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
@@ -205,6 +272,59 @@ public sealed class ChatBotProjectionFanOutEndpointsTests
         mailbox.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         fanOut.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await ConversationItemsAsync(factory).ConfigureAwait(true)).ShouldHaveSingleItem().Kind.ShouldBe(ProjectConversationItemKind.ApprovalEvent);
+    }
+
+    /// <summary>
+    /// The sidecar delivers the published EventStore envelope (metadata plus base64 payload) as CloudEvent data;
+    /// <c>UseCloudEvents</c> unwraps it before the fan-out parses the body, so the governed note projects.
+    /// </summary>
+    [Fact]
+    public async Task FanOutShouldProjectTheEventStoreEnvelopeTheSidecarDeliversAsACloudEvent()
+    {
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>().WithAppChannelToken();
+        using HttpClient client = factory.CreateAppChannelClient();
+        EventStoreEnvelope envelope = new(
+            MessageId,
+            NoteId,
+            nameof(GovernedOperationAggregate),
+            Tenant,
+            "chatbot",
+            SequenceNumber: 1,
+            GlobalPosition: 1,
+            OccurredAt,
+            CorrelationId,
+            CausationId: MessageId,
+            "actor-001",
+            "v1",
+            GovernedOperationProjectionTranslator.GovernedNoteRecordedEventType,
+            MetadataVersion: 1,
+            "json",
+            JsonSerializer.SerializeToUtf8Bytes(new GovernedNoteRecorded(NoteId)),
+            new Dictionary<string, string>());
+        JsonObject cloudEvent = new()
+        {
+            ["specversion"] = "1.0",
+            ["id"] = MessageId,
+            ["source"] = $"hexalith-eventstore/{Tenant}/chatbot",
+            ["type"] = GovernedOperationProjectionTranslator.GovernedNoteRecordedEventType,
+            ["datacontenttype"] = "application/json",
+            ["pubsubname"] = ChatBotProjectionSubscriptionDefaults.PubSubName,
+            ["topic"] = ChatBotProjectionSubscriptionDefaults.Topic,
+            ["data"] = JsonSerializer.SerializeToNode(envelope, JsonSerializerOptions.Web),
+        };
+        using StringContent content = new(cloudEvent.ToJsonString(), Encoding.UTF8, "application/cloudevents+json");
+
+        using HttpResponseMessage response = await client
+            .PostAsync(FanOutRoute, content, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        GovernedOperationView view = (await factory.Services
+            .GetRequiredService<IGovernedOperationProjectionStore>()
+            .GetAsync(Tenant, NoteId, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true)).ShouldNotBeNull();
+        view.TenantId.ShouldBe(Tenant);
+        view.SourceVersion.ShouldBe(1);
     }
 
     /// <summary>A body that is not a JSON object is refused before any family runs.</summary>
