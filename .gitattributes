@@ -1,2 +1,3 @@
-# Preserve the authored CRLF bytes in current recovery guards.
+# Preserve the authored CRLF bytes in these test files.
 tests/Hexalith.ChatBot.Architecture.Tests/LiveRecoveryValidationArchitectureTests.cs whitespace=cr-at-eol
+tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.AuthorityExpiry.cs whitespace=cr-at-eol

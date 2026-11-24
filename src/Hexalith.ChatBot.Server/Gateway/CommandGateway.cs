@@ -128,7 +128,7 @@ internal sealed class CommandGateway(
         if (context.Actor.Principal is Hexalith.ChatBot.Server.Authorization.ChatBotAuthorityPrincipal authority && !authority.IsCurrent(clock.UtcNow))
         {
             await AbortSafelyAsync(idempotency, cancellationToken).ConfigureAwait(false);
-            return await RejectAuthorityLapseAsync(context, cancellationToken).ConfigureAwait(false);
+            return Denied(await admission.RejectAuthorityLapseAsync(context, cancellationToken).ConfigureAwait(false));
         }
 
         context.SetPreparedAcceptedAt(response.AcceptedAt);
@@ -160,7 +160,7 @@ internal sealed class CommandGateway(
         if (context.Actor.Principal is Hexalith.ChatBot.Server.Authorization.ChatBotAuthorityPrincipal preparedAuthority && !preparedAuthority.IsCurrent(clock.UtcNow))
         {
             await AbortUndispatchedIndependentlyAsync(idempotency, response).ConfigureAwait(false);
-            return await RejectAuthorityLapseAsync(context, cancellationToken).ConfigureAwait(false);
+            return Denied(await admission.RejectAuthorityLapseAsync(context, cancellationToken).ConfigureAwait(false));
         }
 
         ChatBotDispatchResult dispatchResult;
@@ -172,7 +172,7 @@ internal sealed class CommandGateway(
         catch (ChatBotAuthorityLapsedException) when (!context.ExternalEffectAttempted)
         {
             await AbortUndispatchedIndependentlyAsync(idempotency, response).ConfigureAwait(false);
-            return await RejectAuthorityLapseAsync(context, cancellationToken).ConfigureAwait(false);
+            return Denied(await admission.RejectAuthorityLapseAsync(context, cancellationToken).ConfigureAwait(false));
         }
         catch (CommandDispatchValidationException) when (!context.ExternalEffectAttempted)
         {
@@ -326,20 +326,6 @@ internal sealed class CommandGateway(
         }
     }
 
-    private async ValueTask<ChatBotGatewayResult> RejectAuthorityLapseAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
-    {
-        try
-        {
-            return Denied(await admission.RejectAuthorityLapseAsync(context, cancellationToken).ConfigureAwait(false));
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateDependencyUnavailable(
-                context.Submission.CorrelationId, context.Submission.TaskId));
-        }
-    }
-
     private ChatBotGatewayResult Denied(ChatBotCommandAdmissionDecision decision)
     {
         string reasonCode = decision.ReasonCode ?? ChatBotAuthorizationReasonCodes.AuthorizationDenied;
@@ -366,7 +352,8 @@ internal sealed class CommandGateway(
             return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateCanonicalExecutionUnavailable(decision.CorrelationId, decision.TaskId));
         }
 
-        if (reasonCode is "idempotency_outcome_unavailable" or Contracts.Messages.ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)
+        if (reasonCode is "idempotency_outcome_unavailable" or Contracts.Messages.ChatBotRefusalReasonCodes.PolicySnapshotUnavailable
+            or Contracts.Messages.ChatBotMessageCodes.DependencyDegraded)
         {
             return ChatBotGatewayResult.Denied(problemDetailsFactory.CreateDependencyUnavailable(decision.CorrelationId, decision.TaskId));
         }

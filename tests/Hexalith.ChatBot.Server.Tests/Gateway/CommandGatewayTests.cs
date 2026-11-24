@@ -1390,6 +1390,7 @@ public sealed partial class CommandGatewayTests
             "retention-old-fingerprint:sha256:oldretentionfingerprint001", "retention-new-fingerprint:sha256:newretentionfingerprint001",
             $"retention-class:{ComplianceRetentionClassIds.SourceEmailMetadata}", $"retention-class:{ComplianceRetentionClassIds.AuditRecords}",
             "retention-window:source-email-metadata-window", "retention-window:audit-records-window",
+            "admin-role:compliance-admin", "policy-snapshot:policy-snapshot-admin-v1", "reason:compliance-retention-update",
         })
         {
             envelope.SourceEvidenceRefs.ShouldContain(reference);
@@ -5789,9 +5790,15 @@ public sealed partial class CommandGatewayTests
         idempotencyStore.RecordCount.ShouldBe(0);
     }
 
-    private sealed class MutableClock(DateTimeOffset now) : ISystemClock
+    private sealed class MutableClock(DateTimeOffset now, Func<DateTimeOffset, DateTimeOffset>? read = null) : ISystemClock
     {
-        public DateTimeOffset UtcNow { get; set; } = now;
+        private DateTimeOffset _utcNow = now;
+
+        public DateTimeOffset UtcNow
+        {
+            get => read?.Invoke(_utcNow) ?? _utcNow;
+            set => _utcNow = value;
+        }
     }
 
     private static void AssertPreparedOutcome(PriorCommandOutcome actual, CommandSubmissionResponse expected)

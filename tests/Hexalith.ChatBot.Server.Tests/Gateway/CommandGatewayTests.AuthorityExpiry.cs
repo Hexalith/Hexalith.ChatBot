@@ -9,7 +9,6 @@ using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Authorization;
 using Hexalith.ChatBot.Tests.TrustedAuthority;
 
-using NSubstitute;
 using Shouldly;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
@@ -190,9 +189,11 @@ public sealed partial class CommandGatewayTests
     }
 
     [Theory]
+    [InlineData("after-precommit-audit", false)]
     [InlineData("before-preparation", false)]
     [InlineData("after-preparation", false)]
     [InlineData("during-dispatch", false)]
+    [InlineData("after-precommit-audit", true)]
     [InlineData("before-preparation", true)]
     [InlineData("after-preparation", true)]
     [InlineData("during-dispatch", true)]
@@ -200,9 +201,8 @@ public sealed partial class CommandGatewayTests
     {
         using CancellationTokenSource caller = new();
         DateTimeOffset now = new TrustedAuthorityClock().UtcNow;
-        ISystemClock clock = Substitute.For<ISystemClock>();
         int readsUntilExpiry = int.MaxValue;
-        clock.UtcNow.Returns(_ => --readsUntilExpiry > 0 ? now : now.AddSeconds(2));
+        MutableClock clock = new(now, current => --readsUntilExpiry > 0 ? current : current.AddSeconds(2));
         SyntheticOwnerAuthorityProvider owner = new(clock)
         {
             Transform = evidence => evidence with { ExpiresAt = now.AddSeconds(1) },
@@ -220,7 +220,11 @@ public sealed partial class CommandGatewayTests
         {
             OnPreCommit = () =>
             {
-                if (boundary == "before-preparation")
+                if (boundary == "after-precommit-audit")
+                {
+                    readsUntilExpiry = 1;
+                }
+                else if (boundary == "before-preparation")
                 {
                     // Admission's final authority check succeeds. The receipt clock read then crosses the expiry.
                     readsUntilExpiry = 2;
@@ -233,7 +237,9 @@ public sealed partial class CommandGatewayTests
                     caller.Cancel();
                 }
 
-                throw new OperationCanceledException("audit-provider-diagnostic");
+                throw boundary == "after-precommit-audit"
+                    ? new IOException("audit-provider-diagnostic")
+                    : new OperationCanceledException("audit-provider-diagnostic");
             },
         };
         CommandGateway gateway = Gateway(dispatcher, clock: clock, idempotencyStore: idempotency, auditWriter: audit,
@@ -252,7 +258,7 @@ public sealed partial class CommandGatewayTests
             Serialized(result.Problem).ShouldNotContain("audit-provider-diagnostic");
         }
 
-        idempotency.Boundaries.Contains("preparation").ShouldBe(boundary != "before-preparation");
+        idempotency.Boundaries.Contains("preparation").ShouldBe(boundary is "after-preparation" or "during-dispatch");
         dispatcher.DispatchCount.ShouldBe(boundary == "during-dispatch" ? 1 : 0);
         audit.AuthorizationFailures.ShouldHaveSingleItem();
         real.Records.ShouldBeEmpty();

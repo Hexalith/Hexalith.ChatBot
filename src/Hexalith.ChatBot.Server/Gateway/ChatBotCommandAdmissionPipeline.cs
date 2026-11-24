@@ -467,6 +467,7 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             await AbortSafelyAsync(idempotencyDecision.Metadata, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             return ChatBotCommandAdmissionDecision.Rejected(exceptionReason, submission.CorrelationId, submission.TaskId);
         }
     }
@@ -629,18 +630,26 @@ internal sealed class ChatBotCommandAdmissionPipeline(
         string reasonCode,
         CancellationToken cancellationToken)
     {
-        await auditWriter
-            .RecordAuthorizationFailureAsync(
-                new ChatBotAuthorizationFailureAuditFact(
-                    tenantId,
-                    actorId,
-                    AuditMetadata.SafeCommandName(submission.Request.CommandType),
-                    reasonCode,
-                    submission.CorrelationId,
-                    submission.TaskId,
-                    ChatBotSurfaceOrigins.ToWireValue(submission.Origin)),
-                cancellationToken)
-            .ConfigureAwait(false);
+        try
+        {
+            await auditWriter
+                .RecordAuthorizationFailureAsync(
+                    new ChatBotAuthorizationFailureAuditFact(
+                        tenantId,
+                        actorId,
+                        AuditMetadata.SafeCommandName(submission.Request.CommandType),
+                        reasonCode,
+                        submission.CorrelationId,
+                        submission.TaskId,
+                        ChatBotSurfaceOrigins.ToWireValue(submission.Origin)),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ChatBotCommandAdmissionDecision.Rejected(ChatBotMessageCodes.DependencyDegraded, submission.CorrelationId, submission.TaskId);
+        }
 
         if (reasonCode != ChatBotRefusalReasonCodes.PolicySnapshotUnavailable)
         {
