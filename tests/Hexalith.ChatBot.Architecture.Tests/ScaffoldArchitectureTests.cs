@@ -1077,8 +1077,8 @@ public static class ScaffoldArchitectureTests
 
         PackageCatalogTestHelper.Version("Hexalith.Folders.Client").ShouldBe("2.0.1");
         PackageCatalogTestHelper.Version("Hexalith.Folders.Contracts").ShouldBe("2.0.1");
-        PackageCatalogTestHelper.Version("Hexalith.Projects.Client").ShouldBe("1.2.4");
-        PackageCatalogTestHelper.Version("Hexalith.Projects.Contracts").ShouldBe("1.2.4");
+        PackageCatalogTestHelper.Version("Hexalith.Projects.Client").ShouldBe("2.0.0");
+        PackageCatalogTestHelper.Version("Hexalith.Projects.Contracts").ShouldBe("2.0.0");
         PackageCatalogTestHelper.Version("LibGit2Sharp").ShouldBe("0.32.0");
         PackageCatalogTestHelper.AssertExclusiveAuthority();
     }
