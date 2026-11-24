@@ -26,6 +26,8 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
     private IProjectConversationHubConnection? _connection;
     private Func<Task>? _onChanged;
     private Func<Task>? _onReconnected;
+    private Func<Task>? _onInitialJoin;
+    private bool _hasJoinedTenant;
     private string? _subscribedTenant;
     private int _recoveryActive;
     private volatile bool _disposeRequested;
@@ -47,30 +49,33 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
     /// </summary>
     /// <param name="tenantId">The kebab tenant id whose change group to join.</param>
     /// <param name="onProjectConversationChanged">Invoked when a matching change signal is observed.</param>
-    /// <param name="onReconnected">
-    /// Invoked after the connection transparently reconnects and rejoins the tenant group, so the caller can re-query
-    /// authoritative server state — SignalR does not replay signals missed during the disconnect window. [AC5]
-    /// </param>
-    public async Task EnsureSubscribedAsync(string? tenantId, Func<Task> onProjectConversationChanged, Func<Task> onReconnected)
+    /// <param name="onReconnected">Invoked after a previously joined subscription rejoins its group.</param>
+    /// <param name="onInitialJoin">Invoked after the first successful join for this tenant.</param>
+    public async Task EnsureSubscribedAsync(
+        string? tenantId, Func<Task> onProjectConversationChanged, Func<Task> onReconnected, Func<Task>? onInitialJoin = null)
     {
+        (IProjectConversationHubConnection? connection, Func<Task>? callback) joined;
         await _subscriptionChanges.WaitAsync().ConfigureAwait(false);
         try
         {
-            await EnsureSubscribedCoreAsync(tenantId, onProjectConversationChanged, onReconnected).ConfigureAwait(false);
+            joined = await EnsureSubscribedCoreAsync(tenantId, onProjectConversationChanged, onReconnected, onInitialJoin).ConfigureAwait(false);
         }
         finally
         {
             _ = _subscriptionChanges.Release();
         }
+
+        await NotifyAsync(joined.connection, joined.callback).ConfigureAwait(false);
     }
 
-    private async Task EnsureSubscribedCoreAsync(string? tenantId, Func<Task> onProjectConversationChanged, Func<Task> onReconnected)
+    private async Task<(IProjectConversationHubConnection?, Func<Task>?)> EnsureSubscribedCoreAsync(
+        string? tenantId, Func<Task> onProjectConversationChanged, Func<Task> onReconnected, Func<Task>? onInitialJoin)
     {
         ArgumentNullException.ThrowIfNull(onProjectConversationChanged);
         ArgumentNullException.ThrowIfNull(onReconnected);
         if (_disposeRequested || string.IsNullOrWhiteSpace(tenantId))
         {
-            return;
+            return default;
         }
 
         if (_connection is not null &&
@@ -83,18 +88,22 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
             // re-queried the project the user had navigated away from.
             _onChanged = onProjectConversationChanged;
             _onReconnected = onReconnected;
-            return;
+            _onInitialJoin = onInitialJoin;
+            return default;
         }
 
+        bool hasJoinedTenant = _hasJoinedTenant && string.Equals(_subscribedTenant, tenantId, StringComparison.Ordinal);
         await DisposeConnectionAsync().ConfigureAwait(false);
 
         if (_disposeRequested)
         {
-            return;
+            return default;
         }
 
         _onChanged = onProjectConversationChanged;
         _onReconnected = onReconnected;
+        _onInitialJoin = onInitialJoin;
+        _hasJoinedTenant = hasJoinedTenant;
         _subscribedTenant = tenantId;
 
         IProjectConversationHubConnection connection;
@@ -106,7 +115,7 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
         {
             // Uri construction / builder failure must not escape into OnAfterRenderAsync and break the surface.
             ScheduleRecovery();
-            return;
+            return default;
         }
 
         _connection = connection;
@@ -115,7 +124,7 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
         if (_disposeRequested)
         {
             await DisposeConnectionAsync(expectedConnection: connection).ConfigureAwait(false);
-            return;
+            return default;
         }
 
         try
@@ -125,7 +134,7 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
                 if (IsCurrentConnection(connection) &&
                     string.Equals(signalTenantId, _subscribedTenant, StringComparison.Ordinal))
                 {
-                    await NotifyAsync(_onChanged).ConfigureAwait(false);
+                    await NotifyAsync(connection, _onChanged).ConfigureAwait(false);
                 }
             });
 
@@ -146,7 +155,7 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
 
                 if (joined)
                 {
-                    await NotifyAsync(_onReconnected).ConfigureAwait(false);
+                    await NotifyAsync(connection, _onReconnected).ConfigureAwait(false);
                 }
                 else
                 {
@@ -167,13 +176,16 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
             await connection.StartAsync().ConfigureAwait(false);
             if (!IsCurrentConnection(connection))
             {
-                return;
+                return default;
             }
 
             if (!await JoinTenantAsync(connection).ConfigureAwait(false))
             {
                 throw new InvalidOperationException("The project-conversation hub tenant group could not be joined.");
             }
+
+            _hasJoinedTenant = true;
+            return (connection, hasJoinedTenant ? onReconnected : onInitialJoin);
         }
         catch (Exception)
         {
@@ -186,6 +198,7 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
             // transient blip at page load.
             await DisposeConnectionAsync(clearSubscription: false, expectedConnection: connection).ConfigureAwait(false);
             ScheduleRecovery();
+            return default;
         }
     }
 
@@ -247,9 +260,10 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
     private bool IsCurrentConnection(IProjectConversationHubConnection connection)
         => !_disposeRequested && ReferenceEquals(_connection, connection);
 
-    private async Task NotifyAsync(Func<Task>? callback)
+    // Dispatch outside the subscription lock and keep the selected callback with its connection.
+    private async Task NotifyAsync(IProjectConversationHubConnection? connection, Func<Task>? callback)
     {
-        if (_disposeRequested || callback is null)
+        if (connection is null || callback is null || !IsCurrentConnection(connection))
         {
             return;
         }
@@ -288,7 +302,6 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
                     await Task.Delay(delay, _lifetime.Token).ConfigureAwait(false);
                     if (await RecoverCurrentSubscriptionAsync().ConfigureAwait(false))
                     {
-                        await NotifyAsync(_onReconnected).ConfigureAwait(false);
                         return;
                     }
                 }
@@ -317,6 +330,8 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
 
     private async Task<bool> RecoverCurrentSubscriptionAsync()
     {
+        (IProjectConversationHubConnection? connection, Func<Task>? callback) joined;
+        bool connected;
         await _subscriptionChanges.WaitAsync(_lifetime.Token).ConfigureAwait(false);
         try
         {
@@ -327,13 +342,16 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
                 return false;
             }
 
-            await EnsureSubscribedCoreAsync(tenant, onChanged, onReconnected).ConfigureAwait(false);
-            return _connection?.State is HubConnectionState.Connected;
+            joined = await EnsureSubscribedCoreAsync(tenant, onChanged, onReconnected, _onInitialJoin).ConfigureAwait(false);
+            connected = _connection?.State is HubConnectionState.Connected;
         }
         finally
         {
             _ = _subscriptionChanges.Release();
         }
+
+        await NotifyAsync(joined.connection, joined.callback).ConfigureAwait(false);
+        return connected;
     }
 
     private async Task DisposeConnectionAsync(bool clearSubscription = true, IProjectConversationHubConnection? expectedConnection = null)
@@ -350,6 +368,8 @@ internal sealed class ProjectConversationStreamingSubscriber : IAsyncDisposable
         {
             _onChanged = null;
             _onReconnected = null;
+            _onInitialJoin = null;
+            _hasJoinedTenant = false;
             _subscribedTenant = null;
         }
         if (connection is not null)

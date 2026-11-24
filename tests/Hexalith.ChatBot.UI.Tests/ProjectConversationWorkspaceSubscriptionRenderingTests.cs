@@ -42,6 +42,9 @@ public sealed class ProjectConversationWorkspaceSubscriptionRenderingTests
         ChatBotProjectConversationWorkspace workspace = await MountAsync(renderer, factory, "project-alpha");
         await renderer.Dispatcher.InvokeAsync(() => InvokeAfterRenderAsync(workspace));
         connection.JoinedTenants.ShouldBe(["tenant-alpha"]);
+        actions.OfType<ProjectConversationProjectionSignalReceivedAction>().ShouldBe(
+            [new ProjectConversationProjectionSignalReceivedAction("project-alpha", "tenant-alpha") { ScopeVersion = 7 }]);
+        actions.OfType<ProjectConversationAiResponseReconnectAction>().ShouldBeEmpty();
         actions.Clear();
 
         await connection.TriggerChangedAsync("tenant-other");
@@ -110,6 +113,9 @@ public sealed class ProjectConversationWorkspaceSubscriptionRenderingTests
         WorkspaceSubscriptionHubConnection current = changeTenant ? replacement : first;
         first.StartCount.ShouldBe(1);
         factory.CreateCount.ShouldBe(changeTenant ? 2 : 1);
+        actions.OfType<ProjectConversationProjectionSignalReceivedAction>().ShouldBe(
+            [new ProjectConversationProjectionSignalReceivedAction("project-current", currentTenant) { ScopeVersion = 11 }]);
+        actions.OfType<ProjectConversationAiResponseReconnectAction>().ShouldBeEmpty();
         if (changeTenant)
         {
             first.DisposeCount.ShouldBe(1);
@@ -128,6 +134,57 @@ public sealed class ProjectConversationWorkspaceSubscriptionRenderingTests
             new ProjectConversationProjectionSignalReceivedAction("project-current", currentTenant) { ScopeVersion = 11 },
             new ProjectConversationAiResponseReconnectAction("project-current") { ScopeVersion = 11 },
         ]);
+    }
+
+    /// <summary>The initial join catches up once the replacement route has its authoritative conversation.</summary>
+    [Fact]
+    public async Task InitialJoinShouldWaitForLoadingReplacementRouteWithoutAnnouncingReconnect()
+    {
+        WorkspaceSubscriptionRenderState state = new(Snapshot("project-old", "tenant-alpha", 10));
+        TaskCompletionSource releaseStart = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        WorkspaceSubscriptionHubConnection connection = new() { StartDelay = releaseStart.Task };
+        WorkspaceSubscriptionHubConnectionFactory factory = new(connection);
+        List<object> actions = [];
+        ServiceProvider provider = CreateProvider(state, actions);
+        await using var providerLifetime = provider.ConfigureAwait(true);
+        using HtmlRenderer renderer = new(provider, provider.GetRequiredService<ILoggerFactory>());
+        ChatBotProjectConversationWorkspace workspace = await MountAsync(renderer, factory, "project-old");
+        Task subscription = renderer.Dispatcher.InvokeAsync(() => InvokeAfterRenderAsync(workspace));
+        await connection.StartEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        ProjectConversationState replacement = Snapshot("project-current", "tenant-alpha", 11);
+        try
+        {
+            await renderer.Dispatcher.InvokeAsync(async () =>
+            {
+                state.Value = replacement with { IsLoading = true, Conversation = null };
+                await workspace.SetParametersAsync(ParameterView.FromDictionary(new Dictionary<string, object?>
+                {
+                    [nameof(ChatBotProjectConversationWorkspace.ProjectId)] = "project-current",
+                })).ConfigureAwait(true);
+                await InvokeAfterRenderAsync(workspace).ConfigureAwait(true);
+            });
+        }
+        finally
+        {
+            releaseStart.TrySetResult();
+        }
+
+        await subscription.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        connection.JoinedTenants.ShouldBe(["tenant-alpha"]);
+        actions.OfType<ProjectConversationProjectionSignalReceivedAction>().ShouldBeEmpty();
+        actions.OfType<ProjectConversationAiResponseReconnectAction>().ShouldBeEmpty();
+
+        await renderer.Dispatcher.InvokeAsync(async () =>
+        {
+            state.Value = replacement;
+            await InvokeAfterRenderAsync(workspace).ConfigureAwait(true);
+            await InvokeAfterRenderAsync(workspace).ConfigureAwait(true);
+        });
+
+        actions.OfType<ProjectConversationProjectionSignalReceivedAction>().ShouldBe(
+            [new ProjectConversationProjectionSignalReceivedAction("project-current", "tenant-alpha") { ScopeVersion = 11 }]);
+        actions.OfType<ProjectConversationAiResponseReconnectAction>().ShouldBeEmpty();
+        factory.CreateCount.ShouldBe(1);
     }
 
     private static ProjectConversationState Snapshot(string projectId, string tenant, long scopeVersion)

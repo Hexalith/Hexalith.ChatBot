@@ -361,6 +361,7 @@
     // response progress changes nudge a typed re-query. The signal is advisory and carries no response/version/sequence,
     // so the callback dispatches a signal action that the effect fails closed and turns into an authoritative re-query.
     private int _subscribing;
+    private (string TenantId, bool Reconnected)? _pendingTenantCatchUp;
     private volatile bool _disposed;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -383,6 +384,7 @@
             bool scopeChanged;
             do
             {
+                RefreshPendingTenantCatchUp();
                 string project = ProjectId;
                 string? tenant = Conversation?.TenantContext;
                 long scopeVersion = State.Value.ProjectScopeVersion;
@@ -390,12 +392,8 @@
                     tenant,
                     () => DispatchStreamingActionAsync(
                         new ProjectConversationProjectionSignalReceivedAction(project, tenant!) { ScopeVersion = scopeVersion }),
-                    () =>
-                    {
-                        // Re-query authoritative state after reconnect; signals missed while disconnected are not replayed.
-                        return DispatchStreamingActionAsync(
-                            new ProjectConversationAiResponseReconnectAction(project) { ScopeVersion = scopeVersion });
-                    });
+                    () => QueueTenantCatchUpAsync(tenant!, reconnected: true),
+                    () => QueueTenantCatchUpAsync(tenant!, reconnected: false));
 
                 // A render during startup cannot enter this method again. Rebind here when its project/scope changed.
                 scopeChanged = !_disposed &&
@@ -408,6 +406,36 @@
         finally
         {
             _ = Interlocked.Exchange(ref _subscribing, 0);
+        }
+    }
+
+    private Task QueueTenantCatchUpAsync(string tenantId, bool reconnected)
+        => _disposed ? Task.CompletedTask : InvokeAsync(() =>
+        {
+            if (!_disposed)
+            {
+                _pendingTenantCatchUp = (tenantId, reconnected);
+                RefreshPendingTenantCatchUp();
+            }
+        });
+
+    private void RefreshPendingTenantCatchUp()
+    {
+        ProjectConversationState current = State.Value;
+        if (_disposed || _pendingTenantCatchUp is not { } pending ||
+            current.Conversation is not { } conversation ||
+            !string.Equals(conversation.ProjectId, ProjectId, StringComparison.Ordinal) ||
+            !string.Equals(current.RequestedProjectId ?? conversation.ProjectId, ProjectId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _pendingTenantCatchUp = null;
+        if (string.Equals(conversation.TenantContext, pending.TenantId, StringComparison.Ordinal))
+        {
+            Dispatcher.Dispatch(pending.Reconnected
+                ? new ProjectConversationAiResponseReconnectAction(ProjectId) { ScopeVersion = current.ProjectScopeVersion }
+                : new ProjectConversationProjectionSignalReceivedAction(ProjectId, pending.TenantId) { ScopeVersion = current.ProjectScopeVersion });
         }
     }
 

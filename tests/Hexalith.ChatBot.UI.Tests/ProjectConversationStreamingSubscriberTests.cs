@@ -10,6 +10,84 @@ namespace Hexalith.ChatBot.UI.Tests;
 
 public sealed class ProjectConversationStreamingSubscriberTests
 {
+    /// <summary>Refreshes a projection update that arrived after the initial read and before the group join.</summary>
+    [Fact]
+    public async Task InitialTenantJoinShouldCatchUpToAuthoritativeState()
+    {
+        TaskCompletionSource releaseJoin = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeHubConnection connection = new() { JoinDelay = releaseJoin.Task };
+        ProjectConversationStreamingSubscriber subscriber = new(
+            new ChatBotHubEndpoint(new Uri("https://chatbot.example/")), new QueueHubConnectionFactory(connection));
+        await using var cleanup = subscriber.ConfigureAwait(true);
+        int authoritativeVersion = 1;
+        int renderedVersion = authoritativeVersion;
+        int refreshes = 0;
+        Task RefreshAsync()
+        {
+            connection.JoinedTenants.ShouldBe(["tenant-alpha"]);
+            renderedVersion = authoritativeVersion;
+            refreshes++;
+            return Task.CompletedTask;
+        }
+
+        Task subscription = subscriber.EnsureSubscribedAsync("tenant-alpha", () => Task.CompletedTask, () => Task.CompletedTask, RefreshAsync);
+        subscription.IsCompleted.ShouldBeFalse();
+        authoritativeVersion = 2;
+        renderedVersion.ShouldBe(1);
+
+        releaseJoin.SetResult();
+        await subscription.ConfigureAwait(true);
+        renderedVersion.ShouldBe(2);
+        refreshes.ShouldBe(1);
+    }
+
+    /// <summary>An unsuccessful join leaves the workspace on its current typed read.</summary>
+    [Fact]
+    public async Task InitialTenantJoinFailureShouldNotRefresh()
+    {
+        FakeHubConnection connection = new(joinOutcomes: [false]);
+        ProjectConversationStreamingSubscriber subscriber = new(
+            new ChatBotHubEndpoint(new Uri("https://chatbot.example/")),
+            new QueueHubConnectionFactory(connection),
+            TimeSpan.FromMinutes(1));
+        await using var cleanup = subscriber.ConfigureAwait(true);
+        int refreshes = 0;
+
+        await subscriber.EnsureSubscribedAsync("tenant-alpha", () => Task.CompletedTask, () => Task.CompletedTask, () =>
+        {
+            refreshes++;
+            return Task.CompletedTask;
+        });
+
+        refreshes.ShouldBe(0);
+        connection.DisposeCount.ShouldBe(1);
+    }
+
+    /// <summary>A group join completing during disposal cannot refresh the workspace.</summary>
+    [Fact]
+    public async Task InitialTenantJoinFinishingDuringDisposalShouldNotRefresh()
+    {
+        TaskCompletionSource releaseJoin = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FakeHubConnection connection = new() { JoinDelay = releaseJoin.Task };
+        ProjectConversationStreamingSubscriber subscriber = new(
+            new ChatBotHubEndpoint(new Uri("https://chatbot.example/")), new QueueHubConnectionFactory(connection));
+        int refreshes = 0;
+        Task subscription = subscriber.EnsureSubscribedAsync("tenant-alpha", () => Task.CompletedTask, () => Task.CompletedTask, () =>
+        {
+            refreshes++;
+            return Task.CompletedTask;
+        });
+        subscription.IsCompleted.ShouldBeFalse();
+
+        ValueTask disposal = subscriber.DisposeAsync();
+        releaseJoin.SetResult();
+        await subscription.ConfigureAwait(true);
+        await disposal.ConfigureAwait(true);
+
+        refreshes.ShouldBe(0);
+        connection.DisposeCount.ShouldBe(1);
+    }
+
     [Fact]
     public async Task ClosedHubShouldAutomaticallyBuildJoinAndNotifyRecoveryWithoutUiActivity()
     {

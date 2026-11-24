@@ -1959,6 +1959,7 @@ Final native follow-up qualification (2026-10-26): independent review correction
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-establish-stable-operation-identity-and-concurrency-contracts.md`
   summary: U1-B7 — Re-query authoritative project-conversation state after the initial successful tenant subscription (medium; UI subscription owner).
   evidence: ChatBotProjectConversationWorkspace reads the conversation before OnAfterRenderAsync joins the tenant group, and ProjectConversationStreamingSubscriber.EnsureSubscribedCoreAsync returns after the initial JoinTenantAsync without invoking a refresh callback. A projection change between the initial read and group join is not replayed and remains unseen until another signal or user action. The same initial-join behavior exists at the preserved original baseline. Verify with a deterministic change between read and join followed by the typed current-state refresh, preserving tenant/project/scope guards.
+  resolution: Resolved 2026-11-24. Every successful join refreshes authoritative state through the mounted workspace's current tenant, project, and scope. Failed or disposed subscriptions do not refresh. The subscriber and workspace rendering test classes passed all 19 cases.
 
 ### DW-148: U1-E3 — Reject compound comma-separated names for non-flags client enum contracts (medium; client contract owner).
 
