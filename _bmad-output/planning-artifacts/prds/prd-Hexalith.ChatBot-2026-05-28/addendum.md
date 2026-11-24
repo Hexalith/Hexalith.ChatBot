@@ -402,7 +402,7 @@ Fresh qualification requires a hosted controlled-loss path that derives RPO from
 | Requirement | Commitment / target | Story 12.15 status | Decision scope |
 | --- | --- | --- | --- |
 | A10 / NFR56 | RPO ≤ 15 minutes; RTO ≤ 4 hours | No current qualifying hosted bundle | Provisional; fresh controlled-loss and RTO-capable evidence are stop-ship M2 gates. |
-| NFR57 | Projection rebuild ≤ 4 hours | No current production-shaped full-window proof | Provisional; requires fresh exact-candidate evidence. |
+| NFR57 | Projection rebuild ≤ 4 hours | The bounded sandbox independently loads the seed and rebuild datasets and WORM stores, seeds the baseline oracle directly, and rebuilds governed operations through the production audit reconstructor and projection handler. It retains source and governed fingerprints for independent comparison. The [recovery ADR](../../../../docs/adrs/live-recovery-validation-drivers.md) retires `RV-REBUILD-WORM` for that sandbox path. | Provisional. Production-shaped full-window proof and fresh exact-candidate evidence are still required. The sandbox retains its 180-second measurable ceiling and durable-WORM, provider-scale, and hosted-evidence limitations. |
 | NFR41 | Dependency/scope recording ≤ 5 minutes | No current product-monitoring proof for every dependency | Not established; missing evidence is `unmeasurable`, never inferred from sandbox expectations. |
 
 The per-tenant dashboard exposes `within-budget`, `approaching`, `exhausted`, or `unsupported`. The dashboard must report `unsupported` when a numeric target, live signal, route, or burn test is absent. This status blocks the associated M2 production-readiness claim.

@@ -2268,6 +2268,7 @@ archived: 2026-11-24
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-independent-worm-rebuild.md`
   summary: The PRD addendum NFR57 row no longer states the independently proven sandbox rebuild path this story recorded.
   evidence: Spec-commit addendum retired `RV-REBUILD-WORM` for the sandbox path; HEAD `addendum.md:404` only says there is no current production-shaped full-window proof. Later addendum rewrite (approval 2026-09-14), not this story.
+  resolution: Resolved 2026-11-24. The NFR57 row records the independent sandbox rebuild and links the ADR that retires its rebuild residual. The row retains the full-window, freshness and production qualification limits.
 
 - source_spec: `/home/administrator/projects/hexalith/chatbot/_bmad-output/implementation-artifacts/spec-12-16-bind-the-live-hexalith-memories-derived-store-backing.md`
   summary: Production ingestion-binding cannot fetch exact mailbox message or attachment bytes because no owned repository exposes that content API.
