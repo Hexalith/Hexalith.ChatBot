@@ -1252,6 +1252,7 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: The gateway redaction stage copies correlation and task identifiers without validating their provenance.
   evidence: `CoarseUserFacingRedactionStage.Apply` copied both fields at Story 1.4 baseline. HTTP middleware validates incoming identifiers, but internal callers should be traced before deciding whether the stage needs its own validation.
+  resolution: Resolved 2026-11-24. The gateway replaces an invalid or missing correlation ID and omits invalid optional task IDs. Valid IDs retain their ULID value in canonical wire form. SafeOutcomeProblemCompatibilityTests passed all 31 cases.
 ### DW-144: Operation status serialization throws when stored completion or audit enum text is unknown.
 
 status: done 2026-11-24

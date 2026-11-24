@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Contracts.Messages;
 
 namespace Hexalith.ChatBot.Server.Gateway.Redaction;
@@ -42,8 +43,9 @@ internal sealed class CoarseUserFacingRedactionStage : IUserFacingRedactionStage
                 ? problem.Category : CategoryForStatus(status),
             Code = entry.Code,
             Message = entry.Reason,
-            CorrelationId = problem.CorrelationId,
-            TaskId = problem.TaskId,
+            CorrelationId = ChatBotCorrelationId.TryParse(problem.CorrelationId, out ChatBotCorrelationId correlationId)
+                ? correlationId.Value : ChatBotCorrelationId.New().Value,
+            TaskId = ChatBotTaskId.TryParse(problem.TaskId, out ChatBotTaskId taskId) ? taskId.Value : null,
             Retryable = known && problem.Retryable && !entry.IsTerminal &&
                 catalogAction == ProblemDetailsClientAction.RetryLater &&
                 problem.ClientAction == ProblemDetailsClientAction.RetryLater,

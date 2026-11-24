@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
@@ -11,6 +12,45 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway;
 /// <summary>Checks incompatible or malformed metadata at the public problem boundary.</summary>
 public sealed class SafeOutcomeProblemCompatibilityTests
 {
+    /// <summary>Invalid or absent identifiers are replaced or omitted at the public boundary.</summary>
+    /// <param name="identifier">The supplied correlation and task identifier.</param>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("private-identifier")]
+    [InlineData("01arz3ndektsv4rrffq69g5faI")]
+    public void RedactionShouldDiscardInvalidProblemIdentifiers(string? identifier)
+    {
+        ProblemDetails result = new CoarseUserFacingRedactionStage().Apply(new ProblemDetails
+        {
+            CorrelationId = identifier!,
+            TaskId = identifier,
+        });
+
+        ChatBotIdentity.IsValidUlid(result.CorrelationId).ShouldBeTrue();
+        result.TaskId.ShouldBeNull();
+        Newtonsoft.Json.Linq.JObject.FromObject(result)["taskId"].ShouldBeNull();
+    }
+
+    /// <summary>Valid identifiers keep their value and use the canonical OpenAPI wire casing.</summary>
+    /// <param name="correlationId">The supplied valid correlation identifier.</param>
+    /// <param name="taskId">The supplied valid task identifier.</param>
+    [Theory]
+    [InlineData("01ARZ3NDEKTSV4RRFFQ69G5FAV", "01ARZ3NDEKTSV4RRFFQ69G5FAW")]
+    [InlineData("01arz3ndektsv4rrffq69g5fav", "01arz3ndektsv4rrffq69g5faw")]
+    public void RedactionShouldKeepValidProblemIdentifiers(string correlationId, string taskId)
+    {
+        ProblemDetails result = new CoarseUserFacingRedactionStage().Apply(new ProblemDetails
+        {
+            CorrelationId = correlationId,
+            TaskId = taskId,
+        });
+
+        result.CorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+        result.TaskId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+    }
+
     /// <summary>Every admitted operation class retains specific safe conflict guidance.</summary>
     [Fact]
     public void EveryIdempotencyOperationClassShouldHaveCatalogBackedConflict()
