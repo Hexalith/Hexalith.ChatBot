@@ -1385,9 +1385,16 @@ Scope reviewed: Story 1.1c re-verification, commit range `8c3dd15~1..9567f43`.
 - source_spec: `spec-1-2-publish-the-openapi-contract-spine-and-typed-client.md`
   summary: After a durable receipt, a thrown post-commit audit write or operation-status upsert escapes `CommandGateway.SubmitAsync` as a raw 500 for a committed command.
   evidence: Loop 16 findings 12/45 (medium), pre-existing; carried in the spec triage log since Loop 7 BH8 (Loops 13 BH3, 14 BH8, 15 BH6) but never recorded in this ledger. `CommandGateway.cs:228-255` matches baseline apart from the `AcceptedAt` copy. Same-ID retries replay the stored receipt; fresh-ID `SubmitAsync` retries of generic commands re-dispatch.
-- source_spec: `spec-1-2-publish-the-openapi-contract-spine-and-typed-client.md`
-  summary: Valid enum-keyed dictionary maps (e.g. `TenantPolicyValue.AiActionLowRiskAllowed`) pass request validation but cannot deserialize because `JsonEnumMemberStringConverter` lacks dictionary-key support, so authorization denies them with 403.
-  evidence: Loop 16 finding 60 (medium), pre-existing; carried from Loop 12 EH2 / Loop 14 BH1 and never recorded in this ledger. The converter, `TenantPolicyValue`, and `ParticipantAuthorizationStage` are unchanged from baseline; `ReadSubmitTenantPolicyChange` catches the `NotSupportedException`. Fix with `ReadAsPropertyName`/`WriteAsPropertyName` support.
+### DW-143: Valid enum-keyed dictionary maps (e.g. `TenantPolicyValue.AiActionLowRiskAllowed`) pass request validation but cannot deserialize because `JsonEnumMemberStringConverter` lacks dictionary-key support, so authorization denies them with 403.
+
+origin: legacy ledger entry from Deferred from: code review of spec-1-2-publish-the-openapi-contract-spine-and-typed-client (2026-10-05)
+source_spec: `spec-1-2-publish-the-openapi-contract-spine-and-typed-client.md`
+severity: medium
+reason: Loop 16 finding 60 (medium), pre-existing; carried from Loop 12 EH2 / Loop 14 BH1 and never recorded in this ledger. The converter, `TenantPolicyValue`, and `ParticipantAuthorizationStage` are unchanged from baseline; `ReadSubmitTenantPolicyChange` catches the `NotSupportedException`. Fix with `ReadAsPropertyName`/`WriteAsPropertyName` support.
+status: done 2026-11-24
+resolution: System.Text.Json reads and writes declared policy-map wire keys. Contract tests round-trip the policy map and reject undefined, numeric, and CLR-alias keys.
+
+
 - source_spec: `spec-1-2-publish-the-openapi-contract-spine-and-typed-client.md`
   summary: Post-commit idempotency-receipt repair (`DaprCoarseIdempotencyStore.ReconcileOutcomeFromAuditAsync` and `RecoverPendingOutcomeAsync`) conflicts with ARCHITECTURE-SPINE AD-2 ("post-commit repair … prohibited", "split idempotency truth"), and no ADR or interim exception records it.
   evidence: Loop 16 finding 23 (medium). The split receipt existed at baseline; spec tasks for durable recovery require the repair machinery. AD-2 notes terminal-idempotency co-commit remains owner-unaccepted under A13, so an explicit interim exception or ADR is the resolution path, not a code change in Story 1.2.

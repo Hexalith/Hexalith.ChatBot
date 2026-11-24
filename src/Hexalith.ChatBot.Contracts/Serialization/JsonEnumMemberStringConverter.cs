@@ -14,6 +14,8 @@ public sealed class JsonEnumMemberStringConverter<TEnum> : JsonConverter<TEnum>
 {
     private static readonly IReadOnlyDictionary<TEnum, string> ValuesByEnum = BuildValuesByEnum();
     private static readonly IReadOnlyDictionary<string, TEnum> ValuesByToken = BuildValuesByToken();
+    private static readonly IReadOnlyDictionary<string, TEnum> ValuesByWireToken = ValuesByEnum.ToDictionary(
+        pair => pair.Value, pair => pair.Key, StringComparer.Ordinal);
 
     public override TEnum Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
@@ -25,10 +27,7 @@ public sealed class JsonEnumMemberStringConverter<TEnum> : JsonConverter<TEnum>
             throw new JsonException($"Expected string token for {typeof(TEnum).Name}.");
         }
 
-        string? token = reader.GetString();
-        return token is not null && ValuesByToken.TryGetValue(token, out TEnum value)
-            ? value
-            : throw new JsonException($"Unknown {typeof(TEnum).Name} value '{token}'.");
+        return ParseToken(reader.GetString(), ValuesByToken);
     }
 
     public override void Write(Utf8JsonWriter writer, TEnum value, JsonSerializerOptions options)
@@ -36,13 +35,34 @@ public sealed class JsonEnumMemberStringConverter<TEnum> : JsonConverter<TEnum>
         ArgumentNullException.ThrowIfNull(writer);
         ArgumentNullException.ThrowIfNull(options);
 
-        if (!ValuesByEnum.TryGetValue(value, out string? token))
-        {
-            throw new JsonException($"Unknown {typeof(TEnum).Name} value '{value}'.");
-        }
-
-        writer.WriteStringValue(token);
+        writer.WriteStringValue(WireToken(value));
     }
+
+    /// <inheritdoc />
+    public override TEnum ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(typeToConvert);
+        ArgumentNullException.ThrowIfNull(options);
+        return ParseToken(reader.GetString(), ValuesByWireToken);
+    }
+
+    /// <inheritdoc />
+    public override void WriteAsPropertyName(Utf8JsonWriter writer, TEnum value, JsonSerializerOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        ArgumentNullException.ThrowIfNull(options);
+        writer.WritePropertyName(WireToken(value));
+    }
+
+    private static TEnum ParseToken(string? token, IReadOnlyDictionary<string, TEnum> tokens)
+        => token is not null && tokens.TryGetValue(token, out TEnum value)
+            ? value
+            : throw new JsonException($"Unknown {typeof(TEnum).Name} value '{token}'.");
+
+    private static string WireToken(TEnum value)
+        => ValuesByEnum.TryGetValue(value, out string? token)
+            ? token
+            : throw new JsonException($"Unknown {typeof(TEnum).Name} value '{value}'.");
 
     private static IReadOnlyDictionary<TEnum, string> BuildValuesByEnum()
         => typeof(TEnum)
