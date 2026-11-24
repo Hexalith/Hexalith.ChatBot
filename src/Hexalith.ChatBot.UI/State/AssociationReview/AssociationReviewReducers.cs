@@ -68,6 +68,7 @@ public static class AssociationReviewReducers
             IsLoading = false,
             ErrorCode = action.ErrorCode,
             ErrorScope = AssociationReviewErrorScope.Load,
+            FailureActivation = state.FailureActivation + 1,
         };
     }
 
@@ -195,6 +196,7 @@ public static class AssociationReviewReducers
             PendingDecisionCode = null,
             ErrorCode = action.ErrorCode,
             ErrorScope = AssociationReviewErrorScope.Submit,
+            FailureActivation = state.FailureActivation + 1,
         };
     }
 
@@ -238,6 +240,7 @@ public static class AssociationReviewReducers
             IsSubmitting = false,
             ErrorCode = action.ErrorCode,
             ErrorScope = AssociationReviewErrorScope.Submit,
+            FailureActivation = state.FailureActivation + 1,
         };
     }
 

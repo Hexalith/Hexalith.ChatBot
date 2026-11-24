@@ -160,6 +160,54 @@ public sealed class AssociationReviewStateTests
             .ReduceSubmitFailed(Loaded(), new AssociationDecisionSubmitFailedAction("conflict"))
             .ErrorScope.ShouldBe(AssociationReviewErrorScope.Submit);
 
+    /// <summary>
+    /// A retry that fails with the code already on screen is a new attempt: every recorded failure advances the
+    /// activation, and neither the retry itself nor a later success rewinds it.
+    /// </summary>
+    [Fact]
+    public void EachRecordedFailureAdvancesTheFailureActivation()
+    {
+        const string Failure = "timeout";
+        AssociationReviewState first = AssociationReviewReducers.ReduceFailed(
+            AssociationReviewReducers.ReduceLoad(Loaded(), new LoadAssociationReviewAction("association-A")),
+            new AssociationReviewFailedAction(Failure));
+        first.FailureActivation.ShouldBe(1);
+
+        AssociationReviewState retrying = AssociationReviewReducers.ReduceLoad(first, new LoadAssociationReviewAction("association-A"));
+        retrying.ErrorCode.ShouldBeNull();
+        retrying.FailureActivation.ShouldBe(1);
+
+        AssociationReviewState repeated = AssociationReviewReducers.ReduceFailed(retrying, new AssociationReviewFailedAction(Failure));
+        repeated.ErrorCode.ShouldBe(first.ErrorCode);
+        repeated.FailureActivation.ShouldBe(2);
+
+        AssociationReviewState decisionFailed = AssociationReviewReducers.ReduceSubmitFailed(
+            AssociationReviewReducers.ReduceSubmitStarted(repeated),
+            new AssociationDecisionSubmitFailedAction(Failure));
+        decisionFailed.FailureActivation.ShouldBe(3);
+
+        AssociationReviewState correctionFailed = AssociationReviewReducers.ReduceCorrectionFailed(
+            AssociationReviewReducers.ReduceCorrectionSubmitStarted(decisionFailed),
+            new AssociationCorrectionSubmitFailedAction(Failure));
+        correctionFailed.FailureActivation.ShouldBe(4);
+
+        AssociationReviewReducers.ReduceLoaded(correctionFailed, new AssociationReviewLoadedAction(Review("NeedsReview", Candidate("project-a"))))
+            .FailureActivation.ShouldBe(4);
+    }
+
+    /// <summary>A failure from a load the reviewer already navigated away from is not a new attempt.</summary>
+    [Fact]
+    public void AStaleLoadFailureDoesNotAdvanceTheFailureActivation()
+    {
+        LoadAssociationReviewAction left = new("association-A");
+        AssociationReviewState current = AssociationReviewReducers.ReduceLoad(
+            AssociationReviewReducers.ReduceLoad(Empty(), left),
+            new LoadAssociationReviewAction("association-B"));
+
+        AssociationReviewReducers.ReduceFailed(current, new AssociationReviewFailedAction("timeout") { OriginatingLoad = left })
+            .FailureActivation.ShouldBe(0);
+    }
+
     private static AssociationReviewState Empty()
         => new(false, false, null, null, string.Empty, string.Empty, null, null);
 

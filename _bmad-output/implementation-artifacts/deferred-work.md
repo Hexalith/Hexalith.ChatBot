@@ -1297,6 +1297,7 @@ archived: 2026-11-24
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-4-return-versioned-safe-outcomes.md`
   summary: Give distinct association-review attempts or route identities distinct announcement keys for repeated same-code failures.
   evidence: D-B5; the baseline already deduplicated by the fixed association-review-failed identity plus unchanged error code. Trace association navigation and retry focus behavior, then verify the chosen attempt identity in a mounted page.
+  resolution: Resolved 2026-11-24. `AssociationReviewState.FailureActivation` now advances on every recorded load, decision and correction failure (stale loads excluded). The failure banner passes it as `AnnouncementActivation` under its fixed key, and the summary focus guard keys on code plus activation, so each same-code retry announces and takes focus once while re-renders and remounts stay quiet. The mounted-page test `SafeOutcomeInteractionTests.AssociationReviewRetryShouldAnnounceAndFocusEachSameCodeFailure` retries a same-code load failure with and without an intermediate loading render and fails without the activation or with the code-only focus guard; reducer tests pin the counter. UI.Tests passed 634/634, and SafeOutcomeInteractionTests (14), VersionedSafeOutcomeRenderTests (96), ProjectConversationWorkspaceLifecycleRenderTests (1) and RealRenderAssociationEvidenceE2ETests (5) passed.
 
 ## Deferred from: code review of spec-1-4-return-versioned-safe-outcomes (2026-10-14, src chunk)
 

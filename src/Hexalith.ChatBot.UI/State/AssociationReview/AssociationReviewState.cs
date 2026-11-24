@@ -16,6 +16,12 @@ public sealed record AssociationReviewState(
     /// <summary>Gets the exact load action that established the current route.</summary>
     internal LoadAssociationReviewAction? CurrentLoad { get; init; }
 
+    /// <summary>
+    /// Gets the circuit's failure number. Every recorded load, decision or correction failure advances it, so a
+    /// failure that repeats the previous code after a retry is still announced and focused as a new attempt.
+    /// </summary>
+    public long FailureActivation { get; init; }
+
     public AssociationCandidateModel? SelectedCandidate
         => Review?.Candidates.FirstOrDefault(candidate => string.Equals(candidate.ProjectId, SelectedCandidateId, StringComparison.Ordinal));
 

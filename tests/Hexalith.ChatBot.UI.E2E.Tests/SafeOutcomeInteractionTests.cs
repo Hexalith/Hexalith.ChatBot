@@ -6,6 +6,7 @@ using Hexalith.ChatBot.UI.Components.Pages;
 using Hexalith.ChatBot.UI.Localization;
 using Hexalith.ChatBot.UI.Design;
 using Hexalith.ChatBot.UI.Services;
+using Hexalith.ChatBot.UI.State.AssociationReview;
 using Hexalith.ChatBot.UI.State.ProjectConversation;
 using Hexalith.ChatBot.UI.State.OperationalDashboards;
 using Hexalith.ChatBot.UI.State.GovernedOperations;
@@ -141,6 +142,79 @@ public sealed class SafeOutcomeInteractionTests
         }, governedState: state);
     }
 
+    /// <summary>Each retry that fails again with the same code announces and takes focus once.</summary>
+    [Fact]
+    public Task AssociationReviewRetryShouldAnnounceAndFocusEachSameCodeFailure()
+    {
+        const string AssociationId = "association-001";
+        const string Failure = ChatBotMessageCodes.DependencyDegraded;
+        SafeOutcomeRenderState<AssociationReviewState> state = new(AssociationReviewReducers.ReduceFailed(
+            AssociationReviewReducers.ReduceLoad(new(false, false, null, null, "", "", null, null), new(AssociationId)),
+            new(Failure)));
+        InteractionRenderJsRuntime js = new();
+        return RunAsync(async (renderer, dispatcher) =>
+        {
+            Dictionary<string, object?> route = new() { [nameof(AssociationReview.AssociationId)] = AssociationId };
+            AssociationReview page = await renderer.MountAsync<AssociationReview>(route).ConfigureAwait(true);
+            await renderer.Dispatcher.InvokeAsync(async () =>
+            {
+                IEnumerable<ChatBotStatusBanner> Banners() => renderer.Find<ChatBotStatusBanner>(page)
+                    .Where(item => item.StableId == "association-review-failed");
+                async Task RenderAsync(AssociationReviewState next)
+                {
+                    state.Value = next;
+                    await renderer.UpdateAsync(page, route).ConfigureAwait(true);
+                }
+
+                async Task<LoadAssociationReviewAction> RetryAsync()
+                {
+                    int loads = dispatcher.Actions.OfType<LoadAssociationReviewAction>().Count();
+                    ChatBotGovernedAction retry = renderer.Find<ChatBotGovernedAction>(page)
+                        .Single(item => item.StableId == "association-review-retry");
+                    await renderer.Find<FluentButton>(retry).Single().OnClick.InvokeAsync(new MouseEventArgs()).ConfigureAwait(true);
+                    LoadAssociationReviewAction[] dispatched = [.. dispatcher.Actions.OfType<LoadAssociationReviewAction>()];
+                    dispatched.Length.ShouldBe(loads + 1);
+                    dispatched[^1].AssociationId.ShouldBe(AssociationId);
+                    return dispatched[^1];
+                }
+
+                async Task ShouldAnnounceAndFocusOnceAsync(long activation)
+                {
+                    state.Value.FailureActivation.ShouldBe(activation);
+                    ChatBotStatusBanner banner = Banners().ShouldHaveSingleItem();
+                    renderer.Attribute(banner, "data-chatbot-announcement-key").ShouldBe($"association-review-failed-{Failure}");
+                    renderer.Attribute(banner, "data-chatbot-live-announced").ShouldBe("true");
+                    renderer.Attribute(banner, "aria-live").ShouldBe("polite");
+                    js.FocusedElements.Count.ShouldBe((int)activation);
+
+                    await RenderAsync(state.Value).ConfigureAwait(true);
+                    renderer.Attribute(Banners().ShouldHaveSingleItem(), "data-chatbot-live-announced").ShouldBe("false");
+                    renderer.Attribute(Banners().Single(), "aria-live").ShouldBe("off");
+                    js.FocusedElements.Count.ShouldBe((int)activation);
+                }
+
+                await ShouldAnnounceAndFocusOnceAsync(1).ConfigureAwait(true);
+
+                // A retry whose loading state renders before the same failure returns.
+                LoadAssociationReviewAction retry = await RetryAsync().ConfigureAwait(true);
+                await RenderAsync(AssociationReviewReducers.ReduceLoad(state.Value, retry)).ConfigureAwait(true);
+                Banners().ShouldBeEmpty();
+                await RenderAsync(AssociationReviewReducers.ReduceFailed(state.Value, new(Failure))).ConfigureAwait(true);
+                await ShouldAnnounceAndFocusOnceAsync(2).ConfigureAwait(true);
+
+                // A retry that fails before any render keeps the same banner and summary on screen.
+                retry = await RetryAsync().ConfigureAwait(true);
+                await RenderAsync(AssociationReviewReducers.ReduceFailed(
+                    AssociationReviewReducers.ReduceLoad(state.Value, retry), new(Failure))).ConfigureAwait(true);
+                await ShouldAnnounceAndFocusOnceAsync(3).ConfigureAwait(true);
+
+                // Returning to the page does not announce the failure the reviewer already heard.
+                page = await renderer.MountAsync<AssociationReview>(route).ConfigureAwait(true);
+                renderer.Attribute(Banners().ShouldHaveSingleItem(), "aria-live").ShouldBe("off");
+            }).ConfigureAwait(true);
+        }, associationState: state, jsRuntime: js);
+    }
+
     /// <summary>A new composer instance can announce a same-code submission in the same circuit.</summary>
     [Fact]
     public Task ComposerSubmissionShouldAnnounceAcrossRemount()
@@ -250,7 +324,8 @@ public sealed class SafeOutcomeInteractionTests
         });
 
     private static async Task RunAsync(Func<SafeOutcomeInteractiveRenderer, SafeOutcomeRenderDispatcher, Task> test, string culture = "en", string? dashboardError = ChatBotMessageCodes.DependencyDegraded,
-        SafeOutcomeRenderState<GovernedOperationsState>? governedState = null)
+        SafeOutcomeRenderState<GovernedOperationsState>? governedState = null, SafeOutcomeRenderState<AssociationReviewState>? associationState = null,
+        InteractionRenderJsRuntime? jsRuntime = null)
     {
         CultureInfo original = CultureInfo.CurrentUICulture;
         CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(culture);
@@ -267,10 +342,12 @@ public sealed class SafeOutcomeInteractionTests
             services.AddSingleton<IState<OperationalDashboardsState>>(new SafeOutcomeRenderState<OperationalDashboardsState>(new(false, null, dashboardError)));
             services.AddSingleton<IState<GovernedOperationsState>>(governedState
                 ?? new SafeOutcomeRenderState<GovernedOperationsState>(new(false, null, ChatBotMessageCodes.DependencyDegraded)));
+            services.AddSingleton<IState<AssociationReviewState>>(associationState
+                ?? new SafeOutcomeRenderState<AssociationReviewState>(new(false, false, null, null, "", "", null, null)));
             SafeOutcomeRenderDispatcher dispatcher = new();
             services.AddSingleton<IDispatcher>(dispatcher);
             services.AddSingleton(new ChatBotHubEndpoint(new Uri("http://127.0.0.1")));
-            services.AddSingleton<IJSRuntime, InteractionRenderJsRuntime>();
+            services.AddSingleton<IJSRuntime>(jsRuntime ?? new InteractionRenderJsRuntime());
             services.AddSingleton<ChatBotUiTextLocalizer>();
             services.AddSingleton<ChatBotCultureFormatter>();
             services.AddSingleton<ChatBotAnnouncementDeduplicationState>();

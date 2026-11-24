@@ -59,7 +59,8 @@
                                      StableId="association-review-failed"
                                      ShowCatalogAction="@(State.Value.ErrorScope is not AssociationReviewErrorScope.Load || !CanRetryFailure(error))"
                                      StateFamily="@AssociationReviewFailureCatalog.StateFamily(error)"
-                                     AnnouncementKey="association-review-failed">
+                                     AnnouncementKey="association-review-failed"
+                                     AnnouncementActivation="@State.Value.FailureActivation">
                     @FailureBody(error)
                 </ChatBotStatusBanner>
                 </div>
@@ -259,7 +260,7 @@
     private AssociationReviewModel? Review => State.Value.Review;
 
     private ElementReference? _errorSummary;
-    private string? _announcedErrorCode;
+    private (string? Code, long Activation) _announcedFailure;
 
     private bool CanReadEvidence => Review?.AssociationId == AssociationId && !State.Value.IsLoading
         && State.Value.ErrorScope is not AssociationReviewErrorScope.Load;
@@ -296,16 +297,18 @@
         }
 
         // A validation or failure summary must take focus so the reviewer lands on the reason rather than
-        // discovering it only if they happen to scroll. Guarded on the code so re-renders do not steal focus
-        // back while the same error is still on screen.
-        string? current = State.Value.ValidationErrorCode ?? State.Value.ErrorCode;
-        if (string.Equals(current, _announcedErrorCode, StringComparison.Ordinal))
+        // discovering it only if they happen to scroll. Guarded on the code and its failure activation so
+        // re-renders do not steal focus back while the same error is still on screen, while a retry that fails
+        // again with the same code takes focus once more.
+        (string? Code, long Activation) current = (State.Value.ValidationErrorCode ?? State.Value.ErrorCode, State.Value.FailureActivation);
+        if (string.Equals(current.Code, _announcedFailure.Code, StringComparison.Ordinal)
+            && current.Activation == _announcedFailure.Activation)
         {
             return;
         }
 
-        _announcedErrorCode = current;
-        if (current is { Length: > 0 } && _errorSummary is { } summary)
+        _announcedFailure = current;
+        if (current.Code is { Length: > 0 } && _errorSummary is { } summary)
         {
             await summary.FocusAsync().ConfigureAwait(true);
         }

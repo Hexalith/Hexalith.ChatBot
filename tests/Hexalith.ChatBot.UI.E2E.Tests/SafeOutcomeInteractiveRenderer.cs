@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.RenderTree;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 
 namespace Hexalith.ChatBot.UI.E2E.Tests;
 
@@ -11,6 +13,9 @@ internal sealed class SafeOutcomeInteractiveRenderer(IServiceProvider services, 
     : Renderer(services, loggerFactory)
 {
     private readonly Dictionary<IComponent, int> _componentIds = [];
+
+    // Lets captured element references (for example FocusAsync targets) reach the test JS runtime.
+    private readonly WebElementReferenceContext _elementReferenceContext = new(services.GetRequiredService<IJSRuntime>());
 
     /// <inheritdoc/>
     public override Dispatcher Dispatcher { get; } = Dispatcher.CreateDefault();
@@ -25,6 +30,7 @@ internal sealed class SafeOutcomeInteractiveRenderer(IServiceProvider services, 
     internal Task<T> MountAsync<T>(Dictionary<string, object?>? parameters = null) where T : IComponent
         => Dispatcher.InvokeAsync(async () =>
         {
+            ElementReferenceContext = _elementReferenceContext;
             T component = (T)InstantiateComponent(typeof(T));
             int id = AssignRootComponentId(component);
             _componentIds[component] = id;
