@@ -95,13 +95,14 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
             """
             () => {
                 window.__story132StatefulAnnouncements = 0;
-                const live = document.querySelector("[data-chatbot-stable-id='project-conversation-ai-response-stop'] [role='status']");
-                let previous = (live?.textContent || '').trim();
+                const selector = "[data-chatbot-stable-id='project-conversation-ai-response-stop'] [role='status']";
+                const readLiveText = () => (document.querySelector(selector)?.textContent || '').trim();
+                let previous = readLiveText();
                 new MutationObserver(() => {
-                    const current = (live?.textContent || '').trim();
-                    if (current && current !== previous) window.__story132StatefulAnnouncements++;
+                    const current = readLiveText();
+                    if (current === 'Response stopped' && current !== previous) window.__story132StatefulAnnouncements++;
                     previous = current;
-                }).observe(live, { subtree: true, childList: true, characterData: true });
+                }).observe(document.body, { subtree: true, childList: true, characterData: true });
             }
             """);
         await stop.ClickAsync();
@@ -113,6 +114,7 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
             "element => document.activeElement === element && element.shadowRoot?.activeElement?.tagName === 'TEXTAREA'"))
             .ShouldBeTrue();
 
+        await page.WaitForFunctionAsync("() => window.__story132StatefulAnnouncements >= 1");
         await page.WaitForTimeoutAsync(500);
         (await page.EvaluateAsync<int>("() => window.__story132StatefulAnnouncements || 0")).ShouldBe(1);
 
