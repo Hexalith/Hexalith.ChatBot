@@ -62,6 +62,95 @@ public sealed class VersionedSafeOutcomeBrowserTests
         (await page.EvaluateAsync<string[]>("() => window.safeOutcomeLiveActivations").ConfigureAwait(true)).Length.ShouldBe(2);
     }
 
+    /// <summary>A deduplicated failure banner remounted in the same circuit keeps no live role; its announcing render keeps one.</summary>
+    [Fact]
+    public async Task RemountedSuppressedBannerShouldDropItsLiveRole()
+    {
+        LiveChatBotUiHost host = new("authorization_denied");
+        await using var hostLifetime = host.ConfigureAwait(true);
+        _ = host.Server;
+        using IPlaywright playwright = await Playwright.CreateAsync().ConfigureAwait(true);
+        string? chrome = RealRenderFixture.ResolveChromeExecutable();
+        IBrowser browser = await playwright.Chromium.LaunchAsync(new()
+        {
+            Headless = true, ExecutablePath = string.IsNullOrWhiteSpace(chrome) ? null : chrome,
+            Args = ["--no-sandbox", "--disable-dev-shm-usage"],
+        }).ConfigureAwait(true);
+        await using var browserLifetime = browser.ConfigureAwait(true);
+        IBrowserContext context = await browser.NewContextAsync().ConfigureAwait(true);
+        await using var contextLifetime = context.ConfigureAwait(true);
+        await context.AddCookiesAsync([new Cookie { Name = ".AspNetCore.Culture", Value = "c=en|uic=en", Url = host.BaseUri }]).ConfigureAwait(true);
+        IPage page = await context.NewPageAsync().ConfigureAwait(true);
+        IResponse? response = await page.GotoAsync($"{host.BaseUri}/governed-operations").ConfigureAwait(true);
+        response.ShouldNotBeNull();
+        response!.Status.ShouldBe(200);
+        browser.BrowserType.Name.ShouldBe("chromium");
+        browser.Version.ShouldNotBeNullOrWhiteSpace();
+
+        // Only a live browser DOM can record these renders; the document marker proves every remount stays in one circuit.
+        await page.EvaluateAsync("""
+            () => {
+                window.suppressedBannerDocument = crypto.randomUUID();
+                window.suppressedBannerRenders = [];
+                let mounts = 0;
+                new MutationObserver(() => {
+                    const banner = document.querySelector('[data-chatbot-stable-id="governed-note-failed"]');
+                    if (!banner) return;
+                    banner.suppressedBannerMount ??= ++mounts;
+                    const render = [banner.suppressedBannerMount, banner.getAttribute('data-chatbot-announcement-key'),
+                        banner.getAttribute('data-chatbot-live-announced'), banner.getAttribute('aria-live'),
+                        banner.getAttribute('role') ?? 'none'].join('|');
+                    if (window.suppressedBannerRenders.at(-1) !== render) window.suppressedBannerRenders.push(render);
+                }).observe(document.body, {subtree: true, childList: true, attributes: true,
+                    attributeFilter: ['role', 'aria-live', 'data-chatbot-live-announced', 'data-chatbot-announcement-key']});
+            }
+            """).ConfigureAwait(true);
+        string documentMarker = await page.EvaluateAsync<string>("() => window.suppressedBannerDocument").ConfigureAwait(true);
+
+        ILocator record = page.Locator("[data-chatbot-stable-id='record-governed-note'] fluent-button");
+        await Assertions.Expect(record).ToBeEnabledAsync(new() { Timeout = 20_000 }).ConfigureAwait(true);
+        await record.ClickAsync().ConfigureAwait(true);
+        ILocator banner = page.Locator("[data-chatbot-stable-id='governed-note-failed']");
+        await Assertions.Expect(banner).ToHaveAttributeAsync("data-chatbot-feedback-state", "TerminalPolicyFailure").ConfigureAwait(true);
+        await page.WaitForFunctionAsync("() => window.suppressedBannerRenders.some(render => render.startsWith('1|'))").ConfigureAwait(true);
+
+        ICDPSession cdp = await context.NewCDPSessionAsync(page).ConfigureAwait(true);
+        for (int mount = 2; mount <= 3; mount++)
+        {
+            await page.EvaluateAsync("() => Blazor.navigateTo('/', false)").ConfigureAwait(true);
+            await page.Locator("#project-workspace-title").WaitForAsync(new() { State = WaitForSelectorState.Visible }).ConfigureAwait(true);
+            await Assertions.Expect(banner).ToHaveCountAsync(0).ConfigureAwait(true);
+            await page.EvaluateAsync("() => Blazor.navigateTo('/governed-operations', false)").ConfigureAwait(true);
+            await page.WaitForFunctionAsync("mount => window.suppressedBannerRenders.some(render => render.startsWith(`${mount}|`))", mount).ConfigureAwait(true);
+            await Assertions.Expect(banner).ToHaveAttributeAsync("aria-live", "off").ConfigureAwait(true);
+            (await banner.GetAttributeAsync("role").ConfigureAwait(true)).ShouldBeNull();
+
+            // Chromium keeps an inserted role="alert" an alert even with aria-live off; the remount must expose
+            // neither an alert role nor a live region to assistive technology.
+            JsonElement node = await AccessibilityNodeAsync(cdp, "[data-chatbot-stable-id='governed-note-failed']").ConfigureAwait(true);
+            node.GetProperty("role").GetProperty("value").GetString().ShouldNotBe("alert");
+            node.GetProperty("properties").EnumerateArray().Select(property => property.GetProperty("name").GetString()).ShouldNotContain("live");
+        }
+
+        (await page.EvaluateAsync<string>("() => window.suppressedBannerDocument").ConfigureAwait(true)).ShouldBe(documentMarker);
+
+        // Each render is "mount|announcement key|announced|aria-live|role".
+        const string Key = "governed-note-failed-authorization_denied";
+        string[] renders = await page.EvaluateAsync<string[]>("() => window.suppressedBannerRenders").ConfigureAwait(true);
+        renders.ShouldContain($"1|{Key}|true|assertive|alert", string.Join(", ", renders));
+        renders.ShouldAllBe(render => render.Contains($"|{Key}|", StringComparison.Ordinal), string.Join(", ", renders));
+        renders.Where(render => render.Contains("|off|", StringComparison.Ordinal))
+            .ShouldAllBe(render => render.EndsWith("|none", StringComparison.Ordinal), string.Join(", ", renders));
+        renders.Where(render => render.Contains("|assertive|", StringComparison.Ordinal))
+            .ShouldAllBe(render => render.EndsWith("|alert", StringComparison.Ordinal), string.Join(", ", renders));
+        foreach (int mount in new[] { 2, 3 })
+        {
+            string[] remounted = [.. renders.Where(render => render.StartsWith($"{mount}|", StringComparison.Ordinal))];
+            remounted.ShouldNotBeEmpty(string.Join(", ", renders));
+            remounted.ShouldAllBe(render => render.EndsWith("|false|off|none", StringComparison.Ordinal), string.Join(", ", renders));
+        }
+    }
+
     /// <summary>Checks localized denial text, semantic state and keyboard reachable unavailable actions in each visual mode.</summary>
     /// <param name="culture">The UI culture.</param>
     /// <param name="colorScheme">The preferred color scheme.</param>
@@ -137,8 +226,11 @@ public sealed class VersionedSafeOutcomeBrowserTests
         ILocator banner = composer.Locator("[data-chatbot-stable-id$=\"project-conversation-composer-status\"]");
         await Assertions.Expect(banner).ToHaveAttributeAsync("data-chatbot-feedback-state",
             code == "authorization_denied" ? "BlockedAction" : "TerminalPolicyFailure").ConfigureAwait(true);
-        // A previously announced persistent state may have aria-live=off after a render; its semantic role stays an alert.
-        await Assertions.Expect(banner).ToHaveAttributeAsync("role", "alert").ConfigureAwait(true);
+        // The role follows the effective politeness: the announcing render is an alert, and a later render that
+        // suppresses the repeat turns aria-live off and drops the role with it.
+        string liveState = await banner.EvaluateAsync<string>(
+            "banner => `${banner.getAttribute('aria-live')}|${banner.getAttribute('role') ?? 'none'}`").ConfigureAwait(true);
+        liveState.ShouldBeOneOf("assertive|alert", "off|none");
         string reason = code == "authorization_denied"
             ? culture == "fr" ? "L'opération n'est pas disponible pour cet appelant." : "The operation is not available to this caller."
             : culture == "fr" ? "L'action demandée est indisponible." : "The requested action is unavailable.";
@@ -168,5 +260,21 @@ public sealed class VersionedSafeOutcomeBrowserTests
         content.ShouldNotContain("restricted prose");
         content.ShouldNotContain("restricted payload");
         content.ShouldNotContain("restricted exception");
+    }
+
+    private static async Task<JsonElement> AccessibilityNodeAsync(ICDPSession cdp, string selector)
+    {
+        JsonElement? document = await cdp.SendAsync("DOM.getDocument", new() { ["depth"] = 0 }).ConfigureAwait(true);
+        JsonElement? node = await cdp.SendAsync("DOM.querySelector", new()
+        {
+            ["nodeId"] = document!.Value.GetProperty("root").GetProperty("nodeId").GetInt32(),
+            ["selector"] = selector,
+        }).ConfigureAwait(true);
+        JsonElement? tree = await cdp.SendAsync("Accessibility.getPartialAXTree", new()
+        {
+            ["nodeId"] = node!.Value.GetProperty("nodeId").GetInt32(),
+            ["fetchRelatives"] = false,
+        }).ConfigureAwait(true);
+        return tree!.Value.GetProperty("nodes")[0];
     }
 }

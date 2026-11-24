@@ -108,13 +108,16 @@
             ? ChatBotLiveRegionPoliteness.Assertive
             : ChatBotLiveRegionPoliteness.Polite;
 
+    // The role follows the effective politeness, like aria-live. A deduplicated banner that remounts is inserted
+    // again, and an inserted role="alert" can raise an alert event even with aria-live off, so a suppressed banner
+    // carries no role attribute.
     private string? AriaRole
-        => ResolvedPoliteness switch
+        => EffectivePoliteness switch
         {
             ChatBotLiveRegionPoliteness.Polite => "status",
             ChatBotLiveRegionPoliteness.Assertive => "alert",
             ChatBotLiveRegionPoliteness.None => null,
-            _ => throw new ArgumentOutOfRangeException(nameof(ResolvedPoliteness), ResolvedPoliteness, null),
+            _ => throw new ArgumentOutOfRangeException(nameof(EffectivePoliteness), EffectivePoliteness, null),
         };
 
     private string AriaLive
@@ -123,7 +126,7 @@
             ChatBotLiveRegionPoliteness.Polite => "polite",
             ChatBotLiveRegionPoliteness.Assertive => "assertive",
             ChatBotLiveRegionPoliteness.None => "off",
-            _ => throw new ArgumentOutOfRangeException(nameof(ResolvedPoliteness), ResolvedPoliteness, null),
+            _ => throw new ArgumentOutOfRangeException(nameof(EffectivePoliteness), EffectivePoliteness, null),
         };
 
     private ChatBotLiveRegionPoliteness EffectivePoliteness

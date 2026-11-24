@@ -7,7 +7,7 @@
             Class="chatbot-visually-hidden"
             id="@($"{Item.ItemId}-failure-announcement")"
             data-chatbot-failure-announcement="@Item.ItemId"
-            role="@(IsTerminal ? "alert" : "status")"
+            role="@AriaRole"
             aria-live="@AriaLive"
             aria-atomic="true">@_announcementText</FluentText>
 
@@ -153,6 +153,9 @@
             StateHasChanged();
         }
     }
+
+    // A quiet or deduplicated item keeps no live role, so its remount cannot raise an alert with aria-live off.
+    private string? AriaRole => _announce ? (IsTerminal ? "alert" : "status") : null;
 
     private string AriaLive => _announce ? (IsTerminal ? "assertive" : "polite") : "off";
 
