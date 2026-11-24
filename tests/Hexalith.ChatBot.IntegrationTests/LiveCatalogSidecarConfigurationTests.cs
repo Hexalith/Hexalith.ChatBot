@@ -8,10 +8,10 @@ namespace Hexalith.ChatBot.IntegrationTests;
 public sealed class LiveCatalogSidecarConfigurationTests
 {
     [Theory]
-    [InlineData("")]
-    [InlineData("spec: {}\n")]
-    [InlineData("spec:\n  tracing:\n    samplingRate: '1'\n  mtls:\n    enabled: false\n")]
-    public void AppliesIsolatedDiscoveryAndMutualTlsWithOrWithoutExistingSpec(string spec)
+    [InlineData("", false)]
+    [InlineData("spec: {}\n", false)]
+    [InlineData("spec:\n  tracing:\n    samplingRate: '1'\n  mtls:\n    enabled: false\n", true)]
+    public void AppliesIsolatedDiscoveryAndMutualTlsWithOrWithoutExistingSpec(string spec, bool expectTracing)
     {
         const string header = "apiVersion: dapr.io/v1alpha1\nkind: Configuration\nmetadata:\n  name: test-sidecar\n";
         JsonObject config = LiveCatalogFixture.PrepareSidecarConfiguration(header + spec, "isolated-discovery.db");
@@ -22,7 +22,7 @@ public sealed class LiveCatalogSidecarConfigurationTests
         JsonNode discovery = configuredSpec["nameResolution"].ShouldNotBeNull();
         discovery["component"]!.GetValue<string>().ShouldBe("sqlite");
         discovery["configuration"]!["connectionString"]!.GetValue<string>().ShouldBe("isolated-discovery.db");
-        if (spec.Contains("tracing", StringComparison.Ordinal))
+        if (expectTracing)
         {
             configuredSpec["tracing"]!["samplingRate"]!.GetValue<string>().ShouldBe("1");
         }
